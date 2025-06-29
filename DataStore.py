@@ -121,7 +121,7 @@ def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR):
                 df_copy = v.copy()
                 # Convert index to pandas Timestamps with Asia/Kolkata timezone to preserve tz info
                 df_copy = v.copy()
-                if not pd.api.types.is_datetime64tz_dtype(df_copy.index):
+                if not isinstance(df_copy.index.dtype, pd.DatetimeTZDtype):
                     df_copy.index = pd.to_datetime(df_copy.index).tz_localize('Asia/Kolkata', ambiguous='NaT', nonexistent='shift_forward')
                 converted_data[new_key] = df_copy.to_dict("split")
             else:
