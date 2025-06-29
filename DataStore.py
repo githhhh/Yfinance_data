@@ -58,48 +58,65 @@ def download_batch_stocks(tickers, period="1y", interval="1d"):
     """
     Download stock data in parallel per ticker (like original AssetsManager logic).
     Returns a dict of stock_code -> DataFrame.
+    Adds debug output for process and speed.
     """
     import time as time_module
     from concurrent.futures import ThreadPoolExecutor, as_completed
     all_data = {}
-    max_workers = 10
+    max_workers = 6  # Lowered to reduce rate limit risk
     max_retries = 1
-    def download_single_stock(stock_code, period, interval):
-        # Append .NS suffix if not present and not an index symbol
-        if not stock_code.endswith(".NS") and not stock_code.startswith("^"):
-            stock_code = f"{stock_code}.NS"
-        attempt = 0
-        while attempt <= max_retries:
-            try:
-                ticker = yf.Ticker(stock_code)
-                data = ticker.history(
-                    period=period,
-                    interval=interval,
-                    auto_adjust=True,
-                    rounding=True,
-                    timeout=10,
-                )
-                if not data.empty:
-                    return stock_code, data.round(2)
-            except Exception as e:
-                pass  # Optionally log error
-            attempt += 1
-            time_module.sleep(0.5)
-        return stock_code, None
-
+    batch_size = 250
+    total = len(tickers)
+    print(f"[Batch Download] Starting download for {total} stocks, batch size {batch_size}, max_workers {max_workers}")
     start_time = time_module.time()
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_ticker = {
-            executor.submit(download_single_stock, ticker, period, interval): ticker
-            for ticker in tickers
-        }
-        for future in as_completed(future_to_ticker):
-            stock_code, data = future.result()
-            if data is not None:
-                all_data[stock_code] = data
+    failed = []
+    for batch_start in range(0, total, batch_size):
+        batch = tickers[batch_start:batch_start+batch_size]
+        print(f"[Batch Download] Processing batch {batch_start//batch_size+1}: {len(batch)} stocks")
+        batch_success = 0
+        batch_failed = 0
+        batch_start_time = time_module.time()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_ticker = {
+                executor.submit(download_single_stock, ticker, period, interval): ticker
+                for ticker in batch
+            }
+            for future in as_completed(future_to_ticker):
+                stock_code, data = future.result()
+                if data is not None:
+                    all_data[stock_code] = data
+                    batch_success += 1
+                else:
+                    failed.append(stock_code)
+                    batch_failed += 1
+        batch_end_time = time_module.time()
+        print(f"[Batch Download] Batch finished: Downloaded {batch_success}, Failed {batch_failed} (Time: {batch_end_time - batch_start_time:.2f}s)")
+        time_module.sleep(1.5 if len(batch) > 10 else 1.0)
+    if failed:
+        print(f"[Batch Download] Retrying {len(failed)} failed stocks...")
+        for attempt in range(1, max_retries+1):
+            if not failed:
+                break
+            retry_failed = []
+            print(f"[Batch Download] Retry attempt {attempt}/{max_retries} for {len(failed)} stocks")
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_ticker = {
+                    executor.submit(download_single_stock, ticker, period, interval): ticker
+                    for ticker in failed
+                }
+                for future in as_completed(future_to_ticker):
+                    stock_code, data = future.result()
+                    if data is not None:
+                        all_data[stock_code] = data
+                    else:
+                        retry_failed.append(stock_code)
+            failed = retry_failed
+            if failed:
+                print(f"[Batch Download] Still failed: {len(failed)} stocks. Waiting before next retry...")
+                time_module.sleep(1.0)
     elapsed = time_module.time() - start_time
-    print(f"Downloaded {len(all_data)} stocks in {elapsed:.2f} seconds")
-    return all_data
+    print(f"[Batch Download] Finished: {len(all_data)} downloaded, {len(failed)} failed. Total time: {elapsed:.2f} seconds")
+    return all_data, failed
 
 def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR):
     """
@@ -160,6 +177,6 @@ if __name__ == "__main__":
         print("No tickers to download.")
     else:
         # Example: download 1 year daily data
-        stock_data = download_batch_stocks(tickers, period="1y", interval="1d")
+        stock_data, failed = download_batch_stocks(tickers, period="1y", interval="1d")
         save_path = save_stock_data(stock_data)
         loaded_data = load_stock_data(save_path) if save_path else None
