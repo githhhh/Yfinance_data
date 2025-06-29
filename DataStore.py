@@ -6,7 +6,7 @@ import yfinance as yf
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-STOCK_LIST_PATH = "Indices/ind_nifty50list.csv"
+STOCK_LIST_PATH = "Indices/EQUITY_L.csv"
 RESULTS_PKL_DIR = "results_pkl"
 BATCH_SIZE = 200
 MAX_WORKERS = 10
