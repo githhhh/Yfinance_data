@@ -26,7 +26,7 @@ jobs:
 
       - name: Run data download script
         run: |
-          python Data_automations/DataStore.py
+          python DataStore.py
 
       - name: Commit and push updated pkl file
         run: |
