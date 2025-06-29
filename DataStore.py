@@ -19,7 +19,7 @@ def read_stock_list(stock_list_path=STOCK_LIST_PATH):
     """
     try:
         df = pd.read_csv(stock_list_path)
-        tickers = df["Symbol"].astype(str).tolist()
+        tickers = df["SYMBOL"].astype(str).tolist()
         return tickers
     except Exception as e:
         print(f"Error reading stock list from {stock_list_path}: {e}")
