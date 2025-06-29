@@ -63,7 +63,7 @@ def download_batch_stocks(tickers, period="1y", interval="1d"):
     import time as time_module
     from concurrent.futures import ThreadPoolExecutor, as_completed
     all_data = {}
-    max_workers = 6  # Lowered to reduce rate limit risk
+    max_workers = 7  # Lowered to reduce rate limit risk
     max_retries = 1
     batch_size = 250
     total = len(tickers)
