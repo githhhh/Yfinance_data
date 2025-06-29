@@ -1,1 +1,1 @@
-# Yfinance_data
+# For Extremly Lazy People
