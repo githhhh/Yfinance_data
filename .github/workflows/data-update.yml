@@ -26,8 +26,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pandas yfinance==0.2.61
+          
+          pip install yfinance==0.2.61
 
       - name: Run data download script
         run: |
