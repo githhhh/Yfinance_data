@@ -8,8 +8,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 STOCK_LIST_PATH = "Indices/EQUITY_L.csv"
 RESULTS_PKL_DIR = "results_pkl"
-BATCH_SIZE = 200
-MAX_WORKERS = 6
+BATCH_SIZE = 220
+MAX_WORKERS = 5
 MAX_RETRIES = 1
 
 def read_stock_list(stock_list_path=STOCK_LIST_PATH):
@@ -63,7 +63,7 @@ def download_batch_stocks(tickers, period="1y", interval="1d"):
     import time as time_module
     from concurrent.futures import ThreadPoolExecutor, as_completed
     all_data = {}
-    max_workers = 6  # Lowered to reduce rate limit risk
+    max_workers = 5  # Lowered to reduce rate limit risk
     max_retries = 1
     batch_size = 220
     total = len(tickers)
