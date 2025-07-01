@@ -8,8 +8,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 STOCK_LIST_PATH = "Indices/EQUITY_L.csv"
 RESULTS_PKL_DIR = "results_pkl"
-BATCH_SIZE = 263
-MAX_WORKERS = 5
+BATCH_SIZE = 150
+MAX_WORKERS = 6
 MAX_RETRIES = 1
 
 def read_stock_list(stock_list_path=STOCK_LIST_PATH):
