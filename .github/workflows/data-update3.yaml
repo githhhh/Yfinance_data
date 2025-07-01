@@ -2,8 +2,7 @@ name: Update Stock Data - 3PM IST
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '25 9 * * 1-5'  # 2:55 PM IST (9:25 UTC) - 5 min buffer for setup
+   # 2:55 PM IST (9:25 UTC) - 5 min buffer for setup
 
 jobs:
   update-data:
