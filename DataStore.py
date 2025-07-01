@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 STOCK_LIST_PATH = "Indices/EQUITY_L.csv"
 RESULTS_PKL_DIR = "results_pkl"
-BATCH_SIZE = 150
+BATCH_SIZE = 180
 MAX_WORKERS = 6
 MAX_RETRIES = 1
 
@@ -65,7 +65,7 @@ def download_batch_stocks(tickers, period="1y", interval="1d"):
     all_data = {}
     max_workers = 6  # Lowered to reduce rate limit risk
     max_retries = 1
-    batch_size = 150
+    batch_size = 180
     total = len(tickers)
     print(f"[Batch Download] Starting download for {total} stocks, batch size {batch_size}, max_workers {max_workers}")
     start_time = time_module.time()
