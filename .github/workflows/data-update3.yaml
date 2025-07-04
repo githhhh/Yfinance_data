@@ -1,0 +1,58 @@
+name: Update Stock Data - 3PM IST
+
+on:
+  workflow_dispatch:
+   # 2:55 PM IST (9:25 UTC) - 5 min buffer for setup
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+
+    steps:
+      # --- TIMER DELAY UNTIL 3:00 PM IST ---
+      - name: Delay until 3:00 PM IST
+        run: |
+          current_epoch=$(date +%s)
+          target_epoch=$(date -d "TZ=\"Asia/Kolkata\" 15:00:00" +%s)
+          sleep_seconds=$((target_epoch - current_epoch))
+          
+          if [ $sleep_seconds -gt 0 ]; then
+            echo "Waiting until 3:00 PM IST (${sleep_seconds}s)..."
+            sleep $sleep_seconds
+          else
+            echo "Already past 3:00 PM IST, proceeding immediately"
+          fi
+
+      # --- MAIN EXECUTION ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Create results directory
+        run: mkdir -p results_pkl
+
+      - name: Install dependencies
+        run: pip install yfinance==0.2.61
+
+      - name: Run data download script
+        run: |
+          echo "Execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          python DataStore.py
+          echo "Execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add results_pkl/*.pkl
+          git commit -m "Update 3PM stock data [skip ci]" || echo "No changes to commit"
+          git push

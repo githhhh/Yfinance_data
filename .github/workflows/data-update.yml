@@ -2,15 +2,31 @@ name: Update Stock Data
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '59 3 * * *' # Runs daily at 9:29 AM IST (3:59 UTC)
+    # 9:24 AM IST (3:54 UTC) - Buffer for setup
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    timeout-minutes: 15  # Extended timeout for delay
+
     steps:
+      # --- TIMER DELAY UNTIL 9:29 AM ---
+      - name: Delay until 9:29 AM IST
+        run: |
+          current_epoch=$(date +%s)
+          target_epoch=$(date -d "TZ=\"Asia/Kolkata\" 09:29:00" +%s)
+          sleep_seconds=$((target_epoch - current_epoch))
+          
+          if [ $sleep_seconds -gt 0 ]; then
+            echo "Waiting until 9:29 AM IST (${sleep_seconds}s)..."
+            sleep $sleep_seconds
+          else
+            echo "Already past 9:29 AM IST, proceeding immediately"
+          fi
+
+      # --- MAIN EXECUTION ---
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -25,18 +41,18 @@ jobs:
         run: mkdir -p results_pkl
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas yfinance==0.2.61
+        run: pip install yfinance==0.2.61
 
       - name: Run data download script
         run: |
+          echo "Actual execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
           python DataStore.py
+          echo "Execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
-      - name: Commit and push updated pkl file
+      - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add results_pkl/*.pkl
-          git commit -m "Update stock data pkl [skip ci]" || echo "No changes to commit"
+          git commit -m "Update stock data [skip ci]" || echo "No changes to commit"
           git push
