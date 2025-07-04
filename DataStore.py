@@ -179,4 +179,4 @@ if __name__ == "__main__":
         # Example: download 1 year daily data
         stock_data, failed = download_batch_stocks(tickers, period="1y", interval="1d")
         save_path = save_stock_data(stock_data)
-        loaded_data = load_stock_data(save_path) if save_path else None
+        loaded_data = load_stock_data(save_path) if save_path else None 
