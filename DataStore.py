@@ -125,7 +125,7 @@ def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR):
     """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
-    date_suffix = datetime.now().strftime("%d%m%y_%H%M%S")
+    date_suffix = datetime.now().strftime("%d%m%y")
     filename = f"stock_data_{date_suffix}.pkl"
     filepath = os.path.join(save_dir, filename)
     try:
