@@ -18,6 +18,7 @@ def read_stock_list(stock_list_path=STOCK_LIST_PATH):
     try:
         df = pd.read_csv(stock_list_path)
         tickers = df["SYMBOL"].astype(str).tolist()
+        tickers = [t.replace(".", "-") for t in tickers]
         # tickers = [t if t.startswith("^") or t.endswith(".NS") else f"{t}.NS" for t in tickers]
         return tickers
     except Exception as e:
