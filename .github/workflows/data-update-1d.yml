@@ -1,0 +1,47 @@
+name: Update Stock Data - Daily (1D)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-daily-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15  # Extended timeout for daily data
+
+    steps:
+      # --- MAIN EXECUTION ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Create results directory
+        run: mkdir -p results_pkl
+
+      - name: Clean old data files
+        run: |
+          find results_pkl -name "*.pkl" -mtime +5 -delete || true
+
+      - name: Install dependencies
+        run: pip install yfinance==0.2.61
+
+      - name: Run daily data download script
+        run: |
+          echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          python DataStore.py --period=2y --interval=1d
+          echo "Daily data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+
+      - name: Commit and push daily data changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add results_pkl/*1d*.pkl
+          git commit -m "Update daily stock data (2Y-1D) [skip ci]" || echo "No changes to commit"
+          git push

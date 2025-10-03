@@ -1,0 +1,47 @@
+name: Update Stock Data - Weekly (1WK)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-weekly-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15  # 统一为15分钟
+
+    steps:
+      # --- MAIN EXECUTION ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Create results directory
+        run: mkdir -p results_pkl
+
+      - name: Clean old data files
+        run: |
+          find results_pkl -name "*.pkl" -mtime +5 -delete || true
+
+      - name: Install dependencies
+        run: pip install yfinance==0.2.61
+
+      - name: Run weekly data download script
+        run: |
+          echo "Weekly data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          python DataStore.py --period=5y --interval=1wk
+          echo "Weekly data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+
+      - name: Commit and push weekly data changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add results_pkl/*1wk*.pkl
+          git commit -m "Update weekly stock data (5Y-1WK) [skip ci]" || echo "No changes to commit"
+          git push
