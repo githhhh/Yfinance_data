@@ -5,8 +5,9 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import argparse
 
-STOCK_LIST_PATH = "Indices/EQUITY_L.csv"
+STOCK_LIST_PATH = "us/stock_list.csv"
 RESULTS_PKL_DIR = "results_pkl"
 BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
@@ -17,7 +18,7 @@ def read_stock_list(stock_list_path=STOCK_LIST_PATH):
     try:
         df = pd.read_csv(stock_list_path)
         tickers = df["SYMBOL"].astype(str).tolist()
-        tickers = [t if t.startswith("^") or t.endswith(".NS") else f"{t}.NS" for t in tickers]
+        # tickers = [t if t.startswith("^") or t.endswith(".NS") else f"{t}.NS" for t in tickers]
         return tickers
     except Exception as e:
         print(f"Error reading stock list from {stock_list_path}: {e}")
@@ -104,22 +105,22 @@ def download_batch_stocks(tickers, period="1y", interval="1d"):
           f"Total time: {overall_end - overall_start:.2f} seconds")
     return all_data, failed
 
-def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR):
+def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR, interval="1d"):
     """Save stock data dict to a pickle file."""
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
-    date_suffix = datetime.now().strftime("%d%m%y")
-    filename = f"stock_data_{date_suffix}.pkl"
-    filepath = os.path.join(save_dir, filename)
+    filepath = get_stock_pkl_path(interval)
     try:
         converted_data = {}
         for k, v in stock_data.items():
-            new_key = k[:-3] if k.endswith(".NS") else k
+            # 美股不需要去掉.NS后缀，因为我们已经修改了read_stock_list
+            new_key = k
             if hasattr(v, "to_dict"):
                 df_copy = v.copy()
                 if not isinstance(df_copy.index.dtype, pd.DatetimeTZDtype):
+                    # 美股使用美国东部时区
                     df_copy.index = pd.to_datetime(df_copy.index).tz_localize(
-                        "Asia/Kolkata", ambiguous="NaT", nonexistent="shift_forward"
+                        "US/Eastern", ambiguous="NaT", nonexistent="shift_forward"
                     )
                 converted_data[new_key] = df_copy.to_dict("split")
             else:
@@ -149,11 +150,21 @@ def load_stock_data(pickle_path):
         print(f"Error loading pickle file: {e}")
         return {}
 
+def get_stock_pkl_path(interval="1d"):
+    date_suffix = datetime.now().strftime("%d%m%y")
+    filename = f"stock_data_{date_suffix}_{interval}.pkl"
+    filepath = os.path.join(RESULTS_PKL_DIR, filename)
+    return filepath
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Download stock data')
+    parser.add_argument('--period', default='2y', help='Data period (1y, 2y, etc.)')
+    parser.add_argument('--interval', default='1d', help='Data interval (1d, 1wk, etc.)')
+    args = parser.parse_args()
     tickers = read_stock_list()
     if not tickers:
         print("No tickers to download.")
     else:
-        stock_data, failed = download_batch_stocks(tickers, period="1y", interval="1d")
-        save_path = save_stock_data(stock_data)
+        stock_data, failed = download_batch_stocks(tickers, period=args.period, interval=args.interval)
+        save_path = save_stock_data(stock_data, interval=args.interval)
         loaded_data = load_stock_data(save_path) if save_path else None
