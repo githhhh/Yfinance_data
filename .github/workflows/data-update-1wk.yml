@@ -26,8 +26,7 @@ jobs:
         run: mkdir -p results_pkl
 
       - name: Clean old data files
-        run: |
-          find results_pkl -name "*.pkl" -mtime +5 -delete || true
+        run: cd results_pkl && ls -r *.pkl 2>/dev/null | tail -n +7 | xargs -r rm -f || true
 
       - name: Install dependencies
         run: pip install yfinance==0.2.61
