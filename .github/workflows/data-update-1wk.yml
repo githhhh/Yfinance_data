@@ -28,7 +28,14 @@ jobs:
       - name: Clean old data files
         run: |
           cd results_pkl 2>/dev/null || { echo "No results_pkl directory"; exit 0; }
-          [ -f *.pkl ] 2>/dev/null || { echo "No pkl files found"; exit 0; }
+          
+          shopt -s nullglob
+          files=(*.pkl)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No pkl files found"
+            exit 0
+          fi
           
           echo "Files (sorted by time, * = keep):"
           ls -t *.pkl | awk 'NR<=6 {print "  " $0 " *"} NR>6 {print "  " $0}'
