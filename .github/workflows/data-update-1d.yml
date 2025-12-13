@@ -29,7 +29,7 @@ jobs:
         run: |
           cd results_pkl 2>/dev/null || { echo "No results_pkl directory"; exit 0; }
           
-          shopt -s nullglob
+          shopt -s nullglob  
           files=(*.pkl)
 
           if [ ${#files[@]} -eq 0 ]; then
@@ -42,7 +42,7 @@ jobs:
           
           total=$(ls -1 *.pkl | wc -l)
           if [ "$total" -gt 6 ]; then
-            ls -t *.pkl | tail -n +7 | xargs rm -f
+            ls -t *.pkl | sed -n '7,$p' | xargs -I {} rm -f "{}"
             echo "Deleted $((total - 6)) old files, kept 6 newest"
           else
             echo "No cleanup needed ($total files)"
