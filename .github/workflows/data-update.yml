@@ -33,8 +33,8 @@ jobs:
           python DataStore.py --period=2y --interval=1d
           echo "Daily data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
-      - name: Wait for 1 minute
-        run: sleep 60
+      - name: Wait for 5 seconds
+        run: sleep 5
 
       - name: Run weekly data download script
         run: |
