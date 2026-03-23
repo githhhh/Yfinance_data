@@ -3,6 +3,9 @@ name: Update Stock Data - Daily (1D)
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   update-daily-data:
     runs-on: ubuntu-latest
