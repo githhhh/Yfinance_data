@@ -7,12 +7,12 @@ EPS 季度同比增速筛选器
 
 from tradingview_screener import Query, col
 
-def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv"):
+def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv", verbose=True):
     """
     统一外部调用入口。
     Returns: (total_count, dataframe, tickers_list)
     """
-    count, df = screen_high_eps_growth(min_eps_growth, min_price, limit, output_file)
+    count, df = screen_high_eps_growth(min_eps_growth, min_price, limit, output_file, verbose)
     tickers_list = []
     if not df.empty and 'ticker' in df.columns:
         # ticker field is typically 'EXCHANGE:SYMBOL', we extract the 'SYMBOL'
@@ -20,16 +20,17 @@ def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="eps_g
     return count, df, tickers_list
 
 
-def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv"):
+def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv", verbose=True):
     """
     筛选 EPS 季度同比增速 >= min_eps_growth 且价格 >= min_price 的美股
     """
-    print("=" * 60)
-    print("筛选条件:")
-    print(f"  - EPS Diluted (Quarterly YoY Growth) >= {min_eps_growth}%")
-    print(f"  - 价格 >= ${min_price}")
-    print("  - 仅美股普通股（排除 OTC / 优先股 / 基金）")
-    print("=" * 60)
+    if verbose:
+        print("=" * 60)
+        print("筛选条件:")
+        print(f"  - EPS Diluted (Quarterly YoY Growth) >= {min_eps_growth}%")
+        print(f"  - 价格 >= ${min_price}")
+        print("  - 仅美股普通股（排除 OTC / 优先股 / 基金）")
+        print("=" * 60)
 
     count, df = (
         Query()
@@ -55,7 +56,8 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         .get_scanner_data()
     )
 
-    print(f"\n总共找到 {count} 只符合条件的股票，返回 {len(df)} 只\n")
+    if verbose:
+        print(f"\n总共找到 {count} 只符合条件的股票，返回 {len(df)} 只\n")
 
     # 重命名列方便阅读
     if not df.empty:
@@ -66,11 +68,13 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             'market_cap_basic': '市值',
             'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
         })
-        print(df_display.to_string(index=False))
+        if verbose:
+            print(df_display.to_string(index=False))
 
         # 保存到 CSV
         df.to_csv(output_file, index=False)
-        print(f"\n结果已保存到: {output_file}")
+        if verbose:
+            print(f"\n结果已保存到: {output_file}")
 
     return count, df
 

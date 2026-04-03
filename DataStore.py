@@ -15,28 +15,33 @@ MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
 def merge_screener_results(new_tickers, stock_list_path=STOCK_LIST_PATH):
-    """Merge new tickers into the existing stock_list.csv."""
+    """Merge new tickers into the existing stock_list.csv, replacing previous screener results."""
     if not new_tickers:
         return
     try:
         existing_df = pd.read_csv(stock_list_path)
-        existing_tickers = set(existing_df["SYMBOL"].dropna().astype(str).tolist())
+        # Ensure backward compatibility: if no SOURCE column, assume all existings are MANUAL
+        if "SOURCE" not in existing_df.columns:
+            existing_df["SOURCE"] = "MANUAL"
+            
+        # Retain only MANUAL ones (drop older SCREENER results)
+        manual_df = existing_df[existing_df["SOURCE"] != "SCREENER"].copy()
     except Exception as e:
         print(f"Error reading {stock_list_path} for merging: {e}")
-        existing_tickers = set()
-        existing_df = pd.DataFrame(columns=["SYMBOL"])
+        manual_df = pd.DataFrame(columns=["SYMBOL", "SOURCE"])
 
-    new_ticker_set = set(new_tickers)
-    added_tickers = new_ticker_set - existing_tickers
+    # Create dataframe for new screener tickers
+    added_df = pd.DataFrame({"SYMBOL": new_tickers, "SOURCE": "SCREENER"})
     
-    if added_tickers:
-        print(f"[Merge] Found {len(added_tickers)} new tickers from screener. Merging into {stock_list_path}...")
-        added_df = pd.DataFrame({"SYMBOL": list(added_tickers)})
-        combined_df = pd.concat([existing_df, added_df], ignore_index=True)
-        combined_df.to_csv(stock_list_path, index=False)
-        print(f"[Merge] Merged {len(added_tickers)} new tickers. Total tickers now: {len(combined_df)}")
-    else:
-        print("[Merge] No new tickers to add. All screener results are already in the list.")
+    # Combine preserved manual tickers and fresh screener tickers
+    combined_df = pd.concat([manual_df, added_df], ignore_index=True)
+    
+    # Deduplicate in case a screener ticker is already in the MANUAL list
+    # 'keep="first"' ensures the "MANUAL" label takes precedence
+    combined_df = combined_df.drop_duplicates(subset=["SYMBOL"], keep="first")
+    
+    combined_df.to_csv(stock_list_path, index=False)
+    print(f"[Merge] Replaced old screener results with {len(new_tickers)} fresh tickers. Total tickers now: {len(combined_df)}")
 
 def read_stock_list(stock_list_path=STOCK_LIST_PATH):
     """Read stock tickers from CSV file."""
@@ -187,15 +192,21 @@ if __name__ == "__main__":
     parser.add_argument('--period', default='2y', help='Data period (1y, 2y, etc.)')
     parser.add_argument('--interval', default='1d', help='Data interval (1d, 1wk, etc.)')
     parser.add_argument('--skip-screener', action='store_true', help='Skip the screener step')
+    parser.add_argument('--screener-only', action='store_true', help='Only run the screener and merge, do not download')
+    parser.add_argument('--min-eps-growth', type=int, default=150, help='Minimum EPS YoY growth for the screener')
     args = parser.parse_args()
 
     if not args.skip_screener:
-        print("\n[DataStore] Running EPS Screener before download...")
-        count, df, new_tickers = run_screener()
+        print(f"\n[DataStore] Running EPS Screener (min_eps_growth>={args.min_eps_growth}%) before download...")
+        count, df, new_tickers = run_screener(min_eps_growth=args.min_eps_growth, verbose=False)
         merge_screener_results(new_tickers)
         print("\n[DataStore] Screener phase complete.\n")
     else:
         print("\n[DataStore] Skipping Screener phase (--skip-screener specified).\n")
+
+    if args.screener_only:
+        print("[DataStore] Exiting early (--screener-only specified).")
+        exit(0)
 
     tickers = read_stock_list()
     if not tickers:

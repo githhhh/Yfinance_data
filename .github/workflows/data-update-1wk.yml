@@ -31,10 +31,16 @@ jobs:
       - name: Install dependencies
         run: pip install yfinance==1.0 tradingview-screener
 
+      - name: Run Screener and Merge
+        continue-on-error: true
+        run: |
+          echo "Screener execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          python DataStore.py --screener-only --min-eps-growth=150
+
       - name: Run weekly data download script
         run: |
           echo "Weekly data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
-          python DataStore.py --period=5y --interval=1wk
+          python DataStore.py --period=5y --interval=1wk --skip-screener
           echo "Weekly data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
       - name: Clean old data files (Keep today only)
