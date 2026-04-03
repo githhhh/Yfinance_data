@@ -6,12 +6,37 @@ import yfinance as yf
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
+from eps_screener import run_screener
 
 STOCK_LIST_PATH = "us/stock_list.csv"
 RESULTS_PKL_DIR = "results_pkl"
 BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
+
+def merge_screener_results(new_tickers, stock_list_path=STOCK_LIST_PATH):
+    """Merge new tickers into the existing stock_list.csv."""
+    if not new_tickers:
+        return
+    try:
+        existing_df = pd.read_csv(stock_list_path)
+        existing_tickers = set(existing_df["SYMBOL"].dropna().astype(str).tolist())
+    except Exception as e:
+        print(f"Error reading {stock_list_path} for merging: {e}")
+        existing_tickers = set()
+        existing_df = pd.DataFrame(columns=["SYMBOL"])
+
+    new_ticker_set = set(new_tickers)
+    added_tickers = new_ticker_set - existing_tickers
+    
+    if added_tickers:
+        print(f"[Merge] Found {len(added_tickers)} new tickers from screener. Merging into {stock_list_path}...")
+        added_df = pd.DataFrame({"SYMBOL": list(added_tickers)})
+        combined_df = pd.concat([existing_df, added_df], ignore_index=True)
+        combined_df.to_csv(stock_list_path, index=False)
+        print(f"[Merge] Merged {len(added_tickers)} new tickers. Total tickers now: {len(combined_df)}")
+    else:
+        print("[Merge] No new tickers to add. All screener results are already in the list.")
 
 def read_stock_list(stock_list_path=STOCK_LIST_PATH):
     """Read stock tickers from CSV file."""
@@ -161,7 +186,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download stock data')
     parser.add_argument('--period', default='2y', help='Data period (1y, 2y, etc.)')
     parser.add_argument('--interval', default='1d', help='Data interval (1d, 1wk, etc.)')
+    parser.add_argument('--skip-screener', action='store_true', help='Skip the screener step')
     args = parser.parse_args()
+
+    if not args.skip_screener:
+        print("\n[DataStore] Running EPS Screener before download...")
+        count, df, new_tickers = run_screener()
+        merge_screener_results(new_tickers)
+        print("\n[DataStore] Screener phase complete.\n")
+    else:
+        print("\n[DataStore] Skipping Screener phase (--skip-screener specified).\n")
+
     tickers = read_stock_list()
     if not tickers:
         print("No tickers to download.")
