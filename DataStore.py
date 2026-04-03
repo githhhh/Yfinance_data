@@ -14,8 +14,11 @@ BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
-def read_stock_list(stock_list_path=STOCK_LIST_PATH):
+def read_stock_list(stock_list_path=STOCK_LIST_PATH, index_tickers=None):
     """Read static stock tickers from CSV and dynamically merge with screener results."""
+    if index_tickers is None:
+        index_tickers = ["SPY", "QQQ", "DIA"]
+        
     tickers = set()
     
     # 1. Read Manual / Static list
@@ -38,6 +41,13 @@ def read_stock_list(stock_list_path=STOCK_LIST_PATH):
             print(f"Error reading screener results from {screener_path}: {e}")
             
     final_list = list(tickers)
+    
+    # 3. Insert index tickers at the beginning
+    for idx_ticker in reversed(index_tickers):
+        if idx_ticker in final_list:
+            final_list.remove(idx_ticker)
+        final_list.insert(0, idx_ticker)
+        
     print(f"[Merge] Dynamically merged tickers for download. Total unique tickers: {len(final_list)}")
     return final_list
 
