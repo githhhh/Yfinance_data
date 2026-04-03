@@ -14,46 +14,32 @@ BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
-def merge_screener_results(new_tickers, stock_list_path=STOCK_LIST_PATH):
-    """Merge new tickers into the existing stock_list.csv, replacing previous screener results."""
-    if not new_tickers:
-        return
-    try:
-        existing_df = pd.read_csv(stock_list_path)
-        # Ensure backward compatibility: if no SOURCE column, assume all existings are MANUAL
-        if "SOURCE" not in existing_df.columns:
-            existing_df["SOURCE"] = "MANUAL"
-            
-        # Retain only MANUAL ones (drop older SCREENER results)
-        manual_df = existing_df[existing_df["SOURCE"] != "SCREENER"].copy()
-    except Exception as e:
-        print(f"Error reading {stock_list_path} for merging: {e}")
-        manual_df = pd.DataFrame(columns=["SYMBOL", "SOURCE"])
-
-    # Create dataframe for new screener tickers
-    added_df = pd.DataFrame({"SYMBOL": new_tickers, "SOURCE": "SCREENER"})
-    
-    # Combine preserved manual tickers and fresh screener tickers
-    combined_df = pd.concat([manual_df, added_df], ignore_index=True)
-    
-    # Deduplicate in case a screener ticker is already in the MANUAL list
-    # 'keep="first"' ensures the "MANUAL" label takes precedence
-    combined_df = combined_df.drop_duplicates(subset=["SYMBOL"], keep="first")
-    
-    combined_df.to_csv(stock_list_path, index=False)
-    print(f"[Merge] Replaced old screener results with {len(new_tickers)} fresh tickers. Total tickers now: {len(combined_df)}")
-
 def read_stock_list(stock_list_path=STOCK_LIST_PATH):
-    """Read stock tickers from CSV file."""
+    """Read static stock tickers from CSV and dynamically merge with screener results."""
+    tickers = set()
+    
+    # 1. Read Manual / Static list
     try:
         df = pd.read_csv(stock_list_path)
-        tickers = df["SYMBOL"].astype(str).tolist()
-        tickers = [t.replace(".", "-") for t in tickers]
-        # tickers = [t if t.startswith("^") or t.endswith(".NS") else f"{t}.NS" for t in tickers]
-        return tickers
+        manual_tickers = df["SYMBOL"].astype(str).tolist()
+        tickers.update([t.replace(".", "-") for t in manual_tickers])
     except Exception as e:
         print(f"Error reading stock list from {stock_list_path}: {e}")
-        return []
+        
+    # 2. Read latest Screener results
+    screener_path = "us/eps_growth_screener_results.csv"
+    if os.path.exists(screener_path):
+        try:
+            df_screen = pd.read_csv(screener_path)
+            if 'ticker' in df_screen.columns:
+                screen_tickers = df_screen['ticker'].apply(lambda x: x.split(':')[-1] if isinstance(x, str) and ':' in x else x).tolist()
+                tickers.update([t.replace(".", "-") for t in screen_tickers])
+        except Exception as e:
+            print(f"Error reading screener results from {screener_path}: {e}")
+            
+    final_list = list(tickers)
+    print(f"[Merge] Dynamically merged tickers for download. Total unique tickers: {len(final_list)}")
+    return final_list
 
 def download_single_stock(stock_code, period, interval):
     """Download data for a single stock with retries."""
@@ -199,7 +185,6 @@ if __name__ == "__main__":
     if not args.skip_screener:
         print(f"\n[DataStore] Running EPS Screener (min_eps_growth>={args.min_eps_growth}%) before download...")
         count, df, new_tickers = run_screener(min_eps_growth=args.min_eps_growth, verbose=False)
-        merge_screener_results(new_tickers)
         print("\n[DataStore] Screener phase complete.\n")
     else:
         print("\n[DataStore] Skipping Screener phase (--skip-screener specified).\n")

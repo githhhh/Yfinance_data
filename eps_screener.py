@@ -7,7 +7,7 @@ EPS 季度同比增速筛选器
 
 from tradingview_screener import Query, col
 
-def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv", verbose=True):
+def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="us/eps_growth_screener_results.csv", verbose=True):
     """
     统一外部调用入口。
     Returns: (total_count, dataframe, tickers_list)
@@ -20,7 +20,7 @@ def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="eps_g
     return count, df, tickers_list
 
 
-def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_file="eps_growth_screener_results.csv", verbose=True):
+def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_file="us/eps_growth_screener_results.csv", verbose=True):
     """
     筛选 EPS 季度同比增速 >= min_eps_growth 且价格 >= min_price 的美股
     """
