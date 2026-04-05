@@ -17,7 +17,7 @@ MAX_RETRIES = 1          # retry failed tickers a couple of times
 def read_stock_list(stock_list_path=STOCK_LIST_PATH, index_tickers=None):
     """Read static stock tickers from CSV and dynamically merge with screener results."""
     if index_tickers is None:
-        index_tickers = ["SPY", "QQQ", "DIA"]
+        index_tickers = ["^GSPC", "^IXIC", "^DJI"]
         
     tickers = set()
     
