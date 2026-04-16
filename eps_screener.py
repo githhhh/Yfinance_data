@@ -61,10 +61,12 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
     if verbose:
         print(f"\n总共找到 {count} 只符合条件的股票，返回 {len(df)} 只\n")
 
-    # 重命名列方便阅读
     if not df.empty:
+        if 'name' in df.columns:
+            df = df.rename(columns={'name': 'code'})
+            
         df_display = df.rename(columns={
-            'name': '名称',
+            'code': '代码',
             'close': '价格',
             'volume': '成交量',
             'market_cap_basic': '市值',
@@ -74,8 +76,7 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         if verbose:
             print(df_display.to_string(index=False))
 
-        # 保存到 CSV (添加标准 code 列供 DataStore 合并)
-        df['code'] = df['ticker'].apply(lambda x: x.split(':')[-1] if isinstance(x, str) and ':' in x else x)
+        # 保存到 CSV
         df.to_csv(output_file, index=False)
         if verbose:
             print(f"\n结果已保存到: {output_file}")
