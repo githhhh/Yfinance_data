@@ -6,49 +6,62 @@ import yfinance as yf
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
-from eps_screener import run_screener
+from eps_screener import run_screener as run_eps_screener
+from importlib import import_module
 
-STOCK_LIST_PATH = "us/stock_list.csv"
+
 RESULTS_PKL_DIR = "results_pkl"
 BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
-def read_stock_list(stock_list_path=STOCK_LIST_PATH, index_tickers=None):
-    """Read static stock tickers from CSV and dynamically merge with screener results."""
+def read_stock_list(stock_list_dir="us", index_tickers=None):
+    """Read and merge all CSV data sources under stock_list_dir.
+    
+    Convention: all CSV files must have a `code` column containing clean ticker symbols.
+    """
     if index_tickers is None:
         index_tickers = ["^GSPC", "^IXIC", "^DJI"]
         
     tickers = set()
+    merged_sources = []
     
-    # 1. Read Manual / Static list
-    try:
-        df = pd.read_csv(stock_list_path)
-        manual_tickers = df["SYMBOL"].astype(str).tolist()
-        tickers.update([t.replace(".", "-") for t in manual_tickers])
-    except Exception as e:
-        print(f"Error reading stock list from {stock_list_path}: {e}")
-        
-    # 2. Read latest Screener results
-    screener_path = "us/eps_growth_screener_results.csv"
-    if os.path.exists(screener_path):
+    # Auto-discover and merge ALL CSV data sources under us/
+    import glob
+    csv_files = sorted(glob.glob(os.path.join(stock_list_dir, "*.csv")))
+    
+    if not csv_files:
+        print(f"[Merge] WARNING: No CSV files found in {stock_list_dir}/")
+    
+    for csv_path in csv_files:
         try:
-            df_screen = pd.read_csv(screener_path)
-            if 'ticker' in df_screen.columns:
-                screen_tickers = df_screen['ticker'].apply(lambda x: x.split(':')[-1] if isinstance(x, str) and ':' in x else x).tolist()
-                tickers.update([t.replace(".", "-") for t in screen_tickers])
+            df = pd.read_csv(csv_path)
+            if 'code' not in df.columns:
+                print(f"[Merge] ⚠️  WARNING: {csv_path} has no 'code' column — skipped (columns found: {list(df.columns)})")
+                continue
+            codes = df['code'].dropna().astype(str).tolist()
+            if not codes:
+                print(f"[Merge] {csv_path}: 'code' column is empty — skipped")
+                continue
+            tickers.update([t.replace(".", "-") for t in codes])
+            merged_sources.append(f"{os.path.basename(csv_path)} ({len(codes)} tickers)")
         except Exception as e:
-            print(f"Error reading screener results from {screener_path}: {e}")
-            
+            print(f"[Merge] ⚠️  ERROR reading {csv_path}: {e}")
+    
+    # Print merge summary
+    print(f"\n[Merge] === Data Source Summary ===")
+    for src in merged_sources:
+        print(f"[Merge]   ✓ {src}")
+    
     final_list = list(tickers)
     
-    # 3. Insert index tickers at the beginning
+    # Insert index tickers at the beginning
     for idx_ticker in reversed(index_tickers):
         if idx_ticker in final_list:
             final_list.remove(idx_ticker)
         final_list.insert(0, idx_ticker)
         
-    print(f"[Merge] Dynamically merged tickers for download. Total unique tickers: {len(final_list)}")
+    print(f"[Merge] Total unique tickers after dedup: {len(final_list)} (including {len(index_tickers)} index tickers)")
     return final_list
 
 def download_single_stock(stock_code, period, interval):
@@ -193,9 +206,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.skip_screener:
+        # --- EPS Screener ---
         print(f"\n[DataStore] Running EPS Screener (min_eps_growth>={args.min_eps_growth}%) before download...")
-        count, df, new_tickers = run_screener(min_eps_growth=args.min_eps_growth, verbose=False)
-        print("\n[DataStore] Screener phase complete.\n")
+        count, df, new_tickers = run_eps_screener(min_eps_growth=args.min_eps_growth, verbose=False)
+        print(f"[DataStore] EPS Screener complete. Found {count} stocks.\n")
+
+        # --- 52-Week New High Screener ---
+        try:
+            from importlib import import_module
+            mod_52wk = import_module("52_wk_new_high_screener")
+            print("[DataStore] Running 52-Week New High Screener...")
+            count_52, df_52, tickers_52 = mod_52wk.run_screener(verbose=False)
+            print(f"[DataStore] 52-Week New High Screener complete. Found {count_52} stocks.\n")
+        except Exception as e:
+            print(f"[DataStore] 52-Week New High Screener failed: {e}\n")
     else:
         print("\n[DataStore] Skipping Screener phase (--skip-screener specified).\n")
 

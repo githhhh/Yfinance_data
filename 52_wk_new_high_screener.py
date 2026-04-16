@@ -1,18 +1,20 @@
 """
-EPS 季度同比增速筛选器
+52周新高筛选器
 使用 TradingView-Screener 筛选:
-  - EPS Diluted (Quarterly YoY Growth) >= 150%
+  - 今日最高价 >= 52周最高价 (即创出52周新高)
   - 价格 >= 15
+  - 仅美股普通股（排除 OTC / 优先股 / 基金）
 """
 
 from tradingview_screener import Query, col
 
-def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="us/eps_growth_screener_results.csv", verbose=True):
+
+def run_screener(min_price=15, limit=200, output_file="us/52wk_new_high_results.csv", verbose=True):
     """
     统一外部调用入口。
     Returns: (total_count, dataframe, tickers_list)
     """
-    count, df = screen_high_eps_growth(min_eps_growth, min_price, limit, output_file, verbose)
+    count, df = screen_52wk_new_high(min_price, limit, output_file, verbose)
     tickers_list = []
     if not df.empty and 'ticker' in df.columns:
         # ticker field is typically 'EXCHANGE:SYMBOL', we extract the 'SYMBOL'
@@ -20,14 +22,14 @@ def run_screener(min_eps_growth=150, min_price=15, limit=200, output_file="us/ep
     return count, df, tickers_list
 
 
-def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_file="us/eps_growth_screener_results.csv", verbose=True):
+def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_results.csv", verbose=True):
     """
-    筛选 EPS 季度同比增速 >= min_eps_growth 且价格 >= min_price 的美股
+    筛选今日创出52周新高且价格 >= min_price 的美股
     """
     if verbose:
         print("=" * 60)
         print("筛选条件:")
-        print(f"  - EPS Diluted (Quarterly YoY Growth) >= {min_eps_growth}%")
+        print(f"  - 今日最高价 >= 52周最高价 (52-Week New High)")
         print(f"  - 价格 >= ${min_price}")
         print("  - 仅美股普通股（排除 OTC / 优先股 / 基金）")
         print("=" * 60)
@@ -39,8 +41,12 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             'close',
             'volume',
             'market_cap_basic',
-            'earnings_per_share_diluted_yoy_growth_fq',
+            'price_52_week_high',
+            'High.All',
+            'change',
             'relative_volume_10d_calc',
+            'earnings_per_share_diluted_yoy_growth_fq',
+            'sector',
         )
         .where(
             col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
@@ -50,7 +56,7 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             col('type') == 'stock',
             col('close') >= min_price,
             col('active_symbol') == True,
-            col('earnings_per_share_diluted_yoy_growth_fq') >= min_eps_growth,
+            col('price_52_week_high') <= 'high',
         )
         .order_by('earnings_per_share_diluted_yoy_growth_fq', ascending=False)
         .limit(limit)
@@ -68,8 +74,12 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             'close': '价格',
             'volume': '成交量',
             'market_cap_basic': '市值',
-            'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
+            'price_52_week_high': '52周最高',
+            'High.All': '历史最高',
+            'change': '涨跌幅(%)',
             'relative_volume_10d_calc': '相对10d成交量',
+            'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
+            'sector': '板块',
         })
         if verbose:
             print(df_display.to_string(index=False))
