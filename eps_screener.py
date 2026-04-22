@@ -76,10 +76,10 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         if verbose:
             print(df_display.to_string(index=False))
 
-        # 保存到 CSV
-        df.to_csv(output_file, index=False)
-        if verbose:
-            print(f"\n结果已保存到: {output_file}")
+    # 保存到 CSV (无结果时也要覆盖旧文件)
+    df.to_csv(output_file, index=False)
+    if verbose:
+        print(f"\n结果已保存到: {output_file}")
 
     return count, df
 
