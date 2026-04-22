@@ -220,6 +220,16 @@ if __name__ == "__main__":
             print(f"[DataStore] 52-Week New High Screener complete. Found {count_52} stocks.\n")
         except Exception as e:
             print(f"[DataStore] 52-Week New High Screener failed: {e}\n")
+
+        # --- Weekly Volume Breakout Screener ---
+        try:
+            from importlib import import_module
+            mod_weekly_vol = import_module("weekly_vol_screener")
+            print("[DataStore] Running Weekly Volume Breakout Screener...")
+            count_vol, df_vol, tickers_vol = mod_weekly_vol.run_screener(verbose=False)
+            print(f"[DataStore] Weekly Volume Breakout Screener complete. Found {count_vol} stocks.\n")
+        except Exception as e:
+            print(f"[DataStore] Weekly Volume Breakout Screener failed: {e}\n")
     else:
         print("\n[DataStore] Skipping Screener phase (--skip-screener specified).\n")
 
