@@ -1,8 +1,9 @@
 """
-EPS 季度同比增速筛选器
+EPS 季度同比增速筛选器 (周线级别)
 使用 TradingView-Screener 筛选:
   - EPS Diluted (Quarterly YoY Growth) >= 150%
   - 价格 >= 15
+  - 所有行情数据均为周线级别 (|1W)
 """
 
 from tradingview_screener import Query, col
@@ -37,10 +38,14 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         .select(
             'name',
             'close',
-            'volume',
+            'open|1W',
+            'high|1W',
+            'low|1W',
+            'volume|1W',
             'market_cap_basic',
             'earnings_per_share_diluted_yoy_growth_fq',
-            'relative_volume_10d_calc',
+            'relative_volume_10d_calc|1W',
+            'sector',
         )
         .where(
             col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
@@ -68,10 +73,14 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         df_display = df.rename(columns={
             'code': '代码',
             'close': '价格',
-            'volume': '成交量',
+            'open|1W': '周开盘',
+            'high|1W': '周最高',
+            'low|1W': '周最低',
+            'volume|1W': '周成交量',
             'market_cap_basic': '市值',
             'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
-            'relative_volume_10d_calc': '相对10d成交量',
+            'relative_volume_10d_calc|1W': '周相对成交量',
+            'sector': '板块',
         })
         if verbose:
             print(df_display.to_string(index=False))

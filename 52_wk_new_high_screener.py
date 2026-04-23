@@ -1,9 +1,10 @@
 """
-52周新高筛选器
+52周新高筛选器 (周线级别)
 使用 TradingView-Screener 筛选:
   - 今日最高价 >= 52周最高价 (即创出52周新高)
   - 价格 >= 15
   - 仅美股普通股（排除 OTC / 优先股 / 基金）
+  - 所有行情数据均为周线级别 (|1W)
 """
 
 from tradingview_screener import Query, col
@@ -39,12 +40,15 @@ def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_
         .select(
             'name',
             'close',
-            'volume',
+            'open|1W',
+            'high|1W',
+            'low|1W',
+            'volume|1W',
             'market_cap_basic',
             'price_52_week_high',
             'High.All',
-            'change',
-            'relative_volume_10d_calc',
+            'change|1W',
+            'relative_volume_10d_calc|1W',
             'earnings_per_share_diluted_yoy_growth_fq',
             'sector',
         )
@@ -74,12 +78,15 @@ def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_
         df_display = df.rename(columns={
             'code': '代码',
             'close': '价格',
-            'volume': '成交量',
+            'open|1W': '周开盘',
+            'high|1W': '周最高',
+            'low|1W': '周最低',
+            'volume|1W': '周成交量',
             'market_cap_basic': '市值',
             'price_52_week_high': '52周最高',
             'High.All': '历史最高',
-            'change': '涨跌幅(%)',
-            'relative_volume_10d_calc': '相对10d成交量',
+            'change|1W': '周涨跌幅(%)',
+            'relative_volume_10d_calc|1W': '周相对成交量',
             'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
             'sector': '板块',
         })

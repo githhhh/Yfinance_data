@@ -1,9 +1,11 @@
 """
-周线放量突破筛选器
+周线放量突破筛选器 (周线级别)
 使用 TradingView-Screener 筛选:
   - 周线级别当周成交量 >= 10周均量的 1.3倍 (即 relative_volume_10d_calc|1W >= 1.3)
+  - 仅筛选买盘资金 (周线收盘价 >= 周线开盘价)
   - 价格 >= 15
   - 仅美股普通股（排除 OTC / 优先股 / 基金）
+  - 所有行情数据均为周线级别 (|1W)
 """
 
 from tradingview_screener import Query, col
@@ -28,6 +30,7 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
         print("=" * 60)
         print("筛选条件:")
         print(f"  - 周线成交量/10周均量比值 (Relative Volume 10W) >= {min_vol_ratio}")
+        print(f"  - 仅筛选买盘资金 (周线收盘价 >= 周线开盘价)")
         print(f"  - 价格 >= ${min_price}")
         print("  - 仅美股普通股（排除 OTC / 优先股 / 基金）")
         print("=" * 60)
@@ -37,7 +40,10 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
         .select(
             'name',
             'close',
-            'volume',
+            'open|1W',
+            'high|1W',
+            'low|1W',
+            'volume|1W',
             'market_cap_basic',
             'relative_volume_10d_calc|1W',
             'change|1W',
@@ -52,6 +58,7 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
             col('close') >= min_price,
             col('active_symbol') == True,
             col('relative_volume_10d_calc|1W') >= min_vol_ratio,
+            col('close') >= col('open|1W'), # 确保是买盘 (周线)
         )
         .order_by('relative_volume_10d_calc|1W', ascending=False)
         .limit(limit)
@@ -69,7 +76,10 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
         df_display = df.rename(columns={
             'code': '代码',
             'close': '价格',
-            'volume': '成交量',
+            'open|1W': '周开盘',
+            'high|1W': '周最高',
+            'low|1W': '周最低',
+            'volume|1W': '周成交量',
             'market_cap_basic': '市值',
             'relative_volume_10d_calc|1W': '周线放量比例',
             'change|1W': '周涨跌幅(%)',
