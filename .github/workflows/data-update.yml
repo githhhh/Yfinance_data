@@ -44,8 +44,9 @@ jobs:
 
       - name: Wait for rate limit cooldown
         run: |
-          echo "Waiting 120s for Yahoo Finance rate limit cooldown..."
-          sleep 120
+          SLEEP_TIME=$((RANDOM % 121 + 180))
+          echo "Waiting ${SLEEP_TIME}s (random 180~300s) for Yahoo Finance rate limit cooldown..."
+          sleep $SLEEP_TIME
 
       - name: Run weekly data download script
         run: |
