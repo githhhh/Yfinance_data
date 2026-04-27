@@ -37,14 +37,14 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
         Query()
         .select(
             'name',
+            'earnings_per_share_diluted_yoy_growth_fq',
+            'relative_volume_10d_calc|1W',
             'close',
             'open|1W',
             'high|1W',
             'low|1W',
             'volume|1W',
             'market_cap_basic',
-            'earnings_per_share_diluted_yoy_growth_fq',
-            'relative_volume_10d_calc|1W',
             'sector',
         )
         .where(
@@ -68,18 +68,22 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
 
     if not df.empty:
         if 'name' in df.columns:
-            df = df.rename(columns={'name': 'code'})
+            df = df.rename(columns={
+                'name': 'code',
+                'earnings_per_share_diluted_yoy_growth_fq': 'eps_growth',
+                'relative_volume_10d_calc|1W': 'vol_ratio_1w'
+            })
             
         df_display = df.rename(columns={
             'code': '代码',
+            'eps_growth': 'EPS季度同比(%)',
+            'vol_ratio_1w': '周相对成交量',
             'close': '价格',
             'open|1W': '周开盘',
             'high|1W': '周最高',
             'low|1W': '周最低',
             'volume|1W': '周成交量',
             'market_cap_basic': '市值',
-            'earnings_per_share_diluted_yoy_growth_fq': 'EPS季度同比(%)',
-            'relative_volume_10d_calc|1W': '周相对成交量',
             'sector': '板块',
         })
         if verbose:

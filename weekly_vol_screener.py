@@ -39,13 +39,14 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
         Query()
         .select(
             'name',
+            'relative_volume_10d_calc|1W',
+            'earnings_per_share_diluted_yoy_growth_fq',
             'close',
             'open|1W',
             'high|1W',
             'low|1W',
             'volume|1W',
             'market_cap_basic',
-            'relative_volume_10d_calc|1W',
             'change|1W',
             'sector',
         )
@@ -71,17 +72,22 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
 
     if not df.empty:
         if 'name' in df.columns:
-            df = df.rename(columns={'name': 'code'})
+            df = df.rename(columns={
+                'name': 'code',
+                'earnings_per_share_diluted_yoy_growth_fq': 'eps_growth',
+                'relative_volume_10d_calc|1W': 'vol_ratio_1w'
+            })
             
         df_display = df.rename(columns={
             'code': '代码',
+            'vol_ratio_1w': '周线放量比例',
+            'eps_growth': 'EPS季度同比(%)',
             'close': '价格',
             'open|1W': '周开盘',
             'high|1W': '周最高',
             'low|1W': '周最低',
             'volume|1W': '周成交量',
             'market_cap_basic': '市值',
-            'relative_volume_10d_calc|1W': '周线放量比例',
             'change|1W': '周涨跌幅(%)',
             'sector': '板块',
         })
