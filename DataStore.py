@@ -7,6 +7,9 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
 from eps_screener import run_screener as run_eps_screener
+from stage2_screener import run_screener as run_stage2_screener, load_whitelist, WHITELIST_PATH
+
+FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
 
 
@@ -15,14 +18,11 @@ BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
-def read_stock_list(stock_list_dir="us", index_tickers=None):
+def read_stock_list(stock_list_dir="us"):
     """Read and merge all CSV data sources under stock_list_dir.
     
     Convention: all CSV files must have a `code` column containing clean ticker symbols.
     """
-    if index_tickers is None:
-        index_tickers = ["^GSPC", "^IXIC", "^DJI"]
-        
     tickers = set()
     merged_sources = []
     
@@ -55,13 +55,7 @@ def read_stock_list(stock_list_dir="us", index_tickers=None):
     
     final_list = list(tickers)
     
-    # Insert index tickers at the beginning
-    for idx_ticker in reversed(index_tickers):
-        if idx_ticker in final_list:
-            final_list.remove(idx_ticker)
-        final_list.insert(0, idx_ticker)
-        
-    print(f"[Merge] Total unique tickers after dedup: {len(final_list)} (including {len(index_tickers)} index tickers)")
+    print(f"[Merge] Total unique tickers after dedup: {len(final_list)}")
     return final_list
 
 def download_single_stock(stock_code, period, interval):
@@ -206,7 +200,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.skip_screener:
-        # --- EPS Screener ---
+        # --- Stage2 Screener (必须先跑) ---
+        print("\n[DataStore] Running Stage2 IBD Screener (must run first)...")
+        count_s2, df_s2, tickers_s2 = run_stage2_screener(verbose=False)
+        print(f"[DataStore] Stage2 Screener complete. Found {count_s2} stocks.\n")
+
+        # --- EPS Screener (豁免，不做 Stage2 过滤) ---
         print(f"\n[DataStore] Running EPS Screener (min_eps_growth>={args.min_eps_growth}%) before download...")
         count, df, new_tickers = run_eps_screener(min_eps_growth=args.min_eps_growth, verbose=False)
         print(f"[DataStore] EPS Screener complete. Found {count} stocks.\n")
@@ -217,7 +216,7 @@ if __name__ == "__main__":
             mod_52wk = import_module("52_wk_new_high_screener")
             print("[DataStore] Running 52-Week New High Screener...")
             count_52, df_52, tickers_52 = mod_52wk.run_screener(verbose=False)
-            print(f"[DataStore] 52-Week New High Screener complete. Found {count_52} stocks.\n")
+            print(f"[DataStore] 52-Week New High Screener complete. Found {count_52} stocks (after Stage2 filter).\n")
         except Exception as e:
             print(f"[DataStore] 52-Week New High Screener failed: {e}\n")
 
@@ -227,7 +226,7 @@ if __name__ == "__main__":
             mod_weekly_vol = import_module("weekly_vol_screener")
             print("[DataStore] Running Weekly Volume Breakout Screener...")
             count_vol, df_vol, tickers_vol = mod_weekly_vol.run_screener(verbose=False)
-            print(f"[DataStore] Weekly Volume Breakout Screener complete. Found {count_vol} stocks.\n")
+            print(f"[DataStore] Weekly Volume Breakout Screener complete. Found {count_vol} stocks (after Stage2 filter).\n")
         except Exception as e:
             print(f"[DataStore] Weekly Volume Breakout Screener failed: {e}\n")
     else:
@@ -237,10 +236,39 @@ if __name__ == "__main__":
         print("[DataStore] Exiting early (--screener-only specified).")
         exit(0)
 
-    tickers = read_stock_list()
+    # Fallback 机制: 检查 Stage2 白名单是否存在
+    stage2_available = load_whitelist() is not None
+    if stage2_available:
+        # 正常路径: glob union (screener CSVs 已被 Stage2 过滤)
+        tickers = read_stock_list()
+        if tickers:
+            # 写入 Fallback 快照
+            os.makedirs(os.path.dirname(FILTER_SNAPSHOT_PATH), exist_ok=True)
+            pd.DataFrame({'code': tickers}).to_csv(FILTER_SNAPSHOT_PATH, index=False)
+            print(f"[DataStore] Fallback 快照已更新: {FILTER_SNAPSHOT_PATH} ({len(tickers)} 只)")
+    else:
+        # Fallback 路径: Stage2 失败，读取上次快照
+        print(f"[DataStore] ⚠️  Stage2 白名单不存在，启用 Fallback...")
+        if os.path.exists(FILTER_SNAPSHOT_PATH):
+            fallback_df = pd.read_csv(FILTER_SNAPSHOT_PATH)
+            tickers = fallback_df['code'].dropna().astype(str).tolist()
+            if len(tickers) > 1500:
+                tickers = tickers[:1500]
+            print(f"[DataStore] Fallback 读取 {FILTER_SNAPSHOT_PATH}: {len(tickers)} 只")
+        else:
+            tickers = read_stock_list()
+            print(f"[DataStore] Fallback 快照不存在，使用 glob union: {len(tickers)} 只")
+
     if not tickers:
         print("No tickers to download.")
     else:
+        # 静默加入指数，确保不写入任何 CSV 中
+        index_tickers = ["^GSPC", "^IXIC", "^DJI"]
+        for idx in reversed(index_tickers):
+            if idx in tickers:
+                tickers.remove(idx)
+            tickers.insert(0, idx)
+
         stock_data, failed = download_batch_stocks(tickers, period=args.period, interval=args.interval)
         save_path = save_stock_data(stock_data, interval=args.interval)
         loaded_data = load_stock_data(save_path) if save_path else None

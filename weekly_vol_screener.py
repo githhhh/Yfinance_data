@@ -9,6 +9,7 @@
 """
 
 from tradingview_screener import Query, col
+from stage2_screener import load_whitelist
 
 def run_screener(min_vol_ratio=1.3, min_price=15, limit=200, output_file="us/weekly_vol_screener_results.csv", verbose=True):
     """
@@ -93,6 +94,16 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
         })
         if verbose:
             print(df_display.to_string(index=False))
+
+    # Stage2 过滤: 仅保留在 Stage2 白名单中的 code
+    stage2_codes = load_whitelist()
+    if stage2_codes is not None and not df.empty and 'code' in df.columns:
+        before = len(df)
+        df = df[df['code'].isin(stage2_codes)]
+        if verbose:
+            print(f"[Stage2 Filter] {before} → {len(df)} (过滤 {before - len(df)} 只不在 Stage2 中)")
+    elif stage2_codes is None and verbose:
+        print("[Stage2 Filter] 白名单不存在，跳过过滤（写全量）")
 
     # 保存到 CSV (无结果时也要覆盖旧文件)
     df.to_csv(output_file, index=False)
