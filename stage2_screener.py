@@ -1,14 +1,18 @@
 """
 Stage 2 IBD 前置过滤器
 ====================
-双 Pass 联合查询（普通股 + ADR），生成 Stage 2 白名单。
+双 Pass 查询，生成 Stage 2 白名单。
 
-条件 (IBD Method B):
+Pass 1 - Stage 2 主体 (普通股 + ADR):
   - Close >= SMA40|1W  (Price above 200-day MA)
   - SMA10|1W >= SMA40|1W  (50-day MA above 200-day MA, 金叉)
   - Close >= 15
-  - 普通股: type=stock, typespecs=common, !preferred
-  - ADR: type=dr (不限 typespecs)
+  - type in [stock, dr], 排除 preferred
+
+Pass 2 - 次新股/IPO 豁免:
+  - 上市不足 40 周 (SMA40|1W 为空)
+  - Close >= SMA10|1W (中短期趋势向上)
+  - 周线相对成交量 >= 1.3 (有资金介入)
 
 输出: us/stage2/stage2_whitelist.csv
 """
@@ -20,13 +24,11 @@ from tradingview_screener import Query, col
 
 WHITELIST_PATH = os.path.join("us", "stage2", "stage2_whitelist.csv")
 
-# Stage 2 均线条件 (IBD Method B)
-BASE_FILTERS = [
+# 公共基础过滤条件
+COMMON_FILTERS = [
     col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
     col('close') >= 15,
     col('active_symbol') == True,
-    col('close') >= col('SMA40|1W'),      # Price > 200-day MA
-    col('SMA10|1W') >= col('SMA40|1W'),   # 50-day MA > 200-day MA (金叉)
 ]
 
 
@@ -46,46 +48,55 @@ def run_screener(output_file=WHITELIST_PATH, verbose=True):
 
 
 def _query_stage2(output_file, verbose):
-    """双 Pass 联合查询: 普通股 + ADR"""
+    """双 Pass 查询: Stage2 主体 + 次新股豁免"""
 
-    # Pass 1: 普通股（不限 is_primary）
+    # Pass 1: Stage 2 主体（普通股 + ADR 合并查询）
+    # type in [stock, dr] + 排除 preferred，ADR 天然不含 preferred typespecs
     if verbose:
-        print("[Stage2] Pass 1: 普通股查询...")
-    count_stock, df_stock = (
+        print("[Stage2] Pass 1: Stage2 主体 (普通股+ADR)...")
+    count_main, df_main = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W')
+        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector')
         .where(
-            *BASE_FILTERS,
-            col('typespecs').has('common'),
+            *COMMON_FILTERS,
+            col('type').isin(['stock', 'dr']),
             col('typespecs').has_none_of('preferred'),
-            col('type') == 'stock',
+            col('close') >= col('SMA40|1W'),      # Price > 200-day MA
+            col('SMA10|1W') >= col('SMA40|1W'),   # 50-day MA > 200-day MA (金叉)
         )
-        .limit(2000)
+        .limit(2500)
         .set_markets('america')
         .get_scanner_data()
     )
     if verbose:
-        print(f"[Stage2] Pass 1 普通股: {len(df_stock)} 只")
+        print(f"[Stage2] Pass 1 Stage2 主体: {len(df_main)} 只")
 
-    # Pass 2: ADR（不要求 typespecs common）
+    # Pass 2: 次新股/动能股豁免 (IPO/Momentum Exemption)
+    # 上市不足 40 周，SMA40|1W 为空，与 Pass 1 天然互斥
     if verbose:
-        print("[Stage2] Pass 2: ADR 查询...")
-    count_dr, df_dr = (
+        print("[Stage2] Pass 2: 次新股豁免...")
+    count_ipo, df_ipo = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W')
+        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector')
         .where(
-            *BASE_FILTERS,
-            col('type') == 'dr',
+            *COMMON_FILTERS,
+            col('type').isin(['stock', 'dr']),
+            col('typespecs').has_none_of('preferred'),
+            col('relative_volume_10d_calc|1W') >= 1.3,
+            col('close') >= col('SMA10|1W'),
+            col('SMA40|1W').empty(),  # 互斥逻辑：专门抓取没有 40 周均线的次新股
         )
-        .limit(500)
+        .limit(200)
         .set_markets('america')
         .get_scanner_data()
     )
     if verbose:
-        print(f"[Stage2] Pass 2 ADR: {len(df_dr)} 只")
+        print(f"[Stage2] Pass 2 次新股: {len(df_ipo)} 只")
 
-    # 合并
-    df_all = pd.concat([df_stock, df_dr], ignore_index=True)
+    # 合并 (次新股的 SMA40|1W 全为 NaN，统一 dtype 避免 FutureWarning)
+    if not df_ipo.empty and 'SMA40|1W' in df_ipo.columns:
+        df_ipo['SMA40|1W'] = df_ipo['SMA40|1W'].astype(float)
+    df_all = pd.concat([df_main, df_ipo], ignore_index=True)
 
     if df_all.empty:
         print("[Stage2] WARNING: 查询结果为空")
@@ -94,6 +105,9 @@ def _query_stage2(output_file, verbose):
 
     if 'name' in df_all.columns:
         df_all = df_all.rename(columns={'name': 'code'})
+
+    # 去重 (Pass 1/2 天然互斥，但防御性去重)
+    df_all = df_all.drop_duplicates(subset='code', keep='first')
 
     total = len(df_all)
     tickers_list = df_all['code'].tolist()
@@ -104,7 +118,7 @@ def _query_stage2(output_file, verbose):
     # 保存白名单
     df_all.to_csv(output_file, index=False)
     if verbose:
-        print(f"[Stage2] 白名单已保存: {output_file} ({total} 只 = {len(df_stock)} 普通股 + {len(df_dr)} ADR)")
+        print(f"[Stage2] 白名单已保存: {output_file} ({total} 只 = {len(df_main)} 主体 + {len(df_ipo)} 次新股)")
 
     return total, df_all, tickers_list
 
