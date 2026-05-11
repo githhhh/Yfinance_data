@@ -52,6 +52,7 @@ def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_
             'High.All',
             'change|1W',
             'sector',
+            'industry',
         )
         .where(
             col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
@@ -94,6 +95,7 @@ def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_
             'High.All': '历史最高',
             'change|1W': '周涨跌幅(%)',
             'sector': '板块',
+            'industry': '子行业',
         })
         if verbose:
             print(df_display.to_string(index=False))

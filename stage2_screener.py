@@ -56,7 +56,7 @@ def _query_stage2(output_file, verbose):
         print("[Stage2] Pass 1: Stage2 主体 (普通股+ADR)...")
     count_main, df_main = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector')
+        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry')
         .where(
             *COMMON_FILTERS,
             col('type').isin(['stock', 'dr']),
@@ -77,7 +77,7 @@ def _query_stage2(output_file, verbose):
         print("[Stage2] Pass 2: 次新股豁免...")
     count_ipo, df_ipo = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector')
+        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry')
         .where(
             *COMMON_FILTERS,
             col('type').isin(['stock', 'dr']),

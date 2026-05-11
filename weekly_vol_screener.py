@@ -50,6 +50,7 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
             'market_cap_basic',
             'change|1W',
             'sector',
+            'industry',
         )
         .where(
             col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
@@ -91,6 +92,7 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
             'market_cap_basic': '市值',
             'change|1W': '周涨跌幅(%)',
             'sector': '板块',
+            'industry': '子行业',
         })
         if verbose:
             print(df_display.to_string(index=False))

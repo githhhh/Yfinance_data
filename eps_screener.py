@@ -46,6 +46,7 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             'volume|1W',
             'market_cap_basic',
             'sector',
+            'industry',
         )
         .where(
             col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
@@ -85,6 +86,7 @@ def screen_high_eps_growth(min_eps_growth=150, min_price=15, limit=200, output_f
             'volume|1W': '周成交量',
             'market_cap_basic': '市值',
             'sector': '板块',
+            'industry': '子行业',
         })
         if verbose:
             print(df_display.to_string(index=False))
