@@ -2,6 +2,12 @@ name: Update Stock Data - Daily (1D)
 
 on:
   workflow_dispatch:
+    inputs:
+      years:
+        description: '数据年数 (默认2, 可输入5、10等)'
+        required: false
+        default: '2'
+        type: string
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -39,8 +45,9 @@ jobs:
 
       - name: Run daily data download script
         run: |
-          echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
-          python DataStore.py --period=2y --interval=1d --skip-screener
+          YEARS="${{ github.event.inputs.years || '2' }}"
+          echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z"), period=${YEARS}y"
+          python DataStore.py --period=${YEARS}y --interval=1d --skip-screener
           echo "Daily data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
       - name: Clean old data files (Keep today only)
@@ -65,8 +72,9 @@ jobs:
 
       - name: Commit and push daily data changes
         run: |
+          YEARS="${{ github.event.inputs.years || '2' }}"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add results_pkl/ us/
-          git commit -m "Update daily stock data (2Y-1D) [skip ci]" || echo "No changes to commit"
+          git commit -m "Update daily stock data (${YEARS}Y-1D) [skip ci]" || echo "No changes to commit"
           git push
