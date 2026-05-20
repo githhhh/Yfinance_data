@@ -59,7 +59,7 @@ def screen_52wk_new_high(min_price=15, limit=200, output_file="us/52wk_new_high_
             col('is_primary') == True,
             col('typespecs').has('common'),
             col('typespecs').has_none_of('preferred'),
-            col('type') == 'stock',
+            col('type').isin(['stock', 'dr']),
             col('close') >= min_price,
             col('active_symbol') == True,
             col('price_52_week_high') <= 'high',

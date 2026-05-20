@@ -57,7 +57,7 @@ def screen_weekly_vol_breakout(min_vol_ratio=1.3, min_price=15, limit=200, outpu
             col('is_primary') == True,
             col('typespecs').has('common'),
             col('typespecs').has_none_of('preferred'),
-            col('type') == 'stock',
+            col('type').isin(['stock', 'dr']),
             col('close') >= min_price,
             col('active_symbol') == True,
             col('relative_volume_10d_calc|1W') >= min_vol_ratio,
