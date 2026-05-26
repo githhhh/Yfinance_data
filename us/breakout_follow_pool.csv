@@ -1,547 +1,555 @@
-﻿code,signal,signal_source,pullback_v_is_dry,volume_ratio,hold_return,breakout_date,pct_above_ceiling,touched_ema10_count,mbox_count,ceiling,pullback_count,pullback_pct,pullback_pct_off_peak,is_bullish,is_priority,sector,industry
-BSRR,True,ceiling_breakout,,1.5702039721132979,0.0,2026-05-18,0.4,0,0,38.03,0,,,True,True,Finance,Regional Banks
-STBA,True,ceiling_breakout,,1.0231964979717305,0.0,2026-05-18,0.9,0,0,44.47,0,,,True,False,Finance,Regional Banks
-FISI,True,ceiling_breakout,,0.7758916441125313,0.0,2026-05-18,0.7,0,0,35.1,0,,,True,False,Finance,Regional Banks
-RBCAA,True,ceiling_breakout,,0.7356167945048223,0.0,2026-05-18,3.5,0,0,76.76,0,,,True,False,Finance,Regional Banks
-ACNB,True,ceiling_breakout,,0.6561144701068699,0.0,2026-05-18,1.8,0,0,53.49,0,,,True,False,Finance,Regional Banks
-OVBC,True,three_weeks_tight_breakout,False,1.4030486318030702,21.6,2025-11-17,24.8,5,2,37.83,4,-6.1,0.7,True,True,Finance,Regional Banks
-CTBI,True,10_wk_ema_touch_confirm,False,0.8722796915492473,16.6,2026-01-05,16.7,4,1,57.16,1,-17.8,-2.6,True,False,Finance,Regional Banks
-PKBK,True,pivot,True,1.3215477705954037,34.3,2025-12-01,36.3,1,1,23.11,3,-6.1,0.1,True,True,Finance,Regional Banks
-PFIS,True,pivot,False,1.1674889072252665,12.0,2026-03-23,12.4,2,0,52.71,1,-8.8,-1.0,True,False,Finance,Regional Banks
-PCB,True,pivot,False,1.125383155743687,12.3,2026-03-23,12.4,2,0,21.83,2,-6.7,-1.6,True,False,Finance,Regional Banks
-FSBC,True,pivot,False,1.077872724260773,19.9,2025-10-20,29.3,4,2,32.45,2,-16.5,0.2,True,False,Finance,Regional Banks
-TMP,True,pivot,True,0.7985994398686734,13.1,2026-03-23,15.4,1,0,74.34,1,-7.0,-0.3,True,False,Finance,Regional Banks
-OBK,True,pivot,True,0.7057099186097817,13.8,2026-03-30,17.9,1,0,40.14,1,-6.4,-1.1,True,False,Finance,Regional Banks
-DCOM,True,pivot,False,0.6480506409990286,3.0,2026-04-06,6.3,1,0,34.7,1,-8.8,-2.6,True,False,Finance,Regional Banks
-OUST,True,ceiling_breakout,,1.856245910026027,0.0,2026-05-18,2.2,0,0,36.24,0,,,True,True,Electronic Technology,Semiconductors
-ALAB,True,ceiling_breakout,,1.418280960937488,0.0,2026-05-18,16.7,0,0,262.9,0,,,True,True,Electronic Technology,Semiconductors
-QCOM,True,ceiling_breakout,,1.1682402310710138,0.0,2026-05-18,13.4,0,0,210.03,0,,,True,False,Electronic Technology,Semiconductors
-CEVA,True,ceiling_breakout,,1.1211572861740409,0.0,2026-05-18,4.5,0,0,37.75,0,,,True,False,Electronic Technology,Semiconductors
-NXPI,True,three_weeks_tight_breakout,False,1.0116225475214404,7.2,2026-04-27,14.7,0,0,275.81,1,-3.8,6.9,True,False,Electronic Technology,Semiconductors
-KLAC,True,10_wk_ema_touch_confirm,False,0.9429635818926652,8.8,2026-04-06,19.7,2,0,1577.27,1,-15.1,-2.5,True,False,Electronic Technology,Semiconductors
-ARM,True,pivot,False,1.46579987943538,30.5,2026-04-20,67.6,0,0,182.88,1,-18.4,29.0,True,True,Electronic Technology,Semiconductors
-ALGM,True,pivot,False,0.9552514918221015,14.9,2026-04-13,19.5,0,0,38.45,1,-19.6,-6.6,True,False,Electronic Technology,Semiconductors
-AKR,True,ceiling_breakout,,0.9361431195631013,0.0,2026-05-18,4.5,0,0,21.01,0,,,True,False,Finance,Real Estate Investment Trusts
-KRG,True,ceiling_breakout,,0.8725084857412444,0.0,2026-05-18,3.6,0,0,26.09,0,,,True,False,Finance,Real Estate Investment Trusts
-XHR,True,ceiling_breakout,,0.7695150537323237,0.0,2026-05-18,5.4,0,0,15.96,0,,,True,False,Finance,Real Estate Investment Trusts
-BNL,True,three_weeks_tight_breakout,True,0.575485192110529,11.3,2026-03-30,11.7,2,0,18.27,1,-5.0,0.1,True,False,Finance,Real Estate Investment Trusts
-IVT,True,pivot,True,1.4614337403794515,9.0,2026-02-02,10.3,1,0,29.82,2,-6.2,0.6,True,True,Finance,Real Estate Investment Trusts
-SBRA,True,pivot,True,0.9731718693652648,5.8,2026-02-09,8.6,1,0,19.08,1,-9.4,-0.2,False,False,Finance,Real Estate Investment Trusts
-CPBI,True,ceiling_breakout,,2.873313112664293,0.0,2026-05-18,5.2,0,0,17.79,0,,,True,True,Finance,Investment Banks/Brokers
-GS,True,ceiling_breakout,,1.096540924204497,0.0,2026-05-18,1.8,0,0,979.54,0,,,True,False,Finance,Investment Banks/Brokers
-BNY,True,pivot,False,0.8491810968354769,57.4,2025-05-12,60.4,5,2,86.77,7,-5.0,1.6,True,False,Finance,Investment Banks/Brokers
-LPG,True,ceiling_breakout,,1.9316470796401815,0.0,2026-05-18,10.2,0,0,42.15,0,,,True,True,Transportation,Marine Shipping
-NMM,True,pivot,True,1.397529918540205,7.4,2026-03-30,13.7,1,0,65.53,2,-10.1,-4.3,True,True,Transportation,Marine Shipping
-FRO,True,pivot,False,1.0107350337893464,34.0,2026-01-26,45.4,3,1,25.53,1,-26.9,-6.1,True,False,Transportation,Marine Shipping
-CLBK,True,ceiling_breakout,,1.6696078576096773,0.0,2026-05-18,3.5,0,0,19.68,0,,,True,True,Finance,Savings Banks
-PDLB,True,ceiling_breakout,,1.6603348261938484,0.0,2026-05-18,3.1,0,0,18.01,0,,,True,True,Finance,Savings Banks
-TFSL,True,three_weeks_tight_breakout,,1.155349339073066,4.3,2026-05-11,5.8,1,0,15.1,0,,,True,False,Finance,Savings Banks
-R,True,10_wk_ema_touch_confirm,False,0.9756454131843842,7.9,2026-04-13,9.0,2,0,223.84,1,-11.5,-3.6,True,False,Transportation,Air Freight/Couriers
-FDX,True,10_wk_ema_touch_confirm,True,0.7481777749431362,26.7,2026-01-05,30.4,3,1,302.37,2,-15.5,-2.4,True,False,Transportation,Air Freight/Couriers
-BURL,True,ceiling_breakout,,1.4335627520417797,0.0,2026-05-18,7.3,0,0,302.42,0,,,True,True,Retail Trade,Apparel/Footwear Retail
-ROST,True,10_wk_ema_touch_confirm,False,1.4614590816346917,50.5,2025-10-20,50.6,4,0,155.9,5,-9.0,2.1,True,True,Retail Trade,Apparel/Footwear Retail
-CMP,True,10_wk_ema_touch_confirm,,1.0546995820660976,16.5,2026-04-27,18.5,1,0,25.81,0,,,True,False,Process Industries,Chemicals: Specialty
-LIN,True,pivot,False,0.8440185022306818,4.6,2026-02-16,7.6,2,1,481.05,1,-8.0,1.4,True,False,Process Industries,Chemicals: Specialty
-BKR,True,pivot,True,0.9185606068121256,28.6,2026-01-12,31.3,3,1,50.33,2,-11.3,-5.9,True,False,Industrial Services,Contract Drilling
-SLB,True,pivot,True,0.7616405975362356,51.0,2025-12-01,53.4,3,0,37.33,4,-7.8,0.1,True,False,Industrial Services,Contract Drilling
-CTS,True,ceiling_breakout,,1.0068600132978234,0.0,2026-05-18,4.5,0,0,59.61,0,,,True,False,Electronic Technology,Electronic Production Equipment
-BE,True,pivot,False,1.0360378033797295,81.5,2026-04-06,104.6,1,0,147.82,1,-16.0,2.0,True,False,Electronic Technology,Electronic Production Equipment
-ACMR,True,ceiling_breakout,,1.1831666169571011,0.0,2026-05-18,7.9,0,0,67.99,0,,,True,False,Producer Manufacturing,Industrial Machinery
-SKYT,True,ceiling_breakout,,1.0781215920851297,0.0,2026-05-18,6.4,0,0,34.97,0,,,True,False,Producer Manufacturing,Industrial Machinery
-LIVN,True,ceiling_breakout,,0.7745452140409865,0.0,2026-05-18,2.7,0,0,71.92,0,,,True,False,Health Technology,Medical Specialties
-ELMD,True,10_wk_ema_touch_confirm,,1.532339168361295,7.1,2026-05-11,28.0,1,0,29.87,0,,,True,True,Health Technology,Medical Specialties
-UNM,True,three_weeks_tight_breakout,,0.7031008749644924,3.5,2026-05-11,3.6,0,0,81.55,0,,,True,False,Finance,Multi-Line Insurance
-GL,True,10_wk_ema_touch_confirm,False,1.295705762532753,7.2,2026-04-06,7.6,2,0,145.27,1,-2.5,1.1,True,False,Finance,Multi-Line Insurance
-WBI,True,10_wk_ema_touch_confirm,True,0.6480703336130994,24.5,2026-02-09,24.8,3,0,24.97,2,-12.3,2.1,True,False,Industrial Services,Oilfield Services/Equipment
-NOV,True,10_wk_ema_touch_confirm,,0.6344806548223565,2.2,2026-05-11,2.2,1,0,20.36,0,,,True,False,Industrial Services,Oilfield Services/Equipment
-RXO,True,10_wk_ema_touch_confirm,False,1.7933812543654948,30.3,2026-04-13,35.2,2,0,18.02,1,-28.3,4.3,True,True,Technology Services,Packaged Software
-BKSY,True,pivot,False,1.1261856191601332,40.2,2026-04-06,50.6,1,0,31.79,1,-26.7,17.7,True,False,Technology Services,Packaged Software
-ROIV,True,10_wk_ema_touch_confirm,True,1.8200208596516245,112.8,2025-09-08,131.5,4,1,12.94,4,-14.0,-0.7,True,True,Health Technology,Pharmaceuticals: Major
-LQDA,True,10_wk_ema_touch_confirm,,1.0773513749060233,7.1,2026-05-11,30.7,1,0,46.67,0,,,True,False,Health Technology,Pharmaceuticals: Major
-SNDR,True,ceiling_breakout,,0.8275855631641544,0.0,2026-05-18,0.8,0,0,33.14,0,,,True,False,Transportation,Trucking
-ARCB,True,10_wk_ema_touch_confirm,False,0.7023549333137226,5.1,2026-04-13,10.6,1,0,112.68,1,-18.5,-7.7,True,False,Transportation,Trucking
-ATRO,True,ceiling_breakout,,1.1294628221267655,0.0,2026-05-18,0.2,0,0,80.7,0,,,True,False,Electronic Technology,Aerospace & Defense
-DAL,True,ceiling_breakout,,0.7499400286213053,0.0,2026-05-18,1.2,0,0,75.26,0,,,True,False,Transportation,Airlines
-CYD,True,ceiling_breakout,,1.9487548201479727,0.0,2026-05-18,1.4,0,0,56.55,0,,,True,True,Producer Manufacturing,Auto Parts: OEM
-SIRI,True,pivot,True,1.0130146414664112,14.5,2026-04-13,22.3,0,0,23.62,1,-7.4,5.9,True,False,Consumer Services,Broadcasting
-PLPC,True,pivot,True,0.6018292962696667,36.9,2026-03-09,48.7,2,0,240.57,1,-12.9,1.5,True,False,Producer Manufacturing,Building Products
-CMPR,True,ceiling_breakout,,1.8596493235378861,0.0,2026-05-18,0.2,0,0,102.22,0,,,True,True,Commercial Services,Commercial Printing/Forms
-NTAP,True,ceiling_breakout,,1.3464005997039912,0.0,2026-05-18,11.6,0,0,124.86,0,,,True,True,Electronic Technology,Computer Peripherals
-OSS,True,10_wk_ema_touch_confirm,,0.7827264097423507,13.7,2026-05-04,39.8,1,0,12.75,0,,,True,False,Electronic Technology,Computer Processing Hardware
-TRS,True,ceiling_breakout,,0.8338374934909841,0.0,2026-05-18,0.7,0,0,39.86,0,,,True,False,Process Industries,Containers/Packaging
-LPTH,True,ceiling_breakout,,1.9960055575111957,0.0,2026-05-18,12.7,0,0,15.04,0,,,True,True,Electronic Technology,Electronic Components
-HLT,True,ceiling_breakout,,0.6973798626038988,0.0,2026-05-18,0.1,0,0,320.83,0,,,True,False,Consumer Services,Hotels/Resorts/Cruise lines
-CRDO,True,ceiling_breakout,,1.1553060283281604,0.0,2026-05-18,12.9,0,0,193.5,0,,,True,False,Technology Services,Information Technology Services
-PFG,True,three_weeks_tight_breakout,True,0.693699544171695,4.5,2026-04-20,7.1,0,0,97.01,1,-3.2,1.9,True,False,Finance,Investment Managers
-KRP,True,pivot,False,1.041972750807326,6.1,2026-04-20,8.7,1,0,13.98,1,-9.3,0.6,False,False,Miscellaneous,Investment Trusts/Mutual Funds
-ALRS,True,three_weeks_tight_breakout,False,1.085944669825661,17.2,2026-01-05,21.8,2,1,23.03,3,-10.0,1.6,True,False,Finance,Major Banks
-MANU,True,ceiling_breakout,,0.9919563963659009,0.0,2026-05-18,1.8,0,0,19.65,0,,,True,False,Consumer Services,Movies/Entertainment
-MOV,True,10_wk_ema_touch_confirm,True,0.9486049781437104,40.1,2025-11-24,47.9,3,1,19.24,4,-8.4,-0.0,True,False,Consumer Durables,Other Consumer Specialties
-LXFR,True,ceiling_breakout,,0.687488185402194,0.0,2026-05-18,3.3,0,0,15.71,0,,,True,False,Non-Energy Minerals,Other Metals/Minerals
-MCY,True,10_wk_ema_touch_confirm,False,1.0463359974710718,4.9,2026-04-13,5.1,1,0,96.15,1,-6.2,0.3,True,False,Finance,Property/Casualty Insurance
-PSMT,True,three_weeks_tight_breakout,False,0.947119361486601,66.4,2025-04-21,74.5,7,3,94.37,7,-6.2,1.2,True,False,Retail Trade,Specialty Stores
-FEIM,True,ceiling_breakout,,0.8803621794247116,0.0,2026-05-18,13.8,0,0,59.74,0,,,True,False,Electronic Technology,Telecommunications Equipment
-BK,True,pivot,False,0.9529913307485859,55.1,2025-05-12,58.1,5,2,86.77,7,-5.0,0.1,True,False,,
-TIGO,True,10_wk_ema_touch_confirm,False,1.0415365840614053,242.3,2025-03-03,265.3,9,1,23.5,8,-17.7,0.7,True,False,Communications,Wireless Telecommunications
-CHMG,False,,False,2.3661145862596062,3.2,2026-04-20,6.8,0,0,64.57,1,-8.2,-2.7,True,True,Finance,Regional Banks
-SRBK,False,,False,2.201569641514708,50.3,2025-04-14,50.7,10,3,12.41,6,-8.2,-4.6,True,True,Finance,Regional Banks
-FNRN,False,,False,1.8801286224639862,73.4,2025-07-21,75.2,5,1,9.95,5,-3.7,-3.1,False,False,Finance,Regional Banks
-OVLY,False,,False,1.6733655836787023,6.1,2026-03-23,9.0,2,0,30.98,1,-8.5,-4.8,True,True,Finance,Regional Banks
-CBK,False,,True,1.3642912521256543,11.8,2026-03-23,12.7,1,0,25.45,1,-8.2,-3.4,True,True,Finance,Regional Banks
-BOTJ,False,,False,1.3106951254796138,34.9,2025-10-27,37.8,5,0,16.51,5,-23.9,-23.6,False,False,Finance,Regional Banks
-PEBK,False,,False,1.309285494302433,30.5,2025-11-24,31.8,2,2,31.9,3,-9.6,-1.4,True,True,Finance,Regional Banks
-GSBC,False,,False,1.1127852427787732,4.7,2026-04-06,9.0,0,0,65.05,2,-5.1,0.5,True,False,Finance,Regional Banks
-NTB,False,,False,1.0879191501127563,23.4,2025-11-17,24.2,3,2,45.09,3,-6.2,-2.3,True,False,Finance,Regional Banks
-ATLO,False,,False,1.062783821405635,34.3,2025-11-24,35.9,2,2,21.19,3,-7.8,-3.1,True,False,Finance,Regional Banks
-RRBI,False,,False,1.0158927890650955,45.7,2025-08-11,47.9,6,1,61.31,4,-13.4,-8.2,True,False,Finance,Regional Banks
-TRMK,False,,False,0.9997976993301888,5.0,2026-01-26,9.1,1,0,40.69,2,-6.5,-3.1,True,False,Finance,Regional Banks
-BWFG,False,,False,0.9263763754856318,54.8,2025-04-28,60.7,5,3,32.42,4,-16.6,-2.4,True,False,Finance,Regional Banks
-MSBI,False,,False,0.9157824862333269,11.9,2026-04-20,12.4,1,0,24.58,1,-8.2,-2.0,True,False,Finance,Regional Banks
-UVSP,False,,True,0.9118235249736986,18.9,2025-12-01,23.3,2,2,31.88,3,-3.8,1.2,True,False,Finance,Regional Banks
-CARE,False,,False,0.8253188538579996,20.4,2026-03-23,34.2,1,0,20.45,2,-3.1,3.6,True,False,Finance,Regional Banks
-FXNC,False,,False,0.824648755676382,5.4,2026-03-23,6.7,1,0,26.07,1,-11.7,-6.8,True,False,Finance,Regional Banks
-AMAL,False,,False,0.8033608097553172,9.5,2026-01-19,13.9,1,0,36.26,2,-17.3,-5.8,True,False,Finance,Regional Banks
-CBAN,False,,False,0.7951915263843727,7.3,2026-01-12,9.6,2,0,18.06,3,-10.8,-7.8,True,False,Finance,Regional Banks
-RBKB,False,,True,0.7819241773596688,0.2,2026-02-09,12.7,1,0,13.75,1,-8.7,-6.1,False,False,Finance,Regional Banks
-SRCE,False,,True,0.7710348175791346,11.1,2026-01-26,12.6,2,1,65.7,2,-5.8,-1.4,True,False,Finance,Regional Banks
-CPF,False,,True,0.7620983381374898,10.1,2026-03-23,10.8,1,0,31.34,1,-6.4,-1.9,True,False,Finance,Regional Banks
-BY,False,,False,0.7506514529007638,4.3,2026-03-30,6.0,1,0,31.29,1,-7.4,-3.0,True,False,Finance,Regional Banks
-CCNE,False,,True,0.7345538002279013,13.8,2026-01-12,16.4,2,1,26.33,3,-9.1,-3.6,True,False,Finance,Regional Banks
-CATY,False,,True,0.7220135721370745,5.6,2026-04-13,6.1,0,0,53.99,1,-4.6,-1.3,True,False,Finance,Regional Banks
-CCBG,False,,True,0.6942274190029738,0.0,2026-04-06,3.8,0,0,44.72,1,-7.8,-2.7,True,False,Finance,Regional Banks
-COSO,False,,False,0.6610695348558078,6.8,2026-03-23,7.0,1,0,23.99,1,-4.7,-1.8,True,False,Finance,Regional Banks
-FBP,False,,True,0.6516645782539109,6.5,2026-04-06,8.3,1,0,22.26,1,-6.0,-1.6,True,False,Finance,Regional Banks
-CNOB,False,,True,0.64388573751465,2.0,2026-04-27,4.8,0,0,28.4,1,-8.5,-2.3,True,False,Finance,Regional Banks
-CZWI,False,,True,0.5577237819463678,19.6,2025-11-24,23.2,2,1,16.57,4,-6.0,-4.8,False,False,Finance,Regional Banks
-ADI,False,,True,1.718707409559935,50.6,2025-11-24,56.0,2,1,254.5,4,-12.5,-8.9,False,False,Electronic Technology,Semiconductors
-MRAM,False,,,1.6877927384609457,56.7,2026-04-27,95.4,0,0,17.24,1,-45.2,-34.6,False,False,Electronic Technology,Semiconductors
-SITM,False,,False,1.5999417690421758,106.9,2025-12-01,132.1,3,2,313.93,3,-40.5,-13.8,False,False,Electronic Technology,Semiconductors
-AIP,False,,,1.596677973180706,87.6,2026-04-06,98.8,0,0,18.25,0,,,True,True,Electronic Technology,Semiconductors
-NVEC,False,,False,1.587597825339308,5.8,2026-04-27,7.2,1,0,85.1,1,-9.1,-3.1,True,True,Electronic Technology,Semiconductors
-GFS,False,,False,1.5236409215921325,98.8,2026-03-16,102.7,1,0,42.26,2,-8.6,12.1,True,True,Electronic Technology,Semiconductors
-LSCC,False,,False,1.3523706417372552,81.6,2025-12-01,103.0,3,1,70.55,3,-14.5,11.9,True,True,Electronic Technology,Semiconductors
-PENG,False,,,1.338732767848445,73.4,2026-04-20,77.4,0,0,29.99,0,,,True,True,Electronic Technology,Semiconductors
-ASX,False,,False,1.3165575549776403,173.7,2025-10-13,180.5,3,2,12.41,4,-14.2,1.5,True,True,Electronic Technology,Semiconductors
-SMTC,False,,False,1.2494212215034015,89.7,2026-03-30,107.0,2,0,75.75,1,-17.9,38.7,True,False,Electronic Technology,Semiconductors
-SYNA,False,,,1.2440534604497635,48.9,2026-04-27,51.9,0,0,94.59,0,,,True,False,Electronic Technology,Semiconductors
-QUIK,False,,False,1.2258704430075675,1.1,2026-05-04,8.1,0,0,18.6,1,-7.7,1.1,True,False,Electronic Technology,Semiconductors
-MTSI,False,,True,1.1708343299115618,160.6,2025-10-27,164.5,3,2,145.95,4,-11.3,31.3,True,False,Electronic Technology,Semiconductors
-NVTS,False,,,1.1610149858138872,69.3,2026-04-20,73.6,0,0,16.85,0,,,True,False,Electronic Technology,Semiconductors
-DIOD,False,,False,1.075627070336447,68.4,2026-01-26,69.5,1,1,58.8,2,-22.7,-15.4,False,False,Electronic Technology,Semiconductors
-MPWR,False,,False,1.0679873289726058,42.4,2026-03-30,46.1,1,0,1087.89,1,-15.0,-4.3,True,False,Electronic Technology,Semiconductors
-NVDA,False,,,1.06283313913233,0.1,2026-05-04,1.5,0,0,212.17,1,-9.2,-9.0,False,False,Electronic Technology,Semiconductors
-COHU,False,,False,1.0553134667043356,-0.9,2026-04-20,9.2,0,0,42.6,1,-18.0,-8.2,False,False,Electronic Technology,Semiconductors
-AMKR,False,,False,1.0540832086414655,13.4,2026-04-06,23.1,1,0,53.43,1,-21.2,-17.0,False,False,Electronic Technology,Semiconductors
-FN,False,,False,1.0463731361371016,138.1,2025-06-23,149.8,6,0,281.79,5,-18.8,-6.0,False,False,Electronic Technology,Semiconductors
-MU,False,,False,1.0289280458060412,378.3,2025-09-08,424.4,3,1,143.22,4,-5.4,0.5,True,False,Electronic Technology,Semiconductors
-INTC,False,,False,1.02098731392222,92.1,2026-04-06,136.8,0,0,50.6,1,-21.6,-8.2,True,False,Electronic Technology,Semiconductors
-MRVL,False,,,0.9689880965297567,83.4,2026-03-30,91.3,1,0,102.64,0,,,True,False,Electronic Technology,Semiconductors
-CRUS,False,,False,0.9665769479956214,7.0,2026-04-06,16.1,1,0,147.46,1,-11.1,-2.6,True,False,Electronic Technology,Semiconductors
-TXN,False,,,0.9567449516546658,35.2,2026-04-13,43.4,0,0,215.64,0,,,True,False,Electronic Technology,Semiconductors
-MXL,False,,False,0.9532196936397044,-0.7,2026-05-04,27.3,0,0,77.89,1,-20.8,-2.1,True,False,Electronic Technology,Semiconductors
-ON,False,,,0.953198236022584,40.0,2026-04-13,47.8,0,0,78.61,0,,,True,False,Electronic Technology,Semiconductors
-MCHP,False,,False,0.9368710333444371,4.5,2026-04-20,12.8,0,0,82.86,1,-15.8,-11.8,False,False,Electronic Technology,Semiconductors
-ASML,False,,False,0.9022230505857276,40.8,2025-12-29,49.6,2,1,1091.18,1,-21.9,2.4,True,False,Electronic Technology,Semiconductors
-AOSL,False,,False,0.9002542139492495,23.1,2026-04-13,30.6,0,0,31.94,1,-23.9,-9.2,True,False,Electronic Technology,Semiconductors
-AAOI,False,,False,0.8663642593423008,316.2,2026-01-26,321.6,2,0,43.05,2,-38.6,-22.3,False,False,Electronic Technology,Semiconductors
-AMD,False,,False,0.8569464757268505,67.9,2026-04-13,75.0,0,0,267.08,1,-7.2,2.5,True,False,Electronic Technology,Semiconductors
-SLAB,False,,True,0.8386877696445753,5.3,2026-02-02,35.9,2,1,160.0,2,-1.6,-0.4,True,False,Electronic Technology,Semiconductors
-FORM,False,,False,0.8048301164817286,87.9,2026-01-05,106.5,2,0,62.48,3,-29.4,-18.9,True,False,Electronic Technology,Semiconductors
-AVGO,False,,True,0.7940729174511044,1.9,2026-04-13,3.2,0,0,401.39,1,-9.8,-5.4,False,False,Electronic Technology,Semiconductors
-TSM,False,,False,0.7882523026785685,78.5,2025-06-23,81.6,5,3,222.76,5,-25.3,-3.7,False,False,Electronic Technology,Semiconductors
-LASR,False,,False,0.7517837998085275,346.2,2025-06-02,399.0,7,0,15.74,9,-21.0,-2.2,True,False,Electronic Technology,Semiconductors
-TSEM,False,,True,0.7103670695793909,73.2,2026-03-16,98.6,1,0,142.68,1,-19.0,24.7,True,False,Electronic Technology,Semiconductors
-COHR,False,,False,0.7084650093605197,224.5,2025-10-13,232.4,4,1,113.6,6,-29.5,-8.6,False,False,Electronic Technology,Semiconductors
-CTO,False,,False,1.8195516070761064,4.2,2026-04-06,8.3,2,0,18.81,1,-6.8,-1.4,True,True,Finance,Real Estate Investment Trusts
-WELL,False,,False,1.325807540447862,3.0,2026-04-13,4.1,1,0,207.6,1,-9.4,-1.2,True,True,Finance,Real Estate Investment Trusts
-OUT,False,,False,1.1278837005291085,70.6,2025-11-03,81.3,4,1,18.53,4,-10.9,-3.9,True,False,Finance,Real Estate Investment Trusts
-PSTL,False,,False,1.1000632555868548,48.6,2026-01-05,49.5,2,1,15.85,3,-5.7,1.9,True,False,Finance,Real Estate Investment Trusts
-CTRE,False,,False,1.0887588666286594,28.8,2025-08-04,32.2,4,1,31.12,4,-15.2,-1.1,False,False,Finance,Real Estate Investment Trusts
-LTC,False,,True,1.0697386846299477,5.0,2026-02-02,7.2,2,0,35.89,1,-11.2,-4.3,True,False,Finance,Real Estate Investment Trusts
-VTR,False,,False,1.043091988051678,7.5,2026-02-02,10.3,2,1,79.98,1,-10.2,-0.3,True,False,Finance,Real Estate Investment Trusts
-HST,False,,False,0.9870182921625098,18.2,2026-03-30,20.1,1,0,18.64,2,-5.5,0.1,True,False,Finance,Real Estate Investment Trusts
-NTST,False,,True,0.9769489528955148,6.1,2026-03-30,6.5,1,0,19.19,1,-4.7,-2.5,False,False,Finance,Real Estate Investment Trusts
-CBL,False,,False,0.9731454158580686,17.4,2026-03-30,24.6,0,0,37.9,1,-9.8,-1.6,True,False,Finance,Real Estate Investment Trusts
-FRT,False,,False,0.964456101097511,6.4,2026-04-13,8.3,0,0,110.55,2,-3.9,2.2,True,False,Finance,Real Estate Investment Trusts
-LAMR,False,,False,0.9462947067148185,14.7,2026-04-06,18.4,2,0,129.28,2,-9.2,-3.5,True,False,Finance,Real Estate Investment Trusts
-WSR,False,,False,0.8882476515947693,35.1,2026-01-19,35.2,2,0,14.05,3,-0.5,-0.1,False,False,Finance,Real Estate Investment Trusts
-EQIX,False,,True,0.8811590897930451,12.7,2026-03-23,13.1,0,0,954.61,1,-7.4,-3.9,True,False,Finance,Real Estate Investment Trusts
-MAC,False,,False,0.872513254082782,3.5,2026-04-06,4.7,1,0,21.18,1,-6.9,-1.7,True,False,Finance,Real Estate Investment Trusts
-FR,False,,True,0.7965518928184137,12.4,2025-11-24,13.5,3,0,55.74,3,-12.2,-1.2,True,False,Finance,Real Estate Investment Trusts
-SILA,False,,True,0.7389153073591544,19.9,2026-04-13,20.5,1,0,25.08,1,-0.3,-0.1,False,False,Finance,Real Estate Investment Trusts
-HR,False,,,0.7306819102818349,11.1,2026-04-13,11.5,2,0,18.26,0,,,False,False,Finance,Real Estate Investment Trusts
-MDV,False,,False,0.7287944393031566,1.5,2026-05-04,13.9,0,0,16.01,1,-2.6,1.1,True,False,Finance,Real Estate Investment Trusts
-IRM,False,,False,0.6665980757266028,-0.6,2026-04-27,2.1,1,0,123.89,1,-9.0,-5.7,True,False,Finance,Real Estate Investment Trusts
-EGP,False,,True,0.6574061272363165,-0.1,2026-05-04,2.4,0,0,200.29,1,-3.6,-0.8,True,False,Finance,Real Estate Investment Trusts
-IBKR,False,,,1.3147226719622778,1.1,2026-04-27,3.7,0,0,78.48,1,-8.3,-8.0,False,False,Finance,Investment Banks/Brokers
-OPY,False,,False,1.0481528926887154,12.2,2026-01-26,19.7,2,1,78.4,2,-21.7,-19.7,True,False,Finance,Investment Banks/Brokers
-VIRT,False,,False,0.9787666456532157,13.5,2026-03-30,18.8,0,0,44.15,2,-5.5,-5.2,False,False,Finance,Investment Banks/Brokers
-CBOE,False,,False,0.9623147883014144,37.3,2026-01-05,41.6,4,1,252.3,3,-4.8,-2.9,False,False,Finance,Investment Banks/Brokers
-STT,False,,True,0.7666611630612257,10.4,2026-04-06,15.1,1,0,133.78,1,-5.2,-1.0,True,False,Finance,Investment Banks/Brokers
-SNEX,False,,False,0.6611811199894602,20.7,2026-04-06,29.4,0,0,86.67,1,-18.6,-10.6,True,False,Finance,Investment Banks/Brokers
-SBLK,False,,True,1.4455920652793066,8.6,2026-03-30,9.5,1,0,24.11,2,-4.6,-2.7,True,True,Transportation,Marine Shipping
-GSL,False,,True,1.3999343889956566,14.0,2025-11-10,21.3,5,1,31.35,4,-12.4,-10.9,False,False,Transportation,Marine Shipping
-DAC,False,,False,1.2391238975763839,33.6,2026-01-05,38.2,3,1,94.7,3,-6.6,-3.2,True,False,Transportation,Marine Shipping
-NVGS,False,,False,1.1991403440212423,29.7,2026-01-05,30.7,3,1,17.7,3,-4.4,-2.8,False,False,Transportation,Marine Shipping
-ECO,False,,False,1.1569100215221726,37.5,2026-01-26,40.0,2,1,38.63,3,-8.5,-6.1,False,False,Transportation,Marine Shipping
-ESEA,False,,True,1.119976182515397,-3.1,2026-03-30,3.0,2,0,63.32,1,-13.9,-12.8,False,False,Transportation,Marine Shipping
-MATX,False,,True,1.0131447240997296,9.5,2026-03-30,10.3,1,0,164.81,1,-11.9,-4.1,True,False,Transportation,Marine Shipping
-INSW,False,,False,0.9751211006701269,52.7,2026-01-12,55.5,2,0,53.7,2,-11.2,-9.9,False,False,Transportation,Marine Shipping
-TDW,False,,False,0.9606766992921943,26.9,2026-01-26,28.4,2,0,61.74,2,-13.7,-10.9,False,False,Transportation,Marine Shipping
-TEN,False,,True,0.9544264226120297,50.5,2026-02-09,50.7,1,0,28.28,3,-7.0,-4.4,True,False,Transportation,Marine Shipping
-STNG,False,,False,0.869027243592791,-3.3,2026-04-27,1.7,0,0,78.88,1,-10.7,-8.2,False,False,Transportation,Marine Shipping
-KEX,False,,False,0.8258684826748295,6.9,2026-03-23,8.4,0,0,132.21,1,-8.0,-5.9,False,False,Transportation,Marine Shipping
-TNK,False,,False,0.7628305668310953,6.6,2026-03-23,9.7,2,0,70.4,2,-10.7,-8.1,True,False,Transportation,Marine Shipping
-WBS,False,,False,1.4838869571792608,13.5,2025-12-08,15.6,2,0,62.12,2,-9.2,-2.3,True,True,Finance,Savings Banks
-TRST,False,,False,0.8857989144679674,35.7,2025-10-20,41.9,5,2,35.41,2,-2.9,2.1,True,False,Finance,Savings Banks
-SMBC,False,,True,0.7055843893377595,3.7,2026-04-06,6.3,1,0,64.92,2,-5.6,-1.1,True,False,Finance,Savings Banks
-PRLB,False,,,1.0952155954140148,3.0,2026-05-04,3.6,0,0,68.91,1,-6.9,-2.4,False,False,Process Industries,Chemicals: Specialty
-GPRE,False,,False,1.0411783053919037,11.7,2026-02-02,25.7,2,0,12.31,3,-21.8,-18.3,False,False,Process Industries,Chemicals: Specialty
-CC,False,,False,0.9359886325357594,-0.7,2026-03-23,20.0,1,0,17.81,2,-26.2,-22.7,False,False,Process Industries,Chemicals: Specialty
-WLKP,False,,False,0.8306067726409383,1.3,2026-04-06,3.1,1,0,21.83,2,-4.8,-2.7,False,False,Process Industries,Chemicals: Specialty
-MTX,False,,False,0.7991496914972526,8.9,2026-03-23,16.4,2,0,65.96,2,-9.1,-5.2,False,False,Process Industries,Chemicals: Specialty
-REX,False,,False,0.740301183397314,55.9,2025-08-25,61.5,1,1,30.2,4,-24.8,-4.4,False,False,Process Industries,Chemicals: Specialty
-SDRL,False,,True,1.0300013981927432,45.9,2025-12-29,48.8,4,0,34.27,4,-11.5,-3.6,False,False,Industrial Services,Contract Drilling
-VAL,False,,True,0.8971292032548793,5.4,2026-02-09,23.4,1,1,81.97,1,-18.3,-4.1,False,False,Industrial Services,Contract Drilling
-NE,False,,False,0.8196335638128015,5.0,2026-04-20,9.7,2,0,47.39,1,-13.4,-4.7,False,False,Industrial Services,Contract Drilling
-VSH,False,,,1.7940302739997338,67.6,2026-04-20,69.1,0,0,27.95,0,,,True,True,Electronic Technology,Electronic Production Equipment
-AEIS,False,,False,1.3215033620454955,145.9,2025-06-23,146.6,6,0,131.75,7,-25.3,-17.0,False,False,Electronic Technology,Electronic Production Equipment
-FLEX,False,,False,1.217888009515744,72.6,2026-04-06,83.4,1,0,72.22,1,-14.9,-7.1,False,False,Electronic Technology,Electronic Production Equipment
-LFUS,False,,False,1.1448948031682975,42.8,2026-01-26,55.5,1,1,296.1,2,-19.7,-2.9,True,False,Electronic Technology,Electronic Production Equipment
-TER,False,,False,1.030029737496822,97.4,2025-11-24,123.9,2,1,160.06,3,-28.5,-15.1,True,False,Electronic Technology,Electronic Production Equipment
-SANM,False,,False,0.9398470433215256,28.2,2026-04-20,33.0,0,0,185.29,1,-16.4,-3.4,True,False,Electronic Technology,Electronic Production Equipment
-PLAB,False,,True,0.9377605642847242,26.0,2026-03-30,29.3,1,0,39.8,1,-16.8,-4.6,True,False,Electronic Technology,Electronic Production Equipment
-VRT,False,,False,0.904517380434024,39.7,2026-02-09,61.8,1,0,202.33,2,-17.3,-13.8,False,False,Electronic Technology,Electronic Production Equipment
-BHE,False,,False,0.8419645822984776,63.8,2026-01-26,66.1,1,1,51.25,2,-9.4,-3.0,False,False,Electronic Technology,Electronic Production Equipment
-AXTI,False,,False,0.7850247929776326,2223.9,2025-10-20,2397.0,3,0,5.64,6,-17.3,69.2,True,False,Electronic Technology,Electronic Production Equipment
-AEHR,False,,False,0.776490197314774,34.9,2026-04-06,81.2,0,0,52.45,2,-29.4,-12.6,False,False,Electronic Technology,Electronic Production Equipment
-PLXS,False,,True,0.7285862644466793,46.6,2026-01-12,57.4,2,1,168.77,3,-10.7,-3.7,True,False,Electronic Technology,Electronic Production Equipment
-VECO,False,,False,0.7272568703267573,15.1,2026-04-20,24.4,0,0,47.87,1,-28.5,-9.0,True,False,Electronic Technology,Electronic Production Equipment
-MPTI,False,,True,0.6397503933438226,2.2,2026-05-04,16.9,0,0,71.0,1,-17.8,-4.8,True,False,Electronic Technology,Electronic Production Equipment
-MEC,False,,False,3.393038365365501,-6.4,2026-05-04,10.6,0,0,23.02,1,-22.8,-6.4,True,True,Producer Manufacturing,Industrial Machinery
-TKR,False,,False,1.5235196138811704,32.4,2026-01-05,34.8,1,1,88.97,3,-8.3,-2.7,True,True,Producer Manufacturing,Industrial Machinery
-GHM,False,,False,1.3722110256426874,50.8,2025-12-08,63.7,3,1,58.0,5,-13.0,-8.3,False,False,Producer Manufacturing,Industrial Machinery
-MOD,False,,False,1.3041960941228454,41.1,2026-01-26,57.0,3,1,165.89,2,-19.1,-9.3,False,False,Producer Manufacturing,Industrial Machinery
-ICHR,False,,False,1.2628329047549314,43.3,2026-03-30,48.5,1,0,46.43,1,-17.5,-8.5,False,False,Producer Manufacturing,Industrial Machinery
-HLIO,False,,,1.2385484501661062,2.7,2026-05-11,4.2,0,0,75.95,0,,,True,False,Producer Manufacturing,Industrial Machinery
-KLIC,False,,False,1.189319063886122,82.0,2026-01-12,83.8,2,1,56.79,3,-23.8,-2.4,True,False,Producer Manufacturing,Industrial Machinery
-MKSI,False,,False,1.0761417218203346,105.5,2025-11-24,120.4,3,1,145.49,3,-20.1,-1.9,True,False,Producer Manufacturing,Industrial Machinery
-AMAT,False,,True,1.0318860908772112,61.7,2025-12-01,71.7,3,1,251.65,4,-11.3,-3.5,False,False,Producer Manufacturing,Industrial Machinery
-JCI,False,,True,1.0238347876544185,0.8,2026-02-02,12.5,3,0,122.99,1,-14.3,-5.8,False,False,Producer Manufacturing,Industrial Machinery
-NGS,False,,True,0.9977127726453442,42.9,2025-11-17,45.0,3,0,29.32,4,-12.2,2.8,True,False,Producer Manufacturing,Industrial Machinery
-CECO,False,,False,0.9785028427893738,-0.1,2026-05-04,3.2,0,0,79.17,1,-18.4,-9.5,False,False,Producer Manufacturing,Industrial Machinery
-ASYS,False,,False,0.9670598251138292,2.7,2026-05-04,19.5,0,0,18.47,1,-16.6,-7.6,True,False,Producer Manufacturing,Industrial Machinery
-JBL,False,,False,0.9291678177748041,45.1,2026-01-12,60.3,2,1,227.24,2,-9.0,-2.1,True,False,Producer Manufacturing,Industrial Machinery
-WWD,False,,False,0.9010125403673871,17.3,2025-11-24,31.9,3,0,266.4,3,-22.7,-13.6,False,False,Producer Manufacturing,Industrial Machinery
-LRCX,False,,True,0.8923812739478298,162.3,2025-09-08,183.6,3,1,107.66,5,-18.9,2.5,True,False,Producer Manufacturing,Industrial Machinery
-NPO,False,,False,0.8785963496038627,29.3,2026-01-26,30.9,3,1,235.44,3,-10.1,-5.7,False,False,Producer Manufacturing,Industrial Machinery
-UCTT,False,,False,0.8071477709185353,45.7,2026-03-16,49.9,1,0,56.03,1,-21.4,-4.2,False,False,Producer Manufacturing,Industrial Machinery
-ACLS,False,,True,0.6914535591200619,42.2,2026-04-06,52.5,0,0,102.93,1,-24.2,-8.5,True,False,Producer Manufacturing,Industrial Machinery
-GRC,False,,False,0.6620395166703911,63.4,2025-09-15,69.9,3,2,42.77,3,-28.4,-8.4,False,False,Producer Manufacturing,Industrial Machinery
-OII,False,,False,0.5412681711802881,20.4,2026-02-02,27.5,1,0,30.41,1,-16.2,-0.7,True,False,Producer Manufacturing,Industrial Machinery
-AVNS,False,,True,0.9364863286190617,88.0,2026-01-19,89.3,1,1,13.0,2,-1.0,-0.8,False,False,Health Technology,Medical Specialties
-AXGN,False,,True,0.7967144653506708,6.2,2026-04-13,14.0,1,0,35.89,1,-13.8,-10.8,False,False,Health Technology,Medical Specialties
-CELC,False,,False,0.7575331595994532,246.4,2025-07-28,522.9,3,1,22.19,5,-16.3,8.6,False,False,Health Technology,Medical Specialties
-ALL,False,,,1.3981807067750187,-0.4,2026-05-11,1.3,0,0,213.92,1,-3.6,-1.7,False,False,Finance,Multi-Line Insurance
-PLGO,False,,True,1.0182032421650533,8.7,2026-04-13,12.2,0,0,20.32,1,-13.8,-3.5,False,False,Finance,Multi-Line Insurance
-HG,False,,False,0.8793170082486673,50.9,2025-08-04,54.1,5,1,20.48,5,-10.8,-4.3,False,False,Finance,Multi-Line Insurance
-CNO,False,,,0.7819440959190515,2.8,2026-05-04,5.9,0,0,44.65,0,,,True,False,Finance,Multi-Line Insurance
-PUMP,False,,False,1.7510837761042697,47.5,2026-01-26,51.7,2,0,11.17,2,-27.1,-4.4,False,False,Industrial Services,Oilfield Services/Equipment
-KGS,False,,False,1.4679585886956283,50.2,2026-02-02,58.4,0,0,46.53,2,-5.9,23.5,False,False,Industrial Services,Oilfield Services/Equipment
-AROC,False,,False,0.9373352532121728,27.5,2026-01-26,29.9,2,0,28.68,2,-8.6,-4.9,True,False,Industrial Services,Oilfield Services/Equipment
-USAC,False,,True,0.8520127792992803,11.5,2026-02-09,12.1,1,1,25.95,2,-3.5,-2.8,False,False,Industrial Services,Oilfield Services/Equipment
-HAL,False,,,0.7573961353351568,-0.7,2026-05-11,1.7,0,0,40.78,1,-2.5,-1.4,False,False,Industrial Services,Oilfield Services/Equipment
-FET,False,,True,0.7356880981374674,157.6,2025-08-04,164.7,3,0,21.57,3,-17.2,-10.2,True,False,Industrial Services,Oilfield Services/Equipment
-LBRT,False,,True,0.6251097125829388,29.6,2026-01-26,33.7,0,0,23.81,2,-23.3,-6.4,False,False,Industrial Services,Oilfield Services/Equipment
-ZM,False,,False,1.5744356861355888,2.1,2026-04-27,9.4,0,0,96.52,1,-12.9,-3.5,True,True,Technology Services,Packaged Software
-CHRN,False,,True,1.5249203831649554,97.4,2025-12-29,171.6,1,1,5.7,3,-33.6,-23.9,False,False,Technology Services,Packaged Software
-BAND,False,,,1.2170487299679702,36.8,2026-04-27,111.2,0,0,29.07,0,,,True,False,Technology Services,Packaged Software
-ADEA,False,,False,1.1565286996951638,45.2,2026-01-05,51.5,2,1,17.73,2,-23.0,-19.5,False,False,Technology Services,Packaged Software
-TWLO,False,,False,1.037342703784379,2.5,2026-04-27,23.6,1,0,151.95,1,-10.8,-7.8,False,False,Technology Services,Packaged Software
-NBIS,False,,True,0.9359622099030139,48.1,2026-04-06,62.5,1,0,132.15,2,-21.7,-8.1,False,False,Technology Services,Packaged Software
-FFIV,False,,,0.9019295108769341,11.2,2026-05-04,13.8,0,0,346.0,0,,,True,False,Technology Services,Packaged Software
-NTCT,False,,False,0.8205786227252279,28.7,2026-03-23,33.7,0,0,30.67,2,-5.1,3.3,True,False,Technology Services,Packaged Software
-OPLN,False,,False,0.8189413682626565,11.9,2026-04-13,13.9,0,0,31.07,1,-19.6,-8.0,False,False,Technology Services,Packaged Software
-PBI,False,,False,0.8072731731419447,19.5,2026-04-13,20.1,0,0,12.7,2,-8.1,-7.1,False,False,Technology Services,Packaged Software
-YOU,False,,False,0.7771982982654274,24.4,2026-02-23,44.4,2,0,41.6,1,-16.0,16.5,True,False,Technology Services,Packaged Software
-ROKU,False,,True,0.7193308696184677,1.6,2026-04-27,7.6,0,0,116.66,1,-8.5,-4.0,True,False,Technology Services,Packaged Software
-DOCN,False,,False,0.6659804006137919,197.9,2026-01-05,206.6,3,0,51.69,4,-15.5,-3.8,True,False,Technology Services,Packaged Software
-PL,False,,False,0.6574835740238257,593.0,2025-08-04,597.3,7,2,6.36,3,-50.3,10.2,True,False,Technology Services,Packaged Software
-NYAX,False,,False,0.634596422031272,4.2,2026-04-13,11.9,1,0,60.76,1,-15.8,-9.2,True,False,Technology Services,Packaged Software
-CPRX,False,,,1.2432443157658435,19.0,2026-04-13,19.8,0,0,26.09,0,,,True,False,Health Technology,Pharmaceuticals: Major
-ETON,False,,False,1.1544096568642244,46.0,2026-03-16,53.0,1,0,21.3,1,-17.2,19.9,True,False,Health Technology,Pharmaceuticals: Major
-KALV,False,,False,1.0260173031363404,38.6,2026-03-23,56.2,2,0,17.15,1,-12.4,25.7,True,False,Health Technology,Pharmaceuticals: Major
-LGND,False,,False,1.005019826941258,-1.1,2026-04-13,9.7,0,0,209.1,1,-14.8,-2.3,True,False,Health Technology,Pharmaceuticals: Major
-RPRX,False,,False,0.9772290481946817,43.5,2025-11-03,46.5,3,1,37.2,3,-6.9,9.5,True,False,Health Technology,Pharmaceuticals: Major
-ASRT,False,,False,0.972662069295188,20.9,2026-03-23,68.0,1,1,13.95,1,-12.4,14.6,True,False,Health Technology,Pharmaceuticals: Major
-ORKA,False,,False,0.9432172741723043,81.5,2026-01-12,96.9,2,0,30.78,2,-22.5,-14.6,False,False,Health Technology,Pharmaceuticals: Major
-VTRS,False,,False,0.9255269882189422,-3.0,2026-05-04,4.5,0,0,15.93,1,-8.6,-5.0,True,False,Health Technology,Pharmaceuticals: Major
-JAZZ,False,,True,0.8736740554833605,28.3,2026-03-30,31.1,0,0,182.99,1,-4.6,17.5,True,False,Health Technology,Pharmaceuticals: Major
-SYRE,False,,False,0.8231307201407316,44.4,2026-04-06,55.5,0,0,47.61,1,-14.8,-2.5,False,False,Health Technology,Pharmaceuticals: Major
-KNSA,False,,True,0.7588027604415178,-3.7,2026-04-27,21.7,1,0,43.73,1,-11.1,-9.5,False,False,Health Technology,Pharmaceuticals: Major
-CYTK,False,,False,0.7359162451649397,0.0,2026-05-04,11.0,0,0,69.33,1,-8.8,-4.1,True,False,Health Technology,Pharmaceuticals: Major
-PRAX,False,,False,0.7203616709475428,80.8,2025-10-13,274.1,2,0,91.83,5,-12.2,-1.7,False,False,Health Technology,Pharmaceuticals: Major
-INDV,False,,True,0.7083175854152396,-0.3,2026-04-27,2.5,0,0,36.62,1,-12.7,-8.5,True,False,Health Technology,Pharmaceuticals: Major
-ALKS,False,,,0.6938865742421935,-1.8,2026-05-11,1.3,0,0,36.32,1,-8.4,-7.0,False,False,Health Technology,Pharmaceuticals: Major
-TVTX,False,,False,0.5971729423558298,0.7,2026-04-27,5.5,0,0,42.13,1,-7.0,-0.6,True,False,Health Technology,Pharmaceuticals: Major
-XOMA,False,,True,0.43046160676657613,0.7,2026-04-27,4.3,0,0,39.92,1,-1.2,-0.8,False,False,Health Technology,Pharmaceuticals: Major
-KNX,False,,False,1.09793747658021,8.8,2026-04-13,11.7,1,0,62.77,1,-10.9,3.5,True,False,Transportation,Trucking
-CVLG,False,,False,1.051720509274532,22.7,2026-04-13,27.9,1,0,29.26,1,-8.3,9.5,True,False,Transportation,Trucking
-WERN,False,,,1.0299091541315117,31.2,2026-03-30,33.7,2,0,29.77,0,,,True,False,Transportation,Trucking
-JBHT,False,,False,0.9085383495439466,30.8,2025-12-08,33.9,2,1,193.26,3,-9.9,-1.7,False,False,Transportation,Trucking
-XPO,False,,False,0.8866729387474575,-0.3,2026-02-02,27.3,3,0,159.43,3,-16.5,-12.3,False,False,Transportation,Trucking
-RKLB,False,,,1.1600857430680316,28.7,2026-05-04,36.3,1,0,99.58,0,,,True,False,Electronic Technology,Aerospace & Defense
-HXL,False,,False,0.9791463152240868,19.3,2025-11-17,23.2,5,0,69.97,3,-21.5,-11.1,False,False,Electronic Technology,Aerospace & Defense
-CW,False,,False,0.9718486147521981,78.6,2025-05-12,89.5,4,3,385.91,6,-8.4,-2.3,True,False,Electronic Technology,Aerospace & Defense
-PKE,False,,True,0.9092247412096217,70.4,2025-12-08,78.4,3,0,19.4,4,-7.6,-0.1,True,False,Electronic Technology,Aerospace & Defense
-SIF,False,,False,0.8627315849088334,79.5,2026-02-09,163.3,3,0,7.5,2,-16.1,-3.1,True,False,Electronic Technology,Aerospace & Defense
-DCO,False,,False,0.756626409713667,34.0,2026-01-05,42.3,2,0,101.47,2,-19.9,0.6,False,False,Electronic Technology,Aerospace & Defense
-VTOL,False,,False,0.845551407395603,-1.7,2026-01-19,5.1,2,0,40.66,2,-19.9,-14.8,True,False,Transportation,Airlines
-GTX,False,,,1.275561653250161,28.7,2026-04-27,56.0,1,0,21.34,0,,,True,False,Producer Manufacturing,Auto Parts: OEM
-CMI,False,,True,1.2653406146670503,67.4,2025-08-04,71.0,2,1,374.09,7,-12.5,-10.9,False,False,Producer Manufacturing,Auto Parts: OEM
-DAN,False,,True,0.9463096337044448,86.7,2025-08-11,92.6,3,1,17.74,4,-18.8,-12.1,True,False,Producer Manufacturing,Auto Parts: OEM
-ITT,False,,True,0.6733038169584731,0.9,2026-03-30,1.0,1,0,193.07,1,-15.5,-13.0,False,False,Producer Manufacturing,Auto Parts: OEM
-NPKI,False,,False,1.0806220288607726,11.4,2026-01-12,19.0,2,0,13.04,3,-11.8,-5.9,True,False,Producer Manufacturing,Building Products
-DLX,False,,False,0.850245471609454,19.5,2025-11-24,23.9,3,0,19.15,4,-30.0,-24.7,True,False,Commercial Services,Commercial Printing/Forms
-STX,False,,True,0.826558203894824,598.0,2025-05-26,625.0,7,1,112.1,6,-25.6,77.2,True,False,Electronic Technology,Computer Peripherals
-EXTR,False,,,0.7997880045354998,6.5,2026-05-04,11.8,0,0,22.89,0,,,True,False,Electronic Technology,Computer Peripherals
-WDC,False,,False,0.7388162528963006,667.0,2025-06-23,700.6,4,0,60.49,4,-25.5,51.5,False,False,Electronic Technology,Computer Peripherals
-SNDK,False,,True,0.7369530431108736,2057.1,2025-09-01,2555.2,4,1,55.69,5,-18.3,-5.5,True,False,Electronic Technology,Computer Peripherals
-ADTN,False,,False,0.6904181972401284,21.2,2026-03-23,28.9,0,0,12.16,2,-24.6,-16.2,True,False,Electronic Technology,Computer Peripherals
-HPE,False,,,0.9459339166743953,42.1,2026-04-13,50.9,0,0,24.91,0,,,True,False,Electronic Technology,Computer Processing Hardware
-DELL,False,,False,0.9185507851615634,72.3,2026-03-23,77.1,0,0,166.69,1,-23.9,11.8,True,False,Electronic Technology,Computer Processing Hardware
-NATL,False,,False,0.6977230663696892,5.8,2026-02-09,10.6,2,0,40.39,2,-13.3,-7.9,True,False,Electronic Technology,Computer Processing Hardware
-ESP,False,,False,2.3906704567797146,7.7,2026-01-12,13.3,2,0,50.84,2,-23.6,-20.0,False,False,Electronic Technology,Electronic Components
-VPG,False,,False,1.9557599041967946,87.7,2026-04-20,102.6,0,0,56.14,1,-10.2,85.1,True,True,Electronic Technology,Electronic Components
-BELFA,False,,False,1.4098432284454907,129.9,2025-07-21,139.9,5,2,105.18,7,-19.1,-7.5,True,True,Electronic Technology,Electronic Components
-CAMT,False,,False,1.1875100995840293,14.7,2026-01-12,24.1,2,0,134.82,3,-29.8,-20.4,False,False,Electronic Technology,Electronic Components
-TTMI,False,,False,1.0917920006076882,546.6,2025-05-12,601.3,5,2,27.08,6,-16.4,5.5,True,False,Electronic Technology,Electronic Components
-GLW,False,,False,1.0175915210841615,262.6,2025-07-14,263.3,5,2,53.41,5,-33.0,8.4,True,False,Electronic Technology,Electronic Components
-KN,False,,False,0.9895779316946092,44.1,2026-03-23,49.8,1,0,24.48,1,-3.1,3.7,True,False,Electronic Technology,Electronic Components
-NVT,False,,True,0.9035082516298456,39.8,2026-03-30,40.6,1,0,117.13,1,-12.8,-5.6,False,False,Electronic Technology,Electronic Components
-RFIL,False,,True,0.8497519084475335,63.2,2026-02-23,93.7,2,0,9.56,2,-15.0,20.1,True,False,Electronic Technology,Electronic Components
-VICR,False,,False,0.8004449580793537,156.7,2025-12-15,172.4,3,1,98.38,3,-27.1,-15.4,False,False,Electronic Technology,Electronic Components
-VIK,False,,False,1.4860992822866192,26.1,2025-11-24,31.4,3,2,64.11,1,-23.9,-2.3,False,False,Consumer Services,Hotels/Resorts/Cruise lines
-CVEO,False,,False,0.9765594765326839,18.4,2026-04-06,18.5,1,0,28.36,1,-18.1,-7.9,False,False,Consumer Services,Hotels/Resorts/Cruise lines
-MCRI,False,,False,0.8636641732465253,1.6,2026-04-20,3.5,1,0,112.85,1,-6.2,-3.4,False,False,Consumer Services,Hotels/Resorts/Cruise lines
-LIND,False,,False,0.7690230941624011,36.8,2026-01-05,38.0,2,0,14.91,2,-28.2,-7.9,True,False,Consumer Services,Hotels/Resorts/Cruise lines
-VIAV,False,,False,1.1184507919372033,279.7,2025-10-13,285.3,2,1,12.85,5,-25.0,-18.1,False,False,Technology Services,Information Technology Services
-PDFS,False,,False,1.0243074653379585,18.7,2026-04-06,28.7,2,0,35.82,1,-27.9,-11.8,True,False,Technology Services,Information Technology Services
-XMTR,False,,,0.9987175873762283,11.5,2026-05-04,32.8,0,0,67.19,0,,,True,False,Technology Services,Information Technology Services
-RIOT,False,,False,0.7860772404400155,1.7,2026-05-04,8.6,0,0,22.55,1,-5.7,0.1,True,False,Technology Services,Information Technology Services
-ATEN,False,,False,0.6736164232142463,30.8,2026-03-23,35.6,0,0,21.51,1,-11.2,3.8,True,False,Technology Services,Information Technology Services
-INGM,False,,False,0.6502148988235626,8.0,2026-03-30,12.5,1,0,23.68,1,-19.6,-14.8,True,False,Technology Services,Information Technology Services
-FSLY,False,,True,0.5328014968356702,-10.6,2026-02-09,31.4,1,0,12.42,2,-54.1,-52.3,False,False,Technology Services,Information Technology Services
-AAMI,False,,False,1.3202339768642333,15.6,2026-04-06,27.4,0,0,56.18,1,-10.6,2.4,True,True,Finance,Investment Managers
-MYFW,False,,False,1.2186477302649452,-0.5,2026-04-27,1.5,0,0,28.0,1,-8.1,-5.3,True,False,Finance,Investment Managers
-HASI,False,,False,1.0361249695382397,4.3,2026-04-06,8.8,1,0,37.31,1,-8.6,-5.5,False,False,Finance,Investment Managers
-VCTR,False,,,0.9474257865963951,16.3,2026-04-13,20.9,1,0,71.07,0,,,True,False,Finance,Investment Managers
-MS,False,,True,0.8798810087359458,4.1,2026-05-04,5.5,0,0,190.6,1,-4.3,3.2,True,False,Finance,Investment Managers
-NTRS,False,,True,0.8483708208144464,21.8,2025-12-08,25.7,1,1,133.44,3,-6.1,-0.9,True,False,Finance,Investment Managers
-BEN,False,,,0.7387205933101965,4.0,2026-04-27,7.4,0,0,28.88,1,-5.9,-4.4,False,False,Finance,Investment Managers
-PBT,False,,False,1.3749813392009003,50.3,2026-03-16,52.6,1,0,20.32,1,-11.5,37.2,True,True,Miscellaneous,Investment Trusts/Mutual Funds
-WT,False,,False,0.7393749964527262,20.7,2026-04-06,30.1,2,0,14.67,2,-5.7,-3.7,False,False,Miscellaneous,Investment Trusts/Mutual Funds
-GAIN,False,,False,0.6974391983817649,11.7,2026-03-30,15.1,1,0,13.82,1,-13.7,-5.7,False,False,Miscellaneous,Investment Trusts/Mutual Funds
-BLX,False,,False,1.2382272816863584,16.8,2026-01-26,17.0,1,1,47.1,2,-8.8,-2.7,True,False,Finance,Major Banks
-THFF,False,,False,0.988138471408609,15.6,2025-12-01,18.1,1,1,58.09,2,-14.6,-0.7,True,False,Finance,Major Banks
-AROW,False,,True,0.9221033866827711,12.4,2026-03-23,12.7,2,0,32.68,1,-7.7,-2.5,True,False,Finance,Major Banks
-CAC,False,,False,0.8779486951540934,7.6,2026-03-23,9.1,1,0,45.22,1,-9.2,-4.7,True,False,Finance,Major Banks
-OSBC,False,,False,0.8368519341612055,8.2,2025-12-01,10.3,2,1,19.11,2,-14.2,-5.7,True,False,Finance,Major Banks
-BOKF,False,,False,0.7486746574706435,7.2,2026-01-05,11.0,2,0,117.78,1,-13.7,-6.0,True,False,Finance,Major Banks
-C,False,,True,0.6976889447506881,1.0,2026-04-06,2.7,0,0,121.76,1,-9.9,-5.9,True,False,Finance,Major Banks
-STRZ,False,,True,0.934858676169515,10.9,2026-04-13,31.0,0,0,17.0,1,-28.2,-7.2,False,False,Consumer Services,Movies/Entertainment
-MSGE,False,,False,0.9312562894266703,52.2,2025-10-20,58.1,4,1,44.04,4,-20.8,1.6,True,False,Consumer Services,Movies/Entertainment
-MSGS,False,,False,0.7582162496574947,49.0,2025-12-08,50.5,6,1,235.19,3,-12.0,2.4,False,False,Consumer Services,Movies/Entertainment
-FCX,False,,True,0.7266771200817276,10.5,2026-03-23,17.1,3,0,52.96,1,-21.3,-12.1,False,False,Non-Energy Minerals,Other Metals/Minerals
-ALM,False,,False,0.6544422645896755,120.6,2025-12-15,141.1,3,0,7.74,3,-44.6,-23.6,True,False,Non-Energy Minerals,Other Metals/Minerals
-UFCS,False,,False,1.1102371930236965,25.5,2026-03-30,26.9,2,0,37.16,1,-20.2,-3.6,False,False,Finance,Property/Casualty Insurance
-AIZ,False,,,0.9742481593256404,0.1,2026-05-11,3.9,0,0,245.31,0,,,True,False,Finance,Property/Casualty Insurance
-PRA,False,,False,0.9728683553133123,1.7,2026-01-26,1.8,1,0,24.19,2,-1.2,-0.7,True,False,Finance,Property/Casualty Insurance
-THG,False,,,0.9227706996065074,3.2,2026-05-04,4.3,0,0,187.14,0,,,False,False,Finance,Property/Casualty Insurance
-UVE,False,,False,0.810359231411863,10.0,2026-04-13,10.7,1,0,35.22,1,-8.4,-6.7,True,False,Finance,Property/Casualty Insurance
-HZO,False,,False,1.0714602873949455,14.3,2026-04-13,23.7,1,0,28.23,1,-22.0,1.4,True,False,Retail Trade,Specialty Stores
-CASY,False,,False,0.7312622434630389,54.9,2025-11-03,55.9,4,1,529.21,5,-6.8,-5.0,False,False,Retail Trade,Specialty Stores
-ELA,False,,False,0.7247136091972862,44.4,2026-03-16,58.4,1,0,15.06,2,-31.9,-4.9,False,False,Retail Trade,Specialty Stores
-HLIT,False,,False,2.3605584129921238,29.3,2026-04-27,39.8,1,0,10.87,1,-3.5,18.0,True,True,Electronic Technology,Telecommunications Equipment
-VSAT,False,,False,1.5217616623828076,175.1,2025-08-11,179.3,4,3,26.7,5,-3.6,6.0,True,True,Electronic Technology,Telecommunications Equipment
-CSCO,False,,False,1.119354356701031,56.0,2025-11-10,70.0,2,2,70.82,2,-13.6,42.4,True,False,Electronic Technology,Telecommunications Equipment
-NOK,False,,False,0.9619110117354099,75.4,2026-03-30,88.9,1,0,8.19,1,-12.7,11.4,True,False,Electronic Technology,Telecommunications Equipment
-DGII,False,,False,0.9212868526101317,49.8,2026-02-02,51.5,3,1,43.68,2,-12.9,-5.2,True,False,Electronic Technology,Telecommunications Equipment
-AAPL,False,,,0.9208912321202608,10.3,2026-04-27,10.3,0,0,279.86,0,,,True,False,Electronic Technology,Telecommunications Equipment
-CIEN,False,,False,0.7695831853519893,400.2,2025-09-01,475.5,6,0,101.44,3,-23.9,59.5,True,False,Electronic Technology,Telecommunications Equipment
-RLAY,False,,False,2.3433235852470817,7.9,2026-03-30,26.2,1,0,10.72,1,-32.9,-21.9,True,True,,
-WOLF,False,,,1.5344289988400657,90.1,2026-04-27,103.9,0,0,34.28,0,,,True,True,,
-POET,False,,,1.4349117732237506,33.2,2026-05-04,67.1,1,0,8.73,1,-43.2,-29.9,False,False,,
-MBBC,False,,False,1.3017661549989221,9.2,2025-12-22,11.4,1,0,12.0,3,-17.4,-13.7,False,False,,
-TRT,False,,False,1.2689975470349988,-16.3,2026-04-20,81.8,1,0,7.6,1,-49.7,-35.4,False,False,,
-Q,False,,False,0.9489664690140582,40.6,2026-02-09,51.8,1,1,103.36,3,-17.5,-8.5,False,False,,
-LWLG,False,,False,0.8500636526459936,68.9,2026-03-09,118.5,1,0,5.88,2,-41.6,-29.7,False,False,,
-APC,False,,,0.6594949971877895,7.1,2026-05-04,9.1,0,0,19.0,0,,,True,False,,
-NEXA,False,,False,0.597025632303077,53.9,2025-12-22,65.0,2,1,8.77,2,-46.5,-12.6,False,False,,
-ERAS,False,,False,0.5351909497046455,223.0,2025-12-22,225.8,3,0,3.45,3,-64.2,-53.7,True,False,,
-ATEX,False,,,1.210621724196729,40.7,2026-04-20,49.9,0,0,42.41,0,,,True,False,Communications,Wireless Telecommunications
-GSAT,False,,False,0.7624647612596865,3.7,2026-04-13,10.8,0,0,74.88,1,-2.2,0.4,True,False,Communications,Wireless Telecommunications
-ADM,False,,True,0.8594993325461252,20.6,2026-01-12,22.8,3,0,63.14,3,-6.7,-6.1,False,False,Process Industries,Agricultural Commodities/Milling
-SEB,False,,True,0.7610142770393102,15.0,2025-11-17,16.1,3,1,4239.31,3,-27.9,-17.0,True,False,Process Industries,Agricultural Commodities/Milling
-ENLT,False,,False,1.148662923519776,373.1,2025-05-26,404.6,2,1,18.28,9,-10.1,-0.7,True,False,Utilities,Alternative Power Generation
-CENX,False,,True,0.9106179744723771,79.6,2025-12-15,90.0,2,0,34.23,3,-21.8,-5.3,True,False,Non-Energy Minerals,Aluminum
-CSTM,False,,True,0.8960988494448993,42.2,2026-03-23,43.3,1,0,23.2,2,-11.9,-1.9,True,False,Non-Energy Minerals,Aluminum
-KALU,False,,False,0.8143737221616361,69.5,2025-12-01,84.1,1,1,95.3,3,-13.9,-4.1,True,False,Non-Energy Minerals,Aluminum
-RL,False,,True,1.9319549129730151,32.7,2025-07-07,34.8,8,2,280.21,4,-18.4,-2.9,True,True,Consumer Non-Durables,Apparel/Footwear
-MNST,False,,True,0.8585862192499175,32.8,2025-09-22,34.7,4,0,64.45,6,-2.8,-1.3,False,False,Consumer Non-Durables,Beverages: Non-Alcoholic
-PHVS,False,,,0.9967287644613924,3.8,2026-04-13,4.2,0,0,28.48,1,-15.0,-11.0,False,False,Health Technology,Biotechnology
-INBX,False,,False,0.8884863234846608,-21.5,2026-04-20,11.9,0,0,90.58,1,-36.1,-34.8,False,False,Health Technology,Biotechnology
-TNGX,False,,False,0.8434498291554231,19.4,2026-03-02,55.3,1,0,13.03,1,-31.0,-24.5,False,False,Health Technology,Biotechnology
-ARWR,False,,False,0.8343567147670378,1.4,2026-04-20,5.1,0,0,71.3,1,-15.0,-8.9,False,False,Health Technology,Biotechnology
-AXSM,False,,,0.812780802357572,14.3,2026-04-27,23.2,0,0,191.5,0,,,True,False,Health Technology,Biotechnology
-CBIO,False,,False,0.7674048235602299,6.9,2026-03-30,34.7,0,0,15.4,2,-45.6,-24.3,True,False,Health Technology,Biotechnology
-CGON,False,,True,0.7425978569448082,18.5,2026-01-05,39.9,1,0,45.94,3,-17.0,-12.7,False,False,Health Technology,Biotechnology
-UTHR,False,,True,0.7423457069468532,6.0,2026-03-09,9.6,0,0,518.61,2,-6.3,-4.1,False,False,Health Technology,Biotechnology
-KRYS,False,,,0.7226646206465451,-2.0,2026-05-04,1.2,1,0,295.98,1,-10.5,-6.3,False,False,Health Technology,Biotechnology
-MRNA,False,,True,0.7187631038568608,12.1,2026-01-12,31.7,1,0,35.59,2,-24.4,-18.9,False,False,Health Technology,Biotechnology
-ELVN,False,,True,0.5757711274735289,7.0,2026-03-23,38.3,1,0,30.03,1,-20.5,-14.4,True,False,Health Technology,Biotechnology
-ANAB,False,,True,0.5447629303655777,115.0,2025-11-24,120.1,3,1,27.13,3,-21.0,-17.5,False,False,Health Technology,Biotechnology
-RLYB,False,,True,0.21421935859177624,10.4,2026-05-04,62.7,0,0,9.76,1,-11.1,3.7,True,False,Health Technology,Biotechnology
-RSI,False,,False,0.6932343962870096,18.2,2026-04-13,20.0,1,0,22.55,1,-10.9,-6.7,True,False,Consumer Services,Casinos/Gaming
-ODC,False,,False,1.765986862522165,11.1,2026-03-30,12.9,1,0,66.32,1,-9.9,-3.6,False,False,Process Industries,Chemicals: Agricultural
-CF,False,,False,0.6833965121146279,5.5,2026-03-02,19.0,0,0,102.26,1,-20.2,-11.1,False,False,Process Industries,Chemicals: Agricultural
-PRM,False,,True,0.9702178040359937,0.8,2026-04-20,4.1,1,0,29.88,2,-12.5,-10.9,False,False,Process Industries,Chemicals: Major Diversified
-ESI,False,,False,0.9294393058637626,38.6,2026-01-12,42.7,2,1,28.55,3,-15.0,-9.2,False,False,Process Industries,Chemicals: Major Diversified
-SILC,False,,True,1.669257289607306,118.0,2026-03-23,134.1,1,0,19.36,2,-23.9,-13.8,False,False,Electronic Technology,Computer Communications
-NWPX,False,,False,0.9304483024028146,91.5,2025-11-24,99.1,4,0,56.37,5,-8.1,-1.8,True,False,Non-Energy Minerals,Construction Materials
-SHAZ,False,,,2.552999207861397,83.8,2026-04-13,97.3,0,0,34.5,0,,,True,True,Technology Services,Data Processing Services
-AKAM,False,,,1.453136649520136,-0.3,2026-05-04,14.0,1,0,129.17,1,-16.5,-11.0,False,False,Technology Services,Data Processing Services
-APLD,False,,,1.1401734109459503,11.2,2026-05-04,17.6,0,0,39.0,0,,,True,False,Technology Services,Data Processing Services
-CORZ,False,,,0.8291583668847118,10.2,2026-05-04,13.3,0,0,22.3,0,,,True,False,Technology Services,Data Processing Services
-WULF,False,,True,0.7542596840998524,20.9,2026-04-06,41.5,1,0,16.13,2,-23.9,-11.4,True,False,Technology Services,Data Processing Services
-NEE,False,,True,2.106216178876698,1.4,2026-01-26,3.1,1,0,85.88,2,-12.3,-10.3,False,False,Utilities,Electric Utilities
-IDA,False,,False,1.3514323658930927,-1.0,2026-02-09,5.6,1,0,134.53,2,-6.2,-4.0,True,True,Utilities,Electric Utilities
-AEP,False,,False,1.3369744294623498,2.8,2026-02-09,7.8,3,0,122.04,1,-9.7,-4.3,True,True,Utilities,Electric Utilities
-LNT,False,,False,1.1421047046366932,5.6,2026-03-23,7.9,1,0,68.52,1,-6.8,-1.7,True,False,Utilities,Electric Utilities
-AEE,False,,False,1.116303690589184,1.0,2026-02-09,5.9,0,0,105.13,1,-8.6,-3.7,True,False,Utilities,Electric Utilities
-ETR,False,,False,1.0123203689706726,16.1,2026-02-02,16.5,3,0,96.5,2,-7.6,-4.1,True,False,Utilities,Electric Utilities
-KEN,False,,False,0.8297161658209627,72.1,2025-10-27,79.3,2,0,47.81,5,-18.4,-8.5,True,False,Utilities,Electric Utilities
-ORA,False,,,0.6983185827922381,1.6,2026-05-11,3.7,0,0,128.71,0,,,True,False,Utilities,Electric Utilities
-ENS,False,,False,1.708559706034852,92.5,2025-10-13,111.9,2,1,109.58,3,-11.8,-3.1,False,False,Producer Manufacturing,Electrical Products
-SEDG,False,,,1.287455571235169,0.3,2026-05-11,48.9,0,0,41.6,0,,,True,False,Producer Manufacturing,Electrical Products
-THR,False,,False,1.0900895107021125,68.0,2025-12-01,82.9,4,1,35.93,4,-11.2,-7.8,True,False,Producer Manufacturing,Electrical Products
-AMPX,False,,False,1.0858966475218803,-1.8,2026-03-02,12.7,2,0,14.22,2,-34.5,-26.3,False,False,Producer Manufacturing,Electrical Products
-GNRC,False,,True,0.9634271407470536,30.5,2026-04-06,32.9,2,0,203.25,1,-4.9,-0.8,True,False,Producer Manufacturing,Electrical Products
-GEV,False,,False,0.9036693997720524,43.1,2026-01-26,53.6,3,0,676.1,2,-17.1,-12.1,False,False,Producer Manufacturing,Electrical Products
-ALNT,False,,False,0.902327092846736,38.3,2025-10-06,43.0,4,1,44.31,4,-24.2,-18.1,True,False,Producer Manufacturing,Electrical Products
-ROK,False,,False,0.8663948811637927,-0.0,2026-05-04,6.2,0,0,425.74,1,-9.4,-2.1,True,False,Producer Manufacturing,Electrical Products
-FPS,False,,,0.8618887680650096,36.3,2026-04-20,41.9,1,0,33.76,0,,,True,False,Producer Manufacturing,Electrical Products
-POWL,False,,False,0.8457592589063743,99.6,2026-01-12,103.2,1,1,137.44,3,-23.2,-14.3,False,False,Producer Manufacturing,Electrical Products
-LITE,False,,False,0.8160446588363968,806.0,2025-07-21,810.5,3,0,104.0,7,-26.3,-12.8,False,False,Producer Manufacturing,Electrical Products
-FCEL,False,,,2.2025389055971267,123.7,2026-04-20,134.6,1,0,10.66,0,,,True,True,Electronic Technology,Electronic Equipment/Instruments
-ONTO,False,,False,2.0385972435462487,2.0,2026-04-06,9.9,1,0,238.55,1,-24.6,-17.0,False,False,Electronic Technology,Electronic Equipment/Instruments
-KEYS,False,,False,1.9562252754505132,75.1,2025-11-24,83.1,3,2,189.32,3,-11.1,-5.6,False,False,Electronic Technology,Electronic Equipment/Instruments
-NXT,False,,,1.2866004688238153,3.6,2026-05-04,4.5,1,0,124.9,1,-25.1,-16.8,False,False,Electronic Technology,Electronic Equipment/Instruments
-NVMI,False,,False,1.1316863439684193,27.8,2026-01-05,42.8,1,1,352.62,2,-15.9,-8.5,False,False,Electronic Technology,Electronic Equipment/Instruments
-MTRN,False,,,1.0763903144559341,52.1,2026-03-23,59.5,2,0,134.86,0,,,True,False,Electronic Technology,Electronic Equipment/Instruments
-CGNX,False,,False,0.9168446009201959,0.8,2026-05-04,10.7,0,0,59.71,1,-12.1,-8.0,True,False,Electronic Technology,Electronic Equipment/Instruments
-BW,False,,True,0.915394698382363,489.5,2025-10-06,536.8,6,1,2.99,3,-38.4,-13.6,False,False,Electronic Technology,Electronic Equipment/Instruments
-ESE,False,,False,0.8037009708167315,29.6,2026-01-26,32.5,2,0,223.16,2,-13.1,-9.7,True,False,Electronic Technology,Electronic Equipment/Instruments
-DBD,False,,True,0.5900818351936281,15.2,2025-11-24,17.5,2,0,63.21,4,-23.8,-16.4,True,False,Electronic Technology,Electronic Equipment/Instruments
-SXI,False,,False,0.567067412513373,0.9,2026-02-02,4.3,2,0,245.24,2,-18.4,-9.5,True,False,Electronic Technology,Electronic Equipment/Instruments
-ARW,False,,False,1.0921402450489255,37.0,2026-02-02,63.0,1,1,133.35,2,-4.8,14.3,True,False,Distribution Services,Electronics Distributors
-AVT,False,,True,0.8988802688054561,38.5,2026-01-26,54.3,2,1,55.69,1,-13.8,27.6,True,False,Distribution Services,Electronics Distributors
-SNX,False,,True,0.625207810514738,27.3,2026-03-30,45.3,1,0,163.35,1,-7.9,-1.3,True,False,Distribution Services,Electronics Distributors
-GVA,False,,False,1.6922779379028523,13.2,2025-12-08,16.3,2,0,111.78,4,-12.9,-10.4,False,False,Industrial Services,Engineering & Construction
-MWH,False,,,1.467847633473487,11.5,2026-04-13,18.9,0,0,32.34,1,-24.2,-20.6,False,False,Industrial Services,Engineering & Construction
-PWR,False,,False,1.1621408423007669,55.0,2026-01-12,55.2,2,1,466.04,2,-11.7,-7.6,False,False,Industrial Services,Engineering & Construction
-STRL,False,,False,1.1356906676030307,82.6,2026-02-02,90.9,2,1,384.0,2,-21.3,-17.9,False,False,Industrial Services,Engineering & Construction
-MTZ,False,,False,1.106889725897673,122.2,2025-06-23,128.9,6,2,166.95,7,-11.7,-8.6,False,False,Industrial Services,Engineering & Construction
-DY,False,,False,1.0607057620039015,43.1,2025-09-22,47.2,5,1,279.41,3,-28.7,-9.4,False,False,Industrial Services,Engineering & Construction
-FIX,False,,True,1.006194466743191,230.6,2025-07-14,232.0,4,2,550.64,5,-15.3,-11.8,False,False,Industrial Services,Engineering & Construction
-MYRG,False,,False,0.9302710217977218,99.2,2025-11-24,117.6,4,1,205.35,3,-12.0,-6.9,False,False,Industrial Services,Engineering & Construction
-IESC,False,,,0.9240551908611404,36.7,2026-03-30,36.8,2,0,482.35,1,-13.5,-5.8,False,False,Industrial Services,Engineering & Construction
-ESOA,False,,,0.9240373501293003,3.7,2026-04-27,7.8,0,0,16.21,1,-13.8,-12.4,False,False,Industrial Services,Engineering & Construction
-EME,False,,False,0.8618479453271737,12.3,2026-03-30,12.9,1,0,751.7,1,-12.4,-10.8,False,False,Industrial Services,Engineering & Construction
-ECG,False,,False,0.8209802029254447,41.4,2026-02-09,48.6,1,0,100.01,3,-18.6,-13.4,False,False,Industrial Services,Engineering & Construction
-AGX,False,,False,0.6802192707432858,60.2,2026-02-09,65.9,2,0,395.72,3,-17.8,-12.3,False,False,Industrial Services,Engineering & Construction
-ATLC,False,,False,1.2271202715619183,5.3,2026-04-20,9.8,0,0,75.71,1,-15.6,-3.4,True,False,Finance,Finance/Rental/Leasing
-BFH,False,,True,0.8679507502964212,-4.4,2026-04-13,5.9,0,0,81.79,1,-9.7,-5.1,False,False,Finance,Finance/Rental/Leasing
-EZPW,False,,False,0.8474940960348871,102.7,2025-08-25,103.6,5,1,16.6,5,-13.4,-9.0,True,False,Finance,Finance/Rental/Leasing
-FCFS,False,,False,0.6631646124500296,58.7,2025-08-18,66.6,5,0,136.57,5,-3.9,-1.2,True,False,Finance,Finance/Rental/Leasing
-IGIC,False,,False,0.9167940745223256,0.3,2026-03-30,4.2,1,0,24.29,1,-11.3,-7.3,True,False,Finance,Financial Conglomerates
-CHEF,False,,True,0.9539902224312418,-3.0,2026-04-27,10.9,1,0,68.94,1,-9.9,-7.7,False,False,Distribution Services,Food Distributors
-UNFI,False,,False,0.6353014970235953,7.4,2026-03-23,13.9,1,0,43.29,3,-8.6,-6.4,False,False,Distribution Services,Food Distributors
-WILC,False,,False,0.46699563755989415,12.4,2026-04-27,18.3,0,0,30.61,1,-9.9,-1.7,True,False,Distribution Services,Food Distributors
-VLGEA,False,,False,0.9808068021629447,17.2,2026-02-09,19.3,2,0,38.78,3,-10.2,2.5,True,False,Retail Trade,Food Retail
-TSN,False,,False,0.929863207961982,1.8,2026-03-23,3.3,2,0,62.99,1,-9.4,-6.4,False,False,Consumer Non-Durables,Food: Meat/Fish/Dairy
-SENEA,False,,False,0.795181413409082,8.9,2026-02-09,10.0,1,0,126.4,2,-27.5,-16.9,True,False,Consumer Non-Durables,Food: Specialty/Candy
-COCO,False,,,0.6240413169156981,13.9,2026-04-27,28.8,1,0,59.05,1,-4.1,-3.2,False,False,Consumer Non-Durables,Food: Specialty/Candy
-MDU,False,,False,1.482102176685765,3.9,2026-03-30,5.3,2,0,21.05,1,-7.0,-2.6,False,False,Utilities,Gas Distributors
-NI,False,,False,0.9282573881759336,3.9,2026-02-09,9.7,1,0,43.63,2,-4.9,-1.4,True,False,Utilities,Gas Distributors
-SWX,False,,False,0.8445934140275154,17.2,2025-09-29,17.4,5,1,76.61,2,-7.6,-4.1,True,False,Utilities,Gas Distributors
-CTRI,False,,False,0.7937939821267088,18.1,2025-12-01,22.8,2,0,24.6,4,-28.0,-23.2,False,False,Utilities,Gas Distributors
-TRGP,False,,True,0.7929214743753747,31.5,2026-02-02,31.7,2,0,210.21,1,-11.6,6.8,True,False,Utilities,Gas Distributors
-NHC,False,,False,0.9020227449431376,73.1,2025-08-18,81.6,7,2,107.95,5,-14.6,10.4,True,False,Health Services,Hospital/Nursing Management
-AZZ,False,,False,0.7446663840203506,12.5,2026-03-23,15.6,2,0,119.34,1,-10.4,-7.9,False,False,Process Industries,Industrial Specialties
-SHEL,False,,False,0.9620694847344852,10.8,2026-02-09,15.5,0,0,74.19,1,-11.7,-8.9,False,False,Energy Minerals,Integrated Oil
-PR,False,,False,0.6742669441763032,27.8,2026-01-26,32.5,2,0,15.43,1,-14.6,-7.6,False,False,Energy Minerals,Integrated Oil
-EBAY,False,,,0.9311480873075854,11.2,2026-04-27,15.6,1,0,100.14,1,-3.5,-0.9,True,False,Retail Trade,Internet Retail
-GOOG,False,,True,0.9769568762544306,10.8,2026-04-20,10.9,0,0,342.05,1,-5.0,-4.8,False,False,Technology Services,Internet Software/Services
-MRX,False,,False,0.6597217661745536,6.8,2026-04-06,10.9,0,0,47.99,1,-8.0,-6.0,False,False,Technology Services,Internet Software/Services
-OOMA,False,,False,0.8796483566952691,21.7,2026-04-13,23.3,1,0,15.51,1,-5.2,-1.0,True,False,Communications,Major Telecommunications
-SHEN,False,,False,0.8408619004906216,-2.5,2026-04-13,1.4,0,0,15.66,1,-7.1,-4.2,False,False,Communications,Major Telecommunications
-CNC,False,,,0.5503160217785708,10.9,2026-04-27,24.6,0,0,47.47,0,,,True,False,Health Services,Managed Health Care
-SPHR,False,,False,0.692383922678311,121.8,2025-09-08,155.0,2,0,50.74,4,-15.2,-11.6,False,False,Consumer Services,Media Conglomerates
-DVA,False,,,1.1654403430607418,-0.1,2026-05-04,10.5,1,0,179.6,1,-4.2,-2.1,False,False,Health Services,Medical/Nursing Services
-SNDA,False,,False,1.0340333097580006,6.7,2026-04-13,8.2,1,0,34.19,1,-14.8,-4.8,False,False,Health Services,Medical/Nursing Services
-CON,False,,,0.8352757845849543,5.1,2026-05-04,7.2,1,0,23.61,1,-6.1,-4.8,False,False,Health Services,Medical/Nursing Services
-BTSG,False,,False,0.8001362167333761,121.2,2025-09-08,135.7,5,0,24.82,5,-12.7,37.1,False,False,Health Services,Medical/Nursing Services
-RBC,False,,False,1.3346842668987577,35.8,2025-10-20,38.5,4,0,404.24,3,-17.6,-11.4,False,False,Producer Manufacturing,Metal Fabrication
-VMI,False,,False,0.9065292541374751,2.9,2026-04-20,22.7,1,0,418.51,1,-6.6,-2.8,True,False,Producer Manufacturing,Metal Fabrication
-HUT,False,,,0.9299785667278903,60.3,2026-04-06,69.0,1,0,62.68,0,,,True,False,Miscellaneous,Miscellaneous
-UTI,False,,,1.5892087968588595,1.3,2026-05-11,11.1,0,0,36.05,0,,,True,True,Commercial Services,Miscellaneous Commercial Services
-OCS,False,,False,1.438307901404264,27.8,2026-01-05,28.2,2,0,23.01,1,-26.7,-10.0,False,False,Commercial Services,Miscellaneous Commercial Services
-LINC,False,,True,1.0160726344989794,85.6,2026-01-12,93.7,2,0,24.99,4,-14.3,-9.5,False,False,Commercial Services,Miscellaneous Commercial Services
-ANDE,False,,False,0.8409135445997262,22.8,2026-01-12,25.4,3,0,56.51,3,-17.9,-11.0,False,False,Commercial Services,Miscellaneous Commercial Services
-ULS,False,,False,0.8298343411539043,12.3,2026-04-27,12.7,1,0,91.27,1,-12.5,-4.4,True,False,Commercial Services,Miscellaneous Commercial Services
-HCSG,False,,False,0.7859008244655961,25.0,2025-10-13,29.9,5,1,15.73,2,-31.2,-16.2,False,False,Commercial Services,Miscellaneous Commercial Services
-JLHL,False,,,0.3012074791502713,207.1,2026-04-13,209.5,1,0,6.3,1,-57.3,-36.8,False,False,Commercial Services,Miscellaneous Commercial Services
-BLBD,False,,True,1.5762629575959293,5.2,2026-04-06,8.9,1,0,60.89,2,-14.9,-9.9,False,False,Consumer Durables,Motor Vehicles
-NGL,False,,True,1.2304480822966921,187.0,2025-10-20,194.5,4,2,6.15,3,-6.7,33.2,True,False,Industrial Services,Oil & Gas Pipelines
-PAGP,False,,False,1.1947229359547524,27.5,2026-02-02,30.4,1,1,19.9,1,-9.1,6.6,True,False,Industrial Services,Oil & Gas Pipelines
-WMB,False,,True,1.0421489791677627,17.5,2026-01-26,21.6,1,1,64.55,2,-9.3,2.6,True,False,Industrial Services,Oil & Gas Pipelines
-WES,False,,,1.041458999540858,5.8,2026-05-04,7.7,1,0,42.72,1,-3.9,-2.1,True,False,Industrial Services,Oil & Gas Pipelines
-SUNC,False,,True,0.8543678480817812,38.4,2026-01-05,40.8,4,0,50.3,3,-1.9,-1.3,True,False,Industrial Services,Oil & Gas Pipelines
-PAA,False,,False,0.7804752222789353,26.8,2026-02-02,29.1,1,1,18.7,1,-8.8,7.9,True,False,Industrial Services,Oil & Gas Pipelines
-DTM,False,,False,0.6995421911832624,34.3,2025-11-03,39.0,5,1,108.74,2,-14.0,0.4,True,False,Industrial Services,Oil & Gas Pipelines
-ET,False,,,0.6323837122660484,-0.4,2026-05-11,4.4,0,0,19.22,1,-2.7,-2.0,False,False,Industrial Services,Oil & Gas Pipelines
-SEI,False,,False,1.0750571325579084,19.0,2026-04-06,28.4,1,0,57.84,2,-14.1,-6.2,False,False,Energy Minerals,Oil & Gas Production
-WTTR,False,,False,1.0671073780307887,34.4,2026-03-16,34.9,1,0,14.29,1,-16.1,14.3,False,False,Energy Minerals,Oil & Gas Production
-PNRG,False,,,0.955214404954115,8.4,2026-05-04,8.8,1,0,238.2,1,-12.7,-3.3,False,False,Energy Minerals,Oil & Gas Production
-FANG,False,,False,0.5522821801690722,23.8,2026-01-26,30.3,2,0,154.03,2,-17.9,-2.9,False,False,Energy Minerals,Oil & Gas Production
-VLO,False,,True,0.9109709405034503,72.8,2025-08-18,81.9,5,2,135.79,3,-16.1,-3.1,False,False,Energy Minerals,Oil Refining/Marketing
-MPC,False,,True,0.873354051950054,15.5,2026-03-02,20.6,1,1,211.15,1,-16.7,1.1,True,False,Energy Minerals,Oil Refining/Marketing
-DINO,False,,False,0.8487877988806575,26.5,2026-03-02,26.8,2,0,55.13,2,-8.7,-5.8,True,False,Energy Minerals,Oil Refining/Marketing
-PSX,False,,True,0.7642287546198513,27.5,2026-01-19,27.8,1,0,138.99,2,-18.5,-5.1,True,False,Energy Minerals,Oil Refining/Marketing
-APEI,False,,False,0.6690585284946798,27.8,2026-01-05,32.7,2,0,38.8,2,-17.8,-15.4,False,False,Consumer Services,Other Consumer Services
-AMN,False,,False,1.1306969746099542,-4.5,2026-05-04,29.4,0,0,21.38,1,-11.9,-4.6,False,False,Commercial Services,Personnel Services
-RVMD,False,,False,0.6974511804395275,2.0,2026-04-13,21.7,0,0,124.49,1,-15.9,-2.7,True,False,Health Technology,Pharmaceuticals: Other
-SSRM,False,,True,0.6578372719450899,12.4,2026-03-23,22.7,2,0,24.23,1,-23.1,-18.6,False,False,Non-Energy Minerals,Precious Metals
-SCHL,False,,True,0.41946707729708393,17.7,2026-02-23,25.8,2,0,32.37,2,-11.0,-2.4,True,False,Consumer Services,Publishing: Books/Magazines
-NSC,False,,False,0.999329675794765,4.5,2026-04-13,5.5,1,0,298.18,1,-4.1,-2.3,False,False,Transportation,Railroads
-UNP,False,,False,0.989351935036185,6.1,2026-04-06,8.0,1,0,246.29,1,-4.7,-3.2,False,False,Transportation,Railroads
-CSX,False,,False,0.8228987093601126,24.6,2026-01-19,26.0,3,1,36.13,2,-4.7,-2.2,False,False,Transportation,Railroads
-ARMK,False,,False,0.8938524960870187,13.6,2026-04-13,16.5,0,0,43.99,1,-17.1,-4.1,False,False,Consumer Services,Restaurants
-QSR,False,,False,0.6494956791435189,-1.6,2026-03-30,1.2,1,0,74.5,2,-8.8,-7.7,False,False,Consumer Services,Restaurants
-TSAT,False,,False,1.0813675058527692,44.4,2026-03-16,48.8,1,0,35.95,2,-22.4,-3.4,True,False,Communications,Specialty Telecommunications
-ITRN,False,,False,0.7505501435044141,42.6,2026-01-05,43.8,2,0,41.79,4,-8.3,-1.7,True,False,Communications,Specialty Telecommunications
-RS,False,,True,1.0283077974303079,0.3,2026-04-27,4.0,0,0,352.96,1,-7.7,-3.7,True,False,Non-Energy Minerals,Steel
-STLD,False,,True,0.8656910092294169,5.8,2026-04-20,18.7,0,0,202.23,1,-7.0,-1.5,True,False,Non-Energy Minerals,Steel
-VALE,False,,True,0.8258473427699423,24.6,2025-12-22,26.8,1,0,13.0,2,-22.0,-8.1,False,False,Non-Energy Minerals,Steel
-NUE,False,,False,0.7913251704312327,8.3,2026-04-20,18.0,0,0,196.61,1,-4.0,-1.5,True,False,Non-Energy Minerals,Steel
-MO,False,,False,0.6668028123187815,10.5,2026-04-20,13.3,1,0,65.2,1,-8.8,-0.9,True,False,Consumer Non-Durables,Tobacco
-CAT,False,,False,1.0385272852263059,115.0,2025-07-14,119.0,3,1,401.79,4,-9.2,-5.5,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
-FSTR,False,,False,0.8763374396619865,-9.9,2026-05-04,16.8,0,0,32.63,1,-14.2,-10.4,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
-PLOW,False,,False,0.7503997647423967,23.9,2026-01-05,32.8,2,0,33.28,1,-15.2,-5.7,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
-SUN,False,,False,1.2080981782927889,19.9,2026-02-09,25.4,3,0,56.06,1,-14.9,-1.9,False,False,Distribution Services,Wholesale Distributors
-MSM,False,,,0.958068278577061,12.6,2026-04-06,12.9,1,0,94.37,0,,,True,False,Distribution Services,Wholesale Distributors
-WCC,False,,False,0.8787805278246944,61.8,2025-10-20,70.4,4,2,213.33,3,-24.7,12.1,True,False,Distribution Services,Wholesale Distributors
-GWW,False,,,0.8259226995080738,1.3,2026-05-04,4.0,0,0,1199.66,1,-4.8,-2.7,False,False,Distribution Services,Wholesale Distributors
-DXPE,False,,False,0.7151639156669819,5.5,2026-03-23,10.1,1,0,130.97,1,-20.8,-16.8,False,False,Distribution Services,Wholesale Distributors
-AIT,False,,True,0.6264284354161763,1.5,2026-04-27,4.4,0,0,294.24,1,-6.6,-3.0,False,False,Distribution Services,Wholesale Distributors
+﻿code,signal,signal_source,pullback_v_is_dry,volume_ratio,hold_return,breakout_date,pct_above_ceiling,touched_ema10_count,mbox_count,ceiling,ceiling_date,base_depth_pct,pullback_count,pullback_pct,pullback_pct_off_peak,is_bullish,is_priority,sector,industry
+BSRR,True,ceiling_breakout,,1.5702039721132979,0.0,2026-05-18,0.4,0,0,38.03,2026-02-02,-18.1,0,,,True,True,Finance,Regional Banks
+STBA,True,ceiling_breakout,,1.0231964979717305,0.0,2026-05-18,0.9,0,0,44.47,2026-02-16,-13.2,0,,,True,False,Finance,Regional Banks
+FISI,True,ceiling_breakout,,0.7758916441125313,0.0,2026-05-18,0.7,0,0,35.1,2026-02-02,-17.0,0,,,True,False,Finance,Regional Banks
+RBCAA,True,ceiling_breakout,,0.7356167945048223,0.0,2026-05-18,3.5,0,0,76.76,2025-09-01,-17.8,0,,,True,False,Finance,Regional Banks
+ACNB,True,ceiling_breakout,,0.6561144701068699,0.0,2026-05-18,1.8,0,0,53.49,2026-02-02,-16.6,0,,,True,False,Finance,Regional Banks
+OVBC,True,three_weeks_tight_breakout,False,1.4030486318030702,21.6,2025-11-17,24.8,5,2,37.83,2025-04-28,-29.0,4,-6.1,0.7,True,True,Finance,Regional Banks
+CTBI,True,10_wk_ema_touch_confirm,False,0.8722796915492473,16.6,2026-01-05,16.7,4,1,57.16,2025-08-18,-13.6,1,-17.8,-2.6,True,False,Finance,Regional Banks
+PKBK,True,pivot,True,1.3215477705954037,34.3,2025-12-01,36.3,1,1,23.11,2024-11-25,-28.9,3,-6.1,0.1,True,True,Finance,Regional Banks
+PFIS,True,pivot,False,1.1674889072252665,12.0,2026-03-23,12.4,2,0,52.71,2025-09-01,-19.1,1,-8.8,-1.0,True,False,Finance,Regional Banks
+PCB,True,pivot,False,1.125383155743687,12.3,2026-03-23,12.4,2,0,21.83,2025-08-18,-12.2,2,-6.7,-1.6,True,False,Finance,Regional Banks
+FSBC,True,pivot,False,1.077872724260773,19.9,2025-10-20,29.3,4,2,32.45,2024-11-18,-33.7,2,-16.5,0.2,True,False,Finance,Regional Banks
+TMP,True,pivot,True,0.7985994398686734,13.1,2026-03-23,15.4,1,0,74.34,2024-12-02,-30.4,1,-7.0,-0.3,True,False,Finance,Regional Banks
+OBK,True,pivot,True,0.7057099186097817,13.8,2026-03-30,17.9,1,0,40.14,2025-02-10,-29.8,1,-6.4,-1.1,True,False,Finance,Regional Banks
+DCOM,True,pivot,False,0.6480506409990286,3.0,2026-04-06,6.3,1,0,34.7,2024-11-18,-35.8,1,-8.8,-2.6,True,False,Finance,Regional Banks
+OUST,True,ceiling_breakout,,1.856245910026027,0.0,2026-05-18,2.2,0,0,36.24,2025-10-20,-54.7,0,,,True,True,Electronic Technology,Semiconductors
+ALAB,True,ceiling_breakout,,1.418280960937488,0.0,2026-05-18,16.7,0,0,262.9,2025-09-15,-62.8,0,,,True,True,Electronic Technology,Semiconductors
+QCOM,True,ceiling_breakout,,1.1682402310710138,0.0,2026-05-18,13.4,0,0,210.03,2024-06-10,-43.8,0,,,True,False,Electronic Technology,Semiconductors
+CEVA,True,ceiling_breakout,,1.1211572861740409,0.0,2026-05-18,4.5,0,0,37.75,2025-02-10,-54.9,0,,,True,False,Electronic Technology,Semiconductors
+NXPI,True,three_weeks_tight_breakout,False,1.0116225475214404,7.2,2026-04-27,14.7,0,0,275.81,2024-07-08,-47.3,1,-3.8,6.9,True,False,Electronic Technology,Semiconductors
+KLAC,True,10_wk_ema_touch_confirm,False,0.9429635818926652,8.8,2026-04-06,19.7,2,0,1577.27,2026-01-12,-18.7,1,-15.1,-2.5,True,False,Electronic Technology,Semiconductors
+ARM,True,pivot,False,1.46579987943538,30.5,2026-04-20,67.6,0,0,182.88,2025-01-20,-56.3,1,-18.4,29.0,True,True,Electronic Technology,Semiconductors
+ALGM,True,pivot,False,0.9552514918221015,14.9,2026-04-13,19.5,0,0,38.45,2025-07-07,-41.7,1,-19.6,-6.6,True,False,Electronic Technology,Semiconductors
+AKR,True,ceiling_breakout,,0.9361431195631013,0.0,2026-05-18,4.5,0,0,21.01,2026-01-12,-12.4,0,,,True,False,Finance,Real Estate Investment Trusts
+KRG,True,ceiling_breakout,,0.8725084857412444,0.0,2026-05-18,3.6,0,0,26.09,2024-11-25,-33.7,0,,,True,False,Finance,Real Estate Investment Trusts
+XHR,True,ceiling_breakout,,0.7695150537323237,0.0,2026-05-18,5.4,0,0,15.96,2026-02-16,-12.3,0,,,True,False,Finance,Real Estate Investment Trusts
+BNL,True,three_weeks_tight_breakout,True,0.575485192110529,11.3,2026-03-30,11.7,2,0,18.27,2025-10-20,-9.1,1,-5.0,0.1,True,False,Finance,Real Estate Investment Trusts
+IVT,True,pivot,True,1.4614337403794515,9.0,2026-02-02,10.3,1,0,29.82,2024-12-02,-18.2,2,-6.2,0.6,True,True,Finance,Real Estate Investment Trusts
+SBRA,True,pivot,True,0.9731718693652648,5.8,2026-02-09,8.6,1,0,19.08,2025-08-18,-14.0,1,-9.4,-0.2,False,False,Finance,Real Estate Investment Trusts
+CPBI,True,ceiling_breakout,,2.873313112664293,0.0,2026-05-18,5.2,0,0,17.79,2026-02-16,-4.6,0,,,True,True,Finance,Investment Banks/Brokers
+GS,True,ceiling_breakout,,1.096540924204497,0.0,2026-05-18,1.8,0,0,979.54,2026-01-12,-20.3,0,,,True,False,Finance,Investment Banks/Brokers
+BNY,True,pivot,False,0.8491810968354769,57.4,2025-05-12,60.4,5,2,86.77,2025-02-24,-20.8,7,-5.0,1.6,True,False,Finance,Investment Banks/Brokers
+LPG,True,ceiling_breakout,,1.9316470796401815,0.0,2026-05-18,10.2,0,0,42.15,2024-05-27,-64.7,0,,,True,True,Transportation,Marine Shipping
+NMM,True,pivot,True,1.397529918540205,7.4,2026-03-30,13.7,1,0,65.53,2024-09-23,-56.8,2,-10.1,-4.3,True,True,Transportation,Marine Shipping
+FRO,True,pivot,False,1.0107350337893464,34.0,2026-01-26,45.4,3,1,25.53,2024-05-20,-53.4,1,-26.9,-6.1,True,False,Transportation,Marine Shipping
+CLBK,True,ceiling_breakout,,1.6696078576096773,0.0,2026-05-18,3.5,0,0,19.68,2023-12-18,-35.8,0,,,True,True,Finance,Savings Banks
+PDLB,True,ceiling_breakout,,1.6603348261938484,0.0,2026-05-18,3.1,0,0,18.01,2025-12-15,-13.8,0,,,True,True,Finance,Savings Banks
+TFSL,True,three_weeks_tight_breakout,,1.155349339073066,4.3,2026-05-11,5.8,1,0,15.1,2026-02-16,-14.2,0,,,True,False,Finance,Savings Banks
+R,True,10_wk_ema_touch_confirm,False,0.9756454131843842,7.9,2026-04-13,9.0,2,0,223.84,2026-02-16,-17.5,1,-11.5,-3.6,True,False,Transportation,Air Freight/Couriers
+FDX,True,10_wk_ema_touch_confirm,True,0.7481777749431362,26.7,2026-01-05,30.4,3,1,302.37,2024-07-15,-37.1,2,-15.5,-2.4,True,False,Transportation,Air Freight/Couriers
+BURL,True,ceiling_breakout,,1.4335627520417797,0.0,2026-05-18,7.3,0,0,302.42,2025-09-01,-20.5,0,,,True,True,Retail Trade,Apparel/Footwear Retail
+ROST,True,10_wk_ema_touch_confirm,False,1.4614590816346917,50.5,2025-10-20,50.6,4,0,155.9,2024-12-02,-22.5,5,-9.0,2.1,True,True,Retail Trade,Apparel/Footwear Retail
+CMP,True,10_wk_ema_touch_confirm,,1.0546995820660976,16.5,2026-04-27,18.5,1,0,25.81,2026-01-19,-19.4,0,,,True,False,Process Industries,Chemicals: Specialty
+LIN,True,pivot,False,0.8440185022306818,4.6,2026-02-16,7.6,2,1,481.05,2025-09-08,-19.7,1,-8.0,1.4,True,False,Process Industries,Chemicals: Specialty
+BKR,True,pivot,True,0.9185606068121256,28.6,2026-01-12,31.3,3,1,50.33,2025-09-22,-13.8,2,-11.3,-5.9,True,False,Industrial Services,Contract Drilling
+SLB,True,pivot,True,0.7616405975362356,51.0,2025-12-01,53.4,3,0,37.33,2025-07-07,-16.4,4,-7.8,0.1,True,False,Industrial Services,Contract Drilling
+CTS,True,ceiling_breakout,,1.0068600132978234,0.0,2026-05-18,4.5,0,0,59.61,2026-02-09,-23.7,0,,,True,False,Electronic Technology,Electronic Production Equipment
+BE,True,pivot,False,1.0360378033797295,81.5,2026-04-06,104.6,1,0,147.82,2025-11-03,-48.8,1,-16.0,2.0,True,False,Electronic Technology,Electronic Production Equipment
+ACMR,True,ceiling_breakout,,1.1831666169571011,0.0,2026-05-18,7.9,0,0,67.99,2026-02-16,-45.3,0,,,True,False,Producer Manufacturing,Industrial Machinery
+SKYT,True,ceiling_breakout,,1.0781215920851297,0.0,2026-05-18,6.4,0,0,34.97,2026-01-12,-26.2,0,,,True,False,Producer Manufacturing,Industrial Machinery
+VOYG,True,ceiling_breakout,,1.4647110600726105,0.0,2026-05-18,14.9,0,0,38.84,2026-01-19,-44.2,0,,,True,True,Technology Services,Information Technology Services
+CRDO,True,ceiling_breakout,,1.1553060283281604,0.0,2026-05-18,12.9,0,0,193.5,2025-10-27,-55.3,0,,,True,False,Technology Services,Information Technology Services
+LIVN,True,ceiling_breakout,,0.7745452140409865,0.0,2026-05-18,2.7,0,0,71.92,2026-02-23,-21.5,0,,,True,False,Health Technology,Medical Specialties
+ELMD,True,10_wk_ema_touch_confirm,,1.532339168361295,7.1,2026-05-11,28.0,1,0,29.87,2026-01-26,-23.0,0,,,True,True,Health Technology,Medical Specialties
+UNM,True,three_weeks_tight_breakout,,0.7031008749644924,3.5,2026-05-11,3.6,0,0,81.55,2025-02-24,-20.4,0,,,True,False,Finance,Multi-Line Insurance
+GL,True,10_wk_ema_touch_confirm,False,1.295705762532753,7.2,2026-04-06,7.6,2,0,145.27,2025-09-15,-12.4,1,-2.5,1.1,True,False,Finance,Multi-Line Insurance
+WBI,True,10_wk_ema_touch_confirm,True,0.6480703336130994,24.5,2026-02-09,24.8,3,0,24.97,2025-09-15,-25.5,2,-12.3,2.1,True,False,Industrial Services,Oilfield Services/Equipment
+NOV,True,10_wk_ema_touch_confirm,,0.6344806548223565,2.2,2026-05-11,2.2,1,0,20.36,2023-08-28,-48.8,0,,,True,False,Industrial Services,Oilfield Services/Equipment
+RXO,True,10_wk_ema_touch_confirm,False,1.7933812543654948,30.3,2026-04-13,35.2,2,0,18.02,2025-10-27,-42.1,1,-28.3,4.3,True,True,Technology Services,Packaged Software
+BKSY,True,pivot,False,1.1261856191601332,40.2,2026-04-06,50.6,1,0,31.79,2025-10-06,-61.0,1,-26.7,17.7,True,False,Technology Services,Packaged Software
+ROIV,True,10_wk_ema_touch_confirm,True,1.8200208596516245,112.8,2025-09-08,131.5,4,1,12.94,2024-11-25,-32.5,4,-14.0,-0.7,True,True,Health Technology,Pharmaceuticals: Major
+LQDA,True,10_wk_ema_touch_confirm,,1.0773513749060233,7.1,2026-05-11,30.7,1,0,46.67,2026-02-02,-37.6,0,,,True,False,Health Technology,Pharmaceuticals: Major
+SNDR,True,ceiling_breakout,,0.8275855631641544,0.0,2026-05-18,0.8,0,0,33.14,2024-11-25,-39.8,0,,,True,False,Transportation,Trucking
+ARCB,True,10_wk_ema_touch_confirm,False,0.7023549333137226,5.1,2026-04-13,10.6,1,0,112.68,2026-02-02,-26.6,1,-18.5,-7.7,True,False,Transportation,Trucking
+ATRO,True,ceiling_breakout,,1.1294628221267655,0.0,2026-05-18,0.2,0,0,80.7,2026-02-23,-23.8,0,,,True,False,Electronic Technology,Aerospace & Defense
+DAL,True,ceiling_breakout,,0.7499400286213053,0.0,2026-05-18,1.2,0,0,75.26,2026-02-02,-26.7,0,,,True,False,Transportation,Airlines
+CYD,True,ceiling_breakout,,1.9487548201479727,0.0,2026-05-18,1.4,0,0,56.55,2026-02-16,-35.4,0,,,True,True,Producer Manufacturing,Auto Parts: OEM
+SIRI,True,pivot,True,1.0130146414664112,14.5,2026-04-13,22.3,0,0,23.62,2025-09-01,-18.2,1,-7.4,5.9,True,False,Consumer Services,Broadcasting
+PLPC,True,pivot,True,0.6018292962696667,36.9,2026-03-09,48.7,2,0,240.57,2025-10-20,-23.6,1,-12.9,1.5,True,False,Producer Manufacturing,Building Products
+CMPR,True,ceiling_breakout,,1.8596493235378861,0.0,2026-05-18,0.2,0,0,102.22,2024-08-26,-65.6,0,,,True,True,Commercial Services,Commercial Printing/Forms
+NTAP,True,ceiling_breakout,,1.3464005997039912,0.0,2026-05-18,11.6,0,0,124.86,2025-09-15,-25.3,0,,,True,True,Electronic Technology,Computer Peripherals
+OSS,True,10_wk_ema_touch_confirm,,0.7827264097423507,13.7,2026-05-04,39.8,1,0,12.75,2026-01-12,-46.0,0,,,True,False,Electronic Technology,Computer Processing Hardware
+TRS,True,ceiling_breakout,,0.8338374934909841,0.0,2026-05-18,0.7,0,0,39.86,2025-10-20,-23.8,0,,,True,False,Process Industries,Containers/Packaging
+ENPH,True,ceiling_breakout,,1.6602129085097241,0.0,2026-05-18,21.0,0,0,52.93,2026-02-02,-43.5,0,,,True,True,Producer Manufacturing,Electrical Products
+LPTH,True,ceiling_breakout,,1.9960055575111957,0.0,2026-05-18,12.7,0,0,15.04,2026-01-12,-42.0,0,,,True,True,Electronic Technology,Electronic Components
+HLT,True,ceiling_breakout,,0.6973798626038988,0.0,2026-05-18,0.1,0,0,320.83,2026-02-16,-9.8,0,,,True,False,Consumer Services,Hotels/Resorts/Cruise lines
+VRSN,True,ceiling_breakout,,0.9644184207601535,0.0,2026-05-18,1.9,0,0,304.22,2025-07-21,-31.8,0,,,True,False,Technology Services,Internet Software/Services
+PFG,True,three_weeks_tight_breakout,True,0.693699544171695,4.5,2026-04-20,7.1,0,0,97.01,2026-02-02,-12.4,1,-3.2,1.9,True,False,Finance,Investment Managers
+KRP,True,pivot,False,1.041972750807326,6.1,2026-04-20,8.7,1,0,13.98,2024-11-04,-31.8,1,-9.3,0.6,False,False,Miscellaneous,Investment Trusts/Mutual Funds
+ALRS,True,three_weeks_tight_breakout,False,1.085944669825661,17.2,2026-01-05,21.8,2,1,23.03,2024-10-14,-34.0,3,-10.0,1.6,True,False,Finance,Major Banks
+MANU,True,ceiling_breakout,,0.9919563963659009,0.0,2026-05-18,1.8,0,0,19.65,2025-06-23,-25.8,0,,,True,False,Consumer Services,Movies/Entertainment
+MOV,True,10_wk_ema_touch_confirm,True,0.9486049781437104,40.1,2025-11-24,47.9,3,1,19.24,2024-12-09,-39.4,4,-8.4,-0.0,True,False,Consumer Durables,Other Consumer Specialties
+LXFR,True,ceiling_breakout,,0.687488185402194,0.0,2026-05-18,3.3,0,0,15.71,2026-02-16,-29.1,0,,,True,False,Non-Energy Minerals,Other Metals/Minerals
+MCY,True,10_wk_ema_touch_confirm,False,1.0463359974710718,4.9,2026-04-13,5.1,1,0,96.15,2025-12-22,-14.6,1,-6.2,0.3,True,False,Finance,Property/Casualty Insurance
+PSMT,True,three_weeks_tight_breakout,False,0.947119361486601,66.4,2025-04-21,74.5,7,3,94.37,2024-12-16,-14.9,7,-6.2,1.2,True,False,Retail Trade,Specialty Stores
+FEIM,True,ceiling_breakout,,0.8803621794247116,0.0,2026-05-18,13.8,0,0,59.74,2026-01-05,-33.4,0,,,True,False,Electronic Technology,Telecommunications Equipment
+BK,True,pivot,False,0.9529913307485859,55.1,2025-05-12,58.1,5,2,86.77,2025-02-24,-20.8,7,-5.0,0.1,True,False,,
+TIGO,True,10_wk_ema_touch_confirm,False,1.0415365840614053,242.3,2025-03-03,265.3,9,1,23.5,2024-09-16,-14.0,8,-17.7,0.7,True,False,Communications,Wireless Telecommunications
+CHMG,False,,False,2.3661145862596062,3.2,2026-04-20,6.8,0,0,64.57,2026-02-02,-22.6,1,-8.2,-2.7,True,True,Finance,Regional Banks
+SRBK,False,,False,2.201569641514708,50.3,2025-04-14,50.7,10,3,12.41,2025-01-27,-10.1,6,-8.2,-4.6,True,True,Finance,Regional Banks
+FNRN,False,,False,1.8801286224639862,73.4,2025-07-21,75.2,5,1,9.95,2025-03-10,-9.8,5,-3.7,-3.1,False,False,Finance,Regional Banks
+OVLY,False,,False,1.6733655836787023,6.1,2026-03-23,9.0,2,0,30.98,2024-12-02,-28.4,1,-8.5,-4.8,True,True,Finance,Regional Banks
+CBK,False,,True,1.3642912521256543,11.8,2026-03-23,12.7,1,0,25.45,2025-12-15,-9.1,1,-8.2,-3.4,True,True,Finance,Regional Banks
+BOTJ,False,,False,1.3106951254796138,34.9,2025-10-27,37.8,5,0,16.51,2024-12-02,-32.2,5,-23.9,-23.6,False,False,Finance,Regional Banks
+PEBK,False,,False,1.309285494302433,30.5,2025-11-24,31.8,2,2,31.9,2024-12-09,-27.8,3,-9.6,-1.4,True,True,Finance,Regional Banks
+GSBC,False,,False,1.1127852427787732,4.7,2026-04-06,9.0,0,0,65.05,2026-02-16,-9.4,2,-5.1,0.5,True,False,Finance,Regional Banks
+NTB,False,,False,1.0879191501127563,23.4,2025-11-17,24.2,3,2,45.09,2025-06-30,-11.6,3,-6.2,-2.3,True,False,Finance,Regional Banks
+ATLO,False,,False,1.062783821405635,34.3,2025-11-24,35.9,2,2,21.19,2023-02-13,-37.0,3,-7.8,-3.1,True,False,Finance,Regional Banks
+RRBI,False,,False,1.0158927890650955,45.7,2025-08-11,47.9,6,1,61.31,2024-11-25,-25.2,4,-13.4,-8.2,True,False,Finance,Regional Banks
+TRMK,False,,False,0.9997976993301888,5.0,2026-01-26,9.1,1,0,40.69,2025-09-15,-11.8,2,-6.5,-3.1,True,False,Finance,Regional Banks
+BWFG,False,,False,0.9263763754856318,54.8,2025-04-28,60.7,5,3,32.42,2024-11-18,-20.5,4,-16.6,-2.4,True,False,Finance,Regional Banks
+MSBI,False,,False,0.9157824862333269,11.9,2026-04-20,12.4,1,0,24.58,2024-11-18,-44.7,1,-8.2,-2.0,True,False,Finance,Regional Banks
+UVSP,False,,True,0.9118235249736986,18.9,2025-12-01,23.3,2,2,31.88,2025-06-30,-14.8,3,-3.8,1.2,True,False,Finance,Regional Banks
+CARE,False,,False,0.8253188538579996,20.4,2026-03-23,34.2,1,0,20.45,2025-09-08,-18.2,2,-3.1,3.6,True,False,Finance,Regional Banks
+FXNC,False,,False,0.824648755676382,5.4,2026-03-23,6.7,1,0,26.07,2025-02-03,-31.8,1,-11.7,-6.8,True,False,Finance,Regional Banks
+AMAL,False,,False,0.8033608097553172,9.5,2026-01-19,13.9,1,0,36.26,2025-02-10,-32.5,2,-17.3,-5.8,True,False,Finance,Regional Banks
+CBAN,False,,False,0.7951915263843727,7.3,2026-01-12,9.6,2,0,18.06,2025-09-22,-14.2,3,-10.8,-7.8,True,False,Finance,Regional Banks
+RBKB,False,,True,0.7819241773596688,0.2,2026-02-09,12.7,1,0,13.75,2025-08-18,-31.6,1,-8.7,-6.1,False,False,Finance,Regional Banks
+SRCE,False,,True,0.7710348175791346,11.1,2026-01-26,12.6,2,1,65.7,2025-02-10,-23.1,2,-5.8,-1.4,True,False,Finance,Regional Banks
+CPF,False,,True,0.7620983381374898,10.1,2026-03-23,10.8,1,0,31.34,2025-09-01,-14.2,1,-6.4,-1.9,True,False,Finance,Regional Banks
+BY,False,,False,0.7506514529007638,4.3,2026-03-30,6.0,1,0,31.29,2024-11-18,-29.0,1,-7.4,-3.0,True,False,Finance,Regional Banks
+CCNE,False,,True,0.7345538002279013,13.8,2026-01-12,16.4,2,1,26.33,2025-09-15,-14.5,3,-9.1,-3.6,True,False,Finance,Regional Banks
+CATY,False,,True,0.7220135721370745,5.6,2026-04-13,6.1,0,0,53.99,2026-02-02,-15.3,1,-4.6,-1.3,True,False,Finance,Regional Banks
+CCBG,False,,True,0.6942274190029738,0.0,2026-04-06,3.8,0,0,44.72,2025-12-08,-12.8,1,-7.8,-2.7,True,False,Finance,Regional Banks
+COSO,False,,False,0.6610695348558078,6.8,2026-03-23,7.0,1,0,23.99,2025-09-15,-13.6,1,-4.7,-1.8,True,False,Finance,Regional Banks
+FBP,False,,True,0.6516645782539109,6.5,2026-04-06,8.3,1,0,22.26,2025-09-22,-14.7,1,-6.0,-1.6,True,False,Finance,Regional Banks
+CNOB,False,,True,0.64388573751465,2.0,2026-04-27,4.8,0,0,28.4,2026-02-02,-13.9,1,-8.5,-2.3,True,False,Finance,Regional Banks
+CZWI,False,,True,0.5577237819463678,19.6,2025-11-24,23.2,2,1,16.57,2025-09-15,-12.7,4,-6.0,-4.8,False,False,Finance,Regional Banks
+AMBQ,False,,,1.7316808389344571,102.2,2026-04-27,118.3,0,0,37.41,2026-01-12,-39.2,0,,,True,True,Electronic Technology,Semiconductors
+ADI,False,,True,1.718707409559935,50.6,2025-11-24,56.0,2,1,254.5,2025-08-18,-12.8,4,-12.5,-8.9,False,False,Electronic Technology,Semiconductors
+MRAM,False,,,1.6877927384609457,56.7,2026-04-27,95.4,0,0,17.24,2026-01-19,-53.6,1,-45.2,-34.6,False,False,Electronic Technology,Semiconductors
+SITM,False,,False,1.5999417690421758,106.9,2025-12-01,132.1,3,2,313.93,2025-09-15,-22.4,3,-40.5,-13.8,False,False,Electronic Technology,Semiconductors
+AIP,False,,,1.596677973180706,87.6,2026-04-06,98.8,0,0,18.25,2026-01-12,-25.9,0,,,True,True,Electronic Technology,Semiconductors
+NVEC,False,,False,1.587597825339308,5.8,2026-04-27,7.2,1,0,85.1,2023-06-26,-43.6,1,-9.1,-3.1,True,True,Electronic Technology,Semiconductors
+GFS,False,,False,1.5236409215921325,98.8,2026-03-16,102.7,1,0,42.26,2025-07-07,-25.4,2,-8.6,12.1,True,True,Electronic Technology,Semiconductors
+LSCC,False,,False,1.3523706417372552,81.6,2025-12-01,103.0,3,1,70.55,2025-02-17,-50.8,3,-14.5,11.9,True,True,Electronic Technology,Semiconductors
+PENG,False,,,1.338732767848445,73.4,2026-04-20,77.4,0,0,29.99,2023-06-26,-57.8,0,,,True,True,Electronic Technology,Semiconductors
+ASX,False,,False,1.3165575549776403,173.7,2025-10-13,180.5,3,2,12.41,2024-07-08,-46.0,4,-14.2,1.5,True,True,Electronic Technology,Semiconductors
+SMTC,False,,False,1.2494212215034015,89.7,2026-03-30,107.0,2,0,75.75,2025-01-13,-68.3,1,-17.9,38.7,True,False,Electronic Technology,Semiconductors
+SYNA,False,,,1.2440534604497635,48.9,2026-04-27,51.9,0,0,94.59,2026-01-12,-31.8,0,,,True,False,Electronic Technology,Semiconductors
+QUIK,False,,False,1.2258704430075675,1.1,2026-05-04,8.1,0,0,18.6,2024-03-11,-77.1,1,-7.7,1.1,True,False,Electronic Technology,Semiconductors
+MTSI,False,,True,1.1708343299115618,160.6,2025-10-27,164.5,3,2,145.95,2025-01-13,-42.4,4,-11.3,31.3,True,False,Electronic Technology,Semiconductors
+NVTS,False,,,1.1610149858138872,69.3,2026-04-20,73.6,0,0,16.85,2025-10-13,-59.3,0,,,True,False,Electronic Technology,Semiconductors
+DIOD,False,,False,1.075627070336447,68.4,2026-01-26,69.5,1,1,58.8,2025-10-20,-28.1,2,-22.7,-15.4,False,False,Electronic Technology,Semiconductors
+MPWR,False,,False,1.0679873289726058,42.4,2026-03-30,46.1,1,0,1087.89,2025-10-20,-23.7,1,-15.0,-4.3,True,False,Electronic Technology,Semiconductors
+NVDA,False,,,1.06283313913233,0.1,2026-05-04,1.5,0,0,212.17,2025-10-27,-22.6,1,-9.2,-9.0,False,False,Electronic Technology,Semiconductors
+COHU,False,,False,1.0553134667043356,-0.9,2026-04-20,9.2,0,0,42.6,2023-07-24,-70.5,1,-18.0,-8.2,False,False,Electronic Technology,Semiconductors
+AMKR,False,,False,1.0540832086414655,13.4,2026-04-06,23.1,1,0,53.43,2026-01-05,-24.9,1,-21.2,-17.0,False,False,Electronic Technology,Semiconductors
+FN,False,,False,1.0463731361371016,138.1,2025-06-23,149.8,6,0,281.79,2025-01-20,-47.3,5,-18.8,-6.0,False,False,Electronic Technology,Semiconductors
+MU,False,,False,1.0289280458060412,378.3,2025-09-08,424.4,3,1,143.22,2024-06-10,-57.1,4,-5.4,0.5,True,False,Electronic Technology,Semiconductors
+INTC,False,,False,1.02098731392222,92.1,2026-04-06,136.8,0,0,50.6,2023-12-25,-65.1,1,-21.6,-8.2,True,False,Electronic Technology,Semiconductors
+MRVL,False,,,0.9689880965297567,83.4,2026-03-30,91.3,1,0,102.64,2025-12-01,-31.2,0,,,True,False,Electronic Technology,Semiconductors
+CRUS,False,,False,0.9665769479956214,7.0,2026-04-06,16.1,1,0,147.46,2024-08-26,-48.6,1,-11.1,-2.6,True,False,Electronic Technology,Semiconductors
+TXN,False,,,0.9567449516546658,35.2,2026-04-13,43.4,0,0,215.64,2025-07-07,-30.0,0,,,True,False,Electronic Technology,Semiconductors
+MXL,False,,False,0.9532196936397044,-0.7,2026-05-04,27.3,0,0,77.89,2021-12-27,-89.3,1,-20.8,-2.1,True,False,Electronic Technology,Semiconductors
+ON,False,,,0.953198236022584,40.0,2026-04-13,47.8,0,0,78.61,2024-08-26,-60.5,0,,,True,False,Electronic Technology,Semiconductors
+MCHP,False,,False,0.9368710333444371,4.5,2026-04-20,12.8,0,0,82.86,2026-02-09,-28.4,1,-15.8,-11.8,False,False,Electronic Technology,Semiconductors
+ASML,False,,False,0.9022230505857276,40.8,2025-12-29,49.6,2,1,1091.18,2024-07-08,-47.6,1,-21.9,2.4,True,False,Electronic Technology,Semiconductors
+AOSL,False,,False,0.9002542139492495,23.1,2026-04-13,30.6,0,0,31.94,2025-10-13,-46.7,1,-23.9,-9.2,True,False,Electronic Technology,Semiconductors
+AAOI,False,,False,0.8663642593423008,316.2,2026-01-26,321.6,2,0,43.05,2024-11-25,-77.4,2,-38.6,-22.3,False,False,Electronic Technology,Semiconductors
+AMD,False,,False,0.8569464757268505,67.9,2026-04-13,75.0,0,0,267.08,2025-10-27,-29.5,1,-7.2,2.5,True,False,Electronic Technology,Semiconductors
+SLAB,False,,True,0.8386877696445753,5.3,2026-02-02,35.9,2,1,160.0,2025-02-17,-48.2,2,-1.6,-0.4,True,False,Electronic Technology,Semiconductors
+FORM,False,,False,0.8048301164817286,87.9,2026-01-05,106.5,2,0,62.48,2024-07-01,-63.9,3,-29.4,-18.9,True,False,Electronic Technology,Semiconductors
+AVGO,False,,True,0.7940729174511044,1.9,2026-04-13,3.2,0,0,401.39,2025-11-24,-27.8,1,-9.8,-5.4,False,False,Electronic Technology,Semiconductors
+TSM,False,,False,0.7882523026785685,78.5,2025-06-23,81.6,5,3,222.76,2025-01-20,-40.5,5,-25.3,-3.7,False,False,Electronic Technology,Semiconductors
+LASR,False,,False,0.7517837998085275,346.2,2025-06-02,399.0,7,0,15.74,2023-06-26,-60.6,9,-21.0,-2.2,True,False,Electronic Technology,Semiconductors
+TSEM,False,,True,0.7103670695793909,73.2,2026-03-16,98.6,1,0,142.68,2026-02-02,-24.0,1,-19.0,24.7,True,False,Electronic Technology,Semiconductors
+COHR,False,,False,0.7084650093605197,224.5,2025-10-13,232.4,4,1,113.6,2024-12-02,-59.9,6,-29.5,-8.6,False,False,Electronic Technology,Semiconductors
+CTO,False,,False,1.8195516070761064,4.2,2026-04-06,8.3,2,0,18.81,2025-02-10,-23.1,1,-6.8,-1.4,True,True,Finance,Real Estate Investment Trusts
+WELL,False,,False,1.325807540447862,3.0,2026-04-13,4.1,1,0,207.6,2025-11-24,-13.2,1,-9.4,-1.2,True,True,Finance,Real Estate Investment Trusts
+OUT,False,,False,1.1278837005291085,70.6,2025-11-03,81.3,4,1,18.53,2024-11-25,-34.1,4,-10.9,-3.9,True,False,Finance,Real Estate Investment Trusts
+PSTL,False,,False,1.1000632555868548,48.6,2026-01-05,49.5,2,1,15.85,2025-09-15,-13.6,3,-5.7,1.9,True,False,Finance,Real Estate Investment Trusts
+CTRE,False,,False,1.0887588666286594,28.8,2025-08-04,32.2,4,1,31.12,2024-10-28,-24.4,4,-15.2,-1.1,False,False,Finance,Real Estate Investment Trusts
+LTC,False,,True,1.0697386846299477,5.0,2026-02-02,7.2,2,0,35.89,2024-11-04,-17.9,1,-11.2,-4.3,True,False,Finance,Real Estate Investment Trusts
+VTR,False,,False,1.043091988051678,7.5,2026-02-02,10.3,2,1,79.98,2025-11-24,-8.3,1,-10.2,-0.3,True,False,Finance,Real Estate Investment Trusts
+HST,False,,False,0.9870182921625098,18.2,2026-03-30,20.1,1,0,18.64,2024-02-26,-38.5,2,-5.5,0.1,True,False,Finance,Real Estate Investment Trusts
+NTST,False,,True,0.9769489528955148,6.1,2026-03-30,6.5,1,0,19.19,2025-10-20,-12.2,1,-4.7,-2.5,False,False,Finance,Real Estate Investment Trusts
+CBL,False,,False,0.9731454158580686,17.4,2026-03-30,24.6,0,0,37.9,2026-01-05,-11.5,1,-9.8,-1.6,True,False,Finance,Real Estate Investment Trusts
+FRT,False,,False,0.964456101097511,6.4,2026-04-13,8.3,0,0,110.55,2024-11-25,-30.2,2,-3.9,2.2,True,False,Finance,Real Estate Investment Trusts
+LAMR,False,,False,0.9462947067148185,14.7,2026-04-06,18.4,2,0,129.28,2024-10-14,-26.7,2,-9.2,-3.5,True,False,Finance,Real Estate Investment Trusts
+WSR,False,,False,0.8882476515947693,35.1,2026-01-19,35.2,2,0,14.05,2025-03-24,-19.9,3,-0.5,-0.1,False,False,Finance,Real Estate Investment Trusts
+EQIX,False,,True,0.8811590897930451,12.7,2026-03-23,13.1,0,0,954.61,2024-12-02,-28.5,1,-7.4,-3.9,True,False,Finance,Real Estate Investment Trusts
+MAC,False,,False,0.872513254082782,3.5,2026-04-06,4.7,1,0,21.18,2024-12-02,-43.3,1,-6.9,-1.7,True,False,Finance,Real Estate Investment Trusts
+FR,False,,True,0.7965518928184137,12.4,2025-11-24,13.5,3,0,55.74,2025-03-03,-30.1,3,-12.2,-1.2,True,False,Finance,Real Estate Investment Trusts
+SILA,False,,True,0.7389153073591544,19.9,2026-04-13,20.5,1,0,25.08,2025-09-15,-15.0,1,-0.3,-0.1,False,False,Finance,Real Estate Investment Trusts
+HR,False,,,0.7306819102818349,11.1,2026-04-13,11.5,2,0,18.26,2025-10-20,-12.9,0,,,False,False,Finance,Real Estate Investment Trusts
+MDV,False,,False,0.7287944393031566,1.5,2026-05-04,13.9,0,0,16.01,2024-10-21,-21.9,1,-2.6,1.1,True,False,Finance,Real Estate Investment Trusts
+IRM,False,,False,0.6665980757266028,-0.6,2026-04-27,2.1,1,0,123.89,2024-10-21,-43.6,1,-9.0,-5.7,True,False,Finance,Real Estate Investment Trusts
+EGP,False,,True,0.6574061272363165,-0.1,2026-05-04,2.4,0,0,200.29,2021-12-27,-38.6,1,-3.6,-0.8,True,False,Finance,Real Estate Investment Trusts
+DOC,False,,False,0.5981777877902517,1.0,2026-05-04,5.1,0,0,18.78,2025-09-29,-18.7,1,-3.1,-0.2,True,False,Finance,Real Estate Investment Trusts
+IBKR,False,,,1.3147226719622778,1.1,2026-04-27,3.7,0,0,78.48,2026-01-19,-19.7,1,-8.3,-8.0,False,False,Finance,Investment Banks/Brokers
+OPY,False,,False,1.0481528926887154,12.2,2026-01-26,19.7,2,1,78.4,2025-09-15,-20.0,2,-21.7,-19.7,True,False,Finance,Investment Banks/Brokers
+VIRT,False,,False,0.9787666456532157,13.5,2026-03-30,18.8,0,0,44.15,2025-06-30,-28.9,2,-5.5,-5.2,False,False,Finance,Investment Banks/Brokers
+CBOE,False,,False,0.9623147883014144,37.3,2026-01-05,41.6,4,1,252.3,2025-08-04,-9.0,3,-4.8,-2.9,False,False,Finance,Investment Banks/Brokers
+STT,False,,True,0.7666611630612257,10.4,2026-04-06,15.1,1,0,133.78,2026-01-05,-13.8,1,-5.2,-1.0,True,False,Finance,Investment Banks/Brokers
+SNEX,False,,False,0.6611811199894602,20.7,2026-04-06,29.4,0,0,86.67,2026-02-16,-22.0,1,-18.6,-10.6,True,False,Finance,Investment Banks/Brokers
+SBLK,False,,True,1.4455920652793066,8.6,2026-03-30,9.5,1,0,24.11,2024-05-27,-51.3,2,-4.6,-2.7,True,True,Transportation,Marine Shipping
+GSL,False,,True,1.3999343889956566,14.0,2025-11-10,21.3,5,1,31.35,2025-09-08,-15.9,4,-12.4,-10.9,False,False,Transportation,Marine Shipping
+DAC,False,,False,1.2391238975763839,33.6,2026-01-05,38.2,3,1,94.7,2025-09-01,-12.5,3,-6.6,-3.2,True,False,Transportation,Marine Shipping
+NVGS,False,,False,1.1991403440212423,29.7,2026-01-05,30.7,3,1,17.7,2024-07-01,-41.4,3,-4.4,-2.8,False,False,Transportation,Marine Shipping
+ECO,False,,False,1.1569100215221726,37.5,2026-01-26,40.0,2,1,38.63,2025-11-10,-20.2,3,-8.5,-6.1,False,False,Transportation,Marine Shipping
+ESEA,False,,True,1.119976182515397,-3.1,2026-03-30,3.0,2,0,63.32,2025-08-18,-20.4,1,-13.9,-12.8,False,False,Transportation,Marine Shipping
+MATX,False,,True,1.0131447240997296,9.5,2026-03-30,10.3,1,0,164.81,2024-11-04,-47.6,1,-11.9,-4.1,True,False,Transportation,Marine Shipping
+INSW,False,,False,0.9751211006701269,52.7,2026-01-12,55.5,2,0,53.7,2024-05-20,-53.2,2,-11.2,-9.9,False,False,Transportation,Marine Shipping
+TDW,False,,False,0.9606766992921943,26.9,2026-01-26,28.4,2,0,61.74,2025-08-18,-24.4,2,-13.7,-10.9,False,False,Transportation,Marine Shipping
+TEN,False,,True,0.9544264226120297,50.5,2026-02-09,50.7,1,0,28.28,2024-05-27,-54.0,3,-7.0,-4.4,True,False,Transportation,Marine Shipping
+STNG,False,,False,0.869027243592791,-3.3,2026-04-27,1.7,0,0,78.88,2024-06-17,-62.1,1,-10.7,-8.2,False,False,Transportation,Marine Shipping
+KEX,False,,False,0.8258684826748295,6.9,2026-03-23,8.4,0,0,132.21,2024-11-18,-39.9,1,-8.0,-5.9,False,False,Transportation,Marine Shipping
+TNK,False,,False,0.7628305668310953,6.6,2026-03-23,9.7,2,0,70.4,2024-05-27,-54.3,2,-10.7,-8.1,True,False,Transportation,Marine Shipping
+WBS,False,,False,1.4838869571792608,13.5,2025-12-08,15.6,2,0,62.12,2025-08-25,-16.7,2,-9.2,-2.3,True,True,Finance,Savings Banks
+TRST,False,,False,0.8857989144679674,35.7,2025-10-20,41.9,5,2,35.41,2024-11-18,-26.1,2,-2.9,2.1,True,False,Finance,Savings Banks
+SMBC,False,,True,0.7055843893377595,3.7,2026-04-06,6.3,1,0,64.92,2024-11-18,-32.0,2,-5.6,-1.1,True,False,Finance,Savings Banks
+PRLB,False,,,1.0952155954140148,3.0,2026-05-04,3.6,0,0,68.91,2026-02-09,-22.3,1,-6.9,-2.4,False,False,Process Industries,Chemicals: Specialty
+GPRE,False,,False,1.0411783053919037,11.7,2026-02-02,25.7,2,0,12.31,2025-10-13,-25.4,3,-21.8,-18.3,False,False,Process Industries,Chemicals: Specialty
+CC,False,,False,0.9359886325357594,-0.7,2026-03-23,20.0,1,0,17.81,2025-09-15,-41.9,2,-26.2,-22.7,False,False,Process Industries,Chemicals: Specialty
+WLKP,False,,False,0.8306067726409383,1.3,2026-04-06,3.1,1,0,21.83,2025-02-17,-22.8,2,-4.8,-2.7,False,False,Process Industries,Chemicals: Specialty
+MTX,False,,False,0.7991496914972526,8.9,2026-03-23,16.4,2,0,65.96,2025-08-25,-18.5,2,-9.1,-5.2,False,False,Process Industries,Chemicals: Specialty
+REX,False,,False,0.740301183397314,55.9,2025-08-25,61.5,1,1,30.2,2024-05-06,-44.6,4,-24.8,-4.4,False,False,Process Industries,Chemicals: Specialty
+SDRL,False,,True,1.0300013981927432,45.9,2025-12-29,48.8,4,0,34.27,2025-09-08,-18.0,4,-11.5,-3.6,False,False,Industrial Services,Contract Drilling
+VAL,False,,True,0.8971292032548793,5.4,2026-02-09,23.4,1,1,81.97,2024-07-22,-66.9,1,-18.3,-4.1,False,False,Industrial Services,Contract Drilling
+NE,False,,False,0.8196335638128015,5.0,2026-04-20,9.7,2,0,47.39,2023-08-28,-65.5,1,-13.4,-4.7,False,False,Industrial Services,Contract Drilling
+VSH,False,,,1.7940302739997338,67.6,2026-04-20,69.1,0,0,27.95,2023-06-26,-63.9,0,,,True,True,Electronic Technology,Electronic Production Equipment
+AEIS,False,,False,1.3215033620454955,145.9,2025-06-23,146.6,6,0,131.75,2025-02-17,-43.2,7,-25.3,-17.0,False,False,Electronic Technology,Electronic Production Equipment
+FLEX,False,,False,1.217888009515744,72.6,2026-04-06,83.4,1,0,72.22,2025-12-08,-23.6,1,-14.9,-7.1,False,False,Electronic Technology,Electronic Production Equipment
+LFUS,False,,False,1.1448948031682975,42.8,2026-01-26,55.5,1,1,296.1,2023-07-10,-52.6,2,-19.7,-2.9,True,False,Electronic Technology,Electronic Production Equipment
+TER,False,,False,1.030029737496822,97.4,2025-11-24,123.9,2,1,160.06,2024-07-08,-59.1,3,-28.5,-15.1,True,False,Electronic Technology,Electronic Production Equipment
+SANM,False,,False,0.9398470433215256,28.2,2026-04-20,33.0,0,0,185.29,2026-01-19,-36.3,1,-16.4,-3.4,True,False,Electronic Technology,Electronic Production Equipment
+PLAB,False,,True,0.9377605642847242,26.0,2026-03-30,29.3,1,0,39.8,2025-12-08,-39.2,1,-16.8,-4.6,True,False,Electronic Technology,Electronic Production Equipment
+VRT,False,,False,0.904517380434024,39.7,2026-02-09,61.8,1,0,202.33,2025-10-27,-27.0,2,-17.3,-13.8,False,False,Electronic Technology,Electronic Production Equipment
+BHE,False,,False,0.8419645822984776,63.8,2026-01-26,66.1,1,1,51.25,2024-11-04,-41.2,2,-9.4,-3.0,False,False,Electronic Technology,Electronic Production Equipment
+AXTI,False,,False,0.7850247929776326,2223.9,2025-10-20,2397.0,3,0,5.64,2024-03-18,-80.0,6,-17.3,69.2,True,False,Electronic Technology,Electronic Production Equipment
+AEHR,False,,False,0.776490197314774,34.9,2026-04-06,81.2,0,0,52.45,2023-08-28,-88.0,2,-29.4,-12.6,False,False,Electronic Technology,Electronic Production Equipment
+PLXS,False,,True,0.7285862644466793,46.6,2026-01-12,57.4,2,1,168.77,2025-01-13,-38.7,3,-10.7,-3.7,True,False,Electronic Technology,Electronic Production Equipment
+VECO,False,,False,0.7272568703267573,15.1,2026-04-20,24.4,0,0,47.87,2024-07-01,-64.7,1,-28.5,-9.0,True,False,Electronic Technology,Electronic Production Equipment
+MPTI,False,,True,0.6397503933438226,2.2,2026-05-04,16.9,0,0,71.0,2024-12-02,-51.4,1,-17.8,-4.8,True,False,Electronic Technology,Electronic Production Equipment
+MEC,False,,False,3.393038365365501,-6.4,2026-05-04,10.6,0,0,23.02,2024-10-28,-49.1,1,-22.8,-6.4,True,True,Producer Manufacturing,Industrial Machinery
+TKR,False,,False,1.5235196138811704,32.4,2026-01-05,34.8,1,1,88.97,2024-05-06,-38.1,3,-8.3,-2.7,True,True,Producer Manufacturing,Industrial Machinery
+GHM,False,,False,1.3722110256426874,50.8,2025-12-08,63.7,3,1,58.0,2025-07-28,-20.6,5,-13.0,-8.3,False,False,Producer Manufacturing,Industrial Machinery
+MOD,False,,False,1.3041960941228454,41.1,2026-01-26,57.0,3,1,165.89,2025-12-01,-33.0,2,-19.1,-9.3,False,False,Producer Manufacturing,Industrial Machinery
+ICHR,False,,False,1.2628329047549314,43.3,2026-03-30,48.5,1,0,46.43,2024-02-12,-71.7,1,-17.5,-8.5,False,False,Producer Manufacturing,Industrial Machinery
+HLIO,False,,,1.2385484501661062,2.7,2026-05-11,4.2,0,0,75.95,2026-02-09,-18.4,0,,,True,False,Producer Manufacturing,Industrial Machinery
+KLIC,False,,False,1.189319063886122,82.0,2026-01-12,83.8,2,1,56.79,2023-07-24,-54.0,3,-23.8,-2.4,True,False,Producer Manufacturing,Industrial Machinery
+MKSI,False,,False,1.0761417218203346,105.5,2025-11-24,120.4,3,1,145.49,2024-07-08,-62.6,3,-20.1,-1.9,True,False,Producer Manufacturing,Industrial Machinery
+AMAT,False,,True,1.0318860908772112,61.7,2025-12-01,71.7,3,1,251.65,2024-07-08,-51.3,4,-11.3,-3.5,False,False,Producer Manufacturing,Industrial Machinery
+JCI,False,,True,1.0238347876544185,0.8,2026-02-02,12.5,3,0,122.99,2025-11-03,-12.1,1,-14.3,-5.8,False,False,Producer Manufacturing,Industrial Machinery
+NGS,False,,True,0.9977127726453442,42.9,2025-11-17,45.0,3,0,29.32,2025-01-20,-43.7,4,-12.2,2.8,True,False,Producer Manufacturing,Industrial Machinery
+CECO,False,,False,0.9785028427893738,-0.1,2026-05-04,3.2,0,0,79.17,2026-02-09,-36.7,1,-18.4,-9.5,False,False,Producer Manufacturing,Industrial Machinery
+ASYS,False,,False,0.9670598251138292,2.7,2026-05-04,19.5,0,0,18.47,2026-01-26,-45.7,1,-16.6,-7.6,True,False,Producer Manufacturing,Industrial Machinery
+JBL,False,,False,0.9291678177748041,45.1,2026-01-12,60.3,2,1,227.24,2025-06-30,-16.6,2,-9.0,-2.1,True,False,Producer Manufacturing,Industrial Machinery
+WWD,False,,False,0.9010125403673871,17.3,2025-11-24,31.9,3,0,266.4,2025-07-28,-12.7,3,-22.7,-13.6,False,False,Producer Manufacturing,Industrial Machinery
+LRCX,False,,True,0.8923812739478298,162.3,2025-09-08,183.6,3,1,107.66,2024-07-01,-48.1,5,-18.9,2.5,True,False,Producer Manufacturing,Industrial Machinery
+NPO,False,,False,0.8785963496038627,29.3,2026-01-26,30.9,3,1,235.44,2025-10-20,-14.4,3,-10.1,-5.7,False,False,Producer Manufacturing,Industrial Machinery
+UCTT,False,,False,0.8071477709185353,45.7,2026-03-16,49.9,1,0,56.03,2024-07-08,-70.3,1,-21.4,-4.2,False,False,Producer Manufacturing,Industrial Machinery
+ACLS,False,,True,0.6914535591200619,42.2,2026-04-06,52.5,0,0,102.93,2025-09-22,-28.5,1,-24.2,-8.5,True,False,Producer Manufacturing,Industrial Machinery
+GRC,False,,False,0.6620395166703911,63.4,2025-09-15,69.9,3,2,42.77,2024-11-25,-29.2,3,-28.4,-8.4,False,False,Producer Manufacturing,Industrial Machinery
+OII,False,,False,0.5412681711802881,20.4,2026-02-02,27.5,1,0,30.41,2024-07-22,-49.2,1,-16.2,-0.7,True,False,Producer Manufacturing,Industrial Machinery
+VIAV,False,,False,1.1184507919372033,279.7,2025-10-13,285.3,2,1,12.85,2025-02-03,-37.0,5,-25.0,-18.1,False,False,Technology Services,Information Technology Services
+PDFS,False,,False,1.0243074653379585,18.7,2026-04-06,28.7,2,0,35.82,2026-01-12,-25.8,1,-27.9,-11.8,True,False,Technology Services,Information Technology Services
+XMTR,False,,,0.9987175873762283,11.5,2026-05-04,32.8,0,0,67.19,2026-02-02,-46.6,0,,,True,False,Technology Services,Information Technology Services
+FTNT,False,,,0.9486192474611962,17.4,2026-05-04,19.2,1,0,112.37,2025-02-10,-37.6,0,,,True,False,Technology Services,Information Technology Services
+RIOT,False,,False,0.7860772404400155,1.7,2026-05-04,8.6,0,0,22.55,2025-10-20,-49.0,1,-5.7,0.1,True,False,Technology Services,Information Technology Services
+ATEN,False,,False,0.6736164232142463,30.8,2026-03-23,35.6,0,0,21.51,2025-02-10,-36.8,1,-11.2,3.8,True,False,Technology Services,Information Technology Services
+INGM,False,,False,0.6502148988235626,8.0,2026-03-30,12.5,1,0,23.68,2025-10-27,-20.2,1,-19.6,-14.8,True,False,Technology Services,Information Technology Services
+FSLY,False,,True,0.5328014968356702,-10.6,2026-02-09,31.4,1,0,12.42,2025-11-24,-36.6,2,-54.1,-52.3,False,False,Technology Services,Information Technology Services
+AVNS,False,,True,0.9364863286190617,88.0,2026-01-19,89.3,1,1,13.0,2025-09-01,-18.2,2,-1.0,-0.8,False,False,Health Technology,Medical Specialties
+AXGN,False,,True,0.7967144653506708,6.2,2026-04-13,14.0,1,0,35.89,2026-02-16,-23.3,1,-13.8,-10.8,False,False,Health Technology,Medical Specialties
+CELC,False,,False,0.7575331595994532,246.4,2025-07-28,522.9,3,1,22.19,2024-03-25,-65.9,5,-16.3,8.6,False,False,Health Technology,Medical Specialties
+ALL,False,,,1.3981807067750187,-0.4,2026-05-11,1.3,0,0,213.92,2026-01-05,-11.1,1,-3.6,-1.7,False,False,Finance,Multi-Line Insurance
+PLGO,False,,True,1.0182032421650533,8.7,2026-04-13,12.2,0,0,20.32,2024-11-25,-31.7,1,-13.8,-3.5,False,False,Finance,Multi-Line Insurance
+HG,False,,False,0.8793170082486673,50.9,2025-08-04,54.1,5,1,20.48,2025-05-26,-6.7,5,-10.8,-4.3,False,False,Finance,Multi-Line Insurance
+CNO,False,,,0.7819440959190515,2.8,2026-05-04,5.9,0,0,44.65,2026-02-02,-13.0,0,,,True,False,Finance,Multi-Line Insurance
+PUMP,False,,False,1.7510837761042697,47.5,2026-01-26,51.7,2,0,11.17,2025-01-13,-59.6,2,-27.1,-4.4,False,False,Industrial Services,Oilfield Services/Equipment
+KGS,False,,False,1.4679585886956283,50.2,2026-02-02,58.4,0,0,46.53,2025-01-20,-40.6,2,-5.9,23.5,False,False,Industrial Services,Oilfield Services/Equipment
+AROC,False,,False,0.9373352532121728,27.5,2026-01-26,29.9,2,0,28.68,2025-01-13,-32.5,2,-8.6,-4.9,True,False,Industrial Services,Oilfield Services/Equipment
+USAC,False,,True,0.8520127792992803,11.5,2026-02-09,12.1,1,1,25.95,2025-02-03,-25.2,2,-3.5,-2.8,False,False,Industrial Services,Oilfield Services/Equipment
+HAL,False,,,0.7573961353351568,-0.7,2026-05-11,1.7,0,0,40.78,2023-10-09,-55.3,1,-2.5,-1.4,False,False,Industrial Services,Oilfield Services/Equipment
+FET,False,,True,0.7356880981374674,157.6,2025-08-04,164.7,3,0,21.57,2025-03-17,-40.8,3,-17.2,-10.2,True,False,Industrial Services,Oilfield Services/Equipment
+LBRT,False,,True,0.6251097125829388,29.6,2026-01-26,33.7,0,0,23.81,2024-05-27,-61.0,2,-23.3,-6.4,False,False,Industrial Services,Oilfield Services/Equipment
+ZM,False,,False,1.5744356861355888,2.1,2026-04-27,9.4,0,0,96.52,2026-02-09,-26.8,1,-12.9,-3.5,True,True,Technology Services,Packaged Software
+CHRN,False,,True,1.5249203831649554,97.4,2025-12-29,171.6,1,1,5.7,2025-09-29,-38.6,3,-33.6,-23.9,False,False,Technology Services,Packaged Software
+BAND,False,,,1.2170487299679702,36.8,2026-04-27,111.2,0,0,29.07,2023-01-30,-67.9,0,,,True,False,Technology Services,Packaged Software
+ADEA,False,,False,1.1565286996951638,45.2,2026-01-05,51.5,2,1,17.73,2025-09-29,-34.9,2,-23.0,-19.5,False,False,Technology Services,Packaged Software
+CRWD,False,,,1.1237261207370737,11.7,2026-05-11,19.8,0,0,553.64,2025-10-27,-38.1,0,,,True,False,Technology Services,Packaged Software
+TWLO,False,,False,1.037342703784379,2.5,2026-04-27,23.6,1,0,151.95,2025-01-27,-49.0,1,-10.8,-7.8,False,False,Technology Services,Packaged Software
+DDOG,False,,,0.9538966241796998,11.1,2026-05-04,14.1,0,0,194.87,2025-11-03,-49.7,0,,,True,False,Technology Services,Packaged Software
+NBIS,False,,True,0.9359622099030139,48.1,2026-04-06,62.5,1,0,132.15,2025-10-27,-44.4,2,-21.7,-8.1,False,False,Technology Services,Packaged Software
+FFIV,False,,,0.9019295108769341,11.2,2026-05-04,13.8,0,0,346.0,2025-10-06,-35.3,0,,,True,False,Technology Services,Packaged Software
+NTCT,False,,False,0.8205786227252279,28.7,2026-03-23,33.7,0,0,30.67,2025-11-03,-17.5,2,-5.1,3.3,True,False,Technology Services,Packaged Software
+OPLN,False,,False,0.8189413682626565,11.9,2026-04-13,13.9,0,0,31.07,2025-12-22,-16.9,1,-19.6,-8.0,False,False,Technology Services,Packaged Software
+PBI,False,,False,0.8072731731419447,19.5,2026-04-13,20.1,0,0,12.7,2025-07-21,-30.6,2,-8.1,-7.1,False,False,Technology Services,Packaged Software
+YOU,False,,False,0.7771982982654274,24.4,2026-02-23,44.4,2,0,41.6,2025-12-08,-26.1,1,-16.0,16.5,True,False,Technology Services,Packaged Software
+ROKU,False,,True,0.7193308696184677,1.6,2026-04-27,7.6,0,0,116.66,2025-10-27,-32.7,1,-8.5,-4.0,True,False,Technology Services,Packaged Software
+DOCN,False,,False,0.6659804006137919,197.9,2026-01-05,206.6,3,0,51.69,2023-07-17,-62.5,4,-15.5,-3.8,True,False,Technology Services,Packaged Software
+PL,False,,False,0.6574835740238257,593.0,2025-08-04,597.3,7,2,6.36,2025-01-27,-56.1,3,-50.3,10.2,True,False,Technology Services,Packaged Software
+NYAX,False,,False,0.634596422031272,4.2,2026-04-13,11.9,1,0,60.76,2026-01-19,-17.2,1,-15.8,-9.2,True,False,Technology Services,Packaged Software
+CPRX,False,,,1.2432443157658435,19.0,2026-04-13,19.8,0,0,26.09,2025-06-02,-27.0,0,,,True,False,Health Technology,Pharmaceuticals: Major
+ETON,False,,False,1.1544096568642244,46.0,2026-03-16,53.0,1,0,21.3,2025-09-22,-33.0,1,-17.2,19.9,True,False,Health Technology,Pharmaceuticals: Major
+KALV,False,,False,1.0260173031363404,38.6,2026-03-23,56.2,2,0,17.15,2025-12-08,-17.1,1,-12.4,25.7,True,False,Health Technology,Pharmaceuticals: Major
+LGND,False,,False,1.005019826941258,-1.1,2026-04-13,9.7,0,0,209.1,2025-11-24,-15.9,1,-14.8,-2.3,True,False,Health Technology,Pharmaceuticals: Major
+RPRX,False,,False,0.9772290481946817,43.5,2025-11-03,46.5,3,1,37.2,2025-08-04,-9.8,3,-6.9,9.5,True,False,Health Technology,Pharmaceuticals: Major
+ASRT,False,,False,0.972662069295188,20.9,2026-03-23,68.0,1,1,13.95,2025-09-29,-38.3,1,-12.4,14.6,True,False,Health Technology,Pharmaceuticals: Major
+ORKA,False,,False,0.9432172741723043,81.5,2026-01-12,96.9,2,0,30.78,2024-10-14,-82.2,2,-22.5,-14.6,False,False,Health Technology,Pharmaceuticals: Major
+VTRS,False,,False,0.9255269882189422,-3.0,2026-05-04,4.5,0,0,15.93,2026-02-16,-19.2,1,-8.6,-5.0,True,False,Health Technology,Pharmaceuticals: Major
+JAZZ,False,,True,0.8736740554833605,28.3,2026-03-30,31.1,0,0,182.99,2025-11-17,-14.2,1,-4.6,17.5,True,False,Health Technology,Pharmaceuticals: Major
+SYRE,False,,False,0.8231307201407316,44.4,2026-04-06,55.5,0,0,47.61,2024-03-11,-77.1,1,-14.8,-2.5,False,False,Health Technology,Pharmaceuticals: Major
+KNSA,False,,True,0.7588027604415178,-3.7,2026-04-27,21.7,1,0,43.73,2025-12-15,-15.3,1,-11.1,-9.5,False,False,Health Technology,Pharmaceuticals: Major
+CYTK,False,,False,0.7359162451649397,0.0,2026-05-04,11.0,0,0,69.33,2025-11-24,-15.7,1,-8.8,-4.1,True,False,Health Technology,Pharmaceuticals: Major
+PRAX,False,,False,0.7203616709475428,80.8,2025-10-13,274.1,2,0,91.83,2025-02-10,-70.9,5,-12.2,-1.7,False,False,Health Technology,Pharmaceuticals: Major
+INDV,False,,True,0.7083175854152396,-0.3,2026-04-27,2.5,0,0,36.62,2025-12-22,-24.4,1,-12.7,-8.5,True,False,Health Technology,Pharmaceuticals: Major
+ALKS,False,,,0.6938865742421935,-1.8,2026-05-11,1.3,0,0,36.32,2025-11-03,-25.7,1,-8.4,-7.0,False,False,Health Technology,Pharmaceuticals: Major
+TVTX,False,,False,0.5971729423558298,0.7,2026-04-27,5.5,0,0,42.13,2025-12-22,-46.4,1,-7.0,-0.6,True,False,Health Technology,Pharmaceuticals: Major
+XOMA,False,,True,0.43046160676657613,0.7,2026-04-27,4.3,0,0,39.92,2025-09-29,-44.2,1,-1.2,-0.8,False,False,Health Technology,Pharmaceuticals: Major
+KNX,False,,False,1.09793747658021,8.8,2026-04-13,11.7,1,0,62.77,2026-02-23,-17.7,1,-10.9,3.5,True,False,Transportation,Trucking
+CVLG,False,,False,1.051720509274532,22.7,2026-04-13,27.9,1,0,29.26,2024-11-25,-41.0,1,-8.3,9.5,True,False,Transportation,Trucking
+WERN,False,,,1.0299091541315117,31.2,2026-03-30,33.7,2,0,29.77,2025-08-18,-23.2,0,,,True,False,Transportation,Trucking
+JBHT,False,,False,0.9085383495439466,30.8,2025-12-08,33.9,2,1,193.26,2024-11-04,-37.3,3,-9.9,-1.7,False,False,Transportation,Trucking
+XPO,False,,False,0.8866729387474575,-0.3,2026-02-02,27.3,3,0,159.43,2024-12-09,-46.6,3,-16.5,-12.3,False,False,Transportation,Trucking
+RKLB,False,,,1.1600857430680316,28.7,2026-05-04,36.3,1,0,99.58,2026-01-12,-43.6,0,,,True,False,Electronic Technology,Aerospace & Defense
+HXL,False,,False,0.9791463152240868,19.3,2025-11-17,23.2,5,0,69.97,2025-01-20,-36.1,3,-21.5,-11.1,False,False,Electronic Technology,Aerospace & Defense
+CW,False,,False,0.9718486147521981,78.6,2025-05-12,89.5,4,3,385.91,2024-11-04,-31.0,6,-8.4,-2.3,True,False,Electronic Technology,Aerospace & Defense
+PKE,False,,True,0.9092247412096217,70.4,2025-12-08,78.4,3,0,19.4,2025-07-14,-22.8,4,-7.6,-0.1,True,False,Electronic Technology,Aerospace & Defense
+SIF,False,,False,0.8627315849088334,79.5,2026-02-09,163.3,3,0,7.5,2025-09-08,-34.9,2,-16.1,-3.1,True,False,Electronic Technology,Aerospace & Defense
+DCO,False,,False,0.756626409713667,34.0,2026-01-05,42.3,2,0,101.47,2025-10-20,-16.5,2,-19.9,0.6,False,False,Electronic Technology,Aerospace & Defense
+VTOL,False,,False,0.845551407395603,-1.7,2026-01-19,5.1,2,0,40.66,2025-10-27,-14.3,2,-19.9,-14.8,True,False,Transportation,Airlines
+GTX,False,,,1.275561653250161,28.7,2026-04-27,56.0,1,0,21.34,2026-02-09,-21.0,0,,,True,False,Producer Manufacturing,Auto Parts: OEM
+CMI,False,,True,1.2653406146670503,67.4,2025-08-04,71.0,2,1,374.09,2024-12-02,-31.8,7,-12.5,-10.9,False,False,Producer Manufacturing,Auto Parts: OEM
+DAN,False,,True,0.9463096337044448,86.7,2025-08-11,92.6,3,1,17.74,2025-06-30,-15.2,4,-18.8,-12.1,True,False,Producer Manufacturing,Auto Parts: OEM
+ITT,False,,True,0.6733038169584731,0.9,2026-03-30,1.0,1,0,193.07,2025-11-03,-13.7,1,-15.5,-13.0,False,False,Producer Manufacturing,Auto Parts: OEM
+NPKI,False,,False,1.0806220288607726,11.4,2026-01-12,19.0,2,0,13.04,2025-10-20,-15.6,3,-11.8,-5.9,True,False,Producer Manufacturing,Building Products
+DLX,False,,False,0.850245471609454,19.5,2025-11-24,23.9,3,0,19.15,2025-08-18,-10.8,4,-30.0,-24.7,True,False,Commercial Services,Commercial Printing/Forms
+STX,False,,True,0.826558203894824,598.0,2025-05-26,625.0,7,1,112.1,2024-10-14,-44.3,6,-25.6,77.2,True,False,Electronic Technology,Computer Peripherals
+EXTR,False,,,0.7997880045354998,6.5,2026-05-04,11.8,0,0,22.89,2025-09-08,-41.1,0,,,True,False,Electronic Technology,Computer Peripherals
+WDC,False,,False,0.7388162528963006,667.0,2025-06-23,700.6,4,0,60.49,2024-07-08,-52.5,4,-25.5,51.5,False,False,Electronic Technology,Computer Peripherals
+SNDK,False,,True,0.7369530431108736,2057.1,2025-09-01,2555.2,4,1,55.69,2025-03-24,-49.9,5,-18.3,-5.5,True,False,Electronic Technology,Computer Peripherals
+ADTN,False,,False,0.6904181972401284,21.2,2026-03-23,28.9,0,0,12.16,2025-02-10,-43.0,2,-24.6,-16.2,True,False,Electronic Technology,Computer Peripherals
+HPE,False,,,0.9459339166743953,42.1,2026-04-13,50.9,0,0,24.91,2025-09-15,-21.0,0,,,True,False,Electronic Technology,Computer Processing Hardware
+DELL,False,,False,0.9185507851615634,72.3,2026-03-23,77.1,0,0,166.69,2025-10-27,-34.4,1,-23.9,11.8,True,False,Electronic Technology,Computer Processing Hardware
+NATL,False,,False,0.6977230663696892,5.8,2026-02-09,10.6,2,0,40.39,2025-09-01,-17.5,2,-13.3,-7.9,True,False,Electronic Technology,Computer Processing Hardware
+ENS,False,,False,1.708559706034852,92.5,2025-10-13,111.9,2,1,109.58,2024-07-22,-30.7,3,-11.8,-3.1,False,False,Producer Manufacturing,Electrical Products
+SEDG,False,,,1.287455571235169,0.3,2026-05-11,48.9,0,0,41.6,2025-11-03,-32.2,0,,,True,False,Producer Manufacturing,Electrical Products
+THR,False,,False,1.0900895107021125,68.0,2025-12-01,82.9,4,1,35.93,2024-05-20,-35.8,4,-11.2,-7.8,True,False,Producer Manufacturing,Electrical Products
+AMPX,False,,False,1.0858966475218803,-1.8,2026-03-02,12.7,2,0,14.22,2025-10-27,-45.8,2,-34.5,-26.3,False,False,Producer Manufacturing,Electrical Products
+GNRC,False,,True,0.9634271407470536,30.5,2026-04-06,32.9,2,0,203.25,2025-08-11,-33.7,1,-4.9,-0.8,True,False,Producer Manufacturing,Electrical Products
+GEV,False,,False,0.9036693997720524,43.1,2026-01-26,53.6,3,0,676.1,2025-07-28,-21.7,2,-17.1,-12.1,False,False,Producer Manufacturing,Electrical Products
+ALNT,False,,False,0.902327092846736,38.3,2025-10-06,43.0,4,1,44.31,2023-02-27,-62.1,4,-24.2,-18.1,True,False,Producer Manufacturing,Electrical Products
+ROK,False,,False,0.8663948811637927,-0.0,2026-05-04,6.2,0,0,425.74,2026-01-26,-18.6,1,-9.4,-2.1,True,False,Producer Manufacturing,Electrical Products
+FPS,False,,,0.8618887680650096,36.3,2026-04-20,41.9,1,0,33.76,2026-02-02,-23.1,0,,,True,False,Producer Manufacturing,Electrical Products
+POWL,False,,False,0.8457592589063743,99.6,2026-01-12,103.2,1,1,137.44,2025-10-27,-32.7,3,-23.2,-14.3,False,False,Producer Manufacturing,Electrical Products
+LITE,False,,False,0.8160446588363968,806.0,2025-07-21,810.5,3,0,104.0,2025-01-20,-56.1,7,-26.3,-12.8,False,False,Producer Manufacturing,Electrical Products
+ESP,False,,False,2.3906704567797146,7.7,2026-01-12,13.3,2,0,50.84,2025-09-08,-29.9,2,-23.6,-20.0,False,False,Electronic Technology,Electronic Components
+VPG,False,,False,1.9557599041967946,87.7,2026-04-20,102.6,0,0,56.14,2026-02-02,-30.2,1,-10.2,85.1,True,True,Electronic Technology,Electronic Components
+BELFA,False,,False,1.4098432284454907,129.9,2025-07-21,139.9,5,2,105.18,2024-10-14,-48.8,7,-19.1,-7.5,True,True,Electronic Technology,Electronic Components
+CAMT,False,,False,1.1875100995840293,14.7,2026-01-12,24.1,2,0,134.82,2024-07-01,-64.8,3,-29.8,-20.4,False,False,Electronic Technology,Electronic Components
+TTMI,False,,False,1.0917920006076882,546.6,2025-05-12,601.3,5,2,27.08,2025-02-10,-41.8,6,-16.4,5.5,True,False,Electronic Technology,Electronic Components
+GLW,False,,False,1.0175915210841615,262.6,2025-07-14,263.3,5,2,53.41,2025-01-20,-31.2,5,-33.0,8.4,True,False,Electronic Technology,Electronic Components
+KN,False,,False,0.9895779316946092,44.1,2026-03-23,49.8,1,0,24.48,2025-09-29,-16.0,1,-3.1,3.7,True,False,Electronic Technology,Electronic Components
+NVT,False,,True,0.9035082516298456,39.8,2026-03-30,40.6,1,0,117.13,2025-10-27,-20.7,1,-12.8,-5.6,False,False,Electronic Technology,Electronic Components
+RFIL,False,,True,0.8497519084475335,63.2,2026-02-23,93.7,2,0,9.56,2025-09-22,-42.1,2,-15.0,20.1,True,False,Electronic Technology,Electronic Components
+VICR,False,,False,0.8004449580793537,156.7,2025-12-15,172.4,3,1,98.38,2023-07-24,-68.6,3,-27.1,-15.4,False,False,Electronic Technology,Electronic Components
+VIK,False,,False,1.4860992822866192,26.1,2025-11-24,31.4,3,2,64.11,2025-08-25,-12.1,1,-23.9,-2.3,False,False,Consumer Services,Hotels/Resorts/Cruise lines
+CVEO,False,,False,0.9765594765326839,18.4,2026-04-06,18.5,1,0,28.36,2024-09-16,-36.5,1,-18.1,-7.9,False,False,Consumer Services,Hotels/Resorts/Cruise lines
+MCRI,False,,False,0.8636641732465253,1.6,2026-04-20,3.5,1,0,112.85,2025-07-14,-24.8,1,-6.2,-3.4,False,False,Consumer Services,Hotels/Resorts/Cruise lines
+LIND,False,,False,0.7690230941624011,36.8,2026-01-05,38.0,2,0,14.91,2025-08-18,-23.7,2,-28.2,-7.9,True,False,Consumer Services,Hotels/Resorts/Cruise lines
+GOOG,False,,True,0.9769568762544306,10.8,2026-04-20,10.9,0,0,342.05,2026-01-26,-20.6,1,-5.0,-4.8,False,False,Technology Services,Internet Software/Services
+MRX,False,,False,0.6597217661745536,6.8,2026-04-06,10.9,0,0,47.99,2025-05-05,-42.5,1,-8.0,-6.0,False,False,Technology Services,Internet Software/Services
+AAMI,False,,False,1.3202339768642333,15.6,2026-04-06,27.4,0,0,56.18,2026-01-26,-18.5,1,-10.6,2.4,True,True,Finance,Investment Managers
+MYFW,False,,False,1.2186477302649452,-0.5,2026-04-27,1.5,0,0,28.0,2026-01-12,-17.2,1,-8.1,-5.3,True,False,Finance,Investment Managers
+HASI,False,,False,1.0361249695382397,4.3,2026-04-06,8.8,1,0,37.31,2022-08-08,-69.8,1,-8.6,-5.5,False,False,Finance,Investment Managers
+VCTR,False,,,0.9474257865963951,16.3,2026-04-13,20.9,1,0,71.07,2025-08-18,-21.0,0,,,True,False,Finance,Investment Managers
+MS,False,,True,0.8798810087359458,4.1,2026-05-04,5.5,0,0,190.6,2026-01-12,-20.3,1,-4.3,3.2,True,False,Finance,Investment Managers
+NTRS,False,,True,0.8483708208144464,21.8,2025-12-08,25.7,1,1,133.44,2025-09-22,-10.3,3,-6.1,-0.9,True,False,Finance,Investment Managers
+BEN,False,,,0.7387205933101965,4.0,2026-04-27,7.4,0,0,28.88,2023-01-30,-46.8,1,-5.9,-4.4,False,False,Finance,Investment Managers
+PBT,False,,False,1.3749813392009003,50.3,2026-03-16,52.6,1,0,20.32,2025-11-10,-20.5,1,-11.5,37.2,True,True,Miscellaneous,Investment Trusts/Mutual Funds
+WT,False,,False,0.7393749964527262,20.7,2026-04-06,30.1,2,0,14.67,2025-09-15,-27.4,2,-5.7,-3.7,False,False,Miscellaneous,Investment Trusts/Mutual Funds
+GAIN,False,,False,0.6974391983817649,11.7,2026-03-30,15.1,1,0,13.82,2026-01-12,-6.6,1,-13.7,-5.7,False,False,Miscellaneous,Investment Trusts/Mutual Funds
+BLX,False,,False,1.2382272816863584,16.8,2026-01-26,17.0,1,1,47.1,2025-09-08,-20.6,2,-8.8,-2.7,True,False,Finance,Major Banks
+THFF,False,,False,0.988138471408609,15.6,2025-12-01,18.1,1,1,58.09,2025-08-25,-13.4,2,-14.6,-0.7,True,False,Finance,Major Banks
+AROW,False,,True,0.9221033866827711,12.4,2026-03-23,12.7,2,0,32.68,2024-11-11,-33.7,1,-7.7,-2.5,True,False,Finance,Major Banks
+CAC,False,,False,0.8779486951540934,7.6,2026-03-23,9.1,1,0,45.22,2024-11-18,-27.4,1,-9.2,-4.7,True,False,Finance,Major Banks
+OSBC,False,,False,0.8368519341612055,8.2,2025-12-01,10.3,2,1,19.11,2025-02-03,-27.3,2,-14.2,-5.7,True,False,Finance,Major Banks
+BOKF,False,,False,0.7486746574706435,7.2,2026-01-05,11.0,2,0,117.78,2024-11-25,-29.7,1,-13.7,-6.0,True,False,Finance,Major Banks
+C,False,,True,0.6976889447506881,1.0,2026-04-06,2.7,0,0,121.76,2026-02-02,-16.6,1,-9.9,-5.9,True,False,Finance,Major Banks
+STRZ,False,,True,0.934858676169515,10.9,2026-04-13,31.0,0,0,17.0,2025-07-21,-50.6,1,-28.2,-7.2,False,False,Consumer Services,Movies/Entertainment
+MSGE,False,,False,0.9312562894266703,52.2,2025-10-20,58.1,4,1,44.04,2024-10-14,-35.8,4,-20.8,1.6,True,False,Consumer Services,Movies/Entertainment
+MSGS,False,,False,0.7582162496574947,49.0,2025-12-08,50.5,6,1,235.19,2024-12-09,-26.3,3,-12.0,2.4,False,False,Consumer Services,Movies/Entertainment
+FCX,False,,True,0.7266771200817276,10.5,2026-03-23,17.1,3,0,52.96,2024-05-13,-48.6,1,-21.3,-12.1,False,False,Non-Energy Minerals,Other Metals/Minerals
+ALM,False,,False,0.6544422645896755,120.6,2025-12-15,141.1,3,0,7.74,2025-06-30,-59.2,3,-44.6,-23.6,True,False,Non-Energy Minerals,Other Metals/Minerals
+UFCS,False,,False,1.1102371930236965,25.5,2026-03-30,26.9,2,0,37.16,2025-11-10,-9.8,1,-20.2,-3.6,False,False,Finance,Property/Casualty Insurance
+AIZ,False,,,0.9742481593256404,0.1,2026-05-11,3.9,0,0,245.31,2026-02-02,-14.8,0,,,True,False,Finance,Property/Casualty Insurance
+PRA,False,,False,0.9728683553133123,1.7,2026-01-26,1.8,1,0,24.19,2025-09-29,-1.4,2,-1.2,-0.7,True,False,Finance,Property/Casualty Insurance
+THG,False,,,0.9227706996065074,3.2,2026-05-04,4.3,0,0,187.14,2025-12-15,-11.5,0,,,False,False,Finance,Property/Casualty Insurance
+UVE,False,,False,0.810359231411863,10.0,2026-04-13,10.7,1,0,35.22,2025-11-10,-20.3,1,-8.4,-6.7,True,False,Finance,Property/Casualty Insurance
+HZO,False,,False,1.0714602873949455,14.3,2026-04-13,23.7,1,0,28.23,2025-09-29,-24.1,1,-22.0,1.4,True,False,Retail Trade,Specialty Stores
+CASY,False,,False,0.7312622434630389,54.9,2025-11-03,55.9,4,1,529.21,2025-07-21,-7.7,5,-6.8,-5.0,False,False,Retail Trade,Specialty Stores
+ELA,False,,False,0.7247136091972862,44.4,2026-03-16,58.4,1,0,15.06,2025-12-15,-27.0,2,-31.9,-4.9,False,False,Retail Trade,Specialty Stores
+HLIT,False,,False,2.3605584129921238,29.3,2026-04-27,39.8,1,0,10.87,2025-10-27,-22.1,1,-3.5,18.0,True,True,Electronic Technology,Telecommunications Equipment
+VSAT,False,,False,1.5217616623828076,175.1,2025-08-11,179.3,4,3,26.7,2024-08-05,-74.9,5,-3.6,6.0,True,True,Electronic Technology,Telecommunications Equipment
+CSCO,False,,False,1.119354356701031,56.0,2025-11-10,70.0,2,2,70.82,2025-08-04,-8.7,2,-13.6,42.4,True,False,Electronic Technology,Telecommunications Equipment
+NOK,False,,False,0.9619110117354099,75.4,2026-03-30,88.9,1,0,8.19,2025-10-27,-28.4,1,-12.7,11.4,True,False,Electronic Technology,Telecommunications Equipment
+DGII,False,,False,0.9212868526101317,49.8,2026-02-02,51.5,3,1,43.68,2022-11-21,-53.8,2,-12.9,-5.2,True,False,Electronic Technology,Telecommunications Equipment
+AAPL,False,,,0.9208912321202608,10.3,2026-04-27,10.3,0,0,279.86,2025-11-24,-13.2,0,,,True,False,Electronic Technology,Telecommunications Equipment
+CIEN,False,,False,0.7695831853519893,400.2,2025-09-01,475.5,6,0,101.44,2025-01-20,-51.5,3,-23.9,59.5,True,False,Electronic Technology,Telecommunications Equipment
+RLAY,False,,False,2.3433235852470817,7.9,2026-03-30,26.2,1,0,10.72,2024-09-09,-83.5,1,-32.9,-21.9,True,True,,
+WOLF,False,,,1.5344289988400657,90.1,2026-04-27,103.9,0,0,34.28,2025-09-29,-76.5,0,,,True,True,,
+POET,False,,,1.4349117732237506,33.2,2026-05-04,67.1,1,0,8.73,2026-01-12,-44.2,1,-43.2,-29.9,False,False,,
+MBBC,False,,False,1.3017661549989221,9.2,2025-12-22,11.4,1,0,12.0,2025-04-21,-18.9,3,-17.4,-13.7,False,False,,
+TRT,False,,False,1.2689975470349988,-16.3,2026-04-20,81.8,1,0,7.6,2026-01-05,-41.8,1,-49.7,-35.4,False,False,,
+Q,False,,False,0.9489664690140582,40.6,2026-02-09,51.8,1,1,103.36,2025-10-27,-31.9,3,-17.5,-8.5,False,False,,
+LWLG,False,,False,0.8500636526459936,68.9,2026-03-09,118.5,1,0,5.88,2025-11-03,-51.7,2,-41.6,-29.7,False,False,,
+APC,False,,,0.6594949971877895,7.1,2026-05-04,9.1,0,0,19.0,2026-04-27,-5.4,0,,,True,False,,
+NEXA,False,,False,0.597025632303077,53.9,2025-12-22,65.0,2,1,8.77,2024-12-23,-49.4,2,-46.5,-12.6,False,False,,
+ERAS,False,,False,0.5351909497046455,223.0,2025-12-22,225.8,3,0,3.45,2024-07-22,-70.7,3,-64.2,-53.7,True,False,,
+ATEX,False,,,1.210621724196729,40.7,2026-04-20,49.9,0,0,42.41,2024-07-08,-58.5,0,,,True,False,Communications,Wireless Telecommunications
+GSAT,False,,False,0.7624647612596865,3.7,2026-04-13,10.8,0,0,74.88,2025-12-08,-28.3,1,-2.2,0.4,True,False,Communications,Wireless Telecommunications
+ADM,False,,True,0.8594993325461252,20.6,2026-01-12,22.8,3,0,63.14,2025-10-13,-13.9,3,-6.7,-6.1,False,False,Process Industries,Agricultural Commodities/Milling
+SEB,False,,True,0.7610142770393102,15.0,2025-11-17,16.1,3,1,4239.31,2022-03-28,-44.4,3,-27.9,-17.0,True,False,Process Industries,Agricultural Commodities/Milling
+ENLT,False,,False,1.148662923519776,373.1,2025-05-26,404.6,2,1,18.28,2025-02-17,-23.4,9,-10.1,-0.7,True,False,Utilities,Alternative Power Generation
+CENX,False,,True,0.9106179744723771,79.6,2025-12-15,90.0,2,0,34.23,2025-11-03,-25.8,3,-21.8,-5.3,True,False,Non-Energy Minerals,Aluminum
+CSTM,False,,True,0.8960988494448993,42.2,2026-03-23,43.3,1,0,23.2,2024-04-01,-68.4,2,-11.9,-1.9,True,False,Non-Energy Minerals,Aluminum
+KALU,False,,False,0.8143737221616361,69.5,2025-12-01,84.1,1,1,95.3,2024-05-13,-52.8,3,-13.9,-4.1,True,False,Non-Energy Minerals,Aluminum
+RL,False,,True,1.9319549129730151,32.7,2025-07-07,34.8,8,2,280.21,2025-02-10,-37.7,4,-18.4,-2.9,True,True,Consumer Non-Durables,Apparel/Footwear
+MNST,False,,True,0.8585862192499175,32.8,2025-09-22,34.7,4,0,64.45,2025-05-26,-9.9,6,-2.8,-1.3,False,False,Consumer Non-Durables,Beverages: Non-Alcoholic
+PHVS,False,,,0.9967287644613924,3.8,2026-04-13,4.2,0,0,28.48,2025-11-24,-18.7,1,-15.0,-11.0,False,False,Health Technology,Biotechnology
+INBX,False,,False,0.8884863234846608,-21.5,2026-04-20,11.9,0,0,90.58,2025-12-01,-36.7,1,-36.1,-34.8,False,False,Health Technology,Biotechnology
+TNGX,False,,False,0.8434498291554231,19.4,2026-03-02,55.3,1,0,13.03,2023-10-02,-92.1,1,-31.0,-24.5,False,False,Health Technology,Biotechnology
+ARWR,False,,False,0.8343567147670378,1.4,2026-04-20,5.1,0,0,71.3,2025-12-22,-24.2,1,-15.0,-8.9,False,False,Health Technology,Biotechnology
+AXSM,False,,,0.812780802357572,14.3,2026-04-27,23.2,0,0,191.5,2026-01-19,-20.5,0,,,True,False,Health Technology,Biotechnology
+CBIO,False,,False,0.7674048235602299,6.9,2026-03-30,34.7,0,0,15.4,2025-11-24,-43.4,2,-45.6,-24.3,True,False,Health Technology,Biotechnology
+CGON,False,,True,0.7425978569448082,18.5,2026-01-05,39.9,1,0,45.94,2025-11-24,-19.4,3,-17.0,-12.7,False,False,Health Technology,Biotechnology
+UTHR,False,,True,0.7423457069468532,6.0,2026-03-09,9.6,0,0,518.61,2025-12-15,-12.1,2,-6.3,-4.1,False,False,Health Technology,Biotechnology
+KRYS,False,,,0.7226646206465451,-2.0,2026-05-04,1.2,1,0,295.98,2026-01-12,-18.2,1,-10.5,-6.3,False,False,Health Technology,Biotechnology
+MRNA,False,,True,0.7187631038568608,12.1,2026-01-12,31.7,1,0,35.59,2025-07-21,-37.4,2,-24.4,-18.9,False,False,Health Technology,Biotechnology
+ELVN,False,,True,0.5757711274735289,7.0,2026-03-23,38.3,1,0,30.03,2024-10-14,-55.7,1,-20.5,-14.4,True,False,Health Technology,Biotechnology
+ANAB,False,,True,0.5447629303655777,115.0,2025-11-24,120.1,3,1,27.13,2024-09-09,-70.0,3,-21.0,-17.5,False,False,Health Technology,Biotechnology
+RLYB,False,,True,0.21421935859177624,10.4,2026-05-04,62.7,0,0,9.76,2024-11-25,-82.0,1,-11.1,3.7,True,False,Health Technology,Biotechnology
+RSI,False,,False,0.6932343962870096,18.2,2026-04-13,20.0,1,0,22.55,2025-08-25,-31.2,1,-10.9,-6.7,True,False,Consumer Services,Casinos/Gaming
+ODC,False,,False,1.765986862522165,11.1,2026-03-30,12.9,1,0,66.32,2025-09-08,-31.6,1,-9.9,-3.6,False,False,Process Industries,Chemicals: Agricultural
+CF,False,,False,0.6833965121146279,5.5,2026-03-02,19.0,0,0,102.26,2025-06-16,-26.9,1,-20.2,-11.1,False,False,Process Industries,Chemicals: Agricultural
+PRM,False,,True,0.9702178040359937,0.8,2026-04-20,4.1,1,0,29.88,2026-01-05,-31.8,2,-12.5,-10.9,False,False,Process Industries,Chemicals: Major Diversified
+ESI,False,,False,0.9294393058637626,38.6,2026-01-12,42.7,2,1,28.55,2024-11-18,-42.0,3,-15.0,-9.2,False,False,Process Industries,Chemicals: Major Diversified
+SILC,False,,True,1.669257289607306,118.0,2026-03-23,134.1,1,0,19.36,2025-09-08,-31.1,2,-23.9,-13.8,False,False,Electronic Technology,Computer Communications
+NWPX,False,,False,0.9304483024028146,91.5,2025-11-24,99.1,4,0,56.37,2024-11-18,-34.4,5,-8.1,-1.8,True,False,Non-Energy Minerals,Construction Materials
+SHAZ,False,,,2.552999207861397,83.8,2026-04-13,97.3,0,0,34.5,2026-02-16,-52.0,0,,,True,True,Technology Services,Data Processing Services
+AKAM,False,,,1.453136649520136,-0.3,2026-05-04,14.0,1,0,129.17,2024-02-05,-47.7,1,-16.5,-11.0,False,False,Technology Services,Data Processing Services
+APLD,False,,,1.1401734109459503,11.2,2026-05-04,17.6,0,0,39.0,2026-01-19,-48.7,0,,,True,False,Technology Services,Data Processing Services
+CORZ,False,,,0.8291583668847118,10.2,2026-05-04,13.3,0,0,22.3,2025-10-27,-40.1,0,,,True,False,Technology Services,Data Processing Services
+WULF,False,,True,0.7542596840998524,20.9,2026-04-06,41.5,1,0,16.13,2025-11-24,-31.0,2,-23.9,-11.4,True,False,Technology Services,Data Processing Services
+NEE,False,,True,2.106216178876698,1.4,2026-01-26,3.1,1,0,85.88,2025-11-24,-9.4,2,-12.3,-10.3,False,False,Utilities,Electric Utilities
+IDA,False,,False,1.3514323658930927,-1.0,2026-02-09,5.6,1,0,134.53,2025-10-13,-8.9,2,-6.2,-4.0,True,True,Utilities,Electric Utilities
+AEP,False,,False,1.3369744294623498,2.8,2026-02-09,7.8,3,0,122.04,2025-11-24,-9.2,1,-9.7,-4.3,True,True,Utilities,Electric Utilities
+LNT,False,,False,1.1421047046366932,5.6,2026-03-23,7.9,1,0,68.52,2025-11-24,-8.2,1,-6.8,-1.7,True,False,Utilities,Electric Utilities
+AEE,False,,False,1.116303690589184,1.0,2026-02-09,5.9,0,0,105.13,2025-11-24,-9.4,1,-8.6,-3.7,True,False,Utilities,Electric Utilities
+ETR,False,,False,1.0123203689706726,16.1,2026-02-02,16.5,3,0,96.5,2025-11-24,-7.0,2,-7.6,-4.1,True,False,Utilities,Electric Utilities
+KEN,False,,False,0.8297161658209627,72.1,2025-10-27,79.3,2,0,47.81,2025-07-21,-17.0,5,-18.4,-8.5,True,False,Utilities,Electric Utilities
+ORA,False,,,0.6983185827922381,1.6,2026-05-11,3.7,0,0,128.71,2026-01-26,-21.8,0,,,True,False,Utilities,Electric Utilities
+FCEL,False,,,2.2025389055971267,123.7,2026-04-20,134.6,1,0,10.66,2025-09-29,-46.4,0,,,True,True,Electronic Technology,Electronic Equipment/Instruments
+ONTO,False,,False,2.0385972435462487,2.0,2026-04-06,9.9,1,0,238.55,2024-07-08,-64.0,1,-24.6,-17.0,False,False,Electronic Technology,Electronic Equipment/Instruments
+KEYS,False,,False,1.9562252754505132,75.1,2025-11-24,83.1,3,2,189.32,2023-02-13,-37.4,3,-11.1,-5.6,False,False,Electronic Technology,Electronic Equipment/Instruments
+NXT,False,,,1.2866004688238153,3.6,2026-05-04,4.5,1,0,124.9,2026-02-02,-22.0,1,-25.1,-16.8,False,False,Electronic Technology,Electronic Equipment/Instruments
+NVMI,False,,False,1.1316863439684193,27.8,2026-01-05,42.8,1,1,352.62,2025-10-20,-24.4,2,-15.9,-8.5,False,False,Electronic Technology,Electronic Equipment/Instruments
+MTRN,False,,,1.0763903144559341,52.1,2026-03-23,59.5,2,0,134.86,2025-10-20,-18.9,0,,,True,False,Electronic Technology,Electronic Equipment/Instruments
+CGNX,False,,False,0.9168446009201959,0.8,2026-05-04,10.7,0,0,59.71,2026-02-09,-29.8,1,-12.1,-8.0,True,False,Electronic Technology,Electronic Equipment/Instruments
+BW,False,,True,0.915394698382363,489.5,2025-10-06,536.8,6,1,2.99,2024-10-14,-92.6,3,-38.4,-13.6,False,False,Electronic Technology,Electronic Equipment/Instruments
+ESE,False,,False,0.8037009708167315,29.6,2026-01-26,32.5,2,0,223.16,2025-10-20,-13.3,2,-13.1,-9.7,True,False,Electronic Technology,Electronic Equipment/Instruments
+DBD,False,,True,0.5900818351936281,15.2,2025-11-24,17.5,2,0,63.21,2025-08-18,-13.8,4,-23.8,-16.4,True,False,Electronic Technology,Electronic Equipment/Instruments
+SXI,False,,False,0.567067412513373,0.9,2026-02-02,4.3,2,0,245.24,2025-11-24,-11.9,2,-18.4,-9.5,True,False,Electronic Technology,Electronic Equipment/Instruments
+ARW,False,,False,1.0921402450489255,37.0,2026-02-02,63.0,1,1,133.35,2025-06-30,-23.7,2,-4.8,14.3,True,False,Distribution Services,Electronics Distributors
+AVT,False,,True,0.8988802688054561,38.5,2026-01-26,54.3,2,1,55.69,2025-06-30,-21.5,1,-13.8,27.6,True,False,Distribution Services,Electronics Distributors
+SNX,False,,True,0.625207810514738,27.3,2026-03-30,45.3,1,0,163.35,2025-09-22,-13.4,1,-7.9,-1.3,True,False,Distribution Services,Electronics Distributors
+GVA,False,,False,1.6922779379028523,13.2,2025-12-08,16.3,2,0,111.78,2025-08-18,-13.2,4,-12.9,-10.4,False,False,Industrial Services,Engineering & Construction
+MWH,False,,,1.467847633473487,11.5,2026-04-13,18.9,0,0,32.34,2026-02-09,-18.3,1,-24.2,-20.6,False,False,Industrial Services,Engineering & Construction
+PWR,False,,False,1.1621408423007669,55.0,2026-01-12,55.2,2,1,466.04,2025-11-24,-12.4,2,-11.7,-7.6,False,False,Industrial Services,Engineering & Construction
+STRL,False,,False,1.1356906676030307,82.6,2026-02-02,90.9,2,1,384.0,2025-10-20,-26.7,2,-21.3,-17.9,False,False,Industrial Services,Engineering & Construction
+MTZ,False,,False,1.106889725897673,122.2,2025-06-23,128.9,6,2,166.95,2025-01-20,-40.3,7,-11.7,-8.6,False,False,Industrial Services,Engineering & Construction
+DY,False,,False,1.0607057620039015,43.1,2025-09-22,47.2,5,1,279.41,2025-08-04,-16.6,3,-28.7,-9.4,False,False,Industrial Services,Engineering & Construction
+FIX,False,,True,1.006194466743191,230.6,2025-07-14,232.0,4,2,550.64,2025-01-20,-50.0,5,-15.3,-11.8,False,False,Industrial Services,Engineering & Construction
+MYRG,False,,False,0.9302710217977218,99.2,2025-11-24,117.6,4,1,205.35,2025-07-21,-16.5,3,-12.0,-6.9,False,False,Industrial Services,Engineering & Construction
+IESC,False,,,0.9240551908611404,36.7,2026-03-30,36.8,2,0,482.35,2025-12-08,-23.7,1,-13.5,-5.8,False,False,Industrial Services,Engineering & Construction
+ESOA,False,,,0.9240373501293003,3.7,2026-04-27,7.8,0,0,16.21,2024-11-25,-53.4,1,-13.8,-12.4,False,False,Industrial Services,Engineering & Construction
+EME,False,,False,0.8618479453271737,12.3,2026-03-30,12.9,1,0,751.7,2025-10-20,-24.9,1,-12.4,-10.8,False,False,Industrial Services,Engineering & Construction
+ECG,False,,False,0.8209802029254447,41.4,2026-02-09,48.6,1,0,100.01,2025-11-03,-21.9,3,-18.6,-13.4,False,False,Industrial Services,Engineering & Construction
+AGX,False,,False,0.6802192707432858,60.2,2026-02-09,65.9,2,0,395.72,2025-11-24,-30.3,3,-17.8,-12.3,False,False,Industrial Services,Engineering & Construction
+ATLC,False,,False,1.2271202715619183,5.3,2026-04-20,9.8,0,0,75.71,2025-09-08,-37.3,1,-15.6,-3.4,True,False,Finance,Finance/Rental/Leasing
+BFH,False,,True,0.8679507502964212,-4.4,2026-04-13,5.9,0,0,81.79,2026-01-05,-17.4,1,-9.7,-5.1,False,False,Finance,Finance/Rental/Leasing
+EZPW,False,,False,0.8474940960348871,102.7,2025-08-25,103.6,5,1,16.6,2025-04-21,-22.6,5,-13.4,-9.0,True,False,Finance,Finance/Rental/Leasing
+FCFS,False,,False,0.6631646124500296,58.7,2025-08-18,66.6,5,0,136.57,2025-06-30,-13.6,5,-3.9,-1.2,True,False,Finance,Finance/Rental/Leasing
+IGIC,False,,False,0.9167940745223256,0.3,2026-03-30,4.2,1,0,24.29,2025-04-28,-18.6,1,-11.3,-7.3,True,False,Finance,Financial Conglomerates
+CHEF,False,,True,0.9539902224312418,-3.0,2026-04-27,10.9,1,0,68.94,2025-07-28,-22.8,1,-9.9,-7.7,False,False,Distribution Services,Food Distributors
+UNFI,False,,False,0.6353014970235953,7.4,2026-03-23,13.9,1,0,43.29,2025-10-13,-28.6,3,-8.6,-6.4,False,False,Distribution Services,Food Distributors
+WILC,False,,False,0.46699563755989415,12.4,2026-04-27,18.3,0,0,30.61,2026-02-02,-23.6,1,-9.9,-1.7,True,False,Distribution Services,Food Distributors
+VLGEA,False,,False,0.9808068021629447,17.2,2026-02-09,19.3,2,0,38.78,2025-09-08,-23.4,3,-10.2,2.5,True,False,Retail Trade,Food Retail
+TSN,False,,False,0.929863207961982,1.8,2026-03-23,3.3,2,0,62.99,2024-09-02,-21.1,1,-9.4,-6.4,False,False,Consumer Non-Durables,Food: Meat/Fish/Dairy
+SENEA,False,,False,0.795181413409082,8.9,2026-02-09,10.0,1,0,126.4,2025-11-17,-16.9,2,-27.5,-16.9,True,False,Consumer Non-Durables,Food: Specialty/Candy
+COCO,False,,,0.6240413169156981,13.9,2026-04-27,28.8,1,0,59.05,2026-02-02,-23.8,1,-4.1,-3.2,False,False,Consumer Non-Durables,Food: Specialty/Candy
+MDU,False,,False,1.482102176685765,3.9,2026-03-30,5.3,2,0,21.05,2025-11-24,-10.5,1,-7.0,-2.6,False,False,Utilities,Gas Distributors
+NI,False,,False,0.9282573881759336,3.9,2026-02-09,9.7,1,0,43.63,2025-11-24,-7.8,2,-4.9,-1.4,True,False,Utilities,Gas Distributors
+SWX,False,,False,0.8445934140275154,17.2,2025-09-29,17.4,5,1,76.61,2024-11-25,-18.8,2,-7.6,-4.1,True,False,Utilities,Gas Distributors
+CTRI,False,,False,0.7937939821267088,18.1,2025-12-01,22.8,2,0,24.6,2025-01-20,-41.3,4,-28.0,-23.2,False,False,Utilities,Gas Distributors
+TRGP,False,,True,0.7929214743753747,31.5,2026-02-02,31.7,2,0,210.21,2025-01-13,-32.6,1,-11.6,6.8,True,False,Utilities,Gas Distributors
+NHC,False,,False,0.9020227449431376,73.1,2025-08-18,81.6,7,2,107.95,2025-05-12,-14.5,5,-14.6,10.4,True,False,Health Services,Hospital/Nursing Management
+AZZ,False,,False,0.7446663840203506,12.5,2026-03-23,15.6,2,0,119.34,2025-09-08,-22.5,1,-10.4,-7.9,False,False,Process Industries,Industrial Specialties
+SHEL,False,,False,0.9620694847344852,10.8,2026-02-09,15.5,0,0,74.19,2025-10-20,-9.2,1,-11.7,-8.9,False,False,Energy Minerals,Integrated Oil
+PR,False,,False,0.6742669441763032,27.8,2026-01-26,32.5,2,0,15.43,2024-11-18,-37.7,1,-14.6,-7.6,False,False,Energy Minerals,Integrated Oil
+EBAY,False,,,0.9311480873075854,11.2,2026-04-27,15.6,1,0,100.14,2025-08-11,-22.3,1,-3.5,-0.9,True,False,Retail Trade,Internet Retail
+OOMA,False,,False,0.8796483566952691,21.7,2026-04-13,23.3,1,0,15.51,2025-02-10,-36.9,1,-5.2,-1.0,True,False,Communications,Major Telecommunications
+SHEN,False,,False,0.8408619004906216,-2.5,2026-04-13,1.4,0,0,15.66,2025-07-21,-38.3,1,-7.1,-4.2,False,False,Communications,Major Telecommunications
+CNC,False,,,0.5503160217785708,10.9,2026-04-27,24.6,0,0,47.47,2026-01-05,-33.4,0,,,True,False,Health Services,Managed Health Care
+SPHR,False,,False,0.692383922678311,121.8,2025-09-08,155.0,2,0,50.74,2024-08-19,-52.9,4,-15.2,-11.6,False,False,Consumer Services,Media Conglomerates
+DVA,False,,,1.1654403430607418,-0.1,2026-05-04,10.5,1,0,179.6,2025-01-27,-43.8,1,-4.2,-2.1,False,False,Health Services,Medical/Nursing Services
+SNDA,False,,False,1.0340333097580006,6.7,2026-04-13,8.2,1,0,34.19,2024-04-29,-43.4,1,-14.8,-4.8,False,False,Health Services,Medical/Nursing Services
+CON,False,,,0.8352757845849543,5.1,2026-05-04,7.2,1,0,23.61,2025-08-25,-22.1,1,-6.1,-4.8,False,False,Health Services,Medical/Nursing Services
+BTSG,False,,False,0.8001362167333761,121.2,2025-09-08,135.7,5,0,24.82,2025-01-27,-37.6,5,-12.7,37.1,False,False,Health Services,Medical/Nursing Services
+RBC,False,,False,1.3346842668987577,35.8,2025-10-20,38.5,4,0,404.24,2025-08-18,-9.8,3,-17.6,-11.4,False,False,Producer Manufacturing,Metal Fabrication
+VMI,False,,False,0.9065292541374751,2.9,2026-04-20,22.7,1,0,418.51,2025-10-20,-10.0,1,-6.6,-2.8,True,False,Producer Manufacturing,Metal Fabrication
+HUT,False,,,0.9299785667278903,60.3,2026-04-06,69.0,1,0,62.68,2026-01-05,-32.9,0,,,True,False,Miscellaneous,Miscellaneous
+UTI,False,,,1.5892087968588595,1.3,2026-05-11,11.1,0,0,36.05,2025-05-26,-40.9,0,,,True,True,Commercial Services,Miscellaneous Commercial Services
+OCS,False,,False,1.438307901404264,27.8,2026-01-05,28.2,2,0,23.01,2025-01-27,-39.2,1,-26.7,-10.0,False,False,Commercial Services,Miscellaneous Commercial Services
+LINC,False,,True,1.0160726344989794,85.6,2026-01-12,93.7,2,0,24.99,2025-08-04,-30.8,4,-14.3,-9.5,False,False,Commercial Services,Miscellaneous Commercial Services
+ANDE,False,,False,0.8409135445997262,22.8,2026-01-12,25.4,3,0,56.51,2023-12-25,-46.0,3,-17.9,-11.0,False,False,Commercial Services,Miscellaneous Commercial Services
+ULS,False,,False,0.8298343411539043,12.3,2026-04-27,12.7,1,0,91.27,2025-11-24,-25.2,1,-12.5,-4.4,True,False,Commercial Services,Miscellaneous Commercial Services
+HCSG,False,,False,0.7859008244655961,25.0,2025-10-13,29.9,5,1,15.73,2025-06-30,-19.5,2,-31.2,-16.2,False,False,Commercial Services,Miscellaneous Commercial Services
+JLHL,False,,,0.3012074791502713,207.1,2026-04-13,209.5,1,0,6.3,2025-06-23,-57.1,1,-57.3,-36.8,False,False,Commercial Services,Miscellaneous Commercial Services
+BLBD,False,,True,1.5762629575959293,5.2,2026-04-06,8.9,1,0,60.89,2025-09-15,-24.2,2,-14.9,-9.9,False,False,Consumer Durables,Motor Vehicles
+NGL,False,,True,1.2304480822966921,187.0,2025-10-20,194.5,4,2,6.15,2024-04-08,-57.1,3,-6.7,33.2,True,False,Industrial Services,Oil & Gas Pipelines
+PAGP,False,,False,1.1947229359547524,27.5,2026-02-02,30.4,1,1,19.9,2025-02-17,-24.4,1,-9.1,6.6,True,False,Industrial Services,Oil & Gas Pipelines
+WMB,False,,True,1.0421489791677627,17.5,2026-01-26,21.6,1,1,64.55,2025-09-29,-14.3,2,-9.3,2.6,True,False,Industrial Services,Oil & Gas Pipelines
+WES,False,,,1.041458999540858,5.8,2026-05-04,7.7,1,0,42.72,2026-02-09,-9.5,1,-3.9,-2.1,True,False,Industrial Services,Oil & Gas Pipelines
+SUNC,False,,True,0.8543678480817812,38.4,2026-01-05,40.8,4,0,50.3,2025-11-03,-9.5,3,-1.9,-1.3,True,False,Industrial Services,Oil & Gas Pipelines
+PAA,False,,False,0.7804752222789353,26.8,2026-02-02,29.1,1,1,18.7,2025-02-17,-25.0,1,-8.8,7.9,True,False,Industrial Services,Oil & Gas Pipelines
+DTM,False,,False,0.6995421911832624,34.3,2025-11-03,39.0,5,1,108.74,2025-01-13,-25.6,2,-14.0,0.4,True,False,Industrial Services,Oil & Gas Pipelines
+ET,False,,,0.6323837122660484,-0.4,2026-05-11,4.4,0,0,19.22,2025-01-20,-30.8,1,-2.7,-2.0,False,False,Industrial Services,Oil & Gas Pipelines
+SEI,False,,False,1.0750571325579084,19.0,2026-04-06,28.4,1,0,57.84,2026-01-12,-23.1,2,-14.1,-6.2,False,False,Energy Minerals,Oil & Gas Production
+WTTR,False,,False,1.0671073780307887,34.4,2026-03-16,34.9,1,0,14.29,2024-11-25,-51.2,1,-16.1,14.3,False,False,Energy Minerals,Oil & Gas Production
+PNRG,False,,,0.955214404954115,8.4,2026-05-04,8.8,1,0,238.2,2025-03-24,-46.9,1,-12.7,-3.3,False,False,Energy Minerals,Oil & Gas Production
+FANG,False,,False,0.5522821801690722,23.8,2026-01-26,30.3,2,0,154.03,2025-06-09,-14.8,2,-17.9,-2.9,False,False,Energy Minerals,Oil & Gas Production
+VLO,False,,True,0.9109709405034503,72.8,2025-08-18,81.9,5,2,135.79,2025-01-13,-29.5,3,-16.1,-3.1,False,False,Energy Minerals,Oil Refining/Marketing
+MPC,False,,True,0.873354051950054,15.5,2026-03-02,20.6,1,1,211.15,2024-04-01,-46.8,1,-16.7,1.1,True,False,Energy Minerals,Oil Refining/Marketing
+DINO,False,,False,0.8487877988806575,26.5,2026-03-02,26.8,2,0,55.13,2025-11-10,-18.5,2,-8.7,-5.8,True,False,Energy Minerals,Oil Refining/Marketing
+PSX,False,,True,0.7642287546198513,27.5,2026-01-19,27.8,1,0,138.99,2025-09-22,-11.0,2,-18.5,-5.1,True,False,Energy Minerals,Oil Refining/Marketing
+APEI,False,,False,0.6690585284946798,27.8,2026-01-05,32.7,2,0,38.8,2025-09-22,-22.2,2,-17.8,-15.4,False,False,Consumer Services,Other Consumer Services
+AMN,False,,False,1.1306969746099542,-4.5,2026-05-04,29.4,0,0,21.38,2025-10-20,-30.0,1,-11.9,-4.6,False,False,Commercial Services,Personnel Services
+RVMD,False,,False,0.6974511804395275,2.0,2026-04-13,21.7,0,0,124.49,2026-01-12,-26.5,1,-15.9,-2.7,True,False,Health Technology,Pharmaceuticals: Other
+SSRM,False,,True,0.6578372719450899,12.4,2026-03-23,22.7,2,0,24.23,2025-09-22,-24.9,1,-23.1,-18.6,False,False,Non-Energy Minerals,Precious Metals
+SCHL,False,,True,0.41946707729708393,17.7,2026-02-23,25.8,2,0,32.37,2024-09-23,-53.0,2,-11.0,-2.4,True,False,Consumer Services,Publishing: Books/Magazines
+NSC,False,,False,0.999329675794765,4.5,2026-04-13,5.5,1,0,298.18,2025-09-29,-7.9,1,-4.1,-2.3,False,False,Transportation,Railroads
+UNP,False,,False,0.989351935036185,6.1,2026-04-06,8.0,1,0,246.29,2024-08-26,-18.8,1,-4.7,-3.2,False,False,Transportation,Railroads
+CSX,False,,False,0.8228987093601126,24.6,2026-01-19,26.0,3,1,36.13,2025-08-11,-12.6,2,-4.7,-2.2,False,False,Transportation,Railroads
+ARMK,False,,False,0.8938524960870187,13.6,2026-04-13,16.5,0,0,43.99,2025-07-21,-21.0,1,-17.1,-4.1,False,False,Consumer Services,Restaurants
+QSR,False,,False,0.6494956791435189,-1.6,2026-03-30,1.2,1,0,74.5,2024-03-25,-24.0,2,-8.8,-7.7,False,False,Consumer Services,Restaurants
+TSAT,False,,False,1.0813675058527692,44.4,2026-03-16,48.8,1,0,35.95,2025-10-13,-36.0,2,-22.4,-3.4,True,False,Communications,Specialty Telecommunications
+ITRN,False,,False,0.7505501435044141,42.6,2026-01-05,43.8,2,0,41.79,2025-02-24,-33.0,4,-8.3,-1.7,True,False,Communications,Specialty Telecommunications
+RS,False,,True,1.0283077974303079,0.3,2026-04-27,4.0,0,0,352.96,2026-02-02,-18.1,1,-7.7,-3.7,True,False,Non-Energy Minerals,Steel
+STLD,False,,True,0.8656910092294169,5.8,2026-04-20,18.7,0,0,202.23,2026-02-02,-20.1,1,-7.0,-1.5,True,False,Non-Energy Minerals,Steel
+VALE,False,,True,0.8258473427699423,24.6,2025-12-22,26.8,1,0,13.0,2023-12-25,-43.1,2,-22.0,-8.1,False,False,Non-Energy Minerals,Steel
+NUE,False,,False,0.7913251704312327,8.3,2026-04-20,18.0,0,0,196.61,2024-04-01,-51.1,1,-4.0,-1.5,True,False,Non-Energy Minerals,Steel
+MO,False,,False,0.6668028123187815,10.5,2026-04-20,13.3,1,0,65.2,2025-08-18,-17.5,1,-8.8,-0.9,True,False,Consumer Non-Durables,Tobacco
+CAT,False,,False,1.0385272852263059,115.0,2025-07-14,119.0,3,1,401.79,2025-01-20,-34.5,4,-9.2,-5.5,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
+FSTR,False,,False,0.8763374396619865,-9.9,2026-05-04,16.8,0,0,32.63,2026-02-02,-18.0,1,-14.2,-10.4,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
+PLOW,False,,False,0.7503997647423967,23.9,2026-01-05,32.8,2,0,33.28,2025-08-18,-15.7,1,-15.2,-5.7,False,False,Producer Manufacturing,Trucks/Construction/Farm Machinery
+SUN,False,,False,1.2080981782927889,19.9,2026-02-09,25.4,3,0,56.06,2024-03-04,-22.6,1,-14.9,-1.9,False,False,Distribution Services,Wholesale Distributors
+MSM,False,,,0.958068278577061,12.6,2026-04-06,12.9,1,0,94.37,2023-12-18,-31.5,0,,,True,False,Distribution Services,Wholesale Distributors
+WCC,False,,False,0.8787805278246944,61.8,2025-10-20,70.4,4,2,213.33,2024-11-25,-41.8,3,-24.7,12.1,True,False,Distribution Services,Wholesale Distributors
+GWW,False,,,0.8259226995080738,1.3,2026-05-04,4.0,0,0,1199.66,2026-02-02,-14.1,1,-4.8,-2.7,False,False,Distribution Services,Wholesale Distributors
+DXPE,False,,False,0.7151639156669819,5.5,2026-03-23,10.1,1,0,130.97,2025-09-29,-35.8,1,-20.8,-16.8,False,False,Distribution Services,Wholesale Distributors
+AIT,False,,True,0.6264284354161763,1.5,2026-04-27,4.4,0,0,294.24,2026-02-02,-14.9,1,-6.6,-3.0,False,False,Distribution Services,Wholesale Distributors
