@@ -1,0 +1,781 @@
+# Breakout Pool 本地分析面板设计 v0.1.24
+
+## 1. 最终定位
+
+这是一个**本地 Streamlit 分析面板**，用于读取 `breakout_follow_pool.csv`，快速验证不同字段筛选和排序组合。
+
+第一版只强化三件事：
+
+```text
+字段组合筛选能力
+强表格展示能力
+少量关键图表辅助感知
+```
+
+页面主角是 Result Table。图表只做辅助，不承担筛选主流程。
+
+---
+
+## 2. 放置位置与启动
+
+目录固定：
+
+```text
+Yfinance_data/
+  dashboard/
+    run_app.py
+    app.py
+    data_utils.py
+    field_config.py
+    table_view.py
+    self_check.py
+    requirements.txt
+    README.md
+    tests/
+      test_filters.py
+      test_charts.py
+      test_table_config.py
+    .streamlit/
+      config.toml
+```
+
+启动：
+
+```bash
+python dashboard/run_app.py --csv /path/to/breakout_follow_pool.csv
+```
+
+默认读取：
+
+```text
+dashboard/data/breakout_follow_pool.csv
+```
+
+---
+
+## 3. 复杂度边界
+
+### 3.1 文件职责
+
+```text
+app.py           Streamlit 页面组织与状态收集
+data_utils.py    CSV 读取、字段清洗、筛选、排序、图表聚合纯函数
+field_config.py  字段配置、preset、默认列、可筛选字段、可排序字段
+table_view.py    AG Grid 表格封装
+self_check.py    本地 CSV 自测脚本：验证筛选逻辑、排序逻辑、图表聚合数据
+run_app.py       单命令启动入口
+tests/           pytest 单元测试：使用小样本 fixture 验证纯函数
+```
+
+页面层不写复杂业务判断。筛选、排序、聚合必须放在 `data_utils.py`，方便测试。
+
+### 3.2 依赖
+
+```text
+streamlit
+pandas
+numpy
+plotly
+streamlit-aggrid
+python-dateutil
+pytest
+```
+
+`streamlit-aggrid` 只用于 Result Table，因为表格需要拖列和 pin 列。其它部分尽量使用 Streamlit 原生组件。
+
+---
+
+## 4. 页面布局
+
+采用紧凑左右布局。
+
+```text
+┌────────────────────┬───────────────────────────────────────────────┐
+│ Sidebar Filters    │ Active Filters / KPI                          │
+│                    │ Compact Charts                                │
+│                    │ Sort Bar                                      │
+│                    │ Result Table                                  │
+└────────────────────┴───────────────────────────────────────────────┘
+```
+
+右侧顺序固定：
+
+```text
+1. Active Filter Summary，一行 chips
+2. KPI，一行 4 个数字
+3. 2 个核心图表，单行并排，高度约 220px
+4. Sort Bar，一行
+5. Result Table，占主要空间
+```
+
+不要再增加说明卡片、长字段卡片、测试预览卡片、逻辑注释卡片。
+
+---
+
+## 5. 模式设计
+
+页面只有两个互斥模式。
+
+### 5.1 Custom Filter Mode，默认
+
+用于字段组合筛选和排序实验。
+
+Custom Mode 中完全隔离以下字段：
+
+```text
+C_continuous
+rank_C_continuous
+is_priority
+```
+
+这些字段不出现在 Custom Mode 的筛选、排序、默认列、Advanced Field Filters 中。
+
+### 5.2 C Rank Reference Mode
+
+只用于查看旧 C Rank 参照队列。
+
+固定规则：
+
+```text
+signal=True
+rank_C_continuous asc
+```
+
+显示范围：
+
+```text
+All rows / Top 10 / Top 20 / Top 30 / Top 50
+```
+
+C Rank Mode 不使用 Custom Filters，不使用 Sort Bar，不参与图表联动。
+
+---
+
+## 6. 筛选设计
+
+筛选分两层。
+
+```text
+Core Filters：高频字段，直接显示
+Advanced Field Filters：任意字段组合，默认折叠，按需添加
+```
+
+所有启用条件统一使用 AND 组合。
+
+```text
+Core Filters AND Advanced Field Filters
+```
+
+未启用字段完全不参与过滤。
+
+---
+
+## 7. Sidebar：核心筛选
+
+### 7.1 Preset，只保留 3 个
+
+#### IBD 有效突破，默认
+
+```text
+signal=True
+ibd_entry_valid=True
+sort_1=ibd_entry_volume_ratio desc
+sort_2=ibd_entry_close_vs_trigger_pct desc
+```
+
+#### Ceiling Pullback 回撤确认
+
+```text
+signal=True
+signal_source=ceiling_breakout
+ibd_candidate_rule=ceiling_pullback
+sort_1=pct_above_ceiling asc
+```
+
+注意：`ceiling_pullback` 是 `ibd_candidate_rule`，不是独立 `signal_source`。
+
+#### MA Touch Count
+
+```text
+signal=True
+sort_1=touched_ema10_count desc
+```
+
+### 7.2 Core Filters，默认可见
+
+只放最常用字段。
+
+| 分组 | 字段 | 控件 | 默认 |
+|---|---|---|---|
+| Signal | `signal` | select | True |
+| Signal | `signal_source` | select | All |
+| Candidate | `ibd_candidate_rule` | select | All |
+| IBD Entry | `ibd_entry_valid` | select | True |
+| IBD Entry | `ibd_entry_volume_ratio` | compact range | auto |
+| IBD Entry | `ibd_entry_close_vs_trigger_pct` | compact range | auto |
+
+### 7.3 Secondary Filters，默认折叠
+
+用于后置收窄，不放在第一屏核心位置。
+
+| 分组 | 字段 | 控件 | 默认 |
+|---|---|---|---|
+| Risk / Structure | `pct_above_ceiling` | compact range | auto |
+| Risk / Structure | `touched_ema10_count` | compact range | auto |
+| Risk / Structure | `volume_ratio` | compact range | auto |
+| Grouping | `sector` | searchable multiselect | All |
+| Grouping | `industry` | searchable multiselect | All |
+
+---
+
+## 8. Advanced Field Filters
+
+### 8.1 目标
+
+支持对 Custom Mode 可显示字段进行任意组合筛选。
+
+默认不启用，不展开，不铺满侧边栏。
+
+入口样式：
+
+```text
+Advanced filters · 0 active
++ Add filter
+```
+
+### 8.2 添加方式
+
+每条高级筛选由 4 部分组成：
+
+```text
+Enable / Field / Operator / Value
+```
+
+示例：
+
+```text
+volume_ratio >= 1.3
+pullback_v_is_dry is True
+hold_return >= 0
+breakout_date after 2026-05-01
+code contains CR
+```
+
+最终组合：
+
+```text
+signal=True
+AND ibd_entry_valid=True
+AND volume_ratio>=1.3
+AND pullback_v_is_dry=True
+AND hold_return>=0
+```
+
+### 8.3 操作符
+
+| 字段类型 | 操作符 |
+|---|---|
+| Boolean | is True / is False |
+| Category | in / not in |
+| Number | >= / <= / between / is empty / not empty |
+| Date | after / before / between / is empty / not empty |
+| Text | contains / equals / startswith / non-empty |
+
+### 8.4 可选字段
+
+Advanced Field Filters 的字段来源：
+
+```text
+Custom Mode 可显示字段 - Custom Mode 隔离字段
+```
+
+禁止字段：
+
+```text
+C_continuous
+rank_C_continuous
+is_priority
+```
+
+---
+
+## 9. Active Filter Summary
+
+右侧顶部显示当前实际生效条件。
+
+形式是一行 chips，不做大卡片。
+
+示例：
+
+```text
+Preset: IBD 有效突破 · Rows: 42/212 · signal=True · ibd_entry_valid=True · volume_ratio>=1.3 · Sort: ibd_entry_volume_ratio desc → close_vs_trigger desc
+```
+
+要求：
+
+```text
+只显示启用条件
+Advanced filters 必须显示
+排序必须显示
+C Rank Mode 使用独立摘要
+```
+
+---
+
+## 10. KPI，一行即可
+
+保留 4 个：
+
+```text
+Filtered Rows
+IBD Valid Rate
+Median IBD Volume Ratio
+Median Close vs Trigger
+```
+
+KPI 只基于当前筛选结果计算。
+
+---
+
+## 11. 图表，只保留 2 个
+
+图表不是主流程，只提供快速全局感知。
+
+### 11.1 IBD Valid Rate by Signal Source
+
+类型：横向 100% stacked bar，替代普通 stacked count bar。
+
+```text
+y = signal_source
+x = percentage
+segments = ibd_entry_valid True / False
+right_label = valid_count / total_count + valid_rate
+hover = signal_source, valid_count, invalid_count, total_count, valid_rate
+```
+
+用途：更直观地观察不同信号类型的 IBD 有效确认率。
+
+设计要求：
+
+```text
+每个 signal_source 一行
+绿色段表示 ibd_entry_valid=True
+灰色/弱色段表示 ibd_entry_valid=False
+右侧直接显示 77/81 · 95% 这类摘要
+按照 total_count desc 或 signal_source 固定顺序排列
+空结果显示 empty state
+```
+
+不要使用普通堆叠柱状图只展示 count，因为它不够直观，难以一眼比较不同信号类型的有效确认比例。
+
+### 11.2 Volume × Close Strength
+
+类型：scatter。
+
+```text
+x = ibd_entry_volume_ratio
+y = ibd_entry_close_vs_trigger_pct
+hover = code, signal_source, ibd_candidate_rule, ibd_entry_price, pct_above_ceiling
+```
+
+用途：对应默认排序逻辑，观察放量强度与收盘确认质量。
+
+### 11.3 图表交互
+
+只使用 Plotly 原生能力：
+
+```text
+hover 查看完整字段
+legend click 隐藏/显示分类
+scatter zoom / box select / lasso select
+```
+
+图表点击不修改全局筛选。筛选只通过 Sidebar 控件完成。
+
+### 11.4 后续扩展位
+
+保留 `chart_registry` 扩展位，但 v0.1 不默认显示更多图表。
+
+---
+
+## 12. Sort Bar
+
+放在表格上方，一行展示。
+
+最多三层排序：
+
+```text
+sort_1 field + direction
+sort_2 field + direction
+sort_3 field + direction
+```
+
+排序字段来自 Custom Mode 可显示字段，但排除：
+
+```text
+C_continuous
+rank_C_continuous
+is_priority
+```
+
+---
+
+## 13. Result Table，核心模块
+
+### 13.1 表格组件
+
+使用 `streamlit-aggrid`，封装在 `table_view.py`。
+
+必须支持：
+
+```text
+固定 code 列
+横向滚动
+拖动列顺序
+pin / unpin 列
+列宽调整
+单列排序
+quick filter
+复制单元格 / 行
+```
+
+### 13.2 默认 pin
+
+```text
+code pinned left
+```
+
+用户可以额外 pin 常用列，例如：
+
+```text
+signal_source
+ibd_entry_valid
+ibd_entry_volume_ratio
+```
+
+不保存用户列状态。刷新后恢复默认。
+
+### 13.3 默认列
+
+默认 18～20 列，按业务链路排列。
+
+```text
+code
+sector
+industry
+signal_source
+ibd_candidate_rule
+ibd_candidate_price
+ibd_entry_valid
+ibd_entry_date
+ibd_entry_price
+ibd_entry_volume_ratio
+ibd_entry_close_vs_trigger_pct
+pct_above_ceiling
+touched_ema10_count
+volume_ratio
+pullback_v_is_dry
+pullback_count
+pullback_pct_off_peak
+hold_return
+breakout_date
+ceiling
+```
+
+不包含：
+
+```text
+C_continuous
+rank_C_continuous
+is_priority
+ibd_entry_reject_reason
+ibd_candidate_extra
+```
+
+长字段不放默认列，避免表格变脏。原始数据导出仍保留。
+
+### 13.4 Column View
+
+只保留简单切换：
+
+```text
+Core / IBD / Risk / Full Custom
+```
+
+`Full Custom` 用 multiselect 选择显示列。
+
+表格可显示字段，也可被 Advanced Field Filters 选择为筛选字段。
+
+### 13.5 导出
+
+导出当前筛选结果，保留原始 CSV 全部字段。
+
+---
+
+## 14. field_config.py
+
+所有字段统一配置，避免散落在页面代码中。
+
+```python
+FIELD_CONFIG = {
+    "ibd_entry_volume_ratio": {
+        "type": "number",
+        "label": "IBD Entry Volume Ratio",
+        "group": "IBD Entry",
+        "filterable": True,
+        "sortable": True,
+        "custom_mode": True,
+        "c_rank_mode": False,
+        "default_table": True,
+        "advanced_filter": True,
+        "format": "0.00x",
+        "help": "突破当日成交量相对前 50 均量的比例",
+    },
+}
+```
+
+字段配置必须驱动：
+
+```text
+筛选控件
+Advanced Field Filters
+排序字段
+表格列
+图表 hover
+```
+
+---
+
+## 15. data_utils.py 纯函数
+
+必须提供：
+
+```python
+load_pool_csv(path: str) -> pd.DataFrame
+normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame
+build_filter_specs(ui_state) -> list[FilterSpec]
+apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame
+apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame
+build_active_filter_summary(filters, sort_specs) -> list[str]
+build_kpis(df: pd.DataFrame) -> dict
+build_chart_data(df: pd.DataFrame) -> dict[str, pd.DataFrame]
+```
+
+---
+
+## 16. 自测与测试要求，必须实现
+
+这个面板的主要风险不是 UI，而是筛选组合、排序结果和图表聚合口径错误。实现完成后必须提供可运行的自测脚本，并在交付前跑通。
+
+要求保留两类测试：
+
+```text
+pytest 单元测试：验证纯函数，使用小型 fixture 数据。
+self_check.py 自测脚本：读取真实 breakout_follow_pool.csv，验证实际筛选结果和图表数据口径。
+```
+
+自测命令：
+
+```bash
+python dashboard/self_check.py --csv /path/to/breakout_follow_pool.csv
+pytest dashboard/tests -q
+```
+
+`self_check.py` 不启动 Streamlit，只调用 `data_utils.py` 与 `field_config.py` 中的纯函数，输出简洁结果：
+
+```text
+[PASS] load and normalize
+[PASS] preset: IBD 有效突破
+[PASS] preset: Ceiling Pullback 回撤确认
+[PASS] preset: MA Touch Count
+[PASS] advanced filters AND logic
+[PASS] sort specs
+[PASS] chart: IBD Valid Rate by Signal Source aggregation
+[PASS] chart: Volume × Close Strength row source
+[PASS] mode isolation
+```
+
+任何一项失败都必须 `exit(1)`，不能只打印 warning。
+
+### 16.1 测试重点
+
+测试只围绕核心功能。
+
+### 16.2 Normalize
+
+```text
+Boolean 字段正确转换
+Number 字段正确转换
+Date 字段正确转换
+空值不报错
+```
+
+### 16.3 Preset
+
+```text
+IBD 有效突破：signal=True AND ibd_entry_valid=True
+Ceiling Pullback：signal=True AND signal_source=ceiling_breakout AND ibd_candidate_rule=ceiling_pullback
+MA Touch Count：signal=True，按 touched_ema10_count desc
+```
+
+### 16.4 Advanced Filters
+
+```text
+未启用字段不参与过滤
+启用字段与 Core Filters 进行 AND 组合
+多个高级字段全部 AND 组合
+category / number / boolean / date / text 操作符正确
+```
+
+### 16.5 Sort
+
+```text
+一层排序正确
+两层排序正确
+三层排序正确
+空值排序稳定
+```
+
+### 16.6 Mode Isolation
+
+```text
+Custom Mode 不出现 C_continuous / rank_C_continuous / is_priority
+C Rank Mode 不受 Custom Filters 影响
+C Rank Mode 固定 signal=True + rank_C_continuous asc
+```
+
+### 16.7 Table
+
+```text
+code 默认 pinned left
+默认列符合配置
+Full Custom 只能选择 Custom Mode 允许字段
+导出 CSV 保留原始全部字段
+```
+
+### 16.8 Chart
+
+```text
+IBD Valid Rate by Signal Source 的 valid_count + invalid_count 合计等于当前筛选结果行数
+Scatter 只使用当前筛选结果
+空结果显示 empty state
+```
+
+### 16.9 self_check.py 必须验证的真实 CSV 逻辑
+
+`self_check.py` 使用真实 CSV 进行端到端口径验证，不能只检查程序是否报错。
+
+必须至少验证以下内容：
+
+#### Preset 结果验证
+
+每个 preset 都要用一份显式 pandas mask 进行交叉验证。
+
+```python
+# IBD 有效突破
+expected = df[(df["signal"] == True) & (df["ibd_entry_valid"] == True)]
+actual = apply_filters(df, build_preset_filters("ibd_valid_breakout"))
+assert set(actual["code"]) == set(expected["code"])
+```
+
+```python
+# Ceiling Pullback 回撤确认
+expected = df[
+    (df["signal"] == True)
+    & (df["signal_source"] == "ceiling_breakout")
+    & (df["ibd_candidate_rule"] == "ceiling_pullback")
+]
+```
+
+```python
+# MA Touch Count
+expected = df[df["signal"] == True].sort_values("touched_ema10_count", ascending=False)
+```
+
+#### Advanced Filters 组合验证
+
+至少构造 3 组组合条件：
+
+```text
+number + boolean：volume_ratio >= 1.3 AND pullback_v_is_dry=True
+category + number：signal_source in [...] AND ibd_entry_volume_ratio >= 1.5
+date/text：breakout_date after ... AND code contains ...
+```
+
+每组都要用手写 pandas mask 对比 `apply_filters()` 的结果 code 集合。
+
+#### 排序验证
+
+至少验证：
+
+```text
+一层排序：ibd_entry_volume_ratio desc
+两层排序：ibd_entry_volume_ratio desc + ibd_entry_close_vs_trigger_pct desc
+三层排序：ibd_entry_valid desc + ibd_entry_volume_ratio desc + pct_above_ceiling asc
+```
+
+排序验证以 `code` 顺序列表为准。
+
+#### 图表数据验证
+
+图表的数据必须来自当前筛选后的 DataFrame。
+
+`IBD Valid Rate by Signal Source`：
+
+```text
+valid_count + invalid_count 合计 == 当前筛选结果行数
+按 signal_source + ibd_entry_valid groupby 的结果 == build_chart_data 输出
+valid_rate = valid_count / total_count，total_count 为 0 时显示 0 或空态
+每个 signal_source 输出一行，包含 valid_count / invalid_count / total_count / valid_rate_pct
+```
+
+`Volume × Close Strength`：
+
+```text
+散点图行数 == 当前筛选结果中 x/y 所需字段可用的行数
+散点图 code 集合是当前筛选结果 code 集合的子集
+hover 字段必须存在：code, signal_source, ibd_candidate_rule, ibd_entry_price, pct_above_ceiling
+```
+
+#### 模式隔离验证
+
+```text
+Custom Mode 可筛选字段中不能出现 C_continuous / rank_C_continuous / is_priority
+Custom Mode 默认列中不能出现 C_continuous / rank_C_continuous / is_priority
+C Rank Mode 固定 signal=True + rank_C_continuous asc
+C Rank Mode 不读取 Custom Filters 和 Sort Bar
+```
+
+### 16.10 交付验收要求
+
+Codex 完成实现后，必须在回复中附上：
+
+```text
+运行命令
+测试命令
+self_check.py 输出摘要
+pytest 输出摘要
+```
+
+未跑自测，视为未完成交付。
+
+---
+
+## 17. Codex 实现指令
+
+请在 `Yfinance_data/dashboard/` 下实现本地 Streamlit 分析面板。
+
+重点：
+
+```text
+1. 表格是主角，图表只保留 2 个。
+2. 左侧只显示核心筛选；其它字段通过 Advanced Field Filters 按需添加。
+3. Advanced Field Filters 支持 Custom Mode 可显示字段，默认不启用。
+4. 所有启用筛选统一 AND 组合。
+5. Result Table 使用 streamlit-aggrid，必须支持拖列、pin 列，并默认固定 code。
+6. Custom Mode 完全隔离 C_continuous / rank_C_continuous / is_priority。
+7. C Rank Reference Mode 独立，只按 signal=True + rank_C_continuous asc 展示。
+8. 筛选、排序、表格列、图表聚合必须有 pytest 测试。
+9. 必须实现 dashboard/self_check.py，并用真实 CSV 验证筛选逻辑和图表聚合口径。
+10. 交付前必须运行：python dashboard/self_check.py --csv <csv_path> 和 pytest dashboard/tests -q。
+```
