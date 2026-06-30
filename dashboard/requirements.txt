@@ -1,0 +1,7 @@
+streamlit
+pandas
+numpy
+plotly
+streamlit-aggrid
+python-dateutil
+pytest
