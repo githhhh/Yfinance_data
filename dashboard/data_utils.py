@@ -60,20 +60,7 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def build_filter_specs(ui_state: dict[str, Any]) -> list[FilterSpec]:
-    filters: list[FilterSpec] = []
-    for raw_filter in ui_state.get("core_filters", []) + ui_state.get("advanced_filters", []):
-        filters.append(
-            FilterSpec(
-                field=raw_filter["field"],
-                operator=raw_filter["operator"],
-                value=raw_filter.get("value"),
-                value2=raw_filter.get("value2"),
-                enabled=raw_filter.get("enabled", True),
-                label=raw_filter.get("label"),
-            )
-        )
-    return filters
+
 
 
 def combine_filter_specs(preset_filters: list[FilterSpec], ui_filters: list[FilterSpec]) -> list[FilterSpec]:
@@ -136,13 +123,7 @@ def apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame:
     ).copy()
 
 
-def apply_c_rank_mode(
-    df: pd.DataFrame,
-    limit: int | None = None,
-    filters: list[FilterSpec] | None = None,
-    sort_specs: list[SortSpec] | None = None,
-) -> pd.DataFrame:
-    del filters, sort_specs
+def apply_c_rank_mode(df: pd.DataFrame, limit: int | None = None) -> pd.DataFrame:
     _ensure_column(df, "signal")
     _ensure_column(df, "rank_C_continuous")
 
@@ -308,11 +289,11 @@ def _empty_mask(series: pd.Series) -> pd.Series:
 
 
 def _true_mask(series: pd.Series) -> pd.Series:
-    return series.map(lambda value: False if pd.isna(value) else bool(value) is True).astype(bool)
+    return series.fillna(False).astype(bool)
 
 
 def _false_mask(series: pd.Series) -> pd.Series:
-    return series.map(lambda value: False if pd.isna(value) else bool(value) is False).astype(bool)
+    return ~series.fillna(True).astype(bool)
 
 
 def _median_or_none(df: pd.DataFrame, field: str) -> float | None:
@@ -355,7 +336,17 @@ def _build_signal_quality_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    working = df.copy()
+    needed = [
+        "signal_source",
+        "ibd_candidate_rule",
+        "ibd_entry_valid",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_vs_trigger_pct",
+        "volume_ratio",
+        "pct_above_ceiling",
+    ]
+    available = [c for c in needed if c in df.columns]
+    working = df[available].copy()
     for column in [
         "ibd_entry_volume_ratio",
         "ibd_entry_close_vs_trigger_pct",
@@ -407,7 +398,8 @@ def _build_structure_action_map_data(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    working = df.copy()
+    available = [c for c in columns if c in df.columns]
+    working = df[available].copy()
     for column in columns:
         if column not in working.columns:
             working[column] = pd.NA
@@ -421,7 +413,9 @@ def _build_sector_concentration_data(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    working = df.copy()
+    needed = ["sector", "industry", "code", "ibd_entry_valid"]
+    available = [c for c in needed if c in df.columns]
+    working = df[available].copy()
     working["sector"] = _label_series(working, "sector")
     working["industry"] = _label_series(working, "industry")
     working["valid"] = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))).astype(int)
@@ -456,7 +450,8 @@ def _build_scatter_data(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    working = df.copy()
+    available = [c for c in columns if c in df.columns]
+    working = df[available].copy()
     for column in columns:
         if column not in working.columns:
             working[column] = pd.NA

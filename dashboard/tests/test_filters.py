@@ -224,6 +224,6 @@ def test_c_rank_mode_ignores_custom_filters_and_sorts_by_rank():
     custom_filters = [FilterSpec("code", "equals", "AAA")]
     custom_sort = [SortSpec("volume_ratio", "desc")]
 
-    actual = apply_c_rank_mode(df, limit=None, filters=custom_filters, sort_specs=custom_sort)
+    actual = apply_c_rank_mode(df, limit=None)
 
     assert actual["code"].tolist() == ["BBB", "AAA", "DDD"]

@@ -779,3 +779,57 @@ pytest 输出摘要
 9. 必须实现 dashboard/self_check.py，并用真实 CSV 验证筛选逻辑和图表聚合口径。
 10. 交付前必须运行：python dashboard/self_check.py --csv <csv_path> 和 pytest dashboard/tests -q。
 ```
+
+## 18. Senior Engineer Code Review (v0.1.24 实现评估)
+
+这是一个基于 Senior Engineer 视角、遵循极简主义（Ponytail）和“红蓝对抗”预演机制的深度 Code Review。
+
+整体来看，该 Dashboard 模块采用了非常优秀的**数据与视图解耦**架构：`field_config.py` 充当统一配置中心，`data_utils.py` 封装纯函数式数据处理，`app.py` 负责渲染。这种配置驱动（Configuration-driven）的设计使得可维护性和扩展性极高。
+
+但在深入代码细节与执行上下文中，我发现了几个严重的**性能隐患**和**冗余设计**。以下是具体的 Review 报告：
+
+### 🔴 1. 严重的性能与内存隐患 (Red Team 视角)
+
+Streamlit 的生命周期是**“每次交互重新执行整个脚本”**。在此机制下，当前代码存在致命的性能消耗：
+
+*   **缺失数据缓存 (致命)**：
+    `app.py` 的 `main()` 中直接调用 `df = load_pool_csv(args.csv)`。由于没有任何缓存机制，用户每次在侧边栏调整一个 Filter，程序都会去磁盘重新读取一次 CSV、并重新执行所有字符串截取和类型转换 (`normalize_pool_df`)。对于量化分析数百上千条数据的场景，这会导致明显的 UI 卡顿。
+    **最优解修改：** 必须在 `data_utils.py` 或 `app.py` 中使用 `@st.cache_data` 装饰器包裹加载逻辑。
+*   **滥用深拷贝 (`df.copy()`)**：
+    `data_utils.py` 中所有的图表聚合函数（如 `_build_signal_quality_matrix_data`、`_build_structure_action_map_data` 等）在开头都使用了 `working = df.copy()`。这会导致内存中同时存在多个全量 DataFrame 副本。实际上聚合操作只需要用到 3~4 列。
+    **最优解修改：** 绝不要全量 copy。应当仅截取需要的列进行计算，或使用 `df.assign()`。例如：`working = df[['signal_source', 'ibd_entry_valid']].copy()`。
+*   **非向量化的 Map 操作 (降维打击)**：
+    `data_utils.py` 中的布尔掩码函数实现非常低效：
+    ```python
+    def _true_mask(series: pd.Series) -> pd.Series:
+        return series.map(lambda value: False if pd.isna(value) else bool(value) is True).astype(bool)
+    ```
+    使用 `lambda` 使得 Pandas 放弃了底层的 C 级加速，退化为 Python 层面的逐行循环。
+    **最优解修改：** 使用纯向量化操作，性能可提升几十倍：
+    `return series.fillna(False).astype(bool)`
+
+### 🟡 2. 代码冗余与极简主义违背 (Ponytail 视角)
+
+贯彻“能少写一行绝不多写”的极简主义，代码中存在一些无用逻辑和过度依赖：
+
+*   **死代码 (Dead Code)**：
+    `data_utils.py` 中的 `build_filter_specs(ui_state: dict[str, Any]) -> list[FilterSpec]` 完全是废弃代码，`app.py` 并没有调用它，而是手动组装了 Filter 列表。应该直接删除。
+*   **奇怪的函数签名**：
+    `apply_c_rank_mode` 函数签名中接受了 `filters` 和 `sort_specs`，但在第一行就 `del filters, sort_specs`。如果没有通过高阶函数强制约束接口，这毫无意义，应该直接从签名中剔除。
+*   **依赖管理臃肿**：
+    `requirements.txt` 中引入了 `pytest`，但是工程内部使用的测试是 `self_check.py`，它自带 `if __name__ == '__main__':` 运行逻辑，并没有用到 pytest 框架。同时引入了 `numpy`，虽然 pandas 依赖它，但如果没有直接在代码里 `import numpy` 进行特殊矩阵操作，就不应该在顶级依赖中声明。
+
+### 🟢 3. 健壮性与兜底逻辑评估 (First Principles 视角)
+
+*   **过滤器的“兜底掩盖”风险**：
+    在 `_coerce_float` 和 `_coerce_timestamp` 中，如果类型转换失败，使用了 `try...except` 吞掉异常并返回 `None`。如果上游的数据清洗（如数据源改版导致某列混入了无法解析的字符）出现问题，由于此处的静默处理，Dashboard 会显示为空数据或错误过滤，而不是明确报错。
+    **建议：** 考虑到量化系统的严谨性，建议在 `normalize_pool_df` 阶段就进行严格校验，渲染阶段的过滤只做逻辑匹配。
+
+---
+
+### 🛠️ 建议的修改切口 (Action Plan)
+
+1.  在 `data_utils.py` 的 `load_pool_csv` 加上 `@st.cache_data`，根除 UI 卡顿。
+2.  用 `.fillna(False).astype(bool)` 重写 `_true_mask` 和 `_false_mask`，移除 Lambda 函数。
+3.  重构 `_build_*_data` 绘图函数，移除无脑的 `df.copy()` 避免内存暴涨。
+4.  清理废弃的死代码 `build_filter_specs`，精简 `requirements.txt` 和无用的函数参数。

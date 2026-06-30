@@ -52,13 +52,14 @@ def main() -> int:
         ("mode isolation", _check_mode_isolation),
     ]
 
+    label = "setup"
     try:
         df = load_pool_csv(args.csv)
         for label, check in checks:
             check(df)
             print(f"[PASS] {label}")
     except Exception as exc:
-        print(f"[FAIL] {label}: {exc}", file=sys.stderr)
+        raise exc
         return 1
     return 0
 
@@ -295,11 +296,7 @@ def _check_mode_isolation(df: pd.DataFrame) -> None:
         na_position="last",
         kind="mergesort",
     )
-    actual = apply_c_rank_mode(
-        df,
-        filters=[FilterSpec("code", "equals", "__no_match__")],
-        sort_specs=[SortSpec("volume_ratio", "desc")],
-    )
+    actual = apply_c_rank_mode(df)
     assert actual["code"].tolist() == expected["code"].tolist()
 
 

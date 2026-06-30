@@ -46,12 +46,17 @@ from dashboard.table_view import render_table
 st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide")
 
 
+@st.cache_data
+def cached_load_pool_csv(path: str) -> pd.DataFrame:
+    return load_pool_csv(path)
+
+
 def main() -> None:
     args = _parse_args()
     st.title("Breakout Pool")
 
     try:
-        df = load_pool_csv(args.csv)
+        df = cached_load_pool_csv(args.csv)
     except Exception as exc:
         st.error(f"Could not load CSV: {exc}")
         return
