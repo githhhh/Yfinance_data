@@ -24,3 +24,17 @@ def test_self_check_runs_as_direct_script(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "[PASS] load and normalize" in result.stdout
+
+
+def test_self_check_reports_setup_failures_with_label(tmp_path):
+    missing_csv = tmp_path / "missing.csv"
+
+    result = subprocess.run(
+        [sys.executable, "dashboard/self_check.py", "--csv", str(missing_csv)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "[FAIL] setup:" in result.stderr

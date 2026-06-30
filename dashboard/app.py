@@ -47,8 +47,14 @@ st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide")
 
 
 @st.cache_data
-def cached_load_pool_csv(path: str) -> pd.DataFrame:
+def cached_load_pool_csv(path: str, cache_fingerprint: tuple[int, int]) -> pd.DataFrame:
+    del cache_fingerprint
     return load_pool_csv(path)
+
+
+def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
+    stat = Path(path).stat()
+    return (stat.st_mtime_ns, stat.st_size)
 
 
 def main() -> None:
@@ -56,7 +62,7 @@ def main() -> None:
     st.title("Breakout Pool")
 
     try:
-        df = cached_load_pool_csv(args.csv)
+        df = cached_load_pool_csv(args.csv, _csv_cache_fingerprint(args.csv))
     except Exception as exc:
         st.error(f"Could not load CSV: {exc}")
         return

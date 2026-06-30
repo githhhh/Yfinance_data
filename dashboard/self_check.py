@@ -59,7 +59,7 @@ def main() -> int:
             check(df)
             print(f"[PASS] {label}")
     except Exception as exc:
-        raise exc
+        print(f"[FAIL] {label}: {exc}", file=sys.stderr)
         return 1
     return 0
 

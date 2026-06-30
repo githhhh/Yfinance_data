@@ -833,3 +833,101 @@ Streamlit 的生命周期是**“每次交互重新执行整个脚本”**。在
 2.  用 `.fillna(False).astype(bool)` 重写 `_true_mask` 和 `_false_mask`，移除 Lambda 函数。
 3.  重构 `_build_*_data` 绘图函数，移除无脑的 `df.copy()` 避免内存暴涨。
 4.  清理废弃的死代码 `build_filter_specs`，精简 `requirements.txt` 和无用的函数参数。
+
+## 19. Review Follow-up Fixes (2026-06-30)
+
+本轮 review 后发现并修复了 v0.1.24 性能优化提交中的 3 个回归风险。
+
+### 19.1 Streamlit CSV 缓存失效策略
+
+问题：
+
+`app.py` 中新增的 `@st.cache_data` 只以 CSV 路径作为缓存 key。若定时任务覆盖同一路径的
+`breakout_follow_pool.csv`，Dashboard rerun 时可能继续使用旧 DataFrame。
+
+修复：
+
+`cached_load_pool_csv(path, cache_fingerprint)` 增加文件指纹参数，指纹由
+`(st_mtime_ns, st_size)` 组成。CSV 同路径被覆盖后，只要修改时间或文件大小变化，Streamlit
+缓存 key 会同步变化，从而重新读取并标准化数据。
+
+回归测试：
+
+`test_csv_cache_fingerprint_changes_when_same_path_is_rewritten` 覆盖同一路径重写后的指纹变化。
+
+### 19.2 Boolean Mask 的 pandas FutureWarning
+
+问题：
+
+`_true_mask/_false_mask` 使用 `series.fillna(...).astype(bool)` 后，pandas 会触发 object dtype
+静默 downcasting 的 `FutureWarning`。这会污染测试输出，并增加未来 pandas 升级后的行为风险。
+
+修复：
+
+改为 `series.to_numpy(dtype=bool, na_value=...)` 后再包装回 `pd.Series`，保留原语义：
+
+```text
+_true_mask:  NA -> False
+_false_mask: NA -> False
+```
+
+回归测试：
+
+`test_boolean_masks_do_not_emit_pandas_downcasting_warning` 同时覆盖 `_true_mask` 和 `_false_mask`
+的返回值与 warning 行为。
+
+### 19.3 self_check 失败上下文
+
+问题：
+
+`self_check.py` 的异常路径从原先的 `[FAIL] {label}: ...` 退化为直接 `raise`，导致失败时只有
+traceback，缺少当前失败检查项，定位成本上升。
+
+修复：
+
+恢复 `print(f"[FAIL] {label}: {exc}", file=sys.stderr)`，并保持返回码为 `1`。
+
+回归测试：
+
+`test_self_check_reports_setup_failures_with_label` 覆盖 CSV 缺失时的 `[FAIL] setup:` 输出。
+
+### 19.4 验证记录
+
+修复后执行：
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m pytest dashboard/tests -q -p no:cacheprovider
+```
+
+结果：
+
+```text
+30 passed
+```
+
+同时执行真实 CSV 自检：
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python dashboard/self_check.py --csv us/breakout_follow_pool.csv
+```
+
+结果：
+
+```text
+[PASS] load and normalize
+[PASS] preset: Review All Signals
+[PASS] preset: IBD Valid Breakout
+[PASS] preset: Action Clean Entry
+[PASS] preset: Ceiling Breakout
+[PASS] preset: Ceiling Pullback
+[PASS] preset: Pivot Review
+[PASS] preset: 10W EMA Touch
+[PASS] advanced filters AND logic
+[PASS] sort specs
+[PASS] chart: Signal Quality Matrix aggregation
+[PASS] chart: Structure Action Map row source
+[PASS] chart: Sector Concentration aggregation
+[PASS] chart: IBD Valid Rate by Signal Source aggregation
+[PASS] chart: Volume x Close Strength row source
+[PASS] mode isolation
+```

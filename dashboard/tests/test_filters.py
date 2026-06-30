@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 
 from dashboard.data_utils import (
@@ -10,6 +12,8 @@ from dashboard.data_utils import (
     build_preset_sort,
     combine_filter_specs,
     normalize_pool_df,
+    _false_mask,
+    _true_mask,
 )
 from dashboard.field_config import EXCLUDED_CUSTOM_FIELDS, PRESETS, get_preset_options
 
@@ -227,3 +231,16 @@ def test_c_rank_mode_ignores_custom_filters_and_sorts_by_rank():
     actual = apply_c_rank_mode(df, limit=None)
 
     assert actual["code"].tolist() == ["BBB", "AAA", "DDD"]
+
+
+def test_boolean_masks_do_not_emit_pandas_downcasting_warning():
+    series = pd.Series([True, False, None], dtype="object")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        true_mask = _true_mask(series)
+        false_mask = _false_mask(series)
+
+    assert true_mask.tolist() == [True, False, False]
+    assert false_mask.tolist() == [False, True, False]
+    assert not any(issubclass(item.category, FutureWarning) for item in caught)

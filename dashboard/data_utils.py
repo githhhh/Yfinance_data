@@ -289,11 +289,11 @@ def _empty_mask(series: pd.Series) -> pd.Series:
 
 
 def _true_mask(series: pd.Series) -> pd.Series:
-    return series.fillna(False).astype(bool)
+    return pd.Series(series.to_numpy(dtype=bool, na_value=False), index=series.index)
 
 
 def _false_mask(series: pd.Series) -> pd.Series:
-    return ~series.fillna(True).astype(bool)
+    return ~pd.Series(series.to_numpy(dtype=bool, na_value=True), index=series.index)
 
 
 def _median_or_none(df: pd.DataFrame, field: str) -> float | None:
