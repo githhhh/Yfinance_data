@@ -18,9 +18,10 @@ python -m pytest dashboard/tests -q
 ## Logic Notes
 
 - Custom Filter mode combines every enabled core and advanced condition with AND.
-- Disabled advanced filters do not participate in filtering.
+- Custom Filter mode no longer uses presets. Filters are shown as a trading decision funnel: route, entry confirmation and strength, weekly volume and price, structure, and grouping.
+- Daily entry strength filters are only enabled when `ibd_entry_valid=True`.
 - C Rank Reference mode ignores Custom Filter mode conditions and sorts only by `rank_C_continuous asc` after `signal=True`.
-- Default review starts from `Review: All Signals`, so signal-quality charts can show valid and invalid rows instead of collapsing to 100% valid.
-- `Action: Clean Entry` is the tighter confirmed-entry preset for a buy-zone style working list.
+- C Rank Reference mode displays its fixed rules and formula reference above the table.
+- Result Table defaults to `All Fields`, ordered by business groups, and includes the derived `base_duration_weeks` column.
 - Charts are auxiliary only. They read the current filtered DataFrame and do not mutate global filters.
 - Default chart dimensions are `Signal Quality Matrix`, `Structure Action Map`, and an expandable sector concentration view.

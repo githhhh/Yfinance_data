@@ -23,21 +23,13 @@ from dashboard.data_utils import (
     build_active_filter_summary,
     build_chart_data,
     build_kpis,
-    build_preset_filters,
-    build_preset_sort,
-    combine_filter_specs,
     load_pool_csv,
 )
 from dashboard.field_config import (
-    FIELD_CONFIG,
-    PRESETS,
+    get_all_table_columns,
     get_column_view_fields,
-    get_custom_mode_fields,
-    get_default_table_columns,
     get_field_label,
-    get_field_type,
-    get_filterable_fields,
-    get_preset_options,
+    get_filter_funnel_groups,
     get_sortable_fields,
 )
 from dashboard.table_view import render_table
@@ -67,7 +59,7 @@ def main() -> None:
         st.error(f"Could not load CSV: {exc}")
         return
 
-    mode = st.sidebar.radio("Mode", ["Custom Filter", "C Rank Reference"], horizontal=False)
+    mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0)
     if mode == "C Rank Reference":
         _render_c_rank_mode(df)
     else:
@@ -82,16 +74,15 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _render_custom_mode(df: pd.DataFrame) -> None:
-    preset_key = _preset_selector()
-    filters = combine_filter_specs(build_preset_filters(preset_key), _sidebar_filters(df, preset_key))
-    sort_specs = _sort_specs(preset_key)
+    filters = _funnel_filters(df)
+    sort_specs = _sort_specs()
 
     filtered = apply_filters(df, filters)
     sorted_df = apply_sort(filtered, sort_specs)
 
-    chips = [f"Preset: {PRESETS[preset_key]['label']}", f"Rows: {len(filtered)}/{len(df)}"]
+    chips = [f"Rows: {len(filtered)}/{len(df)}"]
     chips.extend(build_active_filter_summary(filters, sort_specs))
-    st.caption(" | ".join(chips))
+    st.caption(" | ".join(chips) if chips else "No active filters")
 
     _render_kpis(filtered)
     _render_charts(filtered)
@@ -101,158 +92,126 @@ def _render_custom_mode(df: pd.DataFrame) -> None:
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
-    limit_label = st.sidebar.selectbox("Display range", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"])
+    _render_c_rank_rules()
+    limit_label = st.selectbox("Top N", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"])
     limit = None if limit_label == "All rows" else int(limit_label.split()[1])
     ranked = apply_c_rank_mode(df, limit=limit)
     st.caption(f"C Rank Reference | Rows: {len(ranked)}/{len(df)} | signal=True | rank_C_continuous asc")
-    columns = [
-        "code",
-        "sector",
-        "industry",
-        "signal_source",
-        "ibd_candidate_rule",
-        "C_continuous",
-        "rank_C_continuous",
-        "is_priority",
-        "ibd_entry_valid",
-        "ibd_entry_volume_ratio",
-        "pct_above_ceiling",
-        "touched_ema10_count",
-    ]
+    leading_columns = ["code", "rank_C_continuous", "C_continuous", "is_priority"]
+    columns = leading_columns + [column for column in get_all_table_columns() if column not in set(leading_columns)]
     render_table(ranked, [column for column in columns if column in ranked.columns], height=720)
     _download_current_rows(ranked, "c_rank_reference.csv")
 
 
-def _preset_selector() -> str:
-    options = get_preset_options()
-    labels = [label for _, label in options]
-    selected_label = st.sidebar.selectbox("Preset", labels, index=0)
-    return dict((label, key) for key, label in options)[selected_label]
+def _render_c_rank_rules() -> None:
+    st.subheader("C Rank Reference Mode")
+    left, right = st.columns(2)
+    with left:
+        st.markdown(
+            "\n".join(
+                [
+                    "**Fixed Mode Rules**",
+                    "- signal=True",
+                    "- rank_C_continuous asc",
+                    "- Top N selector only",
+                    "- Custom filters ignored",
+                ]
+            )
+        )
+    with right:
+        st.markdown(
+            "\n".join(
+                [
+                    "**Ranking Formula Reference**",
+                    "- 2.5 x pct(base_depth_abs)",
+                    "- 2.0 x pct(pct_above_ceiling)",
+                    "- 0.5 x pct(volume_ratio)",
+                    "- 0.5 x fresh_touch / fresh_pullback",
+                ]
+            )
+        )
 
 
-def _sidebar_filters(df: pd.DataFrame, preset_key: str) -> list[FilterSpec]:
-    st.sidebar.subheader("Core Filters")
-    preset_defaults = _preset_default_values(preset_key)
+def _funnel_filters(df: pd.DataFrame) -> list[FilterSpec]:
+    st.subheader("Filters")
+    groups = get_filter_funnel_groups()
+    funnel_order = [
+        "1 Route",
+        "2 Entry Confirmation & Strength",
+        "3 Weekly Volume & Price",
+        "4 Structure",
+        "5 Grouping",
+    ]
+    if list(groups) != funnel_order:
+        raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
+    tabs = st.tabs(funnel_order)
     filters: list[FilterSpec] = []
 
-    signal = st.sidebar.selectbox(
-        "signal",
-        ["All", "True", "False"],
-        index=_select_index(["All", "True", "False"], preset_defaults.get("signal", "All")),
-        key=f"{preset_key}_signal",
-    )
-    _append_bool_filter(filters, "signal", signal)
+    with tabs[0]:
+        candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
+        candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0)
+        if candidate_rule != "All":
+            filters.append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
 
-    signal_sources = ["All"] + _unique_values(df, "signal_source")
-    signal_source = st.sidebar.selectbox(
-        "signal_source",
-        signal_sources,
-        index=_select_index(signal_sources, preset_defaults.get("signal_source", "All")),
-        key=f"{preset_key}_signal_source",
-    )
-    if signal_source != "All":
-        filters.append(FilterSpec("signal_source", "equals", signal_source))
+    with tabs[1]:
+        entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0)
+        if entry_valid == "Valid only":
+            filters.append(FilterSpec("ibd_entry_valid", "is true"))
+        elif entry_valid == "Invalid only":
+            filters.append(FilterSpec("ibd_entry_valid", "is false"))
 
-    candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
-    candidate_rule = st.sidebar.selectbox(
-        "ibd_candidate_rule",
-        candidate_rules,
-        index=_select_index(candidate_rules, preset_defaults.get("ibd_candidate_rule", "All")),
-        key=f"{preset_key}_ibd_candidate_rule",
-    )
-    if candidate_rule != "All":
-        filters.append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
+        strength_disabled = entry_valid != "Valid only"
+        for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
+            spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
+            if spec is not None:
+                filters.append(spec)
 
-    ibd_valid = st.sidebar.selectbox(
-        "ibd_entry_valid",
-        ["All", "True", "False"],
-        index=_select_index(["All", "True", "False"], preset_defaults.get("ibd_entry_valid", "All")),
-        key=f"{preset_key}_ibd_entry_valid",
-    )
-    _append_bool_filter(filters, "ibd_entry_valid", ibd_valid)
+    with tabs[2]:
+        spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
+        if spec is not None:
+            filters.append(spec)
+        bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0)
+        _append_bool_filter(filters, "is_bullish", bullish)
 
-    for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
-        spec = _range_filter(df, field, st.sidebar, preset_defaults.get(field), key_prefix=preset_key)
+    with tabs[3]:
+        for field in ["touched_ema10_count"]:
+            spec = _range_filter(df, field, st, key_prefix="structure")
+            if spec is not None:
+                filters.append(spec)
+        spec = _pullback_magnitude_filter(df)
         if spec is not None:
             filters.append(spec)
 
-    with st.sidebar.expander("Secondary Filters", expanded=False):
-        for field in ["pct_above_ceiling", "touched_ema10_count", "volume_ratio"]:
-            spec = _range_filter(df, field, st, preset_defaults.get(field), key_prefix=preset_key)
-            if spec is not None:
-                filters.append(spec)
+    with tabs[4]:
         for field in ["sector", "industry"]:
             choices = _unique_values(df, field)
-            selected = st.multiselect(field, choices, default=[])
+            selected = st.multiselect(get_field_label(field), choices, default=[])
             if selected:
                 filters.append(FilterSpec(field, "in", selected))
 
-    filters.extend(_advanced_filters(df))
     return filters
 
 
-def _advanced_filters(df: pd.DataFrame) -> list[FilterSpec]:
-    filterable_fields = get_filterable_fields()
-    active_specs: list[FilterSpec] = []
-    with st.sidebar.expander(f"Advanced filters · {len(active_specs)} active", expanded=False):
-        count = st.number_input("+ Add filter", min_value=0, max_value=10, value=0, step=1)
-        for index in range(int(count)):
-            enabled = st.checkbox(f"Enable {index + 1}", value=True, key=f"advanced_enabled_{index}")
-            field = st.selectbox(
-                f"Field {index + 1}",
-                filterable_fields,
-                format_func=get_field_label,
-                key=f"advanced_field_{index}",
-            )
-            spec = _advanced_filter_row(df, field, enabled, index)
-            if spec is not None:
-                active_specs.append(spec)
-    return active_specs
-
-
-def _advanced_filter_row(df: pd.DataFrame, field: str, enabled: bool, index: int) -> FilterSpec | None:
-    field_type = get_field_type(field)
-    operators = _operators_for_type(field_type)
-    operator = st.selectbox(f"Operator {index + 1}", operators, key=f"advanced_operator_{index}")
-
-    if operator in {"is true", "is false", "is empty", "not empty", "non-empty"}:
-        return FilterSpec(field, operator, enabled=enabled)
-
-    if operator in {"in", "not in"}:
-        values = _unique_values(df, field)
-        selected = st.multiselect(f"Value {index + 1}", values, key=f"advanced_value_{index}")
-        return FilterSpec(field, operator, selected, enabled=enabled) if selected else None
-
-    if operator == "between":
-        first = st.text_input(f"From {index + 1}", key=f"advanced_value_{index}_from")
-        second = st.text_input(f"To {index + 1}", key=f"advanced_value_{index}_to")
-        return FilterSpec(field, operator, first, second, enabled=enabled) if first and second else None
-
-    value = st.text_input(f"Value {index + 1}", key=f"advanced_value_{index}")
-    return FilterSpec(field, operator, value, enabled=enabled) if value else None
-
-
-def _sort_specs(preset_key: str) -> list[SortSpec]:
+def _sort_specs() -> list[SortSpec]:
     st.subheader("Sort")
     sortable = [""] + get_sortable_fields()
-    defaults = build_preset_sort(preset_key)
     columns = st.columns(3)
     specs: list[SortSpec] = []
     for index in range(3):
-        default = defaults[index] if index < len(defaults) else SortSpec("", "asc", enabled=False)
+        default = SortSpec("", "asc", enabled=False)
         with columns[index]:
             field = st.selectbox(
                 f"sort_{index + 1}",
                 sortable,
                 index=_select_index(sortable, default.field),
                 format_func=lambda value: "None" if value == "" else get_field_label(value),
-                key=f"{preset_key}_sort_field_{index}",
+                key=f"sort_field_{index}",
             )
             direction = st.selectbox(
                 f"direction_{index + 1}",
                 ["asc", "desc"],
                 index=0 if default.direction == "asc" else 1,
-                key=f"{preset_key}_sort_direction_{index}",
+                key=f"sort_direction_{index}",
             )
         if field:
             specs.append(SortSpec(field, direction))
@@ -367,12 +326,11 @@ def _render_sort_summary(sort_specs: list[SortSpec]) -> None:
 
 
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
-    column_view = st.selectbox("Column View", ["Core", "IBD", "Risk", "Full Custom"])
-    if column_view == "Full Custom":
-        all_columns = get_custom_mode_fields()
-        columns = st.multiselect("Columns", all_columns, default=get_default_table_columns(), format_func=get_field_label)
-    else:
-        columns = get_column_view_fields(column_view)
+    column_view = st.selectbox(
+        "Column View",
+        ["All Fields", "Signal", "IBD Entry", "Structure", "Volume/Pullback", "Grouping", "Reference"],
+    )
+    columns = get_column_view_fields(column_view)
     render_table(filtered_df, columns)
     export_df = original_df.loc[filtered_df.index].copy()
     _download_current_rows(export_df, "breakout_pool_filtered.csv")
@@ -385,24 +343,6 @@ def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
         file_name=filename,
         mime="text/csv",
     )
-
-
-def _preset_default_values(preset_key: str) -> dict[str, Any]:
-    values: dict[str, Any] = {}
-    for spec in build_preset_filters(preset_key):
-        if spec.operator == "is true":
-            values[spec.field] = "True"
-        elif spec.operator == "is false":
-            values[spec.field] = "False"
-        elif spec.operator == "equals":
-            values[spec.field] = spec.value
-        elif spec.operator == ">=":
-            values[spec.field] = (spec.value, None)
-        elif spec.operator == "<=":
-            values[spec.field] = (None, spec.value)
-        elif spec.operator == "between":
-            values[spec.field] = (spec.value, spec.value2)
-    return values
 
 
 def _append_bool_filter(filters: list[FilterSpec], field: str, selected: str) -> None:
@@ -418,6 +358,7 @@ def _range_filter(
     container: Any,
     default_bounds: tuple[float | None, float | None] | None = None,
     key_prefix: str = "",
+    disabled: bool = False,
 ) -> FilterSpec | None:
     if field not in df.columns:
         return None
@@ -440,10 +381,36 @@ def _range_filter(
         max_value=max_value,
         value=(default_min, default_max),
         key=f"{key_prefix}_range_{field}" if key_prefix else f"range_{field}",
+        disabled=disabled,
     )
+    if disabled:
+        return None
     if selected == (min_value, max_value):
         return None
     return FilterSpec(field, "between", selected[0], selected[1])
+
+
+def _pullback_magnitude_filter(df: pd.DataFrame) -> FilterSpec | None:
+    field = "pullback_pct"
+    if field not in df.columns:
+        return None
+    values = pd.to_numeric(df[field], errors="coerce").dropna().abs()
+    if values.empty:
+        return None
+    min_value = float(values.min())
+    max_value = float(values.max())
+    if min_value == max_value:
+        return None
+    selected = st.slider(
+        "Pullback Pct magnitude",
+        min_value=min_value,
+        max_value=max_value,
+        value=(min_value, max_value),
+        key="structure_range_pullback_pct_magnitude",
+    )
+    if selected == (min_value, max_value):
+        return None
+    return FilterSpec(field, "between", -selected[1], -selected[0])
 
 
 def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
@@ -451,18 +418,6 @@ def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
         return []
     values = df[field].dropna().astype(str).sort_values().unique().tolist()
     return [value for value in values if value]
-
-
-def _operators_for_type(field_type: str) -> list[str]:
-    if field_type == "boolean":
-        return ["is true", "is false"]
-    if field_type == "category":
-        return ["in", "not in"]
-    if field_type == "number":
-        return [">=", "<=", "between", "is empty", "not empty"]
-    if field_type == "date":
-        return ["after", "before", "between", "is empty", "not empty"]
-    return ["contains", "equals", "startswith", "non-empty"]
 
 
 def _select_index(options: list[Any], value: Any) -> int:

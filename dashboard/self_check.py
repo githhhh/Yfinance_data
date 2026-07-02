@@ -25,6 +25,7 @@ from dashboard.field_config import (
     EXCLUDED_CUSTOM_FIELDS,
     get_default_table_columns,
     get_filterable_fields,
+    get_sortable_fields,
 )
 
 
@@ -288,7 +289,8 @@ def _check_scatter_chart(df: pd.DataFrame) -> None:
 
 def _check_mode_isolation(df: pd.DataFrame) -> None:
     assert not EXCLUDED_CUSTOM_FIELDS.intersection(get_filterable_fields())
-    assert not EXCLUDED_CUSTOM_FIELDS.intersection(get_default_table_columns())
+    assert not EXCLUDED_CUSTOM_FIELDS.intersection(get_sortable_fields())
+    assert EXCLUDED_CUSTOM_FIELDS.issubset(set(get_default_table_columns()))
 
     expected = df[_true_mask(df["signal"])].sort_values(
         by=["rank_C_continuous"],

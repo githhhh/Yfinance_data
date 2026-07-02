@@ -53,14 +53,15 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
     for column in DATE_FIELDS.intersection(result.columns):
         result[column] = pd.to_datetime(result[column], errors="coerce")
 
+    if {"breakout_date", "ceiling_date"}.issubset(result.columns):
+        duration_days = (result["breakout_date"] - result["ceiling_date"]).dt.days
+        result["base_duration_weeks"] = (duration_days / 7).round()
+
     for column in result.columns:
         if column not in BOOLEAN_FIELDS and column not in NUMBER_FIELDS and column not in DATE_FIELDS:
             result[column] = result[column].replace("", pd.NA)
 
     return result
-
-
-
 
 
 def combine_filter_specs(preset_filters: list[FilterSpec], ui_filters: list[FilterSpec]) -> list[FilterSpec]:

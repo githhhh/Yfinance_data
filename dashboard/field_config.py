@@ -32,6 +32,7 @@ NUMBER_FIELDS = {
     "touched_ema10_count",
     "mbox_count",
     "ceiling",
+    "base_duration_weeks",
     "base_depth_pct",
     "base_mbox_count",
     "base_depth_abs",
@@ -42,56 +43,124 @@ NUMBER_FIELDS = {
     "pullback_pct_off_peak",
 }
 
-DEFAULT_TABLE_COLUMNS = [
+FILTER_FUNNEL_GROUPS = OrderedDict(
+    [
+        ("1 Route", ["ibd_candidate_rule"]),
+        (
+            "2 Entry Confirmation & Strength",
+            ["ibd_entry_valid", "ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"],
+        ),
+        ("3 Weekly Volume & Price", ["volume_ratio", "is_bullish"]),
+        ("4 Structure", ["touched_ema10_count", "pullback_pct"]),
+        ("5 Grouping", ["sector", "industry"]),
+    ]
+)
+
+ALL_TABLE_COLUMNS = [
     "code",
+    "snapshot_date",
     "sector",
     "industry",
+    "signal",
     "signal_source",
     "ibd_candidate_rule",
+    "ibd_candidate_signal_source",
+    "breakout_date",
     "ibd_candidate_price",
+    "ibd_trigger_price",
     "ibd_entry_valid",
     "ibd_entry_date",
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
     "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_rule",
+    "ibd_entry_reject_reason",
+    "ibd_candidate_extra",
+    "ceiling",
+    "ceiling_date",
+    "base_duration_weeks",
     "pct_above_ceiling",
+    "base_depth_abs",
+    "base_depth_pct",
+    "base_mbox_count",
+    "mbox_count",
     "touched_ema10_count",
     "volume_ratio",
-    "pullback_v_is_dry",
+    "is_bullish",
     "pullback_count",
+    "pullback_pct",
     "pullback_pct_off_peak",
+    "pullback_v_is_dry",
     "hold_return",
+    "C_continuous",
+    "rank_C_continuous",
+    "is_priority",
+]
+
+DEFAULT_TABLE_COLUMNS = ALL_TABLE_COLUMNS
+
+SIGNAL_COLUMNS = [
+    "code",
+    "snapshot_date",
+    "signal",
+    "signal_source",
+    "ibd_candidate_rule",
+    "ibd_candidate_signal_source",
     "breakout_date",
-    "ceiling",
 ]
 
 IBD_COLUMNS = [
     "code",
-    "signal_source",
-    "ibd_candidate_rule",
     "ibd_candidate_price",
+    "ibd_trigger_price",
+    "ibd_candidate_extra",
     "ibd_entry_valid",
     "ibd_entry_date",
     "ibd_entry_price",
-    "ibd_trigger_price",
     "ibd_entry_volume_ratio",
     "ibd_entry_close_vs_trigger_pct",
     "ibd_entry_rule",
+    "ibd_entry_reject_reason",
 ]
 
-RISK_COLUMNS = [
+STRUCTURE_COLUMNS = [
     "code",
-    "sector",
-    "industry",
+    "ceiling",
+    "ceiling_date",
+    "base_duration_weeks",
     "pct_above_ceiling",
+    "base_depth_abs",
+    "base_depth_pct",
+    "base_mbox_count",
+    "mbox_count",
     "touched_ema10_count",
-    "volume_ratio",
-    "pullback_v_is_dry",
     "pullback_count",
     "pullback_pct",
     "pullback_pct_off_peak",
+]
+
+VOLUME_PULLBACK_COLUMNS = [
+    "code",
+    "volume_ratio",
+    "is_bullish",
+    "pullback_count",
+    "pullback_pct",
+    "pullback_pct_off_peak",
+    "pullback_v_is_dry",
     "hold_return",
-    "base_depth_pct",
+]
+
+GROUPING_COLUMNS = [
+    "code",
+    "sector",
+    "industry",
+]
+
+REFERENCE_COLUMNS = [
+    "code",
+    "C_continuous",
+    "rank_C_continuous",
+    "is_priority",
 ]
 
 LONG_FIELDS = {"ibd_entry_reject_reason", "ibd_candidate_extra"}
@@ -195,6 +264,7 @@ FIELD_CONFIG = OrderedDict(
         ("mbox_count", _field("M Box Count", "number", "Risk / Structure")),
         ("ceiling", _field("Ceiling", "number", "Risk / Structure", default_table=True, fmt="0.00")),
         ("ceiling_date", _field("Ceiling Date", "date", "Risk / Structure")),
+        ("base_duration_weeks", _field("Base Duration Weeks", "number", "Risk / Structure")),
         ("base_depth_pct", _field("Base Depth Pct", "number", "Risk / Structure", fmt="0.0%")),
         ("base_mbox_count", _field("Base M Box Count", "number", "Risk / Structure")),
         ("base_depth_abs", _field("Base Depth Abs", "number", "Risk / Structure")),
@@ -362,11 +432,14 @@ def get_custom_mode_fields() -> list[str]:
 
 
 def get_filterable_fields() -> list[str]:
-    return [
-        field
-        for field in get_custom_mode_fields()
-        if FIELD_CONFIG[field].get("filterable") and FIELD_CONFIG[field].get("advanced_filter")
-    ]
+    fields: list[str] = []
+    for group_fields in FILTER_FUNNEL_GROUPS.values():
+        fields.extend(
+            field
+            for field in group_fields
+            if field in FIELD_CONFIG and FIELD_CONFIG[field].get("filterable") and FIELD_CONFIG[field].get("advanced_filter")
+        )
+    return fields
 
 
 def get_sortable_fields() -> list[str]:
@@ -374,19 +447,40 @@ def get_sortable_fields() -> list[str]:
 
 
 def get_default_table_columns() -> list[str]:
-    return [field for field in DEFAULT_TABLE_COLUMNS if field in FIELD_CONFIG and _allowed(field)]
+    return get_all_table_columns()
 
 
 def get_column_view_fields(view_name: str) -> list[str]:
-    if view_name == "Core":
-        return get_default_table_columns()
+    if view_name == "All Fields":
+        return get_all_table_columns()
+    if view_name == "Signal":
+        return [field for field in SIGNAL_COLUMNS if field in FIELD_CONFIG]
     if view_name == "IBD":
-        return [field for field in IBD_COLUMNS if field in FIELD_CONFIG and _allowed(field)]
-    if view_name == "Risk":
-        return [field for field in RISK_COLUMNS if field in FIELD_CONFIG and _allowed(field)]
+        return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "IBD Entry":
+        return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "Structure":
+        return [field for field in STRUCTURE_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "Volume/Pullback":
+        return [field for field in VOLUME_PULLBACK_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "Grouping":
+        return [field for field in GROUPING_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "Reference":
+        return [field for field in REFERENCE_COLUMNS if field in FIELD_CONFIG]
     if view_name == "Full Custom":
         return get_custom_mode_fields()
     raise ValueError(f"Unknown column view: {view_name}")
+
+
+def get_filter_funnel_groups() -> OrderedDict[str, list[str]]:
+    return OrderedDict(
+        (group, [field for field in fields if field in FIELD_CONFIG])
+        for group, fields in FILTER_FUNNEL_GROUPS.items()
+    )
+
+
+def get_all_table_columns() -> list[str]:
+    return [field for field in ALL_TABLE_COLUMNS if field in FIELD_CONFIG]
 
 
 def get_field_label(field: str) -> str:

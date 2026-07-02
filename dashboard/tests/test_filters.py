@@ -97,6 +97,20 @@ def test_normalize_pool_df_converts_core_types():
     assert df.loc[0, "breakout_date"] == pd.Timestamp("2026-05-10")
 
 
+def test_normalize_pool_df_adds_base_duration_weeks_from_ceiling_to_breakout_dates():
+    df = normalize_pool_df(
+        pd.DataFrame(
+            [
+                {"code": "AAA", "ceiling_date": "2026-01-01", "breakout_date": "2026-02-12"},
+                {"code": "BBB", "ceiling_date": "2026-01-01", "breakout_date": ""},
+            ]
+        )
+    )
+
+    assert df.loc[0, "base_duration_weeks"] == 6
+    assert pd.isna(df.loc[1, "base_duration_weeks"])
+
+
 def test_all_enabled_filters_are_combined_with_and_logic():
     df = sample_pool_df()
     filters = [

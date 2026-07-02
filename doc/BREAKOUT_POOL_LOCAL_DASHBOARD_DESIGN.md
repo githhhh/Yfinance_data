@@ -595,6 +595,76 @@ pytest dashboard/tests -q
 [PASS] mode isolation
 ```
 
+## 20. Filter Funnel Layout Follow-up (2026-07-02)
+
+本轮根据 `BREAKOUT_POOL_CUSTOM_FILTER_FIELD_GUIDE.md` 重新收敛筛选入口：
+
+```text
+Custom Filter
+1 Route
+2 Entry Confirmation & Strength
+3 Weekly Volume & Price
+4 Structure
+5 Grouping
+```
+
+### 20.1 Custom Filter 不再使用 Preset
+
+页面筛选不再以 preset 作为入口，避免隐藏默认条件。筛选条件全部显式来自漏斗阶段与顶部 Active
+Chips。后台仍保留 preset 纯函数与 self_check 覆盖，用于验证历史筛选口径与筛选引擎正确性。
+
+### 20.2 筛选字段白名单
+
+自定义筛选仅保留具有直接决策价值的字段：
+
+```text
+ibd_candidate_rule
+ibd_entry_valid
+ibd_entry_volume_ratio
+ibd_entry_close_vs_trigger_pct
+volume_ratio
+is_bullish
+touched_ema10_count
+pullback_pct
+sector
+industry
+```
+
+其中 `ibd_entry_volume_ratio` 与 `ibd_entry_close_vs_trigger_pct` 只在
+`ibd_entry_valid=True` 时启用。
+
+`hold_return`、`mbox_count`、`base_depth_abs`、`base_mbox_count`、`pct_above_ceiling`、
+`pullback_pct_off_peak`、`pullback_v_is_dry` 等字段不进入筛选漏斗，仅作为表格观察字段。
+
+### 20.3 表格全字段逻辑分组
+
+Result Table 默认显示 `All Fields`，列顺序按业务链路组织：
+
+```text
+Identity / Grouping
+Signal / Route
+IBD Candidate / Daily Entry
+Base / Structure
+Weekly Volume / Pullback
+C Rank Reference
+```
+
+表格新增 `base_duration_weeks` 衍生列，按
+`round((breakout_date - ceiling_date) / 7)` 计算，仅用于展示。
+
+### 20.4 C Rank Reference 模式说明
+
+`C Rank Reference` 作为独立模式保留，切换后必须显示：
+
+```text
+signal=True
+rank_C_continuous asc
+Top N selector only
+Custom filters ignored
+```
+
+并展示 `C_continuous` 的公式参考与 tie-break 语义，避免与 Custom Filter 漏斗混淆。
+
 任何一项失败都必须 `exit(1)`，不能只打印 warning。
 
 ### 16.1 测试重点
