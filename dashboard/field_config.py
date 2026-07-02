@@ -45,14 +45,14 @@ NUMBER_FIELDS = {
 
 FILTER_FUNNEL_GROUPS = OrderedDict(
     [
-        ("1 Route", ["ibd_candidate_rule"]),
+        ("Route", ["ibd_candidate_rule"]),
         (
-            "2 Entry Confirmation & Strength",
+            "Entry Confirmation & Strength",
             ["ibd_entry_valid", "ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"],
         ),
-        ("3 Weekly Volume & Price", ["volume_ratio", "is_bullish"]),
-        ("4 Structure", ["touched_ema10_count", "pullback_pct"]),
-        ("5 Grouping", ["sector", "industry"]),
+        ("Weekly Volume & Price", ["volume_ratio", "is_bullish"]),
+        ("Structure", ["touched_ema10_count", "pullback_pct"]),
+        ("Grouping", ["sector", "industry"]),
     ]
 )
 

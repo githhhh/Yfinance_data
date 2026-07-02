@@ -16,11 +16,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from dashboard.data_utils import (
     FilterSpec,
-    SortSpec,
     apply_c_rank_mode,
     apply_filters,
-    apply_sort,
-    build_active_filter_summary,
     build_chart_data,
     build_kpis,
     load_pool_csv,
@@ -30,12 +27,19 @@ from dashboard.field_config import (
     get_column_view_fields,
     get_field_label,
     get_filter_funnel_groups,
-    get_sortable_fields,
 )
 from dashboard.table_view import render_table
 
 
 st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide")
+
+FUNNEL_ORDER = [
+    "Route",
+    "Entry Confirmation & Strength",
+    "Weekly Volume & Price",
+    "Structure",
+    "Grouping",
+]
 
 
 @st.cache_data
@@ -51,7 +55,6 @@ def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
 
 def main() -> None:
     args = _parse_args()
-    st.title("Breakout Pool")
 
     try:
         df = cached_load_pool_csv(args.csv, _csv_cache_fingerprint(args.csv))
@@ -59,6 +62,7 @@ def main() -> None:
         st.error(f"Could not load CSV: {exc}")
         return
 
+    _render_page_header()
     mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0)
     if mode == "C Rank Reference":
         _render_c_rank_mode(df)
@@ -73,22 +77,51 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
+def _render_page_header() -> None:
+    st.markdown(
+        """
+        <style>
+        .breakout-header {
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+        }
+        .breakout-eyebrow {
+            color: rgba(255, 255, 255, 0.56);
+            font-size: 0.78rem;
+            letter-spacing: 0;
+            margin-bottom: 2px;
+        }
+        .breakout-title {
+            color: rgba(255, 255, 255, 0.96);
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+        </style>
+        <div class="breakout-header">
+          <div class="breakout-eyebrow">Local Analysis</div>
+          <div class="breakout-title">Breakout Pool Workbench</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_custom_mode(df: pd.DataFrame) -> None:
-    filters = _funnel_filters(df)
-    sort_specs = _sort_specs()
+    filters_by_group = _funnel_filters(df)
+    filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
-    sorted_df = apply_sort(filtered, sort_specs)
 
-    chips = [f"Rows: {len(filtered)}/{len(df)}"]
-    chips.extend(build_active_filter_summary(filters, sort_specs))
-    st.caption(" | ".join(chips) if chips else "No active filters")
+    _render_current_filter_summary(filters_by_group, len(filtered), len(df))
 
     _render_kpis(filtered)
     _render_charts(filtered)
     st.divider()
-    _render_sort_summary(sort_specs)
-    _render_table_controls(sorted_df, df)
+    _render_table_controls(filtered, df)
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
@@ -132,90 +165,169 @@ def _render_c_rank_rules() -> None:
         )
 
 
-def _funnel_filters(df: pd.DataFrame) -> list[FilterSpec]:
+def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
     st.subheader("Filters")
     groups = get_filter_funnel_groups()
-    funnel_order = [
-        "1 Route",
-        "2 Entry Confirmation & Strength",
-        "3 Weekly Volume & Price",
-        "4 Structure",
-        "5 Grouping",
-    ]
-    if list(groups) != funnel_order:
+    if list(groups) != FUNNEL_ORDER:
         raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
-    tabs = st.tabs(funnel_order)
-    filters: list[FilterSpec] = []
+    filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
+    tabs = st.tabs(_funnel_tab_labels(_session_filter_counts(df)))
 
     with tabs[0]:
         candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
-        candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0)
+        candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
         if candidate_rule != "All":
-            filters.append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
+            filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
 
     with tabs[1]:
-        entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0)
+        entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0, key="funnel_entry_valid")
         if entry_valid == "Valid only":
-            filters.append(FilterSpec("ibd_entry_valid", "is true"))
+            filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
         elif entry_valid == "Invalid only":
-            filters.append(FilterSpec("ibd_entry_valid", "is false"))
+            filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
 
         strength_disabled = entry_valid != "Valid only"
         for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
             spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
             if spec is not None:
-                filters.append(spec)
+                filters_by_group["Entry Confirmation & Strength"].append(spec)
 
     with tabs[2]:
         spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
         if spec is not None:
-            filters.append(spec)
-        bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0)
-        _append_bool_filter(filters, "is_bullish", bullish)
+            filters_by_group["Weekly Volume & Price"].append(spec)
+        bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
+        _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
 
     with tabs[3]:
         for field in ["touched_ema10_count"]:
             spec = _range_filter(df, field, st, key_prefix="structure")
             if spec is not None:
-                filters.append(spec)
+                filters_by_group["Structure"].append(spec)
         spec = _pullback_magnitude_filter(df)
         if spec is not None:
-            filters.append(spec)
+            filters_by_group["Structure"].append(spec)
 
     with tabs[4]:
         for field in ["sector", "industry"]:
             choices = _unique_values(df, field)
-            selected = st.multiselect(get_field_label(field), choices, default=[])
+            selected = st.multiselect(get_field_label(field), choices, default=[], key=f"funnel_group_{field}")
             if selected:
-                filters.append(FilterSpec(field, "in", selected))
+                filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
 
-    return filters
+    return filters_by_group
 
 
-def _sort_specs() -> list[SortSpec]:
-    st.subheader("Sort")
-    sortable = [""] + get_sortable_fields()
-    columns = st.columns(3)
-    specs: list[SortSpec] = []
-    for index in range(3):
-        default = SortSpec("", "asc", enabled=False)
-        with columns[index]:
-            field = st.selectbox(
-                f"sort_{index + 1}",
-                sortable,
-                index=_select_index(sortable, default.field),
-                format_func=lambda value: "None" if value == "" else get_field_label(value),
-                key=f"sort_field_{index}",
-            )
-            direction = st.selectbox(
-                f"direction_{index + 1}",
-                ["asc", "desc"],
-                index=0 if default.direction == "asc" else 1,
-                key=f"sort_direction_{index}",
-            )
-        if field:
-            specs.append(SortSpec(field, direction))
-    return specs
+def _flatten_filters(filters_by_group: dict[str, list[FilterSpec]]) -> list[FilterSpec]:
+    return [spec for specs in filters_by_group.values() for spec in specs]
+
+
+def _funnel_tab_labels(filters_by_group: dict[str, list[FilterSpec]]) -> list[str]:
+    return [f"{group} ({len(filters_by_group.get(group, []))})" for group in get_filter_funnel_groups()]
+
+
+def _session_filter_counts(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
+    filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
+
+    candidate_rule = st.session_state.get("funnel_route_rule", "All")
+    if candidate_rule != "All":
+        filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
+
+    entry_valid = st.session_state.get("funnel_entry_valid", "All")
+    if entry_valid == "Valid only":
+        filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
+        for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
+            spec = _range_state_filter(df, field, "entry")
+            if spec is not None:
+                filters_by_group["Entry Confirmation & Strength"].append(spec)
+    elif entry_valid == "Invalid only":
+        filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
+
+    spec = _range_state_filter(df, "volume_ratio", "weekly")
+    if spec is not None:
+        filters_by_group["Weekly Volume & Price"].append(spec)
+    bullish = st.session_state.get("funnel_weekly_is_bullish", "All")
+    _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
+
+    spec = _range_state_filter(df, "touched_ema10_count", "structure")
+    if spec is not None:
+        filters_by_group["Structure"].append(spec)
+    spec = _pullback_magnitude_state_filter(df)
+    if spec is not None:
+        filters_by_group["Structure"].append(spec)
+
+    for field in ["sector", "industry"]:
+        selected = st.session_state.get(f"funnel_group_{field}", [])
+        if selected:
+            filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
+
+    return filters_by_group
+
+
+def _range_state_filter(df: pd.DataFrame, field: str, key_prefix: str) -> FilterSpec | None:
+    if field not in df.columns:
+        return None
+    selected = st.session_state.get(f"{key_prefix}_range_{field}")
+    if selected is None:
+        return None
+    values = pd.to_numeric(df[field], errors="coerce").dropna()
+    if values.empty:
+        return None
+    min_value = float(values.min())
+    max_value = float(values.max())
+    selected_min, selected_max = float(selected[0]), float(selected[1])
+    if (selected_min, selected_max) == (min_value, max_value):
+        return None
+    return FilterSpec(field, "between", selected_min, selected_max)
+
+
+def _pullback_magnitude_state_filter(df: pd.DataFrame) -> FilterSpec | None:
+    field = "pullback_pct"
+    selected = st.session_state.get("structure_range_pullback_pct_magnitude")
+    if field not in df.columns or selected is None:
+        return None
+    values = pd.to_numeric(df[field], errors="coerce").dropna().abs()
+    if values.empty:
+        return None
+    min_value = float(values.min())
+    max_value = float(values.max())
+    selected_min, selected_max = float(selected[0]), float(selected[1])
+    if (selected_min, selected_max) == (min_value, max_value):
+        return None
+    return FilterSpec(field, "between", -selected_max, -selected_min)
+
+
+def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]], filtered_count: int, total_count: int) -> None:
+    st.subheader("Current Filters")
+    st.caption(f"Rows: {filtered_count}/{total_count}")
+    columns = st.columns(len(filters_by_group))
+    for column, (group, filters) in zip(columns, filters_by_group.items()):
+        with column:
+            st.markdown(f"**{group} ({len(filters)})**")
+            if not filters:
+                st.caption("All")
+                continue
+            for spec in filters:
+                st.caption(_describe_filter_condition(spec))
+
+
+def _describe_filter_condition(spec: FilterSpec) -> str:
+    label = get_field_label(spec.field)
+    operator = spec.operator.lower()
+    if operator == "is true":
+        return f"{label}: True"
+    if operator == "is false":
+        return f"{label}: False"
+    if operator == "equals":
+        return f"{label}: {spec.value}"
+    if operator == "in":
+        values = ", ".join(str(value) for value in spec.value)
+        return f"{label}: {values}"
+    if operator == "between":
+        if spec.field == "pullback_pct":
+            return f"{label} magnitude: {abs(float(spec.value2)):.1f} to {abs(float(spec.value)):.1f}"
+        return f"{label}: {spec.value} to {spec.value2}"
+    return f"{label} {spec.operator} {spec.value}"
 
 
 def _render_kpis(df: pd.DataFrame) -> None:
@@ -320,11 +432,6 @@ def _render_charts(df: pd.DataFrame) -> None:
             st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_sort_summary(sort_specs: list[SortSpec]) -> None:
-    active = [f"{get_field_label(spec.field)} {spec.direction}" for spec in sort_specs if spec.enabled]
-    st.caption("Sort Bar: " + (" -> ".join(active) if active else "None"))
-
-
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
     column_view = st.selectbox(
         "Column View",
@@ -418,10 +525,6 @@ def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
         return []
     values = df[field].dropna().astype(str).sort_values().unique().tolist()
     return [value for value in values if value]
-
-
-def _select_index(options: list[Any], value: Any) -> int:
-    return options.index(value) if value in options else 0
 
 
 def _format_number(value: float | int | None, suffix: str = "") -> str:

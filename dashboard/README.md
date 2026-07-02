@@ -18,7 +18,8 @@ python -m pytest dashboard/tests -q
 ## Logic Notes
 
 - Custom Filter mode combines every enabled core and advanced condition with AND.
-- Custom Filter mode no longer uses presets. Filters are shown as a trading decision funnel: route, entry confirmation and strength, weekly volume and price, structure, and grouping.
+- Custom Filter mode no longer uses presets or a separate Sort Bar. Filters are shown as a trading decision funnel: route, entry confirmation and strength, weekly volume and price, structure, and grouping.
+- Funnel tabs show active condition counts, and the current filters are summarized by funnel stage above the charts.
 - Daily entry strength filters are only enabled when `ibd_entry_valid=True`.
 - C Rank Reference mode ignores Custom Filter mode conditions and sorts only by `rank_C_continuous asc` after `signal=True`.
 - C Rank Reference mode displays its fixed rules and formula reference above the table.

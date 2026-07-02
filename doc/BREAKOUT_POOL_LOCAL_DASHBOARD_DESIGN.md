@@ -665,6 +665,31 @@ Custom filters ignored
 
 并展示 `C_continuous` 的公式参考与 tie-break 语义，避免与 Custom Filter 漏斗混淆。
 
+### 20.5 漏斗筛选可见性修正
+
+Custom Filter 模式不再展示独立 Sort Bar，避免 `sort_1`、`sort_2`、`direction_1` 等底层字段名干扰筛选主流程。
+
+漏斗阶段标题使用纯业务名称，不展示内部数字编号：
+
+```text
+Route
+Entry Confirmation & Strength
+Weekly Volume & Price
+Structure
+Grouping
+```
+
+每个漏斗 tab 标题显示当前启用条件数量，例如 `Structure (2)`。页面顶部必须按漏斗阶段展示当前筛选条件：
+
+```text
+Current Filters
+Rows: 42/743
+Route (1): IBD Candidate Rule: pivot
+Entry Confirmation & Strength (2): IBD Entry Valid: True; IBD Entry Volume Ratio: 1.5 to 4.0
+```
+
+无启用条件的阶段显示 `All`，让用户能一眼判断哪些漏斗阶段参与了过滤。
+
 任何一项失败都必须 `exit(1)`，不能只打印 warning。
 
 ### 16.1 测试重点

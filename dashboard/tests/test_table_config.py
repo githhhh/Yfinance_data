@@ -24,21 +24,21 @@ def test_filterable_fields_follow_trading_decision_funnel():
     groups = get_filter_funnel_groups()
 
     assert list(groups) == [
-        "1 Route",
-        "2 Entry Confirmation & Strength",
-        "3 Weekly Volume & Price",
-        "4 Structure",
-        "5 Grouping",
+        "Route",
+        "Entry Confirmation & Strength",
+        "Weekly Volume & Price",
+        "Structure",
+        "Grouping",
     ]
-    assert groups["1 Route"] == ["ibd_candidate_rule"]
-    assert groups["2 Entry Confirmation & Strength"] == [
+    assert groups["Route"] == ["ibd_candidate_rule"]
+    assert groups["Entry Confirmation & Strength"] == [
         "ibd_entry_valid",
         "ibd_entry_volume_ratio",
         "ibd_entry_close_vs_trigger_pct",
     ]
-    assert groups["3 Weekly Volume & Price"] == ["volume_ratio", "is_bullish"]
-    assert groups["4 Structure"] == ["touched_ema10_count", "pullback_pct"]
-    assert groups["5 Grouping"] == ["sector", "industry"]
+    assert groups["Weekly Volume & Price"] == ["volume_ratio", "is_bullish"]
+    assert groups["Structure"] == ["touched_ema10_count", "pullback_pct"]
+    assert groups["Grouping"] == ["sector", "industry"]
     assert get_filterable_fields() == [
         "ibd_candidate_rule",
         "ibd_entry_valid",
