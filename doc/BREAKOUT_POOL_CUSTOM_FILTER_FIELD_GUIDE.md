@@ -1,6 +1,6 @@
 # Breakout Pool 自定义筛选字段指南
 
-本文基于 `doc/BREAKOUT_FOLLOW_POOL_SCHEMA.md`、真实 CSV 表头 `us/breakout_follow_pool.csv` 以及 `dashboard/field_config.py`，用于指导 pool 仪表板中用户进行自定义筛选操作。
+本文基于策略主研发库白皮书 `quant_trade/strategy/doc/BREAKOUT_FOLLOW_POOL_SCHEMA.md`、真实 CSV 表头 `us/breakout_follow_pool.csv` 以及 `dashboard/field_config.py`，用于指导 pool 仪表板中用户进行自定义筛选操作。
 
 ## 一、筛选字段取舍原则
 
@@ -92,7 +92,9 @@ Preset/Core Filters AND Advanced Field Filters
 
 `ceiling_date` 与 `breakout_date` 分别代表大型基底构筑的起始日期与首次越过天花板的突破日期。这两者的绝对历史时间差不能直接用于条件筛选，但可以用来精确计算**大型基底结构持续时间**。由于策略的核心分析周期为周线，我们以**周数 (`Weeks`)** 为单位进行标准化度量：
 
-$$\text{base\_duration\_weeks} = \text{round}\left(\frac{\text{breakout\_date} - \text{ceiling\_date}}{7}\right)$$
+$$\text{base\_duration\_weeks} = \max\left(1,\ \left\lceil \frac{\text{breakout\_date} - \text{ceiling\_date}}{7} \right\rceil\right)$$
+
+*(注：基底时长计算遵循**向上进位与兜底原则**——未满 1 周按 1 周计；任何余数周均向上进位，如 4.2 周计为 5 周。)*
 
 ### 1. 理论依据与业务意义
 在 CAN SLIM 与 IBD 交易体系中，基底构筑的持续时间是衡量机构多头主力吸筹、洗盘充分度与筹码沉淀厚度的绝对关键指标（如标准杯柄或水平基底通常至少需巩固 7 周以上，大型 Stage 2 水平基底往往巩固数月至数年，底蕴越深厚，突破后的主升浪潜能越大）。
