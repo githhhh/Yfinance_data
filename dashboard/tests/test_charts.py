@@ -93,6 +93,24 @@ def test_route_quality_groups_by_candidate_rule():
     assert "median_ibd_entry_breakout_range_ratio" in route.columns
 
 
+def test_route_quality_excludes_empty_candidate_rules():
+    df = normalize_pool_df(
+        pd.DataFrame(
+            [
+                {"code": "AAA", "ibd_candidate_rule": "pivot", "ibd_entry_valid": True},
+                {"code": "BBB", "ibd_candidate_rule": "", "ibd_entry_valid": False},
+                {"code": "CCC", "ibd_candidate_rule": "(empty)", "ibd_entry_valid": False},
+                {"code": "DDD", "ibd_candidate_rule": None, "ibd_entry_valid": False},
+            ]
+        )
+    )
+
+    route = build_chart_data(df)["route_quality"]
+
+    assert route["ibd_candidate_rule"].tolist() == ["pivot"]
+    assert len(route) == 1
+
+
 def test_route_quality_tolerates_missing_optional_metric_columns():
     df = normalize_pool_df(
         pd.DataFrame(
@@ -113,14 +131,12 @@ def test_route_quality_tolerates_missing_optional_metric_columns():
     assert pd.isna(route.loc[0, "median_ibd_entry_close_position"])
 
 
-def test_trend_volume_map_keeps_rows_with_touched_ema10_and_volume():
+def test_trend_volume_map_only_keeps_valid_ibd_entries():
     charts = build_chart_data(chart_sample_df())
     action_map = charts["trend_volume_map"]
 
-    assert action_map["code"].tolist() == ["AAA", "BBB", "CCC", "DDD"]
+    assert action_map["code"].tolist() == ["AAA", "CCC"]
     assert action_map.loc[action_map["code"].eq("AAA"), "entry_status"].item() == "IBD valid"
-    assert action_map.loc[action_map["code"].eq("BBB"), "entry_status"].item() == "IBD invalid"
-    assert action_map.loc[action_map["code"].eq("DDD"), "entry_status"].item() == "Pending"
     assert {"sector", "industry", "dry_status", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}.issubset(action_map.columns)
 
 

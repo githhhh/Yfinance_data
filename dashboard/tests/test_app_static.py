@@ -63,7 +63,7 @@ def test_funnel_tab_labels_return_static_names():
 def test_current_filter_summary_is_grouped_by_funnel():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
 
-    assert "Current Filters" in source
+    assert "Filtered Rows" in source
     assert "_render_current_filter_summary" in source
     assert "_describe_filter_condition" in source
 

@@ -4,3 +4,10 @@ gatherUsageStats = false
 [server]
 headless = true
 fileWatcherType = "poll"
+
+[theme]
+primaryColor = "#10B981"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1F2937"
+textColor = "#F3F4F6"
+font = "sans serif"

@@ -308,6 +308,9 @@ def _build_route_quality_data(df: pd.DataFrame) -> pd.DataFrame:
             working[column] = pd.NA
         working[column] = pd.to_numeric(working[column], errors="coerce")
     working["ibd_candidate_rule"] = _label_series(working, "ibd_candidate_rule")
+    working = working[working["ibd_candidate_rule"] != "(empty)"].copy()
+    if working.empty:
+        return pd.DataFrame(columns=columns)
     working["valid"] = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))).astype(int)
 
     grouped = working.groupby(["ibd_candidate_rule"], dropna=False).agg(
@@ -354,7 +357,8 @@ def _build_trend_volume_map_data(df: pd.DataFrame) -> pd.DataFrame:
             working[column] = pd.NA
     working["touched_ema10_count"] = pd.to_numeric(working["touched_ema10_count"], errors="coerce")
     working["volume_ratio"] = pd.to_numeric(working["volume_ratio"], errors="coerce")
-    working = working.dropna(subset=["touched_ema10_count", "volume_ratio"]).copy()
+    valid_mask = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object")))
+    working = working[valid_mask].dropna(subset=["touched_ema10_count", "volume_ratio"]).copy()
     if working.empty:
         working["touched_ema10_jittered"] = pd.Series(dtype="float64")
         return working[columns].copy()

@@ -130,7 +130,12 @@ def _check_sort_specs(df: pd.DataFrame) -> None:
 
 def _check_route_quality_chart(df: pd.DataFrame) -> None:
     chart = build_chart_data(df)["route_quality"]
-    assert int((chart["valid_count"] + chart["invalid_count"]).sum()) == len(df)
+    valid_df = df[
+        df["ibd_candidate_rule"].fillna("").astype("string").str.strip().ne("")
+        & df["ibd_candidate_rule"].ne("(empty)")
+    ]
+    assert int((chart["valid_count"] + chart["invalid_count"]).sum()) == len(valid_df)
+    assert "(empty)" not in chart["ibd_candidate_rule"].values
     required = {
         "ibd_candidate_rule",
         "valid_count",
@@ -147,9 +152,12 @@ def _check_route_quality_chart(df: pd.DataFrame) -> None:
 
 def _check_trend_volume_map_chart(df: pd.DataFrame) -> None:
     chart = build_chart_data(df)["trend_volume_map"]
-    expected = df.dropna(subset=["touched_ema10_count", "volume_ratio"])
+    valid_mask = _true_mask(df.get("ibd_entry_valid", pd.Series(index=df.index, dtype="object")))
+    expected = df[valid_mask].dropna(subset=["touched_ema10_count", "volume_ratio"])
     assert len(chart) == len(expected)
     assert set(chart["code"]) == set(expected["code"])
+    if not chart.empty:
+        assert all(chart["entry_status"] == "IBD valid")
     required = {"entry_status", "dry_status", "sector", "industry", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}
     assert required.issubset(chart.columns)
 

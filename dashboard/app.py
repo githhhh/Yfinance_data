@@ -31,7 +31,7 @@ from dashboard.field_config import (
 from dashboard.table_view import render_table
 
 
-st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide")
+st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="auto")
 
 FUNNEL_ORDER = [
     "Route",
@@ -62,7 +62,11 @@ def main() -> None:
         st.error(f"Could not load CSV: {exc}")
         return
 
-    mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0)
+    with st.sidebar:
+        st.subheader("🎯 Mode Selector")
+        mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0, key="global_mode_selector")
+        st.divider()
+
     if mode == "C Rank Reference":
         _render_c_rank_mode(df)
     else:
@@ -77,24 +81,49 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _render_custom_mode(df: pd.DataFrame) -> None:
+    st.markdown(
+        """
+        <style>
+        [data-testid="stHeader"] {
+            display: none !important;
+        }
+        .block-container {
+            padding-top: 1.5rem !important;
+            padding-bottom: 1rem !important;
+        }
+        div[data-testid="stVerticalBlock"] > div {
+            padding-bottom: 0.3rem !important;
+        }
+        .streamlit-expanderHeader {
+            padding-top: 0.3rem !important;
+            padding-bottom: 0.3rem !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    kpis_charts_container = st.container()
     summary_container = st.container()
+    
     filters_by_group = _funnel_filters(df)
     filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
 
+    with kpis_charts_container:
+        _render_kpis(filtered)
+        _render_charts(filtered)
+
     with summary_container:
         _render_current_filter_summary(filters_by_group, len(filtered), len(df))
-        st.divider()
 
-    _render_kpis(filtered)
-    _render_charts(filtered)
-    st.divider()
     _render_table_controls(filtered, df)
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
-    _render_c_rank_rules()
+    with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=True):
+        _render_c_rank_rules()
     limit_label = st.selectbox("Top N", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"])
     limit = None if limit_label == "All rows" else int(limit_label.split()[1])
     ranked = apply_c_rank_mode(df, limit=limit)
@@ -106,7 +135,6 @@ def _render_c_rank_mode(df: pd.DataFrame) -> None:
 
 
 def _render_c_rank_rules() -> None:
-    st.subheader("C Rank Reference Mode")
     left, right = st.columns(2)
     with left:
         st.markdown(
@@ -135,58 +163,64 @@ def _render_c_rank_rules() -> None:
 
 
 def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
-    st.subheader("Filters")
     groups = get_filter_funnel_groups()
     if list(groups) != FUNNEL_ORDER:
         raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
     filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
-    tabs = st.tabs(_funnel_tab_labels())
 
-    with tabs[0]:
-        candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
-        candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
-        if candidate_rule != "All":
-            filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
+    with st.expander("⏳ Filter Funnel Config Panel", expanded=True):
+        cols = st.columns(5)
 
-    with tabs[1]:
-        entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0, key="funnel_entry_valid")
-        if entry_valid == "Valid only":
-            filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
-        elif entry_valid == "Invalid only":
-            filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
+        with cols[0]:
+            st.markdown("##### 1. Route")
+            candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
+            candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
+            if candidate_rule != "All":
+                filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
 
-        strength_disabled = entry_valid != "Valid only"
-        for field in [
-            "ibd_entry_volume_ratio",
-            "ibd_entry_close_position",
-            "ibd_entry_breakout_range_ratio",
-        ]:
-            spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
+        with cols[1]:
+            st.markdown("##### 2. Entry & Strength")
+            entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0, key="funnel_entry_valid")
+            if entry_valid == "Valid only":
+                filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
+            elif entry_valid == "Invalid only":
+                filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
+
+            strength_disabled = entry_valid != "Valid only"
+            for field in [
+                "ibd_entry_volume_ratio",
+                "ibd_entry_close_position",
+                "ibd_entry_breakout_range_ratio",
+            ]:
+                spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
+                if spec is not None:
+                    filters_by_group["Entry Confirmation & Strength"].append(spec)
+
+        with cols[2]:
+            st.markdown("##### 3. Weekly Vol & Price")
+            spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
             if spec is not None:
-                filters_by_group["Entry Confirmation & Strength"].append(spec)
+                filters_by_group["Weekly Volume & Price"].append(spec)
+            bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
+            _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
 
-    with tabs[2]:
-        spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
-        if spec is not None:
-            filters_by_group["Weekly Volume & Price"].append(spec)
-        bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
-        _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
-
-    with tabs[3]:
-        for field in ["touched_ema10_count"]:
-            spec = _range_filter(df, field, st, key_prefix="structure")
+        with cols[3]:
+            st.markdown("##### 4. Structure")
+            for field in ["touched_ema10_count"]:
+                spec = _range_filter(df, field, st, key_prefix="structure")
+                if spec is not None:
+                    filters_by_group["Structure"].append(spec)
+            spec = _pullback_magnitude_filter(df)
             if spec is not None:
                 filters_by_group["Structure"].append(spec)
-        spec = _pullback_magnitude_filter(df)
-        if spec is not None:
-            filters_by_group["Structure"].append(spec)
 
-    with tabs[4]:
-        for field in ["sector", "industry"]:
-            choices = _unique_values(df, field)
-            selected = st.multiselect(get_field_label(field), choices, default=[], key=f"funnel_group_{field}")
-            if selected:
-                filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
+        with cols[4]:
+            st.markdown("##### 5. Grouping")
+            for field in ["sector", "industry"]:
+                choices = _unique_values(df, field)
+                selected = st.multiselect(get_field_label(field), choices, default=[], key=f"funnel_group_{field}")
+                if selected:
+                    filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
 
     return filters_by_group
 
@@ -200,20 +234,28 @@ def _funnel_tab_labels(filters_by_group: dict[str, list[FilterSpec]] | None = No
 
 
 def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]], filtered_count: int, total_count: int) -> None:
-    st.subheader("Current Filters")
-    st.caption(f"Rows: {filtered_count}/{total_count}")
-    columns = st.columns(len(filters_by_group))
-    for column, (group, filters) in zip(columns, filters_by_group.items()):
-        with column:
-            st.markdown(f"**{group} ({len(filters)})**")
-            if not filters:
-                st.caption("All")
-                continue
-            for spec in filters:
-                st.caption(_describe_filter_condition(spec))
+    active_groups = {group: filters for group, filters in filters_by_group.items() if filters}
+    if not active_groups:
+        st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** (All records)")
+        return
+        
+    summary_parts = []
+    for group, filters in active_groups.items():
+        short_group = group.split(" & ")[0].split(" Rule")[0].split(" Vol")[0]
+        conditions_str = " & ".join(_describe_filter_condition(spec) for spec in filters)
+        summary_parts.append(f"**{short_group}**: `{conditions_str}`")
+        
+    st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** ｜ " + " ｜ ".join(summary_parts))
 
 
 def _describe_filter_condition(spec: FilterSpec) -> str:
+    def _format_val(v) -> str:
+        try:
+            val = float(v)
+            return f"{val:.2f}"
+        except (ValueError, TypeError):
+            return str(v)
+
     label = get_field_label(spec.field)
     operator = spec.operator.lower()
     if operator == "is true":
@@ -221,15 +263,17 @@ def _describe_filter_condition(spec: FilterSpec) -> str:
     if operator == "is false":
         return f"{label}: False"
     if operator == "equals":
-        return f"{label}: {spec.value}"
+        return f"{label}: {_format_val(spec.value)}"
     if operator == "in":
-        values = ", ".join(str(value) for value in spec.value)
+        values = ", ".join(_format_val(value) for value in spec.value)
         return f"{label}: {values}"
     if operator == "between":
         if spec.field == "pullback_pct":
-            return f"{label} magnitude: {abs(float(spec.value2)):.1f} to {abs(float(spec.value)):.1f}"
-        return f"{label}: {spec.value} to {spec.value2}"
-    return f"{label} {spec.operator} {spec.value}"
+            val1 = _format_val(abs(float(spec.value2)))
+            val2 = _format_val(abs(float(spec.value)))
+            return f"{label} magnitude: {val1} to {val2}"
+        return f"{label}: {_format_val(spec.value)} to {_format_val(spec.value2)}"
+    return f"{label} {spec.operator} {_format_val(spec.value)}"
 
 
 def _render_kpis(df: pd.DataFrame) -> None:
@@ -242,10 +286,31 @@ def _render_kpis(df: pd.DataFrame) -> None:
     columns[4].metric("Median Range Ratio [Valid]", _format_number(kpis["median_ibd_entry_breakout_range_ratio_valid"], "x"))
 
 
+
 def _render_charts(df: pd.DataFrame) -> None:
     charts = build_chart_data(df)
-    left, right = st.columns(2)
-    with left:
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        concentration = charts["sector_concentration"]
+        if concentration.empty:
+            st.info("No rows for Sector Concentration.")
+        else:
+            top = concentration.head(10)
+            fig = px.bar(
+                top,
+                x="share_pct",
+                y="sector",
+                orientation="h",
+                text="share_pct",
+                hover_data=["row_count", "valid_count", "valid_rate_pct", "top_industry"],
+                title="Sector Concentration",
+                height=240,
+            )
+            fig.update_layout(margin={"l": 8, "r": 8, "t": 36, "b": 24}, yaxis={"autorange": "reversed"})
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
         route_df = charts["route_quality"]
         if route_df.empty:
             st.info("No rows for Route Quality.")
@@ -268,25 +333,25 @@ def _render_charts(df: pd.DataFrame) -> None:
                     "median_ibd_entry_breakout_range_ratio": ":.2f",
                 },
                 title="Route Quality",
-                height=260,
+                height=240,
             )
             fig.update_layout(
-                margin={"l": 8, "r": 8, "t": 36, "b": 48},
-                xaxis_title="Candidate Rule",
-                yaxis_title="Count",
+                margin={"l": 8, "r": 8, "t": 36, "b": 16},
+                xaxis_title="",
+                yaxis_title="",
             )
             st.plotly_chart(fig, use_container_width=True)
 
-    with right:
+    with col3:
         action_map = charts["trend_volume_map"]
         if action_map.empty:
-            st.info("No rows for Trend × Volume Map.")
+            st.info("No rows for Trend × Volume Map [Valid Only].")
         else:
             fig = px.scatter(
                 action_map,
                 x="touched_ema10_jittered",
                 y="volume_ratio",
-                color="entry_status",
+                color="ibd_candidate_rule",
                 symbol="ibd_candidate_rule",
                 hover_data=[
                     "code",
@@ -299,35 +364,17 @@ def _render_charts(df: pd.DataFrame) -> None:
                     "ibd_entry_volume_ratio",
                     "ibd_entry_close_position",
                 ],
-                title="Trend × Volume Map",
-                height=260,
+                title="Trend × Volume Map [Valid Only]",
+                height=240,
             )
             fig.add_hline(y=1.3, line_dash="dot", line_color="#546E7A")
             fig.update_layout(
-                margin={"l": 8, "r": 8, "t": 36, "b": 48},
-                legend={"orientation": "h", "y": -0.3},
+                margin={"l": 8, "r": 8, "t": 36, "b": 24},
+                legend={"orientation": "h", "y": -0.2},
                 xaxis={"title": "Trend Maturity (10W EMA Touch Count)"},
                 yaxis={"title": "Current Volume Ratio"},
             )
             st.plotly_chart(fig, use_container_width=True)
-
-    concentration = charts["sector_concentration"]
-    if concentration.empty:
-        st.info("No rows for Sector Concentration.")
-    else:
-        top = concentration.head(12)
-        fig = px.bar(
-            top,
-            x="share_pct",
-            y="sector",
-            orientation="h",
-            text="share_pct",
-            hover_data=["row_count", "valid_count", "valid_rate_pct", "top_industry"],
-            title="Sector Concentration",
-            height=260,
-        )
-        fig.update_layout(margin={"l": 8, "r": 8, "t": 36, "b": 24}, yaxis={"autorange": "reversed"})
-        st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
@@ -387,6 +434,7 @@ def _range_filter(
         value=(default_min, default_max),
         key=f"{key_prefix}_range_{field}" if key_prefix else f"range_{field}",
         disabled=disabled,
+        format="%.2f",
     )
     if disabled:
         return None
@@ -412,6 +460,7 @@ def _pullback_magnitude_filter(df: pd.DataFrame) -> FilterSpec | None:
         max_value=max_value,
         value=(min_value, max_value),
         key="structure_range_pullback_pct_magnitude",
+        format="%.2f",
     )
     if selected == (min_value, max_value):
         return None
