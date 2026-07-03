@@ -8,14 +8,11 @@ from dashboard.data_utils import (
     apply_c_rank_mode,
     apply_filters,
     apply_sort,
-    build_preset_filters,
-    build_preset_sort,
-    combine_filter_specs,
     normalize_pool_df,
     _false_mask,
     _true_mask,
 )
-from dashboard.field_config import EXCLUDED_CUSTOM_FIELDS, PRESETS, get_preset_options
+from dashboard.field_config import EXCLUDED_CUSTOM_FIELDS
 
 
 def sample_pool_df() -> pd.DataFrame:
@@ -30,7 +27,13 @@ def sample_pool_df() -> pd.DataFrame:
                     "ibd_entry_valid": "1",
                     "ibd_entry_volume_ratio": "2.5",
                     "ibd_entry_close_vs_trigger_pct": "0.04",
+                    "ibd_entry_close_position": "0.80",
+                    "ibd_entry_breakout_range_ratio": "1.20",
                     "volume_ratio": "1.4",
+                    "is_bullish": "True",
+                    "pullback_pct": "-5.0",
+                    "sector": "Technology Services",
+                    "industry": "Software - Enterprise",
                     "pullback_v_is_dry": "True",
                     "breakout_date": "2026-05-10",
                     "pct_above_ceiling": "4.0",
@@ -45,7 +48,13 @@ def sample_pool_df() -> pd.DataFrame:
                     "ibd_entry_valid": "0",
                     "ibd_entry_volume_ratio": "3.5",
                     "ibd_entry_close_vs_trigger_pct": "0.02",
+                    "ibd_entry_close_position": "0.40",
+                    "ibd_entry_breakout_range_ratio": "0.60",
                     "volume_ratio": "1.6",
+                    "is_bullish": "False",
+                    "pullback_pct": "-12.0",
+                    "sector": "Health Technology",
+                    "industry": "Biotechnology",
                     "pullback_v_is_dry": "False",
                     "breakout_date": "2026-04-15",
                     "pct_above_ceiling": "8.0",
@@ -60,7 +69,13 @@ def sample_pool_df() -> pd.DataFrame:
                     "ibd_entry_valid": "1",
                     "ibd_entry_volume_ratio": "1.8",
                     "ibd_entry_close_vs_trigger_pct": "0.01",
+                    "ibd_entry_close_position": "0.90",
+                    "ibd_entry_breakout_range_ratio": "1.50",
                     "volume_ratio": "1.5",
+                    "is_bullish": "True",
+                    "pullback_pct": "-8.0",
+                    "sector": "Technology Services",
+                    "industry": "Software - Infrastructure",
                     "pullback_v_is_dry": "False",
                     "breakout_date": "2026-05-20",
                     "pct_above_ceiling": "12.0",
@@ -75,7 +90,13 @@ def sample_pool_df() -> pd.DataFrame:
                     "ibd_entry_valid": "",
                     "ibd_entry_volume_ratio": "",
                     "ibd_entry_close_vs_trigger_pct": "",
+                    "ibd_entry_close_position": "",
+                    "ibd_entry_breakout_range_ratio": "",
                     "volume_ratio": "0.9",
+                    "is_bullish": "",
+                    "pullback_pct": "",
+                    "sector": "Finance",
+                    "industry": "Regional Banks",
                     "pullback_v_is_dry": "",
                     "breakout_date": "2026-06-01",
                     "pct_above_ceiling": "2.0",
@@ -158,48 +179,6 @@ def test_invalid_date_filter_value_returns_no_rows_instead_of_raising():
     assert actual.empty
 
 
-def test_combine_filter_specs_keeps_preset_filters_as_actual_base_filters():
-    preset_filters = [FilterSpec("ibd_entry_volume_ratio", ">=", 99)]
-    ui_filters = [FilterSpec("ibd_entry_volume_ratio", "between", 1.5, 10.0), FilterSpec("signal", "is true")]
-
-    combined = combine_filter_specs(preset_filters, ui_filters)
-
-    assert combined == [
-        FilterSpec("ibd_entry_volume_ratio", ">=", 99),
-        FilterSpec("ibd_entry_volume_ratio", "between", 1.5, 10.0),
-        FilterSpec("signal", "is true"),
-    ]
-
-
-def test_default_preset_reviews_all_active_signals_before_action_lists():
-    assert get_preset_options()[0] == ("active_signal_quality", "Review: All Signals")
-
-    df = sample_pool_df()
-    actual = apply_sort(
-        apply_filters(df, build_preset_filters("active_signal_quality")),
-        build_preset_sort("active_signal_quality"),
-    )
-
-    assert set(actual["code"]) == {"AAA", "BBB", "DDD"}
-    assert actual.iloc[0]["ibd_entry_valid"] is True
-
-
-def test_action_clean_entry_preset_filters_confirmed_non_extended_entries():
-    df = sample_pool_df()
-
-    actual = apply_filters(df, build_preset_filters("action_clean_entry"))
-
-    assert actual["code"].tolist() == ["AAA"]
-
-
-def test_preset_filters_keep_ceiling_pullback_as_candidate_rule():
-    df = sample_pool_df()
-
-    actual = apply_filters(df, build_preset_filters("ceiling_pullback"))
-
-    assert actual["code"].tolist() == ["AAA"]
-
-
 def test_apply_sort_supports_three_stable_levels_and_nulls_last():
     df = sample_pool_df()
     sorted_df = apply_sort(
@@ -212,29 +191,6 @@ def test_apply_sort_supports_three_stable_levels_and_nulls_last():
     )
 
     assert sorted_df["code"].tolist() == ["AAA", "DDD", "BBB", "CCC"]
-
-
-def test_preset_sort_for_ibd_valid_breakout_uses_strength_then_confirmation():
-    sort_specs = build_preset_sort("ibd_valid_breakout")
-
-    assert sort_specs == [
-        SortSpec("ibd_entry_volume_ratio", "desc"),
-        SortSpec("ibd_entry_close_vs_trigger_pct", "desc"),
-    ]
-
-
-def test_ma_touch_count_is_a_true_ma10_touch_review_preset():
-    df = sample_pool_df()
-
-    actual = apply_filters(df, build_preset_filters("ma_touch_count"))
-
-    assert actual["code"].tolist() == ["DDD"]
-
-
-def test_all_presets_keep_c_rank_reference_fields_isolated():
-    for preset in PRESETS.values():
-        fields = {spec["field"] for spec in preset["filters"] + preset["sort"]}
-        assert not fields.intersection(EXCLUDED_CUSTOM_FIELDS)
 
 
 def test_c_rank_mode_ignores_custom_filters_and_sorts_by_rank():
@@ -258,3 +214,89 @@ def test_boolean_masks_do_not_emit_pandas_downcasting_warning():
     assert true_mask.tolist() == [True, False, False]
     assert false_mask.tolist() == [False, True, False]
     assert not any(issubclass(item.category, FutureWarning) for item in caught)
+
+
+def test_funnel_stage1_route_filtering():
+    df = sample_pool_df()
+
+    actual = apply_filters(df, [FilterSpec("ibd_candidate_rule", "in", ["pivot", "ma10_touch_confirm"])])
+
+    assert set(actual["code"]) == {"BBB", "DDD"}
+
+
+def test_funnel_stage2_entry_confirmation_and_strength_filtering():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_valid", "is true"),
+            FilterSpec("ibd_entry_volume_ratio", ">=", 2.0),
+            FilterSpec("ibd_entry_close_position", ">=", 0.75),
+            FilterSpec("ibd_entry_breakout_range_ratio", "between", 1.0, 1.4),
+        ],
+    )
+
+    assert actual["code"].tolist() == ["AAA"]
+
+
+def test_funnel_stage3_weekly_volume_and_price_filtering():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("volume_ratio", ">=", 1.4),
+            FilterSpec("is_bullish", "is true"),
+        ],
+    )
+
+    assert set(actual["code"]) == {"AAA", "DDD"}
+
+
+def test_funnel_stage4_structure_filtering():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("touched_ema10_count", ">=", 2),
+            FilterSpec("pullback_pct", "between", -10.0, -3.0),
+        ],
+    )
+
+    assert set(actual["code"]) == {"AAA", "DDD"}
+
+
+def test_funnel_stage5_grouping_filtering():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("sector", "in", ["Technology Services"]),
+            FilterSpec("industry", "in", ["Software - Enterprise", "Software - Infrastructure"]),
+        ],
+    )
+
+    assert set(actual["code"]) == {"AAA", "DDD"}
+
+
+def test_funnel_full_decision_funnel_integration_and_logic():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_candidate_rule", "in", ["ceiling_pullback", "ma10_touch_confirm"]),
+            FilterSpec("ibd_entry_valid", "is true"),
+            FilterSpec("ibd_entry_close_position", ">=", 0.80),
+            FilterSpec("volume_ratio", ">=", 1.4),
+            FilterSpec("is_bullish", "is true"),
+            FilterSpec("touched_ema10_count", ">=", 2),
+            FilterSpec("sector", "in", ["Technology Services"]),
+        ],
+    )
+
+    assert set(actual["code"]) == {"AAA", "DDD"}
+    assert all(actual["ibd_entry_valid"] == True)

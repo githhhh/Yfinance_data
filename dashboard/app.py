@@ -62,7 +62,6 @@ def main() -> None:
         st.error(f"Could not load CSV: {exc}")
         return
 
-    _render_page_header()
     mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0)
     if mode == "C Rank Reference":
         _render_c_rank_mode(df)
@@ -77,46 +76,16 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
-def _render_page_header() -> None:
-    st.markdown(
-        """
-        <style>
-        .breakout-header {
-            border: 1px solid rgba(255, 255, 255, 0.10);
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin-bottom: 12px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
-        }
-        .breakout-eyebrow {
-            color: rgba(255, 255, 255, 0.56);
-            font-size: 0.78rem;
-            letter-spacing: 0;
-            margin-bottom: 2px;
-        }
-        .breakout-title {
-            color: rgba(255, 255, 255, 0.96);
-            font-size: 1.15rem;
-            font-weight: 700;
-            line-height: 1.25;
-        }
-        </style>
-        <div class="breakout-header">
-          <div class="breakout-eyebrow">Local Analysis</div>
-          <div class="breakout-title">Breakout Pool Workbench</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def _render_custom_mode(df: pd.DataFrame) -> None:
+    summary_container = st.container()
     filters_by_group = _funnel_filters(df)
     filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
 
-    _render_current_filter_summary(filters_by_group, len(filtered), len(df))
+    with summary_container:
+        _render_current_filter_summary(filters_by_group, len(filtered), len(df))
+        st.divider()
 
     _render_kpis(filtered)
     _render_charts(filtered)
@@ -171,7 +140,7 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
     if list(groups) != FUNNEL_ORDER:
         raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
     filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
-    tabs = st.tabs(_funnel_tab_labels(_session_filter_counts(df)))
+    tabs = st.tabs(_funnel_tab_labels())
 
     with tabs[0]:
         candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
@@ -187,7 +156,11 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
             filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
 
         strength_disabled = entry_valid != "Valid only"
-        for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
+        for field in [
+            "ibd_entry_volume_ratio",
+            "ibd_entry_close_position",
+            "ibd_entry_breakout_range_ratio",
+        ]:
             spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
             if spec is not None:
                 filters_by_group["Entry Confirmation & Strength"].append(spec)
@@ -222,79 +195,8 @@ def _flatten_filters(filters_by_group: dict[str, list[FilterSpec]]) -> list[Filt
     return [spec for specs in filters_by_group.values() for spec in specs]
 
 
-def _funnel_tab_labels(filters_by_group: dict[str, list[FilterSpec]]) -> list[str]:
-    return [f"{group} ({len(filters_by_group.get(group, []))})" for group in get_filter_funnel_groups()]
-
-
-def _session_filter_counts(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
-    filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
-
-    candidate_rule = st.session_state.get("funnel_route_rule", "All")
-    if candidate_rule != "All":
-        filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
-
-    entry_valid = st.session_state.get("funnel_entry_valid", "All")
-    if entry_valid == "Valid only":
-        filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
-        for field in ["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"]:
-            spec = _range_state_filter(df, field, "entry")
-            if spec is not None:
-                filters_by_group["Entry Confirmation & Strength"].append(spec)
-    elif entry_valid == "Invalid only":
-        filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
-
-    spec = _range_state_filter(df, "volume_ratio", "weekly")
-    if spec is not None:
-        filters_by_group["Weekly Volume & Price"].append(spec)
-    bullish = st.session_state.get("funnel_weekly_is_bullish", "All")
-    _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
-
-    spec = _range_state_filter(df, "touched_ema10_count", "structure")
-    if spec is not None:
-        filters_by_group["Structure"].append(spec)
-    spec = _pullback_magnitude_state_filter(df)
-    if spec is not None:
-        filters_by_group["Structure"].append(spec)
-
-    for field in ["sector", "industry"]:
-        selected = st.session_state.get(f"funnel_group_{field}", [])
-        if selected:
-            filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
-
-    return filters_by_group
-
-
-def _range_state_filter(df: pd.DataFrame, field: str, key_prefix: str) -> FilterSpec | None:
-    if field not in df.columns:
-        return None
-    selected = st.session_state.get(f"{key_prefix}_range_{field}")
-    if selected is None:
-        return None
-    values = pd.to_numeric(df[field], errors="coerce").dropna()
-    if values.empty:
-        return None
-    min_value = float(values.min())
-    max_value = float(values.max())
-    selected_min, selected_max = float(selected[0]), float(selected[1])
-    if (selected_min, selected_max) == (min_value, max_value):
-        return None
-    return FilterSpec(field, "between", selected_min, selected_max)
-
-
-def _pullback_magnitude_state_filter(df: pd.DataFrame) -> FilterSpec | None:
-    field = "pullback_pct"
-    selected = st.session_state.get("structure_range_pullback_pct_magnitude")
-    if field not in df.columns or selected is None:
-        return None
-    values = pd.to_numeric(df[field], errors="coerce").dropna().abs()
-    if values.empty:
-        return None
-    min_value = float(values.min())
-    max_value = float(values.max())
-    selected_min, selected_max = float(selected[0]), float(selected[1])
-    if (selected_min, selected_max) == (min_value, max_value):
-        return None
-    return FilterSpec(field, "between", -selected_max, -selected_min)
+def _funnel_tab_labels(filters_by_group: dict[str, list[FilterSpec]] | None = None) -> list[str]:
+    return [str(group) for group in get_filter_funnel_groups()]
 
 
 def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]], filtered_count: int, total_count: int) -> None:
@@ -332,104 +234,100 @@ def _describe_filter_condition(spec: FilterSpec) -> str:
 
 def _render_kpis(df: pd.DataFrame) -> None:
     kpis = build_kpis(df)
-    columns = st.columns(4)
+    columns = st.columns(5)
     columns[0].metric("Filtered Rows", kpis["filtered_rows"])
     columns[1].metric("IBD Valid Rate", f"{kpis['ibd_valid_rate_pct']:.2f}%")
     columns[2].metric("Median IBD Volume Ratio", _format_number(kpis["median_ibd_entry_volume_ratio"], "x"))
-    columns[3].metric("Median Close vs Trigger", _format_number(kpis["median_ibd_entry_close_vs_trigger_pct"], "%"))
+    columns[3].metric("Median Close Position", _format_number(kpis["median_ibd_entry_close_position"]))
+    columns[4].metric("Median Range Ratio [Valid]", _format_number(kpis["median_ibd_entry_breakout_range_ratio_valid"], "x"))
 
 
 def _render_charts(df: pd.DataFrame) -> None:
     charts = build_chart_data(df)
     left, right = st.columns(2)
     with left:
-        matrix = charts["signal_quality_matrix"]
-        if matrix.empty:
-            st.info("No rows for Signal Quality Matrix.")
+        route_df = charts["route_quality"]
+        if route_df.empty:
+            st.info("No rows for Route Quality.")
         else:
-            fig = px.scatter(
-                matrix,
-                x="signal_source",
-                y="ibd_candidate_rule",
-                size="total_count",
+            fig = px.bar(
+                route_df,
+                x="ibd_candidate_rule",
+                y="total_count",
                 color="valid_rate_pct",
                 color_continuous_scale="Greens",
                 range_color=[0, 100],
                 text="total_count",
                 hover_data={
-                    "signal_source": True,
                     "ibd_candidate_rule": True,
                     "valid_count": True,
                     "invalid_count": True,
                     "valid_rate_pct": ":.2f",
                     "median_ibd_entry_volume_ratio": ":.2f",
-                    "median_ibd_entry_close_vs_trigger_pct": ":.2%",
-                    "median_pct_above_ceiling": ":.1f",
+                    "median_ibd_entry_close_position": ":.2f",
+                    "median_ibd_entry_breakout_range_ratio": ":.2f",
                 },
-                title="Signal Quality Matrix",
+                title="Route Quality",
                 height=260,
             )
             fig.update_layout(
                 margin={"l": 8, "r": 8, "t": 36, "b": 48},
-                xaxis_title="Signal Source",
-                yaxis_title="Candidate Rule",
+                xaxis_title="Candidate Rule",
+                yaxis_title="Count",
             )
             st.plotly_chart(fig, use_container_width=True)
 
     with right:
-        action_map = charts["structure_action_map"]
+        action_map = charts["trend_volume_map"]
         if action_map.empty:
-            st.info("No rows for Structure Action Map.")
+            st.info("No rows for Trend × Volume Map.")
         else:
             fig = px.scatter(
                 action_map,
-                x="pct_above_ceiling",
+                x="touched_ema10_jittered",
                 y="volume_ratio",
                 color="entry_status",
-                symbol="signal_source",
+                symbol="ibd_candidate_rule",
                 hover_data=[
                     "code",
                     "sector",
                     "industry",
+                    "signal_source",
                     "ibd_candidate_rule",
                     "dry_status",
                     "touched_ema10_count",
                     "ibd_entry_volume_ratio",
-                    "ibd_entry_close_vs_trigger_pct",
+                    "ibd_entry_close_position",
                 ],
-                title="Structure Action Map",
+                title="Trend × Volume Map",
                 height=260,
             )
-            fig.add_vline(x=5, line_dash="dot", line_color="#2E7D32")
-            fig.add_vline(x=10, line_dash="dot", line_color="#F9A825")
             fig.add_hline(y=1.3, line_dash="dot", line_color="#546E7A")
-            x_upper = min(max(float(action_map["pct_above_ceiling"].quantile(0.95)), 20.0), 120.0)
             fig.update_layout(
                 margin={"l": 8, "r": 8, "t": 36, "b": 48},
                 legend={"orientation": "h", "y": -0.3},
-                xaxis={"range": [0, x_upper], "title": "Pct Above Ceiling"},
+                xaxis={"title": "Trend Maturity (10W EMA Touch Count)"},
                 yaxis={"title": "Current Volume Ratio"},
             )
             st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("Sector concentration", expanded=False):
-        concentration = charts["sector_concentration"]
-        if concentration.empty:
-            st.info("No rows for Sector Concentration.")
-        else:
-            top = concentration.head(12)
-            fig = px.bar(
-                top,
-                x="share_pct",
-                y="sector",
-                orientation="h",
-                text="share_pct",
-                hover_data=["row_count", "valid_count", "valid_rate_pct", "top_industry"],
-                title="Sector Concentration",
-                height=260,
-            )
-            fig.update_layout(margin={"l": 8, "r": 8, "t": 36, "b": 24}, yaxis={"autorange": "reversed"})
-            st.plotly_chart(fig, use_container_width=True)
+    concentration = charts["sector_concentration"]
+    if concentration.empty:
+        st.info("No rows for Sector Concentration.")
+    else:
+        top = concentration.head(12)
+        fig = px.bar(
+            top,
+            x="share_pct",
+            y="sector",
+            orientation="h",
+            text="share_pct",
+            hover_data=["row_count", "valid_count", "valid_rate_pct", "top_industry"],
+            title="Sector Concentration",
+            height=260,
+        )
+        fig.update_layout(margin={"l": 8, "r": 8, "t": 36, "b": 24}, yaxis={"autorange": "reversed"})
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:

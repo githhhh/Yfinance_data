@@ -26,6 +26,8 @@ NUMBER_FIELDS = {
     "ibd_trigger_price",
     "ibd_entry_volume_ratio",
     "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
     "volume_ratio",
     "hold_return",
     "pct_above_ceiling",
@@ -48,7 +50,12 @@ FILTER_FUNNEL_GROUPS = OrderedDict(
         ("Route", ["ibd_candidate_rule"]),
         (
             "Entry Confirmation & Strength",
-            ["ibd_entry_valid", "ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"],
+            [
+                "ibd_entry_valid",
+                "ibd_entry_volume_ratio",
+                "ibd_entry_close_position",
+                "ibd_entry_breakout_range_ratio",
+            ],
         ),
         ("Weekly Volume & Price", ["volume_ratio", "is_bullish"]),
         ("Structure", ["touched_ema10_count", "pullback_pct"]),
@@ -73,6 +80,8 @@ ALL_TABLE_COLUMNS = [
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
     "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
     "ibd_entry_rule",
     "ibd_entry_reject_reason",
     "ibd_candidate_extra",
@@ -119,6 +128,8 @@ IBD_COLUMNS = [
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
     "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
     "ibd_entry_rule",
     "ibd_entry_reject_reason",
 ]
@@ -243,6 +254,28 @@ FIELD_CONFIG = OrderedDict(
                 help_text="Close confirmation quality versus trigger price.",
             ),
         ),
+        (
+            "ibd_entry_close_position",
+            _field(
+                "Close Position",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00",
+                help_text="Relative close position within daily high-low range (0 to 1).",
+            ),
+        ),
+        (
+            "ibd_entry_breakout_range_ratio",
+            _field(
+                "Breakout Range Ratio",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00x",
+                help_text="Breakout bar price range relative to typical volatility.",
+            ),
+        ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
         (
             "ibd_entry_reject_reason",
@@ -310,114 +343,6 @@ FIELD_CONFIG = OrderedDict(
         ),
         ("sector", _field("Sector", "category", "Grouping", default_table=True)),
         ("industry", _field("Industry", "category", "Grouping", default_table=True)),
-    ]
-)
-
-PRESETS = OrderedDict(
-    [
-        (
-            "active_signal_quality",
-            {
-                "label": "Review: All Signals",
-                "filters": [{"field": "signal", "operator": "is true"}],
-                "sort": [
-                    {"field": "ibd_entry_valid", "direction": "desc"},
-                    {"field": "ibd_entry_volume_ratio", "direction": "desc"},
-                    {"field": "ibd_entry_close_vs_trigger_pct", "direction": "desc"},
-                ],
-            },
-        ),
-        (
-            "ibd_valid_breakout",
-            {
-                "label": "IBD Valid Breakout",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "ibd_entry_valid", "operator": "is true"},
-                ],
-                "sort": [
-                    {"field": "ibd_entry_volume_ratio", "direction": "desc"},
-                    {"field": "ibd_entry_close_vs_trigger_pct", "direction": "desc"},
-                ],
-            },
-        ),
-        (
-            "action_clean_entry",
-            {
-                "label": "Action: Clean Entry",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "ibd_entry_valid", "operator": "is true"},
-                    {"field": "ibd_entry_volume_ratio", "operator": ">=", "value": 1.5},
-                    {"field": "ibd_entry_close_vs_trigger_pct", "operator": "between", "value": 0.0, "value2": 0.05},
-                    {"field": "pct_above_ceiling", "operator": "<=", "value": 10.0},
-                ],
-                "sort": [
-                    {"field": "pct_above_ceiling", "direction": "asc"},
-                    {"field": "ibd_entry_volume_ratio", "direction": "desc"},
-                    {"field": "ibd_entry_close_vs_trigger_pct", "direction": "asc"},
-                ],
-            },
-        ),
-        (
-            "ceiling_breakout",
-            {
-                "label": "Review: Ceiling Breakout",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "signal_source", "operator": "equals", "value": "ceiling_breakout"},
-                    {"field": "ibd_candidate_rule", "operator": "equals", "value": "ceiling"},
-                ],
-                "sort": [
-                    {"field": "pct_above_ceiling", "direction": "asc"},
-                    {"field": "volume_ratio", "direction": "desc"},
-                ],
-            },
-        ),
-        (
-            "ceiling_pullback",
-            {
-                "label": "Review: Ceiling Pullback",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "signal_source", "operator": "equals", "value": "ceiling_breakout"},
-                    {"field": "ibd_candidate_rule", "operator": "equals", "value": "ceiling_pullback"},
-                ],
-                "sort": [{"field": "pct_above_ceiling", "direction": "asc"}],
-            },
-        ),
-        (
-            "pivot_quality",
-            {
-                "label": "Review: Pivot",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "signal_source", "operator": "equals", "value": "pivot"},
-                    {"field": "ibd_candidate_rule", "operator": "equals", "value": "pivot"},
-                ],
-                "sort": [
-                    {"field": "ibd_entry_valid", "direction": "desc"},
-                    {"field": "volume_ratio", "direction": "desc"},
-                    {"field": "ibd_entry_close_vs_trigger_pct", "direction": "desc"},
-                ],
-            },
-        ),
-        (
-            "ma_touch_count",
-            {
-                "label": "Review: 10W EMA Touch",
-                "filters": [
-                    {"field": "signal", "operator": "is true"},
-                    {"field": "signal_source", "operator": "equals", "value": "10_wk_ema_touch_confirm"},
-                    {"field": "ibd_candidate_rule", "operator": "equals", "value": "ma10_touch_confirm"},
-                ],
-                "sort": [
-                    {"field": "ibd_entry_valid", "direction": "desc"},
-                    {"field": "touched_ema10_count", "direction": "desc"},
-                    {"field": "volume_ratio", "direction": "desc"},
-                ],
-            },
-        ),
     ]
 )
 
@@ -489,7 +414,3 @@ def get_field_label(field: str) -> str:
 
 def get_field_type(field: str) -> str:
     return str(FIELD_CONFIG.get(field, {}).get("type", "text"))
-
-
-def get_preset_options() -> list[tuple[str, str]]:
-    return [(key, str(value["label"])) for key, value in PRESETS.items()]

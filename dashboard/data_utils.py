@@ -3,15 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import zlib
 
 import pandas as pd
+
+import numpy as np
 
 from dashboard.field_config import (
     BOOLEAN_FIELDS,
     DATE_FIELDS,
     FIELD_CONFIG,
     NUMBER_FIELDS,
-    PRESETS,
     get_field_label,
 )
 
@@ -53,7 +55,7 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
     for column in DATE_FIELDS.intersection(result.columns):
         result[column] = pd.to_datetime(result[column], errors="coerce")
 
-    if {"breakout_date", "ceiling_date"}.issubset(result.columns):
+    if "base_duration_weeks" not in result.columns and {"breakout_date", "ceiling_date"}.issubset(result.columns):
         duration_days = (result["breakout_date"] - result["ceiling_date"]).dt.days
         result["base_duration_weeks"] = (duration_days / 7).round()
 
@@ -64,34 +66,6 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def combine_filter_specs(preset_filters: list[FilterSpec], ui_filters: list[FilterSpec]) -> list[FilterSpec]:
-    combined: list[FilterSpec] = []
-    seen: set[tuple[str, str, str, str, bool]] = set()
-    for spec in preset_filters + ui_filters:
-        key = (spec.field, spec.operator, repr(spec.value), repr(spec.value2), spec.enabled)
-        if key in seen:
-            continue
-        combined.append(spec)
-        seen.add(key)
-    return combined
-
-
-def build_preset_filters(preset_key: str) -> list[FilterSpec]:
-    preset = _get_preset(preset_key)
-    return [
-        FilterSpec(
-            field=spec["field"],
-            operator=spec["operator"],
-            value=spec.get("value"),
-            value2=spec.get("value2"),
-        )
-        for spec in preset["filters"]
-    ]
-
-
-def build_preset_sort(preset_key: str) -> list[SortSpec]:
-    preset = _get_preset(preset_key)
-    return [SortSpec(field=spec["field"], direction=spec["direction"]) for spec in preset["sort"]]
 
 
 def apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
@@ -153,29 +127,24 @@ def build_active_filter_summary(filters: list[FilterSpec], sort_specs: list[Sort
 
 def build_kpis(df: pd.DataFrame) -> dict[str, float | int | None]:
     row_count = len(df)
-    valid_count = _true_mask(df.get("ibd_entry_valid", pd.Series(dtype="object"))).sum()
+    valid_mask = _true_mask(df.get("ibd_entry_valid", pd.Series(dtype="object")))
+    valid_count = valid_mask.sum()
+    valid_df = df[valid_mask] if not df.empty else df
     return {
         "filtered_rows": row_count,
         "ibd_valid_rate_pct": round((valid_count / row_count) * 100, 2) if row_count else 0.0,
         "median_ibd_entry_volume_ratio": _median_or_none(df, "ibd_entry_volume_ratio"),
-        "median_ibd_entry_close_vs_trigger_pct": _median_or_none(df, "ibd_entry_close_vs_trigger_pct"),
+        "median_ibd_entry_close_position": _median_or_none(df, "ibd_entry_close_position"),
+        "median_ibd_entry_breakout_range_ratio_valid": _median_or_none(valid_df, "ibd_entry_breakout_range_ratio"),
     }
 
 
 def build_chart_data(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return {
-        "signal_quality_matrix": _build_signal_quality_matrix_data(df),
-        "structure_action_map": _build_structure_action_map_data(df),
+        "route_quality": _build_route_quality_data(df),
+        "trend_volume_map": _build_trend_volume_map_data(df),
         "sector_concentration": _build_sector_concentration_data(df),
-        "ibd_valid_rate_by_signal_source": _build_valid_rate_data(df),
-        "volume_close_strength": _build_scatter_data(df),
     }
-
-
-def _get_preset(preset_key: str) -> dict[str, Any]:
-    if preset_key not in PRESETS:
-        raise ValueError(f"Unknown preset: {preset_key}")
-    return PRESETS[preset_key]
 
 
 def _ensure_column(df: pd.DataFrame, field: str) -> None:
@@ -304,81 +273,61 @@ def _median_or_none(df: pd.DataFrame, field: str) -> float | None:
     return None if pd.isna(value) else float(value)
 
 
-def _build_valid_rate_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["signal_source", "valid_count", "invalid_count", "total_count", "valid_rate_pct"]
-    if df.empty:
-        return pd.DataFrame(columns=columns)
-
-    signal_source = df.get("signal_source", pd.Series(index=df.index, dtype="object")).fillna("(empty)")
-    signal_source = signal_source.replace("", "(empty)")
-    valid = _true_mask(df.get("ibd_entry_valid", pd.Series(index=df.index, dtype="object"))).astype(int)
-
-    working = pd.DataFrame({"signal_source": signal_source, "valid": valid}, index=df.index)
-    grouped = working.groupby("signal_source", dropna=False).agg(total_count=("valid", "size"), valid_count=("valid", "sum"))
-    grouped["invalid_count"] = grouped["total_count"] - grouped["valid_count"]
-    grouped["valid_rate_pct"] = (grouped["valid_count"] / grouped["total_count"] * 100).round(2)
-    result = grouped.reset_index()[columns]
-    return result.sort_values(["total_count", "signal_source"], ascending=[False, True], kind="mergesort").reset_index(drop=True)
-
-
-def _build_signal_quality_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
+def _build_route_quality_data(df: pd.DataFrame) -> pd.DataFrame:
     columns = [
-        "signal_source",
         "ibd_candidate_rule",
         "valid_count",
         "invalid_count",
         "total_count",
         "valid_rate_pct",
         "median_ibd_entry_volume_ratio",
-        "median_ibd_entry_close_vs_trigger_pct",
+        "median_ibd_entry_close_position",
         "median_volume_ratio",
-        "median_pct_above_ceiling",
+        "median_ibd_entry_breakout_range_ratio",
     ]
     if df.empty:
         return pd.DataFrame(columns=columns)
 
     needed = [
-        "signal_source",
         "ibd_candidate_rule",
         "ibd_entry_valid",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
         "volume_ratio",
-        "pct_above_ceiling",
+        "ibd_entry_breakout_range_ratio",
     ]
     available = [c for c in needed if c in df.columns]
     working = df[available].copy()
     for column in [
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
         "volume_ratio",
-        "pct_above_ceiling",
+        "ibd_entry_breakout_range_ratio",
     ]:
         if column not in working.columns:
             working[column] = pd.NA
         working[column] = pd.to_numeric(working[column], errors="coerce")
-    working["signal_source"] = _label_series(working, "signal_source")
     working["ibd_candidate_rule"] = _label_series(working, "ibd_candidate_rule")
     working["valid"] = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))).astype(int)
 
-    grouped = working.groupby(["signal_source", "ibd_candidate_rule"], dropna=False).agg(
+    grouped = working.groupby(["ibd_candidate_rule"], dropna=False).agg(
         total_count=("valid", "size"),
         valid_count=("valid", "sum"),
         median_ibd_entry_volume_ratio=("ibd_entry_volume_ratio", "median"),
-        median_ibd_entry_close_vs_trigger_pct=("ibd_entry_close_vs_trigger_pct", "median"),
+        median_ibd_entry_close_position=("ibd_entry_close_position", "median"),
         median_volume_ratio=("volume_ratio", "median"),
-        median_pct_above_ceiling=("pct_above_ceiling", "median"),
+        median_ibd_entry_breakout_range_ratio=("ibd_entry_breakout_range_ratio", "median"),
     )
     grouped["invalid_count"] = grouped["total_count"] - grouped["valid_count"]
     grouped["valid_rate_pct"] = (grouped["valid_count"] / grouped["total_count"] * 100).round(2)
     return (
         grouped.reset_index()[columns]
-        .sort_values(["total_count", "signal_source", "ibd_candidate_rule"], ascending=[False, True, True], kind="mergesort")
+        .sort_values(["total_count", "ibd_candidate_rule"], ascending=[False, True], kind="mergesort")
         .reset_index(drop=True)
     )
 
 
-def _build_structure_action_map_data(df: pd.DataFrame) -> pd.DataFrame:
+def _build_trend_volume_map_data(df: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "code",
         "sector",
@@ -389,24 +338,34 @@ def _build_structure_action_map_data(df: pd.DataFrame) -> pd.DataFrame:
         "entry_status",
         "pullback_v_is_dry",
         "dry_status",
-        "pct_above_ceiling",
-        "pullback_pct_off_peak",
         "touched_ema10_count",
+        "touched_ema10_jittered",
         "volume_ratio",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
     ]
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    available = [c for c in columns if c in df.columns]
+    available = [c for c in columns if c != "touched_ema10_jittered" and c in df.columns]
     working = df[available].copy()
-    for column in columns:
+    for column in [c for c in columns if c != "touched_ema10_jittered"]:
         if column not in working.columns:
             working[column] = pd.NA
+    working["touched_ema10_count"] = pd.to_numeric(working["touched_ema10_count"], errors="coerce")
+    working["volume_ratio"] = pd.to_numeric(working["volume_ratio"], errors="coerce")
+    working = working.dropna(subset=["touched_ema10_count", "volume_ratio"]).copy()
+    if working.empty:
+        working["touched_ema10_jittered"] = pd.Series(dtype="float64")
+        return working[columns].copy()
+
     working["entry_status"] = working["ibd_entry_valid"].map(_entry_status)
     working["dry_status"] = working["pullback_v_is_dry"].map(_dry_status)
-    return working.dropna(subset=["pct_above_ceiling", "volume_ratio"])[columns].copy()
+    jitter = working["code"].apply(
+        lambda x: (zlib.crc32(str(x).encode("utf-8")) % 301) / 300.0 * 0.3 - 0.15 if pd.notna(x) else 0.0
+    )
+    working["touched_ema10_jittered"] = working["touched_ema10_count"] + jitter
+    return working[columns].copy()
 
 
 def _build_sector_concentration_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -436,27 +395,6 @@ def _build_sector_concentration_data(df: pd.DataFrame) -> pd.DataFrame:
     result = grouped.reset_index()
     result["top_industry"] = result["sector"].map(top_industry)
     return result[columns].sort_values(["row_count", "sector"], ascending=[False, True], kind="mergesort").reset_index(drop=True)
-
-
-def _build_scatter_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = [
-        "code",
-        "signal_source",
-        "ibd_candidate_rule",
-        "ibd_entry_price",
-        "pct_above_ceiling",
-        "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
-    ]
-    if df.empty:
-        return pd.DataFrame(columns=columns)
-
-    available = [c for c in columns if c in df.columns]
-    working = df[available].copy()
-    for column in columns:
-        if column not in working.columns:
-            working[column] = pd.NA
-    return working.dropna(subset=["ibd_entry_volume_ratio", "ibd_entry_close_vs_trigger_pct"])[columns].copy()
 
 
 def _label_series(df: pd.DataFrame, field: str) -> pd.Series:

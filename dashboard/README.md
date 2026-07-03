@@ -25,4 +25,4 @@ python -m pytest dashboard/tests -q
 - C Rank Reference mode displays its fixed rules and formula reference above the table.
 - Result Table defaults to `All Fields`, ordered by business groups, and includes the derived `base_duration_weeks` column.
 - Charts are auxiliary only. They read the current filtered DataFrame and do not mutate global filters.
-- Default chart dimensions are `Signal Quality Matrix`, `Structure Action Map`, and an expandable sector concentration view.
+- Default chart dimensions are `Route Quality`, `Trend × Volume Map`, and a full-width sector concentration view.

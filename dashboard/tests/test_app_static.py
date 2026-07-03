@@ -16,7 +16,7 @@ def test_custom_filter_ui_uses_trading_decision_funnel_without_presets():
     assert "_preset_selector" not in source
     assert "Preset" not in source
     assert 'st.title("Breakout Pool")' not in source
-    assert "Breakout Pool Workbench" in source
+    assert "Breakout Pool Workbench" not in source
     assert '"Route"' in source
     assert '"Entry Confirmation & Strength"' in source
     assert '"Weekly Volume & Price"' in source
@@ -37,7 +37,7 @@ def test_custom_filter_ui_removes_sort_bar_from_custom_mode():
     assert "direction_1" not in source
 
 
-def test_funnel_tab_labels_show_active_filter_counts():
+def test_funnel_tab_labels_return_static_names():
     labels = _funnel_tab_labels(
         {
             "Route": [FilterSpec("ibd_candidate_rule", "equals", "pivot")],
@@ -52,11 +52,11 @@ def test_funnel_tab_labels_show_active_filter_counts():
     )
 
     assert labels == [
-        "Route (1)",
-        "Entry Confirmation & Strength (2)",
-        "Weekly Volume & Price (0)",
-        "Structure (1)",
-        "Grouping (0)",
+        "Route",
+        "Entry Confirmation & Strength",
+        "Weekly Volume & Price",
+        "Structure",
+        "Grouping",
     ]
 
 

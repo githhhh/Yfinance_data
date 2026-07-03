@@ -34,7 +34,8 @@ def test_filterable_fields_follow_trading_decision_funnel():
     assert groups["Entry Confirmation & Strength"] == [
         "ibd_entry_valid",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
     ]
     assert groups["Weekly Volume & Price"] == ["volume_ratio", "is_bullish"]
     assert groups["Structure"] == ["touched_ema10_count", "pullback_pct"]
@@ -43,7 +44,8 @@ def test_filterable_fields_follow_trading_decision_funnel():
         "ibd_candidate_rule",
         "ibd_entry_valid",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
         "volume_ratio",
         "is_bullish",
         "touched_ema10_count",
@@ -71,6 +73,8 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "ibd_entry_price",
         "ibd_entry_volume_ratio",
         "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
         "ibd_entry_rule",
         "ibd_entry_reject_reason",
         "ibd_candidate_extra",

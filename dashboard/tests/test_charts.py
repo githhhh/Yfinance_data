@@ -13,10 +13,12 @@ def chart_sample_df() -> pd.DataFrame:
                     "ibd_candidate_rule": "pivot",
                     "ibd_entry_valid": True,
                     "ibd_entry_volume_ratio": 2.0,
-                    "ibd_entry_close_vs_trigger_pct": 0.02,
+                    "ibd_entry_close_position": 0.80,
+                    "ibd_entry_breakout_range_ratio": 1.20,
                     "ibd_entry_price": 10.0,
                     "pct_above_ceiling": 4.0,
                     "volume_ratio": 1.4,
+                    "touched_ema10_count": 2,
                     "pullback_pct_off_peak": -3.0,
                     "pullback_v_is_dry": True,
                     "sector": "Technology Services",
@@ -28,10 +30,12 @@ def chart_sample_df() -> pd.DataFrame:
                     "ibd_candidate_rule": "pivot",
                     "ibd_entry_valid": False,
                     "ibd_entry_volume_ratio": 3.0,
-                    "ibd_entry_close_vs_trigger_pct": 0.04,
+                    "ibd_entry_close_position": 0.40,
+                    "ibd_entry_breakout_range_ratio": 0.60,
                     "ibd_entry_price": 12.0,
                     "pct_above_ceiling": 8.0,
                     "volume_ratio": 1.8,
+                    "touched_ema10_count": 5,
                     "pullback_pct_off_peak": 4.0,
                     "pullback_v_is_dry": False,
                     "sector": "Technology Services",
@@ -43,10 +47,12 @@ def chart_sample_df() -> pd.DataFrame:
                     "ibd_candidate_rule": "ceiling_pullback",
                     "ibd_entry_valid": True,
                     "ibd_entry_volume_ratio": 4.0,
-                    "ibd_entry_close_vs_trigger_pct": 0.06,
+                    "ibd_entry_close_position": 0.90,
+                    "ibd_entry_breakout_range_ratio": 1.50,
                     "ibd_entry_price": 14.0,
                     "pct_above_ceiling": 2.0,
                     "volume_ratio": 2.2,
+                    "touched_ema10_count": 1,
                     "pullback_pct_off_peak": -1.0,
                     "pullback_v_is_dry": None,
                     "sector": "Finance",
@@ -58,10 +64,12 @@ def chart_sample_df() -> pd.DataFrame:
                     "ibd_candidate_rule": "ceiling",
                     "ibd_entry_valid": None,
                     "ibd_entry_volume_ratio": None,
-                    "ibd_entry_close_vs_trigger_pct": 0.08,
+                    "ibd_entry_close_position": 0.50,
+                    "ibd_entry_breakout_range_ratio": 0.80,
                     "ibd_entry_price": 16.0,
                     "pct_above_ceiling": 1.0,
                     "volume_ratio": 0.9,
+                    "touched_ema10_count": 3,
                     "pullback_pct_off_peak": 7.0,
                     "pullback_v_is_dry": None,
                     "sector": "Finance",
@@ -72,37 +80,25 @@ def chart_sample_df() -> pd.DataFrame:
     )
 
 
-def test_valid_rate_chart_counts_current_rows_by_signal_source():
+def test_route_quality_groups_by_candidate_rule():
     charts = build_chart_data(chart_sample_df())
-    valid_rate = charts["ibd_valid_rate_by_signal_source"].sort_values("signal_source")
+    route = charts["route_quality"].sort_values("ibd_candidate_rule")
 
-    assert valid_rate["signal_source"].tolist() == ["ceiling_breakout", "pivot"]
-    assert valid_rate["total_count"].tolist() == [2, 2]
-    assert valid_rate["valid_count"].tolist() == [1, 1]
-    assert valid_rate["invalid_count"].tolist() == [1, 1]
-    assert valid_rate["valid_rate_pct"].tolist() == [50.0, 50.0]
-
-
-def test_signal_quality_matrix_groups_by_source_and_candidate_rule():
-    charts = build_chart_data(chart_sample_df())
-    matrix = charts["signal_quality_matrix"].sort_values(["signal_source", "ibd_candidate_rule"])
-
-    assert matrix["signal_source"].tolist() == ["ceiling_breakout", "ceiling_breakout", "pivot"]
-    assert matrix["ibd_candidate_rule"].tolist() == ["ceiling", "ceiling_pullback", "pivot"]
-    assert matrix["total_count"].tolist() == [1, 1, 2]
-    assert matrix["valid_count"].tolist() == [0, 1, 1]
-    assert matrix["valid_rate_pct"].tolist() == [0.0, 100.0, 50.0]
-    assert "median_pct_above_ceiling" in matrix.columns
-    assert "median_volume_ratio" in matrix.columns
+    assert route["ibd_candidate_rule"].tolist() == ["ceiling", "ceiling_pullback", "pivot"]
+    assert route["total_count"].tolist() == [1, 1, 2]
+    assert route["valid_count"].tolist() == [0, 1, 1]
+    assert route["valid_rate_pct"].tolist() == [0.0, 100.0, 50.0]
+    assert "median_ibd_entry_close_position" in route.columns
+    assert "median_volume_ratio" in route.columns
+    assert "median_ibd_entry_breakout_range_ratio" in route.columns
 
 
-def test_signal_quality_matrix_tolerates_missing_optional_metric_columns():
+def test_route_quality_tolerates_missing_optional_metric_columns():
     df = normalize_pool_df(
         pd.DataFrame(
             [
                 {
                     "code": "AAA",
-                    "signal_source": "pivot",
                     "ibd_candidate_rule": "pivot",
                     "ibd_entry_valid": True,
                 }
@@ -110,22 +106,22 @@ def test_signal_quality_matrix_tolerates_missing_optional_metric_columns():
         )
     )
 
-    matrix = build_chart_data(df)["signal_quality_matrix"]
+    route = build_chart_data(df)["route_quality"]
 
-    assert matrix["total_count"].tolist() == [1]
-    assert pd.isna(matrix.loc[0, "median_ibd_entry_volume_ratio"])
-    assert pd.isna(matrix.loc[0, "median_pct_above_ceiling"])
+    assert route["total_count"].tolist() == [1]
+    assert pd.isna(route.loc[0, "median_ibd_entry_volume_ratio"])
+    assert pd.isna(route.loc[0, "median_ibd_entry_close_position"])
 
 
-def test_structure_action_map_keeps_review_rows_with_structure_axes():
+def test_trend_volume_map_keeps_rows_with_touched_ema10_and_volume():
     charts = build_chart_data(chart_sample_df())
-    action_map = charts["structure_action_map"]
+    action_map = charts["trend_volume_map"]
 
     assert action_map["code"].tolist() == ["AAA", "BBB", "CCC", "DDD"]
     assert action_map.loc[action_map["code"].eq("AAA"), "entry_status"].item() == "IBD valid"
     assert action_map.loc[action_map["code"].eq("BBB"), "entry_status"].item() == "IBD invalid"
     assert action_map.loc[action_map["code"].eq("DDD"), "entry_status"].item() == "Pending"
-    assert {"sector", "industry", "dry_status", "volume_ratio", "pct_above_ceiling"}.issubset(action_map.columns)
+    assert {"sector", "industry", "dry_status", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}.issubset(action_map.columns)
 
 
 def test_sector_concentration_counts_current_rows_and_share():
@@ -137,24 +133,11 @@ def test_sector_concentration_counts_current_rows_and_share():
     assert concentration["share_pct"].tolist() == [50.0, 50.0]
 
 
-def test_scatter_chart_uses_only_rows_with_required_xy_fields():
-    charts = build_chart_data(chart_sample_df())
-    scatter = charts["volume_close_strength"]
-
-    assert scatter["code"].tolist() == ["AAA", "BBB", "CCC"]
-    assert {
-        "code",
-        "signal_source",
-        "ibd_candidate_rule",
-        "ibd_entry_price",
-        "pct_above_ceiling",
-    }.issubset(scatter.columns)
-
-
 def test_kpis_are_based_on_filtered_dataframe_only():
     kpis = build_kpis(chart_sample_df().iloc[:3])
 
     assert kpis["filtered_rows"] == 3
     assert kpis["ibd_valid_rate_pct"] == round(2 / 3 * 100, 2)
     assert kpis["median_ibd_entry_volume_ratio"] == 3.0
-    assert kpis["median_ibd_entry_close_vs_trigger_pct"] == 0.04
+    assert kpis["median_ibd_entry_close_position"] == 0.80
+    assert kpis["median_ibd_entry_breakout_range_ratio_valid"] == 1.35
