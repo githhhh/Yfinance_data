@@ -300,3 +300,19 @@ def test_funnel_full_decision_funnel_integration_and_logic():
 
     assert set(actual["code"]) == {"AAA", "DDD"}
     assert all(actual["ibd_entry_valid"] == True)
+
+
+def test_apply_filters_supports_gt_and_lt_for_quadrants():
+    df = sample_pool_df()
+
+    actual = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5),
+            FilterSpec("ibd_entry_close_position", "<", 0.70),
+        ],
+    )
+
+    assert set(actual["code"]).issubset({"BBB", "CCC"})
+    assert all(actual["ibd_entry_breakout_range_ratio"] < 1.5)
+    assert all(actual["ibd_entry_close_position"] < 0.70)

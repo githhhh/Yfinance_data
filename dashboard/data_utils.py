@@ -183,6 +183,16 @@ def _filter_mask(series: pd.Series, spec: FilterSpec) -> pd.Series:
         return series.isin(_as_list(spec.value)).fillna(False)
     if operator == "not in":
         return (~series.isin(_as_list(spec.value))).fillna(False)
+    if operator in {">", "gt"}:
+        threshold = _coerce_float(spec.value)
+        if threshold is None:
+            return _false_mask_like(series)
+        return pd.to_numeric(series, errors="coerce").gt(threshold).fillna(False)
+    if operator in {"<", "lt"}:
+        threshold = _coerce_float(spec.value)
+        if threshold is None:
+            return _false_mask_like(series)
+        return pd.to_numeric(series, errors="coerce").lt(threshold).fillna(False)
     if operator == ">=":
         threshold = _coerce_float(spec.value)
         if threshold is None:

@@ -187,22 +187,69 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
                 filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
 
             strength_disabled = entry_valid != "Valid only"
-            for field in [
-                "ibd_entry_volume_ratio",
-                "ibd_entry_close_position",
-                "ibd_entry_breakout_range_ratio",
-            ]:
-                spec = _range_filter(df, field, st, key_prefix="entry", disabled=strength_disabled)
-                if spec is not None:
-                    filters_by_group["Entry Confirmation & Strength"].append(spec)
+            spec = _range_filter(df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=strength_disabled)
+            if spec is not None:
+                filters_by_group["Entry Confirmation & Strength"].append(spec)
+
+            quadrant_options = [
+                "All",
+                "Q1: Power Breakout",
+                "Q4: Stealth Move",
+                "Q2: Bull Trap / Rejection",
+                "Q3: Weak Noise",
+            ]
+            quadrant_help = (
+                "**Breakout Quadrants (Range x Close)**\n\n"
+                "• **Q1 Power**: Range >= 1.5x, Close >= 0.70 (Strongest)\n\n"
+                "• **Q4 Stealth**: Range < 1.5x, Close >= 0.70 (Controlled)\n\n"
+                "• **Q2 Trap**: Range >= 1.5x, Close < 0.70 (Rejection)\n\n"
+                "• **Q3 Noise**: Range < 1.5x, Close < 0.70 (Weak)\n\n"
+                "Ranges: Close Position `[0.0, 1.0]`, Range Ratio `> 0`"
+            )
+            quadrant = st.selectbox(
+                "Breakout Quadrant (Range x Close)",
+                quadrant_options,
+                index=0,
+                key="funnel_entry_quadrant",
+                help=quadrant_help,
+                disabled=strength_disabled,
+            )
+            if quadrant.startswith("Q1"):
+                filters_by_group["Entry Confirmation & Strength"].extend(
+                    [
+                        FilterSpec("ibd_entry_breakout_range_ratio", ">=", 1.5, label="Breakout Range Ratio"),
+                        FilterSpec("ibd_entry_close_position", ">=", 0.70, label="Close Position"),
+                    ]
+                )
+            elif quadrant.startswith("Q2"):
+                filters_by_group["Entry Confirmation & Strength"].extend(
+                    [
+                        FilterSpec("ibd_entry_breakout_range_ratio", ">=", 1.5, label="Breakout Range Ratio"),
+                        FilterSpec("ibd_entry_close_position", "<", 0.70, label="Close Position"),
+                    ]
+                )
+            elif quadrant.startswith("Q4"):
+                filters_by_group["Entry Confirmation & Strength"].extend(
+                    [
+                        FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5, label="Breakout Range Ratio"),
+                        FilterSpec("ibd_entry_close_position", ">=", 0.70, label="Close Position"),
+                    ]
+                )
+            elif quadrant.startswith("Q3"):
+                filters_by_group["Entry Confirmation & Strength"].extend(
+                    [
+                        FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5, label="Breakout Range Ratio"),
+                        FilterSpec("ibd_entry_close_position", "<", 0.70, label="Close Position"),
+                    ]
+                )
 
         with cols[2]:
             st.markdown("##### 3. Weekly Vol & Price")
+            bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
+            _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
             spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
             if spec is not None:
                 filters_by_group["Weekly Volume & Price"].append(spec)
-            bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
-            _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
 
         with cols[3]:
             st.markdown("##### 4. Structure")

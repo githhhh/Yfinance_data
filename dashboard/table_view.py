@@ -2,6 +2,62 @@ from __future__ import annotations
 
 import pandas as pd
 
+try:
+    from st_aggrid import JsCode
+
+    HAS_JS_CODE = True
+except ImportError:
+    HAS_JS_CODE = False
+
+
+def _code_renderer_jscode():
+    if not HAS_JS_CODE:
+        return None
+    return JsCode("""
+    class CodeCellRenderer {
+        init(params) {
+            this.params = params;
+            this.eGui = document.createElement('div');
+            this.eGui.style.cssText = 'cursor:pointer; display:flex; align-items:center; justify-content:space-between; width:100%; font-weight:600; color:#1f77b4;';
+            
+            const codeText = params.value || '';
+            this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
+            this.eGui.title = 'Click to copy ' + codeText;
+            
+            this.eGui.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const textToCopy = String(codeText);
+                
+                const ta = document.createElement('textarea');
+                ta.value = textToCopy;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(textToCopy);
+                    }
+                }
+                document.body.removeChild(ta);
+                
+                this.eGui.innerHTML = '<span style="color:#2e7d32;">' + codeText + '</span><span style="font-size:11px; color:#2e7d32; margin-left:4px;">✓ Copied</span>';
+                setTimeout(() => {
+                    if (this.eGui) {
+                        this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
+                    }
+                }, 1500);
+            });
+        }
+        getGui() {
+            return this.eGui;
+        }
+    }
+    """)
+
 
 def build_grid_options(columns: list[str]) -> dict:
     return {
@@ -41,7 +97,7 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> Non
         gridOptions=build_grid_options(display_columns),
         height=height,
         fit_columns_on_grid_load=False,
-        allow_unsafe_jscode=False,
+        allow_unsafe_jscode=HAS_JS_CODE,
         enable_enterprise_modules=False,
         update_mode="NO_UPDATE",
     )
@@ -59,6 +115,8 @@ def _column_def(column: str) -> dict:
     }
     if column == "code":
         definition["pinned"] = "left"
-        definition["minWidth"] = 96
+        definition["minWidth"] = 110
         definition["lockPinned"] = False
+        if HAS_JS_CODE:
+            definition["cellRenderer"] = _code_renderer_jscode()
     return definition

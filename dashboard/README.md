@@ -21,6 +21,7 @@ python -m pytest dashboard/tests -q
 - Custom Filter mode no longer uses presets or a separate Sort Bar. Filters are shown as a trading decision funnel: route, entry confirmation and strength, weekly volume and price, structure, and grouping.
 - Funnel tabs show active condition counts, and the current filters are summarized by funnel stage above the charts.
 - Daily entry strength filters are only enabled when `ibd_entry_valid=True`.
+- Entry Confirmation & Strength combines `ibd_entry_close_position` (`[0.0, 1.0]`, split at `0.70`) and `ibd_entry_breakout_range_ratio` (`> 0`, split at `1.5x`) into a single Breakout Quadrant selector.
 - C Rank Reference mode ignores Custom Filter mode conditions and sorts only by `rank_C_continuous asc` after `signal=True`.
 - C Rank Reference mode displays its fixed rules and formula reference above the table.
 - Result Table defaults to `All Fields`, ordered by business groups, and includes the derived `base_duration_weeks` column.
