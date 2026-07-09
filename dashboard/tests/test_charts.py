@@ -140,6 +140,22 @@ def test_trend_volume_map_only_keeps_valid_ibd_entries():
     assert {"sector", "industry", "dry_status", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}.issubset(action_map.columns)
 
 
+def test_volume_close_matrix_structure():
+    charts = build_chart_data(chart_sample_df())
+    matrix = charts["volume_close_matrix"]
+
+    assert {"code", "ibd_entry_close_position", "volume_ratio"}.issubset(matrix.columns)
+    assert not matrix.empty
+
+
+def test_breakout_quadrant_profile_structure():
+    charts = build_chart_data(chart_sample_df())
+    profile = charts["breakout_quadrant"]
+
+    assert {"quadrant", "count", "share_pct", "tickers"}.issubset(profile.columns)
+    assert len(profile) == 4
+
+
 def test_sector_concentration_counts_current_rows_and_share():
     charts = build_chart_data(chart_sample_df())
     concentration = charts["sector_concentration"].sort_values("sector")

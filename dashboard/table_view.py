@@ -78,6 +78,7 @@ def build_grid_options(columns: list[str]) -> dict:
 def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> None:
     display_columns = [column for column in columns if column in df.columns]
     display_df = df[display_columns].copy() if display_columns else df.copy()
+    display_df.index = range(1, len(display_df) + 1)
 
     for col in display_df.columns:
         if pd.api.types.is_float_dtype(display_df[col]):

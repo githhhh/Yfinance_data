@@ -143,6 +143,8 @@ def build_chart_data(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return {
         "route_quality": _build_route_quality_data(df),
         "trend_volume_map": _build_trend_volume_map_data(df),
+        "volume_close_matrix": _build_volume_close_matrix_data(df),
+        "breakout_quadrant": _build_breakout_quadrant_data(df),
         "sector_concentration": _build_sector_concentration_data(df),
     }
 
@@ -380,6 +382,97 @@ def _build_trend_volume_map_data(df: pd.DataFrame) -> pd.DataFrame:
     )
     working["touched_ema10_jittered"] = working["touched_ema10_count"] + jitter
     return working[columns].copy()
+
+
+def _build_volume_close_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "code",
+        "sector",
+        "industry",
+        "signal_source",
+        "ibd_candidate_rule",
+        "ibd_entry_valid",
+        "entry_status",
+        "volume_ratio",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+    ]
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    available = [c for c in columns if c in df.columns]
+    working = df[available].copy()
+    for column in columns:
+        if column not in working.columns:
+            working[column] = pd.NA
+
+    working["volume_ratio"] = pd.to_numeric(working["volume_ratio"], errors="coerce")
+    working["ibd_entry_close_position"] = pd.to_numeric(working["ibd_entry_close_position"], errors="coerce")
+    working = working.dropna(subset=["volume_ratio", "ibd_entry_close_position"]).copy()
+    if working.empty:
+        return working[columns].copy()
+
+    working["entry_status"] = working["ibd_entry_valid"].map(_entry_status)
+    return working[columns].copy()
+
+
+def _build_breakout_quadrant_data(df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["quadrant", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"]
+    canonical_quadrants = [
+        "Q1 Power",
+        "Q4 Stealth",
+        "Q2 Trap",
+        "Q3 Noise",
+    ]
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    working = df.copy()
+
+    def assign_quadrant(row: pd.Series) -> str:
+        valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+        if valid is not True:
+            return "Unconfirmed Candidate"
+        rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
+        cp = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
+        if pd.isna(rr) or pd.isna(cp):
+            return "Unconfirmed Candidate"
+        if rr >= 1.5 and cp >= 0.70:
+            return "Q1 Power"
+        if rr >= 1.5 and cp < 0.70:
+            return "Q2 Trap"
+        if rr < 1.5 and cp >= 0.70:
+            return "Q4 Stealth"
+        return "Q3 Noise"
+
+    working["quadrant"] = working.apply(assign_quadrant, axis=1)
+    valid_working = working[working["quadrant"].isin(canonical_quadrants)]
+    total_len = len(valid_working)
+
+    records = []
+    for q in canonical_quadrants:
+        sub = valid_working[valid_working["quadrant"] == q]
+        cnt = len(sub)
+        share = round((cnt / total_len) * 100, 2) if total_len > 0 else 0.0
+        code_list = [str(c) for c in sub["code"].dropna().tolist() if str(c).strip()]
+        if len(code_list) > 8:
+            tickers = ", ".join(code_list[:8]) + f" (+{len(code_list) - 8})"
+        else:
+            tickers = ", ".join(code_list) if code_list else "-"
+        med_vr = _median_or_none(sub, "volume_ratio")
+        med_cp = _median_or_none(sub, "ibd_entry_close_position")
+        records.append(
+            {
+                "quadrant": q,
+                "count": cnt,
+                "share_pct": share,
+                "tickers": tickers,
+                "median_vol_ratio": round(med_vr, 2) if med_vr is not None else pd.NA,
+                "median_close_pos": round(med_cp, 2) if med_cp is not None else pd.NA,
+            }
+        )
+
+    return pd.DataFrame(records)[columns]
 
 
 def _build_sector_concentration_data(df: pd.DataFrame) -> pd.DataFrame:

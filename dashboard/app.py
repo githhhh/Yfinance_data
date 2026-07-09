@@ -175,7 +175,9 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
             st.markdown("##### 1. Route")
             candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
             candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
-            if candidate_rule != "All":
+            if candidate_rule == "All":
+                filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
+            else:
                 filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
 
         with cols[1]:
@@ -193,10 +195,10 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
 
             quadrant_options = [
                 "All",
-                "Q1: Power Breakout",
-                "Q4: Stealth Move",
-                "Q2: Bull Trap / Rejection",
-                "Q3: Weak Noise",
+                "Q1 Power",
+                "Q4 Stealth",
+                "Q2 Trap",
+                "Q3 Noise",
             ]
             quadrant_help = (
                 "**Breakout Quadrants (Range x Close)**\n\n"
@@ -245,8 +247,6 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
 
         with cols[2]:
             st.markdown("##### 3. Weekly Vol & Price")
-            bullish = st.selectbox("Is Bullish", ["All", "True", "False"], index=0, key="funnel_weekly_is_bullish")
-            _append_bool_filter(filters_by_group["Weekly Volume & Price"], "is_bullish", bullish)
             spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
             if spec is not None:
                 filters_by_group["Weekly Volume & Price"].append(spec)
@@ -390,36 +390,35 @@ def _render_charts(df: pd.DataFrame) -> None:
             st.plotly_chart(fig, use_container_width=True)
 
     with col3:
-        action_map = charts["trend_volume_map"]
-        if action_map.empty:
-            st.info("No rows for Trend × Volume Map [Valid Only].")
+        quad_df = charts["breakout_quadrant"]
+        if quad_df.empty:
+            st.info("No rows for Breakout Quadrants.")
         else:
-            fig = px.scatter(
-                action_map,
-                x="touched_ema10_jittered",
-                y="volume_ratio",
-                color="ibd_candidate_rule",
-                symbol="ibd_candidate_rule",
-                hover_data=[
-                    "code",
-                    "sector",
-                    "industry",
-                    "signal_source",
-                    "ibd_candidate_rule",
-                    "dry_status",
-                    "touched_ema10_count",
-                    "ibd_entry_volume_ratio",
-                    "ibd_entry_close_position",
-                ],
-                title="Trend × Volume Map [Valid Only]",
+            fig = px.bar(
+                quad_df,
+                x="count",
+                y="quadrant",
+                orientation="h",
+                color="count",
+                color_continuous_scale="Blues",
+                text="count",
+                hover_data={
+                    "quadrant": True,
+                    "count": True,
+                    "share_pct": ":.2f",
+                    "tickers": True,
+                    "median_vol_ratio": ":.2f",
+                    "median_close_pos": ":.2f",
+                },
+                title="Breakout Quadrants (Range × Close) [Valid Only]",
                 height=240,
             )
-            fig.add_hline(y=1.3, line_dash="dot", line_color="#546E7A")
             fig.update_layout(
-                margin={"l": 8, "r": 8, "t": 36, "b": 24},
-                legend={"orientation": "h", "y": -0.2},
-                xaxis={"title": "Trend Maturity (10W EMA Touch Count)"},
-                yaxis={"title": "Current Volume Ratio"},
+                margin={"l": 8, "r": 8, "t": 36, "b": 16},
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"autorange": "reversed"},
+                coloraxis_showscale=False,
             )
             st.plotly_chart(fig, use_container_width=True)
 

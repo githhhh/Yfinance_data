@@ -136,3 +136,20 @@ def test_grid_options_pin_code_left_and_keep_table_capabilities():
     assert options["defaultColDef"]["sortable"] is True
     assert options["defaultColDef"]["resizable"] is True
     assert options["enableRangeSelection"] is True
+
+
+def test_render_table_sets_one_based_sequential_index(monkeypatch):
+    import pandas as pd
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_dataframe(df, **kwargs):
+        captured["df"] = df
+
+    monkeypatch.setattr("streamlit.dataframe", mock_dataframe)
+
+    df = pd.DataFrame({"code": ["AAA", "BBB"], "val": [1, 2]}, index=[35, 8])
+    render_table(df, ["code", "val"])
+
+    assert captured["df"].index.tolist() == [1, 2]

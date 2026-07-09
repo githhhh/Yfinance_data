@@ -87,3 +87,10 @@ def test_csv_cache_fingerprint_changes_when_same_path_is_rewritten(tmp_path):
     second = _csv_cache_fingerprint(str(csv_path))
 
     assert second != first
+
+
+def test_route_funnel_defaults_to_active_signals():
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+
+    assert '"All Pool Records"' not in source
+    assert 'FilterSpec("signal", "is true", label="Signal")' in source

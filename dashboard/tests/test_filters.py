@@ -316,3 +316,12 @@ def test_apply_filters_supports_gt_and_lt_for_quadrants():
     assert set(actual["code"]).issubset({"BBB", "CCC"})
     assert all(actual["ibd_entry_breakout_range_ratio"] < 1.5)
     assert all(actual["ibd_entry_close_position"] < 0.70)
+
+
+def test_funnel_stage1_default_all_filters_signal_true():
+    df = sample_pool_df()
+
+    actual = apply_filters(df, [FilterSpec("signal", "is true", label="Signal")])
+
+    assert set(actual["code"]) == {"AAA", "BBB", "DDD"}
+    assert "CCC" not in actual["code"].values
