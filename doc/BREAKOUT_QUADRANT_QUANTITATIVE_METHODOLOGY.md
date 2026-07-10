@@ -38,7 +38,7 @@
 | **视觉形状穿透比** | $\text{range\_ratio}_{log} = \frac{\ln(\text{Close} / \text{trigger})}{\ln(\text{High} / \text{Low})}$ | 突破区段占当日图表 K 线整根高度的视觉百分比。 |
 | **对数常态波动标尺** | $\text{ATR}_{log} = \text{SMA}\!\left(\ln\!\left(\frac{\text{High}}{\text{Low}}\right), 20\right)$ | 该股票过去 20 个交易日中，一根“正常标准 K 线”的视觉高度。 |
 
-#### 核心升级：新增“绝对视觉推进力度”字段 `breakout_strength`
+#### 核心升级：评估是否新增“绝对视觉推进力度”字段 `breakout_strength`
 
 将突破评价由单一形状拆解为**“形状形态” + “绝对强度”**两个独立维度：
 
@@ -48,8 +48,17 @@ $$\text{breakout\_strength} = \frac{\ln(\text{Close} / \text{trigger})}{\text{AT
 > - `breakout_strength = 2.0` 代表：收盘价穿透阻力线的实际视觉距离，相当于这只股票**平时两根标准日 K 线的总高度**。
 > - 它完全剔除了分母受当日意外上下影线变动的噪声干扰，真正让“不同标价、不同常规波动率”的股票在突破力度上完全横向平权。
 
+#### 字段落地边界（讨论确认）
+
+本议题的目标是判断字段必要性，不是把所有中间计算量都直接加入 `breakout_follow_pool.csv`：
+
+- **保留现有基础字段**：`ibd_entry_close_position` 与 `ibd_entry_breakout_range_ratio` 继续作为 K 线形态比例与 5 类模型判断的基础字段。
+- **不默认新增中间诊断字段**：`range_ratio_log` 与 `ATR_log_20` 主要服务于内部计算和公式解释，除非后续存在明确审计或前台展示需求，否则不建议进入 pool。
+- **只优先评估一个核心字段**：若要补足“绝对推进力度”语义，优先新增 `ibd_entry_breakout_strength`。它是可直接筛选的原子决策字段，语义为“收盘价穿透 trigger 的对数距离，相当于过去 20 日常态 K 线高度的倍数”。
+- **旧字段不替换**：`ibd_entry_close_vs_trigger_pct` 仍保留为简单百分比诊断字段；`ibd_entry_breakout_strength` 若落地，是对其做波动率标准化补充，而不是替代现有字段。
+
 #### 建议落地组合体系
-- **形态判定 (Shape)**：用 `pos >= 0.70` + `range_ratio_log >= 0.4` 保障 K 线阳线结构结实、突破占比充实；
+- **形态判定 (Shape)**：继续优先使用现有 `pos` + `range_ratio` 基础字段，避免为展示分类重复存储派生标签；
 - **力度判定 (Intensity)**：用 **`breakout_strength >= 1.5`** 确保实际过顶空间不仅是一层薄纸，而是真实的放量实质性跨离。
 
 ---
@@ -106,21 +115,35 @@ range_ratio = 0.0  │   Q3: Noise     │   Q4: Stealth
 - **Q4 Stealth** (`0.0 <= range_ratio < 1.0`, `pos >= 0.70`)：映射 **有效非跳空盘中突破**。
   - *配合建议*：在该象限中，建议再增加前述讨论的 **`breakout_strength >= 1.0~1.5`** 门槛，把刚蹭破阻力皮毛（Marginal）的噪音直接滤除。
 
-#### 方案 B（终极精准版）：用“标准 5 大模型枚举”替代传统四象限 UI
-直接在 Dashboard 与数据产出引擎中，将“四象限”重构为**基于白皮书物理模型的 5 态分类字段 (`breakout_pattern`)**：
+#### 方案 B（推荐精准版）：用“标准 5 大模型派生视图”替代传统四象限 UI
+不新增 `breakout_pattern` 存储字段，而是在 Dashboard 层基于现有两个基础字段实时派生 5 态分类筛选条件：
 1. `GAP_UP`（跳空高开强攻）
 2. `SOLID_BREAKOUT`（长阳实破）
 3. `MODERATE_BREAKOUT`（稳健中破）
 4. `MARGINAL_BREAKOUT`（弱势边破）
 5. `BULL_TRAP`（冲高反落诱多）
 
-让量化分析和前台 UI 筛选完全统一在**物理直觉精准、边界清晰一致**的 5 大模型规范之上。
+派生规则直接复用白皮书基础字段口径：
+
+| Dashboard 选项 | 派生过滤条件 | 说明 |
+| :--- | :--- | :--- |
+| `GAP_UP` | `range_ratio > 1.0 AND pos >= 0.5` | 跳空越过阻力且收在中高位。 |
+| `SOLID_BREAKOUT` | `0.4 <= range_ratio <= 1.0 AND pos >= 0.7` | 突破占比充实，收盘强势。 |
+| `MODERATE_BREAKOUT` | `0.15 <= range_ratio < 0.4 AND pos >= 0.5` | 标准有效穿透，尾盘稳固。 |
+| `MARGINAL_BREAKOUT` | `0.0 <= range_ratio < 0.15 AND pos >= 0.5` | 仅轻微越过阻力，质量偏弱。 |
+| `BULL_TRAP` | `pos < 0.5` | 冲高回落，收在 K 线下半区。 |
+
+此方案保留 `ibd_entry_close_position` 与 `ibd_entry_breakout_range_ratio` 作为唯一真实数据字段，避免在 pool 中持久化可由基础字段确定性计算出的派生枚举。Dashboard 可以将现有 `Breakout Quadrant` 控件替换为 `Breakout Pattern` 控件，但底层仍生成字段组合过滤条件。
 
 ---
 
 ## 议题三：多维特征扩充与仪表盘筛选能力赋能（EPS 业绩与 52 周新高指标）
 
-为了将 Dashboard 仪表盘从单纯的“K 线几何形态观察器”跃升为真正的 **“量化 CANSLIM 机构牛股发现引擎”**，针对突破池缺失的 **EPS 业绩** 与 **52 周新高** 维度，结合现有工程架构（[stage2_screener.py](file:///Users/dev/Documents/Yfinance_data/stage2_screener.py) 与 [52_wk_new_high_screener.py](file:///Users/dev/Documents/Yfinance_data/52_wk_new_high_screener.py)）展开升级架构评估：
+为了将 Dashboard 仪表盘从单纯的“K 线几何形态观察器”跃升为真正的 **“量化 CANSLIM 机构牛股发现引擎”**，针对突破池缺失的 **EPS 业绩** 与 **52 周新高** 维度，结合现有工程架构（[stage2_screener.py](file:///Users/dev/Documents/Yfinance_data/stage2_screener.py) 与 [52_wk_new_high_screener.py](file:///Users/dev/Documents/Yfinance_data/52_wk_new_high_screener.py)）展开升级架构评估。
+
+本议题只补齐 pool 尚缺失的决策元数据。当前 `breakout_follow_pool.csv` 已具备：
+- **行业字段**：`sector` / `industry` 已由 `quant_trade/yfinance_data.load_industry_lookup()` 以 `stage2_whitelist.csv` 为最高优先级注入 pool。
+- **周线量比字段**：`volume_ratio` 已在 pool 中表达当前周线相对成交量，不属于本次新增字段范围。
 
 ### 1. `52wk_new_high_results.csv` 的现行作用与进阶协同
 
@@ -141,12 +164,15 @@ range_ratio = 0.0  │   Q3: Noise     │   Q4: Stealth
 - `price_52_week_high`（最近 52 周最高价）
 
 #### 字典表复用升级：统一“行业 + EPS + 52W 位置字典”
-目前的 [stage2_screener_filter.csv](file:///Users/dev/Documents/Yfinance_data/us/stage2/stage2_screener_filter.csv) / `stage2_whitelist.csv` 除了作为下游的标的白名单与行业分类映射字典，通过字段扩充后，将**直接进化为全栈共享的元数据查询字典 (Metadata Dictionary)**：
+目前的 `stage2_whitelist.csv` 已经是行业分类映射的最高优先级来源。通过字段扩充后，它应进一步演进为全栈共享的元数据查询字典 (Metadata Dictionary)：
 - **上游源头一步到位**：Screener 查询阶段通过 TradingView 服务端即时返回全量标的的 EPS 增速与 52 周高点，无耗时；
 - **下游策略无缝注入**：`breakout_follow` 在生成最终输出快照池 `breakout_follow_pool.csv` 时，基于 `code` 做内存 Left Join，自动附加：
   - `eps_yoy_growth`
+  - `price_52_week_high`
   - `dist_to_52w_high_pct = (Close - price_52_week_high) / price_52_week_high`
   - `is_52w_new_high = (Close >= price_52_week_high)`
+- **补充数据源只做兜底**：`eps_growth_screener_results.csv`、`52wk_new_high_results.csv`、`weekly_vol_screener_results.csv` 可继续作为补充 lookup 来源，但不应覆盖 `stage2_whitelist.csv` 中同 code 的权威元数据。
+- **不重复写入已有字段**：`sector`、`industry`、`volume_ratio` 已在 pool 中存在，本次不重新定义字段口径。
 
 ---
 
@@ -166,4 +192,3 @@ range_ratio = 0.0  │   Q3: Noise     │   Q4: Stealth
 
 - **高预期选股直觉验证**：  
   用户可在仪表盘一键筛选出：**“处在 Stage 2 长牛通道中 + 最新季 EPS 增速 ≥ 25% + 处于 52 周新高阻力真空区 + 当日呈现突破绝对视觉强度 ≥ 1.5 倍 ATR 的实质长阳标的”**，从机制上将技术面形态与企业基本面景气度完美共振。
-
