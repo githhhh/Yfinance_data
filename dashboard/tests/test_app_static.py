@@ -94,3 +94,10 @@ def test_route_funnel_defaults_to_active_signals():
 
     assert '"All Pool Records"' not in source
     assert 'FilterSpec("signal", "is true", label="Signal")' in source
+
+
+def test_breakout_pattern_help_matches_classifier_precedence():
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+
+    assert "MODERATE_BREAKOUT**: Range Ratio >= 0.15 after excluding Bull Trap, Gap Up, and Solid Breakout" in source
+    assert "MODERATE_BREAKOUT**: 0.15 <= Range Ratio < 0.40" not in source

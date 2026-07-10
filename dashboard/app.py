@@ -205,7 +205,7 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
                 "**Breakout Patterns (Range x Close)**\n\n"
                 "• **GAP_UP**: Range Ratio > 1.0, Close Position >= 0.50\n\n"
                 "• **SOLID_BREAKOUT**: 0.40 <= Range Ratio <= 1.0, Close Position >= 0.70\n\n"
-                "• **MODERATE_BREAKOUT**: 0.15 <= Range Ratio < 0.40, Close Position >= 0.50\n\n"
+                "• **MODERATE_BREAKOUT**: Range Ratio >= 0.15 after excluding Bull Trap, Gap Up, and Solid Breakout\n\n"
                 "• **MARGINAL_BREAKOUT**: 0.00 <= Range Ratio < 0.15, Close Position >= 0.50\n\n"
                 "• **BULL_TRAP**: Close Position < 0.50"
             )
