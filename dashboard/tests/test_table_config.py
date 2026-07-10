@@ -61,6 +61,10 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "snapshot_date",
         "sector",
         "industry",
+        "eps_yoy_growth",
+        "price_52_week_high",
+        "dist_to_52w_high_pct",
+        "is_52w_new_high",
         "signal",
         "signal_source",
         "ibd_candidate_rule",
@@ -140,6 +144,7 @@ def test_grid_options_pin_code_left_and_keep_table_capabilities():
 
 def test_render_table_sets_one_based_sequential_index(monkeypatch):
     import pandas as pd
+    import sys
     from dashboard.table_view import render_table
 
     captured = {}
@@ -148,6 +153,7 @@ def test_render_table_sets_one_based_sequential_index(monkeypatch):
         captured["df"] = df
 
     monkeypatch.setattr("streamlit.dataframe", mock_dataframe)
+    monkeypatch.setitem(sys.modules, "st_aggrid", None)
 
     df = pd.DataFrame({"code": ["AAA", "BBB"], "val": [1, 2]}, index=[35, 8])
     render_table(df, ["code", "val"])

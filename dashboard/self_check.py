@@ -38,6 +38,7 @@ def main() -> int:
         ("sort specs", _check_sort_specs),
         ("chart: Route Quality aggregation", _check_route_quality_chart),
         ("chart: Trend Volume Map row source", _check_trend_volume_map_chart),
+        ("chart: Breakout Pattern aggregation", _check_breakout_pattern_chart),
         ("chart: Sector Concentration aggregation", _check_sector_concentration_chart),
         ("mode isolation", _check_mode_isolation),
     ]
@@ -160,6 +161,19 @@ def _check_trend_volume_map_chart(df: pd.DataFrame) -> None:
         assert all(chart["entry_status"] == "IBD valid")
     required = {"entry_status", "dry_status", "sector", "industry", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}
     assert required.issubset(chart.columns)
+
+
+def _check_breakout_pattern_chart(df: pd.DataFrame) -> None:
+    chart = build_chart_data(df)["breakout_pattern"]
+    expected_patterns = {
+        "GAP_UP",
+        "SOLID_BREAKOUT",
+        "MODERATE_BREAKOUT",
+        "MARGINAL_BREAKOUT",
+        "BULL_TRAP",
+    }
+    assert set(chart["pattern"]) == expected_patterns
+    assert {"pattern", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"}.issubset(chart.columns)
 
 
 def _check_sector_concentration_chart(df: pd.DataFrame) -> None:

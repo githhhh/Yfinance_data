@@ -11,6 +11,7 @@ BOOLEAN_FIELDS = {
     "ibd_entry_valid",
     "is_bullish",
     "is_priority",
+    "is_52w_new_high",
 }
 
 DATE_FIELDS = {
@@ -43,6 +44,9 @@ NUMBER_FIELDS = {
     "pullback_count",
     "pullback_pct",
     "pullback_pct_off_peak",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
 }
 
 FILTER_FUNNEL_GROUPS = OrderedDict(
@@ -68,6 +72,10 @@ ALL_TABLE_COLUMNS = [
     "snapshot_date",
     "sector",
     "industry",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "is_52w_new_high",
     "signal",
     "signal_source",
     "ibd_candidate_rule",
@@ -165,6 +173,10 @@ GROUPING_COLUMNS = [
     "code",
     "sector",
     "industry",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "is_52w_new_high",
 ]
 
 REFERENCE_COLUMNS = [
@@ -276,6 +288,18 @@ FIELD_CONFIG = OrderedDict(
                 help_text="Breakout bar price range relative to typical volatility.",
             ),
         ),
+        (
+            "breakout_pattern",
+            _field(
+                "Breakout Pattern",
+                "category",
+                "IBD Entry",
+                filterable=False,
+                sortable=False,
+                default_table=False,
+                advanced_filter=False,
+            ),
+        ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
         (
             "ibd_entry_reject_reason",
@@ -343,6 +367,10 @@ FIELD_CONFIG = OrderedDict(
         ),
         ("sector", _field("Sector", "category", "Grouping", default_table=True)),
         ("industry", _field("Industry", "category", "Grouping", default_table=True)),
+        ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
+        ("price_52_week_high", _field("Price 52 Week High", "number", "Grouping", default_table=True, fmt="0.00")),
+        ("dist_to_52w_high_pct", _field("Distance To 52W High", "number", "Grouping", default_table=True, fmt="0.0%")),
+        ("is_52w_new_high", _field("Is 52W New High", "boolean", "Grouping", default_table=True)),
     ]
 )
 

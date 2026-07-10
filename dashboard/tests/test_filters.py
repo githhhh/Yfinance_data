@@ -132,6 +132,21 @@ def test_normalize_pool_df_adds_base_duration_weeks_from_ceiling_to_breakout_dat
     assert pd.isna(df.loc[1, "base_duration_weeks"])
 
 
+def test_normalize_pool_df_adds_breakout_pattern_for_dashboard_filtering():
+    df = normalize_pool_df(
+        pd.DataFrame(
+            [
+                {"code": "AAA", "ibd_entry_valid": "1", "ibd_entry_close_position": "0.60", "ibd_entry_breakout_range_ratio": "0.60"},
+                {"code": "BBB", "ibd_entry_valid": "1", "ibd_entry_close_position": "0.80", "ibd_entry_breakout_range_ratio": "0.60"},
+            ]
+        )
+    )
+
+    assert df["breakout_pattern"].tolist() == ["MODERATE_BREAKOUT", "SOLID_BREAKOUT"]
+    actual = apply_filters(df, [FilterSpec("breakout_pattern", "equals", "MODERATE_BREAKOUT")])
+    assert actual["code"].tolist() == ["AAA"]
+
+
 def test_all_enabled_filters_are_combined_with_and_logic():
     df = sample_pool_df()
     filters = [
@@ -302,20 +317,51 @@ def test_funnel_full_decision_funnel_integration_and_logic():
     assert all(actual["ibd_entry_valid"] == True)
 
 
-def test_apply_filters_supports_gt_and_lt_for_quadrants():
+def test_apply_filters_supports_breakout_pattern_boundaries():
     df = sample_pool_df()
 
-    actual = apply_filters(
+    gap_up = apply_filters(
         df,
         [
-            FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5),
-            FilterSpec("ibd_entry_close_position", "<", 0.70),
+            FilterSpec("ibd_entry_breakout_range_ratio", ">", 1.0),
+            FilterSpec("ibd_entry_close_position", ">=", 0.5),
+        ],
+    )
+    solid = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_breakout_range_ratio", "between", 0.4, 1.0),
+            FilterSpec("ibd_entry_close_position", ">=", 0.7),
+        ],
+    )
+    moderate = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_breakout_range_ratio", ">=", 0.15),
+            FilterSpec("ibd_entry_breakout_range_ratio", "<", 0.4),
+            FilterSpec("ibd_entry_close_position", ">=", 0.5),
+        ],
+    )
+    marginal = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_breakout_range_ratio", ">=", 0.0),
+            FilterSpec("ibd_entry_breakout_range_ratio", "<", 0.15),
+            FilterSpec("ibd_entry_close_position", ">=", 0.5),
+        ],
+    )
+    bull_trap = apply_filters(
+        df,
+        [
+            FilterSpec("ibd_entry_close_position", "<", 0.5),
         ],
     )
 
-    assert set(actual["code"]).issubset({"BBB", "CCC"})
-    assert all(actual["ibd_entry_breakout_range_ratio"] < 1.5)
-    assert all(actual["ibd_entry_close_position"] < 0.70)
+    assert gap_up["code"].tolist() == ["AAA", "DDD"]
+    assert solid.empty
+    assert moderate.empty
+    assert marginal.empty
+    assert bull_trap["code"].tolist() == ["BBB"]
 
 
 def test_funnel_stage1_default_all_filters_signal_true():

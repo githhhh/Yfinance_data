@@ -193,55 +193,34 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
             if spec is not None:
                 filters_by_group["Entry Confirmation & Strength"].append(spec)
 
-            quadrant_options = [
+            pattern_options = [
                 "All",
-                "Q1 Power",
-                "Q4 Stealth",
-                "Q2 Trap",
-                "Q3 Noise",
+                "GAP_UP",
+                "SOLID_BREAKOUT",
+                "MODERATE_BREAKOUT",
+                "MARGINAL_BREAKOUT",
+                "BULL_TRAP",
             ]
-            quadrant_help = (
-                "**Breakout Quadrants (Range x Close)**\n\n"
-                "• **Q1 Power**: Range >= 1.5x, Close >= 0.70 (Strongest)\n\n"
-                "• **Q4 Stealth**: Range < 1.5x, Close >= 0.70 (Controlled)\n\n"
-                "• **Q2 Trap**: Range >= 1.5x, Close < 0.70 (Rejection)\n\n"
-                "• **Q3 Noise**: Range < 1.5x, Close < 0.70 (Weak)\n\n"
-                "Ranges: Close Position `[0.0, 1.0]`, Range Ratio `> 0`"
+            pattern_help = (
+                "**Breakout Patterns (Range x Close)**\n\n"
+                "• **GAP_UP**: Range Ratio > 1.0, Close Position >= 0.50\n\n"
+                "• **SOLID_BREAKOUT**: 0.40 <= Range Ratio <= 1.0, Close Position >= 0.70\n\n"
+                "• **MODERATE_BREAKOUT**: 0.15 <= Range Ratio < 0.40, Close Position >= 0.50\n\n"
+                "• **MARGINAL_BREAKOUT**: 0.00 <= Range Ratio < 0.15, Close Position >= 0.50\n\n"
+                "• **BULL_TRAP**: Close Position < 0.50"
             )
-            quadrant = st.selectbox(
-                "Breakout Quadrant (Range x Close)",
-                quadrant_options,
+            pattern = st.selectbox(
+                "Breakout Pattern (Range x Close)",
+                pattern_options,
                 index=0,
-                key="funnel_entry_quadrant",
-                help=quadrant_help,
+                key="funnel_entry_pattern",
+                help=pattern_help,
                 disabled=strength_disabled,
             )
-            if quadrant.startswith("Q1"):
+            if not strength_disabled and pattern != "All":
                 filters_by_group["Entry Confirmation & Strength"].extend(
                     [
-                        FilterSpec("ibd_entry_breakout_range_ratio", ">=", 1.5, label="Breakout Range Ratio"),
-                        FilterSpec("ibd_entry_close_position", ">=", 0.70, label="Close Position"),
-                    ]
-                )
-            elif quadrant.startswith("Q2"):
-                filters_by_group["Entry Confirmation & Strength"].extend(
-                    [
-                        FilterSpec("ibd_entry_breakout_range_ratio", ">=", 1.5, label="Breakout Range Ratio"),
-                        FilterSpec("ibd_entry_close_position", "<", 0.70, label="Close Position"),
-                    ]
-                )
-            elif quadrant.startswith("Q4"):
-                filters_by_group["Entry Confirmation & Strength"].extend(
-                    [
-                        FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5, label="Breakout Range Ratio"),
-                        FilterSpec("ibd_entry_close_position", ">=", 0.70, label="Close Position"),
-                    ]
-                )
-            elif quadrant.startswith("Q3"):
-                filters_by_group["Entry Confirmation & Strength"].extend(
-                    [
-                        FilterSpec("ibd_entry_breakout_range_ratio", "<", 1.5, label="Breakout Range Ratio"),
-                        FilterSpec("ibd_entry_close_position", "<", 0.70, label="Close Position"),
+                        FilterSpec("breakout_pattern", "equals", pattern, label="Breakout Pattern"),
                     ]
                 )
 
@@ -390,27 +369,27 @@ def _render_charts(df: pd.DataFrame) -> None:
             st.plotly_chart(fig, use_container_width=True)
 
     with col3:
-        quad_df = charts["breakout_quadrant"]
-        if quad_df.empty:
-            st.info("No rows for Breakout Quadrants.")
+        pattern_df = charts["breakout_pattern"]
+        if pattern_df.empty:
+            st.info("No rows for Breakout Pattern.")
         else:
             fig = px.bar(
-                quad_df,
+                pattern_df,
                 x="count",
-                y="quadrant",
+                y="pattern",
                 orientation="h",
                 color="count",
                 color_continuous_scale="Blues",
                 text="count",
                 hover_data={
-                    "quadrant": True,
+                    "pattern": True,
                     "count": True,
                     "share_pct": ":.2f",
                     "tickers": True,
                     "median_vol_ratio": ":.2f",
                     "median_close_pos": ":.2f",
                 },
-                title="Breakout Quadrants (Range × Close) [Valid Only]",
+                title="Breakout Pattern (Range × Close) [Valid Only]",
                 height=240,
             )
             fig.update_layout(

@@ -8,12 +8,12 @@ def chart_sample_df() -> pd.DataFrame:
         pd.DataFrame(
             [
                 {
-                    "code": "AAA",
+                    "code": "GAP",
                     "signal_source": "pivot",
                     "ibd_candidate_rule": "pivot",
                     "ibd_entry_valid": True,
                     "ibd_entry_volume_ratio": 2.0,
-                    "ibd_entry_close_position": 0.80,
+                    "ibd_entry_close_position": 0.60,
                     "ibd_entry_breakout_range_ratio": 1.20,
                     "ibd_entry_price": 10.0,
                     "pct_above_ceiling": 4.0,
@@ -25,10 +25,27 @@ def chart_sample_df() -> pd.DataFrame:
                     "industry": "Software",
                 },
                 {
-                    "code": "BBB",
+                    "code": "SOLID",
                     "signal_source": "pivot",
                     "ibd_candidate_rule": "pivot",
-                    "ibd_entry_valid": False,
+                    "ibd_entry_valid": True,
+                    "ibd_entry_volume_ratio": 2.0,
+                    "ibd_entry_close_position": 0.80,
+                    "ibd_entry_breakout_range_ratio": 0.60,
+                    "ibd_entry_price": 10.0,
+                    "pct_above_ceiling": 4.0,
+                    "volume_ratio": 1.4,
+                    "touched_ema10_count": 2,
+                    "pullback_pct_off_peak": -3.0,
+                    "pullback_v_is_dry": True,
+                    "sector": "Technology Services",
+                    "industry": "Software",
+                },
+                {
+                    "code": "TRAP",
+                    "signal_source": "pivot",
+                    "ibd_candidate_rule": "pivot",
+                    "ibd_entry_valid": True,
                     "ibd_entry_volume_ratio": 3.0,
                     "ibd_entry_close_position": 0.40,
                     "ibd_entry_breakout_range_ratio": 0.60,
@@ -42,13 +59,13 @@ def chart_sample_df() -> pd.DataFrame:
                     "industry": "Software",
                 },
                 {
-                    "code": "CCC",
+                    "code": "MOD",
                     "signal_source": "ceiling_breakout",
                     "ibd_candidate_rule": "ceiling_pullback",
                     "ibd_entry_valid": True,
                     "ibd_entry_volume_ratio": 4.0,
-                    "ibd_entry_close_position": 0.90,
-                    "ibd_entry_breakout_range_ratio": 1.50,
+                    "ibd_entry_close_position": 0.70,
+                    "ibd_entry_breakout_range_ratio": 0.20,
                     "ibd_entry_price": 14.0,
                     "pct_above_ceiling": 2.0,
                     "volume_ratio": 2.2,
@@ -59,7 +76,24 @@ def chart_sample_df() -> pd.DataFrame:
                     "industry": "Regional Banks",
                 },
                 {
-                    "code": "DDD",
+                    "code": "MARG",
+                    "signal_source": "ceiling_breakout",
+                    "ibd_candidate_rule": "ceiling",
+                    "ibd_entry_valid": True,
+                    "ibd_entry_volume_ratio": 1.7,
+                    "ibd_entry_close_position": 0.55,
+                    "ibd_entry_breakout_range_ratio": 0.08,
+                    "ibd_entry_price": 15.0,
+                    "pct_above_ceiling": 1.5,
+                    "volume_ratio": 1.1,
+                    "touched_ema10_count": 3,
+                    "pullback_pct_off_peak": 7.0,
+                    "pullback_v_is_dry": None,
+                    "sector": "Finance",
+                    "industry": "Regional Banks",
+                },
+                {
+                    "code": "PEND",
                     "signal_source": "ceiling_breakout",
                     "ibd_candidate_rule": "ceiling",
                     "ibd_entry_valid": None,
@@ -85,9 +119,9 @@ def test_route_quality_groups_by_candidate_rule():
     route = charts["route_quality"].sort_values("ibd_candidate_rule")
 
     assert route["ibd_candidate_rule"].tolist() == ["ceiling", "ceiling_pullback", "pivot"]
-    assert route["total_count"].tolist() == [1, 1, 2]
-    assert route["valid_count"].tolist() == [0, 1, 1]
-    assert route["valid_rate_pct"].tolist() == [0.0, 100.0, 50.0]
+    assert route["total_count"].tolist() == [2, 1, 3]
+    assert route["valid_count"].tolist() == [1, 1, 3]
+    assert route["valid_rate_pct"].tolist() == [50.0, 100.0, 100.0]
     assert "median_ibd_entry_close_position" in route.columns
     assert "median_volume_ratio" in route.columns
     assert "median_ibd_entry_breakout_range_ratio" in route.columns
@@ -135,8 +169,8 @@ def test_trend_volume_map_only_keeps_valid_ibd_entries():
     charts = build_chart_data(chart_sample_df())
     action_map = charts["trend_volume_map"]
 
-    assert action_map["code"].tolist() == ["AAA", "CCC"]
-    assert action_map.loc[action_map["code"].eq("AAA"), "entry_status"].item() == "IBD valid"
+    assert action_map["code"].tolist() == ["GAP", "SOLID", "TRAP", "MOD", "MARG"]
+    assert action_map.loc[action_map["code"].eq("GAP"), "entry_status"].item() == "IBD valid"
     assert {"sector", "industry", "dry_status", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}.issubset(action_map.columns)
 
 
@@ -148,12 +182,19 @@ def test_volume_close_matrix_structure():
     assert not matrix.empty
 
 
-def test_breakout_quadrant_profile_structure():
+def test_breakout_pattern_profile_structure():
     charts = build_chart_data(chart_sample_df())
-    profile = charts["breakout_quadrant"]
+    profile = charts["breakout_pattern"]
 
-    assert {"quadrant", "count", "share_pct", "tickers"}.issubset(profile.columns)
-    assert len(profile) == 4
+    assert {"pattern", "count", "share_pct", "tickers"}.issubset(profile.columns)
+    assert profile["pattern"].tolist() == [
+        "GAP_UP",
+        "SOLID_BREAKOUT",
+        "MODERATE_BREAKOUT",
+        "MARGINAL_BREAKOUT",
+        "BULL_TRAP",
+    ]
+    assert profile["count"].tolist() == [1, 1, 1, 1, 1]
 
 
 def test_sector_concentration_counts_current_rows_and_share():
@@ -161,7 +202,7 @@ def test_sector_concentration_counts_current_rows_and_share():
     concentration = charts["sector_concentration"].sort_values("sector")
 
     assert concentration["sector"].tolist() == ["Finance", "Technology Services"]
-    assert concentration["row_count"].tolist() == [2, 2]
+    assert concentration["row_count"].tolist() == [3, 3]
     assert concentration["share_pct"].tolist() == [50.0, 50.0]
 
 
@@ -169,7 +210,7 @@ def test_kpis_are_based_on_filtered_dataframe_only():
     kpis = build_kpis(chart_sample_df().iloc[:3])
 
     assert kpis["filtered_rows"] == 3
-    assert kpis["ibd_valid_rate_pct"] == round(2 / 3 * 100, 2)
-    assert kpis["median_ibd_entry_volume_ratio"] == 3.0
-    assert kpis["median_ibd_entry_close_position"] == 0.80
-    assert kpis["median_ibd_entry_breakout_range_ratio_valid"] == 1.35
+    assert kpis["ibd_valid_rate_pct"] == 100.0
+    assert kpis["median_ibd_entry_volume_ratio"] == 2.0
+    assert kpis["median_ibd_entry_close_position"] == 0.60
+    assert kpis["median_ibd_entry_breakout_range_ratio_valid"] == 0.60

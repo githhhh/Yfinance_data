@@ -56,7 +56,10 @@ def _query_stage2(output_file, verbose):
         print("[Stage2] Pass 1: Stage2 主体 (普通股+ADR)...")
     count_main, df_main = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry')
+        .select(
+            'name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry',
+            'earnings_per_share_diluted_yoy_growth_fq', 'price_52_week_high',
+        )
         .where(
             *COMMON_FILTERS,
             col('type').isin(['stock', 'dr']),
@@ -77,7 +80,10 @@ def _query_stage2(output_file, verbose):
         print("[Stage2] Pass 2: 次新股豁免...")
     count_ipo, df_ipo = (
         Query()
-        .select('name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry')
+        .select(
+            'name', 'close', 'SMA10|1W', 'SMA40|1W', 'sector', 'industry',
+            'earnings_per_share_diluted_yoy_growth_fq', 'price_52_week_high',
+        )
         .where(
             *COMMON_FILTERS,
             col('type').isin(['stock', 'dr']),
@@ -103,8 +109,12 @@ def _query_stage2(output_file, verbose):
         _delete_old_whitelist(output_file)
         return 0, df_all, []
 
-    if 'name' in df_all.columns:
-        df_all = df_all.rename(columns={'name': 'code'})
+    df_all = df_all.rename(
+        columns={
+            'name': 'code',
+            'earnings_per_share_diluted_yoy_growth_fq': 'eps_yoy_growth',
+        }
+    )
 
     # 去重 (Pass 1/2 天然互斥，但防御性去重)
     df_all = df_all.drop_duplicates(subset='code', keep='first')

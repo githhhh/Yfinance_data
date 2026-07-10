@@ -59,6 +59,9 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
         duration_days = (result["breakout_date"] - result["ceiling_date"]).dt.days
         result["base_duration_weeks"] = (duration_days / 7).round()
 
+    if {"ibd_entry_valid", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio"}.issubset(result.columns):
+        result["breakout_pattern"] = result.apply(_classify_breakout_pattern, axis=1)
+
     for column in result.columns:
         if column not in BOOLEAN_FIELDS and column not in NUMBER_FIELDS and column not in DATE_FIELDS:
             result[column] = result[column].replace("", pd.NA)
@@ -144,7 +147,7 @@ def build_chart_data(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "route_quality": _build_route_quality_data(df),
         "trend_volume_map": _build_trend_volume_map_data(df),
         "volume_close_matrix": _build_volume_close_matrix_data(df),
-        "breakout_quadrant": _build_breakout_quadrant_data(df),
+        "breakout_pattern": _build_breakout_pattern_data(df),
         "sector_concentration": _build_sector_concentration_data(df),
     }
 
@@ -416,42 +419,28 @@ def _build_volume_close_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
     return working[columns].copy()
 
 
-def _build_breakout_quadrant_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["quadrant", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"]
-    canonical_quadrants = [
-        "Q1 Power",
-        "Q4 Stealth",
-        "Q2 Trap",
-        "Q3 Noise",
+def _build_breakout_pattern_data(df: pd.DataFrame) -> pd.DataFrame:
+    columns = ["pattern", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"]
+    canonical_patterns = [
+        "GAP_UP",
+        "SOLID_BREAKOUT",
+        "MODERATE_BREAKOUT",
+        "MARGINAL_BREAKOUT",
+        "BULL_TRAP",
     ]
     if df.empty:
         return pd.DataFrame(columns=columns)
 
     working = df.copy()
-
-    def assign_quadrant(row: pd.Series) -> str:
-        valid = _to_bool_or_na(row.get("ibd_entry_valid"))
-        if valid is not True:
-            return "Unconfirmed Candidate"
-        rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
-        cp = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
-        if pd.isna(rr) or pd.isna(cp):
-            return "Unconfirmed Candidate"
-        if rr >= 1.5 and cp >= 0.70:
-            return "Q1 Power"
-        if rr >= 1.5 and cp < 0.70:
-            return "Q2 Trap"
-        if rr < 1.5 and cp >= 0.70:
-            return "Q4 Stealth"
-        return "Q3 Noise"
-
-    working["quadrant"] = working.apply(assign_quadrant, axis=1)
-    valid_working = working[working["quadrant"].isin(canonical_quadrants)]
+    if "breakout_pattern" not in working.columns:
+        working["breakout_pattern"] = working.apply(_classify_breakout_pattern, axis=1)
+    working["pattern"] = working["breakout_pattern"]
+    valid_working = working[working["pattern"].isin(canonical_patterns)]
     total_len = len(valid_working)
 
     records = []
-    for q in canonical_quadrants:
-        sub = valid_working[valid_working["quadrant"] == q]
+    for pattern in canonical_patterns:
+        sub = valid_working[valid_working["pattern"] == pattern]
         cnt = len(sub)
         share = round((cnt / total_len) * 100, 2) if total_len > 0 else 0.0
         code_list = [str(c) for c in sub["code"].dropna().tolist() if str(c).strip()]
@@ -463,7 +452,7 @@ def _build_breakout_quadrant_data(df: pd.DataFrame) -> pd.DataFrame:
         med_cp = _median_or_none(sub, "ibd_entry_close_position")
         records.append(
             {
-                "quadrant": q,
+                "pattern": pattern,
                 "count": cnt,
                 "share_pct": share,
                 "tickers": tickers,
@@ -508,6 +497,25 @@ def _label_series(df: pd.DataFrame, field: str) -> pd.Series:
     if field not in df.columns:
         return pd.Series("(empty)", index=df.index, dtype="object")
     return df[field].fillna("(empty)").replace("", "(empty)")
+
+
+def _classify_breakout_pattern(row: pd.Series) -> str:
+    valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+    if valid is not True:
+        return "Unconfirmed Candidate"
+    rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
+    pos = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
+    if pd.isna(rr) or pd.isna(pos):
+        return "Unconfirmed Candidate"
+    if pos < 0.5:
+        return "BULL_TRAP"
+    if rr > 1.0:
+        return "GAP_UP"
+    if rr >= 0.4 and pos >= 0.7:
+        return "SOLID_BREAKOUT"
+    if rr >= 0.15:
+        return "MODERATE_BREAKOUT"
+    return "MARGINAL_BREAKOUT"
 
 
 def _entry_status(value: Any) -> str:
