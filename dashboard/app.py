@@ -19,6 +19,7 @@ from dashboard.data_utils import (
     apply_c_rank_mode,
     apply_filters,
     build_chart_data,
+    build_entry_status_counts,
     build_kpis,
     load_pool_csv,
 )
@@ -35,10 +36,8 @@ st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_
 
 FUNNEL_ORDER = [
     "Route",
-    "Entry Confirmation & Strength",
-    "Weekly Volume & Price",
-    "Structure",
-    "Grouping",
+    "Entry Status",
+    "Optional Quality Filters",
 ]
 
 
@@ -80,6 +79,14 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
+def _get_snapshot_date(df: pd.DataFrame) -> str:
+    if "snapshot_date" in df.columns:
+        valid = df["snapshot_date"].dropna()
+        if not valid.empty:
+            return str(valid.iloc[0])
+    return "N/A"
+
+
 def _render_custom_mode(df: pd.DataFrame) -> None:
     st.markdown(
         """
@@ -103,22 +110,22 @@ def _render_custom_mode(df: pd.DataFrame) -> None:
         unsafe_allow_html=True,
     )
 
-    kpis_charts_container = st.container()
-    summary_container = st.container()
-    
+    snapshot_date = _get_snapshot_date(df)
+    st.markdown(f"#### Active Signal Filter: `signal=True` ｜ Snapshot Date: `{snapshot_date}`")
+
     filters_by_group = _funnel_filters(df)
     filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
 
-    with kpis_charts_container:
-        _render_kpis(filtered)
-        _render_charts(filtered)
-
-    with summary_container:
-        _render_current_filter_summary(filters_by_group, len(filtered), len(df))
+    _render_current_filter_summary(filters_by_group, len(filtered), len(df))
 
     _render_table_controls(filtered, df)
+
+    with st.container():
+        st.divider()
+        _render_kpis(filtered)
+        _render_charts(filtered)
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
@@ -169,29 +176,35 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
     filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
 
     with st.expander("⏳ Filter Funnel Config Panel", expanded=True):
-        cols = st.columns(5)
+        cols = st.columns([1, 1, 2])
 
         with cols[0]:
             st.markdown("##### 1. Route")
             candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
             candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
-            if candidate_rule == "All":
-                filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
-            else:
+            filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
+            if candidate_rule != "All":
                 filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
 
-        with cols[1]:
-            st.markdown("##### 2. Entry & Strength")
-            entry_valid = st.radio("IBD Entry Valid", ["All", "Valid only", "Invalid only"], index=0, key="funnel_entry_valid")
-            if entry_valid == "Valid only":
-                filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is true"))
-            elif entry_valid == "Invalid only":
-                filters_by_group["Entry Confirmation & Strength"].append(FilterSpec("ibd_entry_valid", "is false"))
+        route_df = apply_filters(df, filters_by_group["Route"])
+        status_counts = build_entry_status_counts(route_df)
 
-            strength_disabled = entry_valid != "Valid only"
-            spec = _range_filter(df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=strength_disabled)
-            if spec is not None:
-                filters_by_group["Entry Confirmation & Strength"].append(spec)
+        with cols[1]:
+            st.markdown("##### 2. Entry Status")
+            status_options = ["All", "UNCONFIRMED", "ACTIONABLE", "EXTENDED", "BELOW_TRIGGER"]
+            selected_status = st.radio(
+                "IBD Entry Status",
+                status_options,
+                index=0,
+                key="funnel_entry_status",
+                format_func=lambda s: f"{s} ({status_counts.get(s, 0)})",
+            )
+            if selected_status != "All":
+                filters_by_group["Entry Status"].append(FilterSpec("ibd_entry_status", "equals", selected_status))
+
+        with cols[2]:
+            st.markdown("##### 3. Optional Quality Filters")
+            disabled_daily = selected_status == "UNCONFIRMED"
 
             pattern_options = [
                 "All",
@@ -215,38 +228,20 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
                 index=0,
                 key="funnel_entry_pattern",
                 help=pattern_help,
-                disabled=strength_disabled,
+                disabled=disabled_daily,
             )
-            if not strength_disabled and pattern != "All":
-                filters_by_group["Entry Confirmation & Strength"].extend(
-                    [
-                        FilterSpec("breakout_pattern", "equals", pattern, label="Breakout Pattern"),
-                    ]
+            if not disabled_daily and pattern != "All":
+                filters_by_group["Optional Quality Filters"].append(
+                    FilterSpec("breakout_pattern", "equals", pattern, label="Breakout Pattern")
                 )
 
-        with cols[2]:
-            st.markdown("##### 3. Weekly Vol & Price")
-            spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly")
+            spec = _range_filter(df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=disabled_daily)
             if spec is not None:
-                filters_by_group["Weekly Volume & Price"].append(spec)
+                filters_by_group["Optional Quality Filters"].append(spec)
 
-        with cols[3]:
-            st.markdown("##### 4. Structure")
-            for field in ["touched_ema10_count"]:
-                spec = _range_filter(df, field, st, key_prefix="structure")
-                if spec is not None:
-                    filters_by_group["Structure"].append(spec)
-            spec = _pullback_magnitude_filter(df)
+            spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly", disabled=False)
             if spec is not None:
-                filters_by_group["Structure"].append(spec)
-
-        with cols[4]:
-            st.markdown("##### 5. Grouping")
-            for field in ["sector", "industry"]:
-                choices = _unique_values(df, field)
-                selected = st.multiselect(get_field_label(field), choices, default=[], key=f"funnel_group_{field}")
-                if selected:
-                    filters_by_group["Grouping"].append(FilterSpec(field, "in", selected))
+                filters_by_group["Optional Quality Filters"].append(spec)
 
     return filters_by_group
 
@@ -405,7 +400,8 @@ def _render_charts(df: pd.DataFrame) -> None:
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
     column_view = st.selectbox(
         "Column View",
-        ["All Fields", "Signal", "IBD Entry", "Structure", "Volume/Pullback", "Grouping", "Reference"],
+        ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Structure", "Volume/Pullback", "Grouping", "Reference"],
+        index=0,
     )
     columns = get_column_view_fields(column_view)
     render_table(filtered_df, columns)

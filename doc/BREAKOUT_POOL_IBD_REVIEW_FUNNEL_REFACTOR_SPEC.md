@@ -20,7 +20,7 @@
 
 1. Pool 新增三个物理字段：
    - `latest_close`
-   - `current_vs_candidate_pct`
+   - `current_vs_ibd_candidate_pct`
    - `ibd_entry_status`
 2. Dashboard 改为 IBD 状态漏斗。
 3. Route 保留为分类筛选。
@@ -95,7 +95,7 @@ Route 是分类；Pattern 和量比是质量筛选。它们不是与 Entry Statu
 ceiling * (1 + pct_above_ceiling / 100)
 ```
 
-### 4.2 `current_vs_candidate_pct`
+### 4.2 `current_vs_ibd_candidate_pct`
 
 | 属性 | 规定 |
 |---|---|
@@ -106,7 +106,7 @@ ceiling * (1 + pct_above_ceiling / 100)
 唯一计算公式：
 
 ```python
-current_vs_candidate_pct = (
+current_vs_ibd_candidate_pct = (
     latest_close / ibd_candidate_price - 1
 ) * 100
 ```
@@ -131,13 +131,13 @@ Schema 已规定 `ibd_candidate_price` 是日线 Resolver 必须跨越的真实 
 ```python
 if signal is not True:
     ibd_entry_status = None
-elif current_vs_candidate_pct is invalid:
+elif current_vs_ibd_candidate_pct is invalid:
     ibd_entry_status = None
 elif ibd_entry_valid is not True:
     ibd_entry_status = "UNCONFIRMED"
-elif current_vs_candidate_pct < 0:
+elif current_vs_ibd_candidate_pct < 0:
     ibd_entry_status = "BELOW_TRIGGER"
-elif current_vs_candidate_pct <= 5:
+elif current_vs_ibd_candidate_pct <= 5:
     ibd_entry_status = "ACTIONABLE"
 else:
     ibd_entry_status = "EXTENDED"
@@ -146,7 +146,7 @@ else:
 重要规则：
 
 - `ibd_entry_valid=False` 时，无论价格在触发价上方还是下方，都属于 `UNCONFIRMED`。
-- `ACTIONABLE` 必须同时满足 `ibd_entry_valid=True` 和 `0 <= current_vs_candidate_pct <= 5`。
+- `ACTIONABLE` 必须同时满足 `ibd_entry_valid=True` 和 `0 <= current_vs_ibd_candidate_pct <= 5`。
 - `EXTENDED` 只表示不适合按当前买点追入，不表示股票质量差。
 - 本轮不细分 `5%～10%`、`10%～15%` 等延伸区间。
 - 不新增 `DATA_INVALID` 状态；数据异常保持空值并由自测报错。
@@ -216,7 +216,7 @@ signal=True + 当前 Route
 - Status 为 `ACTIONABLE`、`EXTENDED` 或 `BELOW_TRIGGER` 时才启用日线质量条件。
 - Status 为 `All` 时不应用日线质量默认条件；避免自动排除未确认候选。
 - `volume_ratio` 可用于任何状态，但默认不设置 `>=1.3`。
-- 本轮不提供 `current_vs_candidate_pct` 独立滑块；它用于状态计算和表格展示。
+- 本轮不提供 `current_vs_ibd_candidate_pct` 独立滑块；它用于状态计算和表格展示。
 
 ### 5.5 不再出现在筛选区的字段
 
@@ -273,7 +273,7 @@ ibd_candidate_rule
 ibd_entry_status
 latest_close
 ibd_candidate_price
-current_vs_candidate_pct
+current_vs_ibd_candidate_pct
 ibd_entry_date
 ibd_entry_price
 ibd_entry_volume_ratio
@@ -285,7 +285,7 @@ ibd_entry_reject_reason
 要求：
 
 - `code` 继续 Pin 在左侧。
-- `current_vs_candidate_pct` 显示为百分比，例如 `+1.36%`。
+- `current_vs_ibd_candidate_pct` 显示为百分比，例如 `+1.36%`。
 - `ibd_entry_reject_reason` 对 `UNCONFIRMED` 必须可见。
 - 原 `All Fields` 和其它 Column View 保留。
 - 本轮不修改默认行排序逻辑。
@@ -299,7 +299,7 @@ ibd_entry_reject_reason
 完成：
 
 - 从本期最新周线读取 `latest_close`；
-- 计算 `current_vs_candidate_pct`；
+- 计算 `current_vs_ibd_candidate_pct`；
 - 计算 `ibd_entry_status`；
 - 将三个字段写入最终 CSV；
 - 不修改现有 IBD Resolver 和排名公式。
@@ -365,7 +365,7 @@ dashboard/self_check.py
 
 构造最小 DataFrame 验证：
 
-| valid | current_vs_candidate_pct | 预期状态 |
+| valid | current_vs_ibd_candidate_pct | 预期状态 |
 |---|---:|---|
 | False | +2.0 | `UNCONFIRMED` |
 | True | 0.0 | `ACTIONABLE` |
@@ -439,7 +439,7 @@ ibd_entry_volume_ratio
 volume_ratio
 ```
 
-`latest_close`、`current_vs_candidate_pct` 为核心展示字段，但本轮不提供直接筛选控件。
+`latest_close`、`current_vs_ibd_candidate_pct` 为核心展示字段，但本轮不提供直接筛选控件。
 
 ### `BREAKOUT_POOL_LOCAL_DASHBOARD_DESIGN.md`
 

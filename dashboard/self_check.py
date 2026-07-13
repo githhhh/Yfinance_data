@@ -21,6 +21,7 @@ from dashboard.data_utils import (
 )
 from dashboard.field_config import (
     EXCLUDED_CUSTOM_FIELDS,
+    get_all_table_columns,
     get_default_table_columns,
     get_filterable_fields,
     get_sortable_fields,
@@ -56,7 +57,16 @@ def main() -> int:
 
 
 def _check_load(df: pd.DataFrame) -> None:
-    required = {"code", "signal", "ibd_entry_valid", "signal_source", "rank_C_continuous"}
+    required = {
+        "code",
+        "signal",
+        "ibd_entry_valid",
+        "signal_source",
+        "rank_C_continuous",
+        "ibd_entry_status",
+        "latest_close",
+        "current_vs_ibd_candidate_pct",
+    }
     missing = required - set(df.columns)
     assert not missing, f"missing required columns: {sorted(missing)}"
     assert len(df) > 0, "CSV has no rows"
@@ -186,7 +196,7 @@ def _check_sector_concentration_chart(df: pd.DataFrame) -> None:
 def _check_mode_isolation(df: pd.DataFrame) -> None:
     assert not EXCLUDED_CUSTOM_FIELDS.intersection(get_filterable_fields())
     assert not EXCLUDED_CUSTOM_FIELDS.intersection(get_sortable_fields())
-    assert EXCLUDED_CUSTOM_FIELDS.issubset(set(get_default_table_columns()))
+    assert EXCLUDED_CUSTOM_FIELDS.issubset(set(get_all_table_columns()))
 
     expected = df[_true_mask(df["signal"])].sort_values(
         by=["rank_C_continuous"],

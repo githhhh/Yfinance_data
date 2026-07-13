@@ -59,6 +59,26 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
         duration_days = (result["breakout_date"] - result["ceiling_date"]).dt.days
         result["base_duration_weeks"] = (duration_days / 7).round()
 
+    if "latest_close" not in result.columns:
+        if {"ceiling", "pct_above_ceiling"}.issubset(result.columns):
+            result["latest_close"] = pd.to_numeric(result["ceiling"], errors="coerce") * (
+                1.0 + pd.to_numeric(result["pct_above_ceiling"], errors="coerce") / 100.0
+            )
+        else:
+            result["latest_close"] = pd.Series(pd.NA, index=result.index)
+
+    if "current_vs_ibd_candidate_pct" not in result.columns:
+        if {"latest_close", "ibd_candidate_price"}.issubset(result.columns):
+            latest = pd.to_numeric(result["latest_close"], errors="coerce")
+            candidate = pd.to_numeric(result["ibd_candidate_price"], errors="coerce")
+            pct = (latest / candidate - 1.0) * 100.0
+            result["current_vs_ibd_candidate_pct"] = pct.where(candidate > 0, pd.NA)
+        else:
+            result["current_vs_ibd_candidate_pct"] = pd.Series(pd.NA, index=result.index)
+
+    if "ibd_entry_status" not in result.columns:
+        result["ibd_entry_status"] = result.apply(_compute_ibd_entry_status, axis=1)
+
     if {"ibd_entry_valid", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio"}.issubset(result.columns):
         result["breakout_pattern"] = result.apply(_classify_breakout_pattern, axis=1)
 
@@ -67,6 +87,7 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
             result[column] = result[column].replace("", pd.NA)
 
     return result
+
 
 
 
@@ -537,3 +558,32 @@ def _describe_filter(label: str, spec: FilterSpec) -> str:
     if operator == "between":
         return f"{label} between {spec.value} and {spec.value2}"
     return f"{label} {spec.operator} {spec.value}"
+
+
+def _compute_ibd_entry_status(row: pd.Series) -> str | Any:
+    signal = _to_bool_or_na(row.get("signal"))
+    if signal is not True:
+        return pd.NA
+    valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+    if valid is not True:
+        return "UNCONFIRMED"
+    pct = pd.to_numeric(row.get("current_vs_ibd_candidate_pct"), errors="coerce")
+    if pd.isna(pct) or not np.isfinite(pct):
+        return "UNCONFIRMED"
+    if pct < 0:
+        return "BELOW_TRIGGER"
+    if pct <= 5.0:
+        return "ACTIONABLE"
+    return "EXTENDED"
+
+
+def build_entry_status_counts(signal_df: pd.DataFrame) -> dict[str, int]:
+    statuses = ["UNCONFIRMED", "ACTIONABLE", "EXTENDED", "BELOW_TRIGGER"]
+    counts = {status: 0 for status in statuses}
+    if not signal_df.empty and "ibd_entry_status" in signal_df.columns:
+        vc = signal_df["ibd_entry_status"].value_counts(dropna=True)
+        for status in statuses:
+            counts[status] = int(vc.get(status, 0))
+    total = len(signal_df)
+    return {"All": total, "ALL": total, **counts}
+

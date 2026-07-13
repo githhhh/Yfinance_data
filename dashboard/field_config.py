@@ -47,23 +47,18 @@ NUMBER_FIELDS = {
     "eps_yoy_growth",
     "price_52_week_high",
     "dist_to_52w_high_pct",
+    "latest_close",
+    "current_vs_ibd_candidate_pct",
 }
 
 FILTER_FUNNEL_GROUPS = OrderedDict(
     [
         ("Route", ["ibd_candidate_rule"]),
+        ("Entry Status", ["ibd_entry_status"]),
         (
-            "Entry Confirmation & Strength",
-            [
-                "ibd_entry_valid",
-                "ibd_entry_volume_ratio",
-                "ibd_entry_close_position",
-                "ibd_entry_breakout_range_ratio",
-            ],
+            "Optional Quality Filters",
+            ["breakout_pattern", "ibd_entry_volume_ratio", "volume_ratio"],
         ),
-        ("Weekly Volume & Price", ["volume_ratio", "is_bullish"]),
-        ("Structure", ["touched_ema10_count", "pullback_pct"]),
-        ("Grouping", ["sector", "industry"]),
     ]
 )
 
@@ -108,13 +103,31 @@ ALL_TABLE_COLUMNS = [
     "pullback_pct",
     "pullback_pct_off_peak",
     "pullback_v_is_dry",
-    "hold_return",
+    "ibd_entry_status",
+    "latest_close",
+    "current_vs_ibd_candidate_pct",
     "C_continuous",
     "rank_C_continuous",
     "is_priority",
 ]
 
-DEFAULT_TABLE_COLUMNS = ALL_TABLE_COLUMNS
+IBD_DECISION_COLUMNS = [
+    "code",
+    "snapshot_date",
+    "ibd_candidate_rule",
+    "ibd_entry_status",
+    "latest_close",
+    "ibd_candidate_price",
+    "current_vs_ibd_candidate_pct",
+    "ibd_entry_price",
+    "ibd_entry_volume_ratio",
+    "volume_ratio",
+    "breakout_pattern",
+    "sector",
+    "industry",
+]
+
+DEFAULT_TABLE_COLUMNS = IBD_DECISION_COLUMNS
 
 SIGNAL_COLUMNS = [
     "code",
@@ -140,6 +153,9 @@ IBD_COLUMNS = [
     "ibd_entry_breakout_range_ratio",
     "ibd_entry_rule",
     "ibd_entry_reject_reason",
+    "ibd_entry_status",
+    "latest_close",
+    "current_vs_ibd_candidate_pct",
 ]
 
 STRUCTURE_COLUMNS = [
@@ -294,10 +310,49 @@ FIELD_CONFIG = OrderedDict(
                 "Breakout Pattern",
                 "category",
                 "IBD Entry",
-                filterable=False,
+                filterable=True,
                 sortable=False,
-                default_table=False,
+                default_table=True,
+                advanced_filter=True,
+                help_text="5-Pattern classification based on physical breakout traits.",
+            ),
+        ),
+        (
+            "ibd_entry_status",
+            _field(
+                "IBD Entry Status",
+                "category",
+                "IBD Entry",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                help_text="Lifecycle state of IBD breakout review.",
+            ),
+        ),
+        (
+            "latest_close",
+            _field(
+                "Latest Close",
+                "number",
+                "IBD Entry",
+                filterable=False,
+                default_table=True,
                 advanced_filter=False,
+                fmt="0.00",
+                help_text="Latest weekly close price.",
+            ),
+        ),
+        (
+            "current_vs_ibd_candidate_pct",
+            _field(
+                "% vs IBD Candidate",
+                "number",
+                "IBD Entry",
+                filterable=False,
+                default_table=True,
+                advanced_filter=False,
+                fmt="0.00%",
+                help_text="Current close relative to IBD candidate price.",
             ),
         ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
@@ -400,10 +455,12 @@ def get_sortable_fields() -> list[str]:
 
 
 def get_default_table_columns() -> list[str]:
-    return get_all_table_columns()
+    return [field for field in IBD_DECISION_COLUMNS if field in FIELD_CONFIG]
 
 
 def get_column_view_fields(view_name: str) -> list[str]:
+    if view_name == "IBD Decision":
+        return [field for field in IBD_DECISION_COLUMNS if field in FIELD_CONFIG]
     if view_name == "All Fields":
         return get_all_table_columns()
     if view_name == "Signal":

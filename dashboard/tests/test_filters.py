@@ -9,6 +9,7 @@ from dashboard.data_utils import (
     apply_filters,
     apply_sort,
     normalize_pool_df,
+    build_entry_status_counts,
     _false_mask,
     _true_mask,
 )
@@ -371,3 +372,54 @@ def test_funnel_stage1_default_all_filters_signal_true():
 
     assert set(actual["code"]) == {"AAA", "BBB", "DDD"}
     assert "CCC" not in actual["code"].values
+
+
+def test_entry_status_boundary_cases():
+    raw = pd.DataFrame(
+        [
+            {"code": "S1", "signal": "True", "ibd_entry_valid": "0", "current_vs_ibd_candidate_pct": 2.0},
+            {"code": "S2", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": None},
+            {"code": "S3", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": -0.01},
+            {"code": "S4", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 0.0},
+            {"code": "S5", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 5.0},
+            {"code": "S6", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 5.01},
+        ]
+    )
+    df = normalize_pool_df(raw)
+    statuses = dict(zip(df["code"], df["ibd_entry_status"]))
+    assert statuses["S1"] == "UNCONFIRMED"
+    assert statuses["S2"] == "UNCONFIRMED"
+    assert statuses["S3"] == "BELOW_TRIGGER"
+    assert statuses["S4"] == "ACTIONABLE"
+    assert statuses["S5"] == "ACTIONABLE"
+    assert statuses["S6"] == "EXTENDED"
+
+
+def test_entry_status_mutual_exclusion_and_conservation():
+    df = sample_pool_df()
+    sig = df[df["signal"] == True]
+    counts = build_entry_status_counts(sig)
+    assert counts["All"] == len(sig)
+    assert (
+        counts["UNCONFIRMED"] + counts["ACTIONABLE"] + counts["EXTENDED"] + counts["BELOW_TRIGGER"]
+        <= counts["All"]
+    )
+
+
+def test_build_entry_status_counts():
+    raw = pd.DataFrame(
+        [
+            {"code": "A", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 2.0},
+            {"code": "B", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 8.0},
+            {"code": "C", "signal": "True", "ibd_entry_valid": "0", "current_vs_ibd_candidate_pct": 1.0},
+            {"code": "D", "signal": "False", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 2.0},
+        ]
+    )
+    df = normalize_pool_df(raw)
+    sig = df[df["signal"] == True]
+    counts = build_entry_status_counts(sig)
+    assert counts["All"] == 3
+    assert counts["ACTIONABLE"] == 1
+    assert counts["EXTENDED"] == 1
+    assert counts["UNCONFIRMED"] == 1
+    assert counts["BELOW_TRIGGER"] == 0

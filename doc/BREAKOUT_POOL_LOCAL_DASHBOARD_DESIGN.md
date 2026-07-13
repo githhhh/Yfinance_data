@@ -1026,3 +1026,27 @@ PYTHONDONTWRITEBYTECODE=1 python dashboard/self_check.py --csv us/breakout_follo
 [PASS] chart: Volume x Close Strength row source
 [PASS] mode isolation
 ```
+
+## 21. IBD Review Funnel Refactor (2026-07-13)
+
+按规范 `BREAKOUT_POOL_IBD_REVIEW_FUNNEL_REFACTOR_SPEC.md` 将看板筛选结构重构为“三阶段 IBD 漏斗”，并以 `IBD Decision` 为默认表格视图。
+
+### 21.1 漏斗三阶段分组
+
+```text
+1. Route
+2. Entry Status
+3. Optional Quality Filters
+```
+
+- **Route**: `signal=True` 为默认不可关闭底座；可单选 `ibd_candidate_rule` (`All`, `ceiling`, `ceiling_pullback`, `pivot`, `ma10_touch_confirm`, `three_weeks_tight`)。
+- **Entry Status**: 统计基于 `signal=True + 当前 Route` 下候选的 `ibd_entry_status` 数量，提供状态选择 (`All`, `UNCONFIRMED`, `ACTIONABLE`, `EXTENDED`, `BELOW_TRIGGER`)。
+- **Optional Quality Filters**: 提供三个进阶质量条件：`breakout_pattern`、`ibd_entry_volume_ratio`、`volume_ratio`。当状态为 `UNCONFIRMED` 时自动禁用日线突破形态与成交量比筛选。
+
+### 21.2 默认视图 IBD Decision
+
+表格默认加载 `IBD Decision` 视图字段组合：
+
+```text
+code, snapshot_date, ibd_candidate_rule, ibd_entry_status, latest_close, ibd_candidate_price, current_vs_ibd_candidate_pct, ibd_entry_price, ibd_entry_volume_ratio, volume_ratio, breakout_pattern, sector, industry
+```

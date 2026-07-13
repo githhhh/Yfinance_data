@@ -13,3 +13,27 @@
 > 2. **高内聚低耦合**：保证后续任何字段演进或规则调整，开发者都能在同一个 Git Commit 中同步修改底层算子代码与白皮书契约，杜绝跨库漏改。
 > 
 > *请前往策略主仓库查阅最新全字段白皮书，本库不再独立维护副本。*
+
+---
+
+## 补充：IBD Review Funnel 新增字段规范 (本地分析视图补充说明)
+
+### 1. `latest_close`
+- **类型**：`float`
+- **语义**：最新周收盘价（或衍生收盘参考价）。
+- **公式**：若池中含物理字段则直接读取；否则在标准化阶段通过 `ceiling * (1 + pct_above_ceiling / 100)` 派生过渡。
+
+### 2. `current_vs_ibd_candidate_pct`
+- **类型**：`float`
+- **语义**：当前最新收盘价相较于 `ibd_candidate_price` 的涨幅百分比。
+- **公式**：`(latest_close / ibd_candidate_price - 1) * 100`。
+- **边界规则**：若 `ibd_candidate_price` 缺失或 `<= 0`，则返回 `NA`。
+
+### 3. `ibd_entry_status`
+- **类型**：`category` / `str`
+- **状态枚举与逻辑**：
+  - `UNCONFIRMED`：未确认形态。包括 `ibd_entry_valid=False`/`NA` 的行，以及成交量未确认等。
+  - `ACTIONABLE`：且且具备有效形态且在合理买点区。条件：`ibd_entry_valid=True` 且 `0 <= current_vs_ibd_candidate_pct <= 5`。
+  - `EXTENDED`：追高区域。条件：`ibd_entry_valid=True` 且 `current_vs_ibd_candidate_pct > 5`。
+  - `BELOW_TRIGGER`：跌破触发价。条件：`ibd_entry_valid=True` 且 `current_vs_ibd_candidate_pct < 0`。
+

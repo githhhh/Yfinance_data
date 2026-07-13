@@ -18,13 +18,9 @@ def test_custom_filter_ui_uses_trading_decision_funnel_without_presets():
     assert 'st.title("Breakout Pool")' not in source
     assert "Breakout Pool Workbench" not in source
     assert '"Route"' in source
-    assert '"Entry Confirmation & Strength"' in source
-    assert '"Weekly Volume & Price"' in source
-    assert '"Structure"' in source
-    assert '"Grouping"' in source
-    assert '"1 Route"' not in source
-    assert '"2 Entry Confirmation & Strength"' not in source
-    assert source.index('"Route"') < source.index('"Entry Confirmation & Strength"')
+    assert '"Entry Status"' in source
+    assert '"Optional Quality Filters"' in source
+    assert source.index('"Route"') < source.index('"Entry Status"')
 
 
 def test_custom_filter_ui_removes_sort_bar_from_custom_mode():
@@ -41,22 +37,15 @@ def test_funnel_tab_labels_return_static_names():
     labels = _funnel_tab_labels(
         {
             "Route": [FilterSpec("ibd_candidate_rule", "equals", "pivot")],
-            "Entry Confirmation & Strength": [
-                FilterSpec("ibd_entry_valid", "is true"),
-                FilterSpec("ibd_entry_volume_ratio", "between", 1.5, 4.0),
-            ],
-            "Weekly Volume & Price": [],
-            "Structure": [FilterSpec("pullback_pct", "between", -12.0, -5.0)],
-            "Grouping": [],
+            "Entry Status": [FilterSpec("ibd_entry_status", "equals", "ACTIONABLE")],
+            "Optional Quality Filters": [],
         }
     )
 
     assert labels == [
         "Route",
-        "Entry Confirmation & Strength",
-        "Weekly Volume & Price",
-        "Structure",
-        "Grouping",
+        "Entry Status",
+        "Optional Quality Filters",
     ]
 
 

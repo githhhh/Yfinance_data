@@ -25,33 +25,22 @@ def test_filterable_fields_follow_trading_decision_funnel():
 
     assert list(groups) == [
         "Route",
-        "Entry Confirmation & Strength",
-        "Weekly Volume & Price",
-        "Structure",
-        "Grouping",
+        "Entry Status",
+        "Optional Quality Filters",
     ]
     assert groups["Route"] == ["ibd_candidate_rule"]
-    assert groups["Entry Confirmation & Strength"] == [
-        "ibd_entry_valid",
+    assert groups["Entry Status"] == ["ibd_entry_status"]
+    assert groups["Optional Quality Filters"] == [
+        "breakout_pattern",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_position",
-        "ibd_entry_breakout_range_ratio",
+        "volume_ratio",
     ]
-    assert groups["Weekly Volume & Price"] == ["volume_ratio", "is_bullish"]
-    assert groups["Structure"] == ["touched_ema10_count", "pullback_pct"]
-    assert groups["Grouping"] == ["sector", "industry"]
     assert get_filterable_fields() == [
         "ibd_candidate_rule",
-        "ibd_entry_valid",
+        "ibd_entry_status",
+        "breakout_pattern",
         "ibd_entry_volume_ratio",
-        "ibd_entry_close_position",
-        "ibd_entry_breakout_range_ratio",
         "volume_ratio",
-        "is_bullish",
-        "touched_ema10_count",
-        "pullback_pct",
-        "sector",
-        "industry",
     ]
 
 
@@ -97,14 +86,35 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "pullback_pct",
         "pullback_pct_off_peak",
         "pullback_v_is_dry",
-        "hold_return",
+        "ibd_entry_status",
+        "latest_close",
+        "current_vs_ibd_candidate_pct",
         "C_continuous",
         "rank_C_continuous",
         "is_priority",
     ]
     assert get_all_table_columns() == expected
-    assert get_default_table_columns() == expected
     assert get_column_view_fields("All Fields") == expected
+
+
+def test_ibd_decision_view_columns():
+    expected = [
+        "code",
+        "snapshot_date",
+        "ibd_candidate_rule",
+        "ibd_entry_status",
+        "latest_close",
+        "ibd_candidate_price",
+        "current_vs_ibd_candidate_pct",
+        "ibd_entry_price",
+        "ibd_entry_volume_ratio",
+        "volume_ratio",
+        "breakout_pattern",
+        "sector",
+        "industry",
+    ]
+    assert get_default_table_columns() == expected
+    assert get_column_view_fields("IBD Decision") == expected
 
 
 def test_table_views_cover_all_fields_without_scattering_related_columns():
