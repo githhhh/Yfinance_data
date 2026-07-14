@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dashboard.field_config import get_field_label
+from dashboard.field_config import FIELD_CONFIG, get_field_label
 
 try:
     from st_aggrid import JsCode
@@ -61,6 +61,52 @@ def _code_renderer_jscode():
     """)
 
 
+def _get_value_formatter(fmt: str | None):
+    if not HAS_JS_CODE or not fmt:
+        return None
+    if fmt == "0.00%":
+        return JsCode("""
+        function(params) {
+            if (params.value === null || params.value === undefined || params.value === '') return '';
+            const val = Number(params.value);
+            if (isNaN(val)) return params.value;
+            if (val > 0) return '+' + val.toFixed(2) + '%';
+            if (val < 0) return val.toFixed(2) + '%';
+            return '0.00%';
+        }
+        """)
+    if fmt == "0.0%":
+        return JsCode("""
+        function(params) {
+            if (params.value === null || params.value === undefined || params.value === '') return '';
+            const val = Number(params.value);
+            if (isNaN(val)) return params.value;
+            if (val > 0) return '+' + val.toFixed(1) + '%';
+            if (val < 0) return val.toFixed(1) + '%';
+            return '0.0%';
+        }
+        """)
+    if fmt == "0.00x":
+        return JsCode("""
+        function(params) {
+            if (params.value === null || params.value === undefined || params.value === '') return '';
+            const val = Number(params.value);
+            if (isNaN(val)) return params.value;
+            return val.toFixed(2) + 'x';
+        }
+        """)
+    if fmt == "0.00":
+        return JsCode("""
+        function(params) {
+            if (params.value === null || params.value === undefined || params.value === '') return '';
+            const val = Number(params.value);
+            if (isNaN(val)) return params.value;
+            return val.toFixed(2);
+        }
+        """)
+    return None
+
+
 def build_grid_options(columns: list[str]) -> dict:
     return {
         "columnDefs": [_column_def(column) for column in columns],
@@ -116,6 +162,11 @@ def _column_def(column: str) -> dict:
         "resizable": True,
         "pinned": None,
     }
+    fmt = FIELD_CONFIG.get(column, {}).get("format")
+    if fmt and HAS_JS_CODE:
+        formatter = _get_value_formatter(fmt)
+        if formatter:
+            definition["valueFormatter"] = formatter
     if column == "code":
         definition["pinned"] = "left"
         definition["minWidth"] = 110

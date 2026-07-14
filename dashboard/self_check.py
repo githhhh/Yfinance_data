@@ -40,6 +40,9 @@ def main() -> int:
 
     checks = [
         ("load and normalize", lambda df: _check_load(df)),
+        ("formula recalculations (dist_to_52w & candidate_pct)", _check_formulas),
+        ("four-state boundaries check", _check_four_state_boundaries),
+        ("status conservation check", _check_status_conservation),
         ("advanced filters AND logic", _check_advanced_filters),
         ("sort specs", _check_sort_specs),
         ("chart: Route Quality aggregation", _check_route_quality_chart),
@@ -74,6 +77,70 @@ def _check_load(df: pd.DataFrame) -> None:
     missing = required - set(df.columns)
     assert not missing, f"missing required columns: {sorted(missing)}"
     assert len(df) > 0, "CSV has no rows"
+
+
+def _check_formulas(df: pd.DataFrame) -> None:
+    # 1. Check current_vs_ibd_candidate_pct formula: (latest_close / ibd_candidate_price - 1) * 100
+    mask_cand = df["latest_close"].notna() & df["ibd_candidate_price"].notna() & df["ibd_candidate_price"].ne(0) & df["current_vs_ibd_candidate_pct"].notna()
+    if mask_cand.any():
+        calc_cand = (df.loc[mask_cand, "latest_close"] / df.loc[mask_cand, "ibd_candidate_price"] - 1.0) * 100.0
+        diff_cand = (calc_cand - df.loc[mask_cand, "current_vs_ibd_candidate_pct"]).abs()
+        max_diff_cand = diff_cand.max()
+        assert max_diff_cand <= 0.05, f"current_vs_ibd_candidate_pct formula discrepancy exceeds tolerance: max diff = {max_diff_cand:.4f}"
+
+    # 2. Check dist_to_52w_high_pct formula: (latest_close / price_52_week_high - 1) * 100
+    mask_52w = df["latest_close"].notna() & df["price_52_week_high"].notna() & df["price_52_week_high"].ne(0) & df["dist_to_52w_high_pct"].notna()
+    if mask_52w.any():
+        calc_52w = (df.loc[mask_52w, "latest_close"] / df.loc[mask_52w, "price_52_week_high"] - 1.0) * 100.0
+        diff_52w = (calc_52w - df.loc[mask_52w, "dist_to_52w_high_pct"]).abs()
+        max_diff_52w = diff_52w.max()
+        assert max_diff_52w <= 0.05, f"dist_to_52w_high_pct formula discrepancy exceeds tolerance: max diff = {max_diff_52w:.4f}"
+
+
+def _check_four_state_boundaries(df: pd.DataFrame) -> None:
+    signal_mask = _true_mask(df["signal"])
+    active_df = df[signal_mask].copy()
+    if active_df.empty:
+        return
+
+    # For active rows with finite current_vs_ibd_candidate_pct
+    valid_pct_mask = active_df["current_vs_ibd_candidate_pct"].notna()
+    test_df = active_df[valid_pct_mask]
+
+    for _, row in test_df.iterrows():
+        pct = float(row["current_vs_ibd_candidate_pct"])
+        status = row["ibd_entry_status"]
+        valid = bool(row["ibd_entry_valid"]) if not pd.isna(row["ibd_entry_valid"]) else False
+
+        if not valid:
+            assert status == "UNCONFIRMED", f"Row {row['code']}: when ibd_entry_valid is not True, status must be UNCONFIRMED, got {status}"
+        else:
+            if pct < 0:
+                assert status == "BELOW_TRIGGER", f"Row {row['code']}: pct={pct} < 0 must be BELOW_TRIGGER, got {status}"
+            elif pct <= 5.0:
+                assert status == "ACTIONABLE", f"Row {row['code']}: pct={pct} in [0, 5.0] must be ACTIONABLE, got {status}"
+            else:
+                assert status == "EXTENDED", f"Row {row['code']}: pct={pct} > 5.0 must be EXTENDED, got {status}"
+
+
+def _check_status_conservation(df: pd.DataFrame) -> None:
+    # 1. Non-signal rows should have NA/empty status
+    non_signal_mask = ~_true_mask(df["signal"])
+    if non_signal_mask.any():
+        non_signal_statuses = df.loc[non_signal_mask, "ibd_entry_status"].dropna()
+        assert non_signal_statuses.empty, f"Non-signal rows should not have ibd_entry_status assigned, found {len(non_signal_statuses)} rows with status"
+
+    # 2. Conservation: sum of status counts among signal=True rows must equal active rows count minus schema errors/NAs
+    signal_mask = _true_mask(df["signal"])
+    signal_df = df[signal_mask]
+    total_active = len(signal_df)
+    
+    statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
+    vc = signal_df["ibd_entry_status"].value_counts(dropna=True)
+    status_sum = sum(vc.get(s, 0) for s in statuses)
+    na_count = signal_df["ibd_entry_status"].isna().sum()
+    
+    assert status_sum + na_count == total_active, f"Status conservation check failed: status_sum({status_sum}) + na_count({na_count}) != total_active({total_active})"
 
 
 def _check_advanced_filters(df: pd.DataFrame) -> None:

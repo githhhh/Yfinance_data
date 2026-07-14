@@ -386,7 +386,7 @@ def test_entry_status_boundary_cases():
     df = normalize_pool_df(raw)
     statuses = dict(zip(df["code"], df["ibd_entry_status"]))
     assert statuses["S1"] == "UNCONFIRMED"
-    assert statuses["S2"] == "UNCONFIRMED"
+    assert pd.isna(statuses["S2"])
     assert statuses["S3"] == "BELOW_TRIGGER"
     assert statuses["S4"] == "ACTIONABLE"
     assert statuses["S5"] == "ACTIONABLE"

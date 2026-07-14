@@ -118,7 +118,7 @@ def _render_custom_mode(df: pd.DataFrame) -> None:
         f"#### Breakout Follow Pool ｜ Total Pool: **{total_pool}** ｜ Active Signal: **{active_signals}** ｜ Snapshot Date: **`{snapshot_date}`**"
     )
 
-    filters_by_group = _funnel_filters(df)
+    filters_by_group, route_df = _funnel_filters(df)
     filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
@@ -133,7 +133,7 @@ def _render_custom_mode(df: pd.DataFrame) -> None:
     _render_table_controls(filtered, df)
 
     with st.expander("📈 Route Quality (Optional Chart)", expanded=False):
-        _render_charts(df)
+        _render_charts(route_df)
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
@@ -177,7 +177,7 @@ def _render_c_rank_rules() -> None:
         )
 
 
-def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
+def _funnel_filters(df: pd.DataFrame) -> tuple[dict[str, list[FilterSpec]], pd.DataFrame]:
     groups = get_filter_funnel_groups()
     if list(groups) != FUNNEL_ORDER:
         raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
@@ -199,7 +199,7 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
 
         with cols[1]:
             st.markdown("##### 2. Entry Status")
-            status_options = ["All", "UNCONFIRMED", "ACTIONABLE", "EXTENDED", "BELOW_TRIGGER"]
+            status_options = ["All", "ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
             selected_status = st.radio(
                 "IBD Entry Status",
                 status_options,
@@ -210,23 +210,25 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
             if selected_status != "All":
                 filters_by_group["Entry Status"].append(FilterSpec("ibd_entry_status", "equals", selected_status))
 
+        status_df = apply_filters(route_df, filters_by_group["Entry Status"])
+
         with cols[2]:
             st.markdown("##### 3. Optional Quality Filters")
             disabled_daily = selected_status == "UNCONFIRMED"
 
-            spec = _range_filter(df, "current_vs_ibd_candidate_pct", st, key_prefix="cand_pct", disabled=False)
+            spec = _range_filter(status_df, "current_vs_ibd_candidate_pct", st, key_prefix="cand_pct", disabled=False)
             if spec is not None:
                 filters_by_group["Optional Quality Filters"].append(spec)
 
-            spec = _range_filter(df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=disabled_daily)
+            spec = _range_filter(status_df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=disabled_daily)
             if spec is not None:
                 filters_by_group["Optional Quality Filters"].append(spec)
 
-            spec = _range_filter(df, "volume_ratio", st, key_prefix="weekly", disabled=False)
+            spec = _range_filter(status_df, "volume_ratio", st, key_prefix="weekly", disabled=False)
             if spec is not None:
                 filters_by_group["Optional Quality Filters"].append(spec)
 
-    return filters_by_group
+    return filters_by_group, route_df
 
 
 def _flatten_filters(filters_by_group: dict[str, list[FilterSpec]]) -> list[FilterSpec]:
@@ -326,7 +328,7 @@ def _render_charts(df: pd.DataFrame) -> None:
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
     column_view = st.selectbox(
         "Column View",
-        ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Structure", "Volume/Pullback", "Grouping", "Reference"],
+        ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Volume/Pullback", "Reference"],
         index=0,
     )
     columns = get_column_view_fields(column_view)
@@ -391,11 +393,19 @@ def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
 
 
 def _format_number(value: float | int | None, suffix: str = "") -> str:
-    if value is None:
+    if value is None or pd.isna(value):
         return "n/a"
     if suffix == "%":
-        return f"{value:.2%}"
-    return f"{value:.2f}{suffix}"
+        val = float(value)
+        if val > 0:
+            return f"+{val:.2f}%"
+        elif val < 0:
+            return f"{val:.2f}%"
+        else:
+            return "0.00%"
+    if suffix == "x":
+        return f"{float(value):.2f}x"
+    return f"{float(value):.2f}{suffix}"
 
 
 if __name__ == "__main__":

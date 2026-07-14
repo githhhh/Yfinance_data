@@ -49,9 +49,10 @@ def load_pool_csv(path: str | Path) -> pd.DataFrame:
     csv_path = Path(path)
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV not found: {csv_path}")
-    df = normalize_pool_df(pd.read_csv(csv_path, encoding="utf-8-sig"))
-    validate_pool_schema(df)
-    return df
+    raw_df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    raw_df.columns = [str(column).lstrip("\ufeff") for column in raw_df.columns]
+    validate_pool_schema(raw_df)
+    return normalize_pool_df(raw_df)
 
 
 def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -71,12 +72,6 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
         duration_days = (result["breakout_date"] - result["ceiling_date"]).dt.days
         result["base_duration_weeks"] = (duration_days / 7).round()
 
-    if "latest_close" not in result.columns:
-        result["latest_close"] = pd.Series(pd.NA, index=result.index)
-
-    if "current_vs_ibd_candidate_pct" not in result.columns:
-        result["current_vs_ibd_candidate_pct"] = pd.Series(pd.NA, index=result.index)
-
     if {"latest_close", "price_52_week_high"}.issubset(result.columns):
         latest = pd.to_numeric(result["latest_close"], errors="coerce")
         high_52w = pd.to_numeric(result["price_52_week_high"], errors="coerce")
@@ -85,12 +80,12 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
     elif "dist_to_52w_high_pct" not in result.columns:
         result["dist_to_52w_high_pct"] = pd.Series(pd.NA, index=result.index)
 
-    if "ibd_entry_status" not in result.columns:
-        result["ibd_entry_status"] = result.apply(_compute_ibd_entry_status, axis=1)
-
     for column in result.columns:
         if column not in BOOLEAN_FIELDS and column not in NUMBER_FIELDS and column not in DATE_FIELDS:
             result[column] = result[column].replace("", pd.NA)
+
+    if "ibd_entry_status" not in result.columns:
+        result["ibd_entry_status"] = result.apply(_compute_ibd_entry_status, axis=1)
 
     return result
 
@@ -482,11 +477,11 @@ def _compute_ibd_entry_status(row: pd.Series) -> str | Any:
     signal = _to_bool_or_na(row.get("signal"))
     if signal is not True:
         return pd.NA
-    valid = _to_bool_or_na(row.get("ibd_entry_valid"))
-    if valid is not True:
-        return "UNCONFIRMED"
     pct = pd.to_numeric(row.get("current_vs_ibd_candidate_pct"), errors="coerce")
     if pd.isna(pct) or not np.isfinite(pct):
+        return pd.NA
+    valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+    if valid is not True:
         return "UNCONFIRMED"
     if pct < 0:
         return "BELOW_TRIGGER"
@@ -496,7 +491,7 @@ def _compute_ibd_entry_status(row: pd.Series) -> str | Any:
 
 
 def build_entry_status_counts(signal_df: pd.DataFrame) -> dict[str, int]:
-    statuses = ["UNCONFIRMED", "ACTIONABLE", "EXTENDED", "BELOW_TRIGGER"]
+    statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
     counts = {status: 0 for status in statuses}
     if not signal_df.empty and "ibd_entry_status" in signal_df.columns:
         vc = signal_df["ibd_entry_status"].value_counts(dropna=True)

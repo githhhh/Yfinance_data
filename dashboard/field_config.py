@@ -11,7 +11,6 @@ BOOLEAN_FIELDS = {
     "ibd_entry_valid",
     "is_bullish",
     "is_priority",
-    "is_52w_new_high",
 }
 
 DATE_FIELDS = {
@@ -70,7 +69,6 @@ ALL_TABLE_COLUMNS = [
     "eps_yoy_growth",
     "price_52_week_high",
     "dist_to_52w_high_pct",
-    "is_52w_new_high",
     "signal",
     "signal_source",
     "ibd_candidate_rule",
@@ -161,22 +159,6 @@ IBD_COLUMNS = [
     "current_vs_ibd_candidate_pct",
 ]
 
-STRUCTURE_COLUMNS = [
-    "code",
-    "ceiling",
-    "ceiling_date",
-    "base_duration_weeks",
-    "pct_above_ceiling",
-    "base_depth_abs",
-    "base_depth_pct",
-    "base_mbox_count",
-    "mbox_count",
-    "touched_ema10_count",
-    "pullback_count",
-    "pullback_pct",
-    "pullback_pct_off_peak",
-]
-
 VOLUME_PULLBACK_COLUMNS = [
     "code",
     "volume_ratio",
@@ -186,16 +168,6 @@ VOLUME_PULLBACK_COLUMNS = [
     "pullback_pct_off_peak",
     "pullback_v_is_dry",
     "hold_return",
-]
-
-GROUPING_COLUMNS = [
-    "code",
-    "sector",
-    "industry",
-    "eps_yoy_growth",
-    "price_52_week_high",
-    "dist_to_52w_high_pct",
-    "is_52w_new_high",
 ]
 
 REFERENCE_COLUMNS = [
@@ -308,19 +280,6 @@ FIELD_CONFIG = OrderedDict(
             ),
         ),
         (
-            "breakout_pattern",
-            _field(
-                "Breakout Pattern",
-                "category",
-                "IBD Entry",
-                filterable=False,
-                sortable=False,
-                default_table=False,
-                advanced_filter=False,
-                help_text="5-Pattern classification based on physical breakout traits.",
-            ),
-        ),
-        (
             "ibd_entry_status",
             _field(
                 "IBD Entry Status",
@@ -371,9 +330,23 @@ FIELD_CONFIG = OrderedDict(
                 advanced_filter=False,
             ),
         ),
-        ("volume_ratio", _field("Volume Ratio", "number", "Risk / Structure", default_table=True, fmt="0.00x")),
-        ("hold_return", _field("Hold Return", "number", "Result", default_table=True, fmt="0.0%")),
-        ("breakout_date", _field("Breakout Date", "date", "Signal", default_table=True)),
+        (
+            "volume_ratio",
+            _field(
+                "Volume Ratio",
+                "number",
+                "Volume/Pullback",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                fmt="0.00x",
+            ),
+        ),
+        ("hold_return", _field("Hold Return", "number", "Volume/Pullback", fmt="0.0%")),
+        (
+            "breakout_date",
+            _field("Breakout Date", "date", "Signal", filterable=True, default_table=True, advanced_filter=True),
+        ),
         ("pct_above_ceiling", _field("Pct Above Ceiling", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("touched_ema10_count", _field("Touched EMA10 Count", "number", "Risk / Structure", default_table=True)),
         ("mbox_count", _field("M Box Count", "number", "Risk / Structure")),
@@ -386,7 +359,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "C_continuous",
             _field(
-                "C Continuous",
+                "Continuous C",
                 "number",
                 "C Rank",
                 custom_mode=False,
@@ -397,9 +370,10 @@ FIELD_CONFIG = OrderedDict(
         (
             "rank_C_continuous",
             _field(
-                "Rank C Continuous",
+                "C Rank",
                 "number",
                 "C Rank",
+                default_table=True,
                 custom_mode=False,
                 c_rank_mode=True,
                 advanced_filter=False,
@@ -407,11 +381,9 @@ FIELD_CONFIG = OrderedDict(
         ),
         ("pullback_count", _field("Pullback Count", "number", "Risk / Structure", default_table=True)),
         ("pullback_pct", _field("Pullback Pct", "number", "Risk / Structure", fmt="0.0%")),
-        (
-            "pullback_pct_off_peak",
-            _field("Pullback Pct Off Peak", "number", "Risk / Structure", default_table=True, fmt="0.0%"),
-        ),
-        ("is_bullish", _field("Is Bullish", "boolean", "Signal")),
+        ("pullback_pct_off_peak", _field("Pullback Pct Off Peak", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
+        ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
+        ("is_bullish", _field("Is Bullish", "boolean", "Risk / Structure")),
         (
             "is_priority",
             _field(
@@ -428,7 +400,6 @@ FIELD_CONFIG = OrderedDict(
         ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
         ("price_52_week_high", _field("Price 52 Week High", "number", "Grouping", default_table=True, fmt="0.00")),
         ("dist_to_52w_high_pct", _field("Distance To 52W High", "number", "Grouping", default_table=True, fmt="0.0%")),
-        ("is_52w_new_high", _field("Is 52W New High", "boolean", "Grouping", default_table=False)),
     ]
 )
 
@@ -468,20 +439,12 @@ def get_column_view_fields(view_name: str) -> list[str]:
         return get_all_table_columns()
     if view_name == "Signal":
         return [field for field in SIGNAL_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "IBD":
-        return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
     if view_name == "IBD Entry":
         return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "Structure":
-        return [field for field in STRUCTURE_COLUMNS if field in FIELD_CONFIG]
     if view_name == "Volume/Pullback":
         return [field for field in VOLUME_PULLBACK_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "Grouping":
-        return [field for field in GROUPING_COLUMNS if field in FIELD_CONFIG]
     if view_name == "Reference":
         return [field for field in REFERENCE_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "Full Custom":
-        return get_custom_mode_fields()
     raise ValueError(f"Unknown column view: {view_name}")
 
 
