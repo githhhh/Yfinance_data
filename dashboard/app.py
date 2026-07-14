@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,8 +32,7 @@ from dashboard.field_config import (
 )
 from dashboard.table_view import render_table
 
-
-st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 FUNNEL_ORDER = [
     "Route",
@@ -55,179 +55,482 @@ def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
 def main() -> None:
     args = _parse_args()
 
-    try:
-        df = cached_load_pool_csv(args.csv, _csv_cache_fingerprint(args.csv))
-    except Exception as exc:
-        st.error(f"Could not load CSV: {exc}")
-        return
-
-    with st.sidebar:
-        st.subheader("🎯 Mode Selector")
-        mode = st.radio("Mode", ["IBD Review", "C Rank Reference"], index=0, key="global_mode_selector")
-        st.divider()
-
-    if mode == "C Rank Reference":
-        _render_c_rank_mode(df)
-    else:
-        _render_custom_mode(df)
-
-
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(add_help=False)
-    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
-    parser.add_argument("--csv", default=str(default_csv))
-    args, _ = parser.parse_known_args()
-    return args
-
-
-def _get_snapshot_date(df: pd.DataFrame) -> str:
-    if "snapshot_date" in df.columns:
-        valid = df["snapshot_date"].dropna()
-        if not valid.empty:
-            return str(valid.iloc[0])
-    return "N/A"
-
-
-def _render_custom_mode(df: pd.DataFrame) -> None:
     st.markdown(
         """
         <style>
         [data-testid="stHeader"] {
             display: none !important;
         }
+        [data-testid="stSidebar"] {
+            display: none !important;
+        }
         .block-container {
-            padding-top: 1.5rem !important;
-            padding-bottom: 1rem !important;
+            padding-top: 1.2rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 98% !important;
         }
         div[data-testid="stVerticalBlock"] > div {
-            padding-bottom: 0.3rem !important;
+            padding-bottom: 0.25rem !important;
         }
-        .streamlit-expanderHeader {
-            padding-top: 0.3rem !important;
-            padding-bottom: 0.3rem !important;
+        .status-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+        .status-card-active {
+            border: 2px solid #1f77b4;
+            background-color: #e3f2fd;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    snapshot_date = _get_snapshot_date(df)
-    total_pool = len(df)
-    active_signals = int(df["signal"].sum()) if "signal" in df.columns else 0
+    df: pd.DataFrame | None = None
+    load_err: str | None = None
+    try:
+        df = cached_load_pool_csv(args.csv, _csv_cache_fingerprint(args.csv))
+    except Exception as exc:
+        load_err = str(exc)
+
+    _render_header_bar(df, load_err)
+
+    if df is None:
+        st.error(f"Could not load breakout pool data: {load_err}")
+        return
+
+    mode = st.session_state.get("global_mode_selector", "IBD Review")
+    if mode == "C Rank Reference":
+        _render_c_rank_reference_view(df)
+    else:
+        _render_ibd_review_view(df)
+
+
+def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
+    col_l, col_r = st.columns([3, 2])
+    with col_l:
+        badge_html = (
+            '<span style="background-color:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Data Ready</span>'
+            if df is not None
+            else '<span style="background-color:#ffebee; color:#c62828; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Schema / Data Error</span>'
+        )
+        snapshot_date = _get_snapshot_date(df) if df is not None else "N/A"
+        total_pool = len(df) if df is not None else 0
+        active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
+        st.markdown(
+            f'<h3 style="margin:0; display:inline-block; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">Breakout Follow Pool {badge_html}</h3>'
+            f'<div style="font-size:13px; color:#555; margin-top:4px;">Snapshot <b>{snapshot_date}</b> · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
+            unsafe_allow_html=True,
+        )
+
+    with col_r:
+        c1, c2 = st.columns([1, 2.5])
+        with c1:
+            if st.button("ⓘ Flow & Rules", use_container_width=True):
+                _render_flow_rules_dialog()
+        with c2:
+            mode = st.segmented_control(
+                "Mode Selector",
+                ["IBD Review", "C Rank Reference"],
+                default=st.session_state.get("global_mode_selector", "IBD Review") or "IBD Review",
+                key="global_mode_selector",
+                label_visibility="collapsed",
+            )
+            if mode is None:
+                mode = "IBD Review"
+    st.divider()
+
+
+@st.dialog("IBD Breakout Review Flow & Rules", width="large")
+def _render_flow_rules_dialog() -> None:
     st.markdown(
-        f"#### Breakout Follow Pool ｜ Total Pool: **{total_pool}** ｜ Active Signal: **{active_signals}** ｜ Snapshot Date: **`{snapshot_date}`**"
+        r"""
+        #### 1. IBD Review Workflow (`signal=True`)
+        - **Step 1: Route Filtering (`Route`)**: Select the candidate breakout/pullback rule (e.g., `ceiling_breakout`, `ma10_touch_confirm`, etc.). Status card totals dynamically update to reflect the count of active signals under the selected route.
+        - **Step 2: Status Triage (`Status Queue`)**: Click any status card to slice the queue.
+          - `ACTIONABLE`: Price $\le +5.0\%$ from trigger and daily volume condition met.
+          - `UNCONFIRMED`: Price within breakout zone or pullback zone but volume unconfirmed (subtitle tracks items within $+3.0\%$).
+          - `BELOW_TRIGGER`: Price fell below trigger price (< $0.0\%$).
+          - `EXTENDED`: Price extended beyond $+5.0\%$ chase limit.
+        - **Step 3: Quality Thresholds (`One-line Filter Bar`)**: Apply strict `AND` intersection filtering on Distance Min/Max %, Entry Volume Ratio Min, and Weekly Volume Ratio Min.
+          - *Note*: `Entry Vol Min` is automatically disabled and cleared when `UNCONFIRMED` or `All` status is selected (enabled for `ACTIONABLE`, `BELOW_TRIGGER`, and `EXTENDED`).
+        - **Step 4: Selected Row Detail**: Click any row in the Decision Table to immediately inspect current price, candidate rule, volume ratio, and `C Rank / C Continuous` scores in the top detail bar.
+        - **Step 5: Code Export**: Use the one-click clipboard copy button or popover text to export filtered codes.
+
+        ---
+        #### 2. C Rank Reference Mode
+        - Isolates and displays all actionable or unconfirmed pool records where `signal=True`, strictly sorted by **`rank_C_continuous` ascending**.
+        - **Top N Selector**: Slice the top candidates (`Top 10`, `Top 20`, `Top 30`, `Top 50`, or `All rows`).
+        """
     )
 
-    filters_by_group, route_df = _funnel_filters(df)
-    filters = _flatten_filters(filters_by_group)
 
-    filtered = apply_filters(df, filters)
-    filtered = apply_default_review_order(filtered)
-
-    _render_current_filter_summary(filters_by_group, len(filtered), len(df))
-
-    active_count = int(df["signal"].sum()) if "signal" in df.columns else len(df)
-    st.markdown(f"**Showing {len(filtered)} of {active_count} Active Signals**")
-    _render_kpis(filtered)
-
-    _render_table_controls(filtered, df)
-
-    with st.expander("📈 Route Quality (Optional Chart)", expanded=False):
-        _render_charts(route_df)
+ENTRY_VOL_ENABLED_STATUSES: set[str] = {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
 
 
-def _render_c_rank_mode(df: pd.DataFrame) -> None:
-    with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=True):
-        _render_c_rank_rules()
-    limit_label = st.selectbox("Top N", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"])
-    limit = None if limit_label == "All rows" else int(limit_label.split()[1])
+def _render_ibd_review_view(df: pd.DataFrame) -> None:
+    active_df = df[df["signal"] == True].copy() if "signal" in df.columns else df.copy()
+    active_signals_count = len(active_df)
+
+    route_val = st.session_state.get("ibd_filter_route", "All")
+    status_val = st.session_state.get("ibd_filter_status", "All")
+    dist_min_val = st.session_state.get("ibd_filter_dist_min", "")
+    dist_max_val = st.session_state.get("ibd_filter_dist_max", "")
+    entry_vol_min_val = st.session_state.get("ibd_filter_entry_vol_min", "")
+    weekly_vol_min_val = st.session_state.get("ibd_filter_weekly_vol_min", "")
+
+    if route_val != "All":
+        route_df = active_df[active_df["ibd_candidate_rule"] == route_val]
+    else:
+        route_df = active_df
+
+    status_counts = build_entry_status_counts(route_df)
+
+    _render_status_queue(status_counts, len(route_df), status_val)
+
+    _render_filter_bar(df, status_val)
+
+    filtered_df = route_df.copy()
+    if status_val != "All":
+        filtered_df = filtered_df[filtered_df["ibd_entry_status"] == status_val]
+
+    if dist_min_val != "":
+        try:
+            val = float(dist_min_val)
+            filtered_df = filtered_df[pd.to_numeric(filtered_df["current_vs_ibd_candidate_pct"], errors="coerce") >= val]
+        except ValueError:
+            pass
+
+    if dist_max_val != "":
+        try:
+            val = float(dist_max_val)
+            filtered_df = filtered_df[pd.to_numeric(filtered_df["current_vs_ibd_candidate_pct"], errors="coerce") <= val]
+        except ValueError:
+            pass
+
+    if status_val in ENTRY_VOL_ENABLED_STATUSES and entry_vol_min_val != "":
+        try:
+            val = float(entry_vol_min_val)
+            filtered_df = filtered_df[pd.to_numeric(filtered_df["ibd_entry_volume_ratio"], errors="coerce") >= val]
+        except ValueError:
+            pass
+
+    if weekly_vol_min_val != "":
+        try:
+            val = float(weekly_vol_min_val)
+            filtered_df = filtered_df[pd.to_numeric(filtered_df["volume_ratio"], errors="coerce") >= val]
+        except ValueError:
+            pass
+
+    filtered_df = apply_default_review_order(filtered_df)
+
+    detail_container = st.empty()
+
+    col_view_c, summary_c, copy_c = st.columns([1.5, 2.5, 2])
+    with col_view_c:
+        column_view = st.selectbox(
+            "Column View",
+            ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Volume/Pullback", "Reference"],
+            index=0,
+            key="ibd_column_view_select",
+        )
+    with summary_c:
+        st.markdown(
+            f'<div style="margin-top:28px; font-size:14px;">📊 <b>Filtered Rows: {len(filtered_df)} / {active_signals_count}</b> Active Signals · Sorted by Status → C Rank</div>',
+            unsafe_allow_html=True,
+        )
+    with copy_c:
+        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+        _render_copy_codes_control(filtered_df["code"].tolist(), key_prefix="ibd_review")
+
+    columns = get_column_view_fields(column_view)
+    selected_code = render_table(filtered_df, columns, height=620)
+
+    with detail_container.container():
+        _render_selected_row_detail(filtered_df, selected_code)
+
+    st.markdown("---")
+    _download_current_rows(df.loc[filtered_df.index] if not filtered_df.empty else pd.DataFrame(), "ibd_review_filtered.csv")
+
+
+def _render_status_queue(status_counts: dict[str, int], route_total: int, current_status: str) -> None:
+    c_title, c_btn = st.columns([3, 1])
+    with c_title:
+        st.markdown("##### 1. Status Queue Triage (`signal=True` + `Route`)")
+    with c_btn:
+        if st.button(f"⚡ All Signals ({route_total})", use_container_width=True, type="primary" if current_status == "All" else "secondary"):
+            st.session_state["ibd_filter_status"] = "All"
+            st.session_state["ibd_filter_entry_vol_min"] = ""
+            st.rerun()
+
+    cols = st.columns(4)
+    statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
+    for i, status_name in enumerate(statuses):
+        with cols[i]:
+            count = status_counts.get(status_name, 0)
+            is_active = current_status == status_name
+            bg_color = "#e3f2fd" if is_active else "#f8f9fa"
+            border_color = "#1f77b4" if is_active else "#e0e0e0"
+
+            subtitle = "&nbsp;"
+            if status_name == "UNCONFIRMED":
+                subtitle = f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3%"
+
+            st.markdown(
+                f"""
+                <div style="border: 2px solid {border_color}; border-radius: 8px; padding: 10px; background-color: {bg_color}; text-align: center; margin-bottom: 8px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #555;">{status_name}</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #1f77b4; margin: 4px 0;">{count}</div>
+                    <div style="font-size: 11px; color: #666;">{subtitle}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            btn_label = f"✓ {status_name} Selected" if is_active else f"Select {status_name}"
+            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True):
+                if is_active:
+                    st.session_state["ibd_filter_status"] = "All"
+                    st.session_state["ibd_filter_entry_vol_min"] = ""
+                else:
+                    st.session_state["ibd_filter_status"] = status_name
+                    if status_name not in ENTRY_VOL_ENABLED_STATUSES:
+                        st.session_state["ibd_filter_entry_vol_min"] = ""
+                st.rerun()
+    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+
+
+def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
+    st.markdown("##### 2. One-line Quality Filtering (`AND` Combination)")
+    cols = st.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8])
+    with cols[0]:
+        routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
+        current_route = st.session_state.get("ibd_filter_route", "All")
+        idx = routes.index(current_route) if current_route in routes else 0
+        selected_route = st.selectbox("Route (Rule)", routes, index=idx, key="ibd_filter_route_input")
+        if selected_route != current_route:
+            st.session_state["ibd_filter_route"] = selected_route
+            st.rerun()
+
+    with cols[1]:
+        val = st.text_input("Distance Min %", value=st.session_state.get("ibd_filter_dist_min", ""), placeholder="-20.0", key="ibd_filter_dist_min_input")
+        if val != st.session_state.get("ibd_filter_dist_min", ""):
+            st.session_state["ibd_filter_dist_min"] = val
+            st.rerun()
+
+    with cols[2]:
+        val = st.text_input("Distance Max %", value=st.session_state.get("ibd_filter_dist_max", ""), placeholder="20.0", key="ibd_filter_dist_max_input")
+        if val != st.session_state.get("ibd_filter_dist_max", ""):
+            st.session_state["ibd_filter_dist_max"] = val
+            st.rerun()
+
+    with cols[3]:
+        is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
+        placeholder_text = "N/A (Disabled)" if is_disabled else "1.5"
+        val_entry = "" if is_disabled else st.session_state.get("ibd_filter_entry_vol_min", "")
+        val = st.text_input("Entry Vol Min (x)", value=val_entry, placeholder=placeholder_text, disabled=is_disabled, key="ibd_filter_entry_vol_min_input")
+        if not is_disabled and val != st.session_state.get("ibd_filter_entry_vol_min", ""):
+            st.session_state["ibd_filter_entry_vol_min"] = val
+            st.rerun()
+
+    with cols[4]:
+        val = st.text_input("Weekly Vol Min (x)", value=st.session_state.get("ibd_filter_weekly_vol_min", ""), placeholder="1.2", key="ibd_filter_weekly_vol_min_input")
+        if val != st.session_state.get("ibd_filter_weekly_vol_min", ""):
+            st.session_state["ibd_filter_weekly_vol_min"] = val
+            st.rerun()
+
+    with cols[5]:
+        st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+        if st.button("Reset", use_container_width=True):
+            st.session_state["ibd_filter_route"] = "All"
+            st.session_state["ibd_filter_status"] = "All"
+            st.session_state["ibd_filter_dist_min"] = ""
+            st.session_state["ibd_filter_dist_max"] = ""
+            st.session_state["ibd_filter_entry_vol_min"] = ""
+            st.session_state["ibd_filter_weekly_vol_min"] = ""
+            st.rerun()
+    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+
+
+def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
+    if filtered_df.empty:
+        st.info("No matching records found with current filter criteria.")
+        return
+
+    row: pd.Series | None = None
+    if selected_code is not None and selected_code in filtered_df["code"].values:
+        row = filtered_df[filtered_df["code"] == selected_code].iloc[0]
+    else:
+        row = filtered_df.iloc[0]
+
+    code = str(row.get("code", "N/A"))
+    sector = str(row.get("sector", "N/A"))
+    industry = str(row.get("industry", "N/A"))
+    signal_src = str(row.get("signal_source", "N/A"))
+    cand_price = _format_number(row.get("ibd_candidate_price"), "")
+    cand_rule = str(row.get("ibd_candidate_rule", "N/A"))
+    dist_pct = _format_number(row.get("current_vs_ibd_candidate_pct"), "%")
+    latest_close = _format_number(row.get("latest_close"), "")
+    status_name = str(row.get("ibd_entry_status", "N/A"))
+    vol_or_reject = str(row.get("ibd_entry_vol_or_reject", "N/A"))
+    rank_c = str(row.get("rank_C_continuous", "N/A"))
+    c_cont = _format_number(row.get("C_continuous"), "")
+
+    st.markdown(
+        f"""
+        <div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:12px 16px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e9ecef; padding-bottom:8px; margin-bottom:10px;">
+                <div>
+                    <span style="font-size:18px; font-weight:800; color:#1f77b4;">{code}</span>
+                    <span style="font-size:14px; color:#495057; margin-left:12px;"><b>Sector/Industry:</b> {sector} / {industry}</span>
+                </div>
+                <div style="font-size:13px; color:#6c757d;"><b>Signal Source:</b> {signal_src}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; text-align:center;">
+                <div style="flex:1; border-right:1px solid #e9ecef;">
+                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Candidate Price</div>
+                    <div style="font-size:16px; font-weight:700; color:#212529;">{cand_price}</div>
+                    <div style="font-size:11px; color:#495057;">Route: {cand_rule}</div>
+                </div>
+                <div style="flex:1; border-right:1px solid #e9ecef;">
+                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Current vs Candidate</div>
+                    <div style="font-size:16px; font-weight:700; color:#212529;">{dist_pct}</div>
+                    <div style="font-size:11px; color:#495057;">Close: {latest_close}</div>
+                </div>
+                <div style="flex:1; border-right:1px solid #e9ecef;">
+                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Entry Status</div>
+                    <div style="font-size:16px; font-weight:700; color:#2e7d32;">{status_name}</div>
+                    <div style="font-size:11px; color:#495057;">Vol / Reason: {vol_or_reject}</div>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">C Rank & Continuous</div>
+                    <div style="font-size:16px; font-weight:700; color:#1f77b4;">#{rank_c}</div>
+                    <div style="font-size:11px; color:#495057;">Continuous: {c_cont}</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
+    st.markdown("##### C Rank Reference View (`signal=True` · Sorted by `rank_C_continuous` asc)")
+    
+    with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(
+                "\n".join(
+                    [
+                        "**Fixed Mode Rules**",
+                        "- signal=True",
+                        "- rank_C_continuous asc",
+                        "- Top N selector only",
+                        "- Custom filters ignored",
+                    ]
+                )
+            )
+        with c2:
+            st.markdown(
+                "\n".join(
+                    [
+                        "**Ranking Formula Reference**",
+                        "- 2.5 x pct(base_depth_abs)",
+                        "- 2.0 x pct(pct_above_ceiling)",
+                        "- 0.5 x pct(volume_ratio)",
+                        "- 0.5 x fresh_touch / fresh_pullback",
+                    ]
+                )
+            )
+
+    col_limit, col_summary, col_copy = st.columns([1.5, 2.5, 2])
+    with col_limit:
+        limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
+        limit = None if limit_label == "All rows" else int(limit_label.split()[1])
+    
     ranked = apply_c_rank_mode(df, limit=limit)
-    st.caption(f"C Rank Reference | Rows: {len(ranked)}/{len(df)} | signal=True | rank_C_continuous asc")
-    leading_columns = ["code", "rank_C_continuous", "C_continuous", "is_priority"]
+    
+    with col_summary:
+        st.markdown(
+            f'<div style="margin-top:28px; font-size:14px;">📊 <b>Showing: {len(ranked)} / {len(df)}</b> Pool Records · Reference Only</div>',
+            unsafe_allow_html=True,
+        )
+    with col_copy:
+        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+        _render_copy_codes_control(ranked["code"].tolist(), key_prefix="c_rank_ref")
+
+    detail_container = st.empty()
+
+    leading_columns = ["code", "rank_C_continuous", "C_continuous", "ibd_entry_status", "current_vs_ibd_candidate_pct", "ibd_candidate_rule", "volume_ratio", "latest_close"]
     columns = leading_columns + [column for column in get_all_table_columns() if column not in set(leading_columns)]
-    render_table(ranked, [column for column in columns if column in ranked.columns], height=720)
+    selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=720)
+
+    with detail_container.container():
+        _render_selected_row_detail(ranked, selected_code)
+
+    st.markdown("---")
     _download_current_rows(ranked, "c_rank_reference.csv")
 
 
-def _render_c_rank_rules() -> None:
-    left, right = st.columns(2)
-    with left:
-        st.markdown(
-            "\n".join(
-                [
-                    "**Fixed Mode Rules**",
-                    "- signal=True",
-                    "- rank_C_continuous asc",
-                    "- Top N selector only",
-                    "- Custom filters ignored",
-                ]
-            )
-        )
-    with right:
-        st.markdown(
-            "\n".join(
-                [
-                    "**Ranking Formula Reference**",
-                    "- 2.5 x pct(base_depth_abs)",
-                    "- 2.0 x pct(pct_above_ceiling)",
-                    "- 0.5 x pct(volume_ratio)",
-                    "- 0.5 x fresh_touch / fresh_pullback",
-                ]
-            )
-        )
+def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
+    codes_str = ", ".join([str(c) for c in codes if pd.notna(c) and str(c).strip()])
+    n = len(codes)
+    html_code = f"""
+    <div style="display:flex; align-items:center; justify-content:flex-end; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <button id="copyBtn_{key_prefix}" style="background:#1f77b4; color:#fff; border:none; border-radius:4px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.12); transition: background 0.2s;">
+            📋 Copy {n} Codes
+        </button>
+        <span id="copyMsg_{key_prefix}" style="margin-left:8px; font-size:12px; color:#2e7d32; font-weight:600; display:none;">✓ Copied!</span>
+    </div>
+    <script>
+        const btn = document.getElementById('copyBtn_{key_prefix}');
+        const msg = document.getElementById('copyMsg_{key_prefix}');
+        const textToCopy = {json.dumps(codes_str)};
+        if (btn) {{
+            btn.addEventListener('click', () => {{
+                const ta = document.createElement('textarea');
+                ta.value = textToCopy;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                try {{
+                    document.execCommand('copy');
+                }} catch (e) {{
+                    if (navigator.clipboard) {{
+                        navigator.clipboard.writeText(textToCopy);
+                    }}
+                }}
+                document.body.removeChild(ta);
+                if (msg) msg.style.display = 'inline';
+                btn.style.background = '#2e7d32';
+                btn.innerText = '✓ Copied {n} Codes';
+                setTimeout(() => {{
+                    if (msg) msg.style.display = 'none';
+                    btn.style.background = '#1f77b4';
+                    btn.innerText = '📋 Copy {n} Codes';
+                }}, 2000);
+            }});
+        }}
+    </script>
+    """
+    col_a, col_b = st.columns([1.5, 1])
+    with col_a:
+        st.components.v1.html(html_code, height=36)
+    with col_b:
+        with st.popover(f"📋 Manual Copy ({n})"):
+            st.caption("If direct copy is blocked by your browser, copy directly from below:")
+            st.code(codes_str, language="text")
 
 
 def _funnel_filters(df: pd.DataFrame) -> tuple[dict[str, list[FilterSpec]], pd.DataFrame]:
     groups = get_filter_funnel_groups()
-    if list(groups) != FUNNEL_ORDER:
-        raise ValueError("Filter funnel configuration is out of sync with the dashboard layout.")
     filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
-
-    with st.expander("⏳ Filter Funnel Config Panel", expanded=True):
-        cols = st.columns([1, 1, 2])
-
-        with cols[0]:
-            st.markdown("##### 1. Route")
-            candidate_rules = ["All"] + _unique_values(df, "ibd_candidate_rule")
-            candidate_rule = st.selectbox("IBD Candidate Rule", candidate_rules, index=0, key="funnel_route_rule")
-            filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
-            if candidate_rule != "All":
-                filters_by_group["Route"].append(FilterSpec("ibd_candidate_rule", "equals", candidate_rule))
-
-        route_df = apply_filters(df, filters_by_group["Route"])
-        status_counts = build_entry_status_counts(route_df)
-
-        with cols[1]:
-            st.markdown("##### 2. Entry Status")
-            status_options = ["All", "ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
-            selected_status = st.radio(
-                "IBD Entry Status",
-                status_options,
-                index=0,
-                key="funnel_entry_status",
-                format_func=lambda s: f"{s} ({status_counts.get(s, 0)})",
-            )
-            if selected_status != "All":
-                filters_by_group["Entry Status"].append(FilterSpec("ibd_entry_status", "equals", selected_status))
-
-        status_df = apply_filters(route_df, filters_by_group["Entry Status"])
-
-        with cols[2]:
-            st.markdown("##### 3. Optional Quality Filters")
-            disabled_daily = selected_status == "UNCONFIRMED"
-
-            spec = _range_filter(status_df, "current_vs_ibd_candidate_pct", st, key_prefix="cand_pct", disabled=False)
-            if spec is not None:
-                filters_by_group["Optional Quality Filters"].append(spec)
-
-            spec = _range_filter(status_df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=disabled_daily)
-            if spec is not None:
-                filters_by_group["Optional Quality Filters"].append(spec)
-
-            spec = _range_filter(status_df, "volume_ratio", st, key_prefix="weekly", disabled=False)
-            if spec is not None:
-                filters_by_group["Optional Quality Filters"].append(spec)
-
+    route_df = df[df["signal"] == True].copy() if "signal" in df.columns else df.copy()
+    filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
     return filters_by_group, route_df
 
 
@@ -244,13 +547,11 @@ def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]]
     if not active_groups:
         st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** (All records)")
         return
-        
     summary_parts = []
     for group, filters in active_groups.items():
         short_group = group.split(" & ")[0].split(" Rule")[0].split(" Vol")[0]
         conditions_str = " & ".join(_describe_filter_condition(spec) for spec in filters)
         summary_parts.append(f"**{short_group}**: `{conditions_str}`")
-        
     st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** ｜ " + " → ".join(summary_parts))
 
 
@@ -282,61 +583,6 @@ def _describe_filter_condition(spec: FilterSpec) -> str:
     return f"{label} {spec.operator} {_format_val(spec.value)}"
 
 
-def _render_kpis(df: pd.DataFrame) -> None:
-    kpis = build_kpis(df)
-    columns = st.columns(4)
-    columns[0].metric("Filtered Rows", kpis["filtered_rows"])
-    columns[1].metric("Median Candidate Dist", _format_number(kpis["median_current_vs_ibd_candidate_pct"], "%"))
-    columns[2].metric("Median IBD Volume Ratio", _format_number(kpis["median_ibd_entry_volume_ratio"], "x"))
-    columns[3].metric("Median Volume Ratio", _format_number(kpis["median_volume_ratio"], "x"))
-
-
-def _render_charts(df: pd.DataFrame) -> None:
-    charts = build_chart_data(df)
-    route_df = charts["route_quality"]
-    if route_df.empty:
-        st.info("No rows for Route Quality.")
-        return
-    fig = px.bar(
-        route_df,
-        x="ibd_candidate_rule",
-        y="total_count",
-        color="valid_rate_pct",
-        color_continuous_scale="Greens",
-        range_color=[0, 100],
-        text="total_count",
-        hover_data={
-            "ibd_candidate_rule": True,
-            "valid_count": True,
-            "invalid_count": True,
-            "valid_rate_pct": ":.2f",
-            "median_ibd_entry_volume_ratio": ":.2f",
-            "median_ibd_entry_close_position": ":.2f",
-            "median_ibd_entry_breakout_range_ratio": ":.2f",
-        },
-        title="Route Quality",
-        height=240,
-    )
-    fig.update_layout(
-        margin={"l": 8, "r": 8, "t": 36, "b": 16},
-        xaxis_title="",
-        yaxis_title="",
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
-    column_view = st.selectbox(
-        "Column View",
-        ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Volume/Pullback", "Reference"],
-        index=0,
-    )
-    columns = get_column_view_fields(column_view)
-    render_table(filtered_df, columns)
-    export_df = original_df.loc[filtered_df.index].copy()
-    _download_current_rows(export_df, "breakout_pool_filtered.csv")
-
-
 def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
     st.download_button(
         "Download CSV",
@@ -346,50 +592,27 @@ def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
     )
 
 
-def _range_filter(
-    df: pd.DataFrame,
-    field: str,
-    container: Any,
-    default_bounds: tuple[float | None, float | None] | None = None,
-    key_prefix: str = "",
-    disabled: bool = False,
-) -> FilterSpec | None:
-    if field not in df.columns:
-        return None
-    values = pd.to_numeric(df[field], errors="coerce").dropna()
-    if values.empty:
-        return None
-    min_value = float(values.min())
-    max_value = float(values.max())
-    if min_value == max_value:
-        return None
-    default_min, default_max = min_value, max_value
-    if default_bounds is not None:
-        if default_bounds[0] is not None:
-            default_min = min(max(float(default_bounds[0]), min_value), max_value)
-        if default_bounds[1] is not None:
-            default_max = min(max(float(default_bounds[1]), min_value), max_value)
-    selected = container.slider(
-        get_field_label(field),
-        min_value=min_value,
-        max_value=max_value,
-        value=(default_min, default_max),
-        key=f"{key_prefix}_range_{field}" if key_prefix else f"range_{field}",
-        disabled=disabled,
-        format="%.2f",
-    )
-    if disabled:
-        return None
-    if selected == (min_value, max_value):
-        return None
-    return FilterSpec(field, "between", selected[0], selected[1])
-
-
 def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
     if field not in df.columns:
         return []
     values = df[field].dropna().astype(str).sort_values().unique().tolist()
     return [value for value in values if value]
+
+
+def _get_snapshot_date(df: pd.DataFrame) -> str:
+    if "snapshot_date" in df.columns:
+        valid = df["snapshot_date"].dropna()
+        if not valid.empty:
+            return str(valid.iloc[0])
+    return "N/A"
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(add_help=False)
+    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
+    parser.add_argument("--csv", default=str(default_csv))
+    args, _ = parser.parse_known_args()
+    return args
 
 
 def _format_number(value: float | int | None, suffix: str = "") -> str:

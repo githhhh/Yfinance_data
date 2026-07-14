@@ -35,7 +35,15 @@ class SortSpec:
     enabled: bool = True
 
 
-REQUIRED_CORE_FIELDS = {"latest_close", "current_vs_ibd_candidate_pct", "ibd_entry_status"}
+REQUIRED_CORE_FIELDS = {
+    "signal",
+    "latest_close",
+    "ibd_entry_status",
+    "current_vs_ibd_candidate_pct",
+    "ibd_candidate_rule",
+    "rank_C_continuous",
+    "C_continuous",
+}
 
 
 def validate_pool_schema(df: pd.DataFrame) -> None:
@@ -86,6 +94,20 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
 
     if "ibd_entry_status" not in result.columns:
         result["ibd_entry_status"] = result.apply(_compute_ibd_entry_status, axis=1)
+
+    if "ibd_entry_vol_or_reject" not in result.columns:
+        def _vol_or_reject(row: pd.Series) -> str | Any:
+            valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+            if valid is not True:
+                reason = str(row.get("ibd_entry_reject_reason", "")).strip()
+                if not reason or reason.lower() == "nan":
+                    return "Volume not confirmed"
+                return reason
+            vol = pd.to_numeric(row.get("ibd_entry_volume_ratio"), errors="coerce")
+            if pd.isna(vol):
+                return "n/a"
+            return f"{vol:.2f}x"
+        result["ibd_entry_vol_or_reject"] = result.apply(_vol_or_reject, axis=1)
 
     return result
 
@@ -491,12 +513,20 @@ def _compute_ibd_entry_status(row: pd.Series) -> str | Any:
 
 
 def build_entry_status_counts(signal_df: pd.DataFrame) -> dict[str, int]:
+    if "signal" in signal_df.columns:
+        signal_df = signal_df[signal_df["signal"] == True]
     statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
     counts = {status: 0 for status in statuses}
+    unconfirmed_within_3pct = 0
     if not signal_df.empty and "ibd_entry_status" in signal_df.columns:
         vc = signal_df["ibd_entry_status"].value_counts(dropna=True)
         for status in statuses:
             counts[status] = int(vc.get(status, 0))
+        if "current_vs_ibd_candidate_pct" in signal_df.columns:
+            unconf_mask = (signal_df["ibd_entry_status"] == "UNCONFIRMED") & pd.to_numeric(
+                signal_df["current_vs_ibd_candidate_pct"], errors="coerce"
+            ).between(0.0, 3.0, inclusive="both")
+            unconfirmed_within_3pct = int(unconf_mask.sum())
     total = len(signal_df)
-    return {"All": total, "ALL": total, **counts}
+    return {"All": total, "ALL": total, "unconfirmed_within_3pct": unconfirmed_within_3pct, **counts}
 

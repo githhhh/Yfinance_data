@@ -64,6 +64,7 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "ibd_entry_date",
         "ibd_entry_price",
         "ibd_entry_volume_ratio",
+        "ibd_entry_vol_or_reject",
         "ibd_entry_close_vs_trigger_pct",
         "ibd_entry_close_position",
         "ibd_entry_breakout_range_ratio",
@@ -99,30 +100,36 @@ def test_all_fields_table_columns_follow_logical_business_groups():
 def test_ibd_decision_view_columns():
     expected = [
         "code",
-        "snapshot_date",
-        "ibd_candidate_rule",
         "ibd_entry_status",
-        "latest_close",
-        "ibd_candidate_price",
+        "ibd_candidate_rule",
         "current_vs_ibd_candidate_pct",
-        "ibd_entry_date",
-        "ibd_entry_price",
-        "ibd_entry_volume_ratio",
-        "ibd_entry_reject_reason",
+        "latest_close",
+        "ibd_entry_vol_or_reject",
         "volume_ratio",
-        "eps_yoy_growth",
-        "price_52_week_high",
-        "dist_to_52w_high_pct",
         "rank_C_continuous",
     ]
     assert get_default_table_columns() == expected
     assert get_column_view_fields("IBD Decision") == expected
 
 
+def test_c_rank_reference_view_columns():
+    expected = [
+        "code",
+        "rank_C_continuous",
+        "C_continuous",
+        "ibd_entry_status",
+        "current_vs_ibd_candidate_pct",
+        "ibd_candidate_rule",
+        "volume_ratio",
+        "latest_close",
+    ]
+    assert get_column_view_fields("C Rank Reference") == expected
+
+
 def test_table_views_cover_all_fields_without_scattering_related_columns():
     all_fields = set(get_all_table_columns())
     grouped_fields: set[str] = set()
-    for view in ["IBD Decision", "Signal", "IBD Entry", "Volume/Pullback", "Reference"]:
+    for view in ["IBD Decision", "C Rank Reference", "Signal", "IBD Entry", "Volume/Pullback", "Reference"]:
         grouped_fields.update(get_column_view_fields(view))
 
     # All fields should be covered by the core views plus All Fields

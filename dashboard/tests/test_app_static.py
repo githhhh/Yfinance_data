@@ -6,8 +6,15 @@ from dashboard.data_utils import FilterSpec
 
 def test_table_controls_do_not_use_unsupported_selectbox_horizontal_keyword():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    import ast
 
-    assert "horizontal=True" not in source
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr == "selectbox":
+                for kw in node.keywords:
+                    assert kw.arg != "horizontal"
 
 
 def test_custom_filter_ui_uses_trading_decision_funnel_without_presets():

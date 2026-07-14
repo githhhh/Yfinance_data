@@ -80,6 +80,7 @@ ALL_TABLE_COLUMNS = [
     "ibd_entry_date",
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
+    "ibd_entry_vol_or_reject",
     "ibd_entry_close_vs_trigger_pct",
     "ibd_entry_close_position",
     "ibd_entry_breakout_range_ratio",
@@ -111,21 +112,24 @@ ALL_TABLE_COLUMNS = [
 
 IBD_DECISION_COLUMNS = [
     "code",
-    "snapshot_date",
-    "ibd_candidate_rule",
     "ibd_entry_status",
-    "latest_close",
-    "ibd_candidate_price",
+    "ibd_candidate_rule",
     "current_vs_ibd_candidate_pct",
-    "ibd_entry_date",
-    "ibd_entry_price",
-    "ibd_entry_volume_ratio",
-    "ibd_entry_reject_reason",
+    "latest_close",
+    "ibd_entry_vol_or_reject",
     "volume_ratio",
-    "eps_yoy_growth",
-    "price_52_week_high",
-    "dist_to_52w_high_pct",
     "rank_C_continuous",
+]
+
+C_RANK_REFERENCE_COLUMNS = [
+    "code",
+    "rank_C_continuous",
+    "C_continuous",
+    "ibd_entry_status",
+    "current_vs_ibd_candidate_pct",
+    "ibd_candidate_rule",
+    "volume_ratio",
+    "latest_close",
 ]
 
 DEFAULT_TABLE_COLUMNS = IBD_DECISION_COLUMNS
@@ -149,6 +153,7 @@ IBD_COLUMNS = [
     "ibd_entry_date",
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
+    "ibd_entry_vol_or_reject",
     "ibd_entry_close_vs_trigger_pct",
     "ibd_entry_close_position",
     "ibd_entry_breakout_range_ratio",
@@ -277,6 +282,18 @@ FIELD_CONFIG = OrderedDict(
                 default_table=True,
                 fmt="0.00x",
                 help_text="Breakout bar price range relative to typical volatility.",
+            ),
+        ),
+        (
+            "ibd_entry_vol_or_reject",
+            _field(
+                "IBD Entry Volume / Reject Reason",
+                "text",
+                "IBD Entry",
+                filterable=False,
+                sortable=False,
+                default_table=True,
+                advanced_filter=False,
             ),
         ),
         (
@@ -435,6 +452,8 @@ def get_default_table_columns() -> list[str]:
 def get_column_view_fields(view_name: str) -> list[str]:
     if view_name == "IBD Decision":
         return [field for field in IBD_DECISION_COLUMNS if field in FIELD_CONFIG]
+    if view_name == "C Rank Reference":
+        return [field for field in C_RANK_REFERENCE_COLUMNS if field in FIELD_CONFIG]
     if view_name == "All Fields":
         return get_all_table_columns()
     if view_name == "Signal":
@@ -461,3 +480,4 @@ def get_all_table_columns() -> list[str]:
 
 def get_field_label(field: str) -> str:
     return str(FIELD_CONFIG.get(field, {}).get("label", field))
+

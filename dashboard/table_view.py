@@ -108,7 +108,7 @@ def _get_value_formatter(fmt: str | None):
 
 
 def build_grid_options(columns: list[str]) -> dict:
-    return {
+    options = {
         "columnDefs": [_column_def(column) for column in columns],
         "defaultColDef": {
             "sortable": True,
@@ -117,13 +117,21 @@ def build_grid_options(columns: list[str]) -> dict:
             "editable": False,
         },
         "enableRangeSelection": True,
-        "rowSelection": "multiple",
+        "rowSelection": "single",
+        "suppressRowClickSelection": False,
         "suppressDragLeaveHidesColumns": True,
         "animateRows": False,
     }
+    if HAS_JS_CODE:
+        options["getRowId"] = JsCode("""
+        function(params) {
+            return params.data && params.data.code ? String(params.data.code) : String(params.node ? params.node.rowIndex : Math.random());
+        }
+        """)
+    return options
 
 
-def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> None:
+def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str | None:
     display_columns = [column for column in columns if column in df.columns]
     display_df = df[display_columns].copy() if display_columns else df.copy()
     display_df.index = range(1, len(display_df) + 1)
@@ -139,17 +147,31 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> Non
 
         st.dataframe(display_df, use_container_width=True, height=height)
         st.caption("Install streamlit-aggrid to enable pinning, drag columns, range selection, and copy support.")
-        return
+        return None
 
-    AgGrid(
+    grid_response = AgGrid(
         display_df,
         gridOptions=build_grid_options(display_columns),
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=HAS_JS_CODE,
         enable_enterprise_modules=False,
-        update_mode="NO_UPDATE",
+        update_on=["selectionChanged"],
+        use_json_serialization=True,
     )
+    selected = grid_response.get("selected_rows", None)
+    if selected is None or len(selected) == 0:
+        return None
+    if isinstance(selected, pd.DataFrame):
+        if "code" in selected.columns and not selected.empty:
+            return str(selected.iloc[0]["code"])
+    elif isinstance(selected, (list, tuple)):
+        first = selected[0]
+        if isinstance(first, dict) and "code" in first:
+            return str(first["code"])
+        elif isinstance(first, pd.Series) and "code" in first:
+            return str(first["code"])
+    return None
 
 
 def _column_def(column: str) -> dict:
