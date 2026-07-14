@@ -182,35 +182,10 @@ def test_volume_close_matrix_structure():
     assert not matrix.empty
 
 
-def test_breakout_pattern_profile_structure():
-    charts = build_chart_data(chart_sample_df())
-    profile = charts["breakout_pattern"]
-
-    assert {"pattern", "count", "share_pct", "tickers"}.issubset(profile.columns)
-    assert profile["pattern"].tolist() == [
-        "GAP_UP",
-        "SOLID_BREAKOUT",
-        "MODERATE_BREAKOUT",
-        "MARGINAL_BREAKOUT",
-        "BULL_TRAP",
-    ]
-    assert profile["count"].tolist() == [1, 1, 1, 1, 1]
-
-
-def test_sector_concentration_counts_current_rows_and_share():
-    charts = build_chart_data(chart_sample_df())
-    concentration = charts["sector_concentration"].sort_values("sector")
-
-    assert concentration["sector"].tolist() == ["Finance", "Technology Services"]
-    assert concentration["row_count"].tolist() == [3, 3]
-    assert concentration["share_pct"].tolist() == [50.0, 50.0]
-
-
 def test_kpis_are_based_on_filtered_dataframe_only():
     kpis = build_kpis(chart_sample_df().iloc[:3])
 
     assert kpis["filtered_rows"] == 3
-    assert kpis["ibd_valid_rate_pct"] == 100.0
+    assert kpis["median_current_vs_ibd_candidate_pct"] is None
     assert kpis["median_ibd_entry_volume_ratio"] == 2.0
-    assert kpis["median_ibd_entry_close_position"] == 0.60
-    assert kpis["median_ibd_entry_breakout_range_ratio_valid"] == 0.60
+    assert kpis["median_volume_ratio"] == 1.4

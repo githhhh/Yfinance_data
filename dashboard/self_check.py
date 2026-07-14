@@ -30,7 +30,12 @@ from dashboard.field_config import (
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Self-check breakout pool dashboard logic.")
-    parser.add_argument("--csv", required=True, help="Path to breakout_follow_pool.csv")
+    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
+    parser.add_argument(
+        "--csv",
+        default=str(default_csv),
+        help="Path to breakout_follow_pool.csv",
+    )
     args = parser.parse_args()
 
     checks = [
@@ -39,8 +44,6 @@ def main() -> int:
         ("sort specs", _check_sort_specs),
         ("chart: Route Quality aggregation", _check_route_quality_chart),
         ("chart: Trend Volume Map row source", _check_trend_volume_map_chart),
-        ("chart: Breakout Pattern aggregation", _check_breakout_pattern_chart),
-        ("chart: Sector Concentration aggregation", _check_sector_concentration_chart),
         ("mode isolation", _check_mode_isolation),
     ]
 
@@ -66,6 +69,7 @@ def _check_load(df: pd.DataFrame) -> None:
         "ibd_entry_status",
         "latest_close",
         "current_vs_ibd_candidate_pct",
+        "dist_to_52w_high_pct",
     }
     missing = required - set(df.columns)
     assert not missing, f"missing required columns: {sorted(missing)}"
@@ -171,26 +175,6 @@ def _check_trend_volume_map_chart(df: pd.DataFrame) -> None:
         assert all(chart["entry_status"] == "IBD valid")
     required = {"entry_status", "dry_status", "sector", "industry", "touched_ema10_count", "touched_ema10_jittered", "volume_ratio"}
     assert required.issubset(chart.columns)
-
-
-def _check_breakout_pattern_chart(df: pd.DataFrame) -> None:
-    chart = build_chart_data(df)["breakout_pattern"]
-    expected_patterns = {
-        "GAP_UP",
-        "SOLID_BREAKOUT",
-        "MODERATE_BREAKOUT",
-        "MARGINAL_BREAKOUT",
-        "BULL_TRAP",
-    }
-    assert set(chart["pattern"]) == expected_patterns
-    assert {"pattern", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"}.issubset(chart.columns)
-
-
-def _check_sector_concentration_chart(df: pd.DataFrame) -> None:
-    chart = build_chart_data(df)["sector_concentration"]
-    assert int(chart["row_count"].sum()) == len(df)
-    assert abs(float(chart["share_pct"].sum()) - 100.0) <= 0.05
-    assert {"sector", "row_count", "share_pct", "valid_count", "valid_rate_pct", "top_industry"}.issubset(chart.columns)
 
 
 def _check_mode_isolation(df: pd.DataFrame) -> None:

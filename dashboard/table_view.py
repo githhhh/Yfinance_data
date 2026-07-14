@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from dashboard.field_config import get_field_label
+
 try:
     from st_aggrid import JsCode
 
@@ -107,7 +109,7 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> Non
 def _column_def(column: str) -> dict:
     definition = {
         "field": column,
-        "headerName": column,
+        "headerName": get_field_label(column),
         "minWidth": 120,
         "sortable": True,
         "filter": True,

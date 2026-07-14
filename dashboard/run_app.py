@@ -8,7 +8,8 @@ from pathlib import Path
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the local breakout pool dashboard.")
-    parser.add_argument("--csv", default=str(Path(__file__).parent / "data" / "breakout_follow_pool.csv"))
+    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
+    parser.add_argument("--csv", default=str(default_csv))
     parser.add_argument("--server-port", default="8501")
     args = parser.parse_args()
 

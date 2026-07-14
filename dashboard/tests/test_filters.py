@@ -1,5 +1,5 @@
 import warnings
-
+import pytest
 import pandas as pd
 
 from dashboard.data_utils import (
@@ -133,19 +133,17 @@ def test_normalize_pool_df_adds_base_duration_weeks_from_ceiling_to_breakout_dat
     assert pd.isna(df.loc[1, "base_duration_weeks"])
 
 
-def test_normalize_pool_df_adds_breakout_pattern_for_dashboard_filtering():
+def test_normalize_pool_df_adds_dist_to_52w_high_pct():
     df = normalize_pool_df(
         pd.DataFrame(
             [
-                {"code": "AAA", "ibd_entry_valid": "1", "ibd_entry_close_position": "0.60", "ibd_entry_breakout_range_ratio": "0.60"},
-                {"code": "BBB", "ibd_entry_valid": "1", "ibd_entry_close_position": "0.80", "ibd_entry_breakout_range_ratio": "0.60"},
+                {"code": "AAA", "latest_close": "95.0", "price_52_week_high": "100.0"},
+                {"code": "BBB", "latest_close": "100.0", "price_52_week_high": "100.0"},
             ]
         )
     )
 
-    assert df["breakout_pattern"].tolist() == ["MODERATE_BREAKOUT", "SOLID_BREAKOUT"]
-    actual = apply_filters(df, [FilterSpec("breakout_pattern", "equals", "MODERATE_BREAKOUT")])
-    assert actual["code"].tolist() == ["AAA"]
+    assert df["dist_to_52w_high_pct"].tolist() == pytest.approx([-5.0, 0.0])
 
 
 def test_all_enabled_filters_are_combined_with_and_logic():
@@ -318,7 +316,7 @@ def test_funnel_full_decision_funnel_integration_and_logic():
     assert all(actual["ibd_entry_valid"] == True)
 
 
-def test_apply_filters_supports_breakout_pattern_boundaries():
+def test_apply_filters_supports_entry_range_and_close_position_boundaries():
     df = sample_pool_df()
 
     gap_up = apply_filters(

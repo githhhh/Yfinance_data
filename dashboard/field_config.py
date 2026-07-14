@@ -57,7 +57,7 @@ FILTER_FUNNEL_GROUPS = OrderedDict(
         ("Entry Status", ["ibd_entry_status"]),
         (
             "Optional Quality Filters",
-            ["breakout_pattern", "ibd_entry_volume_ratio", "volume_ratio"],
+            ["current_vs_ibd_candidate_pct", "ibd_entry_volume_ratio", "volume_ratio"],
         ),
     ]
 )
@@ -119,12 +119,15 @@ IBD_DECISION_COLUMNS = [
     "latest_close",
     "ibd_candidate_price",
     "current_vs_ibd_candidate_pct",
+    "ibd_entry_date",
     "ibd_entry_price",
     "ibd_entry_volume_ratio",
+    "ibd_entry_reject_reason",
     "volume_ratio",
-    "breakout_pattern",
-    "sector",
-    "industry",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "rank_C_continuous",
 ]
 
 DEFAULT_TABLE_COLUMNS = IBD_DECISION_COLUMNS
@@ -310,10 +313,10 @@ FIELD_CONFIG = OrderedDict(
                 "Breakout Pattern",
                 "category",
                 "IBD Entry",
-                filterable=True,
+                filterable=False,
                 sortable=False,
-                default_table=True,
-                advanced_filter=True,
+                default_table=False,
+                advanced_filter=False,
                 help_text="5-Pattern classification based on physical breakout traits.",
             ),
         ),
@@ -348,9 +351,9 @@ FIELD_CONFIG = OrderedDict(
                 "% vs IBD Candidate",
                 "number",
                 "IBD Entry",
-                filterable=False,
+                filterable=True,
                 default_table=True,
-                advanced_filter=False,
+                advanced_filter=True,
                 fmt="0.00%",
                 help_text="Current close relative to IBD candidate price.",
             ),
@@ -425,7 +428,7 @@ FIELD_CONFIG = OrderedDict(
         ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
         ("price_52_week_high", _field("Price 52 Week High", "number", "Grouping", default_table=True, fmt="0.00")),
         ("dist_to_52w_high_pct", _field("Distance To 52W High", "number", "Grouping", default_table=True, fmt="0.0%")),
-        ("is_52w_new_high", _field("Is 52W New High", "boolean", "Grouping", default_table=True)),
+        ("is_52w_new_high", _field("Is 52W New High", "boolean", "Grouping", default_table=False)),
     ]
 )
 
@@ -495,7 +498,3 @@ def get_all_table_columns() -> list[str]:
 
 def get_field_label(field: str) -> str:
     return str(FIELD_CONFIG.get(field, {}).get("label", field))
-
-
-def get_field_type(field: str) -> str:
-    return str(FIELD_CONFIG.get(field, {}).get("type", "text"))

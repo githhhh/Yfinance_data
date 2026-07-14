@@ -35,11 +35,23 @@ class SortSpec:
     enabled: bool = True
 
 
+REQUIRED_CORE_FIELDS = {"latest_close", "current_vs_ibd_candidate_pct", "ibd_entry_status"}
+
+
+def validate_pool_schema(df: pd.DataFrame) -> None:
+    missing = REQUIRED_CORE_FIELDS - set(df.columns)
+    if missing:
+        missing_list = ", ".join(sorted(missing))
+        raise ValueError(f"Schema Error: missing required IBD Review columns: {missing_list}")
+
+
 def load_pool_csv(path: str | Path) -> pd.DataFrame:
     csv_path = Path(path)
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV not found: {csv_path}")
-    return normalize_pool_df(pd.read_csv(csv_path, encoding="utf-8-sig"))
+    df = normalize_pool_df(pd.read_csv(csv_path, encoding="utf-8-sig"))
+    validate_pool_schema(df)
+    return df
 
 
 def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -60,27 +72,21 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
         result["base_duration_weeks"] = (duration_days / 7).round()
 
     if "latest_close" not in result.columns:
-        if {"ceiling", "pct_above_ceiling"}.issubset(result.columns):
-            result["latest_close"] = pd.to_numeric(result["ceiling"], errors="coerce") * (
-                1.0 + pd.to_numeric(result["pct_above_ceiling"], errors="coerce") / 100.0
-            )
-        else:
-            result["latest_close"] = pd.Series(pd.NA, index=result.index)
+        result["latest_close"] = pd.Series(pd.NA, index=result.index)
 
     if "current_vs_ibd_candidate_pct" not in result.columns:
-        if {"latest_close", "ibd_candidate_price"}.issubset(result.columns):
-            latest = pd.to_numeric(result["latest_close"], errors="coerce")
-            candidate = pd.to_numeric(result["ibd_candidate_price"], errors="coerce")
-            pct = (latest / candidate - 1.0) * 100.0
-            result["current_vs_ibd_candidate_pct"] = pct.where(candidate > 0, pd.NA)
-        else:
-            result["current_vs_ibd_candidate_pct"] = pd.Series(pd.NA, index=result.index)
+        result["current_vs_ibd_candidate_pct"] = pd.Series(pd.NA, index=result.index)
+
+    if {"latest_close", "price_52_week_high"}.issubset(result.columns):
+        latest = pd.to_numeric(result["latest_close"], errors="coerce")
+        high_52w = pd.to_numeric(result["price_52_week_high"], errors="coerce")
+        dist = (latest / high_52w - 1.0) * 100.0
+        result["dist_to_52w_high_pct"] = dist.where(latest.notna() & high_52w.gt(0), pd.NA)
+    elif "dist_to_52w_high_pct" not in result.columns:
+        result["dist_to_52w_high_pct"] = pd.Series(pd.NA, index=result.index)
 
     if "ibd_entry_status" not in result.columns:
         result["ibd_entry_status"] = result.apply(_compute_ibd_entry_status, axis=1)
-
-    if {"ibd_entry_valid", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio"}.issubset(result.columns):
-        result["breakout_pattern"] = result.apply(_classify_breakout_pattern, axis=1)
 
     for column in result.columns:
         if column not in BOOLEAN_FIELDS and column not in NUMBER_FIELDS and column not in DATE_FIELDS:
@@ -122,6 +128,37 @@ def apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame:
     ).copy()
 
 
+STATUS_REVIEW_ORDER = {
+    "ACTIONABLE": 0,
+    "UNCONFIRMED": 1,
+    "BELOW_TRIGGER": 2,
+    "EXTENDED": 3,
+    "Pending": 4,
+}
+
+
+def apply_default_review_order(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+    work = df.copy()
+    status_col = (
+        work["ibd_entry_status"].fillna("Pending")
+        if "ibd_entry_status" in work.columns
+        else pd.Series("Pending", index=work.index)
+    )
+    work["_status_rank"] = status_col.map(lambda s: STATUS_REVIEW_ORDER.get(str(s), 99))
+    sort_cols = ["_status_rank"]
+    ascending = [True]
+    if "rank_C_continuous" in work.columns:
+        sort_cols.append("rank_C_continuous")
+        ascending.append(True)
+    if "code" in work.columns:
+        sort_cols.append("code")
+        ascending.append(True)
+    sorted_df = work.sort_values(by=sort_cols, ascending=ascending, na_position="last", kind="mergesort")
+    return sorted_df.drop(columns=["_status_rank"], errors="ignore")
+
+
 def apply_c_rank_mode(df: pd.DataFrame, limit: int | None = None) -> pd.DataFrame:
     _ensure_column(df, "signal")
     _ensure_column(df, "rank_C_continuous")
@@ -133,33 +170,14 @@ def apply_c_rank_mode(df: pd.DataFrame, limit: int | None = None) -> pd.DataFram
     return ranked.copy()
 
 
-def build_active_filter_summary(filters: list[FilterSpec], sort_specs: list[SortSpec]) -> list[str]:
-    chips: list[str] = []
-    for spec in filters:
-        if not spec.enabled:
-            continue
-        label = spec.label or get_field_label(spec.field)
-        chips.append(_describe_filter(label, spec))
-    active_sorts = [spec for spec in sort_specs if spec.enabled and spec.field]
-    if active_sorts:
-        chips.append(
-            "Sort: "
-            + " -> ".join(f"{get_field_label(spec.field)} {spec.direction.lower()}" for spec in active_sorts)
-        )
-    return chips
-
 
 def build_kpis(df: pd.DataFrame) -> dict[str, float | int | None]:
     row_count = len(df)
-    valid_mask = _true_mask(df.get("ibd_entry_valid", pd.Series(dtype="object")))
-    valid_count = valid_mask.sum()
-    valid_df = df[valid_mask] if not df.empty else df
     return {
         "filtered_rows": row_count,
-        "ibd_valid_rate_pct": round((valid_count / row_count) * 100, 2) if row_count else 0.0,
+        "median_current_vs_ibd_candidate_pct": _median_or_none(df, "current_vs_ibd_candidate_pct"),
         "median_ibd_entry_volume_ratio": _median_or_none(df, "ibd_entry_volume_ratio"),
-        "median_ibd_entry_close_position": _median_or_none(df, "ibd_entry_close_position"),
-        "median_ibd_entry_breakout_range_ratio_valid": _median_or_none(valid_df, "ibd_entry_breakout_range_ratio"),
+        "median_volume_ratio": _median_or_none(df, "volume_ratio"),
     }
 
 
@@ -168,8 +186,6 @@ def build_chart_data(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "route_quality": _build_route_quality_data(df),
         "trend_volume_map": _build_trend_volume_map_data(df),
         "volume_close_matrix": _build_volume_close_matrix_data(df),
-        "breakout_pattern": _build_breakout_pattern_data(df),
-        "sector_concentration": _build_sector_concentration_data(df),
     }
 
 
@@ -440,103 +456,13 @@ def _build_volume_close_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
     return working[columns].copy()
 
 
-def _build_breakout_pattern_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["pattern", "count", "share_pct", "tickers", "median_vol_ratio", "median_close_pos"]
-    canonical_patterns = [
-        "GAP_UP",
-        "SOLID_BREAKOUT",
-        "MODERATE_BREAKOUT",
-        "MARGINAL_BREAKOUT",
-        "BULL_TRAP",
-    ]
-    if df.empty:
-        return pd.DataFrame(columns=columns)
 
-    working = df.copy()
-    if "breakout_pattern" not in working.columns:
-        working["breakout_pattern"] = working.apply(_classify_breakout_pattern, axis=1)
-    working["pattern"] = working["breakout_pattern"]
-    valid_working = working[working["pattern"].isin(canonical_patterns)]
-    total_len = len(valid_working)
-
-    records = []
-    for pattern in canonical_patterns:
-        sub = valid_working[valid_working["pattern"] == pattern]
-        cnt = len(sub)
-        share = round((cnt / total_len) * 100, 2) if total_len > 0 else 0.0
-        code_list = [str(c) for c in sub["code"].dropna().tolist() if str(c).strip()]
-        if len(code_list) > 8:
-            tickers = ", ".join(code_list[:8]) + f" (+{len(code_list) - 8})"
-        else:
-            tickers = ", ".join(code_list) if code_list else "-"
-        med_vr = _median_or_none(sub, "volume_ratio")
-        med_cp = _median_or_none(sub, "ibd_entry_close_position")
-        records.append(
-            {
-                "pattern": pattern,
-                "count": cnt,
-                "share_pct": share,
-                "tickers": tickers,
-                "median_vol_ratio": round(med_vr, 2) if med_vr is not None else pd.NA,
-                "median_close_pos": round(med_cp, 2) if med_cp is not None else pd.NA,
-            }
-        )
-
-    return pd.DataFrame(records)[columns]
-
-
-def _build_sector_concentration_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = ["sector", "row_count", "share_pct", "valid_count", "valid_rate_pct", "top_industry"]
-    if df.empty:
-        return pd.DataFrame(columns=columns)
-
-    needed = ["sector", "industry", "code", "ibd_entry_valid"]
-    available = [c for c in needed if c in df.columns]
-    working = df[available].copy()
-    working["sector"] = _label_series(working, "sector")
-    working["industry"] = _label_series(working, "industry")
-    working["valid"] = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))).astype(int)
-
-    grouped = working.groupby("sector", dropna=False).agg(row_count=("code", "size"), valid_count=("valid", "sum"))
-    grouped["share_pct"] = (grouped["row_count"] / len(working) * 100).round(2)
-    grouped["valid_rate_pct"] = (grouped["valid_count"] / grouped["row_count"] * 100).round(2)
-    top_industry = (
-        working.groupby(["sector", "industry"], dropna=False)
-        .size()
-        .rename("industry_count")
-        .reset_index()
-        .sort_values(["sector", "industry_count", "industry"], ascending=[True, False, True], kind="mergesort")
-        .drop_duplicates("sector")
-        .set_index("sector")["industry"]
-    )
-    result = grouped.reset_index()
-    result["top_industry"] = result["sector"].map(top_industry)
-    return result[columns].sort_values(["row_count", "sector"], ascending=[False, True], kind="mergesort").reset_index(drop=True)
 
 
 def _label_series(df: pd.DataFrame, field: str) -> pd.Series:
     if field not in df.columns:
         return pd.Series("(empty)", index=df.index, dtype="object")
     return df[field].fillna("(empty)").replace("", "(empty)")
-
-
-def _classify_breakout_pattern(row: pd.Series) -> str:
-    valid = _to_bool_or_na(row.get("ibd_entry_valid"))
-    if valid is not True:
-        return "Unconfirmed Candidate"
-    rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
-    pos = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
-    if pd.isna(rr) or pd.isna(pos):
-        return "Unconfirmed Candidate"
-    if pos < 0.5:
-        return "BULL_TRAP"
-    if rr > 1.0:
-        return "GAP_UP"
-    if rr >= 0.4 and pos >= 0.7:
-        return "SOLID_BREAKOUT"
-    if rr >= 0.15:
-        return "MODERATE_BREAKOUT"
-    return "MARGINAL_BREAKOUT"
 
 
 def _entry_status(value: Any) -> str:
@@ -550,14 +476,6 @@ def _dry_status(value: Any) -> str:
         return "n/a"
     return "Dry pullback" if bool(value) is True else "Not dry"
 
-
-def _describe_filter(label: str, spec: FilterSpec) -> str:
-    operator = spec.operator.lower()
-    if operator in {"is true", "is false", "not empty", "non-empty", "is empty"}:
-        return f"{label} {spec.operator}"
-    if operator == "between":
-        return f"{label} between {spec.value} and {spec.value2}"
-    return f"{label} {spec.operator} {spec.value}"
 
 
 def _compute_ibd_entry_status(row: pd.Series) -> str | Any:

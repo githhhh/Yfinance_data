@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
 import streamlit as st
 
@@ -17,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from dashboard.data_utils import (
     FilterSpec,
     apply_c_rank_mode,
+    apply_default_review_order,
     apply_filters,
     build_chart_data,
     build_entry_status_counts,
@@ -63,7 +63,7 @@ def main() -> None:
 
     with st.sidebar:
         st.subheader("🎯 Mode Selector")
-        mode = st.radio("Mode", ["Custom Filter", "C Rank Reference"], index=0, key="global_mode_selector")
+        mode = st.radio("Mode", ["IBD Review", "C Rank Reference"], index=0, key="global_mode_selector")
         st.divider()
 
     if mode == "C Rank Reference":
@@ -74,7 +74,8 @@ def main() -> None:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--csv", default=str(Path(__file__).parent / "data" / "breakout_follow_pool.csv"))
+    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
+    parser.add_argument("--csv", default=str(default_csv))
     args, _ = parser.parse_known_args()
     return args
 
@@ -111,21 +112,28 @@ def _render_custom_mode(df: pd.DataFrame) -> None:
     )
 
     snapshot_date = _get_snapshot_date(df)
-    st.markdown(f"#### Active Signal Filter: `signal=True` ｜ Snapshot Date: `{snapshot_date}`")
+    total_pool = len(df)
+    active_signals = int(df["signal"].sum()) if "signal" in df.columns else 0
+    st.markdown(
+        f"#### Breakout Follow Pool ｜ Total Pool: **{total_pool}** ｜ Active Signal: **{active_signals}** ｜ Snapshot Date: **`{snapshot_date}`**"
+    )
 
     filters_by_group = _funnel_filters(df)
     filters = _flatten_filters(filters_by_group)
 
     filtered = apply_filters(df, filters)
+    filtered = apply_default_review_order(filtered)
 
     _render_current_filter_summary(filters_by_group, len(filtered), len(df))
 
+    active_count = int(df["signal"].sum()) if "signal" in df.columns else len(df)
+    st.markdown(f"**Showing {len(filtered)} of {active_count} Active Signals**")
+    _render_kpis(filtered)
+
     _render_table_controls(filtered, df)
 
-    with st.container():
-        st.divider()
-        _render_kpis(filtered)
-        _render_charts(filtered)
+    with st.expander("📈 Route Quality (Optional Chart)", expanded=False):
+        _render_charts(df)
 
 
 def _render_c_rank_mode(df: pd.DataFrame) -> None:
@@ -206,34 +214,9 @@ def _funnel_filters(df: pd.DataFrame) -> dict[str, list[FilterSpec]]:
             st.markdown("##### 3. Optional Quality Filters")
             disabled_daily = selected_status == "UNCONFIRMED"
 
-            pattern_options = [
-                "All",
-                "GAP_UP",
-                "SOLID_BREAKOUT",
-                "MODERATE_BREAKOUT",
-                "MARGINAL_BREAKOUT",
-                "BULL_TRAP",
-            ]
-            pattern_help = (
-                "**Breakout Patterns (Range x Close)**\n\n"
-                "• **GAP_UP**: Range Ratio > 1.0, Close Position >= 0.50\n\n"
-                "• **SOLID_BREAKOUT**: 0.40 <= Range Ratio <= 1.0, Close Position >= 0.70\n\n"
-                "• **MODERATE_BREAKOUT**: Range Ratio >= 0.15 after excluding Bull Trap, Gap Up, and Solid Breakout\n\n"
-                "• **MARGINAL_BREAKOUT**: 0.00 <= Range Ratio < 0.15, Close Position >= 0.50\n\n"
-                "• **BULL_TRAP**: Close Position < 0.50"
-            )
-            pattern = st.selectbox(
-                "Breakout Pattern (Range x Close)",
-                pattern_options,
-                index=0,
-                key="funnel_entry_pattern",
-                help=pattern_help,
-                disabled=disabled_daily,
-            )
-            if not disabled_daily and pattern != "All":
-                filters_by_group["Optional Quality Filters"].append(
-                    FilterSpec("breakout_pattern", "equals", pattern, label="Breakout Pattern")
-                )
+            spec = _range_filter(df, "current_vs_ibd_candidate_pct", st, key_prefix="cand_pct", disabled=False)
+            if spec is not None:
+                filters_by_group["Optional Quality Filters"].append(spec)
 
             spec = _range_filter(df, "ibd_entry_volume_ratio", st, key_prefix="entry", disabled=disabled_daily)
             if spec is not None:
@@ -266,7 +249,7 @@ def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]]
         conditions_str = " & ".join(_describe_filter_condition(spec) for spec in filters)
         summary_parts.append(f"**{short_group}**: `{conditions_str}`")
         
-    st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** ｜ " + " ｜ ".join(summary_parts))
+    st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** ｜ " + " → ".join(summary_parts))
 
 
 def _describe_filter_condition(spec: FilterSpec) -> str:
@@ -299,102 +282,45 @@ def _describe_filter_condition(spec: FilterSpec) -> str:
 
 def _render_kpis(df: pd.DataFrame) -> None:
     kpis = build_kpis(df)
-    columns = st.columns(5)
+    columns = st.columns(4)
     columns[0].metric("Filtered Rows", kpis["filtered_rows"])
-    columns[1].metric("IBD Valid Rate", f"{kpis['ibd_valid_rate_pct']:.2f}%")
+    columns[1].metric("Median Candidate Dist", _format_number(kpis["median_current_vs_ibd_candidate_pct"], "%"))
     columns[2].metric("Median IBD Volume Ratio", _format_number(kpis["median_ibd_entry_volume_ratio"], "x"))
-    columns[3].metric("Median Close Position", _format_number(kpis["median_ibd_entry_close_position"]))
-    columns[4].metric("Median Range Ratio [Valid]", _format_number(kpis["median_ibd_entry_breakout_range_ratio_valid"], "x"))
-
+    columns[3].metric("Median Volume Ratio", _format_number(kpis["median_volume_ratio"], "x"))
 
 
 def _render_charts(df: pd.DataFrame) -> None:
     charts = build_chart_data(df)
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        concentration = charts["sector_concentration"]
-        if concentration.empty:
-            st.info("No rows for Sector Concentration.")
-        else:
-            top = concentration.head(10)
-            fig = px.bar(
-                top,
-                x="share_pct",
-                y="sector",
-                orientation="h",
-                text="share_pct",
-                hover_data=["row_count", "valid_count", "valid_rate_pct", "top_industry"],
-                title="Sector Concentration",
-                height=240,
-            )
-            fig.update_layout(margin={"l": 8, "r": 8, "t": 36, "b": 24}, yaxis={"autorange": "reversed"})
-            st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        route_df = charts["route_quality"]
-        if route_df.empty:
-            st.info("No rows for Route Quality.")
-        else:
-            fig = px.bar(
-                route_df,
-                x="ibd_candidate_rule",
-                y="total_count",
-                color="valid_rate_pct",
-                color_continuous_scale="Greens",
-                range_color=[0, 100],
-                text="total_count",
-                hover_data={
-                    "ibd_candidate_rule": True,
-                    "valid_count": True,
-                    "invalid_count": True,
-                    "valid_rate_pct": ":.2f",
-                    "median_ibd_entry_volume_ratio": ":.2f",
-                    "median_ibd_entry_close_position": ":.2f",
-                    "median_ibd_entry_breakout_range_ratio": ":.2f",
-                },
-                title="Route Quality",
-                height=240,
-            )
-            fig.update_layout(
-                margin={"l": 8, "r": 8, "t": 36, "b": 16},
-                xaxis_title="",
-                yaxis_title="",
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-    with col3:
-        pattern_df = charts["breakout_pattern"]
-        if pattern_df.empty:
-            st.info("No rows for Breakout Pattern.")
-        else:
-            fig = px.bar(
-                pattern_df,
-                x="count",
-                y="pattern",
-                orientation="h",
-                color="count",
-                color_continuous_scale="Blues",
-                text="count",
-                hover_data={
-                    "pattern": True,
-                    "count": True,
-                    "share_pct": ":.2f",
-                    "tickers": True,
-                    "median_vol_ratio": ":.2f",
-                    "median_close_pos": ":.2f",
-                },
-                title="Breakout Pattern (Range × Close) [Valid Only]",
-                height=240,
-            )
-            fig.update_layout(
-                margin={"l": 8, "r": 8, "t": 36, "b": 16},
-                xaxis_title="",
-                yaxis_title="",
-                yaxis={"autorange": "reversed"},
-                coloraxis_showscale=False,
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    route_df = charts["route_quality"]
+    if route_df.empty:
+        st.info("No rows for Route Quality.")
+        return
+    fig = px.bar(
+        route_df,
+        x="ibd_candidate_rule",
+        y="total_count",
+        color="valid_rate_pct",
+        color_continuous_scale="Greens",
+        range_color=[0, 100],
+        text="total_count",
+        hover_data={
+            "ibd_candidate_rule": True,
+            "valid_count": True,
+            "invalid_count": True,
+            "valid_rate_pct": ":.2f",
+            "median_ibd_entry_volume_ratio": ":.2f",
+            "median_ibd_entry_close_position": ":.2f",
+            "median_ibd_entry_breakout_range_ratio": ":.2f",
+        },
+        title="Route Quality",
+        height=240,
+    )
+    fig.update_layout(
+        margin={"l": 8, "r": 8, "t": 36, "b": 16},
+        xaxis_title="",
+        yaxis_title="",
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_table_controls(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> None:
@@ -416,13 +342,6 @@ def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
         file_name=filename,
         mime="text/csv",
     )
-
-
-def _append_bool_filter(filters: list[FilterSpec], field: str, selected: str) -> None:
-    if selected == "True":
-        filters.append(FilterSpec(field, "is true"))
-    elif selected == "False":
-        filters.append(FilterSpec(field, "is false"))
 
 
 def _range_filter(
@@ -462,30 +381,6 @@ def _range_filter(
     if selected == (min_value, max_value):
         return None
     return FilterSpec(field, "between", selected[0], selected[1])
-
-
-def _pullback_magnitude_filter(df: pd.DataFrame) -> FilterSpec | None:
-    field = "pullback_pct"
-    if field not in df.columns:
-        return None
-    values = pd.to_numeric(df[field], errors="coerce").dropna().abs()
-    if values.empty:
-        return None
-    min_value = float(values.min())
-    max_value = float(values.max())
-    if min_value == max_value:
-        return None
-    selected = st.slider(
-        "Pullback Pct magnitude",
-        min_value=min_value,
-        max_value=max_value,
-        value=(min_value, max_value),
-        key="structure_range_pullback_pct_magnitude",
-        format="%.2f",
-    )
-    if selected == (min_value, max_value):
-        return None
-    return FilterSpec(field, "between", -selected[1], -selected[0])
 
 
 def _unique_values(df: pd.DataFrame, field: str) -> list[str]:

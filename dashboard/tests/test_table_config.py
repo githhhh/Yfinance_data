@@ -31,14 +31,14 @@ def test_filterable_fields_follow_trading_decision_funnel():
     assert groups["Route"] == ["ibd_candidate_rule"]
     assert groups["Entry Status"] == ["ibd_entry_status"]
     assert groups["Optional Quality Filters"] == [
-        "breakout_pattern",
+        "current_vs_ibd_candidate_pct",
         "ibd_entry_volume_ratio",
         "volume_ratio",
     ]
     assert get_filterable_fields() == [
         "ibd_candidate_rule",
         "ibd_entry_status",
-        "breakout_pattern",
+        "current_vs_ibd_candidate_pct",
         "ibd_entry_volume_ratio",
         "volume_ratio",
     ]
@@ -106,12 +106,15 @@ def test_ibd_decision_view_columns():
         "latest_close",
         "ibd_candidate_price",
         "current_vs_ibd_candidate_pct",
+        "ibd_entry_date",
         "ibd_entry_price",
         "ibd_entry_volume_ratio",
+        "ibd_entry_reject_reason",
         "volume_ratio",
-        "breakout_pattern",
-        "sector",
-        "industry",
+        "eps_yoy_growth",
+        "price_52_week_high",
+        "dist_to_52w_high_pct",
+        "rank_C_continuous",
     ]
     assert get_default_table_columns() == expected
     assert get_column_view_fields("IBD Decision") == expected
