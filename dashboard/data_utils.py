@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 import zlib
 
 import pandas as pd
@@ -529,4 +531,87 @@ def build_entry_status_counts(signal_df: pd.DataFrame) -> dict[str, int]:
             unconfirmed_within_3pct = int(unconf_mask.sum())
     total = len(signal_df)
     return {"All": total, "ALL": total, "unconfirmed_within_3pct": unconfirmed_within_3pct, **counts}
+
+
+def build_snapshot_freshness(
+    snapshot_date: Any,
+    today: date | datetime | str | None = None,
+) -> dict[str, Any]:
+    if today is None:
+        today_date = datetime.now(ZoneInfo("America/New_York")).date()
+    elif isinstance(today, str):
+        try:
+            today_date = datetime.strptime(today.strip().split(" ")[0].split("T")[0], "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            today_date = datetime.now(ZoneInfo("America/New_York")).date()
+    elif isinstance(today, datetime):
+        today_date = today.date()
+    elif isinstance(today, date):
+        today_date = today
+    else:
+        today_date = datetime.now(ZoneInfo("America/New_York")).date()
+
+    if snapshot_date is None or pd.isna(snapshot_date) or str(snapshot_date).strip() in ("", "N/A", "Unknown", "nan", "None"):
+        return {
+            "status": "UNKNOWN",
+            "label": "Unknown",
+            "age_days": None,
+            "snapshot_date_str": "N/A",
+            "header_html": "Snapshot Unknown",
+        }
+
+    try:
+        s_str = str(snapshot_date).strip().split(" ")[0].split("T")[0]
+        s_date = datetime.strptime(s_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {
+            "status": "UNKNOWN",
+            "label": "Unknown",
+            "age_days": None,
+            "snapshot_date_str": "N/A",
+            "header_html": "Snapshot Unknown",
+        }
+
+    age_days = max((today_date - s_date).days, 0)
+    if age_days <= 3:
+        status = "FRESH"
+        label = "Fresh"
+        color = "#2e7d32"
+    elif age_days <= 6:
+        status = "AGING"
+        label = "Aging"
+        color = "#f57c00"
+    else:
+        status = "STALE"
+        label = "Stale"
+        color = "#c62828"
+
+    return {
+        "status": status,
+        "label": label,
+        "age_days": age_days,
+        "snapshot_date_str": s_str,
+        "header_html": f'Snapshot <b>{s_str}</b> · {age_days}d old · <span style="color:{color}; font-weight:600;">{label}</span>',
+    }
+
+
+def filter_unconfirmed_near_trigger(
+    df: pd.DataFrame,
+    selected_status: str,
+    near_trigger_only: bool,
+) -> pd.DataFrame:
+    if selected_status != "UNCONFIRMED" or not near_trigger_only or df.empty:
+        return df
+    if "ibd_entry_status" not in df.columns or "current_vs_ibd_candidate_pct" not in df.columns:
+        return df
+    distance = pd.to_numeric(
+        df["current_vs_ibd_candidate_pct"],
+        errors="coerce",
+    )
+    mask = (
+        df["ibd_entry_status"].eq("UNCONFIRMED")
+        & distance.notna()
+        & distance.between(0.0, 3.0, inclusive="both")
+    )
+    return df[mask]
 

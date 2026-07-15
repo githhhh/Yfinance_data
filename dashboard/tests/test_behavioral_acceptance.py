@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 from dashboard.data_utils import (
@@ -212,6 +213,8 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     assert options["suppressRowClickSelection"] is False
     assert options["columnDefs"][0]["field"] == "code"
     assert options["columnDefs"][0]["pinned"] == "left"
+    assert "onGridReady" not in options
+    assert "onCellFocused" not in options
 
 
 # 8. Selected Row Detail fallback behavior when selected code is missing
@@ -288,4 +291,123 @@ def test_entry_vol_enabled_for_actionable_below_trigger_and_extended_only():
     assert ENTRY_VOL_ENABLED_STATUSES == {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
     assert "UNCONFIRMED" not in ENTRY_VOL_ENABLED_STATUSES
     assert "All" not in ENTRY_VOL_ENABLED_STATUSES
+
+
+def test_snapshot_freshness_boundaries():
+    from datetime import date
+    from dashboard.data_utils import build_snapshot_freshness
+
+    base_date = date(2026, 7, 10)
+    res3 = build_snapshot_freshness("2026-07-07", today=base_date)
+    assert res3["status"] == "FRESH"
+    assert res3["age_days"] == 3
+
+    res4 = build_snapshot_freshness("2026-07-06", today=base_date)
+    assert res4["status"] == "AGING"
+    assert res4["age_days"] == 4
+
+    res6 = build_snapshot_freshness("2026-07-04", today=base_date)
+    assert res6["status"] == "AGING"
+    assert res6["age_days"] == 6
+
+    res7 = build_snapshot_freshness("2026-07-03", today=base_date)
+    assert res7["status"] == "STALE"
+    assert res7["age_days"] == 7
+
+    res_fut = build_snapshot_freshness("2026-07-15", today=base_date)
+    assert res_fut["age_days"] == 0
+    assert res_fut["status"] == "FRESH"
+
+
+def test_snapshot_freshness_invalid_date():
+    from dashboard.data_utils import build_snapshot_freshness
+
+    assert build_snapshot_freshness(None)["status"] == "UNKNOWN"
+    assert build_snapshot_freshness("")["status"] == "UNKNOWN"
+    assert build_snapshot_freshness("N/A")["status"] == "UNKNOWN"
+    assert build_snapshot_freshness("invalid-date")["status"] == "UNKNOWN"
+    assert build_snapshot_freshness(np.nan)["status"] == "UNKNOWN"
+
+
+def test_near_trigger_inclusive_bounds():
+    from dashboard.data_utils import filter_unconfirmed_near_trigger
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": -0.1},
+        {"code": "B", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 0.0},
+        {"code": "C", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 1.5},
+        {"code": "D", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 3.0},
+        {"code": "E", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 3.1},
+    ])
+    res = filter_unconfirmed_near_trigger(df, "UNCONFIRMED", True)
+    assert res["code"].tolist() == ["B", "C", "D"]
+
+
+def test_near_trigger_excludes_nan():
+    from dashboard.data_utils import filter_unconfirmed_near_trigger
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": np.nan},
+        {"code": "B", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": None},
+        {"code": "C", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": "abc"},
+        {"code": "D", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 1.5},
+    ])
+    res = filter_unconfirmed_near_trigger(df, "UNCONFIRMED", True)
+    assert res["code"].tolist() == ["D"]
+
+
+def test_near_trigger_count_depends_only_on_route():
+    df = sample_full_pool_df()
+    extra = pd.DataFrame([
+        {"code": "ROUTE1", "signal": True, "ibd_candidate_rule": "ceiling_breakout", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 1.2, "volume_ratio": 0.5},
+        {"code": "ROUTE2", "signal": True, "ibd_candidate_rule": "ma10_touch_confirm", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 2.5, "volume_ratio": 2.0},
+    ])
+    full_df = pd.concat([df, extra], ignore_index=True)
+    counts_all = build_entry_status_counts(full_df)
+    counts_route1 = build_entry_status_counts(full_df[full_df["ibd_candidate_rule"] == "ceiling_breakout"])
+
+    assert counts_route1["unconfirmed_within_3pct"] <= counts_all["unconfirmed_within_3pct"]
+
+    route_df = full_df[full_df["ibd_candidate_rule"] == "ceiling_breakout"]
+    base_counts = build_entry_status_counts(route_df)
+    assert base_counts["unconfirmed_within_3pct"] == build_entry_status_counts(route_df)["unconfirmed_within_3pct"]
+
+
+def test_near_trigger_combines_with_distance_filters():
+    from dashboard.data_utils import filter_unconfirmed_near_trigger
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 0.0},
+        {"code": "B", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 0.8},
+        {"code": "C", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 1.5},
+        {"code": "D", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 2.5},
+        {"code": "E", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 3.0},
+    ])
+    near_df = filter_unconfirmed_near_trigger(df, "UNCONFIRMED", True)
+    comb_min = near_df[pd.to_numeric(near_df["current_vs_ibd_candidate_pct"], errors="coerce") >= 1.0]
+    assert comb_min["code"].tolist() == ["C", "D", "E"]
+
+    comb_max = near_df[pd.to_numeric(near_df["current_vs_ibd_candidate_pct"], errors="coerce") <= 2.0]
+    assert comb_max["code"].tolist() == ["A", "B", "C"]
+
+
+def test_near_trigger_state_clears_on_status_change():
+    state = {"ibd_near_trigger_only": True, "ibd_filter_status": "ACTIONABLE"}
+    if state["ibd_filter_status"] != "UNCONFIRMED" and state.get("ibd_near_trigger_only", False):
+        state["ibd_near_trigger_only"] = False
+    assert state["ibd_near_trigger_only"] is False
+
+
+def test_copy_order_after_near_trigger_filter():
+    from dashboard.data_utils import filter_unconfirmed_near_trigger, apply_default_review_order
+
+    df = pd.DataFrame([
+        {"code": "Z_UNCONF", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 1.5, "rank_C_continuous": 10},
+        {"code": "A_UNCONF", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 3.5, "rank_C_continuous": 5},
+        {"code": "M_UNCONF", "ibd_entry_status": "UNCONFIRMED", "current_vs_ibd_candidate_pct": 0.5, "rank_C_continuous": 2},
+    ])
+    filtered = filter_unconfirmed_near_trigger(df, "UNCONFIRMED", True)
+    ordered = apply_default_review_order(filtered)
+    assert ordered["code"].tolist() == ["M_UNCONF", "Z_UNCONF"]
+
 

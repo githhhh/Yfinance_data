@@ -22,6 +22,8 @@ from dashboard.data_utils import (
     build_chart_data,
     build_entry_status_counts,
     build_kpis,
+    build_snapshot_freshness,
+    filter_unconfirmed_near_trigger,
     load_pool_csv,
 )
 from dashboard.field_config import (
@@ -165,12 +167,13 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
             if df is not None
             else '<span style="background-color:#ffebee; color:#c62828; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Schema / Data Error</span>'
         )
-        snapshot_date = _get_snapshot_date(df) if df is not None else "N/A"
+        freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+        snapshot_html = freshness["header_html"]
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
             f'<h3 style="margin:0; display:inline-block; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">Breakout Pool {badge_html}</h3>'
-            f'<div style="font-size:13px; color:#8899a6; margin-top:2px;">Snapshot <b>{snapshot_date}</b> · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
+            f'<div style="font-size:13px; color:#8899a6; margin-top:2px;">{snapshot_html} · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
             unsafe_allow_html=True,
         )
 
@@ -225,6 +228,8 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     route_val = st.session_state.get("ibd_filter_route", "All")
     status_val = st.session_state.get("ibd_filter_status", "All")
+    if status_val != "UNCONFIRMED" and st.session_state.get("ibd_near_trigger_only", False):
+        st.session_state["ibd_near_trigger_only"] = False
     dist_min_val = st.session_state.get("ibd_filter_dist_min", "")
     dist_max_val = st.session_state.get("ibd_filter_dist_max", "")
     entry_vol_min_val = st.session_state.get("ibd_filter_entry_vol_min", "")
@@ -239,7 +244,7 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     _render_status_queue(status_counts, len(route_df), status_val)
 
-    _render_filter_bar(df, status_val)
+    _render_filter_bar(df, status_val, status_counts)
 
     filtered_df = route_df.copy()
     if status_val != "All":
@@ -272,6 +277,10 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
             filtered_df = filtered_df[pd.to_numeric(filtered_df["volume_ratio"], errors="coerce") >= val]
         except ValueError:
             pass
+
+    filtered_df = filter_unconfirmed_near_trigger(
+        filtered_df, status_val, st.session_state.get("ibd_near_trigger_only", False)
+    )
 
     filtered_df = apply_default_review_order(filtered_df)
 
@@ -307,6 +316,7 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
         if st.button(f"{all_prefix}All Signals ({route_total})", key="btn_all_signals", use_container_width=True, type="secondary"):
             st.session_state["ibd_filter_status"] = "All"
             st.session_state["ibd_filter_entry_vol_min"] = ""
+            st.session_state["ibd_near_trigger_only"] = False
             st.rerun()
 
     cols = st.columns(4)
@@ -334,15 +344,18 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
                 if is_active:
                     st.session_state["ibd_filter_status"] = "All"
                     st.session_state["ibd_filter_entry_vol_min"] = ""
+                    st.session_state["ibd_near_trigger_only"] = False
                 else:
                     st.session_state["ibd_filter_status"] = status_name
                     if status_name not in ENTRY_VOL_ENABLED_STATUSES:
                         st.session_state["ibd_filter_entry_vol_min"] = ""
+                    if status_name != "UNCONFIRMED":
+                        st.session_state["ibd_near_trigger_only"] = False
                 st.rerun()
     st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 
-def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
+def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dict[str, int]) -> None:
     st.markdown("##### Filters")
     cols = st.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8])
     with cols[0]:
@@ -367,13 +380,25 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
             st.rerun()
 
     with cols[3]:
-        is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
-        placeholder_text = "N/A (Disabled)" if is_disabled else ""
-        val_entry = "" if is_disabled else st.session_state.get("ibd_filter_entry_vol_min", "")
-        val = st.text_input("Entry Vol Min (x)", value=val_entry, placeholder=placeholder_text, disabled=is_disabled, key="ibd_filter_entry_vol_min_input")
-        if not is_disabled and val != st.session_state.get("ibd_filter_entry_vol_min", ""):
-            st.session_state["ibd_filter_entry_vol_min"] = val
-            st.rerun()
+        if current_status == "UNCONFIRMED":
+            st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+            near_count = status_counts.get("unconfirmed_within_3pct", 0)
+            val = st.checkbox(
+                f"Near Trigger ≤ +3% ({near_count})",
+                value=st.session_state.get("ibd_near_trigger_only", False),
+                key="ibd_near_trigger_only_widget",
+            )
+            if val != st.session_state.get("ibd_near_trigger_only", False):
+                st.session_state["ibd_near_trigger_only"] = val
+                st.rerun()
+        else:
+            is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
+            placeholder_text = "N/A (Disabled)" if is_disabled else ""
+            val_entry = "" if is_disabled else st.session_state.get("ibd_filter_entry_vol_min", "")
+            val = st.text_input("Entry Vol Min (x)", value=val_entry, placeholder=placeholder_text, disabled=is_disabled, key="ibd_filter_entry_vol_min_input")
+            if not is_disabled and val != st.session_state.get("ibd_filter_entry_vol_min", ""):
+                st.session_state["ibd_filter_entry_vol_min"] = val
+                st.rerun()
 
     with cols[4]:
         val = st.text_input("Weekly Vol Min (x)", value=st.session_state.get("ibd_filter_weekly_vol_min", ""), placeholder="", key="ibd_filter_weekly_vol_min_input")
@@ -390,6 +415,7 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
             st.session_state["ibd_filter_dist_max"] = ""
             st.session_state["ibd_filter_entry_vol_min"] = ""
             st.session_state["ibd_filter_weekly_vol_min"] = ""
+            st.session_state["ibd_near_trigger_only"] = False
             st.rerun()
     st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
