@@ -65,23 +65,72 @@ def main() -> None:
             display: none !important;
         }
         .block-container {
-            padding-top: 1.2rem !important;
-            padding-bottom: 2rem !important;
+            padding-top: 0.5rem !important;
+            padding-bottom: 1rem !important;
             max-width: 98% !important;
         }
         div[data-testid="stVerticalBlock"] > div {
-            padding-bottom: 0.25rem !important;
+            padding-bottom: 0.15rem !important;
         }
-        .status-card {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            background-color: #f8f9fa;
-            text-align: center;
+        /* Target exact status card buttons (4 cards) */
+        .status-card button, div[class*="st-key-btn_status_"] button, div[class*="st-key-status_"] button {
+            height: 108px !important;
+            min-height: 108px !important;
+            max-height: 108px !important;
+            width: 100% !important;
+            white-space: pre-wrap !important;
+            padding: 6px 4px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1.25 !important;
+            border-radius: 8px !important;
+            font-size: 13px !important;
         }
-        .status-card-active {
-            border: 2px solid #1f77b4;
-            background-color: #e3f2fd;
+        .status-card button *, div[class*="st-key-btn_status_"] button *, div[class*="st-key-status_"] button * {
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.25 !important;
+        }
+        /* All Signals button */
+        .all-signals-button button, div[class*="st-key-btn_all_signals"] button, div[class*="st-key-btn_all_signals"] {
+            height: 48px !important;
+            min-height: 48px !important;
+            min-width: 190px !important;
+            max-width: 210px !important;
+            margin-left: auto !important;
+            border-radius: 8px !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+        /* Info flow rules button */
+        div[class*="st-key-btn_info_rules"] button {
+            width: 48px !important;
+            min-width: 48px !important;
+            max-width: 48px !important;
+            padding: 4px 0 !important;
+        }
+        /* Popover fallback button inside copy control */
+        div[data-testid="stPopover"] > button {
+            height: 36px !important;
+            min-height: 36px !important;
+            max-height: 36px !important;
+            padding: 4px 14px !important;
+            font-size: 13px !important;
+            border-radius: 6px !important;
+            line-height: 26px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            white-space: nowrap !important;
+        }
+        .status-card button p, div[class*="st-key-btn_status_"] button p, div[class*="st-key-status_"] button p {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        div[data-testid="stPopover"] {
+            margin-top: 1px !important;
         }
         </style>
         """,
@@ -109,7 +158,7 @@ def main() -> None:
 
 
 def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
-    col_l, col_r = st.columns([3, 2])
+    col_l, col_r = st.columns([3, 1.5])
     with col_l:
         badge_html = (
             '<span style="background-color:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Data Ready</span>'
@@ -120,15 +169,15 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
-            f'<h3 style="margin:0; display:inline-block; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">Breakout Follow Pool {badge_html}</h3>'
-            f'<div style="font-size:13px; color:#555; margin-top:4px;">Snapshot <b>{snapshot_date}</b> · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
+            f'<h3 style="margin:0; display:inline-block; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">Breakout Pool {badge_html}</h3>'
+            f'<div style="font-size:13px; color:#8899a6; margin-top:2px;">Snapshot <b>{snapshot_date}</b> · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
             unsafe_allow_html=True,
         )
 
     with col_r:
-        c1, c2 = st.columns([1, 2.5])
+        c1, c2 = st.columns([0.3, 2.7])
         with c1:
-            if st.button("ⓘ Flow & Rules", use_container_width=True):
+            if st.button("ⓘ", key="btn_info_rules", help="Click to view Flow & Rules"):
                 _render_flow_rules_dialog()
         with c2:
             mode = st.segmented_control(
@@ -140,7 +189,7 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
             )
             if mode is None:
                 mode = "IBD Review"
-    st.divider()
+    st.markdown('<hr style="margin: 4px 0 8px 0; border: none; border-top: 1px solid #e0e0e0;" />', unsafe_allow_html=True)
 
 
 @st.dialog("IBD Breakout Review Flow & Rules", width="large")
@@ -226,27 +275,20 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     filtered_df = apply_default_review_order(filtered_df)
 
-    detail_container = st.empty()
-
-    col_view_c, summary_c, copy_c = st.columns([1.5, 2.5, 2])
-    with col_view_c:
-        column_view = st.selectbox(
-            "Column View",
-            ["IBD Decision", "All Fields", "Signal", "IBD Entry", "Volume/Pullback", "Reference"],
-            index=0,
-            key="ibd_column_view_select",
-        )
-    with summary_c:
+    sum_c, copy_c = st.columns([2.6, 1.2])
+    with sum_c:
         st.markdown(
-            f'<div style="margin-top:28px; font-size:14px;">📊 <b>Filtered Rows: {len(filtered_df)} / {active_signals_count}</b> Active Signals · Sorted by Status → C Rank</div>',
+            f'<div style="font-size:14px; font-weight:600; color:#c5ceda; margin-top:8px;">{len(filtered_df)} results · Sorted by Entry Status → C Rank</div>',
             unsafe_allow_html=True,
         )
     with copy_c:
-        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         _render_copy_codes_control(filtered_df["code"].tolist(), key_prefix="ibd_review")
 
-    columns = get_column_view_fields(column_view)
-    selected_code = render_table(filtered_df, columns, height=620)
+    from dashboard.field_config import get_default_table_columns
+    columns = get_default_table_columns()
+
+    detail_container = st.empty()
+    selected_code = render_table(filtered_df, columns, height=480)
 
     with detail_container.container():
         _render_selected_row_detail(filtered_df, selected_code)
@@ -256,40 +298,39 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
 
 def _render_status_queue(status_counts: dict[str, int], route_total: int, current_status: str) -> None:
-    c_title, c_btn = st.columns([3, 1])
+    c_title, c_btn = st.columns([7.5, 1.5])
     with c_title:
-        st.markdown("##### 1. Status Queue Triage (`signal=True` + `Route`)")
+        st.markdown("##### Review Queue")
     with c_btn:
-        if st.button(f"⚡ All Signals ({route_total})", use_container_width=True, type="primary" if current_status == "All" else "secondary"):
+        is_all_active = current_status == "All"
+        all_prefix = "✓ " if is_all_active else ""
+        if st.button(f"{all_prefix}All Signals ({route_total})", key="btn_all_signals", use_container_width=True, type="secondary"):
             st.session_state["ibd_filter_status"] = "All"
             st.session_state["ibd_filter_entry_vol_min"] = ""
             st.rerun()
 
     cols = st.columns(4)
     statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
+    dot_map = {
+        "ACTIONABLE": "🟢",
+        "UNCONFIRMED": "🟡",
+        "BELOW_TRIGGER": "🔴",
+        "EXTENDED": "🔵",
+    }
+    sub_map = {
+        "ACTIONABLE": "0%–5% above candidate",
+        "UNCONFIRMED": f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3% zone",
+        "BELOW_TRIGGER": "＜ 0% below trigger",
+        "EXTENDED": "＞ +5% chase limit",
+    }
     for i, status_name in enumerate(statuses):
         with cols[i]:
             count = status_counts.get(status_name, 0)
             is_active = current_status == status_name
-            bg_color = "#e3f2fd" if is_active else "#f8f9fa"
-            border_color = "#1f77b4" if is_active else "#e0e0e0"
-
-            subtitle = "&nbsp;"
-            if status_name == "UNCONFIRMED":
-                subtitle = f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3%"
-
-            st.markdown(
-                f"""
-                <div style="border: 2px solid {border_color}; border-radius: 8px; padding: 10px; background-color: {bg_color}; text-align: center; margin-bottom: 8px;">
-                    <div style="font-size: 13px; font-weight: 700; color: #555;">{status_name}</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #1f77b4; margin: 4px 0;">{count}</div>
-                    <div style="font-size: 11px; color: #666;">{subtitle}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            btn_label = f"✓ {status_name} Selected" if is_active else f"Select {status_name}"
-            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True):
+            prefix = "✓ " if is_active else ""
+            display_name = status_name.replace("_", " ")
+            btn_label = f"{prefix}{dot_map[status_name]} {display_name}\n{count}\n{sub_map[status_name]}"
+            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="secondary"):
                 if is_active:
                     st.session_state["ibd_filter_status"] = "All"
                     st.session_state["ibd_filter_entry_vol_min"] = ""
@@ -298,11 +339,11 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
                     if status_name not in ENTRY_VOL_ENABLED_STATUSES:
                         st.session_state["ibd_filter_entry_vol_min"] = ""
                 st.rerun()
-    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 
 def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
-    st.markdown("##### 2. One-line Quality Filtering (`AND` Combination)")
+    st.markdown("##### Filters")
     cols = st.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8])
     with cols[0]:
         routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
@@ -314,20 +355,20 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
             st.rerun()
 
     with cols[1]:
-        val = st.text_input("Distance Min %", value=st.session_state.get("ibd_filter_dist_min", ""), placeholder="-20.0", key="ibd_filter_dist_min_input")
+        val = st.text_input("Distance Min %", value=st.session_state.get("ibd_filter_dist_min", ""), placeholder="", key="ibd_filter_dist_min_input")
         if val != st.session_state.get("ibd_filter_dist_min", ""):
             st.session_state["ibd_filter_dist_min"] = val
             st.rerun()
 
     with cols[2]:
-        val = st.text_input("Distance Max %", value=st.session_state.get("ibd_filter_dist_max", ""), placeholder="20.0", key="ibd_filter_dist_max_input")
+        val = st.text_input("Distance Max %", value=st.session_state.get("ibd_filter_dist_max", ""), placeholder="", key="ibd_filter_dist_max_input")
         if val != st.session_state.get("ibd_filter_dist_max", ""):
             st.session_state["ibd_filter_dist_max"] = val
             st.rerun()
 
     with cols[3]:
         is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
-        placeholder_text = "N/A (Disabled)" if is_disabled else "1.5"
+        placeholder_text = "N/A (Disabled)" if is_disabled else ""
         val_entry = "" if is_disabled else st.session_state.get("ibd_filter_entry_vol_min", "")
         val = st.text_input("Entry Vol Min (x)", value=val_entry, placeholder=placeholder_text, disabled=is_disabled, key="ibd_filter_entry_vol_min_input")
         if not is_disabled and val != st.session_state.get("ibd_filter_entry_vol_min", ""):
@@ -335,7 +376,7 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
             st.rerun()
 
     with cols[4]:
-        val = st.text_input("Weekly Vol Min (x)", value=st.session_state.get("ibd_filter_weekly_vol_min", ""), placeholder="1.2", key="ibd_filter_weekly_vol_min_input")
+        val = st.text_input("Weekly Vol Min (x)", value=st.session_state.get("ibd_filter_weekly_vol_min", ""), placeholder="", key="ibd_filter_weekly_vol_min_input")
         if val != st.session_state.get("ibd_filter_weekly_vol_min", ""):
             st.session_state["ibd_filter_weekly_vol_min"] = val
             st.rerun()
@@ -350,7 +391,7 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str) -> None:
             st.session_state["ibd_filter_entry_vol_min"] = ""
             st.session_state["ibd_filter_weekly_vol_min"] = ""
             st.rerun()
-    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 
 def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
@@ -365,9 +406,6 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
         row = filtered_df.iloc[0]
 
     code = str(row.get("code", "N/A"))
-    sector = str(row.get("sector", "N/A"))
-    industry = str(row.get("industry", "N/A"))
-    signal_src = str(row.get("signal_source", "N/A"))
     cand_price = _format_number(row.get("ibd_candidate_price"), "")
     cand_rule = str(row.get("ibd_candidate_rule", "N/A"))
     dist_pct = _format_number(row.get("current_vs_ibd_candidate_pct"), "%")
@@ -377,36 +415,29 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     rank_c = str(row.get("rank_C_continuous", "N/A"))
     c_cont = _format_number(row.get("C_continuous"), "")
 
+    status_color = "#4caf50" if status_name == "ACTIONABLE" else "#f2f5f9"
     st.markdown(
         f"""
-        <div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:12px 16px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e9ecef; padding-bottom:8px; margin-bottom:10px;">
-                <div>
-                    <span style="font-size:18px; font-weight:800; color:#1f77b4;">{code}</span>
-                    <span style="font-size:14px; color:#495057; margin-left:12px;"><b>Sector/Industry:</b> {sector} / {industry}</span>
+        <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
+                <div style="flex:1; border-right:1px solid #303947; text-align:left;">
+                    <span style="font-size:18px; font-weight:800; color:#f2f5f9;">{code}</span>
                 </div>
-                <div style="font-size:13px; color:#6c757d;"><b>Signal Source:</b> {signal_src}</div>
-            </div>
-            <div style="display:flex; justify-content:space-between; text-align:center;">
-                <div style="flex:1; border-right:1px solid #e9ecef;">
-                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Candidate Price</div>
-                    <div style="font-size:16px; font-weight:700; color:#212529;">{cand_price}</div>
-                    <div style="font-size:11px; color:#495057;">Route: {cand_rule}</div>
+                <div style="flex:1.5; border-right:1px solid #303947;">
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
+                    <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{cand_price} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({cand_rule})</span></div>
                 </div>
-                <div style="flex:1; border-right:1px solid #e9ecef;">
-                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Current vs Candidate</div>
-                    <div style="font-size:16px; font-weight:700; color:#212529;">{dist_pct}</div>
-                    <div style="font-size:11px; color:#495057;">Close: {latest_close}</div>
+                <div style="flex:1.5; border-right:1px solid #303947;">
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Current vs Candidate</div>
+                    <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{dist_pct} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">(Close: {latest_close})</span></div>
                 </div>
-                <div style="flex:1; border-right:1px solid #e9ecef;">
-                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">Entry Status</div>
-                    <div style="font-size:16px; font-weight:700; color:#2e7d32;">{status_name}</div>
-                    <div style="font-size:11px; color:#495057;">Vol / Reason: {vol_or_reject}</div>
+                <div style="flex:1.5; border-right:1px solid #303947;">
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Entry Status</div>
+                    <div style="font-size:15px; font-weight:700; color:{status_color};">{status_name.replace('_', ' ')} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({vol_or_reject})</span></div>
                 </div>
-                <div style="flex:1;">
-                    <div style="font-size:11px; color:#6c757d; text-transform:uppercase;">C Rank & Continuous</div>
-                    <div style="font-size:16px; font-weight:700; color:#1f77b4;">#{rank_c}</div>
-                    <div style="font-size:11px; color:#495057;">Continuous: {c_cont}</div>
+                <div style="flex:1.5;">
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">C Rank & Continuous</div>
+                    <div style="font-size:15px; font-weight:700; color:#f2f5f9;">#{rank_c} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({c_cont})</span></div>
                 </div>
             </div>
         </div>
@@ -454,18 +485,18 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     
     with col_summary:
         st.markdown(
-            f'<div style="margin-top:28px; font-size:14px;">📊 <b>Showing: {len(ranked)} / {len(df)}</b> Pool Records · Reference Only</div>',
+            f'<div style="margin-top:28px; font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} / {len(df)} Pool Records · Reference Only</div>',
             unsafe_allow_html=True,
         )
     with col_copy:
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         _render_copy_codes_control(ranked["code"].tolist(), key_prefix="c_rank_ref")
 
-    detail_container = st.empty()
+    from dashboard.field_config import get_column_view_fields
+    columns = get_column_view_fields("C Rank Reference")
 
-    leading_columns = ["code", "rank_C_continuous", "C_continuous", "ibd_entry_status", "current_vs_ibd_candidate_pct", "ibd_candidate_rule", "volume_ratio", "latest_close"]
-    columns = leading_columns + [column for column in get_all_table_columns() if column not in set(leading_columns)]
-    selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=720)
+    detail_container = st.empty()
+    selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=520)
 
     with detail_container.container():
         _render_selected_row_detail(ranked, selected_code)
@@ -479,8 +510,8 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
     n = len(codes)
     html_code = f"""
     <div style="display:flex; align-items:center; justify-content:flex-end; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <button id="copyBtn_{key_prefix}" style="background:#1f77b4; color:#fff; border:none; border-radius:4px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.12); transition: background 0.2s;">
-            📋 Copy {n} Codes
+        <button id="copyBtn_{key_prefix}" style="background:#2e7d32; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; height:36px; line-height:24px; box-shadow:0 1px 3px rgba(0,0,0,0.12); transition: background 0.2s;">
+            Copy {n} Codes
         </button>
         <span id="copyMsg_{key_prefix}" style="margin-left:8px; font-size:12px; color:#2e7d32; font-weight:600; display:none;">✓ Copied!</span>
     </div>
@@ -506,22 +537,22 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                 }}
                 document.body.removeChild(ta);
                 if (msg) msg.style.display = 'inline';
-                btn.style.background = '#2e7d32';
+                btn.style.background = '#1b5e20';
                 btn.innerText = '✓ Copied {n} Codes';
                 setTimeout(() => {{
                     if (msg) msg.style.display = 'none';
-                    btn.style.background = '#1f77b4';
-                    btn.innerText = '📋 Copy {n} Codes';
+                    btn.style.background = '#2e7d32';
+                    btn.innerText = 'Copy {n} Codes';
                 }}, 2000);
             }});
         }}
     </script>
     """
-    col_a, col_b = st.columns([1.5, 1])
+    col_a, col_b = st.columns([1.5, 0.7])
     with col_a:
-        st.components.v1.html(html_code, height=36)
+        st.components.v1.html(html_code, height=38)
     with col_b:
-        with st.popover(f"📋 Manual Copy ({n})"):
+        with st.popover("Manual", use_container_width=True):
             st.caption("If direct copy is blocked by your browser, copy directly from below:")
             st.code(codes_str, language="text")
 
@@ -603,7 +634,7 @@ def _get_snapshot_date(df: pd.DataFrame) -> str:
     if "snapshot_date" in df.columns:
         valid = df["snapshot_date"].dropna()
         if not valid.empty:
-            return str(valid.iloc[0])
+            return str(valid.iloc[0]).split(" ")[0].split("T")[0]
     return "N/A"
 
 

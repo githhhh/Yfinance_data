@@ -178,7 +178,7 @@ def _column_def(column: str) -> dict:
     definition = {
         "field": column,
         "headerName": get_field_label(column),
-        "minWidth": 120,
+        "minWidth": 100,
         "sortable": True,
         "filter": True,
         "resizable": True,
@@ -191,8 +191,50 @@ def _column_def(column: str) -> dict:
             definition["valueFormatter"] = formatter
     if column == "code":
         definition["pinned"] = "left"
-        definition["minWidth"] = 110
+        definition["width"] = 85
+        definition["minWidth"] = 85
         definition["lockPinned"] = False
         if HAS_JS_CODE:
             definition["cellRenderer"] = _code_renderer_jscode()
+    elif column == "rank_C_continuous":
+        definition["pinned"] = "right"
+        definition["width"] = 85
+        definition["minWidth"] = 85
+    elif column == "ibd_candidate_rule":
+        definition["width"] = 130
+        definition["minWidth"] = 110
+    elif column == "current_vs_ibd_candidate_pct":
+        definition["width"] = 120
+        definition["minWidth"] = 110
+    elif column == "latest_close":
+        definition["width"] = 100
+        definition["minWidth"] = 90
+    elif column == "volume_ratio":
+        definition["width"] = 85
+        definition["minWidth"] = 85
+    elif column == "ibd_entry_status":
+        definition["width"] = 115
+        definition["minWidth"] = 105
+    elif column == "ibd_entry_vol_or_reject":
+        definition["minWidth"] = 180
+        definition["flex"] = 1
+    else:
+        definition["width"] = 130
+
+    if HAS_JS_CODE and column == "ibd_entry_status":
+        definition["cellStyle"] = JsCode("""
+        function(params) {
+            const val = String(params.value || '');
+            if (val === 'ACTIONABLE') {
+                return {'color': '#4caf50', 'fontWeight': '700'};
+            } else if (val === 'UNCONFIRMED') {
+                return {'color': '#ffb300', 'fontWeight': '700'};
+            } else if (val === 'BELOW_TRIGGER') {
+                return {'color': '#ef5350', 'fontWeight': '700'};
+            } else if (val === 'EXTENDED') {
+                return {'color': '#90a4ae', 'fontWeight': '700'};
+            }
+            return {'fontWeight': '600'};
+        }
+        """)
     return definition

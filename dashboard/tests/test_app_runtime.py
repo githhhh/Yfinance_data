@@ -20,5 +20,5 @@ def test_default_dashboard_screen_renders_with_real_csv():
 
     assert len(app.exception) == 0
     assert [title.value for title in app.title] == []
-    assert any("Filtered Rows" in item.value for item in app.markdown)
+    assert any("results · Sorted by Entry Status" in item.value for item in app.markdown)
     assert len(app.selectbox) > 0

@@ -277,7 +277,7 @@ def test_copy_codes_control_rendering(monkeypatch):
     assert len(rendered_components) == 1
     assert "Copy 3 Codes" in rendered_components[0]
     assert 'textToCopy = "AAPL, NVDA, TSLA"' in rendered_components[0]
-    assert any("Manual Copy (3)" in pop for pop in rendered_popovers)
+    assert any("Fallback" in pop or "Manual" in pop for pop in rendered_popovers)
     assert any("AAPL, NVDA, TSLA" in code_str for code_str in rendered_codes)
 
 

@@ -221,7 +221,7 @@ FIELD_CONFIG = OrderedDict(
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
-        ("ibd_candidate_rule", _field("IBD Candidate Rule", "category", "Candidate", default_table=True)),
+        ("ibd_candidate_rule", _field("Route", "category", "Candidate", default_table=True)),
         ("ibd_candidate_price", _field("IBD Candidate Price", "number", "Candidate", default_table=True, fmt="0.00")),
         ("ibd_candidate_signal_source", _field("IBD Candidate Signal Source", "category", "Candidate")),
         (
@@ -287,7 +287,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "ibd_entry_vol_or_reject",
             _field(
-                "IBD Entry Volume / Reject Reason",
+                "Entry / Reason",
                 "text",
                 "IBD Entry",
                 filterable=False,
@@ -299,7 +299,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "ibd_entry_status",
             _field(
-                "IBD Entry Status",
+                "Status",
                 "category",
                 "IBD Entry",
                 filterable=True,
@@ -311,7 +311,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "latest_close",
             _field(
-                "Latest Close",
+                "Latest",
                 "number",
                 "IBD Entry",
                 filterable=False,
@@ -324,7 +324,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "current_vs_ibd_candidate_pct",
             _field(
-                "% vs IBD Candidate",
+                "Vs Candidate",
                 "number",
                 "IBD Entry",
                 filterable=True,
@@ -350,7 +350,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "volume_ratio",
             _field(
-                "Volume Ratio",
+                "W Vol",
                 "number",
                 "Volume/Pullback",
                 filterable=True,
