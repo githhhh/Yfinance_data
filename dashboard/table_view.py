@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 
-from dashboard.field_config import FIELD_CONFIG, get_field_label
+from dashboard.field_config import FIELD_CONFIG, STATUS_META, get_field_label
 
 try:
     from st_aggrid import JsCode
@@ -116,6 +118,9 @@ def build_grid_options(columns: list[str]) -> dict:
             "resizable": True,
             "editable": False,
         },
+        "enableBrowserTooltips": False,
+        "tooltipShowDelay": 300,
+        "tooltipHideDelay": 5000,
         "enableRangeSelection": True,
         "rowSelection": "single",
         "suppressRowClickSelection": False,
@@ -184,6 +189,9 @@ def _column_def(column: str) -> dict:
         "resizable": True,
         "pinned": None,
     }
+    help_text = FIELD_CONFIG.get(column, {}).get("help")
+    if help_text:
+        definition["headerTooltip"] = help_text
     fmt = FIELD_CONFIG.get(column, {}).get("format")
     if fmt and HAS_JS_CODE:
         formatter = _get_value_formatter(fmt)
@@ -222,19 +230,25 @@ def _column_def(column: str) -> dict:
         definition["width"] = 130
 
     if HAS_JS_CODE and column == "ibd_entry_status":
-        definition["cellStyle"] = JsCode("""
-        function(params) {
+        meta_json = json.dumps(STATUS_META)
+        definition["cellStyle"] = JsCode(f"""
+        function(params) {{
             const val = String(params.value || '');
-            if (val === 'ACTIONABLE') {
-                return {'color': '#4caf50', 'fontWeight': '700'};
-            } else if (val === 'UNCONFIRMED') {
-                return {'color': '#ffb300', 'fontWeight': '700'};
-            } else if (val === 'BELOW_TRIGGER') {
-                return {'color': '#ef5350', 'fontWeight': '700'};
-            } else if (val === 'EXTENDED') {
-                return {'color': '#90a4ae', 'fontWeight': '700'};
-            }
-            return {'fontWeight': '600'};
-        }
+            const meta = {meta_json};
+            if (meta[val] && meta[val].color) {{
+                return {{'color': meta[val].color, 'fontWeight': '700'}};
+            }}
+            return {{'fontWeight': '600'}};
+        }}
+        """)
+        definition["tooltipValueGetter"] = JsCode(f"""
+        function(params) {{
+            const val = String(params.value || '');
+            const meta = {meta_json};
+            if (meta[val] && meta[val].tooltip) {{
+                return meta[val].tooltip;
+            }}
+            return val;
+        }}
         """)
     return definition

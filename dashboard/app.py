@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import sys
 from pathlib import Path
@@ -27,6 +28,7 @@ from dashboard.data_utils import (
     load_pool_csv,
 )
 from dashboard.field_config import (
+    STATUS_META,
     get_all_table_columns,
     get_column_view_fields,
     get_field_label,
@@ -106,33 +108,193 @@ def main() -> None:
             font-size: 13px !important;
             white-space: nowrap !important;
         }
-        /* Info flow rules button */
-        div[class*="st-key-btn_info_rules"] button {
-            width: 48px !important;
-            min-width: 48px !important;
-            max-width: 48px !important;
-            padding: 4px 0 !important;
+        /* Ensure horizontal blocks align items vertically centered with exact gap */
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-btn_info_rules"]),
+        div[data-testid="stHorizontalBlock"]:has(iframe) {
+            align-items: center !important;
+            gap: 8px !important;
         }
-        /* Popover fallback button inside copy control */
-        div[data-testid="stPopover"] > button {
-            height: 36px !important;
-            min-height: 36px !important;
-            max-height: 36px !important;
-            padding: 4px 14px !important;
-            font-size: 13px !important;
-            border-radius: 6px !important;
-            line-height: 26px !important;
+
+        /* Item 2: Info flow rules button (44x44px, 10px radius) */
+        div[class*="st-key-btn_info_rules"] {
+            display: flex !important;
+            align-items: center !important;
+            height: 44px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        div[class*="st-key-btn_info_rules"] button {
+            width: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            border-radius: 10px !important;
+            padding: 0 !important;
+            margin: 0 !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            white-space: nowrap !important;
+            box-sizing: border-box !important;
         }
+
+        /* Item 2: Mode Segmented Control (44px height, 10px radius) */
+        div[class*="st-key-global_mode_selector"] {
+            display: flex !important;
+            align-items: center !important;
+            height: 44px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] {
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            border-radius: 10px !important;
+            display: flex !important;
+            align-items: center !important;
+            box-sizing: border-box !important;
+        }
+        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] button,
+        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] label {
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Precisely scope copy control row inside column copy_c so outer row is untouched and inner buttons align flush with right edge */
+        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+            width: 100% !important;
+            min-width: 308px !important;
+        }
+        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"] {
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(iframe) {
+            flex: 0 0 180px !important;
+            width: 180px !important;
+            min-width: 180px !important;
+            max-width: 180px !important;
+        }
+        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(div[data-testid="stPopover"]) {
+            flex: 0 0 120px !important;
+            width: 120px !important;
+            min-width: 120px !important;
+            max-width: 120px !important;
+        }
+        div[data-testid="stPopover"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 44px !important;
+            width: 120px !important;
+            min-width: 120px !important;
+            max-width: 120px !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        div[data-testid="stPopover"] > button,
+        div[data-testid="stPopover"] button {
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            width: 120px !important;
+            min-width: 120px !important;
+            max-width: 120px !important;
+            padding: 0 14px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+            white-space: nowrap !important;
+            margin: 0 !important;
+        }
+        div[data-testid="stHorizontalBlock"] iframe {
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            width: 180px !important;
+            min-width: 180px !important;
+            max-width: 180px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            display: block !important;
+            border-radius: 8px !important;
+            box-sizing: border-box !important;
+        }
+
         .status-card button p, div[class*="st-key-btn_status_"] button p, div[class*="st-key-status_"] button p {
             margin: 0 !important;
             padding: 0 !important;
         }
-        div[data-testid="stPopover"] {
-            margin-top: 1px !important;
+
+        /* Guaranteed instant DOM tooltip on hover for status cards */
+        div[class*="st-key-btn_status_ACTIONABLE"]:hover::after {
+            content: "ACTIONABLE: confirmed breakout with strong entry volume (>=1.5x)";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #4caf50; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        div[class*="st-key-btn_status_UNCONFIRMED"]:hover::after {
+            content: "UNCONFIRMED: candidate condition met, waiting for volume confirmation";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #ffb300; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        div[class*="st-key-btn_status_BELOW_TRIGGER"]:hover::after {
+            content: "BELOW TRIGGER: pulling back or building base below trigger price";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #90caf9; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        div[class*="st-key-btn_status_EXTENDED"]:hover::after {
+            content: "EXTENDED: extended >5% from pivot, chase risk";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #e53e3e; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+
+        /* Guaranteed instant DOM tooltip on hover for key table headers */
+        div[col-id="ibd_entry_vol_or_reject"]:hover::after {
+            content: "日线突破确认：成功显示日线量比，未确认显示原因。";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        div[col-id="ibd_candidate_rule"]:hover::after {
+            content: "IBD Candidate 触发价的结构来源。";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        div[col-id="code"]:hover::after {
+            content: "股票代码；选择该行后可在上方查看详情。";
+            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
+            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
         }
         </style>
         """,
@@ -180,7 +342,7 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
     with col_r:
         c1, c2 = st.columns([0.3, 2.7])
         with c1:
-            if st.button("ⓘ", key="btn_info_rules", help="Click to view Flow & Rules"):
+            if st.button("ⓘ", key="btn_info_rules", help="Status → Position → Daily Confirmation → Weekly Volume → C Rank"):
                 _render_flow_rules_dialog()
         with c2:
             mode = st.segmented_control(
@@ -199,22 +361,19 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
 def _render_flow_rules_dialog() -> None:
     st.markdown(
         r"""
-        #### 1. IBD Review Workflow (`signal=True`)
-        - **Step 1: Route Filtering (`Route`)**: Select the candidate breakout/pullback rule (e.g., `ceiling_breakout`, `ma10_touch_confirm`, etc.). Status card totals dynamically update to reflect the count of active signals under the selected route.
-        - **Step 2: Status Triage (`Status Queue`)**: Click any status card to slice the queue.
-          - `ACTIONABLE`: Price $\le +5.0\%$ from trigger and daily volume condition met.
-          - `UNCONFIRMED`: Price within breakout zone or pullback zone but volume unconfirmed (subtitle tracks items within $+3.0\%$).
-          - `BELOW_TRIGGER`: Price fell below trigger price (< $0.0\%$).
-          - `EXTENDED`: Price extended beyond $+5.0\%$ chase limit.
-        - **Step 3: Quality Thresholds (`One-line Filter Bar`)**: Apply strict `AND` intersection filtering on Distance Min/Max %, Entry Volume Ratio Min, and Weekly Volume Ratio Min.
-          - *Note*: `Entry Vol Min` is automatically disabled and cleared when `UNCONFIRMED` or `All` status is selected (enabled for `ACTIONABLE`, `BELOW_TRIGGER`, and `EXTENDED`).
-        - **Step 4: Selected Row Detail**: Click any row in the Decision Table to immediately inspect current price, candidate rule, volume ratio, and `C Rank / C Continuous` scores in the top detail bar.
-        - **Step 5: Code Export**: Use the one-click clipboard copy button or popover text to export filtered codes.
+        ### Review Flow
+        `Status → Position → Daily Confirmation → Weekly Volume → C Rank`
 
-        ---
-        #### 2. C Rank Reference Mode
-        - Isolates and displays all actionable or unconfirmed pool records where `signal=True`, strictly sorted by **`rank_C_continuous` ascending**.
-        - **Top N Selector**: Slice the top candidates (`Top 10`, `Top 20`, `Top 30`, `Top 50`, or `All rows`).
+        ### Status Legend
+        - 🟢 **ACTIONABLE**：日线已确认，位于 Candidate 上方 0%–5%。
+        - 🟡 **UNCONFIRMED**：日线价格或成交量尚未确认。
+        - 🔴 **BELOW TRIGGER**：当前价格位于 Candidate 下方。
+        - 🔵 **EXTENDED**：当前价格超过 Candidate +5%。
+
+        ### Volume Definition
+        - **Entry / Reason**：日线突破确认和日线量比。
+        - **W Vol**：当前周成交量相对 10 周均量。
+        - **C Rank**：质量对照，不代替 IBD 入场状态。
         """
     )
 
@@ -284,7 +443,7 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     filtered_df = apply_default_review_order(filtered_df)
 
-    sum_c, copy_c = st.columns([2.6, 1.2])
+    sum_c, copy_c = st.columns([2.4, 1.6])
     with sum_c:
         st.markdown(
             f'<div style="font-size:14px; font-weight:600; color:#c5ceda; margin-top:8px;">{len(filtered_df)} results · Sorted by Entry Status → C Rank</div>',
@@ -321,12 +480,6 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
 
     cols = st.columns(4)
     statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
-    dot_map = {
-        "ACTIONABLE": "🟢",
-        "UNCONFIRMED": "🟡",
-        "BELOW_TRIGGER": "🔴",
-        "EXTENDED": "🔵",
-    }
     sub_map = {
         "ACTIONABLE": "0%–5% above candidate",
         "UNCONFIRMED": f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3% zone",
@@ -339,8 +492,11 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
             is_active = current_status == status_name
             prefix = "✓ " if is_active else ""
             display_name = status_name.replace("_", " ")
-            btn_label = f"{prefix}{dot_map[status_name]} {display_name}\n{count}\n{sub_map[status_name]}"
-            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="secondary"):
+            meta = STATUS_META.get(status_name, {})
+            dot = meta.get("dot", "⚪")
+            tooltip = meta.get("tooltip", "")
+            btn_label = f"{prefix}{dot} {display_name}\n{count}\n{sub_map[status_name]}"
+            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="secondary", help=tooltip):
                 if is_active:
                     st.session_state["ibd_filter_status"] = "All"
                     st.session_state["ibd_filter_entry_vol_min"] = ""
@@ -431,23 +587,117 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     else:
         row = filtered_df.iloc[0]
 
-    code = str(row.get("code", "N/A"))
-    cand_price = _format_number(row.get("ibd_candidate_price"), "")
-    cand_rule = str(row.get("ibd_candidate_rule", "N/A"))
-    dist_pct = _format_number(row.get("current_vs_ibd_candidate_pct"), "%")
-    latest_close = _format_number(row.get("latest_close"), "")
-    status_name = str(row.get("ibd_entry_status", "N/A"))
-    vol_or_reject = str(row.get("ibd_entry_vol_or_reject", "N/A"))
-    rank_c = str(row.get("rank_C_continuous", "N/A"))
-    c_cont = _format_number(row.get("C_continuous"), "")
+    code = html.escape(str(row.get("code", "N/A")))
+    cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
+    cand_rule = html.escape(str(row.get("ibd_candidate_rule", "N/A")))
+    dist_pct = html.escape(_format_number(row.get("current_vs_ibd_candidate_pct"), "%"))
+    latest_close = html.escape(_format_number(row.get("latest_close"), ""))
+    status_name = html.escape(str(row.get("ibd_entry_status", "N/A")))
+    vol_or_reject = html.escape(str(row.get("ibd_entry_vol_or_reject", "N/A")))
+    rank_c = html.escape(str(row.get("rank_C_continuous", "N/A")))
+    c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
 
-    status_color = "#4caf50" if status_name == "ACTIONABLE" else "#f2f5f9"
+    status_color = STATUS_META.get(str(row.get("ibd_entry_status", "N/A")), {}).get("color", "#4caf50" if status_name == "ACTIONABLE" else "#f2f5f9")
+
+    eps_yoy = html.escape(_format_card_val(row.get("eps_yoy_growth"), "%"))
+    dist_52w = html.escape(_format_card_val(row.get("dist_to_52w_high_pct"), "%"))
+    p_52w = html.escape(_format_card_val(row.get("price_52_week_high"), ""))
+    base_depth = html.escape(_format_card_val(row.get("base_depth_pct"), "%"))
+    base_dur = html.escape(_format_card_val(row.get("base_duration_weeks"), "w"))
+
+    pb_depth = html.escape(_format_card_val(row.get("pullback_pct"), "%"))
+    pb_off_peak = html.escape(_format_card_val(row.get("pullback_pct_off_peak"), "%"))
+
+    is_entry_valid = bool(row.get("ibd_entry_valid")) and str(row.get("ibd_entry_valid")).lower() not in ("false", "0", "nan", "none", "")
+    trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
+    raw_reason = row.get("ibd_entry_reject_reason")
+    reject_reason_str = html.escape(str(raw_reason).strip() if (raw_reason is not None and not pd.isna(raw_reason) and str(raw_reason).strip() not in ("", "nan", "None", "N/A")) else "n/a")
+
+    if is_entry_valid:
+        raw_date = row.get("ibd_entry_date")
+        entry_date_str = html.escape(str(raw_date).split("T")[0] if (raw_date is not None and not pd.isna(raw_date) and str(raw_date).strip() not in ("", "nan", "None", "N/A")) else "n/a")
+        daily_vol_str = html.escape(_format_card_val(row.get("ibd_entry_volume_ratio"), "x"))
+        reject_display = f'<span style="color:#a0aec0;">{reject_reason_str}</span>'
+    else:
+        entry_date_str = "n/a"
+        daily_vol_str = "n/a"
+        reject_display = f'<span style="color:#ffb300; font-weight:700;">{reject_reason_str}</span>' if reject_reason_str != "n/a" else "n/a"
+
     st.markdown(
         f"""
+        <style>
+        .code-hover-wrapper {{ position: relative; display: inline-block; }}
+        .code-hover-trigger {{ font-size: 18px; font-weight: 800; color: #1f77b4; cursor: pointer; border-bottom: 1px dotted #1f77b4; }}
+        .code-hover-popup {{
+            visibility: hidden; opacity: 0; pointer-events: none;
+            position: absolute; top: auto; bottom: calc(100% + 6px); left: 0; width: 450px;
+            background: #1e2631; border: 1px solid #4a5a6a; border-radius: 8px; padding: 12px 14px;
+            box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6); z-index: 999999; text-align: left;
+            transition: visibility 0s linear 0.25s, opacity 0.15s ease-in 0.25s;
+        }}
+        .code-hover-popup::after {{
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            height: 14px;
+        }}
+        .code-hover-wrapper:hover .code-hover-popup,
+        .code-hover-wrapper:focus-within .code-hover-popup,
+        .code-popup-toggle:checked ~ .code-hover-popup {{
+            visibility: visible; opacity: 1; pointer-events: auto;
+            transition: visibility 0s linear 0.25s, opacity 0.15s ease-in 0.25s;
+        }}
+        .code-popup-toggle:checked ~ .code-hover-popup {{
+            transition: visibility 0s linear 0s, opacity 0.15s ease-in 0s;
+        }}
+        .code-popup-section {{ margin-bottom: 10px; border-bottom: 1px solid #303947; padding-bottom: 8px; }}
+        .code-popup-section:last-child {{ margin-bottom: 0; border-bottom: none; padding-bottom: 0; }}
+        .code-popup-title {{ font-size: 11px; font-weight: 700; color: #8899a6; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }}
+        .code-popup-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; }}
+        .code-popup-grid-2 {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; }}
+        .code-popup-item {{ font-size: 11px; color: #a0aec0; }}
+        .code-popup-val {{ font-size: 13px; font-weight: 700; color: #f2f5f9; }}
+        </style>
         <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
                 <div style="flex:1; border-right:1px solid #303947; text-align:left;">
-                    <span style="font-size:18px; font-weight:800; color:#f2f5f9;">{code}</span>
+                    <div class="code-hover-wrapper">
+                        <input type="checkbox" id="code_popup_chk_{code}" class="code-popup-toggle" style="display:none;" />
+                        <label for="code_popup_chk_{code}" tabindex="0" class="code-hover-trigger" title="Hover or click to view details">{code} ▾</label>
+                        <div class="code-hover-popup">
+                            <div class="code-popup-section">
+                                <div class="code-popup-title">1. CANSLIM / Base</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">EPS YoY</div><div class="code-popup-val">{eps_yoy}</div></div>
+                                    <div><div class="code-popup-item">To 52W High</div><div class="code-popup-val">{dist_52w}</div></div>
+                                    <div><div class="code-popup-item">52W High</div><div class="code-popup-val">{p_52w}</div></div>
+                                    <div><div class="code-popup-item">Base Depth</div><div class="code-popup-val">{base_depth}</div></div>
+                                    <div><div class="code-popup-item">Base Duration</div><div class="code-popup-val">{base_dur}</div></div>
+                                </div>
+                            </div>
+                            <div class="code-popup-section">
+                                <div class="code-popup-title">2. Pullback</div>
+                                <div class="code-popup-grid-2">
+                                    <div><div class="code-popup-item">Pullback Depth</div><div class="code-popup-val">{pb_depth}</div></div>
+                                    <div><div class="code-popup-item">Off Pullback Peak</div><div class="code-popup-val">{pb_off_peak}</div></div>
+                                </div>
+                            </div>
+                            <div class="code-popup-section">
+                                <div class="code-popup-title">3. Daily Entry</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">Trigger</div><div class="code-popup-val">{trigger_p}</div></div>
+                                    <div><div class="code-popup-item">Entry Date</div><div class="code-popup-val">{entry_date_str}</div></div>
+                                    <div><div class="code-popup-item">Daily Volume</div><div class="code-popup-val">{daily_vol_str}</div></div>
+                                </div>
+                                <div style="margin-top:6px;">
+                                    <div class="code-popup-item">Reject Reason</div>
+                                    <div class="code-popup-val" style="font-size:12px;">{reject_display}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div style="flex:1.5; border-right:1px solid #303947;">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
@@ -502,7 +752,7 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 )
             )
 
-    col_limit, col_summary, col_copy = st.columns([1.5, 2.5, 2])
+    col_limit, col_summary, col_copy = st.columns([1.3, 2.3, 2.4])
     with col_limit:
         limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
         limit = None if limit_label == "All rows" else int(limit_label.split()[1])
@@ -535,15 +785,62 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
     codes_str = ", ".join([str(c) for c in codes if pd.notna(c) and str(c).strip()])
     n = len(codes)
     html_code = f"""
-    <div style="display:flex; align-items:center; justify-content:flex-end; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <button id="copyBtn_{key_prefix}" style="background:#2e7d32; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; height:36px; line-height:24px; box-shadow:0 1px 3px rgba(0,0,0,0.12); transition: background 0.2s;">
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        * {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
+        html, body {{
+            height: 44px;
+            width: 100%;
+            overflow: hidden;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }}
+        .copy-wrapper {{
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            height: 44px;
+            width: 100%;
+        }}
+        .copy-btn {{
+            background: #2e7d32;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            height: 44px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            transition: background 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+    </style>
+    </head>
+    <body>
+    <div class="copy-wrapper">
+        <button id="copyBtn_{key_prefix}" class="copy-btn">
             Copy {n} Codes
         </button>
-        <span id="copyMsg_{key_prefix}" style="margin-left:8px; font-size:12px; color:#2e7d32; font-weight:600; display:none;">✓ Copied!</span>
     </div>
     <script>
         const btn = document.getElementById('copyBtn_{key_prefix}');
-        const msg = document.getElementById('copyMsg_{key_prefix}');
         const textToCopy = {json.dumps(codes_str)};
         if (btn) {{
             btn.addEventListener('click', () => {{
@@ -562,21 +859,21 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                     }}
                 }}
                 document.body.removeChild(ta);
-                if (msg) msg.style.display = 'inline';
                 btn.style.background = '#1b5e20';
-                btn.innerText = '✓ Copied {n} Codes';
+                btn.innerText = '✓ Copied ({n})';
                 setTimeout(() => {{
-                    if (msg) msg.style.display = 'none';
                     btn.style.background = '#2e7d32';
                     btn.innerText = 'Copy {n} Codes';
                 }}, 2000);
             }});
         }}
     </script>
+    </body>
+    </html>
     """
-    col_a, col_b = st.columns([1.5, 0.7])
+    col_a, col_b = st.columns([180, 120])
     with col_a:
-        st.components.v1.html(html_code, height=38)
+        st.components.v1.html(html_code, height=44, scrolling=False)
     with col_b:
         with st.popover("Manual", use_container_width=True):
             st.caption("If direct copy is blocked by your browser, copy directly from below:")
@@ -670,6 +967,28 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--csv", default=str(default_csv))
     args, _ = parser.parse_known_args()
     return args
+
+
+def _format_card_val(value: object, suffix: str = "") -> str:
+    if value is None or pd.isna(value) or str(value).strip() in ("", "nan", "None", "N/A", "n/a"):
+        return "n/a"
+    try:
+        val = float(value)
+        if suffix == "%":
+            if val > 0:
+                return f"+{val:.2f}%"
+            elif val < 0:
+                return f"{val:.2f}%"
+            return "0.00%"
+        elif suffix == "x":
+            return f"{val:.2f}x"
+        elif suffix == "w":
+            return f"{int(val)}w" if val.is_integer() else f"{val:.1f}w"
+        elif suffix == "":
+            return f"{val:.2f}"
+        return f"{val:.2f}{suffix}"
+    except (ValueError, TypeError):
+        return str(value)
 
 
 def _format_number(value: float | int | None, suffix: str = "") -> str:

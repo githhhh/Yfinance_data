@@ -3,6 +3,33 @@ from __future__ import annotations
 from collections import OrderedDict
 
 
+STATUS_META = {
+    "ACTIONABLE": {
+        "label": "ACTIONABLE",
+        "dot": "🟢",
+        "color": "#4caf50",
+        "tooltip": "日线已确认，当前位于 Candidate 上方 0%–5%，优先 Review。",
+    },
+    "UNCONFIRMED": {
+        "label": "UNCONFIRMED",
+        "dot": "🟡",
+        "color": "#ffb300",
+        "tooltip": "尚未满足日线突破确认，查看 Entry / Reason。",
+    },
+    "BELOW_TRIGGER": {
+        "label": "BELOW TRIGGER",
+        "dot": "🔴",
+        "color": "#ef5350",
+        "tooltip": "已有有效确认，但当前价格位于 Candidate 下方。",
+    },
+    "EXTENDED": {
+        "label": "EXTENDED",
+        "dot": "🔵",
+        "color": "#42a5f5",
+        "tooltip": "日线已确认，但当前超过 Candidate +5%，避免追高。",
+    },
+}
+
 EXCLUDED_CUSTOM_FIELDS = {"C_continuous", "rank_C_continuous", "is_priority"}
 
 BOOLEAN_FIELDS = {
@@ -216,12 +243,12 @@ def _field(
 
 FIELD_CONFIG = OrderedDict(
     [
-        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True)),
+        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="股票代码；选择该行后可在上方查看详情。")),
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
-        ("ibd_candidate_rule", _field("Route", "category", "Candidate", default_table=True)),
+        ("ibd_candidate_rule", _field("Route", "category", "Candidate", default_table=True, help_text="IBD Candidate 触发价的结构来源。")),
         ("ibd_candidate_price", _field("IBD Candidate Price", "number", "Candidate", default_table=True, fmt="0.00")),
         ("ibd_candidate_signal_source", _field("IBD Candidate Signal Source", "category", "Candidate")),
         (
@@ -294,6 +321,7 @@ FIELD_CONFIG = OrderedDict(
                 sortable=False,
                 default_table=True,
                 advanced_filter=False,
+                help_text="日线突破确认：成功显示日线量比，未确认显示原因。",
             ),
         ),
         (
@@ -305,7 +333,7 @@ FIELD_CONFIG = OrderedDict(
                 filterable=True,
                 default_table=True,
                 advanced_filter=True,
-                help_text="Lifecycle state of IBD breakout review.",
+                help_text="当前 IBD Review 状态。",
             ),
         ),
         (
@@ -318,7 +346,7 @@ FIELD_CONFIG = OrderedDict(
                 default_table=True,
                 advanced_filter=False,
                 fmt="0.00",
-                help_text="Latest weekly close price.",
+                help_text="当前数据快照的最新收盘价，不是实时价格。",
             ),
         ),
         (
@@ -331,7 +359,7 @@ FIELD_CONFIG = OrderedDict(
                 default_table=True,
                 advanced_filter=True,
                 fmt="0.00%",
-                help_text="Current close relative to IBD candidate price.",
+                help_text="最新收盘价相对 Candidate Price 的距离。",
             ),
         ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
@@ -357,6 +385,7 @@ FIELD_CONFIG = OrderedDict(
                 default_table=True,
                 advanced_filter=True,
                 fmt="0.00x",
+                help_text="当前周成交量相对 10 周均量的倍数。",
             ),
         ),
         ("hold_return", _field("Hold Return", "number", "Volume/Pullback", fmt="0.0%")),
@@ -394,6 +423,7 @@ FIELD_CONFIG = OrderedDict(
                 custom_mode=False,
                 c_rank_mode=True,
                 advanced_filter=False,
+                help_text="综合质量对照排名，数值越小越靠前。",
             ),
         ),
         ("pullback_count", _field("Pullback Count", "number", "Risk / Structure", default_table=True)),
