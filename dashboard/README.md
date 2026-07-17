@@ -10,8 +10,6 @@ python dashboard/run_app.py --csv us/breakout_follow_pool.csv
 
 ## Review 心流
 
-按以下顺序判断：
-
 **状态 → 价格位置 → 日线确认 → 周线量能 → C Rank 对照**
 
 1. **选状态**
