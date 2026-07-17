@@ -28,27 +28,38 @@ def _code_renderer_jscode():
             this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
             this.eGui.title = 'Click to copy ' + codeText;
             
-            this.eGui.addEventListener('click', (e) => {
+            this.eGui.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const textToCopy = String(codeText);
-                
-                const ta = document.createElement('textarea');
-                ta.value = textToCopy;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                try {
-                    document.execCommand('copy');
-                } catch (err) {
-                    if (navigator.clipboard) {
-                        navigator.clipboard.writeText(textToCopy);
+                let success = false;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(textToCopy);
+                        success = true;
+                    } catch (err) {
+                        // fallback to execCommand
                     }
                 }
-                document.body.removeChild(ta);
-                
-                this.eGui.innerHTML = '<span style="color:#2e7d32;">' + codeText + '</span><span style="font-size:11px; color:#2e7d32; margin-left:4px;">✓ Copied</span>';
+                if (!success) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = textToCopy;
+                        ta.style.position = 'fixed';
+                        ta.style.left = '-9999px';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        success = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    } catch (err2) {
+                        success = false;
+                    }
+                }
+                if (success) {
+                    this.eGui.innerHTML = '<span style="color:#2e7d32;">' + codeText + '</span><span style="font-size:11px; color:#2e7d32; margin-left:4px;">✓ Copied</span>';
+                } else {
+                    this.eGui.innerHTML = '<span style="color:#c62828;">' + codeText + '</span><span style="font-size:11px; color:#c62828; margin-left:4px;">Error</span>';
+                }
                 setTimeout(() => {
                     if (this.eGui) {
                         this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
@@ -121,7 +132,7 @@ def build_grid_options(columns: list[str]) -> dict:
         "enableBrowserTooltips": False,
         "tooltipShowDelay": 300,
         "tooltipHideDelay": 5000,
-        "enableRangeSelection": True,
+        "enableRangeSelection": False,
         "rowSelection": "single",
         "suppressRowClickSelection": False,
         "suppressDragLeaveHidesColumns": True,

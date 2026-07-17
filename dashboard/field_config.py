@@ -243,7 +243,7 @@ def _field(
 
 FIELD_CONFIG = OrderedDict(
     [
-        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="股票代码；选择该行后可在上方查看详情。")),
+        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="点击 Code 复制单个代码；点击该行其他位置查看详情。")),
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
@@ -411,6 +411,7 @@ FIELD_CONFIG = OrderedDict(
                 custom_mode=False,
                 c_rank_mode=True,
                 advanced_filter=False,
+                help_text="综合质量评分（只对 Active Signals 计算和展示分布）。",
             ),
         ),
         (
@@ -423,7 +424,7 @@ FIELD_CONFIG = OrderedDict(
                 custom_mode=False,
                 c_rank_mode=True,
                 advanced_filter=False,
-                help_text="综合质量对照排名，数值越小越靠前。",
+                help_text="综合质量对照排名（只对 Active Signals 计算和展示分布），数值越小越靠前。",
             ),
         ),
         ("pullback_count", _field("Pullback Count", "number", "Risk / Structure", default_table=True)),

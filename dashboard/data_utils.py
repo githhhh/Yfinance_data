@@ -38,11 +38,17 @@ class SortSpec:
 
 
 REQUIRED_CORE_FIELDS = {
+    "code",
     "signal",
     "latest_close",
+    "ibd_candidate_price",
+    "ibd_entry_valid",
     "ibd_entry_status",
     "current_vs_ibd_candidate_pct",
     "ibd_candidate_rule",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_reject_reason",
+    "volume_ratio",
     "rank_C_continuous",
     "C_continuous",
 }
@@ -52,7 +58,73 @@ def validate_pool_schema(df: pd.DataFrame) -> None:
     missing = REQUIRED_CORE_FIELDS - set(df.columns)
     if missing:
         missing_list = ", ".join(sorted(missing))
-        raise ValueError(f"Schema Error: missing required IBD Review columns: {missing_list}")
+        raise ValueError(f"Schema / Data Error: missing required IBD Review columns: {missing_list}")
+
+
+def validate_pool_semantics(df: pd.DataFrame) -> None:
+    if df.empty or len(df) == 0:
+        raise ValueError("Schema / Data Error: dataset cannot be empty")
+
+    if "code" not in df.columns:
+        raise ValueError("Schema / Data Error: missing required IBD Review columns: code")
+
+    for val in df["code"]:
+        if pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan":
+            raise ValueError("Schema / Data Error: code cannot be empty")
+
+    if df["code"].nunique() != len(df):
+        raise ValueError("Schema / Data Error: code cannot be duplicate")
+
+    for val in df["signal"]:
+        bool_val = _to_bool_or_na(val)
+        if bool_val is not True and bool_val is not False:
+            raise ValueError("Schema / Data Error: signal must be convertible to valid boolean")
+
+    active_mask = df["signal"].map(_to_bool_or_na) == True
+    active_df = df[active_mask]
+
+    for col in ["latest_close", "ibd_candidate_price", "current_vs_ibd_candidate_pct", "rank_C_continuous", "C_continuous", "volume_ratio"]:
+        nums = pd.to_numeric(active_df[col], errors="coerce")
+        if nums.isna().any() or not np.isfinite(nums).all():
+            raise ValueError(f"Schema / Data Error: {col} must be valid finite numerical values for active signals")
+
+    if (pd.to_numeric(active_df["ibd_candidate_price"], errors="coerce") <= 0).any():
+        raise ValueError("Schema / Data Error: ibd_candidate_price must be > 0 for active signals")
+
+    for val in active_df["ibd_candidate_rule"]:
+        if pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan":
+            raise ValueError("Schema / Data Error: ibd_candidate_rule cannot be empty for active signals")
+
+    valid_statuses = {"UNCONFIRMED", "BELOW_TRIGGER", "ACTIONABLE", "EXTENDED"}
+    if not active_df["ibd_entry_status"].isin(valid_statuses).all():
+        raise ValueError("Schema / Data Error: ibd_entry_status must belong to the four states for active signals")
+
+    status_sum = active_df["ibd_entry_status"].isin(valid_statuses).sum()
+    if status_sum != len(active_df):
+        raise ValueError("Schema / Data Error: sum of four states must strictly equal Active Signals")
+
+    for _, row in active_df.iterrows():
+        valid = _to_bool_or_na(row.get("ibd_entry_valid"))
+        pct = float(row["current_vs_ibd_candidate_pct"])
+        status = row["ibd_entry_status"]
+        if valid is not True:
+            expected = "UNCONFIRMED"
+        elif pct < 0:
+            expected = "BELOW_TRIGGER"
+        elif pct <= 5.0:
+            expected = "ACTIONABLE"
+        else:
+            expected = "EXTENDED"
+        if status != expected:
+            raise ValueError(
+                f"Schema / Data Error: status formula mismatch for {row.get('code')}: got {status}, expected {expected}"
+            )
+
+    non_active_df = df[~active_mask]
+    if not non_active_df.empty and "ibd_entry_status" in non_active_df.columns:
+        for val in non_active_df["ibd_entry_status"]:
+            if pd.notna(val) and str(val).strip() != "" and str(val).strip().lower() not in ("nan", "none"):
+                raise ValueError("Schema / Data Error: ibd_entry_status must be empty for non-signal rows")
 
 
 def load_pool_csv(path: str | Path) -> pd.DataFrame:
@@ -62,7 +134,9 @@ def load_pool_csv(path: str | Path) -> pd.DataFrame:
     raw_df = pd.read_csv(csv_path, encoding="utf-8-sig")
     raw_df.columns = [str(column).lstrip("\ufeff") for column in raw_df.columns]
     validate_pool_schema(raw_df)
-    return normalize_pool_df(raw_df)
+    normalized = normalize_pool_df(raw_df)
+    validate_pool_semantics(normalized)
+    return normalized
 
 
 def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:

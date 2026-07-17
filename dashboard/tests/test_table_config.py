@@ -153,7 +153,7 @@ def test_grid_options_pin_code_left_and_keep_table_capabilities():
     assert code_col["pinned"] == "left"
     assert options["defaultColDef"]["sortable"] is True
     assert options["defaultColDef"]["resizable"] is True
-    assert options["enableRangeSelection"] is True
+    assert options["enableRangeSelection"] is False
 
 
 def test_render_table_sets_one_based_sequential_index(monkeypatch):

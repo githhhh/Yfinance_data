@@ -5,6 +5,7 @@ from pathlib import Path
 
 from dashboard.data_utils import (
     validate_pool_schema,
+    validate_pool_semantics,
     build_entry_status_counts,
     apply_c_rank_mode,
     apply_default_review_order,
@@ -31,6 +32,8 @@ def sample_full_pool_df() -> pd.DataFrame:
                 "signal": True,
                 "signal_source": "ceiling_breakout",
                 "ibd_candidate_rule": "ceiling_pullback",
+                "ibd_entry_valid": True,
+                "ibd_entry_reject_reason": "",
                 "ibd_entry_status": "ACTIONABLE",
                 "ibd_entry_volume_ratio": 2.5,
                 "ibd_entry_vol_or_reject": "Vol: 2.50x",
@@ -49,6 +52,8 @@ def sample_full_pool_df() -> pd.DataFrame:
                 "signal": True,
                 "signal_source": "pivot",
                 "ibd_candidate_rule": "pivot",
+                "ibd_entry_valid": False,
+                "ibd_entry_reject_reason": "Low Vol",
                 "ibd_entry_status": "UNCONFIRMED",
                 "ibd_entry_volume_ratio": 1.1,
                 "ibd_entry_vol_or_reject": "Low Vol",
@@ -67,6 +72,8 @@ def sample_full_pool_df() -> pd.DataFrame:
                 "signal": True,
                 "signal_source": "ceiling_breakout",
                 "ibd_candidate_rule": "ceiling_pullback",
+                "ibd_entry_valid": True,
+                "ibd_entry_reject_reason": "",
                 "ibd_entry_status": "BELOW_TRIGGER",
                 "ibd_entry_volume_ratio": 1.6,
                 "ibd_entry_vol_or_reject": "Vol: 1.60x",
@@ -85,6 +92,8 @@ def sample_full_pool_df() -> pd.DataFrame:
                 "signal": True,
                 "signal_source": "10_wk_ema_touch_confirm",
                 "ibd_candidate_rule": "ma10_touch_confirm",
+                "ibd_entry_valid": True,
+                "ibd_entry_reject_reason": "",
                 "ibd_entry_status": "EXTENDED",
                 "ibd_entry_volume_ratio": 3.0,
                 "ibd_entry_vol_or_reject": "Vol: 3.00x",
@@ -103,7 +112,9 @@ def sample_full_pool_df() -> pd.DataFrame:
                 "signal": False,
                 "signal_source": "",
                 "ibd_candidate_rule": "pivot",
-                "ibd_entry_status": "ACTIONABLE",
+                "ibd_entry_valid": False,
+                "ibd_entry_reject_reason": "",
+                "ibd_entry_status": "",
                 "ibd_entry_volume_ratio": 4.0,
                 "ibd_entry_vol_or_reject": "Vol: 4.00x",
                 "current_vs_ibd_candidate_pct": 1.0,
@@ -121,14 +132,42 @@ def sample_full_pool_df() -> pd.DataFrame:
 
 
 # 1. Schema Validation Acceptance
-def test_schema_validation_checks_all_seven_core_fields():
+def test_schema_validation_checks_all_thirteen_core_fields():
     df = sample_full_pool_df()
-    validate_pool_schema(df)  # Should pass cleanly when all 7 fields present
+    validate_pool_schema(df)
+    validate_pool_semantics(df)
 
     for required_field in REQUIRED_CORE_FIELDS:
         bad_df = df.drop(columns=[required_field])
         with pytest.raises(ValueError, match=f"missing required IBD Review columns: {required_field}"):
             validate_pool_schema(bad_df)
+
+
+def test_semantic_validation_checks():
+    df = sample_full_pool_df()
+
+    with pytest.raises(ValueError, match="dataset cannot be empty"):
+        validate_pool_semantics(pd.DataFrame())
+
+    bad_code = df.copy()
+    bad_code.loc[0, "code"] = ""
+    with pytest.raises(ValueError, match="code cannot be empty"):
+        validate_pool_semantics(bad_code)
+
+    dup_code = df.copy()
+    dup_code.loc[1, "code"] = "AAPL"
+    with pytest.raises(ValueError, match="code cannot be duplicate"):
+        validate_pool_semantics(dup_code)
+
+    bad_status = df.copy()
+    bad_status.loc[0, "ibd_entry_status"] = "EXTENDED"
+    with pytest.raises(ValueError, match="status formula mismatch"):
+        validate_pool_semantics(bad_status)
+
+    bad_non_active = df.copy()
+    bad_non_active.loc[4, "ibd_entry_status"] = "ACTIONABLE"
+    with pytest.raises(ValueError, match="ibd_entry_status must be empty for non-signal rows"):
+        validate_pool_semantics(bad_non_active)
 
 
 # 2 & 3. Status Queue Cards strict sum and active signal restriction
@@ -234,6 +273,25 @@ def test_selected_row_detail_fallback_when_selected_missing(monkeypatch):
     # Test 2: non-existent selected code (e.g., after data refresh/filtering) -> fallback to iloc[0] (AAPL)
     _render_selected_row_detail(filtered_df, "MISSING_CODE")
     assert any("AAPL" in md and "185.20" in md for md in rendered_markdowns)
+
+
+def test_render_selected_row_detail_pd_na_safe(monkeypatch):
+    df = sample_full_pool_df()
+    df_na = df[df["signal"] == True].copy()
+    df_na["ibd_entry_valid"] = df_na["ibd_entry_valid"].astype("object")
+    df_na.loc[df_na["code"] == "NVDA", "ibd_entry_valid"] = pd.NA
+    df_na.loc[df_na["code"] == "AAPL", "ibd_entry_valid"] = True
+
+    rendered_markdowns = []
+    monkeypatch.setattr("streamlit.markdown", lambda text, **kwargs: rendered_markdowns.append(text))
+    monkeypatch.setattr("streamlit.info", lambda text, **kwargs: rendered_markdowns.append(text))
+
+    _render_selected_row_detail(df_na, "NVDA")
+    assert any("NVDA" in md for md in rendered_markdowns)
+
+    rendered_markdowns.clear()
+    _render_selected_row_detail(df_na, "AAPL")
+    assert any("AAPL" in md for md in rendered_markdowns)
 
 
 # 9. C Rank Reference Mode sorting and Top N slicing

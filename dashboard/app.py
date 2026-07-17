@@ -16,10 +16,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.data_utils import (
-    FilterSpec,
     apply_c_rank_mode,
     apply_default_review_order,
-    apply_filters,
     build_chart_data,
     build_entry_status_counts,
     build_kpis,
@@ -32,17 +30,10 @@ from dashboard.field_config import (
     get_all_table_columns,
     get_column_view_fields,
     get_field_label,
-    get_filter_funnel_groups,
 )
 from dashboard.table_view import render_table
 
 st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="collapsed")
-
-FUNNEL_ORDER = [
-    "Route",
-    "Entry Status",
-    "Optional Quality Filters",
-]
 
 
 @st.cache_data
@@ -91,6 +82,26 @@ def main() -> None:
             line-height: 1.25 !important;
             border-radius: 8px !important;
             font-size: 13px !important;
+        }
+        div[class*="st-key-btn_status_"] button[kind="secondary"], div[class*="st-key-btn_all_signals"] button[kind="secondary"] {
+            border: 1px solid #303947 !important;
+            background: #141a22 !important;
+            color: #cbd5e1 !important;
+        }
+        div[class*="st-key-btn_status_"] button[kind="secondary"]:hover, div[class*="st-key-btn_status_"] button[kind="secondary"]:focus, div[class*="st-key-btn_all_signals"] button[kind="secondary"]:hover, div[class*="st-key-btn_all_signals"] button[kind="secondary"]:focus {
+            border: 1px solid #4a5a6a !important;
+            background: #1e2631 !important;
+            color: #f8fafc !important;
+        }
+        div[class*="st-key-btn_status_"] button[kind="primary"], div[class*="st-key-btn_all_signals"] button[kind="primary"] {
+            border: 1.5px solid #3b82f6 !important;
+            background: #1e293b !important;
+            color: #ffffff !important;
+        }
+        div[class*="st-key-btn_status_"] button[kind="primary"]:hover, div[class*="st-key-btn_all_signals"] button[kind="primary"]:hover {
+            border: 1.5px solid #60a5fa !important;
+            background: #334155 !important;
+            color: #ffffff !important;
         }
         .status-card button *, div[class*="st-key-btn_status_"] button *, div[class*="st-key-status_"] button * {
             margin: 0 !important;
@@ -244,58 +255,6 @@ def main() -> None:
             padding: 0 !important;
         }
 
-        /* Guaranteed instant DOM tooltip on hover for status cards */
-        div[class*="st-key-btn_status_ACTIONABLE"]:hover::after {
-            content: "ACTIONABLE: confirmed breakout with strong entry volume (>=1.5x)";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #4caf50; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-        div[class*="st-key-btn_status_UNCONFIRMED"]:hover::after {
-            content: "UNCONFIRMED: candidate condition met, waiting for volume confirmation";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #ffb300; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-        div[class*="st-key-btn_status_BELOW_TRIGGER"]:hover::after {
-            content: "BELOW TRIGGER: pulling back or building base below trigger price";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #90caf9; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-        div[class*="st-key-btn_status_EXTENDED"]:hover::after {
-            content: "EXTENDED: extended >5% from pivot, chase risk";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #e53e3e; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-
-        /* Guaranteed instant DOM tooltip on hover for key table headers */
-        div[col-id="ibd_entry_vol_or_reject"]:hover::after {
-            content: "日线突破确认：成功显示日线量比，未确认显示原因。";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-        div[col-id="ibd_candidate_rule"]:hover::after {
-            content: "IBD Candidate 触发价的结构来源。";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
-        div[col-id="code"]:hover::after {
-            content: "股票代码；选择该行后可在上方查看详情。";
-            position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-            background: #1e2631; color: #f2f5f9; border: 1px solid #64b5f6; border-radius: 6px;
-            padding: 6px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none;
-        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -351,6 +310,7 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
                 default=st.session_state.get("global_mode_selector", "IBD Review") or "IBD Review",
                 key="global_mode_selector",
                 label_visibility="collapsed",
+                help="Switch between IBD Breakout Review and C Rank Reference (evaluates Active Signals only).",
             )
             if mode is None:
                 mode = "IBD Review"
@@ -359,16 +319,15 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
 
 @st.dialog("IBD Breakout Review Flow & Rules", width="large")
 def _render_flow_rules_dialog() -> None:
+    legend_lines = [f"- {meta.get('dot', '⚪')} **{meta.get('label', k)}**：{meta.get('tooltip', '')}" for k, meta in STATUS_META.items()]
+    legend_md = "\n        ".join(legend_lines)
     st.markdown(
-        r"""
+        f"""
         ### Review Flow
         `Status → Position → Daily Confirmation → Weekly Volume → C Rank`
 
         ### Status Legend
-        - 🟢 **ACTIONABLE**：日线已确认，位于 Candidate 上方 0%–5%。
-        - 🟡 **UNCONFIRMED**：日线价格或成交量尚未确认。
-        - 🔴 **BELOW TRIGGER**：当前价格位于 Candidate 下方。
-        - 🔵 **EXTENDED**：当前价格超过 Candidate +5%。
+        {legend_md}
 
         ### Volume Definition
         - **Entry / Reason**：日线突破确认和日线量比。
@@ -472,7 +431,7 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
     with c_btn:
         is_all_active = current_status == "All"
         all_prefix = "✓ " if is_all_active else ""
-        if st.button(f"{all_prefix}All Signals ({route_total})", key="btn_all_signals", use_container_width=True, type="secondary"):
+        if st.button(f"{all_prefix}All Signals ({route_total})", key="btn_all_signals", use_container_width=True, type="primary" if is_all_active else "secondary"):
             st.session_state["ibd_filter_status"] = "All"
             st.session_state["ibd_filter_entry_vol_min"] = ""
             st.session_state["ibd_near_trigger_only"] = False
@@ -496,7 +455,7 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
             dot = meta.get("dot", "⚪")
             tooltip = meta.get("tooltip", "")
             btn_label = f"{prefix}{dot} {display_name}\n{count}\n{sub_map[status_name]}"
-            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="secondary", help=tooltip):
+            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="primary" if is_active else "secondary", help=tooltip):
                 if is_active:
                     st.session_state["ibd_filter_status"] = "All"
                     st.session_state["ibd_filter_entry_vol_min"] = ""
@@ -608,7 +567,8 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     pb_depth = html.escape(_format_card_val(row.get("pullback_pct"), "%"))
     pb_off_peak = html.escape(_format_card_val(row.get("pullback_pct_off_peak"), "%"))
 
-    is_entry_valid = bool(row.get("ibd_entry_valid")) and str(row.get("ibd_entry_valid")).lower() not in ("false", "0", "nan", "none", "")
+    raw_valid = row.get("ibd_entry_valid")
+    is_entry_valid = bool(pd.notna(raw_valid) and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1")))
     trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
     raw_reason = row.get("ibd_entry_reject_reason")
     reject_reason_str = html.escape(str(raw_reason).strip() if (raw_reason is not None and not pd.isna(raw_reason) and str(raw_reason).strip() not in ("", "nan", "None", "N/A")) else "n/a")
@@ -723,6 +683,8 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
 
 
 def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
+    active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)
+    denom = active_signals_count if active_signals_count > 0 else len(df)
     st.markdown("##### C Rank Reference View (`signal=True` · Sorted by `rank_C_continuous` asc)")
     
     with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=False):
@@ -732,10 +694,10 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 "\n".join(
                     [
                         "**Fixed Mode Rules**",
-                        "- signal=True",
-                        "- rank_C_continuous asc",
-                        "- Top N selector only",
-                        "- Custom filters ignored",
+                        "- Exclusively evaluates Active Signals (`signal=True`) across the pool.",
+                        "- Sorted by `rank_C_continuous` asc to horizontally benchmark quality.",
+                        "- Top N slice selector only (custom filters ignored).",
+                        "- Auxiliary benchmark; does not replace IBD review status.",
                     ]
                 )
             )
@@ -761,7 +723,7 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     
     with col_summary:
         st.markdown(
-            f'<div style="margin-top:28px; font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} / {len(df)} Pool Records · Reference Only</div>',
+            f'<div style="margin-top:28px; font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
             unsafe_allow_html=True,
         )
     with col_copy:
@@ -843,24 +805,38 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
         const btn = document.getElementById('copyBtn_{key_prefix}');
         const textToCopy = {json.dumps(codes_str)};
         if (btn) {{
-            btn.addEventListener('click', () => {{
-                const ta = document.createElement('textarea');
-                ta.value = textToCopy;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                try {{
-                    document.execCommand('copy');
-                }} catch (e) {{
-                    if (navigator.clipboard) {{
-                        navigator.clipboard.writeText(textToCopy);
+            btn.addEventListener('click', async () => {{
+                let success = false;
+                if (navigator.clipboard && navigator.clipboard.writeText) {{
+                    try {{
+                        await navigator.clipboard.writeText(textToCopy);
+                        success = true;
+                    }} catch (e) {{
+                        // fallback to execCommand
                     }}
                 }}
-                document.body.removeChild(ta);
-                btn.style.background = '#1b5e20';
-                btn.innerText = '✓ Copied ({n})';
+                if (!success) {{
+                    try {{
+                        const ta = document.createElement('textarea');
+                        ta.value = textToCopy;
+                        ta.style.position = 'fixed';
+                        ta.style.left = '-9999px';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        success = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }} catch (e2) {{
+                        success = false;
+                    }}
+                }}
+                if (success) {{
+                    btn.style.background = '#1b5e20';
+                    btn.innerText = '✓ Copied ({n})';
+                }} else {{
+                    btn.style.background = '#c62828';
+                    btn.innerText = 'Copy failed · use Manual';
+                }}
                 setTimeout(() => {{
                     btn.style.background = '#2e7d32';
                     btn.innerText = 'Copy {n} Codes';
@@ -878,63 +854,6 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
         with st.popover("Manual", use_container_width=True):
             st.caption("If direct copy is blocked by your browser, copy directly from below:")
             st.code(codes_str, language="text")
-
-
-def _funnel_filters(df: pd.DataFrame) -> tuple[dict[str, list[FilterSpec]], pd.DataFrame]:
-    groups = get_filter_funnel_groups()
-    filters_by_group: dict[str, list[FilterSpec]] = {group: [] for group in FUNNEL_ORDER}
-    route_df = df[df["signal"] == True].copy() if "signal" in df.columns else df.copy()
-    filters_by_group["Route"].append(FilterSpec("signal", "is true", label="Signal"))
-    return filters_by_group, route_df
-
-
-def _flatten_filters(filters_by_group: dict[str, list[FilterSpec]]) -> list[FilterSpec]:
-    return [spec for specs in filters_by_group.values() for spec in specs]
-
-
-def _funnel_tab_labels(filters_by_group: dict[str, list[FilterSpec]] | None = None) -> list[str]:
-    return [str(group) for group in get_filter_funnel_groups()]
-
-
-def _render_current_filter_summary(filters_by_group: dict[str, list[FilterSpec]], filtered_count: int, total_count: int) -> None:
-    active_groups = {group: filters for group, filters in filters_by_group.items() if filters}
-    if not active_groups:
-        st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** (All records)")
-        return
-    summary_parts = []
-    for group, filters in active_groups.items():
-        short_group = group.split(" & ")[0].split(" Rule")[0].split(" Vol")[0]
-        conditions_str = " & ".join(_describe_filter_condition(spec) for spec in filters)
-        summary_parts.append(f"**{short_group}**: `{conditions_str}`")
-    st.markdown(f"📊 **Filtered Rows: `{filtered_count}/{total_count}`** ｜ " + " → ".join(summary_parts))
-
-
-def _describe_filter_condition(spec: FilterSpec) -> str:
-    def _format_val(v) -> str:
-        try:
-            val = float(v)
-            return f"{val:.2f}"
-        except (ValueError, TypeError):
-            return str(v)
-
-    label = get_field_label(spec.field)
-    operator = spec.operator.lower()
-    if operator == "is true":
-        return f"{label}: True"
-    if operator == "is false":
-        return f"{label}: False"
-    if operator == "equals":
-        return f"{label}: {_format_val(spec.value)}"
-    if operator == "in":
-        values = ", ".join(_format_val(value) for value in spec.value)
-        return f"{label}: {values}"
-    if operator == "between":
-        if spec.field == "pullback_pct":
-            val1 = _format_val(abs(float(spec.value2)))
-            val2 = _format_val(abs(float(spec.value)))
-            return f"{label} magnitude: {val1} to {val2}"
-        return f"{label}: {_format_val(spec.value)} to {_format_val(spec.value2)}"
-    return f"{label} {spec.operator} {_format_val(spec.value)}"
 
 
 def _download_current_rows(df: pd.DataFrame, filename: str) -> None:

@@ -25,14 +25,14 @@ def test_status_meta_consistency():
 
 def test_header_tooltip_config():
     expected_tooltips = {
-        "code": "股票代码；选择该行后可在上方查看详情。",
+        "code": "点击 Code 复制单个代码；点击该行其他位置查看详情。",
         "ibd_entry_status": "当前 IBD Review 状态。",
         "ibd_candidate_rule": "IBD Candidate 触发价的结构来源。",
         "current_vs_ibd_candidate_pct": "最新收盘价相对 Candidate Price 的距离。",
         "latest_close": "当前数据快照的最新收盘价，不是实时价格。",
         "ibd_entry_vol_or_reject": "日线突破确认：成功显示日线量比，未确认显示原因。",
         "volume_ratio": "当前周成交量相对 10 周均量的倍数。",
-        "rank_C_continuous": "综合质量对照排名，数值越小越靠前。",
+        "rank_C_continuous": "综合质量对照排名（只对 Active Signals 计算和展示分布），数值越小越靠前。",
     }
     for col, tip in expected_tooltips.items():
         col_def = _column_def(col)
