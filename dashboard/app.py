@@ -53,28 +53,35 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        [data-testid="stHeader"] {
+        div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stHeader"] {
             display: none !important;
         }
-        [data-testid="stSidebar"] {
+        div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stSidebar"] {
             display: none !important;
         }
-        .block-container {
-            padding-top: 0.5rem !important;
-            padding-bottom: 1rem !important;
+        div[data-testid="stAppViewBlockContainer"]:has(.st-key-dashboard_shell) {
+            padding: 8px 16px 16px !important;
             max-width: 98% !important;
         }
-        div[data-testid="stVerticalBlock"] > div {
-            padding-bottom: 0.15rem !important;
+        .st-key-dashboard_shell > div[data-testid="stVerticalBlock"] {
+            gap: 6px !important;
+        }
+        .st-key-dashboard_header > div[data-testid="stVerticalBlock"],
+        .st-key-review_queue > div[data-testid="stVerticalBlock"],
+        .st-key-filters > div[data-testid="stVerticalBlock"],
+        .st-key-results_toolbar > div[data-testid="stVerticalBlock"],
+        .st-key-selected_row > div[data-testid="stVerticalBlock"],
+        .st-key-results_grid > div[data-testid="stVerticalBlock"] {
+            gap: 4px !important;
         }
         /* Target exact status card buttons (4 cards) */
-        .status-card button, div[class*="st-key-btn_status_"] button, div[class*="st-key-status_"] button {
-            height: 108px !important;
-            min-height: 108px !important;
-            max-height: 108px !important;
+        .st-key-status_cards button {
+            height: 78px !important;
+            min-height: 78px !important;
+            max-height: 78px !important;
             width: 100% !important;
-            white-space: pre-wrap !important;
-            padding: 6px 4px !important;
+            white-space: pre-line !important;
+            padding: 8px 6px !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -83,35 +90,41 @@ def main() -> None:
             border-radius: 8px !important;
             font-size: 13px !important;
         }
-        div[class*="st-key-btn_status_"] button[kind="secondary"], div[class*="st-key-btn_all_signals"] button[kind="secondary"] {
+        .st-key-review_queue div[class*="st-key-btn_status_"] button[kind="secondary"],
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button[kind="secondary"] {
             border: 1px solid #303947 !important;
             background: #141a22 !important;
             color: #cbd5e1 !important;
         }
-        div[class*="st-key-btn_status_"] button[kind="secondary"]:hover, div[class*="st-key-btn_status_"] button[kind="secondary"]:focus, div[class*="st-key-btn_all_signals"] button[kind="secondary"]:hover, div[class*="st-key-btn_all_signals"] button[kind="secondary"]:focus {
+        .st-key-review_queue div[class*="st-key-btn_status_"] button[kind="secondary"]:hover,
+        .st-key-review_queue div[class*="st-key-btn_status_"] button[kind="secondary"]:focus,
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button[kind="secondary"]:hover,
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button[kind="secondary"]:focus {
             border: 1px solid #4a5a6a !important;
             background: #1e2631 !important;
             color: #f8fafc !important;
         }
-        div[class*="st-key-btn_status_"] button[kind="primary"], div[class*="st-key-btn_all_signals"] button[kind="primary"] {
+        .st-key-review_queue div[class*="st-key-btn_status_"] button[kind="primary"],
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button[kind="primary"] {
             border: 1.5px solid #3b82f6 !important;
             background: #1e293b !important;
             color: #ffffff !important;
         }
-        div[class*="st-key-btn_status_"] button[kind="primary"]:hover, div[class*="st-key-btn_all_signals"] button[kind="primary"]:hover {
+        .st-key-review_queue div[class*="st-key-btn_status_"] button[kind="primary"]:hover,
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button[kind="primary"]:hover {
             border: 1.5px solid #60a5fa !important;
             background: #334155 !important;
             color: #ffffff !important;
         }
-        .status-card button *, div[class*="st-key-btn_status_"] button *, div[class*="st-key-status_"] button * {
+        .st-key-status_cards button * {
             margin: 0 !important;
             padding: 0 !important;
             line-height: 1.25 !important;
         }
         /* All Signals button */
-        .all-signals-button button, div[class*="st-key-btn_all_signals"] button, div[class*="st-key-btn_all_signals"] {
-            height: 48px !important;
-            min-height: 48px !important;
+        .st-key-review_queue div[class*="st-key-btn_all_signals"] button {
+            height: 44px !important;
+            min-height: 44px !important;
             min-width: 190px !important;
             max-width: 210px !important;
             margin-left: auto !important;
@@ -120,21 +133,21 @@ def main() -> None:
             white-space: nowrap !important;
         }
         /* Ensure horizontal blocks align items vertically centered with exact gap */
-        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-btn_info_rules"]),
-        div[data-testid="stHorizontalBlock"]:has(iframe) {
+        .st-key-dashboard_header div[data-testid="stHorizontalBlock"],
+        .st-key-results_toolbar div[data-testid="stHorizontalBlock"]:has(iframe) {
             align-items: center !important;
             gap: 8px !important;
         }
 
         /* Item 2: Info flow rules button (44x44px, 10px radius) */
-        div[class*="st-key-btn_info_rules"] {
+        .st-key-dashboard_header div[class*="st-key-btn_info_rules"] {
             display: flex !important;
             align-items: center !important;
             height: 44px !important;
             margin: 0 !important;
             padding: 0 !important;
         }
-        div[class*="st-key-btn_info_rules"] button {
+        .st-key-dashboard_header div[class*="st-key-btn_info_rules"] button {
             width: 44px !important;
             min-width: 44px !important;
             max-width: 44px !important;
@@ -151,14 +164,14 @@ def main() -> None:
         }
 
         /* Item 2: Mode Segmented Control (44px height, 10px radius) */
-        div[class*="st-key-global_mode_selector"] {
+        .st-key-dashboard_header div[class*="st-key-global_mode_selector"] {
             display: flex !important;
             align-items: center !important;
             height: 44px !important;
             margin: 0 !important;
             padding: 0 !important;
         }
-        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] {
+        .st-key-dashboard_header div[class*="st-key-global_mode_selector"] div[role="radiogroup"] {
             height: 44px !important;
             min-height: 44px !important;
             max-height: 44px !important;
@@ -167,8 +180,8 @@ def main() -> None:
             align-items: center !important;
             box-sizing: border-box !important;
         }
-        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] button,
-        div[class*="st-key-global_mode_selector"] div[role="radiogroup"] label {
+        .st-key-dashboard_header div[class*="st-key-global_mode_selector"] div[role="radiogroup"] button,
+        .st-key-dashboard_header div[class*="st-key-global_mode_selector"] div[role="radiogroup"] label {
             height: 44px !important;
             min-height: 44px !important;
             max-height: 44px !important;
@@ -179,7 +192,7 @@ def main() -> None:
         }
 
         /* Precisely scope copy control row inside column copy_c so outer row is untouched and inner buttons align flush with right edge */
-        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) {
+        .st-key-results_toolbar div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
@@ -189,24 +202,24 @@ def main() -> None:
             width: 100% !important;
             min-width: 308px !important;
         }
-        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"] {
+        .st-key-results_toolbar div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"] {
             display: block !important;
             padding: 0 !important;
             margin: 0 !important;
         }
-        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(iframe) {
+        .st-key-results_toolbar div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(iframe) {
             flex: 0 0 180px !important;
             width: 180px !important;
             min-width: 180px !important;
             max-width: 180px !important;
         }
-        div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(div[data-testid="stPopover"]) {
+        .st-key-results_toolbar div[data-testid="stColumn"] div[data-testid="stHorizontalBlock"]:has(iframe) > div[data-testid="stColumn"]:has(div[data-testid="stPopover"]) {
             flex: 0 0 120px !important;
             width: 120px !important;
             min-width: 120px !important;
             max-width: 120px !important;
         }
-        div[data-testid="stPopover"] {
+        .st-key-results_toolbar div[data-testid="stPopover"] {
             margin: 0 !important;
             padding: 0 !important;
             height: 44px !important;
@@ -216,8 +229,8 @@ def main() -> None:
             display: flex !important;
             align-items: center !important;
         }
-        div[data-testid="stPopover"] > button,
-        div[data-testid="stPopover"] button {
+        .st-key-results_toolbar div[data-testid="stPopover"] > button,
+        .st-key-results_toolbar div[data-testid="stPopover"] button {
             height: 44px !important;
             min-height: 44px !important;
             max-height: 44px !important;
@@ -235,7 +248,7 @@ def main() -> None:
             white-space: nowrap !important;
             margin: 0 !important;
         }
-        div[data-testid="stHorizontalBlock"] iframe {
+        .st-key-results_toolbar div[data-testid="stHorizontalBlock"] iframe {
             height: 44px !important;
             min-height: 44px !important;
             max-height: 44px !important;
@@ -250,9 +263,31 @@ def main() -> None:
             box-sizing: border-box !important;
         }
 
-        .status-card button p, div[class*="st-key-btn_status_"] button p, div[class*="st-key-status_"] button p {
+        .st-key-status_cards button p {
             margin: 0 !important;
             padding: 0 !important;
+        }
+
+        .st-key-filter_controls > div[data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+        }
+        .st-key-filter_controls input,
+        .st-key-filter_controls button,
+        .st-key-filter_controls div[data-baseweb="select"] > div {
+            min-height: 44px !important;
+            height: 44px !important;
+            box-sizing: border-box !important;
+        }
+        .st-key-filter_controls div[data-testid="stCheckbox"] label {
+            min-height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            white-space: nowrap !important;
+        }
+        .st-key-filter_controls label,
+        .st-key-filter_controls button,
+        .st-key-results_toolbar button {
+            white-space: nowrap !important;
         }
 
         </style>
@@ -267,17 +302,19 @@ def main() -> None:
     except Exception as exc:
         load_err = str(exc)
 
-    _render_header_bar(df, load_err)
+    with st.container(key="dashboard_shell"):
+        with st.container(key="dashboard_header"):
+            _render_header_bar(df, load_err)
 
-    if df is None:
-        st.error(f"Could not load breakout pool data: {load_err}")
-        return
+        if df is None:
+            st.error(f"Could not load breakout pool data: {load_err}")
+            return
 
-    mode = st.session_state.get("global_mode_selector", "IBD Review")
-    if mode == "C Rank Reference":
-        _render_c_rank_reference_view(df)
-    else:
-        _render_ibd_review_view(df)
+        mode = st.session_state.get("global_mode_selector", "IBD Review")
+        if mode == "C Rank Reference":
+            _render_c_rank_reference_view(df)
+        else:
+            _render_ibd_review_view(df)
 
 
 def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
@@ -360,9 +397,11 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     status_counts = build_entry_status_counts(route_df)
 
-    _render_status_queue(status_counts, len(route_df), status_val)
+    with st.container(key="review_queue"):
+        _render_status_queue(status_counts, len(route_df), status_val)
 
-    _render_filter_bar(df, status_val, status_counts)
+    with st.container(key="filters"):
+        _render_filter_bar(df, status_val, status_counts)
 
     filtered_df = route_df.copy()
     if status_val != "All":
@@ -402,20 +441,23 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
     filtered_df = apply_default_review_order(filtered_df)
 
-    sum_c, copy_c = st.columns([2.4, 1.6])
-    with sum_c:
-        st.markdown(
-            f'<div style="font-size:14px; font-weight:600; color:#c5ceda; margin-top:8px;">{len(filtered_df)} results · Sorted by Entry Status → C Rank</div>',
-            unsafe_allow_html=True,
-        )
-    with copy_c:
-        _render_copy_codes_control(filtered_df["code"].tolist(), key_prefix="ibd_review")
+    with st.container(key="results_toolbar"):
+        sum_c, copy_c = st.columns([2.4, 1.6], vertical_alignment="center")
+        with sum_c:
+            st.markdown(
+                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by Entry Status → C Rank</div>',
+                unsafe_allow_html=True,
+            )
+        with copy_c:
+            _render_copy_codes_control(filtered_df["code"].tolist(), key_prefix="ibd_review")
 
     from dashboard.field_config import get_default_table_columns
     columns = get_default_table_columns()
 
-    detail_container = st.empty()
-    selected_code = render_table(filtered_df, columns, height=480)
+    with st.container(key="selected_row"):
+        detail_container = st.empty()
+    with st.container(key="results_grid"):
+        selected_code = render_table(filtered_df, columns, height=480)
 
     with detail_container.container():
         _render_selected_row_detail(filtered_df, selected_code)
@@ -425,7 +467,7 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
 
 
 def _render_status_queue(status_counts: dict[str, int], route_total: int, current_status: str) -> None:
-    c_title, c_btn = st.columns([7.5, 1.5])
+    c_title, c_btn = st.columns([7.5, 1.5], vertical_alignment="center")
     with c_title:
         st.markdown("##### Review Queue")
     with c_btn:
@@ -437,42 +479,43 @@ def _render_status_queue(status_counts: dict[str, int], route_total: int, curren
             st.session_state["ibd_near_trigger_only"] = False
             st.rerun()
 
-    cols = st.columns(4)
-    statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
-    sub_map = {
-        "ACTIONABLE": "0%–5% above candidate",
-        "UNCONFIRMED": f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3% zone",
-        "BELOW_TRIGGER": "＜ 0% below trigger",
-        "EXTENDED": "＞ +5% chase limit",
-    }
-    for i, status_name in enumerate(statuses):
-        with cols[i]:
-            count = status_counts.get(status_name, 0)
-            is_active = current_status == status_name
-            prefix = "✓ " if is_active else ""
-            display_name = status_name.replace("_", " ")
-            meta = STATUS_META.get(status_name, {})
-            dot = meta.get("dot", "⚪")
-            tooltip = meta.get("tooltip", "")
-            btn_label = f"{prefix}{dot} {display_name}\n{count}\n{sub_map[status_name]}"
-            if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="primary" if is_active else "secondary", help=tooltip):
-                if is_active:
-                    st.session_state["ibd_filter_status"] = "All"
-                    st.session_state["ibd_filter_entry_vol_min"] = ""
-                    st.session_state["ibd_near_trigger_only"] = False
-                else:
-                    st.session_state["ibd_filter_status"] = status_name
-                    if status_name not in ENTRY_VOL_ENABLED_STATUSES:
+    with st.container(key="status_cards"):
+        cols = st.columns(4)
+        statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
+        sub_map = {
+            "ACTIONABLE": "0%–5% above candidate",
+            "UNCONFIRMED": f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3% zone",
+            "BELOW_TRIGGER": "＜ 0% below trigger",
+            "EXTENDED": "＞ +5% chase limit",
+        }
+        for i, status_name in enumerate(statuses):
+            with cols[i]:
+                count = status_counts.get(status_name, 0)
+                is_active = current_status == status_name
+                prefix = "✓ " if is_active else ""
+                display_name = status_name.replace("_", " ")
+                meta = STATUS_META.get(status_name, {})
+                dot = meta.get("dot", "⚪")
+                tooltip = meta.get("tooltip", "")
+                btn_label = f"{prefix}{dot} {display_name} · {count}\n{sub_map[status_name]}"
+                if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="primary" if is_active else "secondary", help=tooltip):
+                    if is_active:
+                        st.session_state["ibd_filter_status"] = "All"
                         st.session_state["ibd_filter_entry_vol_min"] = ""
-                    if status_name != "UNCONFIRMED":
                         st.session_state["ibd_near_trigger_only"] = False
-                st.rerun()
-    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
+                    else:
+                        st.session_state["ibd_filter_status"] = status_name
+                        if status_name not in ENTRY_VOL_ENABLED_STATUSES:
+                            st.session_state["ibd_filter_entry_vol_min"] = ""
+                        if status_name != "UNCONFIRMED":
+                            st.session_state["ibd_near_trigger_only"] = False
+                    st.rerun()
 
 
 def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dict[str, int]) -> None:
     st.markdown("##### Filters")
-    cols = st.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8])
+    controls = st.container(key="filter_controls")
+    cols = controls.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8], vertical_alignment="bottom")
     with cols[0]:
         routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
         current_route = st.session_state.get("ibd_filter_route", "All")
@@ -496,7 +539,6 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dic
 
     with cols[3]:
         if current_status == "UNCONFIRMED":
-            st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
             near_count = status_counts.get("unconfirmed_within_3pct", 0)
             val = st.checkbox(
                 f"Near Trigger ≤ +3% ({near_count})",
@@ -522,7 +564,6 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dic
             st.rerun()
 
     with cols[5]:
-        st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
         if st.button("Reset", use_container_width=True):
             st.session_state["ibd_filter_route"] = "All"
             st.session_state["ibd_filter_status"] = "All"
@@ -532,7 +573,6 @@ def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dic
             st.session_state["ibd_filter_weekly_vol_min"] = ""
             st.session_state["ibd_near_trigger_only"] = False
             st.rerun()
-    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 
 def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
@@ -739,27 +779,29 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 )
             )
 
-    col_limit, col_summary, col_copy = st.columns([1.3, 2.3, 2.4])
-    with col_limit:
-        limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
-        limit = None if limit_label == "All rows" else int(limit_label.split()[1])
-    
-    ranked = apply_c_rank_mode(df, limit=limit)
-    
-    with col_summary:
-        st.markdown(
-            f'<div style="margin-top:28px; font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
-            unsafe_allow_html=True,
-        )
-    with col_copy:
-        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
-        _render_copy_codes_control(ranked["code"].tolist(), key_prefix="c_rank_ref")
+    with st.container(key="results_toolbar"):
+        col_limit, col_summary, col_copy = st.columns([1.3, 2.3, 2.4], vertical_alignment="bottom")
+        with col_limit:
+            limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
+            limit = None if limit_label == "All rows" else int(limit_label.split()[1])
+
+        ranked = apply_c_rank_mode(df, limit=limit)
+
+        with col_summary:
+            st.markdown(
+                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
+                unsafe_allow_html=True,
+            )
+        with col_copy:
+            _render_copy_codes_control(ranked["code"].tolist(), key_prefix="c_rank_ref")
 
     from dashboard.field_config import get_column_view_fields
     columns = get_column_view_fields("C Rank Reference")
 
-    detail_container = st.empty()
-    selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=520)
+    with st.container(key="selected_row"):
+        detail_container = st.empty()
+    with st.container(key="results_grid"):
+        selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=520)
 
     with detail_container.container():
         _render_selected_row_detail(ranked, selected_code)

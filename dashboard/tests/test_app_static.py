@@ -1,6 +1,10 @@
 from pathlib import Path
 import ast
+import re
 from dashboard.app import _csv_cache_fingerprint
+
+
+APP_SOURCE = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
 
 
 def test_table_controls_do_not_use_unsupported_selectbox_horizontal_keyword():
@@ -56,3 +60,34 @@ def test_app_no_obsolete_funnel_or_css_tooltip_code():
     assert "def _funnel_tab_labels(" not in source
     assert "div[col-id=" not in source
     assert 'div[class*="st-key-btn_status_ACTIONABLE"]:hover::after' not in source
+
+
+def test_dashboard_uses_stable_keyed_density_containers():
+    for key in [
+        "dashboard_shell",
+        "dashboard_header",
+        "review_queue",
+        "status_cards",
+        "filters",
+        "filter_controls",
+        "results_toolbar",
+        "selected_row",
+        "results_grid",
+    ]:
+        assert f'key="{key}"' in APP_SOURCE
+
+
+def test_density_css_is_scoped_and_has_no_visual_compensation_hacks():
+    assert 'div[data-testid="stVerticalBlock"] > div' not in APP_SOURCE
+    assert "margin-top:28px" not in APP_SOURCE
+    assert "margin-bottom:4px" not in APP_SOURCE
+    assert "margin: -" not in APP_SOURCE
+    assert re.search(r"(?<!-)\btransform\s*:", APP_SOURCE) is None
+    assert "height: 78px" in APP_SOURCE
+    assert ".st-key-status_cards" in APP_SOURCE
+    assert ':has(.st-key-dashboard_shell)' in APP_SOURCE
+
+
+def test_status_cards_render_exactly_two_text_lines():
+    assert 'btn_label = f"{prefix}{dot} {display_name} · {count}\\n{sub_map[status_name]}"' in APP_SOURCE
+    assert 'btn_label = f"{prefix}{dot} {display_name}\\n{count}\\n{sub_map[status_name]}"' not in APP_SOURCE
