@@ -4,7 +4,39 @@ import numpy as np
 
 from dashboard.field_config import STATUS_META, FIELD_CONFIG
 from dashboard.table_view import _column_def
-from dashboard.app import _format_card_val
+from dashboard.app import _format_card_val, _render_selected_row_detail
+
+
+def _selected_detail_markup(monkeypatch, **overrides):
+    row = {
+        "code": "TEST",
+        "ibd_candidate_price": 100.0,
+        "ibd_candidate_rule": "pivot",
+        "current_vs_ibd_candidate_pct": 1.5,
+        "latest_close": 101.5,
+        "ibd_entry_status": "ACTIONABLE",
+        "ibd_entry_vol_or_reject": "Vol: 2.00x",
+        "rank_C_continuous": 3,
+        "C_continuous": 1.2,
+        "eps_yoy_growth": 25.0,
+        "dist_to_52w_high_pct": -4.0,
+        "price_52_week_high": 110.0,
+        "base_depth_pct": -18.0,
+        "base_duration_weeks": 8,
+        "pullback_pct": -6.5,
+        "pullback_pct_off_peak": -2.0,
+        "ibd_entry_valid": True,
+        "ibd_trigger_price": 100.0,
+        "ibd_entry_date": "2026-07-10",
+        "ibd_entry_volume_ratio": 2.0,
+        "ibd_entry_reject_reason": "",
+    }
+    row.update(overrides)
+    rendered = []
+    monkeypatch.setattr("streamlit.markdown", lambda text, **kwargs: rendered.append(text))
+    monkeypatch.setattr("streamlit.info", lambda text, **kwargs: rendered.append(text))
+    _render_selected_row_detail(pd.DataFrame([row]), "TEST")
+    return rendered[-1]
 
 
 def test_status_meta_consistency():
@@ -63,3 +95,41 @@ def test_selected_row_card_val_formatting():
 
     # Test raw decimals
     assert _format_card_val(125.4, "") == "125.40"
+
+
+def test_selected_row_popup_is_semantic_viewport_aware_and_ordered(monkeypatch):
+    markup = _selected_detail_markup(monkeypatch)
+
+    assert "<details" in markup
+    assert "<summary" in markup
+    assert "code-popup-toggle" not in markup
+    assert "position-area: block-start span-inline-end" in markup
+    assert "position-try-fallbacks: flip-block" in markup
+    assert "max-height: calc(100dvh - 24px)" in markup
+    assert "overflow-y: auto" in markup
+    assert markup.index("Daily Entry") < markup.index("Pullback") < markup.index("CANSLIM / Base")
+    assert "Daily Entry Vol" in markup
+    assert "Ceiling/Base Depth" in markup
+
+
+def test_selected_row_popup_hides_empty_pullback_section(monkeypatch):
+    markup = _selected_detail_markup(
+        monkeypatch,
+        pullback_pct=None,
+        pullback_pct_off_peak=None,
+    )
+
+    assert 'data-popup-section="pullback"' not in markup
+    assert "Pullback Depth" not in markup
+    assert "Off Pullback Peak" not in markup
+
+
+def test_selected_row_popup_highlights_invalid_reject_reason(monkeypatch):
+    markup = _selected_detail_markup(
+        monkeypatch,
+        ibd_entry_valid=False,
+        ibd_entry_reject_reason="Low Volume",
+    )
+
+    assert "Low Volume" in markup
+    assert "code-popup-reject" in markup

@@ -566,6 +566,19 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
 
     pb_depth = html.escape(_format_card_val(row.get("pullback_pct"), "%"))
     pb_off_peak = html.escape(_format_card_val(row.get("pullback_pct_off_peak"), "%"))
+    pullback_section = (
+        f"""
+                            <div class="code-popup-section" data-popup-section="pullback">
+                                <div class="code-popup-title">2. Pullback</div>
+                                <div class="code-popup-grid-2">
+                                    <div><div class="code-popup-item">Pullback Depth</div><div class="code-popup-val">{pb_depth}</div></div>
+                                    <div><div class="code-popup-item">Off Pullback Peak</div><div class="code-popup-val">{pb_off_peak}</div></div>
+                                </div>
+                            </div>
+        """
+        if pb_depth != "n/a" or pb_off_peak != "n/a"
+        else ""
+    )
 
     raw_valid = row.get("ibd_entry_valid")
     is_entry_valid = bool(pd.notna(raw_valid) and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1")))
@@ -577,40 +590,52 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
         raw_date = row.get("ibd_entry_date")
         entry_date_str = html.escape(str(raw_date).split("T")[0] if (raw_date is not None and not pd.isna(raw_date) and str(raw_date).strip() not in ("", "nan", "None", "N/A")) else "n/a")
         daily_vol_str = html.escape(_format_card_val(row.get("ibd_entry_volume_ratio"), "x"))
-        reject_display = f'<span style="color:#a0aec0;">{reject_reason_str}</span>'
+        reject_section = ""
     else:
         entry_date_str = "n/a"
         daily_vol_str = "n/a"
-        reject_display = f'<span style="color:#ffb300; font-weight:700;">{reject_reason_str}</span>' if reject_reason_str != "n/a" else "n/a"
+        reject_section = f"""
+                                <div class="code-popup-reject" role="alert">
+                                    <div class="code-popup-item">Reject Reason</div>
+                                    <div class="code-popup-val">{reject_reason_str}</div>
+                                </div>
+        """
 
     st.markdown(
         f"""
         <style>
         .code-hover-wrapper {{ position: relative; display: inline-block; }}
-        .code-hover-trigger {{ font-size: 18px; font-weight: 800; color: #1f77b4; cursor: pointer; border-bottom: 1px dotted #1f77b4; }}
+        .code-detail {{ display: inline-block; }}
+        .code-hover-trigger {{
+            anchor-name: --selected-code;
+            display: inline-block;
+            font-size: 18px;
+            font-weight: 800;
+            color: #1f77b4;
+            cursor: pointer;
+            border-bottom: 1px dotted #1f77b4;
+            list-style: none;
+        }}
+        .code-hover-trigger::-webkit-details-marker {{ display: none; }}
+        .code-hover-trigger::marker {{ content: ""; }}
         .code-hover-popup {{
-            visibility: hidden; opacity: 0; pointer-events: none;
-            position: absolute; top: auto; bottom: calc(100% + 6px); left: 0; width: 450px;
+            display: none;
+            position: fixed;
+            position-anchor: --selected-code;
+            position-area: block-start span-inline-end;
+            position-try-fallbacks: flip-block;
+            width: min(450px, calc(100vw - 24px));
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
             background: #1e2631; border: 1px solid #4a5a6a; border-radius: 8px; padding: 12px 14px;
-            box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6); z-index: 999999; text-align: left;
-            transition: visibility 0s linear 0.25s, opacity 0.15s ease-in 0.25s;
+            margin: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); z-index: 999999; text-align: left;
         }}
-        .code-hover-popup::after {{
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            height: 14px;
-        }}
-        .code-hover-wrapper:hover .code-hover-popup,
-        .code-hover-wrapper:focus-within .code-hover-popup,
-        .code-popup-toggle:checked ~ .code-hover-popup {{
-            visibility: visible; opacity: 1; pointer-events: auto;
-            transition: visibility 0s linear 0.25s, opacity 0.15s ease-in 0.25s;
-        }}
-        .code-popup-toggle:checked ~ .code-hover-popup {{
-            transition: visibility 0s linear 0s, opacity 0.15s ease-in 0s;
+        .code-detail:hover > .code-hover-popup,
+        .code-detail:focus-within > .code-hover-popup,
+        .code-detail[open] > .code-hover-popup {{
+            display: block;
         }}
         .code-popup-section {{ margin-bottom: 10px; border-bottom: 1px solid #303947; padding-bottom: 8px; }}
         .code-popup-section:last-child {{ margin-bottom: 0; border-bottom: none; padding-bottom: 0; }}
@@ -619,44 +644,44 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
         .code-popup-grid-2 {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; }}
         .code-popup-item {{ font-size: 11px; color: #a0aec0; }}
         .code-popup-val {{ font-size: 13px; font-weight: 700; color: #f2f5f9; }}
+        .code-popup-reject {{
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px solid #ffb300;
+            border-radius: 6px;
+            background: rgba(255, 179, 0, 0.12);
+        }}
+        .code-popup-reject .code-popup-val {{ color: #ffca54; font-size: 12px; }}
         </style>
         <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
                 <div style="flex:1; border-right:1px solid #303947; text-align:left;">
                     <div class="code-hover-wrapper">
-                        <input type="checkbox" id="code_popup_chk_{code}" class="code-popup-toggle" style="display:none;" />
-                        <label for="code_popup_chk_{code}" tabindex="0" class="code-hover-trigger" title="Hover or click to view details">{code} ▾</label>
-                        <div class="code-hover-popup">
-                            <div class="code-popup-section">
-                                <div class="code-popup-title">1. CANSLIM / Base</div>
+                        <details class="code-detail" data-selected-code="{code}">
+                            <summary class="code-hover-trigger" title="Hover, focus, or click to view details">{code} ▾</summary>
+                            <div class="code-hover-popup" role="region" aria-label="{code} secondary details">
+                            <div class="code-popup-section" data-popup-section="daily-entry">
+                                <div class="code-popup-title">1. Daily Entry</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">Trigger</div><div class="code-popup-val">{trigger_p}</div></div>
+                                    <div><div class="code-popup-item">Entry Date</div><div class="code-popup-val">{entry_date_str}</div></div>
+                                    <div><div class="code-popup-item">Daily Entry Vol</div><div class="code-popup-val">{daily_vol_str}</div></div>
+                                </div>
+                                {reject_section}
+                            </div>
+                            {pullback_section}
+                            <div class="code-popup-section" data-popup-section="canslim-base">
+                                <div class="code-popup-title">3. CANSLIM / Base</div>
                                 <div class="code-popup-grid">
                                     <div><div class="code-popup-item">EPS YoY</div><div class="code-popup-val">{eps_yoy}</div></div>
                                     <div><div class="code-popup-item">To 52W High</div><div class="code-popup-val">{dist_52w}</div></div>
                                     <div><div class="code-popup-item">52W High</div><div class="code-popup-val">{p_52w}</div></div>
-                                    <div><div class="code-popup-item">Base Depth</div><div class="code-popup-val">{base_depth}</div></div>
+                                    <div><div class="code-popup-item">Ceiling/Base Depth</div><div class="code-popup-val">{base_depth}</div></div>
                                     <div><div class="code-popup-item">Base Duration</div><div class="code-popup-val">{base_dur}</div></div>
                                 </div>
                             </div>
-                            <div class="code-popup-section">
-                                <div class="code-popup-title">2. Pullback</div>
-                                <div class="code-popup-grid-2">
-                                    <div><div class="code-popup-item">Pullback Depth</div><div class="code-popup-val">{pb_depth}</div></div>
-                                    <div><div class="code-popup-item">Off Pullback Peak</div><div class="code-popup-val">{pb_off_peak}</div></div>
-                                </div>
                             </div>
-                            <div class="code-popup-section">
-                                <div class="code-popup-title">3. Daily Entry</div>
-                                <div class="code-popup-grid">
-                                    <div><div class="code-popup-item">Trigger</div><div class="code-popup-val">{trigger_p}</div></div>
-                                    <div><div class="code-popup-item">Entry Date</div><div class="code-popup-val">{entry_date_str}</div></div>
-                                    <div><div class="code-popup-item">Daily Volume</div><div class="code-popup-val">{daily_vol_str}</div></div>
-                                </div>
-                                <div style="margin-top:6px;">
-                                    <div class="code-popup-item">Reject Reason</div>
-                                    <div class="code-popup-val" style="font-size:12px;">{reject_display}</div>
-                                </div>
-                            </div>
-                        </div>
+                        </details>
                     </div>
                 </div>
                 <div style="flex:1.5; border-right:1px solid #303947;">
