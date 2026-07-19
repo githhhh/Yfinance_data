@@ -105,11 +105,28 @@ def test_selected_row_popup_is_semantic_viewport_aware_and_ordered(monkeypatch):
     assert "code-popup-toggle" not in markup
     assert "position-area: block-start span-inline-end" in markup
     assert "position-try-fallbacks: flip-block" in markup
-    assert "max-height: calc(100dvh - 24px)" in markup
+    assert "position-try-order" not in markup
+    assert "max-height: min(360px, calc(50dvh - 12px))" in markup
     assert "overflow-y: auto" in markup
+    assert '<div class="code-hover-surface">' in markup
+    assert "padding: 8px 0" in markup
+    assert "margin: 8px" not in markup
+    assert ".code-hover-trigger:focus-visible" in markup
+    assert "display: list-item" in markup
+    assert ".code-hover-popup:hover" in markup
+    assert ".st-key-selected_row:has(.code-detail:hover)" in markup
+    assert "\n        .code-" not in markup
+    assert "onkeydown=" not in markup
+    assert ".code-detail:focus-within" not in markup
     assert markup.index("Daily Entry") < markup.index("Pullback") < markup.index("CANSLIM / Base")
     assert "Daily Entry Vol" in markup
     assert "Ceiling/Base Depth" in markup
+
+
+def test_selected_row_markup_has_no_blank_lines_that_end_raw_html(monkeypatch):
+    markup = _selected_detail_markup(monkeypatch)
+
+    assert all(line.strip() for line in markup.splitlines())
 
 
 def test_selected_row_popup_hides_empty_pullback_section(monkeypatch):

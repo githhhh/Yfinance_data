@@ -85,6 +85,10 @@ def test_density_css_is_scoped_and_has_no_visual_compensation_hacks():
     assert re.search(r"(?<!-)\btransform\s*:", APP_SOURCE) is None
     assert "height: 78px" in APP_SOURCE
     assert ".st-key-status_cards" in APP_SOURCE
+    assert 'div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)' in APP_SOURCE
+    assert 'div[data-testid="stAppViewBlockContainer"]:has(.st-key-dashboard_shell)' not in APP_SOURCE
+    assert 'div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' in APP_SOURCE
+    assert 'div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' not in APP_SOURCE
     assert ':has(.st-key-dashboard_shell)' in APP_SOURCE
 
 

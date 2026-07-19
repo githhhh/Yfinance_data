@@ -53,13 +53,13 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stHeader"] {
+        div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stHeader"] {
             display: none !important;
         }
-        div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stSidebar"] {
+        div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stSidebar"] {
             display: none !important;
         }
-        div[data-testid="stAppViewBlockContainer"]:has(.st-key-dashboard_shell) {
+        div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
             padding: 8px 16px 16px !important;
             max-width: 98% !important;
         }
@@ -641,14 +641,20 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                                 </div>
         """
 
-    st.markdown(
+    detail_html = (
         f"""
         <style>
-        .code-hover-wrapper {{ position: relative; display: inline-block; }}
-        .code-detail {{ display: inline-block; }}
-        .code-hover-trigger {{
+        .st-key-selected_row:has(.code-detail:hover),
+        .st-key-selected_row:has(.code-detail[open]),
+        .st-key-selected_row:has(.code-hover-trigger:focus-visible) {{
+            position: relative;
+            z-index: 1000;
+        }}
+        .st-key-selected_row .code-hover-wrapper {{ position: relative; display: inline-block; }}
+        .st-key-selected_row .code-detail {{ display: inline-block; }}
+        .st-key-selected_row .code-hover-trigger {{
             anchor-name: --selected-code;
-            display: inline-block;
+            display: list-item;
             font-size: 18px;
             font-weight: 800;
             color: #1f77b4;
@@ -656,50 +662,61 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
             border-bottom: 1px dotted #1f77b4;
             list-style: none;
         }}
-        .code-hover-trigger::-webkit-details-marker {{ display: none; }}
-        .code-hover-trigger::marker {{ content: ""; }}
-        .code-hover-popup {{
+        .st-key-selected_row .code-hover-trigger::-webkit-details-marker {{ display: none; }}
+        .st-key-selected_row .code-hover-trigger::marker {{ content: ""; }}
+        .st-key-selected_row .code-hover-popup {{
             display: none;
             position: fixed;
             position-anchor: --selected-code;
             position-area: block-start span-inline-end;
             position-try-fallbacks: flip-block;
             width: min(450px, calc(100vw - 24px));
-            max-height: calc(100dvh - 24px);
+            max-height: min(360px, calc(50dvh - 12px));
             overflow-y: auto;
             overscroll-behavior: contain;
-            background: #1e2631; border: 1px solid #4a5a6a; border-radius: 8px; padding: 12px 14px;
-            margin: 8px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); z-index: 999999; text-align: left;
+            box-sizing: border-box;
+            padding: 8px 0;
+            z-index: 999999;
+            text-align: left;
         }}
-        .code-detail:hover > .code-hover-popup,
-        .code-detail:focus-within > .code-hover-popup,
-        .code-detail[open] > .code-hover-popup {{
+        .st-key-selected_row .code-hover-surface {{
+            background: #1e2631;
+            border: 1px solid #4a5a6a;
+            border-radius: 8px;
+            padding: 12px 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        }}
+        .st-key-selected_row .code-detail:hover > .code-hover-popup,
+        .st-key-selected_row .code-hover-popup:hover,
+        .st-key-selected_row .code-detail:has(> .code-hover-trigger:focus-visible) > .code-hover-popup,
+        .st-key-selected_row .code-detail[open] > .code-hover-popup {{
             display: block;
         }}
-        .code-popup-section {{ margin-bottom: 10px; border-bottom: 1px solid #303947; padding-bottom: 8px; }}
-        .code-popup-section:last-child {{ margin-bottom: 0; border-bottom: none; padding-bottom: 0; }}
-        .code-popup-title {{ font-size: 11px; font-weight: 700; color: #8899a6; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }}
-        .code-popup-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; }}
-        .code-popup-grid-2 {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; }}
-        .code-popup-item {{ font-size: 11px; color: #a0aec0; }}
-        .code-popup-val {{ font-size: 13px; font-weight: 700; color: #f2f5f9; }}
-        .code-popup-reject {{
+        .st-key-selected_row .code-popup-section {{ margin-bottom: 10px; border-bottom: 1px solid #303947; padding-bottom: 8px; }}
+        .st-key-selected_row .code-popup-section:last-child {{ margin-bottom: 0; border-bottom: none; padding-bottom: 0; }}
+        .st-key-selected_row .code-popup-title {{ font-size: 11px; font-weight: 700; color: #8899a6; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }}
+        .st-key-selected_row .code-popup-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; }}
+        .st-key-selected_row .code-popup-grid-2 {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; }}
+        .st-key-selected_row .code-popup-item {{ font-size: 11px; color: #a0aec0; }}
+        .st-key-selected_row .code-popup-val {{ font-size: 13px; font-weight: 700; color: #f2f5f9; }}
+        .st-key-selected_row .code-popup-reject {{
             margin-top: 8px;
             padding: 8px 10px;
             border: 1px solid #ffb300;
             border-radius: 6px;
             background: rgba(255, 179, 0, 0.12);
         }}
-        .code-popup-reject .code-popup-val {{ color: #ffca54; font-size: 12px; }}
+        .st-key-selected_row .code-popup-reject .code-popup-val {{ color: #ffca54; font-size: 12px; }}
         </style>
         <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
                 <div style="flex:1; border-right:1px solid #303947; text-align:left;">
                     <div class="code-hover-wrapper">
                         <details class="code-detail" data-selected-code="{code}">
-                            <summary class="code-hover-trigger" title="Hover, focus, or click to view details">{code} ▾</summary>
+                            <summary class="code-hover-trigger"
+                                     title="Hover, focus, or click to view details">{code} ▾</summary>
                             <div class="code-hover-popup" role="region" aria-label="{code} secondary details">
+                            <div class="code-hover-surface">
                             <div class="code-popup-section" data-popup-section="daily-entry">
                                 <div class="code-popup-title">1. Daily Entry</div>
                                 <div class="code-popup-grid">
@@ -719,6 +736,7 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                                     <div><div class="code-popup-item">Ceiling/Base Depth</div><div class="code-popup-val">{base_depth}</div></div>
                                     <div><div class="code-popup-item">Base Duration</div><div class="code-popup-val">{base_dur}</div></div>
                                 </div>
+                            </div>
                             </div>
                             </div>
                         </details>
@@ -742,7 +760,10 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                 </div>
             </div>
         </div>
-        """,
+        """
+    )
+    st.markdown(
+        "\n".join(line for line in detail_html.splitlines() if line.strip()),
         unsafe_allow_html=True,
     )
 
