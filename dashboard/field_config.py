@@ -142,6 +142,7 @@ IBD_DECISION_COLUMNS = [
     "ibd_entry_status",
     "ibd_candidate_rule",
     "current_vs_ibd_candidate_pct",
+    "ibd_entry_close_position",
     "latest_close",
     "ibd_entry_vol_or_reject",
     "volume_ratio",
