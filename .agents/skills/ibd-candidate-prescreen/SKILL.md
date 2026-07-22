@@ -33,13 +33,23 @@ description: 从 Dashboard 或策略突破候选池中，以 IBD 资深图表分
 | 1 | 买点新鲜度 | 距 Candidate Price ≤ 2.0% | 位于 Pivot 买点最佳买入窗口 (Fresh Zone) |
 | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | 机构大举建仓放量确认 (Heavy Volume) |
 | 3 | 突破日收高 | Close Position ≥ 0.50（理想 ≥ 0.65）| O'Neil 原著要求收在 Upper Half (≥0.5)，David Ryan/IBD 研讨会推荐 Top Third (≥0.65) |
-| 4 | 基底深度健康 | 8%–33% | 经典的 Cup / Flat Base 结构深度 |
-| 5 | 基底时长合理 | 7–65 周 | 具备充分的筹码换手与巩固期 |
+| 4 | 基底深度健康 | 8%–33% | 经典的 Cup / Flat Base 结构深度 (对应 base_depth_pct / Ceiling Base Depth) |
+| 5 | 基底时长合理 | 7–65 周 | 具备充分的筹码换手与巩固期 (对应 base_duration_weeks) |
 | 6 | Stage 2 结构 | 价格 > 10W EMA > 40W SMA | 经典 Weinstein Stage 2 上升趋势形态 |
-| 7 | 相对强度领先 | 距 52 周高点 > -5.0% | 紧贴历史/52周新高，RS Line 强势 |
-| 8 | 基本面支撑 | EPS YoY 增长 > 0% | CANSLIM 中 C/A 基本面规则 |
+| 7 | 相对强度领先 | 距 52 周高点 > -5.0% | 紧贴历史/52周新高，RS Line 强势 (对应 dist_to_52w_high_pct) |
+| 8 | 基本面支撑 | EPS YoY 增长 > 0% | CANSLIM 中 C/A 基本面规则 (对应 eps_yoy_growth) |
 | 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | 机构资金持续积累 (Accumulation) |
-| 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | 周线级别的放量确认 |
+| 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | 周线级别的放量确认 (对应 volume_ratio) |
+
+## 核心字段规范与精准对齐 (Data Schema & Field Guardrails)
+
+在评估候选标的与读取 UI 弹窗 / CSV 数据时，必须严格区分以下两组深度与状态字段，避免混淆：
+1. **基底深度 `base_depth_pct` (`Ceiling/Base Depth`)**：
+   - 含义：从 Ceiling 突破出来**之前**的基底结构深度（如 Cup with Handle / Flat Base / Double Bottom 的整体形态深度）。
+   - 检查点 4 的筛选卡尺（8%–33%）严格作用于此字段。
+2. **突破后回调深度 `pullback_pct` (`Pullback Depth`)**：
+   - 含义：股票突破 Ceiling / Candidate Price **之后**发起的正常回踩/二次调整深度。
+   - 仪表盘 2. PULLBACK 模块中展示的即为此字段（如 XMTR 的 Pullback Depth 为 `-21.30%`），用于评估突破后回踩是否干枯吸筹 (`pullback_v_is_dry`)，不得将其误当做突破前基底深度。
 
 ## 标准执行流程 (Phase-Based Execution)
 
