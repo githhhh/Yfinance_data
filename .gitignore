@@ -1,3 +1,8 @@
 __pycache__/
 *.pyc
 .DS_Store
+# EPUB Unpacked Book
+.ibd_book_unpacked/
+
+# Big EPUB and unpacked cache
+How_to_Make_Money_in_Stocks.epub
