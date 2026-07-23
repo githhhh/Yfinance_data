@@ -26,18 +26,20 @@ description: 从 Dashboard 或策略突破候选池中，以 IBD 资深图表分
 - **精选上限**：最多精选推荐 **3 只**标的供用户独立审视，每只标的必须给出充分、独立的入选理由。
 - **板块拥挤度防范与风险预警**：当某板块在候选池中占比 > 50% 确认时，触发拥挤度风控，该板块在最终推荐中**最多只占 1 只**，同时必须在报告中结合当下大盘与板块行情的真实数据发出明确的风险提示。
 - **行业分散要求**：正常情况下单一板块不超过 2 只，最终推荐组合必须覆盖至少 **2 个不同板块**。
-- **硬性全通制**：每只推荐标的必须通过全部 10 项 IBD 经典检查点（硬性通过/不通过，拒绝模糊打分）。
+- **硬性卡尺制**：结合 10 项 IBD 经典检查点（硬性通过/不通过，拒绝模糊打分）遴选最优标的。
 
 ## 10 项 IBD 经典检查点 (Checklist)
+
+> 注：原 Weinstein Stage 2 上升趋势检查由于在突破池筛选入口处已作为 100% 硬性前置条件全量满足，故不在二级预筛重复计分，替换为 O'Neil 经典柄部/底部地量缩量确认。
 
 | # | 检查点 | 通过标准 | 经典 IBD 规则依据 (《How to Make Money in Stocks》) |
 |:--:|:--|:--|:--|
 | 1 | 买点新鲜度 | 距 Candidate Price ≤ 2.0% | 位于 Pivot 买点最佳买入窗口 (Fresh Zone) |
 | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | 机构大举建仓放量确认 (Heavy Volume) |
 | 3 | 突破日收高 | Close Position ≥ 0.50（理想 ≥ 0.65）| O'Neil 原著要求收在 Upper Half (≥0.5)，David Ryan/IBD 研讨会推荐 Top Third (≥0.65) |
-| 4 | 形态深度健康 | 8%–33% ( Ceiling 突破查 `base_depth_pct`；Pullback/二次突破查 `pullback_pct` ) | 经典的 Cup / Flat Base / Pullback 深度结构 |
+| 4 | 形态深度健康 | 8%–33% ( 首次突破查 `base_depth_pct`；Pullback/二次突破查 `pullback_pct` ) | 经典的 Cup / Flat Base / Pullback 深度结构 (必须在报告中分别独立展示) |
 | 5 | 基底时长合理 | 7–65 周 | 具备充分的筹码换手与巩固期 (对应 base_duration_weeks) |
-| 6 | Stage 2 结构 | 价格 > 10W EMA > 40W SMA | 经典 Weinstein Stage 2 上升趋势形态 |
+| 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` 或 `vol_dry_ratio` ≤ 0.80x | 经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up) |
 | 7 | 相对强度领先 | 距 52 周高点 > -5.0% | 紧贴历史/52周新高，RS Line 强势 (对应 dist_to_52w_high_pct) |
 | 8 | 基本面支撑 | EPS YoY 增长 > 0% | CANSLIM 中 C/A 基本面规则 (对应 eps_yoy_growth) |
 | 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | 机构资金持续积累 (Accumulation) |
@@ -45,14 +47,15 @@ description: 从 Dashboard 或策略突破候选池中，以 IBD 资深图表分
 
 ## 核心字段规范与 Dashboard 面板数据融合
 
-### 1. 基底深度 vs 回撤深度语义划分与分析指导
-在评估形态结构强度时，必须精准区分以下两个深度指标，切忌混淆或用错字段：
+### 1. 基底深度 vs 回撤深度语义划分与分析指导 (硬性报告规范)
+在评估形态结构强度与撰写预筛报告时，**必须精准区分并独立展示**以下两个深度指标，严禁混淆、合并或只给单个模糊数值：
 - **`base_depth_pct` (`Ceiling Base Depth`)**：
-  - **语义**：从 Ceiling/宏观顶部突破出来**之前**的宏观基底结构深度（可能是持续多年的反复调整形态，如长线 Flat Base / Base on Base）。
-  - **适用场景**：仅用于评估**首次突破 Ceiling** 的结构强度。
+  - **语义**：从 Ceiling/宏观顶部突破出来**之前**的宏观基底结构深度（如长线 Flat Base / Base on Base / Cup 深度）。
+  - **适用场景**：用于评估**首次突破 Ceiling** 的结构强度。
 - **`pullback_pct` (`Pullback Depth`)**：
-  - **语义**：走势突破 Ceiling 后发生延伸，在延伸段中出现的最新/近期回撤深度（如杯柄形态的柄部回撤、10W EMA 触碰回调或 Ceiling Pullback 深度）。
+  - **语义**：走势突破 Ceiling 后发生延伸，在延伸段中出现的最新/近期回撤深度（如杯柄形态柄部回撤、10W EMA 触碰回调或 Ceiling Pullback 深度）。
   - **适用场景**：若走势已相对于 Ceiling 延伸，且出现了 `pullback_pct`，当前正要突破 Pullback 区域（如二次突破），**必须以 `pullback_pct` 作为回撤基底的主要分析指标**。
+- **预筛报告输出强制规则**：在 10 项卡尺评分表及每只标的详评中，**必须显式分别标注并同时列出 `base_depth_pct` 与 `pullback_pct` 两个具体数值**，并明确指出当前属于哪种突破类型（例如：“Ceiling 突破 - 基底深度 24.2%” 或 “Pullback 突破 - 柄部回撤 7.7%”）。
 
 ### 2. Dashboard 4 大二级详情面板数据映射 (UI Detail Panel Integration)
 模型在分析候选标的时，必须提取并结合 Dashboard `_render_selected_row_detail` 提供的 4 大模块完整元数据：
@@ -64,7 +67,7 @@ description: 从 Dashboard 或策略突破候选池中，以 IBD 资深图表分
 3. **PULLBACK 模块**：
    - 提取 `pullback_pct` (近期回撤深度), `pullback_v_is_dry` (回踩缩量确认标记), `vol_dry_ratio` (回踩地量比), `days_in_pullback` (回踩持续天数).
 4. **CANSLIM / BASE 模块**：
-   - 提取 `base_depth_pct` ( Ceiling 基底深度), `base_duration_weeks` (基底形成周数), `eps_yoy_growth` (EPS 同比%), `net_accum_wks` (10周量能吸纳周数), `dist_to_52w_high_pct` (距52周新高%), `stage_2` (Stage 2 趋势确认).
+   - 提取 `base_depth_pct` ( Ceiling 基底深度), `base_duration_weeks` (基底形成周数), `eps_yoy_growth` (EPS 同比%), `net_accum_wks` (10周量能吸纳周数), `dist_to_52w_high_pct` (距52周新高%).
 
 ## 标准执行流程 (Phase-Based Execution)
 
