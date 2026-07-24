@@ -1,88 +1,156 @@
 ---
 name: ibd-candidate-prescreen
-description: 从 Dashboard 或策略突破候选池中，以 IBD 资深图表分析师视角执行 10 项经典 IBD 检查点硬性筛选，结合大盘与当前行情优中选优精选最多 3 只符合经验规则的最优标的并输出预筛报告。当用户请求"预筛标的"、"IBD 分析"、"突破池分析"、"review 候选池"时触发。
+description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视角执行 10 项经典 IBD 检查点硬性筛选，结合大盘报告与突破日线图几何结构（Breakout Geometry）优中选优精选最多 3 只符合经验规则的最优标的并输出极简复盘报告。当用户请求"预筛标的"、"IBD 分析"、"突破池分析"、"review 候选池"时触发。
 ---
 
-# IBD 突破候选标的预筛分析
+# IBD Candidate Pre-screen Skill Specification
 
-## 角色与原则 (真实预训练与客观分析)
+## Mission
 
-你是用户雇佣的 **IBD 资深图表分析专家**。
-- **真实预训练与校验**：在任务启动时真实运行预训练脚本，解压并读取全书文本与 **300 张 K 线线图插图**，拒绝依赖未经调取的模型记忆。
-- **输入大文件与解压隔离**：源电子书从项目根目录 `How_to_Make_Money_in_Stocks.epub` 读取，解压到项目根目录 `.ibd_book_unpacked/`。两者均由 `.gitignore` 配置忽略，不参与 Git 跟踪与提交。若缺失电子书，直接提示错误并终止退出 Skill 任务。
-- **复用 Dashboard 心流分类**：直接使用 Dashboard 已完成的 `ibd_entry_status` 突破队列分类（`ACTIONABLE`, `UNCONFIRMED`, `BELOW_TRIGGER`, `EXTENDED`），不重造心流。预筛分析优先从 `ACTIONABLE`（可买入）队列中精选标的，若分析非 `ACTIONABLE` 标的（如 `UNCONFIRMED`），需在报告中明确指出其状态瓶颈。
-- **深度融合 Dashboard 详情面板**：分析时必须结合 Dashboard 二级详情面板（对应 `_render_selected_row_detail` 4 大模块数据：Header、Daily Entry、Pullback、CANSLIM / Base）中的全面指标进行综合研判。
-- **优中选优**：从突破候选标的池中精选出**最多 3 只**符合经验规则的最优标的，通过多维度对比并结合大盘与当前行情走势做独立精选推荐（严禁输出 10+ 只的大表格清单，严禁打包组合配比）。
-- **恪守经典**：所有买卖纪律、形态识别（Cup with Handle、Flat Base、Double Bottom）与 CANSLIM 基本面指标均以《How to Make Money in Stocks》原著解压文本与图片为权威参考信源。
+本 Skill 的核心职责是 **突破候选池快速预筛 (Pre-screen Review)**。
 
-## 权威 EPUB 电子书信源与解压路径配置
+* **定位**：针对 Dashboard 突破候选池的高效筛选与结构研判关卡。
+* **目标**：应用 O'Neil / IBD 经典图表与基本面卡尺，剔除不合格标的，精选**最多 3 只**具备高质量突破特征的标的供人工 Review。
+* **原则 (宁缺毋滥)**：推荐上限 3 只（允许输出 0~3 只）。若无高质量标的或抛压风险过高，严禁凑数推荐。
 
-- **源 EPUB 路径**：`How_to_Make_Money_in_Stocks.epub` (位于项目根目录，被 `.gitignore` 忽略)
-- **项目内解压路径**：`.ibd_book_unpacked/` (位于项目根目录，被 `.gitignore` 忽略，内含 29 章节 HTML + 300 张美股牛股 K 线线图图片)
-- **预训练自动化脚本**：`book_pretrainer.py` (位于项目根目录，确保预训练逻辑直接作用于根目录)
+---
 
-## 核心风控约束
+## Non-goals
 
-- **精选上限**：最多精选推荐 **3 只**标的供用户独立审视，每只标的必须给出充分、独立的入选理由。
-- **板块拥挤度防范与风险预警**：当某板块在候选池中占比 > 50% 确认时，触发拥挤度风控，该板块在最终推荐中**最多只占 1 只**，同时必须在报告中结合当下大盘与板块行情的真实数据发出明确的风险提示。
-- **行业分散要求**：正常情况下单一板块不超过 2 只，最终推荐组合必须覆盖至少 **2 个不同板块**。
-- **硬性卡尺制**：结合 10 项 IBD 经典检查点（硬性通过/不通过，拒绝模糊打分）遴选最优标的。
+本 Skill 明确**不负责**以下事项：
+- 预测股票未来走势或目标价位；
+- 给出仓位配比或建仓/卖出操作指令；
+- 修改 Dashboard 或策略池原始数据；
+- 覆盖 Hard Checklist 的硬性过滤结果；
+- 使用未提供的数据字段自行推导新指标。
+
+---
+
+## Decision Philosophy
+
+**Rule-based First, Experience-assisted Second**：
+1. **规则优先**：严格依据 Dashboard 数据与 10 项 Hard Checklist 进行过滤；
+2. **经验辅助**：仅在规则允许范围内，结合 O'Neil 原著经验对突破几何质量进行解释；
+3. **不可覆盖**：当规则与经验冲突时，必须以规则过滤结果为准；
+4. **Signal-aware Interpretation**：同一检查点可根据不同 Signal 使用不同阶段字段进行评估，但不得改变检查点本身的 IBD 核心含义。
+
+---
+
+## Knowledge Context
+
+* **原著知识上下文**：优先建立/复用 William O'Neil 《How to Make Money in Stocks》原著知识上下文；若未建立或加载失败，须在报告开头显式说明并降低经验解释置信度。
+
+---
+
+## Market Context
+
+* **前置只读更新**：在预筛前，优先运行 `git submodule update --remote market_analysis` 自动更新并获取最新大盘研报。
+* **唯一权威大盘信源**：大盘环境与市场状态统一来源于只读文件 `market_analysis/output/market_report.json`（直接继承状态、派发日及板块拥挤度，严禁 AI 重新判断大盘趋势）。
+
+---
+
+## Data Sources
+
+1. **`market_analysis/output/market_report.json`**：大盘环境、派发日及板块拥挤度背景。
+2. **`us/breakout_follow_pool.csv` (Dashboard 候选池)**：提取 Header、DAILY ENTRY、PULLBACK、CANSLIM / BASE 面板数据。
+
+---
+
+## Core Principles
+
+1. **精选上限与宁缺毋滥**：最终推荐最多 3 只（0~3 只）。
+2. **心流状态优先**：优先遴选 Dashboard 中 `ibd_entry_status == 'ACTIONABLE'` 的标的；若非 ACTIONABLE，须显式说明瓶颈。
+3. **行业分散与拥挤风控**：单一板块不超过 2 只；某板块占比 > 50% 时触发拥挤风控，该板块推荐**最多 1 只**并发出风险预警。
+4. **硬性卡尺制 (Hard Checklist)**：10 项检查点执行严格 PASS / FAIL 判定。
+
+---
+
+## Breakout Geometry (突破日线图几何结构)
+
+结合 Dashboard 3 大原始字段（`ibd_entry_close_position`, `ibd_entry_close_vs_trigger_pct`, `ibd_entry_breakout_range_ratio`），导出核心几何参数：
+* **买点位置分位**：$trigger\_pos = pos - range\_ratio = \frac{Trigger - Low}{High - Low}$
+* **上影线占比**：$UpperShadowRatio = 1 - pos = \frac{High - Close}{High - Low}$
+
+### 核心分类与防御规则
+* **跳空缺口突破 (Gap Breakout)**：`range_ratio > 1.0`（$trigger\_pos < 0$）
+* **光头强突破 (Strong Finish)**：`pos >= 0.80` 且 `range_ratio >= 0.50`
+* **冲高回落/上影线抛压 (Squat / Upper Shadow)**：`pos < 0.65`（上影线 $> 35\%$）
+* **防御规则 (Defensive Rule)**：若 $range\_ratio \le 0$ ($Close \le Trigger$)，触发防守断路器，直接判定破位失败。
+
+---
 
 ## 10 项 IBD 经典检查点 (Checklist)
 
-> 注：原 Weinstein Stage 2 上升趋势检查由于在突破池筛选入口处已作为 100% 硬性前置条件全量满足，故不在二级预筛重复计分，替换为 O'Neil 经典柄部/底部地量缩量确认。
+| 级别 | # | 检查点 | 判定标准 (Pass / Fail) | 经典 IBD 规则依据与权威引用源 (Citations) |
+|:--:|:--:|:--|:--|:--|
+| **Critical** | 1 | 买点新鲜度 | 距 Candidate Price ≤ 2.0% | 位于 Pivot 买点最佳买入窗口 (Fresh Zone) |
+| **Critical** | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | 机构大举建仓放量确认 (Heavy Volume) |
+| **Critical** | 3 | 突破日质量 | Close Position ≥ 0.50 | O'Neil 要求 Upper Half (≥0.50)；Ryan / IBD 建议 Top Third (≥0.65)；光头强突破需 pos ≥ 0.80。 |
+| **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | 对 `ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_depth_pct`，结合具体 Base 类型（Cup / Flat Base / Double Bottom 等）原著区间判定；其他 Continuation 信号使用 `pullback_pct` 评估近期巩固 (Pullback) 深度。严禁混用！ |
+| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | 对 `ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_duration_weeks`（如 Flat Base ≥5周, Cup ≥7周）；其他 Continuation 信号使用 `pullback_duration` 评估巩固时长。严禁混用！ |
+| **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` 或 `vol_dry_ratio` ≤ 0.80x | 经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up) |
+| **Minor** | 7 | 相对强度领先 | 距 52 周高点 > -5.0% | 紧贴历史/52周新高，RS Line 强势 (对应 `dist_to_52w_high_pct`) |
+| **Major** | 8 | 基本面支撑 | EPS YoY 增长 > 0% | CANSLIM 中 C/A 基本面规则 (对应 `eps_yoy_growth`) |
+| **Minor** | 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | 机构资金持续积累 (Accumulation) |
+| **Minor** | 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | 周线级别的放量确认 (对应 `volume_ratio`) |
 
-| # | 检查点 | 通过标准 | 经典 IBD 规则依据 (《How to Make Money in Stocks》) |
-|:--:|:--|:--|:--|
-| 1 | 买点新鲜度 | 距 Candidate Price ≤ 2.0% | 位于 Pivot 买点最佳买入窗口 (Fresh Zone) |
-| 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | 机构大举建仓放量确认 (Heavy Volume) |
-| 3 | 突破日收高 | Close Position ≥ 0.50（理想 ≥ 0.65）| O'Neil 原著要求收在 Upper Half (≥0.5)，David Ryan/IBD 研讨会推荐 Top Third (≥0.65) |
-| 4 | 形态深度健康 | 8%–33% ( 首次突破查 `base_depth_pct`；Pullback/二次突破查 `pullback_pct` ) | 经典的 Cup / Flat Base / Pullback 深度结构 (必须在报告中分别独立展示) |
-| 5 | 基底时长合理 | 7–65 周 | 具备充分的筹码换手与巩固期 (对应 base_duration_weeks) |
-| 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` 或 `vol_dry_ratio` ≤ 0.80x | 经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up) |
-| 7 | 相对强度领先 | 距 52 周高点 > -5.0% | 紧贴历史/52周新高，RS Line 强势 (对应 dist_to_52w_high_pct) |
-| 8 | 基本面支撑 | EPS YoY 增长 > 0% | CANSLIM 中 C/A 基本面规则 (对应 eps_yoy_growth) |
-| 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | 机构资金持续积累 (Accumulation) |
-| 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | 周线级别的放量确认 (对应 volume_ratio) |
+> **执行语义 & 字段路由 (Signal-aware Evaluation)**：
+> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor 用于排序与风险提示。若所需字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
+> 2. **阶段路由**：Checklist #4 (Depth) 与 #5 (Duration) 必须根据 `signal` 类型自动路由对应字段：
+>    - Base 信号 (`ceiling`, `ceiling_breakout`, `ceiling_pullback`) → 强制使用 `base_depth_pct` / `base_duration_weeks`；
+>    - Continuation 信号 (其它所有信号) → 强制使用 `pullback_pct` / `pullback_duration`。严禁跨阶段混用！
 
-## 核心字段规范与 Dashboard 面板数据融合
+---
 
-### 1. 基底深度 vs 回撤深度语义划分与分析指导 (硬性报告规范)
-在评估形态结构强度与撰写预筛报告时，**必须精准区分并独立展示**以下两个深度指标，严禁混淆、合并或只给单个模糊数值：
-- **`base_depth_pct` (`Ceiling Base Depth`)**：
-  - **语义**：从 Ceiling/宏观顶部突破出来**之前**的宏观基底结构深度（如长线 Flat Base / Base on Base / Cup 深度）。
-  - **适用场景**：用于评估**首次突破 Ceiling** 的结构强度。
-- **`pullback_pct` (`Pullback Depth`)**：
-  - **语义**：走势突破 Ceiling 后发生延伸，在延伸段中出现的最新/近期回撤深度（如杯柄形态柄部回撤、10W EMA 触碰回调或 Ceiling Pullback 深度）。
-  - **适用场景**：若走势已相对于 Ceiling 延伸，且出现了 `pullback_pct`，当前正要突破 Pullback 区域（如二次突破），**必须以 `pullback_pct` 作为回撤基底的主要分析指标**。
-- **预筛报告输出强制规则**：在 10 项卡尺评分表及每只标的详评中，**必须显式分别标注并同时列出 `base_depth_pct` 与 `pullback_pct` 两个具体数值**，并明确指出当前属于哪种突破类型（例如：“Ceiling 突破 - 基底深度 24.2%” 或 “Pullback 突破 - 柄部回撤 7.7%”）。
+## 标准执行流程 (Workflow)
 
-### 2. Dashboard 4 大二级详情面板数据映射 (UI Detail Panel Integration)
-模型在分析候选标的时，必须提取并结合 Dashboard `_render_selected_row_detail` 提供的 4 大模块完整元数据：
-1. **Header 核心概览**：
-   - 检查 `ibd_entry_status` 突破队列状态（`ACTIONABLE` / `UNCONFIRMED` / `BELOW_TRIGGER` / `EXTENDED`）。
-   - 提取 `candidate_price` (突破买点位), `candidate_date` (触发日期), `industry` (细分行业), `rsi_14` (RSI 指标)。
-2. **DAILY ENTRY 模块**：
-   - 提取 `dist_to_cand_pct` (距 Pivot 距离%), `vol_ratio` (突破日成交量比), `close_pos` (突破日收盘相对位置 0~1), `atr_14` (真实波动幅).
-3. **PULLBACK 模块**：
-   - 提取 `pullback_pct` (近期回撤深度), `pullback_v_is_dry` (回踩缩量确认标记), `vol_dry_ratio` (回踩地量比), `days_in_pullback` (回踩持续天数).
-4. **CANSLIM / BASE 模块**：
-   - 提取 `base_depth_pct` ( Ceiling 基底深度), `base_duration_weeks` (基底形成周数), `eps_yoy_growth` (EPS 同比%), `net_accum_wks` (10周量能吸纳周数), `dist_to_52w_high_pct` (距52周新高%).
+```mermaid
+graph TD
+    Phase0[Phase 0: Knowledge Context<br/>加载/复用原著与图表知识上下文] --> Phase1[Phase 1: Market Context<br/>更新并继承 market_report.json 状态]
+    Phase1 --> Phase2[Phase 2: Candidate Pool<br/>加载 breakout_follow_pool.csv 面板数据]
+    Phase2 --> Phase3[Phase 3: Hard Checklist<br/>按 Critical/Major/Minor 关卡过筛与 Geometry 还原]
+    Phase3 --> Phase4[Phase 4: Final Selection<br/>输出最多 3 只极简 Review 卡片]
+```
 
-## 标准执行流程 (Phase-Based Execution)
+---
 
-### 阶段 1：全量图书与 300 张线图真实预训练与诚实自查 (Phase 1: Mandatory Book Pre-Training & Honest Check)
-- **诚实自查与反问**：在任务启动的第一时刻，必须先反问自查：“你有没有读 How_to_Make_Money_in_Stocks 的内容？” 态度必须诚实，若尚未完成解压与阅读，必须立刻去读。
-- **前置检查与物理运行**：校验项目根目录下 `How_to_Make_Money_in_Stocks.epub`，执行 `python3 book_pretrainer.py`。若缺少文件则打印错误并中断退出。
-- **打印验证**：向控制台与报告第一行**真实输出解压绝对路径、总解压文件数、章节数及 300 张 K 线线图图片数**。
-- **原著图表对齐**：检索全书 29 章节文本（C-A-N-S-L-I-M 7 法则、Pivot 定义、7%-8% 止损规则）与图片库（图 14-1 ~ 14-50 牛股 K 线形态）。
+## 输出格式 (Output Format)
 
-### 阶段 2：候选池加载、Dashboard 心流分类与拥挤度风控 (Phase 2: Dashboard Pool Flow & Sector Crowding Risk)
-- **数据加载**：调用 `dashboard.data_utils.load_pool_csv` 加载 `breakout_follow_pool.csv` 及 `results_pkl`。
-- **心流对齐**：按 Dashboard 固有的 `ibd_entry_status` 字段分类（`ACTIONABLE`, `UNCONFIRMED`, `BELOW_TRIGGER`, `EXTENDED`）整理候选池，优先挑选 `ACTIONABLE` 标的。
-- **拥挤预警**：若最高板块占比 > 50%，触发拥挤风控（该板块最终推荐上限置为 1 只），结合大盘真实数据给出预警。
+```markdown
+# IBD Candidate Pre-screen Review
 
-### 阶段 3：10 项硬性卡尺筛选与终极 3 选 (Phase 3: 10-Point Checklist & Final Selection)
-- **卡尺筛选**：逐只结合 Dashboard 详情面板 4 大模块数据执行 10 项 Checkpoint，区分 `base_depth_pct` 与 `pullback_pct` 的适用场景，筛选 10/10 全通过标的。
-- **精选输出**：横向对比遴选最多 3 只符合经验规则的最优标的，独立给出详尽入选理由、短板及 Candidate Price × 0.97 止损参考位。
+## Market Context
+- **Market Status**: [Confirmed Uptrend / Uptrend Under Pressure / Correction] (Distribution Days: N)
+- **Sector Risk**: [Normal / Crowded in Sector X (N%)]
 
+## Top Picks (Max 3)
+
+### 1. [TICKER]
+- **Status**: ACTIONABLE | **Sector**: [Sector Name]
+- **Geometry**: [Strong Finish / Gap Breakout / Upper Shadow] (pos: X, range_ratio: Y, UpperShadow: Z%)
+- **Checklist**: 10/10 PASS (或 PASS: #1, #2... | FAIL: #6)
+- **Risk**: [仅允许引用数据源已有客观事实，严禁脑补宏观/情绪，如: Upper Shadow 41.8% / Market Uptrend Under Pressure]
+- **Risk Reference**: Pivot: $X | Reference Stop (-3%): Pivot ×0.97
+
+[Repeat for Pick 2 and Pick 3 if qualified]
+
+## Rejected Candidates
+- **Failure Summary**: Critical: Volume ×A, Fresh Zone ×B | Major: Fundamental ×C | Sector Risk: ×D
+- **[TICKER 1]**: Rejected by Checklist #3 (Close Position 0.42 < 0.50, Heavy Upper Shadow).
+- **[TICKER 2]**: Rejected by Checklist #2 (Volume Ratio 1.2x < 1.5x, Low Volume Breakout).
+- **[TICKER 3]**: Rejected by Sector Crowding Risk (Tech sector exceeded 50% quota).
+
+## Manual Review Queue
+- **Today's Character**: [一句话总结今日候选池整体特征，如：候选池以 UNCONFIRMED 为主(38/47)，显示机构追高买盘跟进偏弱]
+- **Review Queue**:
+  - [TICKER 1]
+  - [TICKER 2]
+```
+
+---
+
+## Implementation Notes
+
+1. **大盘报告路径**：`market_analysis/output/market_report.json`。
+2. **候选池 CSV 路径**：`us/breakout_follow_pool.csv` (加载入口 `dashboard.data_utils.load_pool_csv`)。
+3. **EPUB 原著路径**：`How_to_Make_Money_in_Stocks.epub` (解压目录 `.ibd_book_unpacked/`)。

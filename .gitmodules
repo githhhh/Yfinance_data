@@ -1,0 +1,3 @@
+[submodule "market_analysis"]
+	path = market_analysis
+	url = git@github-personal:githhhh/market_analysis.git
