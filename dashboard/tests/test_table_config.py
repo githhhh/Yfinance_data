@@ -89,6 +89,7 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "ibd_entry_status",
         "latest_close",
         "current_vs_ibd_candidate_pct",
+        "ibd_breakout_quality",
         "C_continuous",
         "rank_C_continuous",
         "is_priority",
@@ -103,7 +104,7 @@ def test_ibd_decision_view_columns():
         "ibd_entry_status",
         "ibd_candidate_rule",
         "current_vs_ibd_candidate_pct",
-        "ibd_entry_close_position",
+        "ibd_breakout_quality",
         "latest_close",
         "ibd_entry_vol_or_reject",
         "volume_ratio",
@@ -111,6 +112,144 @@ def test_ibd_decision_view_columns():
     ]
     assert get_default_table_columns() == expected
     assert get_column_view_fields("IBD Decision") == expected
+
+
+def test_breakout_quality_derivation_logic():
+    from dashboard.data_utils import _compute_breakout_quality
+    import pandas as pd
+
+    assert (
+        _compute_breakout_quality(
+            pd.Series(
+                {
+                    "ibd_entry_close_vs_trigger_pct": 0.04,
+                    "ibd_entry_close_position": 0.95,
+                    "ibd_entry_breakout_range_ratio": 1.2,
+                }
+            )
+        )
+        == "Powerful Breakout"
+    )
+    assert (
+        _compute_breakout_quality(
+            pd.Series(
+                {
+                    "ibd_entry_close_vs_trigger_pct": 0.04,
+                    "ibd_entry_close_position": 0.85,
+                    "ibd_entry_breakout_range_ratio": 0.60,
+                }
+            )
+        )
+        == "Strong Close"
+    )
+    assert (
+        _compute_breakout_quality(
+            pd.Series({"ibd_entry_close_position": 0.91, "ibd_entry_breakout_range_ratio": 0.33})
+        )
+        == "Constructive Close (Tight)"
+    )
+    assert (
+        _compute_breakout_quality(
+            pd.Series({"ibd_entry_close_position": 0.70, "ibd_entry_breakout_range_ratio": 0.40})
+        )
+        == "Constructive Close"
+    )
+    assert (
+        _compute_breakout_quality(
+            pd.Series({"ibd_entry_close_position": 0.55, "ibd_entry_breakout_range_ratio": 0.40})
+        )
+        == "Weak Close"
+    )
+    assert pd.isna(
+        _compute_breakout_quality(
+            pd.Series({"ibd_entry_close_position": None, "ibd_entry_breakout_range_ratio": 0.40})
+        )
+    )
+    assert pd.isna(
+        _compute_breakout_quality(
+            pd.Series(
+                {
+                    "ibd_entry_close_vs_trigger_pct": 0.0,
+                    "ibd_entry_close_position": 0.92,
+                    "ibd_entry_breakout_range_ratio": 0.65,
+                }
+            )
+        )
+    )
+    assert pd.isna(
+        _compute_breakout_quality(
+            pd.Series(
+                {
+                    "ibd_entry_close_vs_trigger_pct": -0.01,
+                    "ibd_entry_close_position": 0.92,
+                    "ibd_entry_breakout_range_ratio": 0.65,
+                }
+            )
+        )
+    )
+    assert pd.isna(
+        _compute_breakout_quality(
+            pd.Series(
+                {
+                    "ibd_entry_close_position": 0.92,
+                    "ibd_entry_breakout_range_ratio": 0.0,
+                }
+            )
+        )
+    )
+
+
+def test_breakout_quality_sorting_order():
+    from dashboard.data_utils import SortSpec, apply_sort
+    import pandas as pd
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_breakout_quality": "Weak Close"},
+        {"code": "B", "ibd_breakout_quality": "Powerful Breakout"},
+        {"code": "C", "ibd_breakout_quality": "Constructive Close"},
+        {"code": "D", "ibd_breakout_quality": "Strong Close"},
+        {"code": "E", "ibd_breakout_quality": "Constructive Close (Tight)"},
+    ])
+
+    sorted_asc = apply_sort(df, [SortSpec("ibd_breakout_quality", "asc")])
+    assert sorted_asc["code"].tolist() == ["B", "D", "E", "C", "A"]
+
+    sorted_desc = apply_sort(df, [SortSpec("ibd_breakout_quality", "desc")])
+    assert sorted_desc["code"].tolist() == ["A", "C", "E", "D", "B"]
+
+
+def test_breakout_quality_sorting_keeps_alias_labels_compatible():
+    from dashboard.data_utils import SortSpec, apply_sort
+    import pandas as pd
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_breakout_quality": "Constructive Close"},
+        {"code": "B", "ibd_breakout_quality": "Constructive Close (High Close / Thin Thrust)"},
+        {"code": "C", "ibd_breakout_quality": "Strong Close"},
+        {"code": "D", "ibd_breakout_quality": "High Close, Small Breakout"},
+    ])
+
+    sorted_df = apply_sort(df, [SortSpec("ibd_breakout_quality", "asc")])
+
+    assert sorted_df["code"].tolist() == ["C", "B", "D", "A"]
+
+
+def test_breakout_quality_sorting_keeps_unknown_values_last():
+    from dashboard.data_utils import SortSpec, apply_sort
+    import pandas as pd
+
+    df = pd.DataFrame([
+        {"code": "A", "ibd_breakout_quality": "Weak Close"},
+        {"code": "B", "ibd_breakout_quality": pd.NA},
+        {"code": "C", "ibd_breakout_quality": "Powerful Breakout"},
+        {"code": "D", "ibd_breakout_quality": "Unmapped"},
+    ])
+
+    sorted_asc = apply_sort(df, [SortSpec("ibd_breakout_quality", "asc")])
+    assert sorted_asc["code"].tolist() == ["C", "A", "B", "D"]
+
+    sorted_desc = apply_sort(df, [SortSpec("ibd_breakout_quality", "desc")])
+    assert sorted_desc["code"].tolist() == ["A", "C", "B", "D"]
 
 
 def test_c_rank_reference_view_columns():
@@ -157,6 +296,54 @@ def test_grid_options_pin_code_left_and_keep_table_capabilities():
     assert options["enableRangeSelection"] is False
 
 
+def test_breakout_quality_column_uses_custom_dom_components_when_js_is_available():
+    from dashboard.table_view import HAS_JS_CODE
+
+    options = build_grid_options(["ibd_breakout_quality"])
+    quality_col = options["columnDefs"][0]
+
+    if not HAS_JS_CODE:
+        assert "components" not in options
+        return
+
+    assert quality_col["headerComponent"] == "breakoutQualityHeader"
+    assert quality_col["cellRenderer"] == "breakoutQualityCellRenderer"
+    assert "headerTooltip" not in quality_col
+    assert "breakoutQualityHeader" in options["components"]
+    assert "breakoutQualityCellRenderer" in options["components"]
+    header_source = options["components"]["breakoutQualityHeader"].js_code
+    assert "Constructive Close (Tight)" in header_source
+    assert "Constructive</div><div>0.65 &lt;= Close Position &lt; 0.80" in header_source
+    cell_source = options["components"]["breakoutQualityCellRenderer"].js_code
+    assert "breakout-cell-tooltip" in cell_source
+    assert "Matched Standard" in cell_source
+    assert "backgroundImage" in quality_col["cellStyle"].js_code
+    assert "borderLeft" in quality_col["cellStyle"].js_code
+
+
+def test_breakout_quality_row_data_keeps_tooltip_support_fields_hidden():
+    import pandas as pd
+    from dashboard.table_view import _row_data_columns
+
+    df = pd.DataFrame(
+        {
+            "code": ["AAA"],
+            "ibd_breakout_quality": ["Strong Close"],
+            "ibd_entry_close_vs_trigger_pct": [0.04],
+            "ibd_entry_close_position": [0.82],
+            "ibd_entry_breakout_range_ratio": [0.75],
+        }
+    )
+
+    assert _row_data_columns(df, ["code", "ibd_breakout_quality"]) == [
+        "code",
+        "ibd_breakout_quality",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+    ]
+
+
 def test_render_table_sets_one_based_sequential_index(monkeypatch):
     import pandas as pd
     import sys
@@ -174,3 +361,60 @@ def test_render_table_sets_one_based_sequential_index(monkeypatch):
     render_table(df, ["code", "val"])
 
     assert captured["df"].index.tolist() == [1, 2]
+
+
+def test_render_table_preserves_hidden_breakout_quality_precision(monkeypatch):
+    import pandas as pd
+    import sys
+    import types
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_aggrid(df, **kwargs):
+        captured["df"] = df
+        return {}
+
+    monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
+
+    df = pd.DataFrame(
+        {
+            "code": ["AAA"],
+            "ibd_breakout_quality": ["Strong Close"],
+            "ibd_entry_close_vs_trigger_pct": [0.00523],
+            "ibd_entry_close_position": [0.869565],
+            "ibd_entry_breakout_range_ratio": [0.652174],
+        }
+    )
+
+    render_table(df, ["code", "ibd_breakout_quality"])
+
+    assert captured["df"].loc[1, "ibd_entry_close_vs_trigger_pct"] == 0.00523
+    assert captured["df"].loc[1, "ibd_entry_close_position"] == 0.869565
+    assert captured["df"].loc[1, "ibd_entry_breakout_range_ratio"] == 0.652174
+
+
+def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeypatch):
+    import pandas as pd
+    import sys
+    import types
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_aggrid(df, **kwargs):
+        captured["df"] = df
+        return {}
+
+    monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
+
+    df = pd.DataFrame(
+        {
+            "code": ["AAA"],
+            "ibd_breakout_quality": ["High Close, Small Breakout"],
+        }
+    )
+
+    render_table(df, ["code", "ibd_breakout_quality"])
+
+    assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Close (Tight)"

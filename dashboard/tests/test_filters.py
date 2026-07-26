@@ -119,6 +119,54 @@ def test_normalize_pool_df_converts_core_types():
     assert df.loc[0, "breakout_date"] == pd.Timestamp("2026-05-10")
 
 
+def test_normalize_pool_df_adds_entry_reason_and_breakout_quality_together():
+    df = normalize_pool_df(
+        pd.DataFrame(
+            [
+                {
+                    "code": "AAA",
+                    "ibd_entry_valid": "1",
+                    "ibd_entry_volume_ratio": "2.5",
+                    "ibd_entry_close_position": "0.82",
+                    "ibd_entry_breakout_range_ratio": "0.75",
+                },
+                {
+                    "code": "BBB",
+                    "ibd_entry_valid": "0",
+                    "ibd_entry_reject_reason": "Low volume",
+                    "ibd_entry_close_position": "0.58",
+                    "ibd_entry_breakout_range_ratio": "0.40",
+                },
+            ]
+        )
+    )
+
+    assert df["ibd_entry_vol_or_reject"].tolist() == ["2.50x", "Low volume"]
+    assert df["ibd_breakout_quality"].tolist() == ["Strong Close", "Weak Close"]
+
+
+def test_normalize_pool_df_simplifies_breakout_quality_aliases():
+    df = normalize_pool_df(
+        pd.DataFrame(
+            [
+                {
+                    "code": "AAA",
+                    "ibd_breakout_quality": "Constructive Close (High Close / Thin Thrust)",
+                },
+                {
+                    "code": "BBB",
+                    "ibd_breakout_quality": "High Close, Small Breakout",
+                },
+            ]
+        )
+    )
+
+    assert df["ibd_breakout_quality"].tolist() == [
+        "Constructive Close (Tight)",
+        "Constructive Close (Tight)",
+    ]
+
+
 def test_normalize_pool_df_adds_base_duration_weeks_from_ceiling_to_breakout_dates():
     df = normalize_pool_df(
         pd.DataFrame(

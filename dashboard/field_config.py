@@ -30,6 +30,66 @@ STATUS_META = {
     },
 }
 
+QUALITY_META = {
+    "Powerful Breakout": {
+        "label": "Powerful Breakout",
+        "color": "#86efac",
+        "borderColor": "#22c55e",
+        "borderWidth": "5px",
+        "backgroundColor": "rgba(34, 197, 94, 0.26)",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.34), rgba(34, 197, 94, 0.16))",
+        "fontWeight": "700",
+        "rule": "range_ratio > 1.0",
+    },
+    "Strong Close": {
+        "label": "Strong Close",
+        "color": "#4ade80",
+        "borderColor": "#22c55e",
+        "borderWidth": "4px",
+        "backgroundColor": "rgba(34, 197, 94, 0.24)",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.30), rgba(34, 197, 94, 0.12))",
+        "fontWeight": "700",
+        "rule": "pos >= 0.80 & range_ratio >= 0.50",
+    },
+    "Constructive Close (Tight)": {
+        "label": "Constructive Close (Tight)",
+        "color": "#22c55e",
+        "borderColor": "#4ade80",
+        "borderWidth": "3px",
+        "backgroundColor": "rgba(34, 197, 94, 0.12)",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05))",
+        "fontWeight": "600",
+        "rule": "pos >= 0.80 & range_ratio < 0.50",
+    },
+    "Constructive Close": {
+        "label": "Constructive Close",
+        "color": "#86efac",
+        "borderColor": "#86efac",
+        "borderWidth": "2px",
+        "backgroundColor": "rgba(34, 197, 94, 0.08)",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.10), rgba(34, 197, 94, 0.04))",
+        "fontWeight": "500",
+        "rule": "0.65 <= pos < 0.80",
+    },
+    "Weak Close": {
+        "label": "Weak Close",
+        "color": "#bbf7d0",
+        "borderColor": "#bbf7d0",
+        "borderWidth": "1px",
+        "backgroundColor": "rgba(34, 197, 94, 0.04)",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.05), rgba(34, 197, 94, 0.015))",
+        "fontWeight": "400",
+        "rule": "pos < 0.65",
+    },
+}
+
+QUALITY_ORDER = {quality: rank for rank, quality in enumerate(QUALITY_META)}
+QUALITY_ALIASES = {
+    "Constructive Close (High Close / Thin Thrust)": "Constructive Close (Tight)",
+    "High Close, Small Breakout": "Constructive Close (Tight)",
+}
+QUALITY_ORDER.update({alias: QUALITY_ORDER[current] for alias, current in QUALITY_ALIASES.items()})
+
 EXCLUDED_CUSTOM_FIELDS = {"C_continuous", "rank_C_continuous", "is_priority"}
 
 BOOLEAN_FIELDS = {
@@ -132,6 +192,7 @@ ALL_TABLE_COLUMNS = [
     "ibd_entry_status",
     "latest_close",
     "current_vs_ibd_candidate_pct",
+    "ibd_breakout_quality",
     "C_continuous",
     "rank_C_continuous",
     "is_priority",
@@ -142,7 +203,7 @@ IBD_DECISION_COLUMNS = [
     "ibd_entry_status",
     "ibd_candidate_rule",
     "current_vs_ibd_candidate_pct",
-    "ibd_entry_close_position",
+    "ibd_breakout_quality",
     "latest_close",
     "ibd_entry_vol_or_reject",
     "volume_ratio",
@@ -338,6 +399,26 @@ FIELD_CONFIG = OrderedDict(
             ),
         ),
         (
+            "ibd_breakout_quality",
+            _field(
+                "Breakout Quality",
+                "category",
+                "IBD Entry",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                help_text=(
+                    "Breakout Quality Hierarchy (Strong → Weak)\n\n"
+                    "Defense: close_vs_trigger_pct > 0 when present; range_ratio > 0\n\n"
+                    "• Powerful Breakout                     : range_ratio > 1.0 (Gap-up over trigger)\n"
+                    "• Strong Close                          : pos >= 0.80 & range_ratio >= 0.50 (Top 20% & strong thrust)\n"
+                    "• Constructive Close (Tight)            : pos >= 0.80 & range_ratio < 0.50 (High close, tight thrust)\n"
+                    "• Constructive Close                    : 0.65 <= pos < 0.80 (Solid close)\n"
+                    "• Weak Close                            : pos < 0.65 (Upper shadow > 35%)"
+                ),
+            ),
+        ),
+        (
             "latest_close",
             _field(
                 "Latest",
@@ -512,4 +593,3 @@ def get_all_table_columns() -> list[str]:
 
 def get_field_label(field: str) -> str:
     return str(FIELD_CONFIG.get(field, {}).get("label", field))
-

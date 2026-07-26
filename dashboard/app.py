@@ -440,12 +440,13 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
     )
 
     filtered_df = apply_default_review_order(filtered_df)
+    sort_label = "Breakout Quality" if status_val == "ACTIONABLE" else "Entry Status → Breakout Quality"
 
     with st.container(key="results_toolbar"):
         sum_c, copy_c = st.columns([2.4, 1.6], vertical_alignment="center")
         with sum_c:
             st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by Entry Status → C Rank</div>',
+                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by {sort_label}</div>',
                 unsafe_allow_html=True,
             )
         with copy_c:

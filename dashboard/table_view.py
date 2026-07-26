@@ -4,7 +4,14 @@ import json
 
 import pandas as pd
 
-from dashboard.field_config import FIELD_CONFIG, STATUS_META, get_field_label
+from dashboard.field_config import (
+    FIELD_CONFIG,
+    QUALITY_ALIASES,
+    QUALITY_META,
+    QUALITY_ORDER,
+    STATUS_META,
+    get_field_label,
+)
 
 try:
     from st_aggrid import JsCode
@@ -120,6 +127,224 @@ def _get_value_formatter(fmt: str | None):
     return None
 
 
+def _breakout_quality_header_jscode():
+    if not HAS_JS_CODE:
+        return None
+    return JsCode("""
+    class BreakoutQualityHeader {
+        init(params) {
+            this.params = params;
+            this.tooltip = null;
+            this.eGui = document.createElement('div');
+            this.eGui.style.cssText = 'display:flex; align-items:center; width:100%; height:100%; min-width:0; gap:6px; cursor:pointer;';
+
+            this.label = document.createElement('span');
+            this.label.textContent = params.displayName || 'Breakout Quality';
+            this.label.style.cssText = 'min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+
+            this.sortIcon = document.createElement('span');
+            this.sortIcon.style.cssText = 'width:10px; color:#94a3b8; font-size:10px; line-height:1;';
+
+            this.menuButton = document.createElement('button');
+            this.menuButton.type = 'button';
+            this.menuButton.setAttribute('aria-label', 'Filter Breakout Quality');
+            this.menuButton.style.cssText = 'width:18px; height:18px; margin-left:auto; padding:0; border:0; background:transparent; color:#9ca3af; cursor:pointer; display:flex; align-items:center; justify-content:center;';
+            this.menuButton.innerHTML = '<span style="width:12px; height:12px; display:block; background:currentColor; clip-path:polygon(0 0,100% 0,62% 45%,62% 100%,38% 100%,38% 45%); opacity:0.85;"></span>';
+
+            this.eGui.appendChild(this.label);
+            this.eGui.appendChild(this.sortIcon);
+            this.eGui.appendChild(this.menuButton);
+
+            this.onSort = (event) => {
+                if (event.target === this.menuButton || this.menuButton.contains(event.target)) return;
+                params.progressSort(event.shiftKey);
+            };
+            this.onMenu = (event) => {
+                event.stopPropagation();
+                if (params.showColumnMenu) {
+                    params.showColumnMenu(this.menuButton);
+                } else if (params.showColumnMenuAfterButtonClick) {
+                    params.showColumnMenuAfterButtonClick(this.menuButton);
+                }
+            };
+            this.onMouseEnter = () => this.showTooltip();
+            this.onMouseLeave = () => this.hideTooltip();
+            this.onSortChanged = () => this.updateSortIcon();
+
+            this.eGui.addEventListener('click', this.onSort);
+            this.eGui.addEventListener('mouseenter', this.onMouseEnter);
+            this.eGui.addEventListener('mouseleave', this.onMouseLeave);
+            this.menuButton.addEventListener('click', this.onMenu);
+            params.column.addEventListener('sortChanged', this.onSortChanged);
+            this.updateSortIcon();
+        }
+
+        showTooltip() {
+            this.hideTooltip();
+            const tooltip = document.createElement('div');
+            tooltip.className = 'breakout-tooltip';
+            tooltip.style.cssText = 'position:fixed; width:292px; padding:12px 14px; border-radius:6px; background:#0b1329; color:#e2e8f0; box-shadow:0 8px 24px rgba(0,0,0,0.45); font-size:11px; line-height:1.35; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none;';
+            tooltip.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+                    <div style="font-weight:700; color:#ffffff; font-size:12px; letter-spacing:0;">Breakout Quality</div>
+                    <div style="color:#94a3b8; font-size:10px;">strong to weak</div>
+                </div>
+                <div style="display:grid; grid-template-columns:56px 1fr; gap:14px; align-items:center; margin-bottom:10px;">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                        <div style="width:48px; height:7px; border-radius:2px; margin-bottom:3px; background:#2e7d32;"></div>
+                        <div style="width:38px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.78);"></div>
+                        <div style="width:28px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.56);"></div>
+                        <div style="width:18px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.38);"></div>
+                        <div style="width:8px; height:7px; border-radius:2px; background:rgba(46,125,50,0.22);"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr; gap:3px; font-size:11px; min-width:0;">
+                        <div style="color:#c8f7c5; font-weight:700; white-space:nowrap;">Powerful Breakout</div>
+                        <div style="color:#b7efb1; font-weight:700; white-space:nowrap;">Strong Close</div>
+                        <div style="color:#d4f1d1; font-weight:600; white-space:nowrap;">Constructive Close (Tight)</div>
+                        <div style="color:#e3f6e1; font-weight:500; white-space:nowrap;">Constructive Close</div>
+                        <div style="color:#e3f6e1; font-weight:400; white-space:nowrap;">Weak Close</div>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:84px 1fr; gap:4px 8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); color:#94a3b8; font-size:10px;">
+                    <div style="color:#cbd5e1;">Entry Context</div><div>Valid entry rows already close above trigger</div>
+                    <div style="color:#cbd5e1;">Defense</div><div>Close vs Trigger &gt; 0 when present; Range Ratio &gt; 0</div>
+                    <div style="color:#cbd5e1;">Powerful</div><div>Range Ratio &gt; 1.00</div>
+                    <div style="color:#cbd5e1;">Strong</div><div>Close Position >= 0.80 and Range Ratio >= 0.50</div>
+                    <div style="color:#cbd5e1;">Tight</div><div>Close Position >= 0.80 and Range Ratio &lt; 0.50</div>
+                    <div style="color:#cbd5e1;">Constructive</div><div>0.65 &lt;= Close Position &lt; 0.80</div>
+                    <div style="color:#cbd5e1;">Weak</div><div>Close Position &lt; 0.65</div>
+                </div>
+            `;
+            document.body.appendChild(tooltip);
+            const anchor = this.eGui.getBoundingClientRect();
+            const tip = tooltip.getBoundingClientRect();
+            const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - tip.width - 8));
+            const below = anchor.bottom + 6;
+            const top = below + tip.height < window.innerHeight ? below : Math.max(8, anchor.top - tip.height - 6);
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            this.tooltip = tooltip;
+        }
+
+        hideTooltip() {
+            if (this.tooltip && this.tooltip.parentNode) {
+                this.tooltip.parentNode.removeChild(this.tooltip);
+            }
+            this.tooltip = null;
+        }
+
+        updateSortIcon() {
+            const sort = this.params.column.getSort();
+            this.sortIcon.textContent = sort === 'asc' ? '^' : sort === 'desc' ? 'v' : '';
+        }
+
+        getGui() {
+            return this.eGui;
+        }
+
+        destroy() {
+            this.hideTooltip();
+            this.eGui.removeEventListener('click', this.onSort);
+            this.eGui.removeEventListener('mouseenter', this.onMouseEnter);
+            this.eGui.removeEventListener('mouseleave', this.onMouseLeave);
+            this.menuButton.removeEventListener('click', this.onMenu);
+            this.params.column.removeEventListener('sortChanged', this.onSortChanged);
+        }
+    }
+    """)
+
+
+def _breakout_quality_cell_renderer_jscode():
+    if not HAS_JS_CODE:
+        return None
+    meta_json = json.dumps(QUALITY_META)
+    return JsCode("""
+    class BreakoutQualityCellRenderer {
+        init(params) {
+            this.eGui = document.createElement('span');
+            this.tooltip = null;
+            this.eGui.style.cssText = 'display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            this.onMouseEnter = () => this.showTooltip();
+            this.onMouseLeave = () => this.hideTooltip();
+            this.eGui.addEventListener('mouseenter', this.onMouseEnter);
+            this.eGui.addEventListener('mouseleave', this.onMouseLeave);
+            this.refresh(params);
+        }
+
+        refresh(params) {
+            this.params = params;
+            const data = params.data || {};
+            const val = params.value == null ? '' : String(params.value);
+            const meta = __QUALITY_META__;
+            this.eGui.textContent = val;
+            if (!val || val === 'nan' || val === 'None' || val === 'undefined') {
+                this.tooltipLines = [];
+                return true;
+            }
+
+            const closeVsTrigger = Number(data.ibd_entry_close_vs_trigger_pct);
+            const pos = Number(data.ibd_entry_close_position);
+            const rr = Number(data.ibd_entry_breakout_range_ratio);
+            const closeVsTriggerStr = isNaN(closeVsTrigger) ? 'n/a' : (closeVsTrigger * 100).toFixed(2) + '%';
+            const posStr = isNaN(pos) ? 'n/a' : pos.toFixed(2);
+            const rrStr = isNaN(rr) ? 'n/a' : rr.toFixed(2);
+            const triggerPos = isNaN(pos) || isNaN(rr) ? NaN : pos - rr;
+            const triggerPosStr = isNaN(triggerPos) ? 'n/a' : triggerPos.toFixed(2);
+            const upperShadow = isNaN(pos) ? NaN : 1 - pos;
+            const upperShadowStr = isNaN(upperShadow) ? 'n/a' : (upperShadow * 100).toFixed(1) + '%';
+            const rule = meta[val] && meta[val].rule ? meta[val].rule : '';
+            this.tooltipLines = [
+                'Grade: ' + val,
+                'Close vs Trigger : ' + closeVsTriggerStr,
+                'Close Position   : ' + posStr,
+                'Range Ratio      : ' + rrStr,
+                'Trigger Position : ' + triggerPosStr,
+                'Upper Shadow     : ' + upperShadowStr,
+                'Matched Standard : ' + rule,
+                'Entry Context    : Valid entry rows already close above trigger',
+                'Defense Standard : Close vs Trigger > 0 when present; Range Ratio > 0'
+            ];
+            return true;
+        }
+
+        showTooltip() {
+            this.hideTooltip();
+            if (!this.tooltipLines || !this.tooltipLines.length) return;
+            const tooltip = document.createElement('div');
+            tooltip.className = 'breakout-cell-tooltip';
+            tooltip.style.cssText = 'position:fixed; width:286px; padding:10px 12px; border-radius:6px; background:#0b1329; color:#dbeafe; box-shadow:0 8px 22px rgba(0,0,0,0.42); font-size:11px; line-height:1.45; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; pointer-events:none; white-space:pre;';
+            tooltip.textContent = this.tooltipLines.join('\\n');
+            document.body.appendChild(tooltip);
+            const anchor = this.eGui.getBoundingClientRect();
+            const tip = tooltip.getBoundingClientRect();
+            const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - tip.width - 8));
+            const below = anchor.bottom + 6;
+            const top = below + tip.height < window.innerHeight ? below : Math.max(8, anchor.top - tip.height - 6);
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            this.tooltip = tooltip;
+        }
+
+        hideTooltip() {
+            if (this.tooltip && this.tooltip.parentNode) {
+                this.tooltip.parentNode.removeChild(this.tooltip);
+            }
+            this.tooltip = null;
+        }
+
+        getGui() {
+            return this.eGui;
+        }
+
+        destroy() {
+            this.hideTooltip();
+            this.eGui.removeEventListener('mouseenter', this.onMouseEnter);
+            this.eGui.removeEventListener('mouseleave', this.onMouseLeave);
+        }
+    }
+    """.replace("__QUALITY_META__", meta_json))
+
+
 def build_grid_options(columns: list[str]) -> dict:
     options = {
         "columnDefs": [_column_def(column) for column in columns],
@@ -144,29 +369,61 @@ def build_grid_options(columns: list[str]) -> dict:
             return params.data && params.data.code ? String(params.data.code) : String(params.node ? params.node.rowIndex : Math.random());
         }
         """)
+        options["components"] = {
+            "breakoutQualityHeader": _breakout_quality_header_jscode(),
+            "breakoutQualityCellRenderer": _breakout_quality_cell_renderer_jscode(),
+        }
     return options
+
+
+BREAKOUT_QUALITY_TOOLTIP_FIELDS = [
+    "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+]
+
+
+def _row_data_columns(df: pd.DataFrame, columns: list[str]) -> list[str]:
+    display_columns = [column for column in columns if column in df.columns]
+    support_columns = (
+        [column for column in BREAKOUT_QUALITY_TOOLTIP_FIELDS if column in df.columns]
+        if "ibd_breakout_quality" in display_columns
+        else []
+    )
+    return list(dict.fromkeys(display_columns + support_columns))
+
+
+def _normalize_breakout_quality_display_values(df: pd.DataFrame) -> pd.DataFrame:
+    if "ibd_breakout_quality" not in df.columns:
+        return df
+    result = df.copy()
+    result["ibd_breakout_quality"] = result["ibd_breakout_quality"].replace(QUALITY_ALIASES)
+    return result
 
 
 def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str | None:
     display_columns = [column for column in columns if column in df.columns]
-    display_df = df[display_columns].copy() if display_columns else df.copy()
-    display_df.index = range(1, len(display_df) + 1)
+    row_columns = _row_data_columns(df, display_columns)
+    grid_df = df[row_columns].copy() if row_columns else df.copy()
+    grid_df = _normalize_breakout_quality_display_values(grid_df)
+    grid_df.index = range(1, len(grid_df) + 1)
 
-    for col in display_df.columns:
-        if pd.api.types.is_float_dtype(display_df[col]):
-            display_df[col] = display_df[col].round(2)
+    for col in grid_df.columns:
+        if col in display_columns and pd.api.types.is_float_dtype(grid_df[col]):
+            grid_df[col] = grid_df[col].round(2)
 
     try:
         from st_aggrid import AgGrid
     except ImportError:
         import streamlit as st
 
-        st.dataframe(display_df, use_container_width=True, height=height)
+        visible_df = grid_df[display_columns].copy() if display_columns else grid_df
+        st.dataframe(visible_df, use_container_width=True, height=height)
         st.caption("Install streamlit-aggrid to enable pinning, drag columns, range selection, and copy support.")
         return None
 
     grid_response = AgGrid(
-        display_df,
+        grid_df,
         gridOptions=build_grid_options(display_columns),
         height=height,
         fit_columns_on_grid_load=False,
@@ -201,7 +458,7 @@ def _column_def(column: str) -> dict:
         "pinned": None,
     }
     help_text = FIELD_CONFIG.get(column, {}).get("help")
-    if help_text:
+    if help_text and not (HAS_JS_CODE and column == "ibd_breakout_quality"):
         definition["headerTooltip"] = help_text
     fmt = FIELD_CONFIG.get(column, {}).get("format")
     if fmt and HAS_JS_CODE:
@@ -237,6 +494,26 @@ def _column_def(column: str) -> dict:
     elif column == "ibd_entry_vol_or_reject":
         definition["minWidth"] = 180
         definition["flex"] = 1
+    elif column == "ibd_breakout_quality":
+        definition["minWidth"] = 210
+        definition["flex"] = 1
+        if HAS_JS_CODE:
+            definition["headerComponent"] = "breakoutQualityHeader"
+            definition["cellRenderer"] = "breakoutQualityCellRenderer"
+            order_json = json.dumps(QUALITY_ORDER)
+            definition["comparator"] = JsCode("""
+            function(valueA, valueB, nodeA, nodeB, isDescending) {
+                const order = __QUALITY_ORDER__;
+                const keyA = valueA == null ? '' : String(valueA);
+                const keyB = valueB == null ? '' : String(valueB);
+                const rankA = Object.prototype.hasOwnProperty.call(order, keyA) ? order[keyA] : null;
+                const rankB = Object.prototype.hasOwnProperty.call(order, keyB) ? order[keyB] : null;
+                if (rankA === null && rankB === null) return 0;
+                if (rankA === null) return isDescending ? -1 : 1;
+                if (rankB === null) return isDescending ? 1 : -1;
+                return rankA - rankB;
+            }
+            """.replace("__QUALITY_ORDER__", order_json))
     else:
         definition["width"] = 130
 
@@ -260,6 +537,24 @@ def _column_def(column: str) -> dict:
                 return meta[val].tooltip;
             }}
             return val;
+        }}
+        """)
+    elif HAS_JS_CODE and column == "ibd_breakout_quality":
+        meta_json = json.dumps(QUALITY_META)
+        definition["cellStyle"] = JsCode(f"""
+        function(params) {{
+            const val = String(params.value || '');
+            const meta = {meta_json};
+            if (meta[val] && meta[val].color) {{
+                return {{
+                    'color': meta[val].color,
+                    'backgroundColor': meta[val].backgroundColor || 'transparent',
+                    'backgroundImage': meta[val].backgroundImage || 'none',
+                    'fontWeight': meta[val].fontWeight || '600',
+                    'borderLeft': (meta[val].borderWidth || '3px') + ' solid ' + (meta[val].borderColor || meta[val].color)
+                }};
+            }}
+            return {{'color': '#757575', 'fontWeight': '400'}};
         }}
         """)
     return definition

@@ -469,3 +469,42 @@ def test_copy_order_after_near_trigger_filter():
     assert ordered["code"].tolist() == ["M_UNCONF", "Z_UNCONF"]
 
 
+def test_default_review_order_prioritizes_actionable_breakout_quality_and_ignores_c_rank():
+    df = pd.DataFrame(
+        [
+            {
+                "code": "A_WEAK",
+                "ibd_entry_status": "ACTIONABLE",
+                "ibd_breakout_quality": "Weak Close",
+                "rank_C_continuous": 1,
+            },
+            {
+                "code": "B_STRONG",
+                "ibd_entry_status": "ACTIONABLE",
+                "ibd_breakout_quality": "Strong Close",
+                "rank_C_continuous": 99,
+            },
+            {
+                "code": "AA_STRONG",
+                "ibd_entry_status": "ACTIONABLE",
+                "ibd_breakout_quality": "Strong Close",
+                "rank_C_continuous": 100,
+            },
+            {
+                "code": "C_UNKNOWN",
+                "ibd_entry_status": "ACTIONABLE",
+                "ibd_breakout_quality": pd.NA,
+                "rank_C_continuous": 0,
+            },
+            {
+                "code": "D_UNCONF",
+                "ibd_entry_status": "UNCONFIRMED",
+                "ibd_breakout_quality": "Powerful Breakout",
+                "rank_C_continuous": 0,
+            },
+        ]
+    )
+
+    ordered = apply_default_review_order(df)
+
+    assert ordered["code"].tolist() == ["AA_STRONG", "B_STRONG", "A_WEAK", "C_UNKNOWN", "D_UNCONF"]

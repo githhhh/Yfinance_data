@@ -16,6 +16,8 @@ from dashboard.field_config import (
     DATE_FIELDS,
     FIELD_CONFIG,
     NUMBER_FIELDS,
+    QUALITY_ALIASES,
+    QUALITY_ORDER,
     get_field_label,
 )
 
@@ -184,11 +186,35 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
                 return "n/a"
             return f"{vol:.2f}x"
         result["ibd_entry_vol_or_reject"] = result.apply(_vol_or_reject, axis=1)
+    if "ibd_breakout_quality" not in result.columns:
+        result["ibd_breakout_quality"] = result.apply(_compute_breakout_quality, axis=1)
+    else:
+        result["ibd_breakout_quality"] = result["ibd_breakout_quality"].replace(QUALITY_ALIASES)
 
     return result
 
 
-
+def _compute_breakout_quality(row: pd.Series) -> str | Any:
+    close_vs_trigger = pd.to_numeric(row.get("ibd_entry_close_vs_trigger_pct"), errors="coerce")
+    pos = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
+    rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
+    if pd.isna(pos) or pd.isna(rr):
+        return pd.NA
+    if not pd.isna(close_vs_trigger) and close_vs_trigger <= 0:
+        return pd.NA
+    if rr <= 0:
+        return pd.NA
+    if rr > 1.0:
+        return "Powerful Breakout"
+    if pos >= 0.80 and rr >= 0.50:
+        return "Strong Close"
+    if pos >= 0.80 and rr < 0.50:
+        return "Constructive Close (Tight)"
+    if 0.65 <= pos < 0.80:
+        return "Constructive Close"
+    if pos < 0.65:
+        return "Weak Close"
+    return pd.NA
 
 
 def apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
@@ -210,15 +236,30 @@ def apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame:
     if not enabled_specs:
         return df.copy()
 
-    for spec in enabled_specs:
-        _ensure_column(df, spec.field)
+    work = df.copy()
+    temp_cols = []
+    by_cols = []
+    ascending_list = []
 
-    return df.sort_values(
-        by=[spec.field for spec in enabled_specs],
-        ascending=[spec.direction.lower() != "desc" for spec in enabled_specs],
+    for i, spec in enumerate(enabled_specs):
+        _ensure_column(work, spec.field)
+        if spec.field == "ibd_breakout_quality":
+            temp_col = f"_quality_rank_{i}"
+            work[temp_col] = work["ibd_breakout_quality"].map(QUALITY_ORDER)
+            temp_cols.append(temp_col)
+            by_cols.append(temp_col)
+        else:
+            by_cols.append(spec.field)
+        ascending_list.append(spec.direction.lower() != "desc")
+
+    sorted_df = work.sort_values(
+        by=by_cols,
+        ascending=ascending_list,
         na_position="last",
         kind="mergesort",
     ).copy()
+
+    return sorted_df.drop(columns=temp_cols, errors="ignore")
 
 
 STATUS_REVIEW_ORDER = {
@@ -242,14 +283,15 @@ def apply_default_review_order(df: pd.DataFrame) -> pd.DataFrame:
     work["_status_rank"] = status_col.map(lambda s: STATUS_REVIEW_ORDER.get(str(s), 99))
     sort_cols = ["_status_rank"]
     ascending = [True]
-    if "rank_C_continuous" in work.columns:
-        sort_cols.append("rank_C_continuous")
+    if "ibd_breakout_quality" in work.columns:
+        work["_quality_rank"] = work["ibd_breakout_quality"].map(QUALITY_ORDER)
+        sort_cols.append("_quality_rank")
         ascending.append(True)
     if "code" in work.columns:
         sort_cols.append("code")
         ascending.append(True)
     sorted_df = work.sort_values(by=sort_cols, ascending=ascending, na_position="last", kind="mergesort")
-    return sorted_df.drop(columns=["_status_rank"], errors="ignore")
+    return sorted_df.drop(columns=["_status_rank", "_quality_rank"], errors="ignore")
 
 
 def apply_c_rank_mode(df: pd.DataFrame, limit: int | None = None) -> pd.DataFrame:
@@ -688,4 +730,3 @@ def filter_unconfirmed_near_trigger(
         & distance.between(0.0, 3.0, inclusive="both")
     )
     return df[mask]
-
