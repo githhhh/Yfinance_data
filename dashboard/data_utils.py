@@ -17,6 +17,7 @@ from dashboard.field_config import (
     FIELD_CONFIG,
     NUMBER_FIELDS,
     QUALITY_ALIASES,
+    QUALITY_BY_MATRIX_SCORE,
     QUALITY_ORDER,
     get_field_label,
 )
@@ -186,8 +187,11 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
                 return "n/a"
             return f"{vol:.2f}x"
         result["ibd_entry_vol_or_reject"] = result.apply(_vol_or_reject, axis=1)
-    if "ibd_breakout_quality" not in result.columns:
+    quality_input_columns = {"ibd_entry_close_position", "ibd_entry_breakout_range_ratio"}
+    if quality_input_columns.issubset(result.columns):
         result["ibd_breakout_quality"] = result.apply(_compute_breakout_quality, axis=1)
+    elif "ibd_breakout_quality" not in result.columns:
+        result["ibd_breakout_quality"] = pd.NA
     else:
         result["ibd_breakout_quality"] = result["ibd_breakout_quality"].replace(QUALITY_ALIASES)
 
@@ -195,26 +199,25 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _compute_breakout_quality(row: pd.Series) -> str | Any:
-    close_vs_trigger = pd.to_numeric(row.get("ibd_entry_close_vs_trigger_pct"), errors="coerce")
     pos = pd.to_numeric(row.get("ibd_entry_close_position"), errors="coerce")
     rr = pd.to_numeric(row.get("ibd_entry_breakout_range_ratio"), errors="coerce")
     if pd.isna(pos) or pd.isna(rr):
         return pd.NA
-    if not pd.isna(close_vs_trigger) and close_vs_trigger <= 0:
+    if not np.isfinite(pos) or not np.isfinite(rr) or rr < 0:
         return pd.NA
-    if rr <= 0:
-        return pd.NA
-    if rr > 1.0:
-        return "Powerful Breakout"
-    if pos >= 0.80 and rr >= 0.50:
-        return "Strong Close"
-    if pos >= 0.80 and rr < 0.50:
-        return "Constructive Close (Tight)"
-    if 0.65 <= pos < 0.80:
-        return "Constructive Close"
+
     if pos < 0.65:
         return "Weak Close"
-    return pd.NA
+
+    close_score = 2 if pos >= 0.80 else 1
+    trigger_pos = pos - rr
+    if trigger_pos <= 0:
+        clearance_score = 2
+    elif rr >= 0.50:
+        clearance_score = 1
+    else:
+        clearance_score = 0
+    return QUALITY_BY_MATRIX_SCORE[close_score + clearance_score]
 
 
 def apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:

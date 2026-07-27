@@ -142,7 +142,7 @@ def test_normalize_pool_df_adds_entry_reason_and_breakout_quality_together():
     )
 
     assert df["ibd_entry_vol_or_reject"].tolist() == ["2.50x", "Low volume"]
-    assert df["ibd_breakout_quality"].tolist() == ["Strong Close", "Weak Close"]
+    assert df["ibd_breakout_quality"].tolist() == ["Strong Breakout", "Weak Close"]
 
 
 def test_normalize_pool_df_simplifies_breakout_quality_aliases():
@@ -162,8 +162,8 @@ def test_normalize_pool_df_simplifies_breakout_quality_aliases():
     )
 
     assert df["ibd_breakout_quality"].tolist() == [
-        "Constructive Close (Tight)",
-        "Constructive Close (Tight)",
+        "Constructive Breakout",
+        "Constructive Breakout",
     ]
 
 

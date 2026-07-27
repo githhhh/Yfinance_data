@@ -35,58 +35,62 @@ QUALITY_META = {
         "label": "Powerful Breakout",
         "color": "#86efac",
         "borderColor": "#22c55e",
-        "borderWidth": "5px",
-        "backgroundColor": "rgba(34, 197, 94, 0.26)",
-        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.34), rgba(34, 197, 94, 0.16))",
-        "fontWeight": "700",
-        "rule": "range_ratio > 1.0",
-    },
-    "Strong Close": {
-        "label": "Strong Close",
-        "color": "#4ade80",
-        "borderColor": "#22c55e",
-        "borderWidth": "4px",
-        "backgroundColor": "rgba(34, 197, 94, 0.24)",
-        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.30), rgba(34, 197, 94, 0.12))",
-        "fontWeight": "700",
-        "rule": "pos >= 0.80 & range_ratio >= 0.50",
-    },
-    "Constructive Close (Tight)": {
-        "label": "Constructive Close (Tight)",
-        "color": "#22c55e",
-        "borderColor": "#4ade80",
         "borderWidth": "3px",
-        "backgroundColor": "rgba(34, 197, 94, 0.12)",
-        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05))",
-        "fontWeight": "600",
-        "rule": "pos >= 0.80 & range_ratio < 0.50",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.28), rgba(34, 197, 94, 0.12))",
+        "fontWeight": "700",
+        "rule": "High close + full trigger clearance",
     },
-    "Constructive Close": {
-        "label": "Constructive Close",
-        "color": "#86efac",
-        "borderColor": "#86efac",
-        "borderWidth": "2px",
-        "backgroundColor": "rgba(34, 197, 94, 0.08)",
-        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.10), rgba(34, 197, 94, 0.04))",
+    "Strong Breakout": {
+        "label": "Strong Breakout",
+        "color": "#4ade80",
+        "borderColor": "rgba(34, 197, 94, 0.78)",
+        "borderWidth": "3px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.17), rgba(34, 197, 94, 0.06))",
+        "fontWeight": "600",
+        "rule": "One dimension strongest, the other solid",
+    },
+    "Constructive Breakout": {
+        "label": "Constructive Breakout",
+        "color": "#22c55e",
+        "borderColor": "rgba(74, 222, 128, 0.58)",
+        "borderWidth": "3px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.09), rgba(34, 197, 94, 0.03))",
         "fontWeight": "500",
-        "rule": "0.65 <= pos < 0.80",
+        "rule": "Mixed but valid price action",
+    },
+    "Marginal Breakout": {
+        "label": "Marginal Breakout",
+        "color": "#86efac",
+        "borderColor": "rgba(134, 239, 172, 0.38)",
+        "borderWidth": "3px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.04), rgba(34, 197, 94, 0.012))",
+        "fontWeight": "500",
+        "rule": "Valid, but close and clearance are both thin",
     },
     "Weak Close": {
         "label": "Weak Close",
         "color": "#bbf7d0",
-        "borderColor": "#bbf7d0",
-        "borderWidth": "1px",
-        "backgroundColor": "rgba(34, 197, 94, 0.04)",
-        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.05), rgba(34, 197, 94, 0.015))",
+        "borderColor": "rgba(187, 247, 208, 0.22)",
+        "borderWidth": "3px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.01), rgba(34, 197, 94, 0.00))",
         "fontWeight": "400",
-        "rule": "pos < 0.65",
+        "rule": "Low close",
     },
 }
 
+QUALITY_BY_MATRIX_SCORE = {
+    4: "Powerful Breakout",
+    3: "Strong Breakout",
+    2: "Constructive Breakout",
+    1: "Marginal Breakout",
+}
 QUALITY_ORDER = {quality: rank for rank, quality in enumerate(QUALITY_META)}
 QUALITY_ALIASES = {
-    "Constructive Close (High Close / Thin Thrust)": "Constructive Close (Tight)",
-    "High Close, Small Breakout": "Constructive Close (Tight)",
+    "Strong Close": "Strong Breakout",
+    "Constructive Close (Tight)": "Constructive Breakout",
+    "Constructive Close (High Close / Thin Thrust)": "Constructive Breakout",
+    "High Close, Small Breakout": "Constructive Breakout",
+    "Constructive Close": "Marginal Breakout",
 }
 QUALITY_ORDER.update({alias: QUALITY_ORDER[current] for alias, current in QUALITY_ALIASES.items()})
 
@@ -401,20 +405,15 @@ FIELD_CONFIG = OrderedDict(
         (
             "ibd_breakout_quality",
             _field(
-                "Breakout Quality",
+                "Breakout Price Quality",
                 "category",
                 "IBD Entry",
                 filterable=True,
                 default_table=True,
                 advanced_filter=True,
                 help_text=(
-                    "Breakout Quality Hierarchy (Strong → Weak)\n\n"
-                    "Defense: close_vs_trigger_pct > 0 when present; range_ratio > 0\n\n"
-                    "• Powerful Breakout                     : range_ratio > 1.0 (Gap-up over trigger)\n"
-                    "• Strong Close                          : pos >= 0.80 & range_ratio >= 0.50 (Top 20% & strong thrust)\n"
-                    "• Constructive Close (Tight)            : pos >= 0.80 & range_ratio < 0.50 (High close, tight thrust)\n"
-                    "• Constructive Close                    : 0.65 <= pos < 0.80 (Solid close)\n"
-                    "• Weak Close                            : pos < 0.65 (Upper shadow > 35%)"
+                    "Price-action quality based on Close Position and Trigger Clearance.\n"
+                    "Volume confirmation is evaluated separately."
                 ),
             ),
         ),

@@ -139,7 +139,7 @@ def _breakout_quality_header_jscode():
             this.eGui.style.cssText = 'display:flex; align-items:center; width:100%; height:100%; min-width:0; gap:6px; cursor:pointer;';
 
             this.label = document.createElement('span');
-            this.label.textContent = params.displayName || 'Breakout Quality';
+            this.label.textContent = params.displayName || 'Breakout Price Quality';
             this.label.style.cssText = 'min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
 
             this.sortIcon = document.createElement('span');
@@ -147,7 +147,7 @@ def _breakout_quality_header_jscode():
 
             this.menuButton = document.createElement('button');
             this.menuButton.type = 'button';
-            this.menuButton.setAttribute('aria-label', 'Filter Breakout Quality');
+            this.menuButton.setAttribute('aria-label', 'Filter Breakout Price Quality');
             this.menuButton.style.cssText = 'width:18px; height:18px; margin-left:auto; padding:0; border:0; background:transparent; color:#9ca3af; cursor:pointer; display:flex; align-items:center; justify-content:center;';
             this.menuButton.innerHTML = '<span style="width:12px; height:12px; display:block; background:currentColor; clip-path:polygon(0 0,100% 0,62% 45%,62% 100%,38% 100%,38% 45%); opacity:0.85;"></span>';
 
@@ -183,37 +183,41 @@ def _breakout_quality_header_jscode():
             this.hideTooltip();
             const tooltip = document.createElement('div');
             tooltip.className = 'breakout-tooltip';
-            tooltip.style.cssText = 'position:fixed; width:292px; padding:12px 14px; border-radius:6px; background:#0b1329; color:#e2e8f0; box-shadow:0 8px 24px rgba(0,0,0,0.45); font-size:11px; line-height:1.35; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none;';
+            tooltip.style.cssText = 'position:fixed; width:318px; padding:11px 13px; border-radius:6px; background:#0b1329; color:#e2e8f0; box-shadow:0 8px 24px rgba(0,0,0,0.45); font-size:11px; line-height:1.35; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none;';
             tooltip.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
-                    <div style="font-weight:700; color:#ffffff; font-size:12px; letter-spacing:0;">Breakout Quality</div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px;">
+                    <div style="font-weight:700; color:#ffffff; font-size:12px; letter-spacing:0;">Breakout Price Quality</div>
                     <div style="color:#94a3b8; font-size:10px;">strong to weak</div>
                 </div>
-                <div style="display:grid; grid-template-columns:56px 1fr; gap:14px; align-items:center;">
+                <div style="display:grid; grid-template-columns:44px minmax(0,1fr); gap:12px; align-items:center;">
                     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                        <div style="width:48px; height:7px; border-radius:2px; margin-bottom:3px; background:#2e7d32;"></div>
-                        <div style="width:38px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.78);"></div>
-                        <div style="width:28px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.56);"></div>
-                        <div style="width:18px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.38);"></div>
-                        <div style="width:8px; height:7px; border-radius:2px; background:rgba(46,125,50,0.22);"></div>
+                        <div style="width:38px; height:6px; border-radius:2px; margin-bottom:3px; background:#22c55e;"></div>
+                        <div style="width:31px; height:6px; border-radius:2px; margin-bottom:3px; background:rgba(34,197,94,0.78);"></div>
+                        <div style="width:24px; height:6px; border-radius:2px; margin-bottom:3px; background:rgba(74,222,128,0.58);"></div>
+                        <div style="width:17px; height:6px; border-radius:2px; margin-bottom:3px; background:rgba(134,239,172,0.38);"></div>
+                        <div style="width:10px; height:6px; border-radius:2px; background:rgba(187,247,208,0.22);"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr; gap:4px; font-size:11px; min-width:0;">
-                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
-                            <span style="color:#c8f7c5; font-weight:700;">Powerful</span><span style="color:#94a3b8;">Very wide breakout</span>
+                    <div style="display:grid; grid-template-columns:1fr; gap:3px; font-size:11px; min-width:0;">
+                        <div style="display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; white-space:nowrap;">
+                            <span style="color:#86efac; font-weight:700;">Powerful</span><span style="color:#94a3b8;">High close + full clearance</span>
                         </div>
-                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
-                            <span style="color:#b7efb1; font-weight:700;">Strong</span><span style="color:#94a3b8;">High close + solid range</span>
+                        <div style="display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; white-space:nowrap;">
+                            <span style="color:#4ade80; font-weight:600;">Strong</span><span style="color:#94a3b8;">One strong, one solid</span>
                         </div>
-                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
-                            <span style="color:#d4f1d1; font-weight:600;">Tight</span><span style="color:#94a3b8;">High close + tight range</span>
+                        <div style="display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; white-space:nowrap;">
+                            <span style="color:#22c55e; font-weight:500;">Constructive</span><span style="color:#94a3b8;">Mixed but valid</span>
                         </div>
-                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
-                            <span style="color:#e3f6e1; font-weight:500;">Constructive</span><span style="color:#94a3b8;">Decent close</span>
+                        <div style="display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; white-space:nowrap;">
+                            <span style="color:#86efac; font-weight:500;">Marginal</span><span style="color:#94a3b8;">Valid, little edge</span>
                         </div>
-                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                        <div style="display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; white-space:nowrap;">
                             <span style="color:#94a3b8; font-weight:400;">Weak</span><span style="color:#64748b;">Low close</span>
                         </div>
                     </div>
+                </div>
+                <div style="margin-top:9px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.16); color:#94a3b8;">
+                    <div>Price only: Close Position + Trigger Clearance.</div>
+                    <div>Volume is separate.</div>
                 </div>
             `;
             document.body.appendChild(tooltip);
@@ -287,16 +291,21 @@ def _breakout_quality_cell_renderer_jscode():
             const rr = Number(data.ibd_entry_breakout_range_ratio);
             const posStr = isNaN(pos) ? 'n/a' : pos.toFixed(2);
             const rrStr = isNaN(rr) ? 'n/a' : rr.toFixed(2);
-            const whyByGrade = {
-                'Powerful Breakout': 'Very wide breakout',
-                'Strong Close': 'High close + solid range',
-                'Constructive Close (Tight)': 'High close + tight range',
-                'Constructive Close': 'Decent close',
-                'Weak Close': 'Low close'
-            };
-            const why = whyByGrade[val] || 'Quality inputs are incomplete';
+            const triggerPos = pos - rr;
+            let closeLabel = 'Close input unavailable';
+            if (!isNaN(pos)) {
+                closeLabel = pos >= 0.80 ? 'High close' : pos >= 0.65 ? 'Constructive close' : 'Low close';
+            }
+            let clearanceLabel = 'clearance unavailable';
+            if (!isNaN(pos) && !isNaN(rr)) {
+                clearanceLabel = triggerPos <= 0 ? 'full trigger clearance' : rr >= 0.50 ? 'clear trigger clearance' : 'near trigger';
+            }
+            let why = closeLabel + ' + ' + clearanceLabel;
+            if (val === 'Weak Close') {
+                why = 'Low close pressure';
+            }
             this.tooltipLines = [
-                'Pos ' + posStr + ' · Range ' + rrStr,
+                'Close Position ' + posStr + ' · Range Ratio ' + rrStr,
                 why
             ];
             return true;
@@ -307,7 +316,7 @@ def _breakout_quality_cell_renderer_jscode():
             if (!this.tooltipLines || !this.tooltipLines.length) return;
             const tooltip = document.createElement('div');
             tooltip.className = 'breakout-cell-tooltip';
-            tooltip.style.cssText = 'position:fixed; width:190px; padding:8px 10px; border-radius:6px; background:#0b1329; color:#dbeafe; box-shadow:0 8px 22px rgba(0,0,0,0.42); font-size:11px; line-height:1.45; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none; white-space:pre-wrap;';
+            tooltip.style.cssText = 'position:fixed; width:250px; padding:8px 10px; border-radius:6px; background:#0b1329; color:#dbeafe; box-shadow:0 8px 22px rgba(0,0,0,0.42); font-size:11px; line-height:1.45; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none; white-space:pre-wrap;';
             tooltip.textContent = this.tooltipLines.join('\\n');
             document.body.appendChild(tooltip);
             const anchor = this.eGui.getBoundingClientRect();
@@ -490,8 +499,9 @@ def _column_def(column: str) -> dict:
         definition["minWidth"] = 180
         definition["flex"] = 1
     elif column == "ibd_breakout_quality":
-        definition["minWidth"] = 210
-        definition["flex"] = 1
+        definition["width"] = 260
+        definition["minWidth"] = 220
+        definition["maxWidth"] = 300
         if HAS_JS_CODE:
             definition["headerComponent"] = "breakoutQualityHeader"
             definition["cellRenderer"] = "breakoutQualityCellRenderer"
@@ -543,7 +553,6 @@ def _column_def(column: str) -> dict:
             if (meta[val] && meta[val].color) {{
                 return {{
                     'color': meta[val].color,
-                    'backgroundColor': meta[val].backgroundColor || 'transparent',
                     'backgroundImage': meta[val].backgroundImage || 'none',
                     'fontWeight': meta[val].fontWeight || '600',
                     'borderLeft': (meta[val].borderWidth || '3px') + ' solid ' + (meta[val].borderColor || meta[val].color)

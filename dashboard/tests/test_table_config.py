@@ -118,48 +118,34 @@ def test_breakout_quality_derivation_logic():
     from dashboard.data_utils import _compute_breakout_quality
     import pandas as pd
 
-    assert (
-        _compute_breakout_quality(
-            pd.Series(
-                {
-                    "ibd_entry_close_vs_trigger_pct": 0.04,
-                    "ibd_entry_close_position": 0.95,
-                    "ibd_entry_breakout_range_ratio": 1.2,
-                }
+    cases = [
+        (0.80, 0.81, "Powerful Breakout"),
+        (0.80, 0.80, "Powerful Breakout"),
+        (0.80, 0.7999, "Strong Breakout"),
+        (0.7999, 0.80, "Strong Breakout"),
+        (0.30, 1.20, "Weak Close"),
+        (0.80, 0.50, "Strong Breakout"),
+        (0.80, 0.4999, "Constructive Breakout"),
+        (0.65, 0.66, "Strong Breakout"),
+        (0.65, 0.65, "Strong Breakout"),
+        (0.65, 0.6499, "Constructive Breakout"),
+        (0.65, 0.50, "Constructive Breakout"),
+        (0.65, 0.20, "Marginal Breakout"),
+        (0.6499, 1.20, "Weak Close"),
+    ]
+    for pos, range_ratio, expected in cases:
+        assert (
+            _compute_breakout_quality(
+                pd.Series(
+                    {
+                        "ibd_entry_close_position": pos,
+                        "ibd_entry_breakout_range_ratio": range_ratio,
+                    }
+                )
             )
+            == expected
         )
-        == "Powerful Breakout"
-    )
-    assert (
-        _compute_breakout_quality(
-            pd.Series(
-                {
-                    "ibd_entry_close_vs_trigger_pct": 0.04,
-                    "ibd_entry_close_position": 0.85,
-                    "ibd_entry_breakout_range_ratio": 0.60,
-                }
-            )
-        )
-        == "Strong Close"
-    )
-    assert (
-        _compute_breakout_quality(
-            pd.Series({"ibd_entry_close_position": 0.91, "ibd_entry_breakout_range_ratio": 0.33})
-        )
-        == "Constructive Close (Tight)"
-    )
-    assert (
-        _compute_breakout_quality(
-            pd.Series({"ibd_entry_close_position": 0.70, "ibd_entry_breakout_range_ratio": 0.40})
-        )
-        == "Constructive Close"
-    )
-    assert (
-        _compute_breakout_quality(
-            pd.Series({"ibd_entry_close_position": 0.55, "ibd_entry_breakout_range_ratio": 0.40})
-        )
-        == "Weak Close"
-    )
+
     assert pd.isna(
         _compute_breakout_quality(
             pd.Series({"ibd_entry_close_position": None, "ibd_entry_breakout_range_ratio": 0.40})
@@ -169,30 +155,8 @@ def test_breakout_quality_derivation_logic():
         _compute_breakout_quality(
             pd.Series(
                 {
-                    "ibd_entry_close_vs_trigger_pct": 0.0,
                     "ibd_entry_close_position": 0.92,
-                    "ibd_entry_breakout_range_ratio": 0.65,
-                }
-            )
-        )
-    )
-    assert pd.isna(
-        _compute_breakout_quality(
-            pd.Series(
-                {
-                    "ibd_entry_close_vs_trigger_pct": -0.01,
-                    "ibd_entry_close_position": 0.92,
-                    "ibd_entry_breakout_range_ratio": 0.65,
-                }
-            )
-        )
-    )
-    assert pd.isna(
-        _compute_breakout_quality(
-            pd.Series(
-                {
-                    "ibd_entry_close_position": 0.92,
-                    "ibd_entry_breakout_range_ratio": 0.0,
+                    "ibd_entry_breakout_range_ratio": -0.01,
                 }
             )
         )
@@ -206,9 +170,9 @@ def test_breakout_quality_sorting_order():
     df = pd.DataFrame([
         {"code": "A", "ibd_breakout_quality": "Weak Close"},
         {"code": "B", "ibd_breakout_quality": "Powerful Breakout"},
-        {"code": "C", "ibd_breakout_quality": "Constructive Close"},
-        {"code": "D", "ibd_breakout_quality": "Strong Close"},
-        {"code": "E", "ibd_breakout_quality": "Constructive Close (Tight)"},
+        {"code": "C", "ibd_breakout_quality": "Marginal Breakout"},
+        {"code": "D", "ibd_breakout_quality": "Strong Breakout"},
+        {"code": "E", "ibd_breakout_quality": "Constructive Breakout"},
     ])
 
     sorted_asc = apply_sort(df, [SortSpec("ibd_breakout_quality", "asc")])
@@ -232,6 +196,24 @@ def test_breakout_quality_sorting_keeps_alias_labels_compatible():
     sorted_df = apply_sort(df, [SortSpec("ibd_breakout_quality", "asc")])
 
     assert sorted_df["code"].tolist() == ["C", "B", "D", "A"]
+
+
+def test_breakout_quality_recomputes_existing_legacy_labels_when_inputs_exist():
+    from dashboard.data_utils import normalize_pool_df
+    import pandas as pd
+
+    df = pd.DataFrame(
+        {
+            "code": ["AAA", "BBB"],
+            "ibd_breakout_quality": ["Strong Close", "Constructive Close"],
+            "ibd_entry_close_position": [0.30, 0.65],
+            "ibd_entry_breakout_range_ratio": [1.20, 0.20],
+        }
+    )
+
+    normalized = normalize_pool_df(df)
+
+    assert normalized["ibd_breakout_quality"].tolist() == ["Weak Close", "Marginal Breakout"]
 
 
 def test_breakout_quality_sorting_keeps_unknown_values_last():
@@ -301,6 +283,10 @@ def test_breakout_quality_column_uses_custom_dom_components_when_js_is_available
 
     options = build_grid_options(["ibd_breakout_quality"])
     quality_col = options["columnDefs"][0]
+    assert quality_col["headerName"] == "Breakout Price Quality"
+    assert quality_col["width"] == 260
+    assert quality_col["minWidth"] == 220
+    assert quality_col["maxWidth"] == 300
 
     if not HAS_JS_CODE:
         assert "components" not in options
@@ -312,17 +298,21 @@ def test_breakout_quality_column_uses_custom_dom_components_when_js_is_available
     assert "breakoutQualityHeader" in options["components"]
     assert "breakoutQualityCellRenderer" in options["components"]
     header_source = options["components"]["breakoutQualityHeader"].js_code
-    assert "Tight" in header_source
-    assert "High close + solid range" in header_source
-    assert "High close + tight range" in header_source
+    assert "Breakout Price Quality" in header_source
+    assert "Price only" in header_source
+    assert "Volume is separate" in header_source
+    assert "Constructive" in header_source
+    assert "Marginal" in header_source
+    assert "Tight" not in header_source
     assert "Defense" not in header_source
     assert "Entry Context" not in header_source
     cell_source = options["components"]["breakoutQualityCellRenderer"].js_code
     assert "breakout-cell-tooltip" in cell_source
-    assert "'Pos ' + posStr + ' · Range ' + rrStr" in cell_source
+    assert "'Close Position ' + posStr + ' · Range Ratio ' + rrStr" in cell_source
     assert "Why:" not in cell_source
     assert "Rule:" not in cell_source
-    assert "High close + solid range" in cell_source
+    assert "High close" in cell_source
+    assert "clear trigger clearance" in cell_source
     assert "Defense Standard" not in cell_source
     assert "Trigger Position" not in cell_source
     assert "backgroundImage" in quality_col["cellStyle"].js_code
@@ -336,7 +326,7 @@ def test_breakout_quality_row_data_keeps_tooltip_support_fields_hidden():
     df = pd.DataFrame(
         {
             "code": ["AAA"],
-            "ibd_breakout_quality": ["Strong Close"],
+            "ibd_breakout_quality": ["Strong Breakout"],
             "ibd_entry_close_vs_trigger_pct": [0.04],
             "ibd_entry_close_position": [0.82],
             "ibd_entry_breakout_range_ratio": [0.75],
@@ -388,7 +378,7 @@ def test_render_table_preserves_hidden_breakout_quality_precision(monkeypatch):
     df = pd.DataFrame(
         {
             "code": ["AAA"],
-            "ibd_breakout_quality": ["Strong Close"],
+            "ibd_breakout_quality": ["Strong Breakout"],
             "ibd_entry_close_vs_trigger_pct": [0.00523],
             "ibd_entry_close_position": [0.869565],
             "ibd_entry_breakout_range_ratio": [0.652174],
@@ -425,4 +415,4 @@ def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeyp
 
     render_table(df, ["code", "ibd_breakout_quality"])
 
-    assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Close (Tight)"
+    assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Breakout"

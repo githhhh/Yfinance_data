@@ -72,9 +72,9 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 * **上影线占比**：$UpperShadowRatio = 1 - pos = \frac{High - Close}{High - Low}$
 
 ### 核心分类与防御规则
-* **跳空缺口突破 (Gap Breakout)**：`range_ratio > 1.0`（$trigger\_pos < 0$）
-* **光头强突破 (Strong Finish)**：`pos >= 0.80` 且 `range_ratio >= 0.50`
-* **冲高回落/上影线抛压 (Squat / Upper Shadow)**：`pos < 0.65`（上影线 $> 35\%$）
+* **Full-range 突破 (Gap / Full-range Breakout)**：`trigger_pos <= 0`（即 `range_ratio >= pos`），且 `pos >= 0.80`
+* **光头强突破 (Strong Finish)**：`pos >= 0.80` 且 `range_ratio >= 0.50`，但 `trigger_pos > 0`
+* **冲高回落/上影线抛压 (Squat / Upper Shadow)**：`pos < 0.65`（上影线 $> 35\%$）。此项为一票否决：无论 `range_ratio` 多大，均不得升级为 Gap / Full-range Breakout。
 * **防御规则 (Defensive Rule)**：若 $range\_ratio \le 0$ ($Close \le Trigger$)，触发防守断路器，直接判定破位失败。
 
 ---
@@ -127,7 +127,7 @@ graph TD
 
 ### 1. [TICKER]
 - **Status**: ACTIONABLE | **Sector**: [Sector Name]
-- **Geometry**: [Strong Finish / Gap Breakout / Upper Shadow] (pos: X, range_ratio: Y, UpperShadow: Z%)
+- **Geometry**: [Strong Finish / Full-range Breakout / Upper Shadow] (pos: X, range_ratio: Y, UpperShadow: Z%)
 - **Checklist**: 10/10 PASS (或 PASS: #1, #2... | FAIL: #6)
 - **Risk**: [仅允许引用数据源已有客观事实，严禁脑补宏观/情绪，如: Upper Shadow 41.8% / Market Uptrend Under Pressure]
 - **Risk Reference**: Pivot: $X | Reference Stop (-3%): Pivot ×0.97
