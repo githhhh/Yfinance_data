@@ -1,5 +1,8 @@
 from dashboard.field_config import (
     EXCLUDED_CUSTOM_FIELDS,
+    FIELD_CONFIG,
+    NUMBER_FIELDS,
+    QUALITY_META,
     get_all_table_columns,
     get_column_view_fields,
     get_custom_mode_fields,
@@ -83,6 +86,7 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "volume_ratio",
         "is_bullish",
         "pullback_count",
+        "pullback_duration",
         "pullback_pct",
         "pullback_pct_off_peak",
         "pullback_v_is_dry",
@@ -96,6 +100,23 @@ def test_all_fields_table_columns_follow_logical_business_groups():
     ]
     assert get_all_table_columns() == expected
     assert get_column_view_fields("All Fields") == expected
+
+
+def test_pullback_duration_is_registered_as_upstream_structure_field():
+    assert "pullback_duration" in NUMBER_FIELDS
+    assert FIELD_CONFIG["pullback_duration"] == {
+        "label": "Pullback Duration",
+        "type": "number",
+        "group": "Risk / Structure",
+        "filterable": True,
+        "sortable": True,
+        "default_table": True,
+        "custom_mode": True,
+        "c_rank_mode": False,
+        "advanced_filter": True,
+        "format": None,
+        "help": "上游正式产出的回撤/巩固持续时间，用于 Continuation 信号的时长检查。",
+    }
 
 
 def test_ibd_decision_view_columns():
@@ -232,6 +253,38 @@ def test_breakout_quality_sorting_keeps_unknown_values_last():
 
     sorted_desc = apply_sort(df, [SortSpec("ibd_breakout_quality", "desc")])
     assert sorted_desc["code"].tolist() == ["A", "C", "B", "D"]
+
+
+def test_breakout_quality_visual_meta_separates_constructive_marginal_and_weak():
+    assert QUALITY_META["Powerful Breakout"]["borderWidth"] == "5px"
+    assert QUALITY_META["Strong Breakout"]["borderWidth"] == "4px"
+    assert QUALITY_META["Constructive Breakout"] == {
+        "label": "Constructive Breakout",
+        "color": "#4ade80",
+        "borderColor": "rgba(34, 197, 94, 0.85)",
+        "borderWidth": "3px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.10), rgba(34, 197, 94, 0.03))",
+        "fontWeight": "600",
+        "rule": "Mixed but valid price action",
+    }
+    assert QUALITY_META["Marginal Breakout"] == {
+        "label": "Marginal Breakout",
+        "color": "#86c99d",
+        "borderColor": "rgba(134, 239, 172, 0.42)",
+        "borderWidth": "2px",
+        "backgroundImage": "linear-gradient(90deg, rgba(34, 197, 94, 0.025), rgba(34, 197, 94, 0.005))",
+        "fontWeight": "500",
+        "rule": "Valid, but close and clearance are both thin",
+    }
+    assert QUALITY_META["Weak Close"] == {
+        "label": "Weak Close",
+        "color": "#9eaaa2",
+        "borderColor": "rgba(134, 239, 172, 0.20)",
+        "borderWidth": "1px",
+        "backgroundImage": "none",
+        "fontWeight": "400",
+        "rule": "Low close",
+    }
 
 
 def test_c_rank_reference_view_columns():

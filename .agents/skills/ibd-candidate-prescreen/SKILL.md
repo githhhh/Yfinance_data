@@ -44,7 +44,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 ## Market Context
 
-* **前置只读更新**：在预筛前，优先运行 `git submodule update --remote market_analysis` 自动更新并获取最新大盘研报。
+* **前置子仓库更新**：在预筛前，必须优先运行 `git submodule update --remote market_analysis` 自动更新并获取最新大盘研报；该步骤会刷新 `market_analysis` 子仓库 checkout，若父仓库因此出现 submodule 指针变更，须在报告或交付中显式说明。
 * **唯一权威大盘信源**：大盘环境与市场状态统一来源于只读文件 `market_analysis/output/market_report.json`（直接继承状态、派发日及板块拥挤度，作为背景参考，严禁 AI 重新判断大盘趋势或单纯因 Correction 淘汰合格候选）。
 
 ---
@@ -67,7 +67,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 ## Breakout Geometry (突破日线图几何结构)
 
-结合 Dashboard 3 大原始字段（`ibd_entry_close_position`, `ibd_entry_close_vs_trigger_pct`, `ibd_entry_breakout_range_ratio`），导出核心几何参数：
+结合 Dashboard 中由上游正式产出的价格行为字段（`ibd_entry_close_position`, `ibd_entry_breakout_range_ratio`），导出核心几何参数；`ibd_entry_close_vs_trigger_pct` 只作为上游突破有效性上下文，不参与本 Geometry 分类：
 * **买点位置分位**：$trigger\_pos = pos - range\_ratio = \frac{Trigger - Low}{High - Low}$
 * **上影线区间占比**：$CloseToHighGapRatio = 1 - pos = \frac{High - Close}{High - Low}$
 
@@ -87,8 +87,8 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 | **Critical** | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | **IBD Heavy Volume**：机构建仓放量确认（IBD 官方标准为至少高于均量 40%~50%，即 1.40x~1.50x）。 |
 | **Critical** | 3 | 突破日质量 | Close Position ≥ 0.65 | **Project Strict Rule**：O'Neil 底线为 Upper Half (≥0.50)；Ryan / IBD 建议 Top Third (≥0.65)；光头强需 pos ≥ 0.80。 |
 | **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | **IBD Base Geometry**：对 Base 信号（`ceiling` 等）强制使用 `base_depth_pct`（Cup 常见 15%–33%、Flat Base ≤15%、Double Bottom 等），对 Continuation 信号使用 `pullback_pct`。严禁混用！ |
-| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用 `pullback_duration`。严禁混用！ |
-| **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` 或 `vol_dry_ratio` ≤ 0.80x | **Project Rule**：经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up)。 |
+| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用上游正式产出的 `pullback_duration`。严禁混用！ |
+| **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` | **Project Rule**：经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up)。若上游未来正式产出缩量比例字段，可作为补充说明，不得自行推导。 |
 | **Minor** | 7 | 价格紧贴 52 周高点 | 距 52 周高点 > -5.0% | **Project Rule**：对应 `dist_to_52w_high_pct`，测量价格距高点距离（注意：非 RS Rating / RS Line 独立指标）。 |
 | **Major** | 8 | 基本面支撑 | EPS YoY 增长 ≥ 25% | **CANSLIM (C Rule)**：O'Neil 经典 C 规则要求最近季度 EPS YoY 增长至少 25%（注：年度 EPS 增长需独立字段）。 |
 | **Minor** | 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | **Project Rule**：机构资金持续积累代理指标 (Accumulation Proxy)。 |
