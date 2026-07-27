@@ -312,11 +312,19 @@ def test_breakout_quality_column_uses_custom_dom_components_when_js_is_available
     assert "breakoutQualityHeader" in options["components"]
     assert "breakoutQualityCellRenderer" in options["components"]
     header_source = options["components"]["breakoutQualityHeader"].js_code
-    assert "Constructive Close (Tight)" in header_source
-    assert "Constructive</div><div>0.65 &lt;= Close Position &lt; 0.80" in header_source
+    assert "Tight" in header_source
+    assert "High close + solid range" in header_source
+    assert "High close + tight range" in header_source
+    assert "Defense" not in header_source
+    assert "Entry Context" not in header_source
     cell_source = options["components"]["breakoutQualityCellRenderer"].js_code
     assert "breakout-cell-tooltip" in cell_source
-    assert "Matched Standard" in cell_source
+    assert "'Pos ' + posStr + ' · Range ' + rrStr" in cell_source
+    assert "Why:" not in cell_source
+    assert "Rule:" not in cell_source
+    assert "High close + solid range" in cell_source
+    assert "Defense Standard" not in cell_source
+    assert "Trigger Position" not in cell_source
     assert "backgroundImage" in quality_col["cellStyle"].js_code
     assert "borderLeft" in quality_col["cellStyle"].js_code
 

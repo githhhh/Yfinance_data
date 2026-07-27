@@ -189,7 +189,7 @@ def _breakout_quality_header_jscode():
                     <div style="font-weight:700; color:#ffffff; font-size:12px; letter-spacing:0;">Breakout Quality</div>
                     <div style="color:#94a3b8; font-size:10px;">strong to weak</div>
                 </div>
-                <div style="display:grid; grid-template-columns:56px 1fr; gap:14px; align-items:center; margin-bottom:10px;">
+                <div style="display:grid; grid-template-columns:56px 1fr; gap:14px; align-items:center;">
                     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
                         <div style="width:48px; height:7px; border-radius:2px; margin-bottom:3px; background:#2e7d32;"></div>
                         <div style="width:38px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.78);"></div>
@@ -197,22 +197,23 @@ def _breakout_quality_header_jscode():
                         <div style="width:18px; height:7px; border-radius:2px; margin-bottom:3px; background:rgba(46,125,50,0.38);"></div>
                         <div style="width:8px; height:7px; border-radius:2px; background:rgba(46,125,50,0.22);"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr; gap:3px; font-size:11px; min-width:0;">
-                        <div style="color:#c8f7c5; font-weight:700; white-space:nowrap;">Powerful Breakout</div>
-                        <div style="color:#b7efb1; font-weight:700; white-space:nowrap;">Strong Close</div>
-                        <div style="color:#d4f1d1; font-weight:600; white-space:nowrap;">Constructive Close (Tight)</div>
-                        <div style="color:#e3f6e1; font-weight:500; white-space:nowrap;">Constructive Close</div>
-                        <div style="color:#e3f6e1; font-weight:400; white-space:nowrap;">Weak Close</div>
+                    <div style="display:grid; grid-template-columns:1fr; gap:4px; font-size:11px; min-width:0;">
+                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                            <span style="color:#c8f7c5; font-weight:700;">Powerful</span><span style="color:#94a3b8;">Very wide breakout</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                            <span style="color:#b7efb1; font-weight:700;">Strong</span><span style="color:#94a3b8;">High close + solid range</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                            <span style="color:#d4f1d1; font-weight:600;">Tight</span><span style="color:#94a3b8;">High close + tight range</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                            <span style="color:#e3f6e1; font-weight:500;">Constructive</span><span style="color:#94a3b8;">Decent close</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:112px 1fr; gap:8px; white-space:nowrap;">
+                            <span style="color:#94a3b8; font-weight:400;">Weak</span><span style="color:#64748b;">Low close</span>
+                        </div>
                     </div>
-                </div>
-                <div style="display:grid; grid-template-columns:84px 1fr; gap:4px 8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); color:#94a3b8; font-size:10px;">
-                    <div style="color:#cbd5e1;">Entry Context</div><div>Valid entry rows already close above trigger</div>
-                    <div style="color:#cbd5e1;">Defense</div><div>Close vs Trigger &gt; 0 when present; Range Ratio &gt; 0</div>
-                    <div style="color:#cbd5e1;">Powerful</div><div>Range Ratio &gt; 1.00</div>
-                    <div style="color:#cbd5e1;">Strong</div><div>Close Position >= 0.80 and Range Ratio >= 0.50</div>
-                    <div style="color:#cbd5e1;">Tight</div><div>Close Position >= 0.80 and Range Ratio &lt; 0.50</div>
-                    <div style="color:#cbd5e1;">Constructive</div><div>0.65 &lt;= Close Position &lt; 0.80</div>
-                    <div style="color:#cbd5e1;">Weak</div><div>Close Position &lt; 0.65</div>
                 </div>
             `;
             document.body.appendChild(tooltip);
@@ -282,27 +283,21 @@ def _breakout_quality_cell_renderer_jscode():
                 return true;
             }
 
-            const closeVsTrigger = Number(data.ibd_entry_close_vs_trigger_pct);
             const pos = Number(data.ibd_entry_close_position);
             const rr = Number(data.ibd_entry_breakout_range_ratio);
-            const closeVsTriggerStr = isNaN(closeVsTrigger) ? 'n/a' : (closeVsTrigger * 100).toFixed(2) + '%';
             const posStr = isNaN(pos) ? 'n/a' : pos.toFixed(2);
             const rrStr = isNaN(rr) ? 'n/a' : rr.toFixed(2);
-            const triggerPos = isNaN(pos) || isNaN(rr) ? NaN : pos - rr;
-            const triggerPosStr = isNaN(triggerPos) ? 'n/a' : triggerPos.toFixed(2);
-            const upperShadow = isNaN(pos) ? NaN : 1 - pos;
-            const upperShadowStr = isNaN(upperShadow) ? 'n/a' : (upperShadow * 100).toFixed(1) + '%';
-            const rule = meta[val] && meta[val].rule ? meta[val].rule : '';
+            const whyByGrade = {
+                'Powerful Breakout': 'Very wide breakout',
+                'Strong Close': 'High close + solid range',
+                'Constructive Close (Tight)': 'High close + tight range',
+                'Constructive Close': 'Decent close',
+                'Weak Close': 'Low close'
+            };
+            const why = whyByGrade[val] || 'Quality inputs are incomplete';
             this.tooltipLines = [
-                'Grade: ' + val,
-                'Close vs Trigger : ' + closeVsTriggerStr,
-                'Close Position   : ' + posStr,
-                'Range Ratio      : ' + rrStr,
-                'Trigger Position : ' + triggerPosStr,
-                'Upper Shadow     : ' + upperShadowStr,
-                'Matched Standard : ' + rule,
-                'Entry Context    : Valid entry rows already close above trigger',
-                'Defense Standard : Close vs Trigger > 0 when present; Range Ratio > 0'
+                'Pos ' + posStr + ' · Range ' + rrStr,
+                why
             ];
             return true;
         }
@@ -312,7 +307,7 @@ def _breakout_quality_cell_renderer_jscode():
             if (!this.tooltipLines || !this.tooltipLines.length) return;
             const tooltip = document.createElement('div');
             tooltip.className = 'breakout-cell-tooltip';
-            tooltip.style.cssText = 'position:fixed; width:286px; padding:10px 12px; border-radius:6px; background:#0b1329; color:#dbeafe; box-shadow:0 8px 22px rgba(0,0,0,0.42); font-size:11px; line-height:1.45; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; pointer-events:none; white-space:pre;';
+            tooltip.style.cssText = 'position:fixed; width:190px; padding:8px 10px; border-radius:6px; background:#0b1329; color:#dbeafe; box-shadow:0 8px 22px rgba(0,0,0,0.42); font-size:11px; line-height:1.45; border:1px solid rgba(148,163,184,0.22); z-index:999999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; pointer-events:none; white-space:pre-wrap;';
             tooltip.textContent = this.tooltipLines.join('\\n');
             document.body.appendChild(tooltip);
             const anchor = this.eGui.getBoundingClientRect();
