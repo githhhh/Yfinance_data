@@ -38,7 +38,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 ## Knowledge Context
 
-* **原著知识上下文**：优先建立/复用 William O'Neil 《How to Make Money in Stocks》原著知识上下文；若未建立或加载失败，须在报告开头显式说明并降低经验解释置信度。
+* **原著知识上下文**：优先建立/复用 William O'Neil 《How to Make Money in Stocks》原著知识上下文；若未建立或加载失败，降低经验解释置信度，并将“原著上下文未加载”合并到可选背景句，不单独增加说明段落。
 
 ---
 
@@ -61,7 +61,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 1. **精选上限与宁缺毋滥**：最终推荐最多 3 只（0~3 只）。
 2. **心流状态优先**：优先遴选 Dashboard 中 `ibd_entry_status == 'ACTIONABLE'` 的标的；若非 ACTIONABLE，须显式说明瓶颈。
 3. **行业分散与拥挤风控**：单一板块不超过 2 只；某板块占比 > 50% 时触发拥挤风控，该板块推荐**最多 1 只**并发出风险预警。
-4. **分层卡尺制 (Tiered Checklist)**：按照 Critical (淘汰门槛)、Major (质量权衡)、Minor (排序提示) 关卡执行结构化判定。
+4. **分层卡尺制 (Tiered Checklist)**：按照 Critical (淘汰门槛)、Major (质量权衡)、Minor (辅助提示) 关卡执行结构化判定；Minor 中 #10 仅执行下述正向加分语义。
 
 ---
 
@@ -95,10 +95,13 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 | **Minor** | 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | **Project Rule**：周线级别的放量跟进确认 (对应 `volume_ratio`)。 |
 
 > **执行语义 & 字段路由 (Signal-aware Evaluation)**：
-> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor 用于排序与风险提示。若所需字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
+> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor #7 / #9 用于内部排序与风险提示，#10 仅作正向加分。若所需字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
 > 2. **阶段路由**：Checklist #4 (Depth) 与 #5 (Duration) 必须根据 `signal` 类型自动路由对应字段：
 >    - Base 信号 (`ceiling`, `ceiling_breakout`, `ceiling_pullback`) → 强制使用 `base_depth_pct` / `base_duration_weeks`；
 >    - Continuation 信号 (其它所有信号) → 强制使用 `pullback_pct` / `pullback_duration`。严禁跨阶段混用！
+> 3. **日线优先**：先判断突破质量、买点距离与突破日量能，再评估 Base / Pullback、缩量和 EPS；周线量能不参与硬性淘汰。
+> 4. **周线量能仅加分**：周线量能达到 `1.3x` 时，作为“优势”中的加分项展示；低于 `1.3x` 或缺失时直接省略，不得作为拒绝、降级或风险理由。
+> 5. **内部状态不外显**：Critical / Major / Minor 与 PASS / FAIL / UNKNOWN 仅供内部判定；最终报告须翻译为带数字的中文理由。缺失字段仅在确实影响结论时写作“数据缺失”。
 
 ---
 
@@ -109,42 +112,51 @@ graph TD
     Phase0[Phase 0: Knowledge Context<br/>加载/复用原著与图表知识上下文] --> Phase1[Phase 1: Market Context<br/>更新并继承 market_report.json 状态]
     Phase1 --> Phase2[Phase 2: Candidate Pool<br/>加载 breakout_follow_pool.csv 面板数据]
     Phase2 --> Phase3[Phase 3: Hard Checklist<br/>按 Critical/Major/Minor 关卡过筛与 Geometry 还原]
-    Phase3 --> Phase4[Phase 4: Final Selection<br/>输出最多 3 只极简 Review 卡片]
+    Phase3 --> Phase4[Phase 4: Final Selection<br/>输出极简中文决策卡片]
 ```
 
 ---
 
 ## 输出格式 (Output Format)
 
+按以下顺序输出，先给决定，再给依据：
+
+- **长度**：正文最多 20 行；省略空区块及没有影响结论的数据。
+- **结论**：一句话说明优先复核谁、谁值得留意；不凑数。
+- **背景**：仅当大盘状态或板块拥挤实际影响结论时补充一句；原著上下文未加载时也必须输出，并合并在同一句。
+- **优先复核**：0~3 只。每只固定 3 行，依次为“突破日 / 优势 / 判断”。
+- **值得留意**：0~2 只。仅收录日线突破突出但结构、基本面或关键数据证据不完整的标的；不等同于推荐。每只固定 3 行，依次为“突破日 / 顾虑 / 判断”。
+- **暂不优先**：最多列 3 只代表性标的，每只只写一个真正影响优先级的主要原因；若仍有明显亮点，先写亮点再写原因。
+- **名称**：Breakout Quality 使用 Dashboard 原始名称，不自行翻译或创造同义等级。
+- **语言**：判断只写自然语言结论，不复述内部层级、计数或检查过程。
+- **数字**：只保留原始业务数据，不输出检查项数量或通过/失败统计。
+
 ```markdown
-# IBD Candidate Pre-screen Review
+# IBD 候选预筛
 
-## Market Context
-- **Market Status**: [Confirmed Uptrend / Uptrend Under Pressure / Correction] (Distribution Days: N)
-- **Sector Risk**: [Normal / Crowded in Sector X (N%)]
+## 结论
 
-## Top Picks (Max 3)
+[一句话说明最优先标的、值得留意标的及是否宁缺毋滥。]
 
-### 1. [TICKER]
-- **Status**: ACTIONABLE | **Sector**: [Sector Name]
-- **Geometry**: [Strong Finish / Full-range Breakout / Upper Shadow] (pos: X, range_ratio: Y, UpperShadow: Z%)
-- **Checklist**: Critical 3/3 PASS | Major: X PASS / Y FAIL | Minor: Z PASS
-- **Risk**: [仅允许引用数据源已有客观事实，严禁脑补宏观/情绪，如: Upper Shadow 41.8% / Market Uptrend Under Pressure]
-- **Risk Reference**: Pivot: $X | Reference Stop (-3%): Pivot × 0.97
+[背景：大盘或板块影响结论时补充；原著上下文未加载时必须说明；其余情况省略。]
 
-[Repeat for Pick 2 and Pick 3 if qualified]
+## 优先复核
 
-## Rejected Candidates
-- **Failure Summary**: Critical: Volume ×A, Fresh Zone ×B | Major: Fundamental ×C | Sector Risk: ×D
-- **[TICKER 1]**: Rejected by Checklist #3 (Close Position 0.42 < 0.50, Heavy Upper Shadow).
-- **[TICKER 2]**: Rejected by Checklist #2 (Volume Ratio 1.2x < 1.5x, Low Volume Breakout).
-- **[TICKER 3]**: Rejected by Sector Crowding Risk (Tech sector exceeded 50% quota).
+### [TICKER]
+- **突破日：** [Breakout Quality]｜收盘位置 [pos]｜突破幅度 [range_ratio]｜量能 [entry volume]x
+- **优势：** [最多两个带数字的主要理由；周线量能仅在 ≥1.3x 时作为加分]
+- **判断：** [一句话说明为什么值得先做人工 Review]
 
-## Manual Review Queue
-- **Today's Character**: [一句话总结今日候选池整体特征，如：候选池以 UNCONFIRMED 为主(38/47)，显示机构追高买盘跟进偏弱]
-- **Review Queue**:
-  - [TICKER 1]
-  - [TICKER 2]
+## 值得留意
+
+### [TICKER]
+- **突破日：** [Breakout Quality]｜收盘位置 [pos]｜突破幅度 [range_ratio]｜量能 [entry volume]x
+- **顾虑：** [最多两个真正影响判断的结构、基本面或数据缺口]
+- **判断：** [一句话说明为何观察但不列第一优先]
+
+## 暂不优先
+
+- **[TICKER]：** [可选亮点]，但 [一个决定性原因 + 数字]
 ```
 
 ---
