@@ -101,8 +101,22 @@ def test_internal_screening_rules_remain_unchanged():
         "`pos >= 0.80` 且 `range_ratio >= 0.50`，但 `trigger_pos > 0`",
         "`pos < 0.65`（上影线 $> 35\\%$）",
         "若 $range\\_ratio \\le 0$ ($Close \\le Trigger$)",
-        "Base 信号 (`ceiling`, `ceiling_breakout`, `ceiling_pullback`) → 强制使用 `base_depth_pct` / `base_duration_weeks`",
-        "Continuation 信号 (其它所有信号) → 强制使用 `pullback_pct` / `pullback_duration`",
+        "初始 Base 突破 (`ibd_candidate_rule == 'ceiling'`) → 强制使用 `base_depth_pct` / `base_duration_weeks`",
+        "回踩确认 (`ceiling_pullback`, `ma10_touch_confirm`) → 强制使用 `pullback_pct` / `pullback_duration_weeks`",
+        "Pivot / Three-Weeks-Tight → 仅当 `pullback_count > 0` 时评估 `pullback_pct` / `pullback_duration_weeks`",
     )
     for rule in unchanged_rules:
         assert rule in skill
+
+
+def test_signal_field_applicability_prevents_false_missing_data_risks():
+    skill = _skill_text()
+
+    expected_guidance = (
+        "`ceiling` 首次突破只评估 `base_depth_pct` / `base_duration_weeks`",
+        "不得读取或报告 `pullback_v_is_dry`、`pullback_pct`、`pullback_duration_weeks` 缺失",
+        "仅当信号存在实际回撤阶段时才评估",
+        "`pullback_duration_weeks` 必须来自上游正式导出",
+    )
+    for guidance in expected_guidance:
+        assert guidance in skill

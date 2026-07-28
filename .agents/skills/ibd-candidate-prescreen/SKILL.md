@@ -90,7 +90,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 | **Critical** | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | **IBD Heavy Volume**：机构建仓放量确认（IBD 官方标准为至少高于均量 40%~50%，即 1.40x~1.50x）。 |
 | **Critical** | 3 | 突破日质量 | Close Position ≥ 0.65 | **Project Strict Rule**：O'Neil 底线为 Upper Half (≥0.50)（原著 Chapter 2）；Top Third (≥0.67) 为 IBD 教学实战经验；本项目取 ≥0.65 作为折中阈值；光头强需 pos ≥ 0.80。 |
 | **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | 对 `ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_depth_pct`，结合具体 Base 类型（Cup 12%–33%（原著 Chapter 2）/ Flat Base ≤15% / Double Bottom 等）原著区间判定；其他 Continuation 信号使用 `pullback_pct` 评估近期巩固 (Pullback) 深度。严禁混用！ |
-| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用上游正式产出的 `pullback_duration`。严禁混用！ |
+| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用上游正式产出的 `pullback_duration_weeks`。严禁混用！ |
 | **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` | **Project Rule**：经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up)。若上游未来正式产出缩量比例字段，可作为补充说明，不得自行推导。 |
 | **Minor** | 7 | 价格紧贴 52 周高点 | 距 52 周高点 > -5.0% | **Project Rule**：对应 `dist_to_52w_high_pct`，测量价格距高点距离（注意：非 RS Rating / RS Line 独立指标）。 |
 | **Major** | 8 | 基本面支撑 | EPS YoY 增长 ≥ 25% | **CANSLIM (C Rule)**：O'Neil 经典 C 规则要求最近季度 EPS YoY 增长至少 25%（注：年度 EPS 增长需独立字段）。 |
@@ -98,13 +98,16 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 | **Minor** | 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | **Project Rule**：周线级别的放量跟进确认 (对应 `volume_ratio`)。 |
 
 > **执行语义 & 字段路由 (Signal-aware Evaluation)**：
-> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor #7 / #9 用于内部排序与风险提示，#10 仅作正向加分。若所需字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
-> 2. **阶段路由**：Checklist #4 (Depth) 与 #5 (Duration) 必须根据 `signal` 类型自动路由对应字段：
->    - Base 信号 (`ceiling`, `ceiling_breakout`, `ceiling_pullback`) → 强制使用 `base_depth_pct` / `base_duration_weeks`；
->    - Continuation 信号 (其它所有信号) → 强制使用 `pullback_pct` / `pullback_duration`。严禁跨阶段混用！
-> 3. **日线优先**：先判断突破质量、买点距离与突破日量能，再评估 Base / Pullback、缩量和 EPS；周线量能不参与硬性淘汰。
-> 4. **周线量能仅加分**：周线量能达到 `1.3x` 时，作为“优势”中的加分项展示；低于 `1.3x` 或缺失时直接省略，不得作为拒绝、降级或风险理由。
-> 5. **内部状态不外显**：Critical / Major / Minor 与 PASS / FAIL / UNKNOWN 仅供内部判定；最终报告须翻译为带数字的中文理由。缺失字段仅在确实影响结论时写作“数据缺失”。
+> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor #7 / #9 用于内部排序与风险提示，#10 仅作正向加分。若所需且适用的字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
+> 2. **阶段路由**：Checklist #4 (Depth) 与 #5 (Duration) 必须根据 `ibd_candidate_rule` 与真实回撤阶段自动路由对应字段：
+>    - 初始 Base 突破 (`ibd_candidate_rule == 'ceiling'`) → 强制使用 `base_depth_pct` / `base_duration_weeks`；
+>    - 回踩确认 (`ceiling_pullback`, `ma10_touch_confirm`) → 强制使用 `pullback_pct` / `pullback_duration_weeks`；
+>    - Pivot / Three-Weeks-Tight → 仅当 `pullback_count > 0` 时评估 `pullback_pct` / `pullback_duration_weeks`。严禁跨阶段混用！
+> 3. **字段适用性先于缺失判断**：`ceiling` 首次突破只评估 `base_depth_pct` / `base_duration_weeks`；这是刚站上大型平台的阶段，不得读取或报告 `pullback_v_is_dry`、`pullback_pct`、`pullback_duration_weeks` 缺失。回撤缩量、回撤深度和回撤持续时间仅当信号存在实际回撤阶段时才评估。
+> 4. **上游正式字段约束**：`pullback_duration_weeks` 必须来自上游正式导出；若 Continuation 信号确实需要该字段但 CSV 未提供，才可写作“回撤时长数据未导出”，不得自行用其它字段替代。
+> 5. **日线优先**：先判断突破质量、买点距离与突破日量能，再评估 Base / Pullback、缩量和 EPS；周线量能不参与硬性淘汰。
+> 6. **周线量能仅加分**：周线量能达到 `1.3x` 时，作为“优势”中的加分项展示；低于 `1.3x` 或缺失时直接省略，不得作为拒绝、降级或风险理由。
+> 7. **内部状态不外显**：Critical / Major / Minor 与 PASS / FAIL / UNKNOWN 仅供内部判定；最终报告须翻译为带数字的中文理由。缺失字段仅在确实影响结论时写作“数据缺失”。
 
 ---
 

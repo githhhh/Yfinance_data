@@ -86,7 +86,7 @@ def test_all_fields_table_columns_follow_logical_business_groups():
         "volume_ratio",
         "is_bullish",
         "pullback_count",
-        "pullback_duration",
+        "pullback_duration_weeks",
         "pullback_pct",
         "pullback_pct_off_peak",
         "pullback_v_is_dry",
@@ -102,10 +102,10 @@ def test_all_fields_table_columns_follow_logical_business_groups():
     assert get_column_view_fields("All Fields") == expected
 
 
-def test_pullback_duration_is_registered_as_upstream_structure_field():
-    assert "pullback_duration" in NUMBER_FIELDS
-    assert FIELD_CONFIG["pullback_duration"] == {
-        "label": "Pullback Duration",
+def test_pullback_duration_weeks_is_registered_as_upstream_structure_field():
+    assert "pullback_duration_weeks" in NUMBER_FIELDS
+    assert FIELD_CONFIG["pullback_duration_weeks"] == {
+        "label": "Pullback Duration Weeks",
         "type": "number",
         "group": "Risk / Structure",
         "filterable": True,
