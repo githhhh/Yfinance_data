@@ -89,7 +89,7 @@ def test_internal_screening_rules_remain_unchanged():
         "`ibd_entry_status == 'ACTIONABLE'`",
         "单一板块不超过 2 只",
         "某板块占比 > 50%",
-        "距 Candidate Price ≤ 2.0%",
+        "距 Candidate Price ≤ 5.0%",
         "Entry Volume Ratio ≥ 1.5x",
         "Close Position ≥ 0.65",
         "`pullback_v_is_dry == True`",

@@ -377,7 +377,7 @@ FIELD_CONFIG = OrderedDict(
                 "IBD Entry",
                 default_table=True,
                 fmt="0.00x",
-                help_text="Breakout bar price range relative to typical volatility.",
+                help_text="Close-to-trigger distance as a proportion of the day's high-low range.",
             ),
         ),
         (

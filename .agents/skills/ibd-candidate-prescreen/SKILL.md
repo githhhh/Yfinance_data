@@ -74,6 +74,9 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 ### 核心分类与防御规则
 * **Full-range 突破 (Gap / Full-range Breakout)**：`trigger_pos <= 0`（即 `range_ratio >= pos`），且 `pos >= 0.80`
 * **光头强突破 (Strong Finish)**：`pos >= 0.80` 且 `range_ratio >= 0.50`，但 `trigger_pos > 0`
+* **缺口回落 (Faded Gap)**：`trigger_pos <= 0`（全天在 Trigger 之上），但 `pos ∈ [0.65, 0.80)`。仍为 Strong Breakout，但收盘回落意味着日内存在卖压。
+* **扎实突破 (Constructive Breakout)**：满足以下之一：(a) `pos >= 0.80` 但 `rr < 0.50` 且 `trigger_pos > 0`（光头收盘但穿透薄）；(b) `pos ∈ [0.65, 0.80)` 且 `rr >= 0.50` 且 `trigger_pos > 0`（收盘合格且穿透实质）。
+* **薄穿突破 (Marginal Breakout)**：`pos ∈ [0.65, 0.80)` 且 `rr < 0.50`。收盘刚过及格线、穿透力不足，需其他条件补强。
 * **冲高回落/上影线抛压 (Squat / Upper Shadow)**：`pos < 0.65`（上影线 $> 35\%$）。此项为一票否决：无论 `range_ratio` 多大，均不得升级为 Gap / Full-range Breakout。
 * **防御规则 (Defensive Rule)**：若 $range\_ratio \le 0$ ($Close \le Trigger$)，触发防守断路器，直接判定破位失败。
 
@@ -83,10 +86,10 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 | 级别 | # | 检查点 | 判定标准 (Pass / Fail) | 规则依据与权威引用源 (Citations & Rules) |
 |:--:|:--:|:--|:--|:--|
-| **Critical** | 1 | 买点新鲜度 | 距 Candidate Price ≤ 2.0% | **Project Strict Fresh Zone**：IBD 标准买入窗口为 Pivot 0%–5%，本卡尺采用项目更严格的 ≤2% 拦截超买。 |
+| **Critical** | 1 | 买点新鲜度 | 距 Candidate Price ≤ 5.0% | **IBD Standard Buy Zone**：O'Neil 标准买入窗口为 Pivot 0%–5%（原著 Chapter 2），与 Dashboard ACTIONABLE 状态一致；≤ 2% 为 Fresh Zone，排序中优先。 |
 | **Critical** | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | **IBD Heavy Volume**：机构建仓放量确认（IBD 官方标准为至少高于均量 40%~50%，即 1.40x~1.50x）。 |
-| **Critical** | 3 | 突破日质量 | Close Position ≥ 0.65 | **Project Strict Rule**：O'Neil 底线为 Upper Half (≥0.50)；Ryan / IBD 建议 Top Third (≥0.65)；光头强需 pos ≥ 0.80。 |
-| **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | **IBD Base Geometry**：对 Base 信号（`ceiling` 等）强制使用 `base_depth_pct`（Cup 常见 15%–33%、Flat Base ≤15%、Double Bottom 等），对 Continuation 信号使用 `pullback_pct`。严禁混用！ |
+| **Critical** | 3 | 突破日质量 | Close Position ≥ 0.65 | **Project Strict Rule**：O'Neil 底线为 Upper Half (≥0.50)（原著 Chapter 2）；Top Third (≥0.67) 为 IBD 教学实战经验；本项目取 ≥0.65 作为折中阈值；光头强需 pos ≥ 0.80。 |
+| **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | 对 `ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_depth_pct`，结合具体 Base 类型（Cup 12%–33%（原著 Chapter 2）/ Flat Base ≤15% / Double Bottom 等）原著区间判定；其他 Continuation 信号使用 `pullback_pct` 评估近期巩固 (Pullback) 深度。严禁混用！ |
 | **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用上游正式产出的 `pullback_duration`。严禁混用！ |
 | **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` | **Project Rule**：经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up)。若上游未来正式产出缩量比例字段，可作为补充说明，不得自行推导。 |
 | **Minor** | 7 | 价格紧贴 52 周高点 | 距 52 周高点 > -5.0% | **Project Rule**：对应 `dist_to_52w_high_pct`，测量价格距高点距离（注意：非 RS Rating / RS Line 独立指标）。 |
