@@ -36,12 +36,6 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 ---
 
-## Knowledge Context
-
-* **原著知识上下文**：优先建立/复用 William O'Neil 《How to Make Money in Stocks》原著知识上下文；若未建立或加载失败，降低经验解释置信度，并将“原著上下文未加载”合并到可选背景句，不单独增加说明段落。
-
----
-
 ## Market Context
 
 * **前置子仓库更新**：在预筛前，必须优先运行 `git submodule update --remote market_analysis` 自动更新并获取最新大盘研报；该步骤会刷新 `market_analysis` 子仓库 checkout，若父仓库因此出现 submodule 指针变更，须在报告或交付中显式说明。
@@ -115,8 +109,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 ```mermaid
 graph TD
-    Phase0[Phase 0: Knowledge Context<br/>加载/复用原著与图表知识上下文] --> Phase1[Phase 1: Market Context<br/>更新并继承 market_report.json 状态]
-    Phase1 --> Phase2[Phase 2: Candidate Pool<br/>加载 breakout_follow_pool.csv 面板数据]
+    Phase1[Phase 1: Market Context<br/>更新并继承 market_report.json 状态] --> Phase2[Phase 2: Candidate Pool<br/>加载 breakout_follow_pool.csv 面板数据]
     Phase2 --> Phase3[Phase 3: Hard Checklist<br/>按 Critical/Major/Minor 关卡过筛与 Geometry 还原]
     Phase3 --> Phase4[Phase 4: Final Selection<br/>输出极简中文决策卡片]
 ```
@@ -129,7 +122,7 @@ graph TD
 
 - **长度**：正文最多 20 行；省略空区块及没有影响结论的数据。
 - **结论**：一句话说明优先复核谁、谁值得留意；不凑数。
-- **背景**：仅当大盘状态或板块拥挤实际影响结论时补充一句；原著上下文未加载时也必须输出，并合并在同一句。
+- **背景**：仅当大盘状态或板块拥挤实际影响结论时补充一句。
 - **优先复核**：0~3 只。每只固定 3 行，依次为“突破日 / 优势 / 判断”。
 - **值得留意**：0~2 只。仅收录日线突破突出但结构、基本面或关键数据证据不完整的标的；不等同于推荐。每只固定 3 行，依次为“突破日 / 顾虑 / 判断”。
 - **暂不优先**：最多列 3 只代表性标的，每只只写一个真正影响优先级的主要原因；若仍有明显亮点，先写亮点再写原因。
@@ -144,7 +137,7 @@ graph TD
 
 [一句话说明最优先标的、值得留意标的及是否宁缺毋滥。]
 
-[背景：大盘或板块影响结论时补充；原著上下文未加载时必须说明；其余情况省略。]
+[背景：大盘或板块影响结论时补充；其余情况省略。]
 
 ## 优先复核
 
@@ -171,4 +164,3 @@ graph TD
 
 1. **大盘报告路径**：`market_analysis/output/market_report.json`。
 2. **候选池 CSV 路径**：`us/breakout_follow_pool.csv` (加载入口 `dashboard.data_utils.load_pool_csv`)。
-3. **EPUB 原著路径**：`How_to_Make_Money_in_Stocks.epub` (解压目录 `.ibd_book_unpacked/`)。
