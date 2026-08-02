@@ -5,6 +5,7 @@ from dashboard.app import _csv_cache_fingerprint
 
 
 APP_SOURCE = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+STYLE_SOURCE = (Path(__file__).resolve().parents[1] / "review_styles.py").read_text(encoding="utf-8")
 
 
 def test_table_controls_do_not_use_unsupported_selectbox_horizontal_keyword():
@@ -78,18 +79,19 @@ def test_dashboard_uses_stable_keyed_density_containers():
 
 
 def test_density_css_is_scoped_and_has_no_visual_compensation_hacks():
-    assert 'div[data-testid="stVerticalBlock"] > div' not in APP_SOURCE
-    assert "margin-top:28px" not in APP_SOURCE
-    assert "margin-bottom:4px" not in APP_SOURCE
-    assert "margin: -" not in APP_SOURCE
-    assert re.search(r"(?<!-)\btransform\s*:", APP_SOURCE) is None
-    assert "height: 78px" in APP_SOURCE
-    assert ".st-key-status_cards" in APP_SOURCE
-    assert 'div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)' in APP_SOURCE
-    assert 'div[data-testid="stAppViewBlockContainer"]:has(.st-key-dashboard_shell)' not in APP_SOURCE
-    assert 'div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' in APP_SOURCE
-    assert 'div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' not in APP_SOURCE
-    assert ':has(.st-key-dashboard_shell)' in APP_SOURCE
+    combined_source = APP_SOURCE + STYLE_SOURCE
+    assert 'div[data-testid="stVerticalBlock"] > div' not in combined_source
+    assert "margin-top:28px" not in combined_source
+    assert "margin-bottom:4px" not in combined_source
+    assert "margin: -" not in combined_source
+    assert re.search(r"(?<!-)\btransform\s*:", combined_source) is None
+    assert "min-height: 78px" in STYLE_SOURCE
+    assert ".st-key-status_cards" in STYLE_SOURCE
+    assert 'div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)' in STYLE_SOURCE
+    assert 'div[data-testid="stAppViewBlockContainer"]:has(.st-key-dashboard_shell)' not in STYLE_SOURCE
+    assert 'div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' in STYLE_SOURCE
+    assert 'div[data-testid="stAppViewContainer"]:has(.st-key-dashboard_shell) [data-testid="stHeader"]' not in STYLE_SOURCE
+    assert ':has(.st-key-dashboard_shell)' in STYLE_SOURCE
 
 
 def test_status_cards_render_exactly_two_text_lines():
