@@ -298,63 +298,65 @@ def _render_mode_scope_controls(
     state: dict[str, Any],
     analysis: PoolAnalysisResult | None,
 ) -> None:
-    c_title, c_mode, c_scope = st.columns([5.0, 2.1, 2.1], vertical_alignment="center")
-    with c_title:
-        st.markdown("##### Review Queue")
-    with c_mode:
-        with st.container(key="review_mode_controls"):
-            mode_cols = st.columns(2, gap="small")
-            midweek_available = analysis.midweek_available if analysis is not None else False
-            with mode_cols[0]:
-                if st.button(
-                    _selected_button_label(state["mode"] == "MIDWEEK", "Midweek Review"),
-                    key="btn_mode_midweek",
-                    use_container_width=True,
-                    disabled=not midweek_available,
-                    type="primary" if state["mode"] == "MIDWEEK" else "secondary",
-                ):
-                    _store_review_state(switch_review_mode(state, "MIDWEEK"))
-                    st.rerun()
-            with mode_cols[1]:
-                if st.button(
-                    _selected_button_label(state["mode"] == "WEEKEND", "Weekend Full Pool"),
-                    key="btn_mode_weekend",
-                    use_container_width=True,
-                    type="primary" if state["mode"] == "WEEKEND" else "secondary",
-                ):
-                    _store_review_state(switch_review_mode(state, "WEEKEND"))
-                    st.rerun()
-    with c_scope:
-        with st.container(key="review_scope_controls"):
-            scope_cols = st.columns(2, gap="small")
-            is_midweek = state["mode"] == "MIDWEEK"
-            change_total = 0
-            if analysis is not None:
-                change_total = sum(
-                    analysis.summary.get(value, 0)
-                    for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES")
-                )
-            all_total = int(df_active_count_for_state(state, analysis))
-            with scope_cols[0]:
-                if st.button(
-                    _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
-                    key="btn_scope_changes",
-                    use_container_width=True,
-                    disabled=not is_midweek,
-                    type="primary" if state["scope"] == "CHANGES" else "secondary",
-                ):
-                    state["scope"] = "CHANGES"
-                    _store_review_state(state)
-                    st.rerun()
-            with scope_cols[1]:
-                if st.button(
-                    _selected_button_label(state["scope"] == "ALL_SIGNALS", f"All Signals ({all_total})"),
-                    key="btn_scope_all_signals",
-                    use_container_width=True,
-                    type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
-                ):
-                    _store_review_state(reset_to_all_signals(state))
-                    st.rerun()
+    midweek_available = analysis.midweek_available if analysis is not None else False
+    is_midweek = state["mode"] == "MIDWEEK"
+    change_total = 0
+    if analysis is not None:
+        change_total = sum(
+            analysis.summary.get(value, 0)
+            for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES")
+        )
+    all_total = int(df_active_count_for_state(state, analysis))
+
+    with st.container(key="review_queue_heading"):
+        title_col, mode_col, scope_col = st.columns([5.0, 2.1, 2.1], vertical_alignment="center")
+        with title_col:
+            st.markdown("##### Review Queue")
+        with mode_col:
+            with st.container(key="review_mode_controls"):
+                mode_cols = st.columns(2, gap="small")
+                with mode_cols[0]:
+                    if st.button(
+                        _selected_button_label(state["mode"] == "MIDWEEK", "Midweek Review"),
+                        key="btn_mode_midweek",
+                        use_container_width=True,
+                        disabled=not midweek_available,
+                        type="primary" if state["mode"] == "MIDWEEK" else "secondary",
+                    ):
+                        _store_review_state(switch_review_mode(state, "MIDWEEK"))
+                        st.rerun()
+                with mode_cols[1]:
+                    if st.button(
+                        _selected_button_label(state["mode"] == "WEEKEND", "Weekend Full Pool"),
+                        key="btn_mode_weekend",
+                        use_container_width=True,
+                        type="primary" if state["mode"] == "WEEKEND" else "secondary",
+                    ):
+                        _store_review_state(switch_review_mode(state, "WEEKEND"))
+                        st.rerun()
+        with scope_col:
+            with st.container(key="review_scope_controls"):
+                scope_cols = st.columns(2, gap="small")
+                with scope_cols[0]:
+                    if st.button(
+                        _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
+                        key="btn_scope_changes",
+                        use_container_width=True,
+                        disabled=not is_midweek,
+                        type="primary" if state["scope"] == "CHANGES" else "secondary",
+                    ):
+                        state["scope"] = "CHANGES"
+                        _store_review_state(state)
+                        st.rerun()
+                with scope_cols[1]:
+                    if st.button(
+                        _selected_button_label(state["scope"] == "ALL_SIGNALS", f"All Signals ({all_total})"),
+                        key="btn_scope_all_signals",
+                        use_container_width=True,
+                        type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
+                    ):
+                        _store_review_state(reset_to_all_signals(state))
+                        st.rerun()
 
 
 def df_active_count_for_state(
@@ -400,42 +402,81 @@ def _toggle_dimension(state: dict[str, Any], field: str, value: str) -> dict[str
     return result
 
 
+def _render_quick_group(
+    card_ids: tuple[str, str, str],
+    *,
+    count_field: str,
+    state_field: str,
+    counts: dict[str, Any],
+    state: dict[str, Any],
+) -> None:
+    columns = st.columns(3, gap="small")
+    for column, card_id in zip(columns, card_ids, strict=True):
+        metadata = FLOW_CARD_META[card_id]
+        with column:
+            if _render_filter_card(
+                card_id,
+                f"{metadata['label']}  {counts[count_field][card_id]}",
+                metadata,
+                selected=state[state_field] == card_id,
+                button_key=f"btn_{state_field}_{card_id}",
+            ):
+                _store_review_state(_toggle_dimension(state, state_field, card_id))
+                st.rerun()
+
+
 def _render_review_context(
     df: pd.DataFrame,
     counts: dict[str, Any],
     state: dict[str, Any],
 ) -> None:
+    del df
     with st.container(key="review_context_slot"):
         if state["mode"] != "MIDWEEK":
             st.markdown(
-                '<div style="height:58px; display:flex; align-items:center; border:1px solid #303947; border-radius:8px; padding:0 14px; color:#94a3b8;"><b style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-right:16px;">Weekend Baseline</b><strong style="color:#cbd5e1; margin-right:16px;">Complete weekly pool</strong>Midweek comparison is not applied in this view.</div>',
+                '<div class="weekend-context-bar"><strong>Weekend Baseline</strong>'
+                '<span>Complete weekly pool</span>'
+                '<span>Midweek comparison is not applied in this view.</span></div>',
                 unsafe_allow_html=True,
             )
             return
 
-        rows = [
-            ("CHANGE", ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"), "change_filter", "change"),
-            ("ORIGIN", ("NEW", "CARRY", "RECONFIRMED"), "origin_filter", "origin"),
-        ]
-        for row_label, card_ids, state_field, count_field in rows:
-            columns = st.columns([0.58, 1.45, 1.45, 1.45, 0.72], gap="small")
-            with columns[0]:
-                st.caption(row_label)
-            for index, card_id in enumerate(card_ids, start=1):
-                metadata = FLOW_CARD_META[card_id]
-                count = counts[count_field][card_id]
-                with columns[index]:
-                    if _render_filter_card(
-                        card_id,
-                        f"{metadata['label']}  {count}",
-                        metadata,
-                        selected=state[state_field] == card_id,
-                        button_key=f"btn_{state_field}_{card_id}",
-                    ):
-                        _store_review_state(_toggle_dimension(state, state_field, card_id))
-                        st.rerun()
-            with columns[4]:
-                if row_label == "ORIGIN" and st.button("Clear", key="btn_clear_quick", use_container_width=True):
+        with st.container(key="quick_context_row"):
+            change_label, change_group, divider, origin_label, origin_group, clear_col = st.columns(
+                [0.48, 3.95, 0.16, 0.48, 3.95, 0.72], gap="small"
+            )
+            with change_label:
+                with st.container(key="quick_label_change"):
+                    st.caption("CHANGE")
+            with change_group:
+                _render_quick_group(
+                    ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"),
+                    count_field="change",
+                    state_field="change_filter",
+                    counts=counts,
+                    state=state,
+                )
+            with divider:
+                with st.container(key="quick_divider"):
+                    st.markdown('<span aria-hidden="true"></span>', unsafe_allow_html=True)
+            with origin_label:
+                with st.container(key="quick_label_origin"):
+                    st.caption("ORIGIN")
+            with origin_group:
+                _render_quick_group(
+                    ("NEW", "CARRY", "RECONFIRMED"),
+                    count_field="origin",
+                    state_field="origin_filter",
+                    counts=counts,
+                    state=state,
+                )
+            with clear_col:
+                if st.button(
+                    "Clear",
+                    key="btn_clear_quick",
+                    use_container_width=True,
+                    disabled=(state["change_filter"] == "ALL" and state["origin_filter"] == "ALL"),
+                ):
                     _store_review_state(clear_quick_filters(state))
                     st.rerun()
 

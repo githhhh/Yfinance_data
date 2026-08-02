@@ -79,9 +79,9 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     min-height: 50px;
 }
 
-.st-key-review_queue_actions > div[data-testid="stHorizontalBlock"] {
+.st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
     display: grid !important;
-    grid-template-columns: 276px 268px;
+    grid-template-columns: minmax(0, 1fr) 276px 268px;
     gap: 9px !important;
     align-items: center;
 }
@@ -92,15 +92,47 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     min-width: 0 !important;
     max-width: none !important;
     height: 40px;
+    border: 1px solid #3d4855;
+    border-radius: 8px;
+    padding: 3px;
+    overflow: hidden;
+    background: var(--panel-soft);
+    box-sizing: border-box;
+}
+
+.st-key-review_scope_controls {
+    border-color: #3e72b7;
+}
+
+.st-key-review_mode_controls > div[data-testid="stVerticalBlock"],
+.st-key-review_scope_controls > div[data-testid="stVerticalBlock"] {
+    height: 100%;
+    gap: 0 !important;
+}
+
+.st-key-review_mode_controls div[data-testid="stHorizontalBlock"],
+.st-key-review_scope_controls div[data-testid="stHorizontalBlock"] {
+    height: 100%;
+    gap: 0 !important;
+}
+
+.st-key-review_mode_controls div[data-testid="stColumn"],
+.st-key-review_scope_controls div[data-testid="stColumn"] {
+    min-width: 0 !important;
+    padding: 0 !important;
 }
 
 .st-key-review_mode_controls button,
 .st-key-review_scope_controls button {
     width: 100% !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    padding: 0 10px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    padding: 0 8px !important;
     white-space: nowrap !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
 }
 
 .st-key-review_context_slot {
@@ -115,6 +147,87 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     min-height: 48px !important;
     max-height: 48px !important;
     gap: 0 !important;
+}
+
+.st-key-quick_context_row > div[data-testid="stVerticalBlock"] {
+    height: 48px;
+    gap: 0 !important;
+}
+
+.st-key-quick_context_row > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+    min-width: max-content;
+    height: 48px;
+    align-items: center;
+    gap: 6px !important;
+}
+
+.st-key-quick_context_row div[data-testid="stColumn"] {
+    min-width: 0;
+}
+
+.st-key-quick_label_change p,
+.st-key-quick_label_origin p {
+    margin: 0 !important;
+    color: #667485 !important;
+    font-size: 9px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.1em;
+}
+
+.st-key-quick_divider {
+    width: 1px;
+    height: 29px;
+    background: #34404c;
+}
+
+.st-key-review_context_slot div[class*="st-key-flow_card_"] {
+    position: relative;
+    min-width: 0;
+}
+
+.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) {
+    width: 100% !important;
+    height: 31px !important;
+    min-height: 31px !important;
+    border: 1px solid #35414d !important;
+    border-radius: 6px !important;
+    padding: 0 22px 0 18px !important;
+    background: #121921;
+    font-size: 10px !important;
+    white-space: nowrap !important;
+}
+
+.st-key-review_context_slot div[class*="st-key-btn_clear_quick"] button {
+    height: 31px !important;
+    min-height: 31px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: 10px !important;
+}
+
+.weekend-context-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    border: 1px solid #303a46;
+    border-radius: 7px;
+    padding: 0 13px;
+    background: #11171e;
+    color: #74808d;
+    font-size: 11px;
+    box-sizing: border-box;
+}
+
+.weekend-context-bar strong {
+    color: #c8d0d9;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.weekend-context-bar span:first-of-type {
+    color: #8f9ba8;
 }
 
 .st-key-status_cards > div[data-testid="stHorizontalBlock"] {
@@ -183,13 +296,21 @@ select:focus-visible,
 }
 
 @media (width <= 760px) {
-    .st-key-review_queue_actions > div[data-testid="stHorizontalBlock"] {
+    .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
         grid-template-columns: 1fr 1fr;
         width: 100%;
     }
 
+    .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+        grid-column: 1 / -1;
+    }
+
     .st-key-review_context_slot {
         overflow: auto hidden !important;
+    }
+
+    .st-key-quick_context_row {
+        min-width: max-content;
     }
 
     .st-key-status_cards > div[data-testid="stHorizontalBlock"] {
@@ -207,8 +328,12 @@ select:focus-visible,
         padding: 18px 12px !important;
     }
 
-    .st-key-review_queue_actions > div[data-testid="stHorizontalBlock"] {
+    .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
         grid-template-columns: 1fr;
+    }
+
+    .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+        grid-column: auto;
     }
 }
 

@@ -15,6 +15,12 @@ def _compact_css() -> str:
     return re.sub(r"\s+", "", source)
 
 
+def _function_source(name: str, next_name: str) -> str:
+    start = APP_SOURCE.index(f"def {name}(")
+    end = APP_SOURCE.index(f"def {next_name}(", start)
+    return APP_SOURCE[start:end]
+
+
 def test_review_ui_css_is_centralized_and_injected_once():
     assert STYLE_PATH.exists(), "dashboard/review_styles.py must exist"
     assert "from dashboard.review_styles import REVIEW_UI_CSS" in APP_SOURCE
@@ -41,7 +47,7 @@ def test_reference_tokens_and_desktop_geometry_are_explicit():
         "--red:#f04444",
         "padding:29px28px34px",
         "min-height:78px",
-        "grid-template-columns:276px268px",
+        "grid-template-columns:minmax(0,1fr)276px268px",
         "height:48px",
         "grid-template-columns:repeat(4,minmax(0,1fr))",
         "height:70px",
@@ -63,3 +69,28 @@ def test_reference_breakpoints_focus_and_reduced_motion_are_explicit():
         ":focus-visible",
     ]:
         assert rule in css
+
+
+def test_review_context_is_one_horizontal_flow_with_stable_slots():
+    source = _function_source("_render_review_context", "_render_status_queue")
+
+    assert "rows = [" not in source
+    assert 'key="quick_context_row"' in source
+    assert 'key="quick_label_change"' in source
+    assert 'key="quick_divider"' in source
+    assert 'key="quick_label_origin"' in source
+    assert source.count("_render_quick_group(") == 2
+    assert 'key="btn_clear_quick"' in source
+    assert "Weekend Baseline" in source
+
+
+def test_queue_controls_have_stable_heading_and_segmented_group_slots():
+    source = _function_source("_render_mode_scope_controls", "df_active_count_for_state")
+
+    for key in [
+        "review_queue_heading",
+        "review_mode_controls",
+        "review_scope_controls",
+    ]:
+        assert f'key="{key}"' in source
+    assert "disabled=not is_midweek" in source
