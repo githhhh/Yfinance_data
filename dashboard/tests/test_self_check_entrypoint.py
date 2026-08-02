@@ -38,3 +38,43 @@ def test_self_check_reports_setup_failures_with_label(tmp_path):
 
     assert result.returncode == 1
     assert "[FAIL] setup:" in result.stderr
+
+
+def test_self_check_validates_midweek_projection_when_requested(tmp_path):
+    header = (
+        "code,signal,signal_source,ibd_candidate_rule,ibd_entry_valid,ibd_entry_reject_reason,"
+        "ibd_entry_volume_ratio,ibd_entry_close_vs_trigger_pct,ibd_entry_close_position,"
+        "ibd_entry_breakout_range_ratio,volume_ratio,is_bullish,pullback_v_is_dry,breakout_date,"
+        "pct_above_ceiling,touched_ema10_count,rank_C_continuous,C_continuous,ibd_entry_price,"
+        "sector,industry,latest_close,ibd_candidate_price,current_vs_ibd_candidate_pct,"
+        "price_52_week_high,dist_to_52w_high_pct,ibd_entry_status"
+    )
+    complete_path = tmp_path / "complete.csv"
+    complete_path.write_text(
+        header
+        + "\nAAA,True,ceiling_breakout,ceiling_pullback,1,,2.5,0.04,0.80,1.20,1.4,True,True,2026-05-10,4.0,2,2,2.5,10.0,Technology Services,Software - Enterprise,10.4,10.0,4.0,12.0,-13.33,ACTIONABLE",
+        encoding="utf-8",
+    )
+    midweek_path = tmp_path / "midweek.csv"
+    midweek_path.write_text(
+        header
+        + "\nAAA,False,ceiling_breakout,ceiling_pullback,1,,2.5,0.02,0.70,1.10,1.4,True,True,2026-05-10,2.0,2,2,2.5,10.0,Technology Services,Software - Enterprise,10.2,10.0,2.0,12.0,-15.00,",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "dashboard/self_check.py",
+            "--csv",
+            str(complete_path),
+            "--midweek-csv",
+            str(midweek_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "[PASS] midweek projection conservation" in result.stdout

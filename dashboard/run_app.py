@@ -15,8 +15,15 @@ def is_port_in_use(port: int) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the local breakout pool dashboard.")
-    default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
+    project_root = Path(__file__).resolve().parents[1]
+    default_csv = project_root / "us" / "breakout_follow_pool.csv"
+    default_midweek_csv = project_root / "us" / "breakout_follow_pool_midweek.csv"
     parser.add_argument("--csv", default=str(default_csv))
+    parser.add_argument("--midweek-csv", default=str(default_midweek_csv))
+    parser.add_argument(
+        "--window-date",
+        help="Override the Asia/Shanghai business date (YYYY-MM-DD), mainly for replay/testing.",
+    )
     parser.add_argument("--server-port", default="8501")
     parser.add_argument("--headless", action="store_true", help="Run in headless mode without opening browser.")
     args = parser.parse_args()
@@ -37,6 +44,9 @@ def main() -> int:
     csv_path = Path(args.csv).expanduser()
     if not csv_path.is_absolute():
         csv_path = (Path.cwd() / csv_path).resolve()
+    midweek_csv_path = Path(args.midweek_csv).expanduser()
+    if not midweek_csv_path.is_absolute():
+        midweek_csv_path = (Path.cwd() / midweek_csv_path).resolve()
     command = [
         sys.executable,
         "-m",
@@ -50,7 +60,11 @@ def main() -> int:
         "--",
         "--csv",
         str(csv_path),
+        "--midweek-csv",
+        str(midweek_csv_path),
     ]
+    if args.window_date:
+        command.extend(["--window-date", args.window_date])
 
     if os.name == "posix":
         # 在 macOS/Linux 上使用 execvp 替换当前 Python 进程，不创建子进程。

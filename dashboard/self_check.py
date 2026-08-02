@@ -26,6 +26,7 @@ from dashboard.field_config import (
     get_filterable_fields,
     get_sortable_fields,
 )
+from dashboard.services.bf_midweek_review import build_midweek_review
 
 
 def main() -> int:
@@ -35,6 +36,10 @@ def main() -> int:
         "--csv",
         default=str(default_csv),
         help="Path to breakout_follow_pool.csv",
+    )
+    parser.add_argument(
+        "--midweek-csv",
+        help="Optional path to breakout_follow_pool_midweek.csv.",
     )
     args = parser.parse_args()
 
@@ -56,10 +61,26 @@ def main() -> int:
         for label, check in checks:
             check(df)
             print(f"[PASS] {label}")
+        if args.midweek_csv:
+            label = "midweek projection conservation"
+            _check_midweek_projection(df, load_pool_csv(args.midweek_csv))
+            print(f"[PASS] {label}")
     except Exception as exc:
         print(f"[FAIL] {label}: {exc}", file=sys.stderr)
         return 1
     return 0
+
+
+def _check_midweek_projection(complete: pd.DataFrame, midweek: pd.DataFrame) -> None:
+    result = build_midweek_review(midweek, complete)
+    review = result.current_review
+    assert len(review) == len(midweek), "review must preserve the current-pool row count"
+    assert review["code"].tolist() == midweek["code"].tolist(), "review must preserve current-pool order"
+    assert not review["code"].duplicated().any(), "review codes must remain unique"
+    assert set(result.actionable_codes).issubset(set(review["code"])), "actionable codes must come from current pool"
+    assert result.summary["CURRENT_POOL"] == len(review)
+    assert result.summary["EXITED_POOL"] == len(result.exited_pool)
+    assert result.summary["ACTIVE_SIGNALS"] == int(review["review_watch_active"].sum())
 
 
 def _check_load(df: pd.DataFrame) -> None:

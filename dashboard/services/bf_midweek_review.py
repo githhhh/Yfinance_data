@@ -1,0 +1,626 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+import numpy as np
+import pandas as pd
+
+from dashboard.data_utils import load_pool_csv, normalize_pool_df
+
+
+BUSINESS_TIMEZONE = "Asia/Shanghai"
+ENTRY_STATUSES = ("ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED")
+
+
+class PoolWindow(Enum):
+    MIDWEEK = "midweek"
+    COMPLETE = "complete"
+
+
+class PoolMode(Enum):
+    COMPLETE = "complete"
+    MIDWEEK = "midweek"
+    MIDWEEK_WITHOUT_VALID_BASELINE = "midweek_without_valid_baseline"
+
+
+@dataclass(frozen=True)
+class MidweekReviewResult:
+    current_review: pd.DataFrame
+    exited_pool: pd.DataFrame
+    summary: dict[str, int]
+    actionable_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PoolAnalysisResult:
+    mode: PoolMode
+    window: PoolWindow
+    complete_snapshot_date: date | None
+    midweek_snapshot_date: date | None
+    review_week_start: date | None
+    complete_pool: pd.DataFrame
+    midweek_pool: pd.DataFrame
+    midweek_review: pd.DataFrame
+    exited_pool: pd.DataFrame
+    summary: dict[str, int]
+    actionable_codes: tuple[str, ...]
+    warnings: tuple[str, ...]
+    midweek_available: bool
+
+
+SOURCE_FACT_FIELDS = (
+    "signal_source",
+    "ibd_candidate_rule",
+    "ibd_candidate_price",
+    "ibd_candidate_signal_source",
+    "ibd_candidate_extra",
+    "ibd_entry_valid",
+    "ibd_entry_date",
+    "ibd_entry_price",
+    "ibd_trigger_price",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+    "ibd_entry_rule",
+    "ibd_entry_reject_reason",
+)
+
+
+def resolve_window(window_date: date) -> PoolWindow:
+    if window_date.weekday() in {1, 2, 3, 4}:
+        return PoolWindow.MIDWEEK
+    return PoolWindow.COMPLETE
+
+
+def monday_of_week(value: date) -> date:
+    return value - timedelta(days=value.weekday())
+
+
+def complete_target_week(complete_date: date) -> date:
+    weekday = complete_date.weekday()
+    if weekday == 0:
+        return complete_date
+    if weekday in {4, 5, 6}:
+        return complete_date + timedelta(days=7 - weekday)
+    raise ValueError(f"Invalid complete snapshot date: {complete_date.isoformat()}")
+
+
+def _to_bool(value: Any) -> bool | None:
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, float)):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+    text = str(value).strip().lower()
+    if text in {"true", "t", "yes", "y", "1", "1.0"}:
+        return True
+    if text in {"false", "f", "no", "n", "0", "0.0"}:
+        return False
+    return None
+
+
+def _normalized_pool(pool: pd.DataFrame, *, label: str, allow_empty: bool = False) -> pd.DataFrame:
+    if pool is None or pool.empty:
+        if allow_empty:
+            return pd.DataFrame(columns=list(pool.columns) if pool is not None else [])
+        raise ValueError(f"{label} pool cannot be empty")
+    result = normalize_pool_df(pool)
+    required = {"code", "signal"}
+    missing = required.difference(result.columns)
+    if missing:
+        raise ValueError(f"{label} pool missing required columns: {sorted(missing)}")
+    codes = result["code"].astype("string").str.strip()
+    if codes.isna().any() or codes.eq("").any() or codes.str.lower().eq("nan").any():
+        raise ValueError(f"{label} pool code cannot be empty")
+    if codes.duplicated().any():
+        raise ValueError(f"{label} pool code cannot be duplicate")
+    result = result.copy()
+    result["code"] = codes.astype(str)
+    converted = result["signal"].map(_to_bool)
+    if converted.isna().any():
+        raise ValueError(f"{label} pool signal must be a valid boolean")
+    result["signal"] = pd.Series(converted.tolist(), index=result.index, dtype="object")
+    return result
+
+
+def _positive_number(value: Any, *, field: str, code: str) -> float:
+    parsed = pd.to_numeric(value, errors="coerce")
+    if pd.isna(parsed) or not np.isfinite(parsed) or float(parsed) <= 0:
+        raise ValueError(f"{code}: {field} must be a positive finite number")
+    return float(parsed)
+
+
+def _nonempty_status(value: Any, *, code: str) -> str:
+    if value is None or pd.isna(value) or not str(value).strip():
+        raise ValueError(f"{code}: IBD enrichment is incomplete")
+    status = str(value).strip()
+    if status not in ENTRY_STATUSES:
+        raise ValueError(f"{code}: invalid ibd_entry_status {status}")
+    return status
+
+
+def _calculate_status(entry_valid: Any, candidate: float, latest_close: float) -> str:
+    if _to_bool(entry_valid) is not True:
+        return "UNCONFIRMED"
+    pct = round((latest_close / candidate - 1.0) * 100.0, 2)
+    if pct < 0:
+        return "BELOW_TRIGGER"
+    if pct <= 5.0:
+        return "ACTIONABLE"
+    return "EXTENDED"
+
+
+def _entry_change(baseline: str | None, effective: str | None) -> tuple[str, str]:
+    if baseline != "ACTIONABLE" and effective == "ACTIONABLE":
+        return "BECAME_ACTIONABLE", "BECAME_ACTIONABLE"
+    if baseline == "ACTIONABLE" and effective != "ACTIONABLE":
+        if effective == "EXTENDED":
+            detail = "ACTIONABLE_TO_EXTENDED"
+        elif effective == "BELOW_TRIGGER":
+            detail = "ACTIONABLE_TO_BELOW_TRIGGER"
+        else:
+            detail = "LEFT_ACTIONABLE"
+        return detail, "LEFT_ACTIONABLE"
+    if baseline == "ACTIONABLE" and effective == "ACTIONABLE":
+        return "STILL_ACTIONABLE", "UNCHANGED"
+    if baseline != effective:
+        return "STATUS_CHANGED", "OTHER_CHANGES"
+    return "UNCHANGED", "UNCHANGED"
+
+
+def _change_label(origin: str, baseline: str | None, effective: str | None, entry_change: str) -> str:
+    if entry_change == "STILL_ACTIONABLE":
+        return "STILL ACTIONABLE"
+    if baseline == "ACTIONABLE" and effective:
+        return f"ACTIONABLE → {effective.replace('_', ' ')}"
+    if origin in {"NEW", "CARRY", "RECONFIRMED"} and effective:
+        return f"{origin} → {effective.replace('_', ' ')}"
+    return effective.replace("_", " ") if effective else origin
+
+
+def build_midweek_review(
+    current_pool: pd.DataFrame,
+    complete_pool: pd.DataFrame,
+) -> MidweekReviewResult:
+    current = _normalized_pool(current_pool, label="current")
+    complete = _normalized_pool(complete_pool, label="complete", allow_empty=True)
+    complete_by_code = {
+        str(row["code"]): row
+        for _, row in complete.iterrows()
+    }
+    current_codes = set(current["code"])
+    rows: list[dict[str, Any]] = []
+
+    for _, current_row in current.iterrows():
+        code = str(current_row["code"])
+        complete_row = complete_by_code.get(code)
+        signal_current = _to_bool(current_row.get("signal")) is True
+        signal_complete = complete_row is not None and _to_bool(complete_row.get("signal")) is True
+        origin = (
+            "RECONFIRMED"
+            if signal_current and signal_complete
+            else "NEW"
+            if signal_current
+            else "CARRY"
+            if signal_complete
+            else "NONE"
+        )
+        watch_active = signal_current or signal_complete
+        projected = current_row.to_dict()
+        projected["review_pool_change"] = "ENTERED" if complete_row is None else "STAYED"
+        projected["review_signal_origin"] = origin
+        projected["review_watch_active"] = bool(watch_active)
+
+        selected_row = current_row if signal_current else complete_row if signal_complete else None
+        for field in SOURCE_FACT_FIELDS:
+            projected[f"review_{field}"] = selected_row.get(field) if selected_row is not None else None
+
+        baseline_status = (
+            _nonempty_status(complete_row.get("ibd_entry_status"), code=code)
+            if signal_complete
+            else None
+        )
+        effective_status: str | None = None
+        candidate: float | None = None
+        current_vs_candidate: float | None = None
+        entry_valid: bool | None = None
+        if watch_active:
+            latest_close = _positive_number(current_row.get("latest_close"), field="latest_close", code=code)
+            candidate = _positive_number(selected_row.get("ibd_candidate_price"), field="candidate", code=code)
+            raw_valid = selected_row.get("ibd_entry_valid")
+            if raw_valid is None or pd.isna(raw_valid) or _to_bool(raw_valid) is None:
+                raise ValueError(f"{code}: IBD enrichment is incomplete")
+            entry_valid = _to_bool(raw_valid)
+            current_vs_candidate = round((latest_close / candidate - 1.0) * 100.0, 2)
+            if signal_current:
+                effective_status = _nonempty_status(current_row.get("ibd_entry_status"), code=code)
+            else:
+                effective_status = _calculate_status(entry_valid, candidate, latest_close)
+
+        entry_change, change_group = _entry_change(baseline_status, effective_status)
+        projected["review_candidate_price"] = candidate
+        projected["review_entry_valid"] = entry_valid
+        projected["review_baseline_entry_status"] = baseline_status
+        projected["review_effective_entry_status"] = effective_status
+        projected["review_current_vs_candidate_pct"] = current_vs_candidate
+        projected["review_entry_change"] = entry_change
+        projected["review_change_group"] = change_group
+        projected["review_change_label"] = _change_label(origin, baseline_status, effective_status, entry_change)
+        projected["review_futu_actionable"] = bool(watch_active and effective_status == "ACTIONABLE")
+        change_rank = {
+            "BECAME_ACTIONABLE": 0,
+            "LEFT_ACTIONABLE": 1,
+            "OTHER_CHANGES": 2,
+            "UNCHANGED": 3,
+        }[change_group]
+        status_rank = {status: rank for rank, status in enumerate(ENTRY_STATUSES)}.get(effective_status, 9)
+        projected["review_priority"] = change_rank * 10 + status_rank
+        rows.append(projected)
+
+    review = pd.DataFrame(rows, index=current.index)
+    if "review_entry_valid" in review.columns:
+        review["review_entry_valid"] = pd.Series(
+            review["review_entry_valid"].tolist(), index=review.index, dtype="object"
+        )
+    exited = complete.loc[~complete["code"].isin(current_codes)].copy() if not complete.empty else complete.copy()
+    actionable = tuple(review.loc[review["review_futu_actionable"], "code"].astype(str).tolist())
+    summary = _build_summary(review, exited)
+    return MidweekReviewResult(review, exited, summary, actionable)
+
+
+def _build_summary(review: pd.DataFrame, exited: pd.DataFrame) -> dict[str, int]:
+    summary: dict[str, int] = {
+        "CURRENT_POOL": len(review),
+        "EXITED_POOL": len(exited),
+        "ACTIVE_SIGNALS": int(review.get("review_watch_active", pd.Series(dtype=bool)).sum()),
+    }
+    for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES", "UNCHANGED"):
+        summary[value] = int(review.get("review_change_group", pd.Series(dtype=object)).eq(value).sum())
+    for value in ("NEW", "CARRY", "RECONFIRMED", "NONE"):
+        summary[value] = int(review.get("review_signal_origin", pd.Series(dtype=object)).eq(value).sum())
+    for value in ENTRY_STATUSES:
+        summary[value] = int(review.get("review_effective_entry_status", pd.Series(dtype=object)).eq(value).sum())
+    return summary
+
+
+def materialize_review_view(review: pd.DataFrame) -> pd.DataFrame:
+    result = review.copy()
+    if result.empty:
+        return result
+    result["signal"] = pd.Series(result["review_watch_active"].tolist(), index=result.index, dtype="object")
+    for field in SOURCE_FACT_FIELDS:
+        review_field = f"review_{field}"
+        if review_field in result.columns:
+            result[field] = result[review_field]
+    result["ibd_candidate_price"] = result["review_candidate_price"]
+    result["ibd_entry_valid"] = pd.Series(result["review_entry_valid"].tolist(), index=result.index, dtype="object")
+    result["ibd_entry_status"] = result["review_effective_entry_status"]
+    result["current_vs_ibd_candidate_pct"] = result["review_current_vs_candidate_pct"]
+
+    def vol_or_reason(row: pd.Series) -> str:
+        if row.get("review_entry_valid") is not True:
+            reason = row.get("ibd_entry_reject_reason")
+            return str(reason).strip() if reason is not None and not pd.isna(reason) and str(reason).strip() else "Volume not confirmed"
+        volume = pd.to_numeric(row.get("ibd_entry_volume_ratio"), errors="coerce")
+        return "n/a" if pd.isna(volume) else f"{float(volume):.2f}x"
+
+    result["ibd_entry_vol_or_reject"] = result.apply(vol_or_reason, axis=1)
+    return result
+
+
+def default_review_state(mode: PoolMode) -> dict[str, Any]:
+    is_midweek = mode in {PoolMode.MIDWEEK, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE}
+    return {
+        "mode": "MIDWEEK" if is_midweek else "WEEKEND",
+        "scope": "CHANGES" if is_midweek else "ALL_SIGNALS",
+        "change_filter": "ALL",
+        "origin_filter": "ALL",
+        "status_filter": "ALL",
+        "route_filter": "All",
+        "distance_min": "",
+        "distance_max": "",
+        "entry_volume_min": "",
+        "weekly_volume_min": "",
+        "near_trigger_only": False,
+        "filters_expanded": False,
+        "copy_state": "IDLE",
+        "sort_mode": "Review Priority" if is_midweek else "C Rank",
+        "widget_generation": 0,
+    }
+
+
+def switch_review_mode(state: dict[str, Any], target_mode: str) -> dict[str, Any]:
+    target = target_mode.upper()
+    if target == str(state.get("mode", "")).upper():
+        return dict(state)
+    mode = PoolMode.MIDWEEK if target == "MIDWEEK" else PoolMode.COMPLETE
+    result = default_review_state(mode)
+    result["widget_generation"] = int(state.get("widget_generation", 0)) + 1
+    return result
+
+
+def clear_quick_filters(state: dict[str, Any]) -> dict[str, Any]:
+    result = dict(state)
+    result["change_filter"] = "ALL"
+    result["origin_filter"] = "ALL"
+    return result
+
+
+def reset_to_all_signals(state: dict[str, Any]) -> dict[str, Any]:
+    result = dict(state)
+    result.update(
+        {
+            "scope": "ALL_SIGNALS",
+            "change_filter": "ALL",
+            "origin_filter": "ALL",
+            "status_filter": "ALL",
+            "route_filter": "All",
+            "distance_min": "",
+            "distance_max": "",
+            "entry_volume_min": "",
+            "weekly_volume_min": "",
+            "near_trigger_only": False,
+            "filters_expanded": False,
+            "copy_state": "IDLE",
+            "widget_generation": int(state.get("widget_generation", 0)) + 1,
+        }
+    )
+    return result
+
+
+def _number_filter(
+    frame: pd.DataFrame,
+    field: str,
+    raw_value: Any,
+    *,
+    minimum: bool,
+) -> pd.DataFrame:
+    if raw_value is None or str(raw_value).strip() == "" or field not in frame.columns:
+        return frame
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return frame
+    numbers = pd.to_numeric(frame[field], errors="coerce")
+    return frame.loc[numbers.ge(value) if minimum else numbers.le(value)].copy()
+
+
+def apply_review_filters(
+    review: pd.DataFrame,
+    state: dict[str, Any],
+    *,
+    exclude_dimension: str | None = None,
+) -> pd.DataFrame:
+    if review.empty:
+        return review.copy()
+    result = review.copy()
+    active_field = "review_watch_active" if "review_watch_active" in result.columns else "signal"
+    result = result.loc[result[active_field].map(_to_bool).eq(True)].copy()
+    is_midweek = str(state.get("mode", "MIDWEEK")).upper() == "MIDWEEK"
+    if is_midweek and state.get("scope") == "CHANGES" and "review_change_group" in result.columns:
+        result = result.loc[result["review_change_group"].ne("UNCHANGED")].copy()
+
+    if is_midweek and exclude_dimension != "change":
+        selected_change = state.get("change_filter", "ALL")
+        if selected_change != "ALL" and "review_change_group" in result.columns:
+            result = result.loc[result["review_change_group"].eq(selected_change)].copy()
+    if is_midweek and exclude_dimension != "origin":
+        selected_origin = state.get("origin_filter", "ALL")
+        if selected_origin != "ALL" and "review_signal_origin" in result.columns:
+            result = result.loc[result["review_signal_origin"].eq(selected_origin)].copy()
+
+    status_field = (
+        "review_effective_entry_status"
+        if "review_effective_entry_status" in result.columns
+        else "ibd_entry_status"
+    )
+    if exclude_dimension != "status":
+        selected_status = state.get("status_filter", "ALL")
+        if selected_status != "ALL" and status_field in result.columns:
+            result = result.loc[result[status_field].eq(selected_status)].copy()
+
+    if exclude_dimension != "advanced":
+        route = state.get("route_filter", "All")
+        if route != "All" and "ibd_candidate_rule" in result.columns:
+            result = result.loc[result["ibd_candidate_rule"].eq(route)].copy()
+        result = _number_filter(
+            result,
+            "current_vs_ibd_candidate_pct",
+            state.get("distance_min", ""),
+            minimum=True,
+        )
+        result = _number_filter(
+            result,
+            "current_vs_ibd_candidate_pct",
+            state.get("distance_max", ""),
+            minimum=False,
+        )
+        if state.get("status_filter") in {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}:
+            result = _number_filter(
+                result,
+                "ibd_entry_volume_ratio",
+                state.get("entry_volume_min", ""),
+                minimum=True,
+            )
+        result = _number_filter(
+            result,
+            "volume_ratio",
+            state.get("weekly_volume_min", ""),
+            minimum=True,
+        )
+        if state.get("status_filter") == "UNCONFIRMED" and state.get("near_trigger_only"):
+            distance = pd.to_numeric(result.get("current_vs_ibd_candidate_pct"), errors="coerce")
+            result = result.loc[distance.between(0.0, 3.0, inclusive="both")].copy()
+    return result
+
+
+def build_review_filter_counts(
+    review: pd.DataFrame,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    change_base = apply_review_filters(review, state, exclude_dimension="change")
+    origin_base = apply_review_filters(review, state, exclude_dimension="origin")
+    status_base = apply_review_filters(review, state, exclude_dimension="status")
+    status_field = (
+        "review_effective_entry_status"
+        if "review_effective_entry_status" in status_base.columns
+        else "ibd_entry_status"
+    )
+    return {
+        "change": {
+            value: int(change_base.get("review_change_group", pd.Series(dtype=object)).eq(value).sum())
+            for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES", "UNCHANGED")
+        },
+        "origin": {
+            value: int(origin_base.get("review_signal_origin", pd.Series(dtype=object)).eq(value).sum())
+            for value in ("NEW", "CARRY", "RECONFIRMED")
+        },
+        "status": {
+            value: int(status_base.get(status_field, pd.Series(dtype=object)).eq(value).sum())
+            for value in ENTRY_STATUSES
+        },
+        "result": len(apply_review_filters(review, state)),
+    }
+
+
+def sort_review_rows(review: pd.DataFrame, sort_mode: str) -> pd.DataFrame:
+    if review.empty:
+        return review.copy()
+    result = review.copy()
+    if sort_mode == "C Rank":
+        by = [field for field in ("rank_C_continuous", "code") if field in result.columns]
+        return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").copy()
+    if sort_mode == "Distance":
+        by = [field for field in ("current_vs_ibd_candidate_pct", "code") if field in result.columns]
+        return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").copy()
+    status_field = (
+        "review_effective_entry_status"
+        if "review_effective_entry_status" in result.columns
+        else "ibd_entry_status"
+    )
+    result["_review_status_rank"] = result.get(status_field, pd.Series(index=result.index)).map(
+        {status: rank for rank, status in enumerate(ENTRY_STATUSES)}
+    )
+    by = [field for field in ("review_priority", "_review_status_rank", "code") if field in result.columns]
+    return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").drop(
+        columns=["_review_status_rank"], errors="ignore"
+    )
+
+
+def _snapshot_date(pool: pd.DataFrame, *, label: str) -> date:
+    if "snapshot_date" not in pool.columns:
+        raise ValueError(f"{label} pool missing snapshot_date")
+    parsed = pd.to_datetime(pool["snapshot_date"], errors="coerce")
+    if parsed.isna().any():
+        raise ValueError(f"{label} pool snapshot_date must be parseable")
+    dates = {value.date() for value in parsed}
+    if len(dates) != 1:
+        raise ValueError(f"{label} pool snapshot_date must contain exactly one date")
+    return next(iter(dates))
+
+
+def _complete_actionable_codes(pool: pd.DataFrame) -> tuple[str, ...]:
+    if pool.empty:
+        return ()
+    mask = pool["signal"].map(_to_bool).eq(True) & pool["ibd_entry_status"].eq("ACTIONABLE")
+    return tuple(pool.loc[mask, "code"].astype(str).tolist())
+
+
+def analyze_breakout_follow_pool(
+    complete_pool_path: str | Path,
+    midweek_pool_path: str | Path | None,
+    *,
+    window_date: date | None = None,
+    business_timezone: str = BUSINESS_TIMEZONE,
+) -> PoolAnalysisResult:
+    business_date = window_date or datetime.now(ZoneInfo(business_timezone)).date()
+    window = resolve_window(business_date)
+    warnings: list[str] = []
+    complete = pd.DataFrame()
+    complete_date: date | None = None
+    complete_week: date | None = None
+    try:
+        complete = _normalized_pool(load_pool_csv(complete_pool_path), label="complete")
+        complete_date = _snapshot_date(complete, label="complete")
+        complete_week = complete_target_week(complete_date)
+    except Exception as exc:
+        warnings.append(f"Complete pool is not a valid baseline: {exc}")
+
+    midweek = pd.DataFrame()
+    midweek_date: date | None = None
+    midweek_error: Exception | None = None
+    if midweek_pool_path is not None and Path(midweek_pool_path).exists():
+        try:
+            midweek = _normalized_pool(load_pool_csv(midweek_pool_path), label="midweek")
+            midweek_date = _snapshot_date(midweek, label="midweek")
+        except Exception as exc:
+            midweek_error = exc
+            warnings.append(f"Midweek pool is invalid: {exc}")
+
+    empty_review = pd.DataFrame()
+    empty_exited = pd.DataFrame()
+    empty_summary: dict[str, int] = {}
+    review_result: MidweekReviewResult | None = None
+    midweek_available = False
+    no_baseline = False
+    review_week: date | None = complete_week
+
+    if midweek_date is not None:
+        midweek_week = monday_of_week(midweek_date)
+        review_week = complete_week or midweek_week
+        try:
+            if complete_week is not None and midweek_week == complete_week and complete_date is not None and midweek_date > complete_date:
+                review_result = build_midweek_review(midweek, complete)
+                midweek_available = True
+            elif complete_week is None or midweek_week > complete_week:
+                review_result = build_midweek_review(midweek, pd.DataFrame())
+                midweek_available = True
+                no_baseline = True
+                warnings.append("Midweek snapshot has no valid complete-week baseline; Carry is disabled.")
+            else:
+                warnings.append("Midweek snapshot is stale for the current complete-week baseline.")
+        except Exception as exc:
+            warnings.append(f"Midweek projection failed closed: {exc}")
+
+    if window is PoolWindow.MIDWEEK and midweek_error is not None:
+        warnings.append("Midweek review failed closed; the complete pool remains selected.")
+
+    if window is PoolWindow.MIDWEEK and review_result is not None:
+        mode = PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE if no_baseline else PoolMode.MIDWEEK
+        actionable = review_result.actionable_codes
+    else:
+        mode = PoolMode.COMPLETE
+        if complete.empty:
+            if review_result is not None and window is PoolWindow.MIDWEEK:
+                mode = PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE
+                actionable = review_result.actionable_codes
+            else:
+                raise ValueError("Complete pool is unavailable and no usable midweek review exists")
+        else:
+            actionable = _complete_actionable_codes(complete)
+
+    return PoolAnalysisResult(
+        mode=mode,
+        window=window,
+        complete_snapshot_date=complete_date,
+        midweek_snapshot_date=midweek_date,
+        review_week_start=review_week,
+        complete_pool=complete,
+        midweek_pool=midweek,
+        midweek_review=review_result.current_review if review_result else empty_review,
+        exited_pool=review_result.exited_pool if review_result else empty_exited,
+        summary=review_result.summary if review_result else empty_summary,
+        actionable_codes=actionable,
+        warnings=tuple(warnings),
+        midweek_available=midweek_available,
+    )

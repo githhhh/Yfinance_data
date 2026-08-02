@@ -29,12 +29,24 @@ def _code_renderer_jscode():
         init(params) {
             this.params = params;
             this.eGui = document.createElement('div');
-            this.eGui.style.cssText = 'cursor:pointer; display:flex; align-items:center; justify-content:space-between; width:100%; font-weight:600; color:#1f77b4;';
-            
+            this.eGui.style.cssText = 'cursor:pointer; display:grid; grid-template-columns:minmax(0,1fr) 58px 18px; gap:4px; align-items:center; width:100%; font-weight:600; color:#38bdf8;';
             const codeText = params.value || '';
-            this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
-            this.eGui.title = 'Click to copy ' + codeText;
-            
+            const origin = params.data && params.data.review_signal_origin ? String(params.data.review_signal_origin) : '';
+            this.render = (feedback, failed) => {
+                this.eGui.replaceChildren();
+                const code = document.createElement('span');
+                code.textContent = String(codeText);
+                if (feedback) code.style.color = failed ? '#ef5350' : '#4caf50';
+                const badge = document.createElement('span');
+                badge.className = 'origin-slot';
+                badge.textContent = origin === 'RECONFIRMED' ? 'RECONF.' : origin;
+                badge.style.cssText = 'display:inline-flex; width:58px; min-width:58px; min-height:18px; align-items:center; justify-content:center; border:1px solid #475569; border-radius:3px; color:#cbd5e1; font-size:9px; line-height:1; visibility:' + (origin && origin !== 'NONE' ? 'visible' : 'hidden') + ';';
+                const copy = document.createElement('span');
+                copy.textContent = feedback ? (failed ? '!' : '✓') : '⧉';
+                copy.style.cssText = 'font-size:11px; opacity:0.75; text-align:right;';
+                this.eGui.append(code, badge, copy);
+            };
+            this.render(false, false);
             this.eGui.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const textToCopy = String(codeText);
@@ -63,13 +75,13 @@ def _code_renderer_jscode():
                     }
                 }
                 if (success) {
-                    this.eGui.innerHTML = '<span style="color:#2e7d32;">' + codeText + '</span><span style="font-size:11px; color:#2e7d32; margin-left:4px;">✓ Copied</span>';
+                    this.render(true, false);
                 } else {
-                    this.eGui.innerHTML = '<span style="color:#c62828;">' + codeText + '</span><span style="font-size:11px; color:#c62828; margin-left:4px;">Error</span>';
+                    this.render(true, true);
                 }
                 setTimeout(() => {
                     if (this.eGui) {
-                        this.eGui.innerHTML = '<span>' + codeText + '</span><span style="font-size:12px; margin-left:4px; opacity:0.75;">📋</span>';
+                        this.render(false, false);
                     }
                 }, 1500);
             });
@@ -394,6 +406,12 @@ def _row_data_columns(df: pd.DataFrame, columns: list[str]) -> list[str]:
         if "ibd_breakout_quality" in display_columns
         else []
     )
+    if "code" in display_columns:
+        support_columns.extend(
+            column
+            for column in ("review_signal_origin", "review_change_group")
+            if column in df.columns
+        )
     return list(dict.fromkeys(display_columns + support_columns))
 
 
@@ -471,8 +489,8 @@ def _column_def(column: str) -> dict:
             definition["valueFormatter"] = formatter
     if column == "code":
         definition["pinned"] = "left"
-        definition["width"] = 85
-        definition["minWidth"] = 85
+        definition["width"] = 155
+        definition["minWidth"] = 135
         definition["lockPinned"] = False
         if HAS_JS_CODE:
             definition["cellRenderer"] = _code_renderer_jscode()
@@ -522,7 +540,27 @@ def _column_def(column: str) -> dict:
     else:
         definition["width"] = 130
 
-    if HAS_JS_CODE and column == "ibd_entry_status":
+    if HAS_JS_CODE and column == "review_change_label":
+        definition["width"] = 220
+        definition["minWidth"] = 190
+        definition["cellStyle"] = JsCode("""
+        function(params) {
+            const group = params.data && params.data.review_change_group ? String(params.data.review_change_group) : '';
+            const colors = {
+                BECAME_ACTIONABLE: '#22c55e',
+                LEFT_ACTIONABLE: '#ef5350',
+                OTHER_CHANGES: '#2dd4bf',
+                UNCHANGED: '#64748b'
+            };
+            return {
+                color: colors[group] || '#cbd5e1',
+                fontWeight: '700',
+                borderLeft: '3px solid ' + (colors[group] || '#64748b'),
+                backgroundColor: 'rgba(30, 41, 59, 0.35)'
+            };
+        }
+        """)
+    elif HAS_JS_CODE and column == "ibd_entry_status":
         meta_json = json.dumps(STATUS_META)
         definition["cellStyle"] = JsCode(f"""
         function(params) {{

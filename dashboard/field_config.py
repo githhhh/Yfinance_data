@@ -3,30 +3,113 @@ from __future__ import annotations
 from collections import OrderedDict
 
 
+def _tooltip_meta(definition: str, count_basis: str, click_effect: str) -> dict[str, str]:
+    return {
+        "definition": definition,
+        "count_basis": count_basis,
+        "click_effect": click_effect,
+        "tooltip": "\n".join([definition, count_basis, click_effect]),
+    }
+
+
 STATUS_META = {
     "ACTIONABLE": {
         "label": "ACTIONABLE",
         "dot": "🟢",
         "color": "#4caf50",
-        "tooltip": "日线已确认，当前位于 Candidate 上方 0%–5%，优先 Review。",
+        **_tooltip_meta(
+            "Definition: Effective Status is inside the confirmed 0%–5% buy zone.",
+            "Count: rows in the current scope after Change, Origin, and Filters.",
+            "Click: combine ACTIONABLE with the selected Change, Origin, and Filters.",
+        ),
     },
     "UNCONFIRMED": {
         "label": "UNCONFIRMED",
         "dot": "🟡",
         "color": "#ffb300",
-        "tooltip": "尚未满足日线突破确认，查看 Entry / Reason。",
+        **_tooltip_meta(
+            "Definition: the signal has not met the shared daily-entry confirmation rule.",
+            "Count: UNCONFIRMED rows in the current scope after other filters.",
+            "Click: combine UNCONFIRMED with the selected Change, Origin, and Filters.",
+        ),
     },
     "BELOW_TRIGGER": {
         "label": "BELOW TRIGGER",
         "dot": "🔴",
         "color": "#ef5350",
-        "tooltip": "已有有效确认，但当前价格位于 Candidate 下方。",
+        **_tooltip_meta(
+            "Definition: a valid entry exists, but the current close is below the candidate trigger.",
+            "Count: BELOW TRIGGER rows in the current scope after other filters.",
+            "Click: combine BELOW TRIGGER with the selected Change, Origin, and Filters.",
+        ),
     },
     "EXTENDED": {
         "label": "EXTENDED",
         "dot": "🔵",
         "color": "#42a5f5",
-        "tooltip": "日线已确认，但当前超过 Candidate +5%，避免追高。",
+        **_tooltip_meta(
+            "Definition: a valid entry exists, but the current close is above the +5% chase limit.",
+            "Count: EXTENDED rows in the current scope after other filters.",
+            "Click: combine EXTENDED with the selected Change, Origin, and Filters.",
+        ),
+    },
+}
+
+
+FLOW_CARD_META = {
+    "BECAME_ACTIONABLE": {
+        "label": "Became Actionable",
+        "color": "#22c55e",
+        **_tooltip_meta(
+            "Definition: the complete-week baseline was not ACTIONABLE and the current Effective Status is ACTIONABLE.",
+            "Count: matching rows in the current Review scope after Origin, Status, and Filters.",
+            "Click: filter to this transition while preserving Origin, Status, and Filters.",
+        ),
+    },
+    "LEFT_ACTIONABLE": {
+        "label": "Left Actionable",
+        "color": "#ef5350",
+        **_tooltip_meta(
+            "Definition: the baseline was ACTIONABLE and the current Effective Status is no longer ACTIONABLE.",
+            "Count: matching deteriorations in the current Review scope after other dimensions.",
+            "Click: filter to rows that left the buy zone while preserving Origin, Status, and Filters.",
+        ),
+    },
+    "OTHER_CHANGES": {
+        "label": "Other Changes",
+        "color": "#2dd4bf",
+        **_tooltip_meta(
+            "Definition: baseline and current status differ outside the two ACTIONABLE transitions.",
+            "Count: other status transitions in the current Review scope after other dimensions.",
+            "Click: filter to other transitions while preserving Origin, Status, and Filters.",
+        ),
+    },
+    "NEW": {
+        "label": "New",
+        "color": "#22d3ee",
+        **_tooltip_meta(
+            "Definition: current signal=True and the complete-week row has no active signal.",
+            "Count: NEW signals in the current Review scope after Change, Status, and Filters.",
+            "Click: filter to current-row signals while preserving Change, Status, and Filters.",
+        ),
+    },
+    "CARRY": {
+        "label": "Carry",
+        "color": "#94a3b8",
+        **_tooltip_meta(
+            "Definition: no new current signal; the complete-week signal is still watched because the code remains in current_pool.",
+            "Count: CARRY signals in the current Review scope after Change, Status, and Filters.",
+            "Click: filter to carried signals while preserving Change, Status, and Filters.",
+        ),
+    },
+    "RECONFIRMED": {
+        "label": "Reconfirmed",
+        "color": "#93c5fd",
+        **_tooltip_meta(
+            "Definition: both complete-week and current snapshots contain an active signal; the current row is atomic and authoritative.",
+            "Count: RECONFIRMED signals in the current Review scope after Change, Status, and Filters.",
+            "Click: filter to reconfirmed signals while preserving Change, Status, and Filters.",
+        ),
     },
 }
 
@@ -102,6 +185,8 @@ BOOLEAN_FIELDS = {
     "ibd_entry_valid",
     "is_bullish",
     "is_priority",
+    "review_watch_active",
+    "review_futu_actionable",
 }
 
 DATE_FIELDS = {
@@ -140,6 +225,9 @@ NUMBER_FIELDS = {
     "dist_to_52w_high_pct",
     "latest_close",
     "current_vs_ibd_candidate_pct",
+    "review_candidate_price",
+    "review_current_vs_candidate_pct",
+    "review_priority",
 }
 
 FILTER_FUNNEL_GROUPS = OrderedDict(
@@ -313,6 +401,21 @@ def _field(
 FIELD_CONFIG = OrderedDict(
     [
         ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="点击 Code 复制单个代码；点击该行其他位置查看详情。")),
+        (
+            "review_change_label",
+            _field(
+                "Change",
+                "category",
+                "Review",
+                filterable=True,
+                sortable=True,
+                default_table=False,
+                help_text="Signal origin and effective entry-status transition for this Midweek Review row.",
+            ),
+        ),
+        ("review_signal_origin", _field("Origin", "category", "Review", default_table=False)),
+        ("review_change_group", _field("Change Group", "category", "Review", default_table=False)),
+        ("review_priority", _field("Review Priority", "number", "Review", default_table=False)),
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
@@ -572,6 +675,11 @@ def get_sortable_fields() -> list[str]:
 
 def get_default_table_columns() -> list[str]:
     return [field for field in IBD_DECISION_COLUMNS if field in FIELD_CONFIG]
+
+
+def get_midweek_table_columns() -> list[str]:
+    columns = get_default_table_columns()
+    return [columns[0], "review_change_label", *columns[1:]]
 
 
 def get_column_view_fields(view_name: str) -> list[str]:

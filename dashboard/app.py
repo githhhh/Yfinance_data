@@ -4,6 +4,7 @@ import argparse
 import html
 import json
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -26,10 +27,25 @@ from dashboard.data_utils import (
     load_pool_csv,
 )
 from dashboard.field_config import (
+    FLOW_CARD_META,
     STATUS_META,
     get_all_table_columns,
     get_column_view_fields,
     get_field_label,
+    get_midweek_table_columns,
+)
+from dashboard.services.bf_midweek_review import (
+    PoolAnalysisResult,
+    PoolMode,
+    analyze_breakout_follow_pool,
+    apply_review_filters,
+    build_review_filter_counts,
+    clear_quick_filters,
+    default_review_state,
+    materialize_review_view,
+    reset_to_all_signals,
+    sort_review_rows,
+    switch_review_mode,
 )
 from dashboard.table_view import render_table
 
@@ -42,8 +58,26 @@ def cached_load_pool_csv(path: str, cache_fingerprint: tuple[int, int]) -> pd.Da
     return load_pool_csv(path)
 
 
+@st.cache_data
+def cached_analyze_breakout_follow_pool(
+    complete_path: str,
+    midweek_path: str,
+    window_date_value: str,
+    cache_fingerprints: tuple[tuple[int, int], tuple[int, int]],
+) -> PoolAnalysisResult:
+    del cache_fingerprints
+    return analyze_breakout_follow_pool(
+        complete_path,
+        midweek_path,
+        window_date=date.fromisoformat(window_date_value),
+    )
+
+
 def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
-    stat = Path(path).stat()
+    csv_path = Path(path)
+    if not csv_path.exists():
+        return (0, 0)
+    stat = csv_path.stat()
     return (stat.st_mtime_ns, stat.st_size)
 
 
@@ -290,21 +324,161 @@ def main() -> None:
             white-space: nowrap !important;
         }
 
+        .st-key-review_mode_controls button,
+        .st-key-review_scope_controls button {
+            height: 40px !important;
+            min-height: 40px !important;
+            width: 100% !important;
+            white-space: nowrap !important;
+            padding: 0 10px !important;
+        }
+        .st-key-review_mode_controls,
+        .st-key-review_scope_controls {
+            min-width: 286px !important;
+            max-width: 286px !important;
+        }
+        .st-key-review_context_slot {
+            min-height: 58px !important;
+            height: 58px !important;
+            max-height: 58px !important;
+            overflow: visible !important;
+        }
+        .st-key-review_context_slot > div[data-testid="stVerticalBlock"] {
+            min-height: 58px !important;
+            height: 58px !important;
+            max-height: 58px !important;
+            gap: 3px !important;
+        }
+        .st-key-review_context_slot div[class*="st-key-flow_card_"] {
+            position: relative !important;
+            min-width: 0 !important;
+        }
+        .st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) {
+            height: 27px !important;
+            min-height: 27px !important;
+            width: 100% !important;
+            padding: 0 22px 0 8px !important;
+            font-size: 10px !important;
+            white-space: nowrap !important;
+        }
+        .st-key-status_cards div[class*="st-key-flow_card_"] {
+            position: relative !important;
+        }
+        div[class*="st-key-flow_card_"] div[data-testid="stPopover"] {
+            position: absolute !important;
+            top: 3px !important;
+            right: 3px !important;
+            width: 20px !important;
+            height: 20px !important;
+            z-index: 4 !important;
+        }
+        div[class*="st-key-flow_card_"] div[data-testid="stPopover"] button[data-testid="stPopoverButton"] {
+            width: 20px !important;
+            min-width: 20px !important;
+            height: 20px !important;
+            min-height: 20px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+            color: #64748b !important;
+            font-size: 11px !important;
+        }
+        .st-key-review_context_slot div[class*="st-key-flow_card_"] div[data-testid="stPopover"] button[data-testid="stPopoverButton"],
+        .st-key-status_cards div[class*="st-key-flow_card_"] div[data-testid="stPopover"] button[data-testid="stPopoverButton"] {
+            width: 20px !important;
+            min-width: 20px !important;
+            height: 20px !important;
+            min-height: 20px !important;
+            padding: 0 !important;
+        }
+        div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
+            display: none !important;
+        }
+        div[class*="st-key-flow_card_"]:hover div[data-testid="stPopover"] button[data-testid="stPopoverButton"],
+        div[class*="st-key-flow_card_"]:focus-within div[data-testid="stPopover"] button[data-testid="stPopoverButton"] {
+            color: #cbd5e1 !important;
+        }
+        .st-key-filters_header button {
+            height: 44px !important;
+            min-height: 44px !important;
+            justify-content: space-between !important;
+        }
+        .snapshot-segment {
+            display: inline-block;
+            min-width: 122px;
+        }
+        .snapshot-mode-segment {
+            display: inline-block;
+            min-width: 224px;
+        }
+        @media (max-width: 900px) {
+            .st-key-review_queue div[data-testid="stHorizontalBlock"],
+            .st-key-review_context_slot div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                overflow-x: auto !important;
+            }
+            .st-key-review_mode_controls,
+            .st-key-review_scope_controls {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+            }
+            .st-key-review_mode_controls div[data-testid="stHorizontalBlock"],
+            .st-key-review_scope_controls div[data-testid="stHorizontalBlock"] {
+                overflow: visible !important;
+            }
+            .st-key-review_mode_controls div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+            .st-key-review_scope_controls div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+                flex: 1 0 100% !important;
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
     )
 
     df: pd.DataFrame | None = None
+    analysis: PoolAnalysisResult | None = None
     load_err: str | None = None
     try:
-        df = cached_load_pool_csv(args.csv, _csv_cache_fingerprint(args.csv))
+        window_date_value = args.window_date or datetime_business_date()
+        analysis = cached_analyze_breakout_follow_pool(
+            args.csv,
+            args.midweek_csv,
+            window_date_value,
+            (
+                _csv_cache_fingerprint(args.csv),
+                _csv_cache_fingerprint(args.midweek_csv),
+            ),
+        )
+        if "review_ui_state" not in st.session_state:
+            st.session_state["review_ui_state"] = default_review_state(analysis.mode)
+        state = dict(st.session_state["review_ui_state"])
+        if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
+            state = default_review_state(PoolMode.COMPLETE)
+            st.session_state["review_ui_state"] = state
+        df = _view_dataframe(analysis, state)
     except Exception as exc:
         load_err = str(exc)
 
     with st.container(key="dashboard_shell"):
         with st.container(key="dashboard_header"):
-            _render_header_bar(df, load_err)
+            _render_header_bar(df, load_err, analysis)
+
+        if analysis is not None:
+            for warning in analysis.warnings:
+                st.warning(warning, icon="⚠️")
 
         if df is None:
             st.error(f"Could not load breakout pool data: {load_err}")
@@ -312,12 +486,36 @@ def main() -> None:
 
         mode = st.session_state.get("global_mode_selector", "IBD Review")
         if mode == "C Rank Reference":
-            _render_c_rank_reference_view(df)
+            reference_df = analysis.complete_pool if analysis is not None else df
+            _render_c_rank_reference_view(reference_df)
         else:
-            _render_ibd_review_view(df)
+            _render_ibd_review_view(df, analysis)
 
 
-def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
+def datetime_business_date() -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+
+
+def _view_dataframe(analysis: PoolAnalysisResult, state: dict[str, Any]) -> pd.DataFrame:
+    if state.get("mode") == "MIDWEEK" and analysis.midweek_available:
+        return materialize_review_view(analysis.midweek_review)
+    complete = analysis.complete_pool.copy()
+    complete["review_watch_active"] = complete["signal"]
+    complete["review_effective_entry_status"] = complete["ibd_entry_status"]
+    complete["review_priority"] = pd.to_numeric(
+        complete.get("rank_C_continuous"), errors="coerce"
+    )
+    return complete
+
+
+def _render_header_bar(
+    df: pd.DataFrame | None,
+    load_err: str | None,
+    analysis: PoolAnalysisResult | None = None,
+) -> None:
     col_l, col_r = st.columns([3, 1.5])
     with col_l:
         badge_html = (
@@ -325,8 +523,18 @@ def _render_header_bar(df: pd.DataFrame | None, load_err: str | None) -> None:
             if df is not None
             else '<span style="background-color:#ffebee; color:#c62828; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Schema / Data Error</span>'
         )
-        freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
-        snapshot_html = freshness["header_html"]
+        state = st.session_state.get("review_ui_state", {})
+        is_midweek = state.get("mode") == "MIDWEEK" and analysis is not None
+        if is_midweek:
+            snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
+            baseline_value = analysis.complete_snapshot_date.isoformat() if analysis.complete_snapshot_date else "unavailable"
+            snapshot_html = (
+                f'<span class="snapshot-segment">Snapshot <b>{snapshot_value}</b></span> · '
+                f'<span class="snapshot-mode-segment" style="color:#2dd4bf; font-weight:600;">Midweek · baseline {baseline_value}</span>'
+            )
+        else:
+            freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+            snapshot_html = f'<span class="snapshot-segment">{freshness["header_html"]}</span><span class="snapshot-mode-segment"></span>'
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
@@ -377,87 +585,63 @@ def _render_flow_rules_dialog() -> None:
 ENTRY_VOL_ENABLED_STATUSES: set[str] = {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
 
 
-def _render_ibd_review_view(df: pd.DataFrame) -> None:
-    active_df = df[df["signal"] == True].copy() if "signal" in df.columns else df.copy()
-    active_signals_count = len(active_df)
+def _store_review_state(state: dict[str, Any]) -> None:
+    st.session_state["review_ui_state"] = dict(state)
 
-    route_val = st.session_state.get("ibd_filter_route", "All")
-    status_val = st.session_state.get("ibd_filter_status", "All")
-    if status_val != "UNCONFIRMED" and st.session_state.get("ibd_near_trigger_only", False):
-        st.session_state["ibd_near_trigger_only"] = False
-    dist_min_val = st.session_state.get("ibd_filter_dist_min", "")
-    dist_max_val = st.session_state.get("ibd_filter_dist_max", "")
-    entry_vol_min_val = st.session_state.get("ibd_filter_entry_vol_min", "")
-    weekly_vol_min_val = st.session_state.get("ibd_filter_weekly_vol_min", "")
 
-    if route_val != "All":
-        route_df = active_df[active_df["ibd_candidate_rule"] == route_val]
-    else:
-        route_df = active_df
+def _selected_button_label(selected: bool, label: str) -> str:
+    return f"{'✓' if selected else ' '} {label}"
 
-    status_counts = build_entry_status_counts(route_df)
+
+def _render_ibd_review_view(
+    df: pd.DataFrame,
+    analysis: PoolAnalysisResult | None = None,
+) -> None:
+    if "review_ui_state" not in st.session_state:
+        st.session_state["review_ui_state"] = default_review_state(
+            analysis.mode if analysis is not None else PoolMode.COMPLETE
+        )
+    state = dict(st.session_state["review_ui_state"])
+    counts = build_review_filter_counts(df, state)
 
     with st.container(key="review_queue"):
-        _render_status_queue(status_counts, len(route_df), status_val)
+        _render_status_queue(df, counts, state, analysis)
 
     with st.container(key="filters"):
-        _render_filter_bar(df, status_val, status_counts)
+        _render_filter_bar(df, state, counts)
 
-    filtered_df = route_df.copy()
-    if status_val != "All":
-        filtered_df = filtered_df[filtered_df["ibd_entry_status"] == status_val]
-
-    if dist_min_val != "":
-        try:
-            val = float(dist_min_val)
-            filtered_df = filtered_df[pd.to_numeric(filtered_df["current_vs_ibd_candidate_pct"], errors="coerce") >= val]
-        except ValueError:
-            pass
-
-    if dist_max_val != "":
-        try:
-            val = float(dist_max_val)
-            filtered_df = filtered_df[pd.to_numeric(filtered_df["current_vs_ibd_candidate_pct"], errors="coerce") <= val]
-        except ValueError:
-            pass
-
-    if status_val in ENTRY_VOL_ENABLED_STATUSES and entry_vol_min_val != "":
-        try:
-            val = float(entry_vol_min_val)
-            filtered_df = filtered_df[pd.to_numeric(filtered_df["ibd_entry_volume_ratio"], errors="coerce") >= val]
-        except ValueError:
-            pass
-
-    if weekly_vol_min_val != "":
-        try:
-            val = float(weekly_vol_min_val)
-            filtered_df = filtered_df[pd.to_numeric(filtered_df["volume_ratio"], errors="coerce") >= val]
-        except ValueError:
-            pass
-
-    filtered_df = filter_unconfirmed_near_trigger(
-        filtered_df, status_val, st.session_state.get("ibd_near_trigger_only", False)
-    )
-
-    filtered_df = apply_default_review_order(filtered_df)
-    sort_label = (
-        "Breakout Price Quality"
-        if status_val == "ACTIONABLE"
-        else "Entry Status → Breakout Price Quality"
-    )
+    filtered_df = apply_review_filters(df, state)
+    filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
 
     with st.container(key="results_toolbar"):
-        sum_c, copy_c = st.columns([2.4, 1.6], vertical_alignment="center")
+        sum_c, copy_c, sort_c = st.columns([2.3, 1.25, 0.75], vertical_alignment="center")
         with sum_c:
             st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by {sort_label}</div>',
+                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by {state["sort_mode"]}</div>',
                 unsafe_allow_html=True,
             )
         with copy_c:
-            _render_copy_codes_control(filtered_df["code"].tolist(), key_prefix="ibd_review")
+            _render_copy_codes_control(
+                filtered_df["code"].tolist(),
+                key_prefix=f'ibd_review_{state["mode"].lower()}',
+            )
+        with sort_c:
+            options = ["Review Priority", "C Rank", "Distance"] if state["mode"] == "MIDWEEK" else ["C Rank", "Distance"]
+            current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
+            selected_sort = st.selectbox(
+                "Sort",
+                options,
+                index=options.index(current_sort),
+                key=f'review_sort_{state.get("widget_generation", 0)}',
+                label_visibility="collapsed",
+            )
+            if selected_sort != state["sort_mode"]:
+                state["sort_mode"] = selected_sort
+                _store_review_state(state)
+                st.rerun()
 
     from dashboard.field_config import get_default_table_columns
-    columns = get_default_table_columns()
+    columns = get_midweek_table_columns() if state["mode"] == "MIDWEEK" else get_default_table_columns()
 
     with st.container(key="selected_row"):
         detail_container = st.empty()
@@ -468,115 +652,306 @@ def _render_ibd_review_view(df: pd.DataFrame) -> None:
         _render_selected_row_detail(filtered_df, selected_code)
 
     st.markdown("---")
-    _download_current_rows(df.loc[filtered_df.index] if not filtered_df.empty else pd.DataFrame(), "ibd_review_filtered.csv")
+    _download_current_rows(filtered_df, "ibd_review_filtered.csv")
 
 
-def _render_status_queue(status_counts: dict[str, int], route_total: int, current_status: str) -> None:
-    c_title, c_btn = st.columns([7.5, 1.5], vertical_alignment="center")
+def _render_mode_scope_controls(
+    state: dict[str, Any],
+    analysis: PoolAnalysisResult | None,
+) -> None:
+    c_title, c_mode, c_scope = st.columns([5.0, 2.1, 2.1], vertical_alignment="center")
     with c_title:
         st.markdown("##### Review Queue")
-    with c_btn:
-        is_all_active = current_status == "All"
-        all_prefix = "✓ " if is_all_active else ""
-        if st.button(f"{all_prefix}All Signals ({route_total})", key="btn_all_signals", use_container_width=True, type="primary" if is_all_active else "secondary"):
-            st.session_state["ibd_filter_status"] = "All"
-            st.session_state["ibd_filter_entry_vol_min"] = ""
-            st.session_state["ibd_near_trigger_only"] = False
-            st.rerun()
+    with c_mode:
+        with st.container(key="review_mode_controls"):
+            mode_cols = st.columns(2, gap="small")
+            midweek_available = analysis.midweek_available if analysis is not None else False
+            with mode_cols[0]:
+                if st.button(
+                    _selected_button_label(state["mode"] == "MIDWEEK", "Midweek Review"),
+                    key="btn_mode_midweek",
+                    use_container_width=True,
+                    disabled=not midweek_available,
+                    type="primary" if state["mode"] == "MIDWEEK" else "secondary",
+                ):
+                    _store_review_state(switch_review_mode(state, "MIDWEEK"))
+                    st.rerun()
+            with mode_cols[1]:
+                if st.button(
+                    _selected_button_label(state["mode"] == "WEEKEND", "Weekend Full Pool"),
+                    key="btn_mode_weekend",
+                    use_container_width=True,
+                    type="primary" if state["mode"] == "WEEKEND" else "secondary",
+                ):
+                    _store_review_state(switch_review_mode(state, "WEEKEND"))
+                    st.rerun()
+    with c_scope:
+        with st.container(key="review_scope_controls"):
+            scope_cols = st.columns(2, gap="small")
+            is_midweek = state["mode"] == "MIDWEEK"
+            change_total = 0
+            if analysis is not None:
+                change_total = sum(
+                    analysis.summary.get(value, 0)
+                    for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES")
+                )
+            all_total = int(df_active_count_for_state(state, analysis))
+            with scope_cols[0]:
+                if st.button(
+                    _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
+                    key="btn_scope_changes",
+                    use_container_width=True,
+                    disabled=not is_midweek,
+                    type="primary" if state["scope"] == "CHANGES" else "secondary",
+                ):
+                    state["scope"] = "CHANGES"
+                    _store_review_state(state)
+                    st.rerun()
+            with scope_cols[1]:
+                if st.button(
+                    _selected_button_label(state["scope"] == "ALL_SIGNALS", f"All Signals ({all_total})"),
+                    key="btn_scope_all_signals",
+                    use_container_width=True,
+                    type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
+                ):
+                    _store_review_state(reset_to_all_signals(state))
+                    st.rerun()
 
+
+def df_active_count_for_state(
+    state: dict[str, Any],
+    analysis: PoolAnalysisResult | None,
+) -> int:
+    if analysis is None:
+        return 0
+    if state["mode"] == "MIDWEEK":
+        return int(analysis.summary.get("ACTIVE_SIGNALS", 0))
+    if analysis.complete_pool.empty:
+        return 0
+    return int(analysis.complete_pool["signal"].map(bool).sum())
+
+
+def _render_filter_card(
+    card_id: str,
+    button_label: str,
+    metadata: dict[str, str],
+    *,
+    selected: bool,
+    button_key: str,
+) -> bool:
+    with st.container(key=f"flow_card_{card_id.lower()}"):
+        clicked = st.button(
+            button_label,
+            key=button_key,
+            use_container_width=True,
+            type="primary" if selected else "secondary",
+            help=metadata["tooltip"],
+        )
+        with st.popover("ⓘ", help=metadata["tooltip"]):
+            st.markdown(f"**{metadata['label']}**")
+            st.caption(metadata["definition"])
+            st.caption(metadata["count_basis"])
+            st.caption(metadata["click_effect"])
+        return clicked
+
+
+def _toggle_dimension(state: dict[str, Any], field: str, value: str) -> dict[str, Any]:
+    result = dict(state)
+    result[field] = "ALL" if result.get(field) == value else value
+    return result
+
+
+def _render_review_context(
+    df: pd.DataFrame,
+    counts: dict[str, Any],
+    state: dict[str, Any],
+) -> None:
+    with st.container(key="review_context_slot"):
+        if state["mode"] != "MIDWEEK":
+            st.markdown(
+                '<div style="height:58px; display:flex; align-items:center; border:1px solid #303947; border-radius:8px; padding:0 14px; color:#94a3b8;"><b style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-right:16px;">Weekend Baseline</b><strong style="color:#cbd5e1; margin-right:16px;">Complete weekly pool</strong>Midweek comparison is not applied in this view.</div>',
+                unsafe_allow_html=True,
+            )
+            return
+
+        rows = [
+            ("CHANGE", ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"), "change_filter", "change"),
+            ("ORIGIN", ("NEW", "CARRY", "RECONFIRMED"), "origin_filter", "origin"),
+        ]
+        for row_label, card_ids, state_field, count_field in rows:
+            columns = st.columns([0.58, 1.45, 1.45, 1.45, 0.72], gap="small")
+            with columns[0]:
+                st.caption(row_label)
+            for index, card_id in enumerate(card_ids, start=1):
+                metadata = FLOW_CARD_META[card_id]
+                count = counts[count_field][card_id]
+                with columns[index]:
+                    if _render_filter_card(
+                        card_id,
+                        f"{metadata['label']}  {count}",
+                        metadata,
+                        selected=state[state_field] == card_id,
+                        button_key=f"btn_{state_field}_{card_id}",
+                    ):
+                        _store_review_state(_toggle_dimension(state, state_field, card_id))
+                        st.rerun()
+            with columns[4]:
+                if row_label == "ORIGIN" and st.button("Clear", key="btn_clear_quick", use_container_width=True):
+                    _store_review_state(clear_quick_filters(state))
+                    st.rerun()
+
+
+def _render_status_queue(
+    df: pd.DataFrame,
+    counts: dict[str, Any],
+    state: dict[str, Any],
+    analysis: PoolAnalysisResult | None,
+) -> None:
+    _render_mode_scope_controls(state, analysis)
+    _render_review_context(df, counts, state)
+    scope_label = "CHANGED SIGNALS" if state["scope"] == "CHANGES" else "ALL SIGNALS"
+    st.caption(f"CURRENT ENTRY STATUS · {scope_label}")
     with st.container(key="status_cards"):
         cols = st.columns(4)
         statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
         sub_map = {
             "ACTIONABLE": "0%–5% above candidate",
-            "UNCONFIRMED": f"{status_counts.get('unconfirmed_within_3pct', 0)} within +3% zone",
-            "BELOW_TRIGGER": "＜ 0% below trigger",
-            "EXTENDED": "＞ +5% chase limit",
+            "UNCONFIRMED": "Within trigger watch zone",
+            "BELOW_TRIGGER": "Below candidate trigger",
+            "EXTENDED": "\\> +5% chase limit",
         }
         for i, status_name in enumerate(statuses):
             with cols[i]:
-                count = status_counts.get(status_name, 0)
-                is_active = current_status == status_name
+                count = counts["status"].get(status_name, 0)
+                is_active = state["status_filter"] == status_name
                 prefix = "✓ " if is_active else ""
                 display_name = status_name.replace("_", " ")
-                meta = STATUS_META.get(status_name, {})
+                meta = STATUS_META[status_name]
                 dot = meta.get("dot", "⚪")
-                tooltip = meta.get("tooltip", "")
                 btn_label = f"{prefix}{dot} {display_name} · {count}\n{sub_map[status_name]}"
-                if st.button(btn_label, key=f"btn_status_{status_name}", use_container_width=True, type="primary" if is_active else "secondary", help=tooltip):
-                    if is_active:
-                        st.session_state["ibd_filter_status"] = "All"
-                        st.session_state["ibd_filter_entry_vol_min"] = ""
-                        st.session_state["ibd_near_trigger_only"] = False
-                    else:
-                        st.session_state["ibd_filter_status"] = status_name
-                        if status_name not in ENTRY_VOL_ENABLED_STATUSES:
-                            st.session_state["ibd_filter_entry_vol_min"] = ""
-                        if status_name != "UNCONFIRMED":
-                            st.session_state["ibd_near_trigger_only"] = False
+                if _render_filter_card(
+                    status_name,
+                    btn_label,
+                    meta,
+                    selected=is_active,
+                    button_key=f"btn_status_{status_name}",
+                ):
+                    next_state = _toggle_dimension(state, "status_filter", status_name)
+                    if next_state["status_filter"] not in ENTRY_VOL_ENABLED_STATUSES:
+                        next_state["entry_volume_min"] = ""
+                    if next_state["status_filter"] != "UNCONFIRMED":
+                        next_state["near_trigger_only"] = False
+                    _store_review_state(next_state)
                     st.rerun()
 
 
-def _render_filter_bar(df: pd.DataFrame, current_status: str, status_counts: dict[str, int]) -> None:
-    st.markdown("##### Filters")
+def _active_filter_count(state: dict[str, Any]) -> int:
+    return sum(
+        [
+            state.get("route_filter", "All") != "All",
+            bool(state.get("distance_min")),
+            bool(state.get("distance_max")),
+            bool(state.get("entry_volume_min")),
+            bool(state.get("weekly_volume_min")),
+            bool(state.get("near_trigger_only")),
+        ]
+    )
+
+
+def _render_filter_bar(
+    df: pd.DataFrame,
+    state: dict[str, Any],
+    counts: dict[str, Any],
+) -> None:
+    active_count = _active_filter_count(state)
+    summary = "No filters applied" if active_count == 0 else f"{active_count} active"
+    with st.container(key="filters_header"):
+        if st.button(
+            f"Filters   ·   {summary}                                      {'⌃' if state['filters_expanded'] else '⌄'}",
+            key="btn_filters_toggle",
+            use_container_width=True,
+        ):
+            state["filters_expanded"] = not state["filters_expanded"]
+            _store_review_state(state)
+            st.rerun()
+    if not state["filters_expanded"]:
+        return
+
+    generation = state.get("widget_generation", 0)
     controls = st.container(key="filter_controls")
     cols = controls.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8], vertical_alignment="bottom")
     with cols[0]:
         routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
-        current_route = st.session_state.get("ibd_filter_route", "All")
-        idx = routes.index(current_route) if current_route in routes else 0
-        selected_route = st.selectbox("Route (Rule)", routes, index=idx, key="ibd_filter_route_input")
+        current_route = state.get("route_filter", "All")
+        selected_route = st.selectbox(
+            "Route (Rule)",
+            routes,
+            index=routes.index(current_route) if current_route in routes else 0,
+            key=f"review_route_{generation}",
+        )
         if selected_route != current_route:
-            st.session_state["ibd_filter_route"] = selected_route
+            state["route_filter"] = selected_route
+            _store_review_state(state)
             st.rerun()
-
     with cols[1]:
-        val = st.text_input("Distance Min %", value=st.session_state.get("ibd_filter_dist_min", ""), placeholder="", key="ibd_filter_dist_min_input")
-        if val != st.session_state.get("ibd_filter_dist_min", ""):
-            st.session_state["ibd_filter_dist_min"] = val
+        val = st.text_input("Distance Min %", value=state.get("distance_min", ""), key=f"review_dist_min_{generation}")
+        if val != state.get("distance_min", ""):
+            state["distance_min"] = val
+            _store_review_state(state)
             st.rerun()
-
     with cols[2]:
-        val = st.text_input("Distance Max %", value=st.session_state.get("ibd_filter_dist_max", ""), placeholder="", key="ibd_filter_dist_max_input")
-        if val != st.session_state.get("ibd_filter_dist_max", ""):
-            st.session_state["ibd_filter_dist_max"] = val
+        val = st.text_input("Distance Max %", value=state.get("distance_max", ""), key=f"review_dist_max_{generation}")
+        if val != state.get("distance_max", ""):
+            state["distance_max"] = val
+            _store_review_state(state)
             st.rerun()
-
     with cols[3]:
+        current_status = state.get("status_filter", "ALL")
         if current_status == "UNCONFIRMED":
-            near_count = status_counts.get("unconfirmed_within_3pct", 0)
             val = st.checkbox(
-                f"Near Trigger ≤ +3% ({near_count})",
-                value=st.session_state.get("ibd_near_trigger_only", False),
-                key="ibd_near_trigger_only_widget",
+                "Near Trigger ≤ +3%",
+                value=state.get("near_trigger_only", False),
+                key=f"review_near_{generation}",
             )
-            if val != st.session_state.get("ibd_near_trigger_only", False):
-                st.session_state["ibd_near_trigger_only"] = val
+            if val != state.get("near_trigger_only", False):
+                state["near_trigger_only"] = val
+                _store_review_state(state)
                 st.rerun()
         else:
             is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
-            placeholder_text = "N/A (Disabled)" if is_disabled else ""
-            val_entry = "" if is_disabled else st.session_state.get("ibd_filter_entry_vol_min", "")
-            val = st.text_input("Entry Vol Min (x)", value=val_entry, placeholder=placeholder_text, disabled=is_disabled, key="ibd_filter_entry_vol_min_input")
-            if not is_disabled and val != st.session_state.get("ibd_filter_entry_vol_min", ""):
-                st.session_state["ibd_filter_entry_vol_min"] = val
+            val = st.text_input(
+                "Entry Vol Min (x)",
+                value="" if is_disabled else state.get("entry_volume_min", ""),
+                placeholder="N/A (Disabled)" if is_disabled else "",
+                disabled=is_disabled,
+                key=f"review_entry_vol_{generation}",
+            )
+            if not is_disabled and val != state.get("entry_volume_min", ""):
+                state["entry_volume_min"] = val
+                _store_review_state(state)
                 st.rerun()
-
     with cols[4]:
-        val = st.text_input("Weekly Vol Min (x)", value=st.session_state.get("ibd_filter_weekly_vol_min", ""), placeholder="", key="ibd_filter_weekly_vol_min_input")
-        if val != st.session_state.get("ibd_filter_weekly_vol_min", ""):
-            st.session_state["ibd_filter_weekly_vol_min"] = val
+        val = st.text_input("Weekly Vol Min (x)", value=state.get("weekly_volume_min", ""), key=f"review_weekly_vol_{generation}")
+        if val != state.get("weekly_volume_min", ""):
+            state["weekly_volume_min"] = val
+            _store_review_state(state)
             st.rerun()
-
     with cols[5]:
-        if st.button("Reset", use_container_width=True):
-            st.session_state["ibd_filter_route"] = "All"
-            st.session_state["ibd_filter_status"] = "All"
-            st.session_state["ibd_filter_dist_min"] = ""
-            st.session_state["ibd_filter_dist_max"] = ""
-            st.session_state["ibd_filter_entry_vol_min"] = ""
-            st.session_state["ibd_filter_weekly_vol_min"] = ""
-            st.session_state["ibd_near_trigger_only"] = False
+        if st.button("Reset", key="btn_filters_reset", use_container_width=True):
+            reset = dict(state)
+            reset.update(
+                {
+                    "route_filter": "All",
+                    "status_filter": "ALL",
+                    "distance_min": "",
+                    "distance_max": "",
+                    "entry_volume_min": "",
+                    "weekly_volume_min": "",
+                    "near_trigger_only": False,
+                    "widget_generation": generation + 1,
+                }
+            )
+            _store_review_state(reset)
             st.rerun()
 
 
@@ -601,7 +976,40 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     rank_c = html.escape(str(row.get("rank_C_continuous", "N/A")))
     c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
 
+    raw_origin = row.get("review_signal_origin")
+    origin = (
+        str(raw_origin).strip()
+        if raw_origin is not None and not pd.isna(raw_origin) and str(raw_origin).strip() not in {"", "NONE"}
+        else ""
+    )
+    raw_change = row.get("review_change_label")
+    change_summary = (
+        str(raw_change).strip()
+        if raw_change is not None and not pd.isna(raw_change) and str(raw_change).strip()
+        else ""
+    )
+    baseline_raw = row.get("review_baseline_entry_status")
+    baseline_status = (
+        str(baseline_raw).strip().replace("_", " ")
+        if baseline_raw is not None and not pd.isna(baseline_raw) and str(baseline_raw).strip()
+        else ""
+    )
+    origin_badge = (
+        f'<span class="selected-origin" data-origin="{html.escape(origin)}">{html.escape("RECONF." if origin == "RECONFIRMED" else origin)}</span>'
+        if origin
+        else ""
+    )
+    change_markup = (
+        f'<div class="selected-change-summary">{html.escape(change_summary)}</div>'
+        if change_summary
+        else ""
+    )
     status_color = STATUS_META.get(str(row.get("ibd_entry_status", "N/A")), {}).get("color", "#4caf50" if status_name == "ACTIONABLE" else "#f2f5f9")
+    status_transition = (
+        f'{html.escape(baseline_status)} → <span style="color:{status_color};">{status_name.replace("_", " ")}</span>'
+        if baseline_status
+        else f'<span style="color:{status_color};">{status_name.replace("_", " ")}</span>'
+    )
 
     eps_yoy = html.escape(_format_card_val(row.get("eps_yoy_growth"), "%"))
     dist_52w = html.escape(_format_card_val(row.get("dist_to_52w_high_pct"), "%"))
@@ -712,14 +1120,16 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
             background: rgba(255, 179, 0, 0.12);
         }}
         .st-key-selected_row .code-popup-reject .code-popup-val {{ color: #ffca54; font-size: 12px; }}
+        .st-key-selected_row .selected-summary-cell {{ min-width:0; }}
+        .st-key-selected_row .selected-origin {{ display:inline-flex; margin-left:6px; padding:2px 5px; border:1px solid #475569; border-radius:3px; color:#cbd5e1; font-size:9px; line-height:1; vertical-align:middle; }}
+        .st-key-selected_row .selected-change-summary {{ margin-top:2px; color:#2dd4bf; font-size:9px; font-weight:700; text-transform:uppercase; }}
         </style>
         <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
-                <div style="flex:1; border-right:1px solid #303947; text-align:left;">
+                <div class="selected-summary-cell selected-code-cell" style="flex:1; border-right:1px solid #303947; text-align:left;">
                     <div class="code-hover-wrapper">
                         <details class="code-detail" data-selected-code="{code}">
-                            <summary class="code-hover-trigger"
-                                     title="Hover, focus, or click to view details">{code} ▾</summary>
+                            <summary class="code-hover-trigger" aria-label="{code} secondary details">{code} ▾ {origin_badge}</summary>
                             <div class="code-hover-popup" role="region" aria-label="{code} secondary details">
                             <div class="code-hover-surface">
                             <div class="code-popup-section" data-popup-section="daily-entry">
@@ -746,20 +1156,21 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                             </div>
                         </details>
                     </div>
+                    {change_markup}
                 </div>
-                <div style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{cand_price} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({cand_rule})</span></div>
                 </div>
-                <div style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Current vs Candidate</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{dist_pct} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">(Close: {latest_close})</span></div>
                 </div>
-                <div style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Entry Status</div>
-                    <div style="font-size:15px; font-weight:700; color:{status_color};">{status_name.replace('_', ' ')} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({vol_or_reject})</span></div>
+                    <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{status_transition} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({vol_or_reject})</span></div>
                 </div>
-                <div style="flex:1.5;">
+                <div class="selected-summary-cell" style="flex:1.5;">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">C Rank & Continuous</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">#{rank_c} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({c_cont})</span></div>
                 </div>
@@ -977,6 +1388,11 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
     default_csv = Path(__file__).resolve().parents[1] / "us" / "breakout_follow_pool.csv"
     parser.add_argument("--csv", default=str(default_csv))
+    parser.add_argument(
+        "--midweek-csv",
+        default=str(default_csv.with_name("breakout_follow_pool_midweek.csv")),
+    )
+    parser.add_argument("--window-date", default=None)
     args, _ = parser.parse_known_args()
     return args
 
