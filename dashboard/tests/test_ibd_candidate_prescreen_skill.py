@@ -42,7 +42,7 @@ def test_prescreen_output_is_chinese_and_decision_first():
     assert output.count("**突破日：** [Breakout Quality]") == 2
     assert "日线突破突出但结构、基本面或关键数据证据不完整" in output
     assert "只保留原始业务数据，不输出检查项数量或通过/失败统计" in output
-    assert "原著上下文未加载时必须说明" in output
+    assert "原著上下文" not in output
 
     headings = ("## 结论", "## 优先复核", "## 值得留意", "## 暂不优先")
     for heading in headings:
@@ -78,8 +78,7 @@ def test_weekly_volume_is_only_a_positive_bonus_in_user_output():
     assert "周线量能达到 `1.3x` 时，作为“优势”中的加分项展示" in skill
     assert "低于 `1.3x` 或缺失时直接省略" in skill
     assert "不得作为拒绝、降级或风险理由" in skill
-    assert "合并到可选背景句" in skill
-    assert "原著上下文未加载时也必须输出" in skill
+    assert "原著上下文" not in skill
 
 
 def test_internal_screening_rules_remain_unchanged():
