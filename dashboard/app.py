@@ -158,9 +158,9 @@ def _render_header_bar(
     col_l, col_r = st.columns([3, 1.5])
     with col_l:
         badge_html = (
-            '<span style="background-color:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Data Ready</span>'
+            '<span class="data-badge data-badge--ready">Data Ready</span>'
             if df is not None
-            else '<span style="background-color:#ffebee; color:#c62828; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; margin-left:8px;">Schema / Data Error</span>'
+            else '<span class="data-badge data-badge--error">Schema / Data Error</span>'
         )
         state = st.session_state.get("review_ui_state", {})
         is_midweek = state.get("mode") == "MIDWEEK" and analysis is not None
@@ -177,8 +177,8 @@ def _render_header_bar(
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
-            f'<h3 style="margin:0; display:inline-block; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">Breakout Pool {badge_html}</h3>'
-            f'<div style="font-size:13px; color:#8899a6; margin-top:2px;">{snapshot_html} · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
+            f'<h3 class="dashboard-title">Breakout Pool {badge_html}</h3>'
+            f'<div class="dashboard-snapshot">{snapshot_html} · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
             unsafe_allow_html=True,
         )
 
@@ -198,7 +198,6 @@ def _render_header_bar(
             )
             if mode is None:
                 mode = "IBD Review"
-    st.markdown('<hr style="margin: 4px 0 8px 0; border: none; border-top: 1px solid #e0e0e0;" />', unsafe_allow_html=True)
 
 
 @st.dialog("IBD Breakout Review Flow & Rules", width="large")
@@ -986,6 +985,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-variant-numeric: tabular-nums;
         }}
         .copy-btn:disabled {{
             cursor: not-allowed;

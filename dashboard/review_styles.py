@@ -42,9 +42,77 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     gap: 0 !important;
 }
 
+.st-key-dashboard_header > div[data-testid="stVerticalBlock"],
+.st-key-review_queue > div[data-testid="stVerticalBlock"],
+.st-key-filters > div[data-testid="stVerticalBlock"],
+.st-key-results_toolbar > div[data-testid="stVerticalBlock"],
+.st-key-selected_row > div[data-testid="stVerticalBlock"],
+.st-key-results_grid > div[data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+}
+
 .st-key-dashboard_header {
     min-height: 78px;
     border-bottom: 1px solid #aab1bb;
+}
+
+.st-key-dashboard_header > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+    align-items: flex-start;
+    gap: 24px !important;
+}
+
+.dashboard-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 !important;
+    color: var(--text);
+    font-family: Arial Narrow, Roboto Condensed, Inter, ui-sans-serif,
+        -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+    font-size: 29px !important;
+    font-weight: 800 !important;
+    line-height: 1;
+    letter-spacing: -1.1px;
+}
+
+.data-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 25px;
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.data-badge--ready {
+    background: #e8f7eb;
+    color: #27783b;
+}
+
+.data-badge--error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.dashboard-snapshot {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 23px;
+    color: #8d9bab;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.dashboard-snapshot b {
+    color: #aeb9c5;
+}
+
+.dashboard-snapshot .snapshot-mode-segment {
+    color: #40d6ba;
+    font-weight: 700;
 }
 
 .st-key-dashboard_header div[class*="st-key-btn_info_rules"] button {
@@ -55,14 +123,47 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     min-height: 45px !important;
     max-height: 45px !important;
     border-radius: 11px !important;
+    border: 1px solid #414b58 !important;
+    background: transparent !important;
+    color: var(--text) !important;
 }
 
 .st-key-dashboard_header div[class*="st-key-global_mode_selector"] div[role="radiogroup"],
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] div[data-testid="stButtonGroup"],
 .st-key-dashboard_header div[class*="st-key-global_mode_selector"] button,
 .st-key-dashboard_header div[class*="st-key-global_mode_selector"] label {
     height: 45px !important;
     min-height: 45px !important;
     max-height: 45px !important;
+}
+
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] button,
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] label {
+    min-width: 99px;
+    border-color: #414b58 !important;
+    border-radius: 0 !important;
+    padding: 0 16px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+}
+
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] button:first-child,
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] label:first-child {
+    border-radius: 9px 0 0 9px !important;
+}
+
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] button:last-child,
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] label:last-child {
+    min-width: 136px;
+    border-radius: 0 9px 9px 0 !important;
+}
+
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] button[aria-pressed="true"],
+.st-key-dashboard_header div[class*="st-key-global_mode_selector"] label:has(input:checked) {
+    border-color: #00d897 !important;
+    background: rgb(0 216 151 / 4%) !important;
+    color: #00dc98 !important;
 }
 
 .snapshot-segment {
@@ -73,6 +174,10 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
 .snapshot-mode-segment {
     display: inline-block;
     min-width: 211px;
+}
+
+.st-key-review_queue {
+    padding-top: 9px;
 }
 
 .st-key-review_queue_heading {
@@ -133,6 +238,28 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     white-space: nowrap !important;
     font-size: 12px !important;
     font-weight: 700 !important;
+    color: #9aa6b5 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.st-key-review_mode_controls button[kind="primary"] {
+    color: #f7f8f9 !important;
+    background: #243349 !important;
+    box-shadow: inset 0 0 0 1px rgb(71 143 255 / 38%) !important;
+}
+
+.st-key-review_scope_controls button[kind="primary"] {
+    color: #f4f7fa !important;
+    background: #1c2f48 !important;
+    box-shadow: inset 0 -2px #3e91ff !important;
+}
+
+.st-key-review_scope_controls button:disabled {
+    cursor: not-allowed !important;
+    color: #536170 !important;
+    background: #10161e !important;
 }
 
 .st-key-review_context_slot {
@@ -192,9 +319,23 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     border: 1px solid #35414d !important;
     border-radius: 6px !important;
     padding: 0 22px 0 18px !important;
-    background: #121921;
-    font-size: 10px !important;
+    background: #151c24 !important;
+    color: #bac4cf !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
     white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind="primary"]:not([data-testid="stPopoverButton"]) {
+    border-color: #2d8f7f !important;
+    background: #16302e !important;
+    color: #e7f8f4 !important;
+}
+
+.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]):hover {
+    border-color: #536273 !important;
+    background: #19222c !important;
 }
 
 .st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p::before {
@@ -213,7 +354,7 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
 }
 
 .st-key-flow_card_left_actionable button[kind] p::before {
-    background: var(--red) !important;
+    background: linear-gradient(135deg, var(--blue) 0 49%, var(--red) 51% 100%) !important;
 }
 
 .st-key-flow_card_other_changes button[kind] p::before {
@@ -276,6 +417,35 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     height: 70px;
     min-height: 70px !important;
     max-height: 70px !important;
+    justify-content: center !important;
+    border: 1px solid #36414e !important;
+    border-radius: 8px !important;
+    padding: 0 28px !important;
+    background: var(--panel) !important;
+    color: #d6dce3 !important;
+    white-space: pre-line !important;
+    box-shadow: none !important;
+}
+
+.st-key-status_cards div[class*="st-key-flow_card_"] button[kind="primary"] {
+    border-color: #527060 !important;
+    background: #19251f !important;
+}
+
+.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:hover {
+    border-color: #536172 !important;
+    background: #19212a !important;
+}
+
+.st-key-status_cards div[class*="st-key-flow_card_"] button p {
+    margin: 0 !important;
+    color: #d6dce3 !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+    text-align: left;
+    white-space: pre-line !important;
+    font-variant-numeric: tabular-nums;
 }
 
 .st-key-status_cards div[class*="st-key-flow_card_"] {
@@ -344,10 +514,37 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
     height: 45px;
     min-height: 45px !important;
     max-height: 45px !important;
+    justify-content: space-between !important;
+    border: 1px solid #313b47 !important;
+    border-radius: 7px !important;
+    padding: 0 14px !important;
+    background: #11161d !important;
+    color: #dfe4e9 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+}
+
+.st-key-filters_header button:hover {
+    border-color: #465463 !important;
+    background: #141b23 !important;
+}
+
+.st-key-filters {
+    padding-top: 12px;
+}
+
+.st-key-filter_controls input,
+.st-key-filter_controls div[data-baseweb="select"] > div {
+    border-color: #3a4654 !important;
+    background: var(--input) !important;
+    color: var(--text) !important;
 }
 
 .st-key-results_toolbar {
     min-height: 56px;
+    padding-top: 12px;
+    box-sizing: border-box;
 }
 
 .st-key-results_toolbar .results-summary {
@@ -355,6 +552,7 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
     font-size: 14px;
     font-weight: 600;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .st-key-results_actions {
@@ -364,6 +562,10 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
 .st-key-results_actions > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
     align-items: center;
     gap: 8px;
+}
+
+.st-key-results_actions div[data-testid="stColumn"] {
+    min-width: 0 !important;
 }
 
 .st-key-results_toolbar iframe {
@@ -385,9 +587,9 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
     box-sizing: border-box;
     overflow: hidden;
     margin-bottom: 8px;
-    border: 1px solid #303947;
-    border-radius: 6px;
-    background: #141a22;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--panel);
     color: #f2f5f9;
 }
 
@@ -397,7 +599,7 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
     flex-direction: column;
     justify-content: center;
     padding: 8px 12px;
-    border-right: 1px solid #303947;
+    border-right: 1px solid #36404b;
     text-align: center;
 }
 
@@ -441,12 +643,49 @@ select:focus-visible,
 }
 
 @media (width <= 760px) {
-    .st-key-results_toolbar > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+    .st-key-dashboard_header {
+        min-height: 0;
+        padding-bottom: 15px;
+    }
+
+    .st-key-dashboard_header > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
         grid-template-columns: 1fr;
+        width: 100%;
+    }
+
+    .dashboard-snapshot {
+        flex-wrap: wrap;
+        margin-top: 14px;
+        white-space: normal;
+    }
+
+    .snapshot-segment,
+    .snapshot-mode-segment {
+        min-width: 0;
+    }
+
+    .st-key-results_toolbar > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: 1fr;
+        width: 100%;
     }
 
     .st-key-results_actions {
-        max-width: 360px;
+        width: 100%;
+        max-width: none;
+    }
+
+    .st-key-results_actions > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: minmax(180px, 1.5fr) minmax(120px, 1fr);
+        width: 100%;
+    }
+
+    .st-key-results_toolbar iframe,
+    .st-key-results_toolbar div[data-baseweb="select"] > div {
+        width: 100% !important;
+        min-width: 0;
     }
 
     .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
@@ -494,6 +733,24 @@ select:focus-visible,
 
     .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
         grid-column: auto;
+    }
+
+    .dashboard-title {
+        font-size: 25px !important;
+    }
+
+    .st-key-dashboard_header div[data-testid="stColumn"]:has(.st-key-btn_info_rules) {
+        width: 100% !important;
+    }
+
+    .st-key-dashboard_header div[data-testid="stColumn"]:has(.st-key-btn_info_rules) > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: 45px minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .st-key-dashboard_header div[class*="st-key-global_mode_selector"] {
+        width: 100%;
     }
 }
 

@@ -55,6 +55,9 @@ def test_reference_tokens_and_desktop_geometry_are_explicit():
         "min-height:56px",
         "height:60px",
         "grid-template-columns:194pxrepeat(4,minmax(0,1fr))",
+        "font-size:29px",
+        "font-weight:800",
+        "margin-top:23px",
     ]:
         assert declaration in css
 
@@ -133,3 +136,35 @@ def test_results_and_selected_row_use_stable_named_surfaces():
     assert 'key="results_actions"' in APP_SOURCE
     assert 'class="selected-strip"' in APP_SOURCE
     assert 'class="selected-strip selected-strip--empty"' in APP_SOURCE
+
+
+def test_header_markup_and_control_surfaces_follow_reference_hierarchy():
+    css = _compact_css()
+    source = _function_source("_render_header_bar", "_render_flow_rules_dialog")
+
+    for marker in [
+        'class="dashboard-title"',
+        'class="data-badge data-badge--ready"',
+        'class="data-badge data-badge--error"',
+        'class="dashboard-snapshot"',
+    ]:
+        assert marker in APP_SOURCE
+    for declaration in [
+        "background:var(--panel)",
+        "background:#151c24",
+        "border:1pxsolid#36414e",
+        "white-space:pre-line",
+        "justify-content:center",
+    ]:
+        assert declaration in css
+    assert "<hr" not in source
+
+
+def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
+    css = _compact_css()
+
+    assert ".st-key-dashboard_header>div[data-testid=\"stVerticalBlock\"]" in css
+    assert ".st-key-results_toolbar>div[data-testid=\"stVerticalBlock\"]" in css
+    assert ".st-key-results_actions>div[data-testid=\"stVerticalBlock\"]" in css
+    assert "grid-template-columns:minmax(180px,1.5fr)minmax(120px,1fr)" in css
+    assert "font-size:25px" in css
