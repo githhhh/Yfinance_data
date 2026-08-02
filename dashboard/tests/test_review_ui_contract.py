@@ -117,3 +117,19 @@ def test_quick_dots_status_orbs_and_mobile_tooltip_are_styled():
         "inset:auto12px14px",
     ]:
         assert declaration in css
+
+
+def test_copy_control_has_no_permanent_manual_and_keeps_two_copy_paths():
+    source = _function_source("_render_copy_codes_control", "_download_current_rows")
+
+    assert 'st.popover("Manual"' not in source
+    assert "navigator.clipboard.writeText" in source
+    assert "document.execCommand('copy')" in source
+    assert "Copy failed" in source
+    assert "disabled_attr" in source
+
+
+def test_results_and_selected_row_use_stable_named_surfaces():
+    assert 'key="results_actions"' in APP_SOURCE
+    assert 'class="selected-strip"' in APP_SOURCE
+    assert 'class="selected-strip selected-strip--empty"' in APP_SOURCE

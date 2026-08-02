@@ -310,7 +310,7 @@ def test_c_rank_reference_mode_sorting_and_top_n():
     assert ranked_top2["code"].tolist() == ["NVDA", "AAPL"]
 
 
-# 10. Copy Codes dual-layer control and popup rendering
+# 10. Copy Codes primary control and browser fallback rendering
 class DummyCtx:
     def __enter__(self):
         return self
@@ -338,8 +338,28 @@ def test_copy_codes_control_rendering(monkeypatch):
     assert len(rendered_components) == 1
     assert "Copy 3 Codes" in rendered_components[0]
     assert 'textToCopy = "AAPL, NVDA, TSLA"' in rendered_components[0]
-    assert any("Fallback" in pop or "Manual" in pop for pop in rendered_popovers)
-    assert any("AAPL, NVDA, TSLA" in code_str for code_str in rendered_codes)
+    assert "navigator.clipboard.writeText" in rendered_components[0]
+    assert "document.execCommand('copy')" in rendered_components[0]
+    assert "Manual" not in rendered_components[0]
+    assert rendered_popovers == []
+    assert rendered_codes == []
+
+
+def test_copy_codes_control_counts_only_non_blank_codes_and_disables_empty(monkeypatch):
+    rendered_components = []
+    monkeypatch.setattr(
+        "streamlit.components.v1.html",
+        lambda value, **kwargs: rendered_components.append(value),
+    )
+
+    _render_copy_codes_control(["AAPL", None, " ", pd.NA], key_prefix="valid")
+    assert "Copy 1 Codes" in rendered_components[-1]
+    assert 'textToCopy = "AAPL"' in rendered_components[-1]
+    assert " disabled" not in rendered_components[-1].split("</button>", 1)[0]
+
+    _render_copy_codes_control([None, "", "  ", pd.NA], key_prefix="empty")
+    assert "Copy 0 Codes" in rendered_components[-1]
+    assert " disabled" in rendered_components[-1].split("</button>", 1)[0]
 
 
 # 11. Entry Vol rules: enabled for ACTIONABLE, BELOW_TRIGGER, EXTENDED; disabled/cleared for UNCONFIRMED/All

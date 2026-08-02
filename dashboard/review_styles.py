@@ -350,6 +350,22 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
     min-height: 56px;
 }
 
+.st-key-results_toolbar .results-summary {
+    color: #c5ceda;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.st-key-results_actions {
+    width: 100%;
+}
+
+.st-key-results_actions > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+    align-items: center;
+    gap: 8px;
+}
+
 .st-key-results_toolbar iframe {
     min-width: 180px;
     height: 44px !important;
@@ -363,9 +379,42 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
 .st-key-selected_row .selected-strip {
     display: grid;
     grid-template-columns: 194px repeat(4, minmax(0, 1fr));
+    align-items: stretch;
     width: 100%;
     height: 60px;
+    box-sizing: border-box;
     overflow: hidden;
+    margin-bottom: 8px;
+    border: 1px solid #303947;
+    border-radius: 6px;
+    background: #141a22;
+    color: #f2f5f9;
+}
+
+.st-key-selected_row .selected-summary-cell {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 12px;
+    border-right: 1px solid #303947;
+    text-align: center;
+}
+
+.st-key-selected_row .selected-summary-cell:last-child {
+    border-right: 0;
+}
+
+.st-key-selected_row .selected-code-cell {
+    text-align: left;
+}
+
+.st-key-selected_row .selected-strip--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca8b7;
+    font-size: 13px;
 }
 
 button:focus-visible,
@@ -392,6 +441,14 @@ select:focus-visible,
 }
 
 @media (width <= 760px) {
+    .st-key-results_toolbar > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
+        grid-template-columns: 1fr;
+    }
+
+    .st-key-results_actions {
+        max-width: 360px;
+    }
+
     .st-key-review_queue_heading > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"] {
         grid-template-columns: 1fr 1fr;
         width: 100%;

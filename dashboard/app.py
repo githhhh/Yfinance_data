@@ -256,31 +256,34 @@ def _render_ibd_review_view(
     filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
 
     with st.container(key="results_toolbar"):
-        sum_c, copy_c, sort_c = st.columns([2.3, 1.25, 0.75], vertical_alignment="center")
-        with sum_c:
+        summary_col, actions_col = st.columns([1, 0.42], vertical_alignment="center")
+        with summary_col:
             st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">{len(filtered_df)} results · Sorted by {state["sort_mode"]}</div>',
+                f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(state["sort_mode"])}</div>',
                 unsafe_allow_html=True,
             )
-        with copy_c:
-            _render_copy_codes_control(
-                filtered_df["code"].tolist(),
-                key_prefix=f'ibd_review_{state["mode"].lower()}',
-            )
-        with sort_c:
-            options = ["Review Priority", "C Rank", "Distance"] if state["mode"] == "MIDWEEK" else ["C Rank", "Distance"]
-            current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
-            selected_sort = st.selectbox(
-                "Sort",
-                options,
-                index=options.index(current_sort),
-                key=f'review_sort_{state.get("widget_generation", 0)}',
-                label_visibility="collapsed",
-            )
-            if selected_sort != state["sort_mode"]:
-                state["sort_mode"] = selected_sort
-                _store_review_state(state)
-                st.rerun()
+        with actions_col:
+            with st.container(key="results_actions"):
+                copy_col, sort_col = st.columns([1.5, 1], vertical_alignment="center")
+                with copy_col:
+                    _render_copy_codes_control(
+                        filtered_df["code"].tolist(),
+                        key_prefix=f'ibd_review_{state["mode"].lower()}',
+                    )
+                with sort_col:
+                    options = ["Review Priority", "C Rank", "Distance"] if state["mode"] == "MIDWEEK" else ["C Rank", "Distance"]
+                    current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
+                    selected_sort = st.selectbox(
+                        "Sort",
+                        options,
+                        index=options.index(current_sort),
+                        key=f'review_sort_{state.get("widget_generation", 0)}',
+                        label_visibility="collapsed",
+                    )
+                    if selected_sort != state["sort_mode"]:
+                        state["sort_mode"] = selected_sort
+                        _store_review_state(state)
+                        st.rerun()
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if state["mode"] == "MIDWEEK" else get_default_table_columns()
@@ -640,7 +643,11 @@ def _render_filter_bar(
 
 def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
     if filtered_df.empty:
-        st.info("No matching records found with current filter criteria.")
+        st.markdown(
+            '<div class="selected-strip selected-strip--empty" role="status">'
+            '<span>No matching records found with current filter criteria.</span></div>',
+            unsafe_allow_html=True,
+        )
         return
 
     row: pd.Series | None = None
@@ -807,9 +814,8 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
         .st-key-selected_row .selected-origin {{ display:inline-flex; margin-left:6px; padding:2px 5px; border:1px solid #475569; border-radius:3px; color:#cbd5e1; font-size:9px; line-height:1; vertical-align:middle; }}
         .st-key-selected_row .selected-change-summary {{ margin-top:2px; color:#2dd4bf; font-size:9px; font-weight:700; text-transform:uppercase; }}
         </style>
-        <div style="background:#141a22; border:1px solid #303947; color:#f2f5f9; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; text-align:center;">
-                <div class="selected-summary-cell selected-code-cell" style="flex:1; border-right:1px solid #303947; text-align:left;">
+        <div class="selected-strip">
+                <div class="selected-summary-cell selected-code-cell">
                     <div class="code-hover-wrapper">
                         <details class="code-detail" data-selected-code="{code}">
                             <summary class="code-hover-trigger" aria-label="{code} secondary details">{code} ▾ {origin_badge}</summary>
@@ -841,23 +847,22 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                     </div>
                     {change_markup}
                 </div>
-                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{cand_price} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({cand_rule})</span></div>
                 </div>
-                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Current vs Candidate</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{dist_pct} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">(Close: {latest_close})</span></div>
                 </div>
-                <div class="selected-summary-cell" style="flex:1.5; border-right:1px solid #303947;">
+                <div class="selected-summary-cell">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Entry Status</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{status_transition} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({vol_or_reject})</span></div>
                 </div>
-                <div class="selected-summary-cell" style="flex:1.5;">
+                <div class="selected-summary-cell">
                     <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">C Rank & Continuous</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">#{rank_c} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({c_cont})</span></div>
                 </div>
-            </div>
         </div>
         """
     )
@@ -931,8 +936,10 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
 
 
 def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
-    codes_str = ", ".join([str(c) for c in codes if pd.notna(c) and str(c).strip()])
-    n = len(codes)
+    valid_codes = [str(code).strip() for code in codes if pd.notna(code) and str(code).strip()]
+    codes_str = ", ".join(valid_codes)
+    n = len(valid_codes)
+    disabled_attr = " disabled" if n == 0 else ""
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -980,11 +987,16 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
             overflow: hidden;
             text-overflow: ellipsis;
         }}
+        .copy-btn:disabled {{
+            cursor: not-allowed;
+            opacity: 0.58;
+            background: #29462f;
+        }}
     </style>
     </head>
     <body>
     <div class="copy-wrapper">
-        <button id="copyBtn_{key_prefix}" class="copy-btn">
+        <button id="copyBtn_{key_prefix}" class="copy-btn"{disabled_attr}>
             Copy {n} Codes
         </button>
     </div>
@@ -1022,7 +1034,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                     btn.innerText = '✓ Copied ({n})';
                 }} else {{
                     btn.style.background = '#c62828';
-                    btn.innerText = 'Copy failed · use Manual';
+                    btn.innerText = 'Copy failed';
                 }}
                 setTimeout(() => {{
                     btn.style.background = '#2e7d32';
@@ -1034,13 +1046,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
     </body>
     </html>
     """
-    col_a, col_b = st.columns([180, 120])
-    with col_a:
-        st.components.v1.html(html_code, height=44, scrolling=False)
-    with col_b:
-        with st.popover("Manual", use_container_width=True):
-            st.caption("If direct copy is blocked by your browser, copy directly from below:")
-            st.code(codes_str, language="text")
+    st.components.v1.html(html_code, height=44, scrolling=False)
 
 
 def _download_current_rows(df: pd.DataFrame, filename: str) -> None:

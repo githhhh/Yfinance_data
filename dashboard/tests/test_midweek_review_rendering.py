@@ -92,7 +92,24 @@ def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monke
     assert 'data-origin="NEW"' in markup
     assert "NEW → ACTIONABLE" in markup
     assert "UNCONFIRMED →" in markup
+    assert 'class="selected-strip"' in markup
     assert markup.count('class="selected-summary-cell') == 5
+
+
+def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):
+    rendered: list[str] = []
+    monkeypatch.setattr("streamlit.markdown", lambda value, **kwargs: rendered.append(value))
+    monkeypatch.setattr(
+        "streamlit.info",
+        lambda value, **kwargs: rendered.append(f"unexpected-info:{value}"),
+    )
+
+    _render_selected_row_detail(pd.DataFrame(), None)
+
+    assert rendered == [
+        '<div class="selected-strip selected-strip--empty" role="status">'
+        '<span>No matching records found with current filter criteria.</span></div>'
+    ]
 
 
 def test_app_declares_stable_mode_scope_context_filter_and_layout_slots():
