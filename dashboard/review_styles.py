@@ -197,6 +197,41 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     white-space: nowrap !important;
 }
 
+.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    vertical-align: middle;
+}
+
+.st-key-flow_card_became_actionable button[kind] p::before {
+    background: var(--green) !important;
+}
+
+.st-key-flow_card_left_actionable button[kind] p::before {
+    background: var(--red) !important;
+}
+
+.st-key-flow_card_other_changes button[kind] p::before {
+    background: var(--cyan) !important;
+}
+
+.st-key-flow_card_new button[kind] p::before {
+    background: #22d3ee !important;
+}
+
+.st-key-flow_card_carry button[kind] p::before {
+    background: #94a3b8 !important;
+}
+
+.st-key-flow_card_reconfirmed button[kind] p::before {
+    background: #93c5fd !important;
+}
+
 .st-key-review_context_slot div[class*="st-key-btn_clear_quick"] button {
     height: 31px !important;
     min-height: 31px !important;
@@ -241,6 +276,67 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     height: 70px;
     min-height: 70px !important;
     max-height: 70px !important;
+}
+
+.st-key-status_cards div[class*="st-key-flow_card_"] {
+    position: relative;
+}
+
+.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p::before {
+    content: "";
+    display: inline-block;
+    width: 19px;
+    height: 19px;
+    margin-right: 7px;
+    border-radius: 50%;
+    box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), 0 0 5px currentColor;
+    vertical-align: middle;
+}
+
+.st-key-flow_card_actionable button[kind] p::before {
+    color: var(--green);
+    background: #16c832;
+}
+
+.st-key-flow_card_unconfirmed button[kind] p::before {
+    color: var(--yellow);
+    background: #ffc800;
+}
+
+.st-key-flow_card_below_trigger button[kind] p::before {
+    color: var(--red);
+    background: #e71920;
+}
+
+.st-key-flow_card_extended button[kind] p::before {
+    color: var(--blue);
+    background: #0968d5;
+}
+
+div[class*="st-key-flow_card_"] div[data-testid="stPopover"] {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    z-index: 4;
+    width: 16px;
+    height: 16px;
+}
+
+div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] {
+    width: 16px !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    min-height: 16px !important;
+    border: 1px solid #4c5967 !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    background: #121921 !important;
+    color: #82909f !important;
+    font-size: 10px !important;
+}
+
+div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
+    display: none;
 }
 
 .st-key-filters_header button {
@@ -320,6 +416,13 @@ select:focus-visible,
     .st-key-selected_row .selected-strip {
         grid-template-columns: 150px repeat(4, 180px);
         overflow-x: auto;
+    }
+
+    div[data-baseweb="popover"]:has(div[class*="st-key-flow_tooltip_content_"]) {
+        position: fixed !important;
+        inset: auto 12px 14px !important;
+        width: auto !important;
+        max-width: none !important;
     }
 }
 

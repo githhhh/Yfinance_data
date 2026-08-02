@@ -203,7 +203,10 @@ def _render_header_bar(
 
 @st.dialog("IBD Breakout Review Flow & Rules", width="large")
 def _render_flow_rules_dialog() -> None:
-    legend_lines = [f"- {meta.get('dot', '⚪')} **{meta.get('label', k)}**：{meta.get('tooltip', '')}" for k, meta in STATUS_META.items()]
+    legend_lines = [
+        f"- **{meta.get('label', key)}**：{meta.get('tooltip', '')}"
+        for key, meta in STATUS_META.items()
+    ]
     legend_md = "\n        ".join(legend_lines)
     st.markdown(
         f"""
@@ -389,10 +392,11 @@ def _render_filter_card(
             help=metadata["tooltip"],
         )
         with st.popover("ⓘ", help=metadata["tooltip"]):
-            st.markdown(f"**{metadata['label']}**")
-            st.caption(metadata["definition"])
-            st.caption(metadata["count_basis"])
-            st.caption(metadata["click_effect"])
+            with st.container(key=f"flow_tooltip_content_{card_id.lower()}"):
+                st.markdown(f"**{metadata['label']}**")
+                st.caption(metadata["definition"])
+                st.caption(metadata["count_basis"])
+                st.caption(metadata["click_effect"])
         return clicked
 
 
@@ -504,11 +508,10 @@ def _render_status_queue(
             with cols[i]:
                 count = counts["status"].get(status_name, 0)
                 is_active = state["status_filter"] == status_name
-                prefix = "✓ " if is_active else ""
+                prefix = "✓ " if is_active else "  "
                 display_name = status_name.replace("_", " ")
                 meta = STATUS_META[status_name]
-                dot = meta.get("dot", "⚪")
-                btn_label = f"{prefix}{dot} {display_name} · {count}\n{sub_map[status_name]}"
+                btn_label = f"{prefix}{display_name} · {count}\n{sub_map[status_name]}"
                 if _render_filter_card(
                     status_name,
                     btn_label,

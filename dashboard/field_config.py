@@ -15,8 +15,8 @@ def _tooltip_meta(definition: str, count_basis: str, click_effect: str) -> dict[
 STATUS_META = {
     "ACTIONABLE": {
         "label": "ACTIONABLE",
-        "dot": "🟢",
-        "color": "#4caf50",
+        "tone": "green",
+        "color": "#35df65",
         **_tooltip_meta(
             "Definition: Effective Status is inside the confirmed 0%–5% buy zone.",
             "Count: rows in the current scope after Change, Origin, and Filters.",
@@ -25,8 +25,8 @@ STATUS_META = {
     },
     "UNCONFIRMED": {
         "label": "UNCONFIRMED",
-        "dot": "🟡",
-        "color": "#ffb300",
+        "tone": "yellow",
+        "color": "#ffd21f",
         **_tooltip_meta(
             "Definition: the signal has not met the shared daily-entry confirmation rule.",
             "Count: UNCONFIRMED rows in the current scope after other filters.",
@@ -35,8 +35,8 @@ STATUS_META = {
     },
     "BELOW_TRIGGER": {
         "label": "BELOW TRIGGER",
-        "dot": "🔴",
-        "color": "#ef5350",
+        "tone": "red",
+        "color": "#f04444",
         **_tooltip_meta(
             "Definition: a valid entry exists, but the current close is below the candidate trigger.",
             "Count: BELOW TRIGGER rows in the current scope after other filters.",
@@ -45,8 +45,8 @@ STATUS_META = {
     },
     "EXTENDED": {
         "label": "EXTENDED",
-        "dot": "🔵",
-        "color": "#42a5f5",
+        "tone": "blue",
+        "color": "#2791ff",
         **_tooltip_meta(
             "Definition: a valid entry exists, but the current close is above the +5% chase limit.",
             "Count: EXTENDED rows in the current scope after other filters.",

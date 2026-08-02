@@ -94,3 +94,26 @@ def test_queue_controls_have_stable_heading_and_segmented_group_slots():
     ]:
         assert f'key="{key}"' in source
     assert "disabled=not is_midweek" in source
+
+
+def test_status_labels_use_fixed_text_slots_without_emoji():
+    source = _function_source("_render_status_queue", "_active_filter_count")
+
+    for emoji in ["🟢", "🟡", "🔴", "🔵", "⚪"]:
+        assert emoji not in source
+    assert 'prefix = "✓ " if is_active else "  "' in source
+
+
+def test_quick_dots_status_orbs_and_mobile_tooltip_are_styled():
+    css = _compact_css()
+
+    for declaration in [
+        "width:7px",
+        "height:7px",
+        "width:19px",
+        "height:19px",
+        "box-shadow:inset02px3px",
+        "position:fixed",
+        "inset:auto12px14px",
+    ]:
+        assert declaration in css

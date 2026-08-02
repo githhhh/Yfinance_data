@@ -44,15 +44,15 @@ def test_status_meta_consistency():
     for s in expected_statuses:
         assert s in STATUS_META
         assert "label" in STATUS_META[s]
-        assert "dot" in STATUS_META[s]
+        assert "tone" in STATUS_META[s]
         assert "color" in STATUS_META[s]
         assert "tooltip" in STATUS_META[s]
         assert len(STATUS_META[s]["tooltip"]) > 0
 
-    assert STATUS_META["ACTIONABLE"]["dot"] == "🟢"
-    assert STATUS_META["UNCONFIRMED"]["dot"] == "🟡"
-    assert STATUS_META["BELOW_TRIGGER"]["dot"] == "🔴"
-    assert STATUS_META["EXTENDED"]["dot"] == "🔵"
+    assert STATUS_META["ACTIONABLE"]["tone"] == "green"
+    assert STATUS_META["UNCONFIRMED"]["tone"] == "yellow"
+    assert STATUS_META["BELOW_TRIGGER"]["tone"] == "red"
+    assert STATUS_META["EXTENDED"]["tone"] == "blue"
 
 
 def test_header_tooltip_config():
