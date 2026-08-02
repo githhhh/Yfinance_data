@@ -18,9 +18,9 @@ STATUS_META = {
         "tone": "green",
         "color": "#35df65",
         **_tooltip_meta(
-            "Definition: Effective Status is inside the confirmed 0%–5% buy zone.",
-            "Count: rows in the current scope after Change, Origin, and Filters.",
-            "Click: combine ACTIONABLE with the selected Change, Origin, and Filters.",
+            "Definition: the current entry status is inside the confirmed 0%–5% buy zone.",
+            "Count: ACTIONABLE rows in the current scope after all applicable filters.",
+            "Click: filter to ACTIONABLE while preserving compatible filters.",
         ),
     },
     "UNCONFIRMED": {
@@ -29,8 +29,8 @@ STATUS_META = {
         "color": "#ffd21f",
         **_tooltip_meta(
             "Definition: the signal has not met the shared daily-entry confirmation rule.",
-            "Count: UNCONFIRMED rows in the current scope after other filters.",
-            "Click: combine UNCONFIRMED with the selected Change, Origin, and Filters.",
+            "Count: UNCONFIRMED rows in the current scope after all applicable filters.",
+            "Click: filter to UNCONFIRMED while preserving compatible filters.",
         ),
     },
     "BELOW_TRIGGER": {
@@ -39,8 +39,8 @@ STATUS_META = {
         "color": "#f04444",
         **_tooltip_meta(
             "Definition: a valid entry exists, but the current close is below the candidate trigger.",
-            "Count: BELOW TRIGGER rows in the current scope after other filters.",
-            "Click: combine BELOW TRIGGER with the selected Change, Origin, and Filters.",
+            "Count: BELOW TRIGGER rows in the current scope after all applicable filters.",
+            "Click: filter to BELOW TRIGGER while preserving compatible filters.",
         ),
     },
     "EXTENDED": {
@@ -49,8 +49,8 @@ STATUS_META = {
         "color": "#2791ff",
         **_tooltip_meta(
             "Definition: a valid entry exists, but the current close is above the +5% chase limit.",
-            "Count: EXTENDED rows in the current scope after other filters.",
-            "Click: combine EXTENDED with the selected Change, Origin, and Filters.",
+            "Count: EXTENDED rows in the current scope after all applicable filters.",
+            "Click: filter to EXTENDED while preserving compatible filters.",
         ),
     },
 }

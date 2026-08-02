@@ -45,6 +45,13 @@ def test_status_metadata_uses_css_tones_instead_of_emoji_dots():
         assert "dot" not in metadata
 
 
+def test_status_tooltips_remain_truthful_in_midweek_and_weekend_modes():
+    for metadata in STATUS_META.values():
+        assert "Effective Status" not in metadata["tooltip"]
+        assert "Change, Origin" not in metadata["tooltip"]
+        assert "applicable filters" in metadata["tooltip"]
+
+
 def test_midweek_table_adds_one_change_column_after_code_only():
     columns = get_midweek_table_columns()
 
@@ -121,7 +128,7 @@ def test_app_declares_stable_mode_scope_context_filter_and_layout_slots():
     ]:
         assert f'key="{key}"' in APP_SOURCE
     assert 'key="btn_scope_changes"' in APP_SOURCE
-    assert "disabled=not is_midweek" in APP_SOURCE
+    assert "disabled=not has_comparison" in APP_SOURCE
     assert 'state["filters_expanded"]' in APP_SOURCE
     assert "Weekend Baseline" in APP_SOURCE
     assert "Review Priority" in APP_SOURCE

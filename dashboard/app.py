@@ -35,6 +35,7 @@ from dashboard.field_config import (
     get_midweek_table_columns,
 )
 from dashboard.services.bf_midweek_review import (
+    ENTRY_VOL_ENABLED_STATUSES,
     PoolAnalysisResult,
     PoolMode,
     analyze_breakout_follow_pool,
@@ -46,6 +47,7 @@ from dashboard.services.bf_midweek_review import (
     reset_to_all_signals,
     sort_review_rows,
     switch_review_mode,
+    toggle_status_filter,
 )
 from dashboard.review_styles import REVIEW_UI_CSS
 from dashboard.table_view import render_table
@@ -82,6 +84,15 @@ def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
     return (stat.st_mtime_ns, stat.st_size)
 
 
+def _analysis_mode_is(
+    analysis: PoolAnalysisResult | None,
+    target: PoolMode,
+) -> bool:
+    if analysis is None:
+        return False
+    return getattr(analysis.mode, "value", analysis.mode) == target.value
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -106,6 +117,13 @@ def main() -> None:
         state = dict(st.session_state["review_ui_state"])
         if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
             state = default_review_state(PoolMode.COMPLETE)
+            st.session_state["review_ui_state"] = state
+        elif (
+            state.get("mode") == "MIDWEEK"
+            and _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
+            and state.get("scope") == "CHANGES"
+        ):
+            state = default_review_state(PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
             st.session_state["review_ui_state"] = state
         df = _view_dataframe(analysis, state)
     except Exception as exc:
@@ -166,14 +184,30 @@ def _render_header_bar(
         is_midweek = state.get("mode") == "MIDWEEK" and analysis is not None
         if is_midweek:
             snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
-            baseline_value = analysis.complete_snapshot_date.isoformat() if analysis.complete_snapshot_date else "unavailable"
+            baseline_value = (
+                analysis.complete_snapshot_date.isoformat()
+                if _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+                and analysis.complete_snapshot_date
+                else "unavailable"
+            )
             snapshot_html = (
                 f'<span class="snapshot-segment">Snapshot <b>{snapshot_value}</b></span> · '
-                f'<span class="snapshot-mode-segment" style="color:#2dd4bf; font-weight:600;">Midweek · baseline {baseline_value}</span>'
+                f'<span class="snapshot-mode-segment snapshot-mode-segment--midweek">Midweek · baseline {baseline_value}</span>'
             )
         else:
             freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
-            snapshot_html = f'<span class="snapshot-segment">{freshness["header_html"]}</span><span class="snapshot-mode-segment"></span>'
+            age_label = (
+                "Unknown"
+                if freshness["age_days"] is None
+                else f'{freshness["age_days"]}d old · '
+                f'<span class="snapshot-freshness snapshot-freshness--{freshness["status"].lower()}">'
+                f'{html.escape(freshness["label"])}</span>'
+            )
+            snapshot_html = (
+                '<span class="snapshot-segment">Snapshot '
+                f'<b>{html.escape(freshness["snapshot_date_str"])}</b></span> · '
+                f'<span class="snapshot-mode-segment">{age_label}</span>'
+            )
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
@@ -223,9 +257,6 @@ def _render_flow_rules_dialog() -> None:
     )
 
 
-ENTRY_VOL_ENABLED_STATUSES: set[str] = {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
-
-
 def _store_review_state(state: dict[str, Any]) -> None:
     st.session_state["review_ui_state"] = dict(state)
 
@@ -253,6 +284,10 @@ def _render_ibd_review_view(
 
     filtered_df = apply_review_filters(df, state)
     filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
+    has_comparison = (
+        state["mode"] == "MIDWEEK"
+        and _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+    )
 
     with st.container(key="results_toolbar"):
         summary_col, actions_col = st.columns([1, 0.42], vertical_alignment="center")
@@ -270,7 +305,7 @@ def _render_ibd_review_view(
                         key_prefix=f'ibd_review_{state["mode"].lower()}',
                     )
                 with sort_col:
-                    options = ["Review Priority", "C Rank", "Distance"] if state["mode"] == "MIDWEEK" else ["C Rank", "Distance"]
+                    options = ["Review Priority", "C Rank", "Distance"] if has_comparison else ["C Rank", "Distance"]
                     current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
                     selected_sort = st.selectbox(
                         "Sort",
@@ -285,7 +320,7 @@ def _render_ibd_review_view(
                         st.rerun()
 
     from dashboard.field_config import get_default_table_columns
-    columns = get_midweek_table_columns() if state["mode"] == "MIDWEEK" else get_default_table_columns()
+    columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
 
     with st.container(key="selected_row"):
         detail_container = st.empty()
@@ -305,6 +340,10 @@ def _render_mode_scope_controls(
 ) -> None:
     midweek_available = analysis.midweek_available if analysis is not None else False
     is_midweek = state["mode"] == "MIDWEEK"
+    has_comparison = (
+        is_midweek
+        and _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+    )
     change_total = 0
     if analysis is not None:
         change_total = sum(
@@ -328,7 +367,15 @@ def _render_mode_scope_controls(
                         disabled=not midweek_available,
                         type="primary" if state["mode"] == "MIDWEEK" else "secondary",
                     ):
-                        _store_review_state(switch_review_mode(state, "MIDWEEK"))
+                        _store_review_state(
+                            switch_review_mode(
+                                state,
+                                "MIDWEEK",
+                                midweek_has_baseline=(
+                                    _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+                                ),
+                            )
+                        )
                         st.rerun()
                 with mode_cols[1]:
                     if st.button(
@@ -347,7 +394,7 @@ def _render_mode_scope_controls(
                         _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
                         key="btn_scope_changes",
                         use_container_width=True,
-                        disabled=not is_midweek,
+                        disabled=not has_comparison,
                         type="primary" if state["scope"] == "CHANGES" else "secondary",
                     ):
                         state["scope"] = "CHANGES"
@@ -435,6 +482,7 @@ def _render_review_context(
     df: pd.DataFrame,
     counts: dict[str, Any],
     state: dict[str, Any],
+    analysis: PoolAnalysisResult | None,
 ) -> None:
     del df
     with st.container(key="review_context_slot"):
@@ -443,6 +491,14 @@ def _render_review_context(
                 '<div class="weekend-context-bar"><strong>Weekend Baseline</strong>'
                 '<span>Complete weekly pool</span>'
                 '<span>Midweek comparison is not applied in this view.</span></div>',
+                unsafe_allow_html=True,
+            )
+            return
+        if _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE):
+            st.markdown(
+                '<div class="weekend-context-bar"><strong>Midweek Snapshot</strong>'
+                '<span>No valid complete-week baseline</span>'
+                '<span>Change and Origin comparison is unavailable.</span></div>',
                 unsafe_allow_html=True,
             )
             return
@@ -494,7 +550,7 @@ def _render_status_queue(
     analysis: PoolAnalysisResult | None,
 ) -> None:
     _render_mode_scope_controls(state, analysis)
-    _render_review_context(df, counts, state)
+    _render_review_context(df, counts, state, analysis)
     scope_label = "CHANGED SIGNALS" if state["scope"] == "CHANGES" else "ALL SIGNALS"
     st.caption(f"CURRENT ENTRY STATUS · {scope_label}")
     with st.container(key="status_cards"):
@@ -521,12 +577,7 @@ def _render_status_queue(
                     selected=is_active,
                     button_key=f"btn_status_{status_name}",
                 ):
-                    next_state = _toggle_dimension(state, "status_filter", status_name)
-                    if next_state["status_filter"] not in ENTRY_VOL_ENABLED_STATUSES:
-                        next_state["entry_volume_min"] = ""
-                    if next_state["status_filter"] != "UNCONFIRMED":
-                        next_state["near_trigger_only"] = False
-                    _store_review_state(next_state)
+                    _store_review_state(toggle_status_filter(state, status_name))
                     st.rerun()
 
 
@@ -649,11 +700,15 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
         )
         return
 
-    row: pd.Series | None = None
-    if selected_code is not None and selected_code in filtered_df["code"].values:
-        row = filtered_df[filtered_df["code"] == selected_code].iloc[0]
-    else:
-        row = filtered_df.iloc[0]
+    if selected_code is None or selected_code not in filtered_df["code"].values:
+        st.markdown(
+            '<div class="selected-strip selected-strip--empty" role="status">'
+            '<span>Select a row to inspect review details.</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    row = filtered_df[filtered_df["code"] == selected_code].iloc[0]
 
     code = html.escape(str(row.get("code", "N/A")))
     cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))

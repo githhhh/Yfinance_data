@@ -127,6 +127,32 @@ def test_filter_counts_use_the_same_composed_filter_model_as_results():
     assert counts["result"] == len(apply_review_filters(_review_rows(), state)) == 1
 
 
+def test_status_facet_counts_apply_the_target_status_cleanup_rules():
+    rows = _review_rows()
+    state = default_review_state(PoolMode.MIDWEEK)
+    state.update(
+        {
+            "scope": "ALL_SIGNALS",
+            "status_filter": "ACTIONABLE",
+            "entry_volume_min": "1.5",
+        }
+    )
+
+    counts = build_review_filter_counts(rows, state)
+
+    assert counts["status"]["UNCONFIRMED"] == 1
+
+    state.update(
+        {
+            "status_filter": "UNCONFIRMED",
+            "entry_volume_min": "",
+            "near_trigger_only": True,
+        }
+    )
+    counts = build_review_filter_counts(rows, state)
+    assert counts["status"]["ACTIONABLE"] == 3
+
+
 def test_clear_only_resets_change_and_origin_without_touching_status_or_filters():
     state = default_review_state(PoolMode.MIDWEEK)
     state.update(
@@ -182,6 +208,7 @@ def test_all_signals_performs_explicit_scope_and_filter_reset():
 
 def test_default_modes_choose_compatible_scope_sort_and_collapsed_filters():
     midweek = default_review_state(PoolMode.MIDWEEK)
+    no_baseline = default_review_state(PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
     weekend = default_review_state(PoolMode.COMPLETE)
 
     assert (midweek["mode"], midweek["scope"], midweek["sort_mode"]) == (
@@ -191,6 +218,11 @@ def test_default_modes_choose_compatible_scope_sort_and_collapsed_filters():
     )
     assert (weekend["mode"], weekend["scope"], weekend["sort_mode"]) == (
         "WEEKEND",
+        "ALL_SIGNALS",
+        "C Rank",
+    )
+    assert (no_baseline["mode"], no_baseline["scope"], no_baseline["sort_mode"]) == (
+        "MIDWEEK",
         "ALL_SIGNALS",
         "C Rank",
     )
@@ -221,6 +253,17 @@ def test_repeated_mode_click_preserves_state_but_real_switch_resets_incompatible
     assert switched["filters_expanded"] is False
     assert switched["copy_state"] == "IDLE"
     assert switched["sort_mode"] == "C Rank"
+
+    no_baseline = switch_review_mode(
+        switched,
+        "MIDWEEK",
+        midweek_has_baseline=False,
+    )
+    assert (no_baseline["mode"], no_baseline["scope"], no_baseline["sort_mode"]) == (
+        "MIDWEEK",
+        "ALL_SIGNALS",
+        "C Rank",
+    )
 
 
 def test_sort_control_label_matches_actual_review_and_weekend_order():

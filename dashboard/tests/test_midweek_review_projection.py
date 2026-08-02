@@ -154,6 +154,48 @@ def test_projection_classifies_entry_changes_and_summary_from_the_same_fields():
     assert result.summary["UNCHANGED"] == 1
 
 
+def test_carry_status_uses_unrounded_distance_at_zero_and_five_percent_boundaries():
+    complete = pd.DataFrame(
+        [
+            _row("JUST_OVER", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=102, rule="pivot"),
+            _row("JUST_UNDER", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=102, rule="pivot"),
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row("JUST_OVER", snapshot_date="2026-07-29", signal=False, close=105.004),
+            _row("JUST_UNDER", snapshot_date="2026-07-29", signal=False, close=99.996),
+        ]
+    )
+
+    review = build_midweek_review(current, complete).current_review.set_index("code")
+
+    assert review.loc["JUST_OVER", "review_current_vs_candidate_pct"] == 5.0
+    assert review.loc["JUST_OVER", "review_effective_entry_status"] == "EXTENDED"
+    assert review.loc["JUST_UNDER", "review_current_vs_candidate_pct"] == 0.0
+    assert review.loc["JUST_UNDER", "review_effective_entry_status"] == "BELOW_TRIGGER"
+
+
+def test_projection_without_baseline_suppresses_comparison_facts():
+    current = pd.DataFrame(
+        [
+            _row("CURRENT", snapshot_date="2026-07-29", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=102, rule="pivot"),
+            _row("POOL", snapshot_date="2026-07-29", signal=False, close=80),
+        ]
+    )
+
+    result = build_midweek_review(current, pd.DataFrame())
+    review = result.current_review.set_index("code")
+
+    assert result.baseline_available is False
+    assert review.loc["CURRENT", "review_signal_origin"] == "NONE"
+    assert review.loc["CURRENT", "review_change_group"] == "UNCHANGED"
+    assert review.loc["CURRENT", "review_change_label"] == ""
+    assert result.summary["NEW"] == 0
+    assert result.summary["BECAME_ACTIONABLE"] == 0
+    assert result.actionable_codes == ("CURRENT",)
+
+
 @pytest.mark.parametrize(
     ("column", "value", "message"),
     [
@@ -281,6 +323,25 @@ def test_analyze_without_valid_baseline_never_carries_complete_signal(tmp_path):
     assert result.mode is PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE
     assert result.actionable_codes == ("CURRENT_SIGNAL",)
     assert set(result.midweek_review.loc[result.midweek_review["review_watch_active"], "code"]) == {"CURRENT_SIGNAL"}
+    assert result.summary["NEW"] == 0
+    assert result.summary["BECAME_ACTIONABLE"] == 0
+    assert result.midweek_review["review_signal_origin"].eq("NONE").all()
+
+
+def test_analyze_warns_when_midweek_snapshot_is_missing_during_midweek_window(tmp_path):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    pd.DataFrame(
+        [_row("BASE", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=102, rule="pivot")]
+    ).to_csv(complete_path, index=False)
+
+    result = analyze_breakout_follow_pool(
+        complete_path,
+        tmp_path / "missing_midweek.csv",
+        window_date=date(2026, 7, 30),
+    )
+
+    assert result.mode is PoolMode.COMPLETE
+    assert any("Midweek snapshot is unavailable" in warning for warning in result.warnings)
 
 
 @pytest.mark.parametrize("window_date", [date(2026, 7, 30), date(2026, 8, 1)])

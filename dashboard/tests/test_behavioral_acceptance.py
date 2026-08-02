@@ -256,8 +256,8 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     assert "onCellFocused" not in options
 
 
-# 8. Selected Row Detail fallback behavior when selected code is missing
-def test_selected_row_detail_fallback_when_selected_missing(monkeypatch):
+# 8. Selected Row Detail never fabricates a selection
+def test_selected_row_detail_uses_placeholder_when_selected_missing(monkeypatch):
     df = sample_full_pool_df()
     filtered_df = df[df["signal"] == True].copy()
 
@@ -270,9 +270,19 @@ def test_selected_row_detail_fallback_when_selected_missing(monkeypatch):
     assert any("NVDA" in md and "915.00" in md for md in rendered_markdowns)
 
     rendered_markdowns.clear()
-    # Test 2: non-existent selected code (e.g., after data refresh/filtering) -> fallback to iloc[0] (AAPL)
+    # A stale/missing selection must not silently present another row as selected.
     _render_selected_row_detail(filtered_df, "MISSING_CODE")
-    assert any("AAPL" in md and "185.20" in md for md in rendered_markdowns)
+    assert rendered_markdowns == [
+        '<div class="selected-strip selected-strip--empty" role="status">'
+        '<span>Select a row to inspect review details.</span></div>'
+    ]
+
+    rendered_markdowns.clear()
+    _render_selected_row_detail(filtered_df, None)
+    assert rendered_markdowns == [
+        '<div class="selected-strip selected-strip--empty" role="status">'
+        '<span>Select a row to inspect review details.</span></div>'
+    ]
 
 
 def test_render_selected_row_detail_pd_na_safe(monkeypatch):

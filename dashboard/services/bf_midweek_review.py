@@ -15,6 +15,7 @@ from dashboard.data_utils import load_pool_csv, normalize_pool_df
 
 BUSINESS_TIMEZONE = "Asia/Shanghai"
 ENTRY_STATUSES = ("ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED")
+ENTRY_VOL_ENABLED_STATUSES = {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
 
 
 class PoolWindow(Enum):
@@ -34,6 +35,7 @@ class MidweekReviewResult:
     exited_pool: pd.DataFrame
     summary: dict[str, int]
     actionable_codes: tuple[str, ...]
+    baseline_available: bool
 
 
 @dataclass(frozen=True)
@@ -152,10 +154,9 @@ def _nonempty_status(value: Any, *, code: str) -> str:
 def _calculate_status(entry_valid: Any, candidate: float, latest_close: float) -> str:
     if _to_bool(entry_valid) is not True:
         return "UNCONFIRMED"
-    pct = round((latest_close / candidate - 1.0) * 100.0, 2)
-    if pct < 0:
+    if latest_close < candidate:
         return "BELOW_TRIGGER"
-    if pct <= 5.0:
+    if latest_close <= candidate * 1.05:
         return "ACTIONABLE"
     return "EXTENDED"
 
@@ -194,6 +195,7 @@ def build_midweek_review(
 ) -> MidweekReviewResult:
     current = _normalized_pool(current_pool, label="current")
     complete = _normalized_pool(complete_pool, label="complete", allow_empty=True)
+    baseline_available = not complete.empty
     complete_by_code = {
         str(row["code"]): row
         for _, row in complete.iterrows()
@@ -206,20 +208,25 @@ def build_midweek_review(
         complete_row = complete_by_code.get(code)
         signal_current = _to_bool(current_row.get("signal")) is True
         signal_complete = complete_row is not None and _to_bool(complete_row.get("signal")) is True
-        origin = (
-            "RECONFIRMED"
-            if signal_current and signal_complete
-            else "NEW"
-            if signal_current
-            else "CARRY"
-            if signal_complete
-            else "NONE"
-        )
+        origin = "NONE"
+        if baseline_available:
+            origin = (
+                "RECONFIRMED"
+                if signal_current and signal_complete
+                else "NEW"
+                if signal_current
+                else "CARRY"
+                if signal_complete
+                else "NONE"
+            )
         watch_active = signal_current or signal_complete
         projected = current_row.to_dict()
-        projected["review_pool_change"] = "ENTERED" if complete_row is None else "STAYED"
+        projected["review_pool_change"] = (
+            "ENTERED" if complete_row is None else "STAYED"
+        ) if baseline_available else "UNAVAILABLE"
         projected["review_signal_origin"] = origin
         projected["review_watch_active"] = bool(watch_active)
+        projected["review_baseline_available"] = baseline_available
 
         selected_row = current_row if signal_current else complete_row if signal_complete else None
         for field in SOURCE_FACT_FIELDS:
@@ -247,7 +254,11 @@ def build_midweek_review(
             else:
                 effective_status = _calculate_status(entry_valid, candidate, latest_close)
 
-        entry_change, change_group = _entry_change(baseline_status, effective_status)
+        if baseline_available:
+            entry_change, change_group = _entry_change(baseline_status, effective_status)
+            change_label = _change_label(origin, baseline_status, effective_status, entry_change)
+        else:
+            entry_change, change_group, change_label = "UNAVAILABLE", "UNCHANGED", ""
         projected["review_candidate_price"] = candidate
         projected["review_entry_valid"] = entry_valid
         projected["review_baseline_entry_status"] = baseline_status
@@ -255,7 +266,7 @@ def build_midweek_review(
         projected["review_current_vs_candidate_pct"] = current_vs_candidate
         projected["review_entry_change"] = entry_change
         projected["review_change_group"] = change_group
-        projected["review_change_label"] = _change_label(origin, baseline_status, effective_status, entry_change)
+        projected["review_change_label"] = change_label
         projected["review_futu_actionable"] = bool(watch_active and effective_status == "ACTIONABLE")
         change_rank = {
             "BECAME_ACTIONABLE": 0,
@@ -275,7 +286,7 @@ def build_midweek_review(
     exited = complete.loc[~complete["code"].isin(current_codes)].copy() if not complete.empty else complete.copy()
     actionable = tuple(review.loc[review["review_futu_actionable"], "code"].astype(str).tolist())
     summary = _build_summary(review, exited)
-    return MidweekReviewResult(review, exited, summary, actionable)
+    return MidweekReviewResult(review, exited, summary, actionable, baseline_available)
 
 
 def _build_summary(review: pd.DataFrame, exited: pd.DataFrame) -> dict[str, int]:
@@ -319,10 +330,15 @@ def materialize_review_view(review: pd.DataFrame) -> pd.DataFrame:
 
 
 def default_review_state(mode: PoolMode) -> dict[str, Any]:
-    is_midweek = mode in {PoolMode.MIDWEEK, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE}
+    mode_value = getattr(mode, "value", mode)
+    is_midweek = mode_value in {
+        PoolMode.MIDWEEK.value,
+        PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE.value,
+    }
+    has_comparison = mode_value == PoolMode.MIDWEEK.value
     return {
         "mode": "MIDWEEK" if is_midweek else "WEEKEND",
-        "scope": "CHANGES" if is_midweek else "ALL_SIGNALS",
+        "scope": "CHANGES" if has_comparison else "ALL_SIGNALS",
         "change_filter": "ALL",
         "origin_filter": "ALL",
         "status_filter": "ALL",
@@ -334,16 +350,23 @@ def default_review_state(mode: PoolMode) -> dict[str, Any]:
         "near_trigger_only": False,
         "filters_expanded": False,
         "copy_state": "IDLE",
-        "sort_mode": "Review Priority" if is_midweek else "C Rank",
+        "sort_mode": "Review Priority" if has_comparison else "C Rank",
         "widget_generation": 0,
     }
 
 
-def switch_review_mode(state: dict[str, Any], target_mode: str) -> dict[str, Any]:
+def switch_review_mode(
+    state: dict[str, Any],
+    target_mode: str,
+    *,
+    midweek_has_baseline: bool = True,
+) -> dict[str, Any]:
     target = target_mode.upper()
     if target == str(state.get("mode", "")).upper():
         return dict(state)
-    mode = PoolMode.MIDWEEK if target == "MIDWEEK" else PoolMode.COMPLETE
+    mode = (
+        PoolMode.MIDWEEK if midweek_has_baseline else PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE
+    ) if target == "MIDWEEK" else PoolMode.COMPLETE
     result = default_review_state(mode)
     result["widget_generation"] = int(state.get("widget_generation", 0)) + 1
     return result
@@ -354,6 +377,21 @@ def clear_quick_filters(state: dict[str, Any]) -> dict[str, Any]:
     result["change_filter"] = "ALL"
     result["origin_filter"] = "ALL"
     return result
+
+
+def select_status_filter(state: dict[str, Any], status: str) -> dict[str, Any]:
+    result = dict(state)
+    result["status_filter"] = status
+    if status not in ENTRY_VOL_ENABLED_STATUSES:
+        result["entry_volume_min"] = ""
+    if status != "UNCONFIRMED":
+        result["near_trigger_only"] = False
+    return result
+
+
+def toggle_status_filter(state: dict[str, Any], status: str) -> dict[str, Any]:
+    target = "ALL" if state.get("status_filter") == status else status
+    return select_status_filter(state, target)
 
 
 def reset_to_all_signals(state: dict[str, Any]) -> dict[str, Any]:
@@ -470,12 +508,18 @@ def build_review_filter_counts(
 ) -> dict[str, Any]:
     change_base = apply_review_filters(review, state, exclude_dimension="change")
     origin_base = apply_review_filters(review, state, exclude_dimension="origin")
-    status_base = apply_review_filters(review, state, exclude_dimension="status")
     status_field = (
         "review_effective_entry_status"
-        if "review_effective_entry_status" in status_base.columns
+        if "review_effective_entry_status" in review.columns
         else "ibd_entry_status"
     )
+    status_counts: dict[str, int] = {}
+    for value in ENTRY_STATUSES:
+        target_state = select_status_filter(state, value)
+        status_base = apply_review_filters(review, target_state, exclude_dimension="status")
+        status_counts[value] = int(
+            status_base.get(status_field, pd.Series(dtype=object)).eq(value).sum()
+        )
     return {
         "change": {
             value: int(change_base.get("review_change_group", pd.Series(dtype=object)).eq(value).sum())
@@ -485,10 +529,7 @@ def build_review_filter_counts(
             value: int(origin_base.get("review_signal_origin", pd.Series(dtype=object)).eq(value).sum())
             for value in ("NEW", "CARRY", "RECONFIRMED")
         },
-        "status": {
-            value: int(status_base.get(status_field, pd.Series(dtype=object)).eq(value).sum())
-            for value in ENTRY_STATUSES
-        },
+        "status": status_counts,
         "result": len(apply_review_filters(review, state)),
     }
 
@@ -529,6 +570,35 @@ def _snapshot_date(pool: pd.DataFrame, *, label: str) -> date:
     return next(iter(dates))
 
 
+def _has_valid_complete_baseline(complete_date: date, midweek_date: date) -> bool:
+    try:
+        return (
+            monday_of_week(midweek_date) == complete_target_week(complete_date)
+            and midweek_date > complete_date
+        )
+    except ValueError:
+        return False
+
+
+def build_midweek_review_for_snapshots(
+    current_pool: pd.DataFrame,
+    complete_pool: pd.DataFrame,
+) -> MidweekReviewResult:
+    """Use Carry only when both snapshots form a valid review-week pair."""
+    current = _normalized_pool(current_pool, label="current")
+    current_date = _snapshot_date(current, label="midweek")
+    baseline = pd.DataFrame()
+    if complete_pool is not None and not complete_pool.empty:
+        try:
+            complete = _normalized_pool(complete_pool, label="complete")
+            complete_date = _snapshot_date(complete, label="complete")
+            if _has_valid_complete_baseline(complete_date, current_date):
+                baseline = complete
+        except (TypeError, ValueError):
+            baseline = pd.DataFrame()
+    return build_midweek_review(current, baseline)
+
+
 def _complete_actionable_codes(pool: pd.DataFrame) -> tuple[str, ...]:
     if pool.empty:
         return ()
@@ -559,7 +629,8 @@ def analyze_breakout_follow_pool(
     midweek = pd.DataFrame()
     midweek_date: date | None = None
     midweek_error: Exception | None = None
-    if midweek_pool_path is not None and Path(midweek_pool_path).exists():
+    midweek_path_exists = midweek_pool_path is not None and Path(midweek_pool_path).exists()
+    if midweek_path_exists:
         try:
             midweek = _normalized_pool(load_pool_csv(midweek_pool_path), label="midweek")
             midweek_date = _snapshot_date(midweek, label="midweek")
@@ -579,7 +650,7 @@ def analyze_breakout_follow_pool(
         midweek_week = monday_of_week(midweek_date)
         review_week = complete_week or midweek_week
         try:
-            if complete_week is not None and midweek_week == complete_week and complete_date is not None and midweek_date > complete_date:
+            if complete_date is not None and _has_valid_complete_baseline(complete_date, midweek_date):
                 review_result = build_midweek_review(midweek, complete)
                 midweek_available = True
             elif complete_week is None or midweek_week > complete_week:
@@ -592,16 +663,18 @@ def analyze_breakout_follow_pool(
         except Exception as exc:
             warnings.append(f"Midweek projection failed closed: {exc}")
 
-    if window is PoolWindow.MIDWEEK and midweek_error is not None:
+    if window == PoolWindow.MIDWEEK and midweek_error is not None:
         warnings.append("Midweek review failed closed; the complete pool remains selected.")
+    if window == PoolWindow.MIDWEEK and not midweek_path_exists:
+        warnings.append("Midweek snapshot is unavailable; the complete pool remains selected.")
 
-    if window is PoolWindow.MIDWEEK and review_result is not None:
+    if window == PoolWindow.MIDWEEK and review_result is not None:
         mode = PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE if no_baseline else PoolMode.MIDWEEK
         actionable = review_result.actionable_codes
     else:
         mode = PoolMode.COMPLETE
         if complete.empty:
-            if review_result is not None and window is PoolWindow.MIDWEEK:
+            if review_result is not None and window == PoolWindow.MIDWEEK:
                 mode = PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE
                 actionable = review_result.actionable_codes
             else:

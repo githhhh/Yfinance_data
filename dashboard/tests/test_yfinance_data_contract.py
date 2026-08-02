@@ -42,18 +42,18 @@ def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_
     midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
     pd.DataFrame(
         [
-            {"code": "CARRY_ACTION", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CARRY_EXTENDED", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "EXITED", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CURRENT_OVERRIDE", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "CARRY_EXTENDED", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "EXITED", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "CURRENT_OVERRIDE", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
         ]
     ).to_csv(complete_path, index=False)
     current = pd.DataFrame(
         [
-            {"code": "NEW_ACTION", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 50.0, "latest_close": 51.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CARRY_ACTION", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 104.0, "ibd_entry_status": None},
-            {"code": "CARRY_EXTENDED", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 106.0, "ibd_entry_status": None},
-            {"code": "CURRENT_OVERRIDE", "signal": True, "ibd_entry_valid": 0, "ibd_candidate_price": 100.0, "latest_close": 101.0, "ibd_entry_status": "UNCONFIRMED"},
+            {"code": "NEW_ACTION", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 50.0, "latest_close": 51.0, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 104.0, "ibd_entry_status": None},
+            {"code": "CARRY_EXTENDED", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 106.0, "ibd_entry_status": None},
+            {"code": "CURRENT_OVERRIDE", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 0, "ibd_candidate_price": 100.0, "latest_close": 101.0, "ibd_entry_status": "UNCONFIRMED"},
         ]
     )
     monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
@@ -80,6 +80,139 @@ def test_pool_run_rejects_unpublished_and_replaced_snapshots(tmp_path, monkeypat
         published.load_actionable_codes()
     with pytest.raises(ValueError, match="与本轮快照不一致"):
         published.commit()
+
+
+def test_pool_run_rejects_same_codes_with_changed_snapshot_content(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+    published = yfinance_data.BreakoutFollowPoolRun.weekend()
+    published.save_snapshot(
+        pd.DataFrame(
+            [
+                {
+                    "code": "SAME",
+                    "signal": True,
+                    "ibd_entry_valid": 1,
+                    "ibd_entry_status": "ACTIONABLE",
+                }
+            ]
+        )
+    )
+    pd.DataFrame(
+        [
+            {
+                "code": "SAME",
+                "signal": False,
+                "ibd_entry_valid": 1,
+                "ibd_entry_status": "ACTIONABLE",
+            }
+        ]
+    ).to_csv(pool_path, index=False)
+
+    with pytest.raises(ValueError, match="与本轮快照不一致"):
+        published.ensure_current_snapshot()
+
+
+@pytest.mark.parametrize(
+    "baseline_rows",
+    [
+        None,
+        [
+            {
+                "code": "OLD_CARRY",
+                "snapshot_date": "2026-07-17",
+                "signal": True,
+                "ibd_entry_valid": 1,
+                "ibd_candidate_price": 100.0,
+                "ibd_entry_status": "ACTIONABLE",
+            }
+        ],
+        [
+            {
+                "code": "OLD_CARRY",
+                "snapshot_date": "2026-08-03",
+                "signal": True,
+                "ibd_entry_valid": 1,
+                "ibd_candidate_price": 100.0,
+                "ibd_entry_status": "ACTIONABLE",
+            }
+        ],
+        [
+            {
+                "code": "OLD_CARRY",
+                "snapshot_date": "not-a-date",
+                "signal": True,
+                "ibd_entry_valid": 1,
+                "ibd_candidate_price": 100.0,
+                "ibd_entry_status": "ACTIONABLE",
+            }
+        ],
+    ],
+    ids=["missing", "stale", "newer", "malformed"],
+)
+def test_midweek_public_contract_never_carries_from_an_invalid_baseline(
+    tmp_path,
+    monkeypatch,
+    baseline_rows,
+):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    if baseline_rows is not None:
+        pd.DataFrame(baseline_rows).to_csv(complete_path, index=False)
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
+    current = pd.DataFrame(
+        [
+            {
+                "code": "CURRENT",
+                "snapshot_date": "2026-07-29",
+                "signal": True,
+                "ibd_entry_valid": 1,
+                "ibd_candidate_price": 50.0,
+                "latest_close": 51.0,
+                "ibd_entry_status": "ACTIONABLE",
+            },
+            {
+                "code": "OLD_CARRY",
+                "snapshot_date": "2026-07-29",
+                "signal": False,
+                "ibd_entry_valid": None,
+                "ibd_candidate_price": None,
+                "latest_close": 104.0,
+                "ibd_entry_status": None,
+            },
+        ]
+    )
+    pool_run = yfinance_data.BreakoutFollowPoolRun.midweek()
+    pool_run.save_snapshot(current)
+
+    assert pool_run.load_actionable_codes() == ["CURRENT"]
+
+
+def test_midweek_public_contract_ignores_an_unreadable_baseline_file(tmp_path, monkeypatch):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    complete_path.write_text('code,snapshot_date,signal\n"unterminated', encoding="utf-8")
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
+    pool_run = yfinance_data.BreakoutFollowPoolRun.midweek()
+    pool_run.save_snapshot(
+        pd.DataFrame(
+            [
+                {
+                    "code": "CURRENT",
+                    "snapshot_date": "2026-07-29",
+                    "signal": True,
+                    "ibd_entry_valid": 1,
+                    "ibd_candidate_price": 50.0,
+                    "latest_close": 51.0,
+                    "ibd_entry_status": "ACTIONABLE",
+                }
+            ]
+        )
+    )
+
+    assert pool_run.load_actionable_codes() == ["CURRENT"]
 
 
 def test_pool_run_fails_closed_when_ibd_enrichment_is_incomplete(tmp_path, monkeypatch):

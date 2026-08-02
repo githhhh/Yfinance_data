@@ -10,11 +10,12 @@ import logging
 import os
 import subprocess
 import time
+from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
 
-from dashboard.services.bf_midweek_review import build_midweek_review
+from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
 
 
 DATA_ROOT = str(Path(__file__).resolve().parents[1])
@@ -53,6 +54,10 @@ def _pool_codes(pool: pd.DataFrame) -> frozenset[str]:
     return frozenset(codes)
 
 
+def _snapshot_digest(path: str) -> str:
+    return sha256(Path(path).read_bytes()).hexdigest()
+
+
 def _load_complete_actionable_codes(pool: pd.DataFrame) -> list[str]:
     required = {"code", "signal", "ibd_entry_valid", "ibd_entry_status"}
     missing = required.difference(pool.columns)
@@ -68,12 +73,17 @@ def _load_complete_actionable_codes(pool: pd.DataFrame) -> list[str]:
 
 
 def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
-    complete = (
-        pd.read_csv(BREAKOUT_FOLLOW_POOL_PATH, dtype={"code": str}, encoding="utf-8-sig")
-        if os.path.exists(BREAKOUT_FOLLOW_POOL_PATH)
-        else pd.DataFrame()
-    )
-    review = build_midweek_review(midweek, complete)
+    complete = pd.DataFrame()
+    if os.path.exists(BREAKOUT_FOLLOW_POOL_PATH):
+        try:
+            complete = pd.read_csv(
+                BREAKOUT_FOLLOW_POOL_PATH,
+                dtype={"code": str},
+                encoding="utf-8-sig",
+            )
+        except Exception as exc:
+            logging.warning("BF complete Pool 不可用，本轮周中结果禁用 Carry: %s", exc)
+    review = build_midweek_review_for_snapshots(midweek, complete)
     codes = list(review.actionable_codes)
     codes.reverse()
     return codes
@@ -84,7 +94,7 @@ class BreakoutFollowPoolRun:
 
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
-        self._published_codes: frozenset[str] | None = None
+        self._published_digest: str | None = None
 
     @classmethod
     def weekend(cls) -> "BreakoutFollowPoolRun":
@@ -103,17 +113,21 @@ class BreakoutFollowPoolRun:
         return BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH if self._midweek else BREAKOUT_FOLLOW_POOL_PATH
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
-        published_codes = _pool_codes(pool)
+        _pool_codes(pool)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         pool.to_csv(self.path, index=False, encoding="utf-8-sig")
-        self._published_codes = published_codes
+        self._published_digest = _snapshot_digest(self.path)
 
     def ensure_current_snapshot(self) -> pd.DataFrame:
-        if self._published_codes is None:
+        if self._published_digest is None:
             raise RuntimeError(f"BF {self.name} Pool 本轮快照尚未成功写入")
-        pool = pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
-        if _pool_codes(pool) != self._published_codes:
+        try:
+            current_digest = _snapshot_digest(self.path)
+        except OSError as exc:
+            raise ValueError(f"BF {self.name} Pool 与本轮快照不一致") from exc
+        if current_digest != self._published_digest:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致")
+        pool = pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
         return pool
 
     def load_actionable_codes(self) -> list[str]:

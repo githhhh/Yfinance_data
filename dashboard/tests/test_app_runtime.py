@@ -41,7 +41,9 @@ def _midweek_app():
         "2026-07-30",
     ]
     try:
-        return AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+        app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+        app._review_argv = list(sys.argv)
+        return app
     finally:
         sys.argv = old_argv
 
@@ -60,12 +62,22 @@ def _prepare_app_test_interaction(app):
 
 def _click(app, key: str):
     _prepare_app_test_interaction(app)
-    return app.button(key=key).click().run(timeout=30)
+    app.button(key=key).click()
+    return _run_with_review_argv(app)
 
 
 def _run_widget_change(app):
     _prepare_app_test_interaction(app)
-    return app.run(timeout=30)
+    return _run_with_review_argv(app)
+
+
+def _run_with_review_argv(app):
+    old_argv = sys.argv[:]
+    sys.argv = list(app._review_argv)
+    try:
+        return app.run(timeout=30)
+    finally:
+        sys.argv = old_argv
 
 
 def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filters():
@@ -216,3 +228,13 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
 
     assert len(app.exception) == 0
     assert any("no valid complete-week baseline" in warning.value for warning in app.warning)
+    state = app.session_state["review_ui_state"]
+    assert (state["mode"], state["scope"], state["sort_mode"]) == (
+        "MIDWEEK",
+        "ALL_SIGNALS",
+        "C Rank",
+    )
+    assert app.button(key="btn_scope_changes").disabled is True
+    assert not any(button.key == "btn_change_filter_BECAME_ACTIONABLE" for button in app.button)
+    assert any("Change and Origin comparison is unavailable" in item.value for item in app.markdown)
+    assert any("Midweek · baseline unavailable" in item.value for item in app.markdown)

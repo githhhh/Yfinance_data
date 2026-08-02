@@ -85,6 +85,7 @@ def test_review_context_is_one_horizontal_flow_with_stable_slots():
     assert source.count("_render_quick_group(") == 2
     assert 'key="btn_clear_quick"' in source
     assert "Weekend Baseline" in source
+    assert "No valid complete-week baseline" in source
 
 
 def test_queue_controls_have_stable_heading_and_segmented_group_slots():
@@ -96,7 +97,7 @@ def test_queue_controls_have_stable_heading_and_segmented_group_slots():
         "review_scope_controls",
     ]:
         assert f'key="{key}"' in source
-    assert "disabled=not is_midweek" in source
+    assert "disabled=not has_comparison" in source
 
 
 def test_status_labels_use_fixed_text_slots_without_emoji():
@@ -147,6 +148,8 @@ def test_header_markup_and_control_surfaces_follow_reference_hierarchy():
         'class="data-badge data-badge--ready"',
         'class="data-badge data-badge--error"',
         'class="dashboard-snapshot"',
+        'freshness["snapshot_date_str"]',
+        'snapshot-freshness--{freshness["status"].lower()}',
     ]:
         assert marker in APP_SOURCE
     for declaration in [
@@ -168,3 +171,15 @@ def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
     assert ".st-key-results_actions>div[data-testid=\"stVerticalBlock\"]" in css
     assert "grid-template-columns:minmax(180px,1.5fr)minmax(120px,1fr)" in css
     assert "font-size:25px" in css
+
+
+def test_status_card_grid_targets_streamlits_nested_horizontal_block():
+    css = _compact_css()
+    direct = '.st-key-status_cards>div[data-testid="stHorizontalBlock"]'
+    nested = (
+        '.st-key-status_cards>div[data-testid="stVerticalBlock"]'
+        '>div[data-testid="stElementContainer"]>div[data-testid="stHorizontalBlock"]'
+    )
+
+    assert direct not in css
+    assert nested in css
