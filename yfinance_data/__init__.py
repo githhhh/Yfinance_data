@@ -46,12 +46,14 @@ def _is_truthy(value) -> bool:
 def _pool_codes(pool: pd.DataFrame) -> frozenset[str]:
     if "code" not in pool.columns:
         raise ValueError("BF Pool 缺少字段: ['code']")
-    codes = {
+    normalized = [
         str(value).strip()
         for value in pool["code"].dropna()
         if str(value).strip() and str(value).strip().lower() != "nan"
-    }
-    return frozenset(codes)
+    ]
+    if len(normalized) != len(set(normalized)):
+        raise ValueError("BF Pool code 重复")
+    return frozenset(normalized)
 
 
 def _snapshot_digest(path: str) -> str:

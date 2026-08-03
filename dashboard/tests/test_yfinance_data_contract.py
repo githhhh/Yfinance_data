@@ -113,6 +113,17 @@ def test_pool_run_rejects_same_codes_with_changed_snapshot_content(tmp_path, mon
         published.ensure_current_snapshot()
 
 
+def test_pool_run_rejects_duplicate_codes_before_publishing(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+
+    with pytest.raises(ValueError, match="code 重复"):
+        pool_run.save_snapshot(pd.DataFrame({"code": ["DUP", "DUP"]}))
+
+    assert not pool_path.exists()
+
+
 @pytest.mark.parametrize(
     "baseline_rows",
     [
