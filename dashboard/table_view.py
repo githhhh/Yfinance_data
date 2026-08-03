@@ -5,6 +5,7 @@ import json
 import pandas as pd
 
 from dashboard.field_config import (
+    C_RANK_REFERENCE_COLUMNS,
     DISPLAY_FORMAT_FIELDS,
     DISPLAY_VALUE_MAPS,
     FIELD_CONFIG,
@@ -429,6 +430,10 @@ def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -
         "suppressDragLeaveHidesColumns": True,
         "animateRows": False,
     }
+    if columns == C_RANK_REFERENCE_COLUMNS:
+        for definition in options["columnDefs"]:
+            if definition["field"] != "code":
+                definition["flex"] = 1
     if HAS_JS_CODE:
         options["getRowId"] = JsCode("""
         function(params) {

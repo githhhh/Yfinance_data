@@ -338,6 +338,7 @@ def test_c_rank_and_continuous_c_are_adjacent_without_right_pinning():
     ]
     assert columns[0]["pinned"] == "left"
     assert columns[1]["pinned"] is None
+    assert all(column.get("flex") == 1 for column in columns[1:])
 
 
 def test_table_views_cover_all_fields_without_scattering_related_columns():
