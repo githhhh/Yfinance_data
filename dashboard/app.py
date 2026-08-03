@@ -323,11 +323,22 @@ def _render_ibd_review_view(
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
+    grid_key = (
+        "review_results_grid_midweek"
+        if has_comparison
+        else "review_results_grid_weekend"
+    )
 
     with st.container(key="selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(filtered_df, columns, height=480)
+        selected_code = render_table(
+            filtered_df,
+            columns,
+            grid_key=grid_key,
+            show_origin_badge=has_comparison,
+            height=480,
+        )
 
     with detail_container.container():
         _render_selected_row_detail(filtered_df, selected_code)
@@ -976,7 +987,13 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     with st.container(key="selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(ranked, [column for column in columns if column in ranked.columns], height=520)
+        selected_code = render_table(
+            ranked,
+            [column for column in columns if column in ranked.columns],
+            grid_key="c_rank_reference_grid",
+            show_origin_badge=False,
+            height=520,
+        )
 
     with detail_container.container():
         _render_selected_row_detail(ranked, selected_code)

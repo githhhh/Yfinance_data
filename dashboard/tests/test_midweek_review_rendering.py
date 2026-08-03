@@ -97,18 +97,31 @@ def test_midweek_table_adds_one_change_column_after_code_only():
     assert columns[:2] == ["code", "review_change_label"]
     assert "review_signal_origin" not in columns
     assert _column_def("review_change_label")["headerName"] == "Change"
-    assert build_grid_options(columns)["columnDefs"][1]["field"] == "review_change_label"
+    assert build_grid_options(columns, show_origin_badge=True)["columnDefs"][1]["field"] == "review_change_label"
 
 
-def test_code_renderer_reserves_origin_badge_slot_without_native_title():
-    renderer = _code_renderer_jscode()
-    source = renderer.js_code if renderer is not None else Path(
+def test_code_renderer_only_reserves_origin_badge_slot_when_enabled():
+    origin_renderer = _code_renderer_jscode(show_origin_badge=True)
+    plain_renderer = _code_renderer_jscode(show_origin_badge=False)
+    origin_source = origin_renderer.js_code if origin_renderer is not None else Path(
         __file__
     ).resolve().parents[1].joinpath("table_view.py").read_text(encoding="utf-8")
+    plain_source = plain_renderer.js_code if plain_renderer is not None else ""
 
-    assert "review_signal_origin" in source
-    assert "origin-slot" in source
-    assert ".title =" not in source
+    assert "review_signal_origin" in origin_source
+    assert "origin-slot" in origin_source
+    assert "review_signal_origin" not in plain_source
+    assert "origin-slot" not in plain_source
+    assert ".title =" not in origin_source
+
+
+def test_app_uses_distinct_grid_identities_and_only_enables_origin_for_valid_midweek():
+    assert '"review_results_grid_midweek"' in APP_SOURCE
+    assert '"review_results_grid_weekend"' in APP_SOURCE
+    assert 'grid_key="c_rank_reference_grid"' in APP_SOURCE
+    assert "grid_key=grid_key" in APP_SOURCE
+    assert "show_origin_badge=has_comparison" in APP_SOURCE
+    assert "show_origin_badge=False" in APP_SOURCE
 
 
 def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monkeypatch):

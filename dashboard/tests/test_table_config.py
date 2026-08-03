@@ -393,12 +393,41 @@ def test_breakout_quality_row_data_keeps_tooltip_support_fields_hidden():
         }
     )
 
-    assert _row_data_columns(df, ["code", "ibd_breakout_quality"]) == [
+    assert _row_data_columns(
+        df,
+        ["code", "ibd_breakout_quality"],
+        show_origin_badge=False,
+    ) == [
         "code",
         "ibd_breakout_quality",
         "ibd_entry_close_vs_trigger_pct",
         "ibd_entry_close_position",
         "ibd_entry_breakout_range_ratio",
+    ]
+
+
+def test_origin_support_data_requires_the_origin_badge_capability():
+    import inspect
+
+    import pandas as pd
+
+    from dashboard.table_view import _row_data_columns
+
+    assert "show_origin_badge" in inspect.signature(_row_data_columns).parameters
+
+    df = pd.DataFrame(
+        {
+            "code": ["AAA"],
+            "review_signal_origin": ["NEW"],
+            "review_change_group": ["BECAME_ACTIONABLE"],
+        }
+    )
+
+    assert _row_data_columns(df, ["code"], show_origin_badge=False) == ["code"]
+    assert _row_data_columns(df, ["code"], show_origin_badge=True) == [
+        "code",
+        "review_signal_origin",
+        "review_change_group",
     ]
 
 
@@ -416,7 +445,12 @@ def test_render_table_sets_one_based_sequential_index(monkeypatch):
     monkeypatch.setitem(sys.modules, "st_aggrid", None)
 
     df = pd.DataFrame({"code": ["AAA", "BBB"], "val": [1, 2]}, index=[35, 8])
-    render_table(df, ["code", "val"])
+    render_table(
+        df,
+        ["code", "val"],
+        grid_key="table_config_index",
+        show_origin_badge=False,
+    )
 
     assert captured["df"].index.tolist() == [1, 2]
 
@@ -445,14 +479,20 @@ def test_render_table_preserves_hidden_breakout_quality_precision(monkeypatch):
         }
     )
 
-    render_table(df, ["code", "ibd_breakout_quality"])
+    render_table(
+        df,
+        ["code", "ibd_breakout_quality"],
+        grid_key="table_config_precision",
+        show_origin_badge=False,
+    )
 
     assert captured["df"].loc[1, "ibd_entry_close_vs_trigger_pct"] == 0.00523
     assert captured["df"].loc[1, "ibd_entry_close_position"] == 0.869565
     assert captured["df"].loc[1, "ibd_entry_breakout_range_ratio"] == 0.652174
 
 
-def test_render_table_uses_a_stable_component_key_for_selection_events(monkeypatch):
+def test_render_table_uses_the_explicit_grid_identity_for_selection_events(monkeypatch):
+    import inspect
     import pandas as pd
     import sys
     import types
@@ -466,9 +506,17 @@ def test_render_table_uses_a_stable_component_key_for_selection_events(monkeypat
 
     monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
 
-    render_table(pd.DataFrame({"code": ["AAA"]}), ["code"])
+    assert "grid_key" in inspect.signature(render_table).parameters
+    assert "show_origin_badge" in inspect.signature(render_table).parameters
 
-    assert captured["kwargs"]["key"] == "review_results_grid"
+    render_table(
+        pd.DataFrame({"code": ["AAA"]}),
+        ["code"],
+        grid_key="review_results_grid_weekend",
+        show_origin_badge=False,
+    )
+
+    assert captured["kwargs"]["key"] == "review_results_grid_weekend"
 
 
 def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeypatch):
@@ -492,6 +540,11 @@ def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeyp
         }
     )
 
-    render_table(df, ["code", "ibd_breakout_quality"])
+    render_table(
+        df,
+        ["code", "ibd_breakout_quality"],
+        grid_key="table_config_aliases",
+        show_origin_badge=False,
+    )
 
     assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Breakout"

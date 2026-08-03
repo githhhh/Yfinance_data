@@ -21,30 +21,44 @@ except ImportError:
     HAS_JS_CODE = False
 
 
-def _code_renderer_jscode():
+def _code_renderer_jscode(show_origin_badge: bool = False):
     if not HAS_JS_CODE:
         return None
+    origin_setup = (
+        "const origin = params.data && params.data.review_signal_origin ? String(params.data.review_signal_origin) : '';"
+        if show_origin_badge
+        else ""
+    )
+    origin_render = (
+        """
+                const badge = document.createElement('span');
+                badge.className = 'origin-slot';
+                badge.textContent = origin === 'RECONFIRMED' ? 'RECONF.' : origin;
+                badge.style.cssText = 'display:inline-flex; width:58px; min-width:58px; min-height:18px; align-items:center; justify-content:center; border:1px solid #475569; border-radius:3px; color:#cbd5e1; font-size:9px; line-height:1; visibility:' + (origin && origin !== 'NONE' ? 'visible' : 'hidden') + ';';
+        """
+        if show_origin_badge
+        else ""
+    )
+    append_children = "this.eGui.append(code, badge, copy);" if show_origin_badge else "this.eGui.append(code, copy);"
+    grid_template = "minmax(0,1fr) 58px 18px" if show_origin_badge else "minmax(0,1fr) 18px"
     return JsCode("""
     class CodeCellRenderer {
         init(params) {
             this.params = params;
             this.eGui = document.createElement('div');
-            this.eGui.style.cssText = 'cursor:pointer; display:grid; grid-template-columns:minmax(0,1fr) 58px 18px; gap:4px; align-items:center; width:100%; font-weight:600; color:#38bdf8;';
+            this.eGui.style.cssText = 'cursor:pointer; display:grid; grid-template-columns:__GRID_TEMPLATE__; gap:4px; align-items:center; width:100%; font-weight:600; color:#38bdf8;';
             const codeText = params.value || '';
-            const origin = params.data && params.data.review_signal_origin ? String(params.data.review_signal_origin) : '';
+            __ORIGIN_SETUP__
             this.render = (feedback, failed) => {
                 this.eGui.replaceChildren();
                 const code = document.createElement('span');
                 code.textContent = String(codeText);
                 if (feedback) code.style.color = failed ? '#ef5350' : '#4caf50';
-                const badge = document.createElement('span');
-                badge.className = 'origin-slot';
-                badge.textContent = origin === 'RECONFIRMED' ? 'RECONF.' : origin;
-                badge.style.cssText = 'display:inline-flex; width:58px; min-width:58px; min-height:18px; align-items:center; justify-content:center; border:1px solid #475569; border-radius:3px; color:#cbd5e1; font-size:9px; line-height:1; visibility:' + (origin && origin !== 'NONE' ? 'visible' : 'hidden') + ';';
+                __ORIGIN_RENDER__
                 const copy = document.createElement('span');
                 copy.textContent = feedback ? (failed ? '!' : '✓') : '⧉';
                 copy.style.cssText = 'font-size:11px; opacity:0.75; text-align:right;';
-                this.eGui.append(code, badge, copy);
+                __APPEND_CHILDREN__
             };
             this.render(false, false);
             this.eGui.addEventListener('click', async (e) => {
@@ -90,7 +104,10 @@ def _code_renderer_jscode():
             return this.eGui;
         }
     }
-    """)
+    """.replace("__GRID_TEMPLATE__", grid_template)
+    .replace("__ORIGIN_SETUP__", origin_setup)
+    .replace("__ORIGIN_RENDER__", origin_render)
+    .replace("__APPEND_CHILDREN__", append_children))
 
 
 def _get_value_formatter(fmt: str | None):
@@ -361,9 +378,12 @@ def _breakout_quality_cell_renderer_jscode():
     """.replace("__QUALITY_META__", meta_json))
 
 
-def build_grid_options(columns: list[str]) -> dict:
+def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -> dict:
     options = {
-        "columnDefs": [_column_def(column) for column in columns],
+        "columnDefs": [
+            _column_def(column, show_origin_badge=show_origin_badge)
+            for column in columns
+        ],
         "defaultColDef": {
             "sortable": True,
             "filter": True,
@@ -402,14 +422,19 @@ BREAKOUT_QUALITY_TOOLTIP_FIELDS = [
 ]
 
 
-def _row_data_columns(df: pd.DataFrame, columns: list[str]) -> list[str]:
+def _row_data_columns(
+    df: pd.DataFrame,
+    columns: list[str],
+    *,
+    show_origin_badge: bool = False,
+) -> list[str]:
     display_columns = [column for column in columns if column in df.columns]
     support_columns = (
         [column for column in BREAKOUT_QUALITY_TOOLTIP_FIELDS if column in df.columns]
         if "ibd_breakout_quality" in display_columns
         else []
     )
-    if "code" in display_columns:
+    if show_origin_badge and "code" in display_columns:
         support_columns.extend(
             column
             for column in ("review_signal_origin", "review_change_group")
@@ -426,9 +451,20 @@ def _normalize_breakout_quality_display_values(df: pd.DataFrame) -> pd.DataFrame
     return result
 
 
-def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str | None:
+def render_table(
+    df: pd.DataFrame,
+    columns: list[str],
+    *,
+    grid_key: str,
+    show_origin_badge: bool,
+    height: int = 620,
+) -> str | None:
     display_columns = [column for column in columns if column in df.columns]
-    row_columns = _row_data_columns(df, display_columns)
+    row_columns = _row_data_columns(
+        df,
+        display_columns,
+        show_origin_badge=show_origin_badge,
+    )
     grid_df = df[row_columns].copy() if row_columns else df.copy()
     grid_df = _normalize_breakout_quality_display_values(grid_df)
     grid_df.index = range(1, len(grid_df) + 1)
@@ -449,8 +485,11 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str
 
     grid_response = AgGrid(
         grid_df,
-        gridOptions=build_grid_options(display_columns),
-        key="review_results_grid",
+        gridOptions=build_grid_options(
+            display_columns,
+            show_origin_badge=show_origin_badge,
+        ),
+        key=grid_key,
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=HAS_JS_CODE,
@@ -473,7 +512,7 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str
     return None
 
 
-def _column_def(column: str) -> dict:
+def _column_def(column: str, *, show_origin_badge: bool = False) -> dict:
     definition = {
         "field": column,
         "headerName": get_field_label(column),
@@ -497,7 +536,7 @@ def _column_def(column: str) -> dict:
         definition["minWidth"] = 135
         definition["lockPinned"] = False
         if HAS_JS_CODE:
-            definition["cellRenderer"] = _code_renderer_jscode()
+            definition["cellRenderer"] = _code_renderer_jscode(show_origin_badge)
     elif column == "rank_C_continuous":
         definition["pinned"] = "right"
         definition["width"] = 85
