@@ -102,6 +102,52 @@ def _review_grid_key(mode: str) -> str:
     )
 
 
+def build_review_position(
+    df: pd.DataFrame,
+    selected_code: str | None,
+) -> dict[str, object]:
+    total = len(df)
+    selected = str(selected_code).strip() if selected_code is not None else ""
+    if not selected or "code" not in df.columns:
+        return {"code": "", "position": None, "total": total, "label": ""}
+    codes = df["code"].map(lambda value: str(value).strip())
+    matches = codes[codes.eq(selected)]
+    if matches.empty:
+        return {"code": "", "position": None, "total": total, "label": ""}
+    position = int(codes.index.get_loc(matches.index[0])) + 1
+    return {
+        "code": selected,
+        "position": position,
+        "total": total,
+        "label": f"{selected} · {position} of {total}",
+    }
+
+
+def _record_review_visit(
+    store: dict[str, set[str]],
+    view_key: str,
+    selected_code: str | None,
+) -> dict[str, set[str]]:
+    result = {key: set(values) for key, values in store.items()}
+    code = str(selected_code).strip() if selected_code is not None else ""
+    if code:
+        result.setdefault(view_key, set()).add(code)
+    return result
+
+
+def _visited_codes(view_key: str) -> set[str]:
+    store = st.session_state.get("review_visited_codes", {})
+    return set(store.get(view_key, set()))
+
+
+def _store_review_visit(view_key: str, selected_code: str | None) -> None:
+    st.session_state["review_visited_codes"] = _record_review_visit(
+        st.session_state.get("review_visited_codes", {}),
+        view_key,
+        selected_code,
+    )
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -375,7 +421,10 @@ def _render_ibd_review_view(
             grid_key=grid_key,
             show_origin_badge=has_comparison,
             height=480,
+            visited_codes=_visited_codes(state["mode"]),
         )
+
+    _store_review_visit(state["mode"], selected_code)
 
     with detail_container.container():
         _render_selected_row_detail(filtered_df, selected_code)
@@ -762,12 +811,13 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     if selected_code is None or selected_code not in filtered_df["code"].values:
         st.markdown(
             '<div class="selected-strip selected-strip--empty" role="status">'
-            '<span>Select a row to inspect review details.</span></div>',
+            '<span>Select a row · Use ↑↓ to review</span></div>',
             unsafe_allow_html=True,
         )
         return
 
     row = filtered_df[filtered_df["code"] == selected_code].iloc[0]
+    position_label = html.escape(str(build_review_position(filtered_df, selected_code)["label"]))
 
     code = html.escape(str(row.get("code", "N/A")))
     cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
@@ -935,7 +985,7 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                 <div class="selected-summary-cell selected-code-cell">
                     <div class="code-hover-wrapper">
                         <details class="code-detail" data-selected-code="{code}">
-                            <summary class="code-hover-trigger" aria-label="{code} secondary details">{code} ▾ {origin_badge}</summary>
+                            <summary class="code-hover-trigger" aria-label="{code} secondary details">{position_label} ▾ {origin_badge}</summary>
                             <div class="code-hover-popup" role="region" aria-label="{code} secondary details">
                             <div class="code-hover-surface">
                             <div class="code-popup-section" data-popup-section="daily-entry">
@@ -1057,7 +1107,10 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
             grid_key="c_rank_reference_grid",
             show_origin_badge=False,
             height=520,
+            visited_codes=_visited_codes("C_RANK"),
         )
+
+    _store_review_visit("C_RANK", selected_code)
 
     with detail_container.container():
         _render_selected_row_detail(ranked, selected_code)

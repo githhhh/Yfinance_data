@@ -260,6 +260,16 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     assert "onGridReady" not in options
     assert "onCellFocused" not in options
 
+    from dashboard.table_view import HAS_JS_CODE
+
+    if HAS_JS_CODE:
+        assert "_review_visited" in options["getRowStyle"].js_code
+        keyboard_source = options["onCellKeyDown"].js_code
+        assert "ArrowUp" in keyboard_source
+        assert "ArrowDown" in keyboard_source
+        assert "setSelected(true, true)" in keyboard_source
+        assert "ensureIndexVisible" in keyboard_source
+
 
 # 8. Selected Row Detail never fabricates a selection
 def test_selected_row_detail_uses_placeholder_when_selected_missing(monkeypatch):
@@ -279,14 +289,14 @@ def test_selected_row_detail_uses_placeholder_when_selected_missing(monkeypatch)
     _render_selected_row_detail(filtered_df, "MISSING_CODE")
     assert rendered_markdowns == [
         '<div class="selected-strip selected-strip--empty" role="status">'
-        '<span>Select a row to inspect review details.</span></div>'
+        '<span>Select a row · Use ↑↓ to review</span></div>'
     ]
 
     rendered_markdowns.clear()
     _render_selected_row_detail(filtered_df, None)
     assert rendered_markdowns == [
         '<div class="selected-strip selected-strip--empty" role="status">'
-        '<span>Select a row to inspect review details.</span></div>'
+        '<span>Select a row · Use ↑↓ to review</span></div>'
     ]
 
 

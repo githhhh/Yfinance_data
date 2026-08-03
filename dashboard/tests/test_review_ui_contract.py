@@ -143,8 +143,11 @@ def test_header_markup_and_control_surfaces_follow_reference_hierarchy():
 
     for marker in [
         'class="dashboard-title"',
-        'class="data-badge data-badge--ready"',
-        'class="data-badge data-badge--error"',
+        'class="data-badge data-badge--{badge_tone}"',
+        '"Data Fresh"',
+        '"Data Aging"',
+        '"Data Stale"',
+        '"Data Loaded"',
         'class="dashboard-snapshot"',
         'freshness["snapshot_date_str"]',
         'snapshot-freshness--{freshness["status"].lower()}',
@@ -277,7 +280,7 @@ def test_filters_and_results_actions_use_fixed_compact_slots():
     filter_source = _function_source("_render_filter_bar", "_unique_values")
     view_source = _function_source("_render_ibd_review_view", "_render_mode_scope_controls")
 
-    assert 'f"Filters · {summary}"' in filter_source
+    assert 'f"More Filters · {summary}"' in filter_source
     assert "                                      " not in filter_source
     assert 'class="filters-state-marker"' in filter_source
     assert 'data-expanded="{str(state["filters_expanded"]).lower()}"' in filter_source
@@ -295,6 +298,19 @@ def test_filters_and_results_actions_use_fixed_compact_slots():
     assert "max-width:160px" in css
     assert "min-width:170px" in css
     assert "max-width:190px" in css
+
+
+def test_review_views_wire_session_visits_and_current_result_positions():
+    ibd_source = _function_source("_render_ibd_review_view", "_render_mode_scope_controls")
+    c_rank_source = _function_source("_render_c_rank_reference_view", "_render_copy_codes_control")
+    detail_source = _function_source("_render_selected_row_detail", "_render_c_rank_reference_view")
+
+    assert 'visited_codes=_visited_codes(state["mode"])' in ibd_source
+    assert '_store_review_visit(state["mode"], selected_code)' in ibd_source
+    assert 'visited_codes=_visited_codes("C_RANK")' in c_rank_source
+    assert '_store_review_visit("C_RANK", selected_code)' in c_rank_source
+    assert "build_review_position(filtered_df, selected_code)" in detail_source
+    assert "Select a row · Use ↑↓ to review" in detail_source
 
 
 def test_filters_disclosure_state_is_synchronized_to_native_button_aria():

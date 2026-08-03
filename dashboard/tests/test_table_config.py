@@ -587,3 +587,30 @@ def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeyp
     )
 
     assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Breakout"
+
+
+def test_render_table_adds_hidden_visited_support_values(monkeypatch):
+    import pandas as pd
+    import sys
+    import types
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_aggrid(df, **kwargs):
+        captured["df"] = df
+        captured["options"] = kwargs["gridOptions"]
+        return {}
+
+    monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
+
+    render_table(
+        pd.DataFrame({"code": ["AAA", "BBB"]}),
+        ["code"],
+        grid_key="visited_support",
+        show_origin_badge=False,
+        visited_codes={"BBB"},
+    )
+
+    assert captured["df"]["_review_visited"].tolist() == [False, True]
+    assert [column["field"] for column in captured["options"]["columnDefs"]] == ["code"]

@@ -1,10 +1,37 @@
 import pytest
 import pandas as pd
 import numpy as np
+import dashboard.app as dashboard_app
 
 from dashboard.field_config import STATUS_META, FIELD_CONFIG
 from dashboard.table_view import _column_def
 from dashboard.app import _format_card_val, _render_selected_row_detail
+
+
+def test_review_position_follows_current_dataframe_order():
+    df = pd.DataFrame({"code": ["ACU", "NVDA", "TSLA"]})
+
+    assert dashboard_app.build_review_position(df, "NVDA") == {
+        "code": "NVDA",
+        "position": 2,
+        "total": 3,
+        "label": "NVDA · 2 of 3",
+    }
+    assert dashboard_app.build_review_position(df.iloc[[2, 0]], "ACU")["position"] == 2
+    assert dashboard_app.build_review_position(df, "MISSING") == {
+        "code": "",
+        "position": None,
+        "total": 3,
+        "label": "",
+    }
+
+
+def test_visits_are_isolated_by_view_and_deduplicated():
+    store = dashboard_app._record_review_visit({}, "MIDWEEK", "ACU")
+    store = dashboard_app._record_review_visit(store, "MIDWEEK", "ACU")
+    store = dashboard_app._record_review_visit(store, "WEEKEND", "NVDA")
+
+    assert store == {"MIDWEEK": {"ACU"}, "WEEKEND": {"NVDA"}}
 
 
 def _selected_detail_markup(monkeypatch, **overrides):
@@ -121,6 +148,7 @@ def test_selected_row_popup_is_semantic_viewport_aware_and_ordered(monkeypatch):
     assert markup.index("Daily Entry") < markup.index("Pullback") < markup.index("CANSLIM / Base")
     assert "Daily Entry Vol" in markup
     assert "Ceiling/Base Depth" in markup
+    assert "TEST · 1 of 1" in markup
 
 
 def test_selected_row_markup_has_no_blank_lines_that_end_raw_html(monkeypatch):

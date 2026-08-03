@@ -439,6 +439,30 @@ def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -
             "breakoutQualityHeader": _breakout_quality_header_jscode(),
             "breakoutQualityCellRenderer": _breakout_quality_cell_renderer_jscode(),
         }
+        options["getRowStyle"] = JsCode("""
+        function(params) {
+            if (params.data && params.data._review_visited) {
+                return { backgroundColor: 'rgba(56, 189, 248, 0.06)' };
+            }
+            return null;
+        }
+        """)
+        options["onCellKeyDown"] = JsCode("""
+        function(params) {
+            const event = params.event;
+            if (!event || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+            const currentIndex = params.node ? params.node.rowIndex : -1;
+            if (currentIndex < 0) return;
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            const targetIndex = currentIndex + delta;
+            if (targetIndex < 0 || targetIndex >= params.api.getDisplayedRowCount()) return;
+            const target = params.api.getDisplayedRowAtIndex(targetIndex);
+            if (!target) return;
+            target.setSelected(true, true);
+            params.api.ensureIndexVisible(targetIndex);
+            event.preventDefault();
+        }
+        """)
     return options
 
 
@@ -485,6 +509,7 @@ def render_table(
     grid_key: str,
     show_origin_badge: bool,
     height: int = 620,
+    visited_codes: set[str] | None = None,
 ) -> str | None:
     display_columns = [column for column in columns if column in df.columns]
     row_columns = _row_data_columns(
@@ -494,6 +519,12 @@ def render_table(
     )
     grid_df = df[row_columns].copy() if row_columns else df.copy()
     grid_df = _normalize_breakout_quality_display_values(grid_df)
+    visited = {str(code).strip() for code in (visited_codes or set())}
+    grid_df["_review_visited"] = (
+        grid_df["code"].map(lambda value: str(value).strip() in visited)
+        if "code" in grid_df.columns
+        else False
+    )
     grid_df.index = range(1, len(grid_df) + 1)
 
     for col in grid_df.columns:
