@@ -115,6 +115,29 @@ def test_code_renderer_only_reserves_origin_badge_slot_when_enabled():
     assert ".title =" not in origin_source
 
 
+def test_code_renderer_uses_native_copy_button_with_accessible_code_label():
+    renderer = _code_renderer_jscode(show_origin_badge=True)
+    source = renderer.js_code if renderer is not None else Path(
+        __file__
+    ).resolve().parents[1].joinpath("table_view.py").read_text(encoding="utf-8")
+
+    assert "document.createElement('button')" in source
+    assert "copy.setAttribute('aria-label', '复制 ' + String(codeText))" in source
+
+
+def test_code_renderer_only_copy_button_click_stops_row_selection_bubbling():
+    renderer = _code_renderer_jscode(show_origin_badge=True)
+    source = renderer.js_code if renderer is not None else Path(
+        __file__
+    ).resolve().parents[1].joinpath("table_view.py").read_text(encoding="utf-8")
+
+    assert "this.eGui.addEventListener('click'" not in source
+    assert "copy.addEventListener('click'" in source
+    assert source.count("stopPropagation()") == 1
+    copy_handler = source[source.index("copy.addEventListener('click'") :]
+    assert copy_handler.index("stopPropagation()") < copy_handler.index("navigator.clipboard")
+
+
 def test_app_uses_distinct_grid_identities_and_only_enables_origin_for_valid_midweek():
     assert '"review_results_grid_midweek"' in APP_SOURCE
     assert '"review_results_grid_weekend"' in APP_SOURCE

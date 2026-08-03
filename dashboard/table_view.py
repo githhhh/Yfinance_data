@@ -55,50 +55,52 @@ def _code_renderer_jscode(show_origin_badge: bool = False):
                 code.textContent = String(codeText);
                 if (feedback) code.style.color = failed ? '#ef5350' : '#4caf50';
                 __ORIGIN_RENDER__
-                const copy = document.createElement('span');
+                const copy = document.createElement('button');
+                copy.type = 'button';
+                copy.setAttribute('aria-label', '复制 ' + String(codeText));
                 copy.textContent = feedback ? (failed ? '!' : '✓') : '⧉';
-                copy.style.cssText = 'font-size:11px; opacity:0.75; text-align:right;';
+                copy.style.cssText = 'appearance:none; width:18px; height:18px; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; font-size:11px; line-height:18px; opacity:0.75; text-align:center;';
+                copy.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const textToCopy = String(codeText);
+                    let success = false;
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(textToCopy);
+                            success = true;
+                        } catch (err) {
+                            // fallback to execCommand
+                        }
+                    }
+                    if (!success) {
+                        try {
+                            const ta = document.createElement('textarea');
+                            ta.value = textToCopy;
+                            ta.style.position = 'fixed';
+                            ta.style.left = '-9999px';
+                            document.body.appendChild(ta);
+                            ta.focus();
+                            ta.select();
+                            success = document.execCommand('copy');
+                            document.body.removeChild(ta);
+                        } catch (err2) {
+                            success = false;
+                        }
+                    }
+                    if (success) {
+                        this.render(true, false);
+                    } else {
+                        this.render(true, true);
+                    }
+                    setTimeout(() => {
+                        if (this.eGui) {
+                            this.render(false, false);
+                        }
+                    }, 1500);
+                });
                 __APPEND_CHILDREN__
             };
             this.render(false, false);
-            this.eGui.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const textToCopy = String(codeText);
-                let success = false;
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    try {
-                        await navigator.clipboard.writeText(textToCopy);
-                        success = true;
-                    } catch (err) {
-                        // fallback to execCommand
-                    }
-                }
-                if (!success) {
-                    try {
-                        const ta = document.createElement('textarea');
-                        ta.value = textToCopy;
-                        ta.style.position = 'fixed';
-                        ta.style.left = '-9999px';
-                        document.body.appendChild(ta);
-                        ta.focus();
-                        ta.select();
-                        success = document.execCommand('copy');
-                        document.body.removeChild(ta);
-                    } catch (err2) {
-                        success = false;
-                    }
-                }
-                if (success) {
-                    this.render(true, false);
-                } else {
-                    this.render(true, true);
-                }
-                setTimeout(() => {
-                    if (this.eGui) {
-                        this.render(false, false);
-                    }
-                }, 1500);
-            });
         }
         getGui() {
             return this.eGui;
