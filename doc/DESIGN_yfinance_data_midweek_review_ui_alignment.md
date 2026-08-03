@@ -167,7 +167,7 @@ Context slot 在两种模式中始终占同一高度和纵向位置。
 
 Midweek 使用一条连续单行快捷栏，顺序固定为：
 
-`CHANGE` → 进入买区 → 离开买区 → 其他变化 → 分隔线 → `ORIGIN` → 新信号 → 延续 → 再确认 → Clear。
+`CHANGE` → Entered Buy Zone → Left Buy Zone → Other Changes → 分隔线 → `ORIGIN` → New Signal → Carry Over → Confirmed Again → Clear。
 
 每个 chip 包含：
 
@@ -184,7 +184,7 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 
 ### 7.4 Status Queue
 
-固定显示 ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED 四张等宽等高卡片。副标题依次为“买点上方 0%–5%”“等待日线确认”“低于买点”“高于买点 5%，不追”。每卡显示 CSS orb、标准英文状态名称、动态数量和状态说明。卡片点击只切换 Status，且可与 Change/Origin 组合。
+固定显示 ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED 四张等宽等高卡片。副标题依次为 `In 0%–5% Buy Zone`、`Waiting for Confirmation`、`Below Buy Point`、`Over 5% — Don't Chase`。每卡显示独立 CSS orb、标准英文状态名称、动态数量和状态说明；orb 与纵向文本块使用独立布局区域，两行文本左边缘对齐。卡片点击只切换 Status，且可与 Change/Origin 组合。
 
 状态卡不得把 emoji 写入按钮标签。选中标记使用固定槽，不能改变卡片内部布局。独立信息按钮固定在卡片右上角 `16×16px`，不得建立额外布局列、切割主点击区域或影响卡片宽度。Status 对应的 entry-volume 和 near-trigger 状态清理继续沿用现有业务规则。
 
@@ -192,18 +192,18 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 
 以下 10 个心流入口必须使用同一套页面 Tooltip 控制器：
 
-- 进入买区、离开买区、其他变化；
-- 新信号、延续、再确认；
+- Entered Buy Zone、Left Buy Zone、Other Changes；
+- New Signal、Carry Over、Confirmed Again；
 - ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED。
 
 每个 Tooltip 固定使用三行中文短说明：`含义：……`、`数量：当前范围内符合条件的标的数。`、`点击：只看这类标的，并保留其他已选条件。`。“含义”分别为：
 
-- 进入买区：上周不在买区，本次进入 0%–5% 买区；
-- 离开买区：上周在买区，本次已跌破、未确认或涨超 5%；
-- 其他变化：状态和上周不同，但不属于进入或离开买区；
-- 新信号：完整周没有信号，周中首次出现信号；
-- 延续：周中没有新信号，但完整周信号仍在观察，状态按当前价格更新；
-- 再确认：完整周和周中都有信号，以周中数据为准；
+- Entered Buy Zone：上周不在买区，本次进入买点上方 0%–5% 的买区；
+- Left Buy Zone：上周在买区，本次已经离开买区；
+- Other Changes：状态和上周不同，但不是进入或离开买区；
+- New Signal：完整周没有信号，周中首次出现信号；
+- Carry Over：周中没有新信号，但完整周信号继续观察，状态按当前价格更新；
+- Confirmed Again：完整周和周中都有信号，以周中数据为准；
 - ACTIONABLE：已完成入场确认，当前价位于买点上方 0%–5%；
 - UNCONFIRMED：尚未满足日线入场确认条件；
 - BELOW TRIGGER：当前价低于有效买点；
@@ -212,6 +212,7 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 同一 Tooltip 内容由元数据生成一次，并同时绑定原生 Streamlit 主筛选按钮与独立信息按钮；不再并存按钮 `help` 与 `st.popover` 两套内容源。独立信息按钮不进入 Streamlit 筛选事件链，点击时只控制同一个 Tooltip 浮层。交互必须满足：
 
 - 鼠标 hover；
+- hover 延迟约 275ms，提前移出时取消待显示 Tooltip；
 - 键盘 focus；
 - 独立触屏信息按钮；
 - 触发器与浮层通过 `aria-describedby` 关联；
@@ -229,6 +230,7 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 - 真正切换 Mode 后恢复收起；
 - 展开按钮始终为整行 45px 控件，显示 Filters、当前活动筛选数量和 chevron；
 - Filters 摘要靠左，chevron 使用固定的最右槽位，不能依赖空格推位；
+- 收起时显示向下箭头，展开时显示向上箭头，并同步原生按钮的 `aria-expanded`；
 - 现有高级筛选字段和业务约束不变；
 - 展开/收起不能影响 Mode、Scope、Context 或 Status 的几何稳定性。
 
@@ -243,6 +245,7 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 - Copy 反馈不新增一个与 Sort 并列的永久主控件；
 - 空结果时按钮必须呈现明确且无误导的禁用/零数量状态；
 - Sort 控件的选中值必须与实际 DataFrame 排序一致。
+- Sort 必须完整显示 `Review Priority`，不得截断为省略号。
 
 ### 7.8 Selected Row 与 AG Grid
 
@@ -251,6 +254,8 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 - 周中显示完整周到当前的变化；周末不伪造 Change/Origin；
 - 保留表格的动态列、列拖动、Pin、排序、键盘选行与 Selected Row 联动；
 - 周中主表显示必要的 Origin/Change 信息，周末表格不混用周中字段；
+- Midweek、Weekend、C Rank Reference 使用不同 Grid identity；只有有效 Midweek Comparison 启用 Origin badge 与 Change 列，切换后不得复用不兼容的行、列或选中状态；
+- Code 单元格的代码、Origin badge 和空白区域点击均交给 AG Grid 选行；只有右侧原生复制按钮复制代码并阻止冒泡，复制按钮使用 `aria-label="复制 {code}"`；
 - 不用静态 HTML table 替换 AG Grid。
 
 ## 8. 状态与数据流

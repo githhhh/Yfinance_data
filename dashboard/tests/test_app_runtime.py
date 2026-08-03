@@ -240,7 +240,7 @@ def test_runtime_sort_selector_updates_results_summary():
     assert any("results · Sorted by Distance" in item.value for item in app.markdown)
 
 
-def test_runtime_global_mode_switches_to_c_rank_reference():
+def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review():
     app = _midweek_app()
 
     app.get("button_group")[0].set_value(["C Rank Reference"])
@@ -250,6 +250,14 @@ def test_runtime_global_mode_switches_to_c_rank_reference():
     assert app.session_state["global_mode_selector"] == "C Rank Reference"
     assert any("C Rank Reference View" in item.value for item in app.markdown)
     assert any(widget.label == "Top N Slice" for widget in app.selectbox)
+
+    app.get("button_group")[0].set_value(["IBD Review"])
+    _run_with_review_argv(app)
+
+    assert len(app.exception) == 0
+    assert app.session_state["global_mode_selector"] == "IBD Review"
+    assert any("Review Queue" in item.value for item in app.markdown)
+    assert not any(widget.label == "Top N Slice" for widget in app.selectbox)
 
 
 def test_runtime_surfaces_missing_baseline_warning(tmp_path):

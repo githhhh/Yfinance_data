@@ -446,6 +446,26 @@ def test_attached_sample_complete_window_manual_midweek_counts_are_derived_from_
     }
     assert counts["result"] == 111
 
+    weekend_df = result.complete_pool.copy()
+    weekend_df["review_watch_active"] = weekend_df["signal"]
+    weekend_df["review_effective_entry_status"] = weekend_df["ibd_entry_status"]
+    weekend_df["review_priority"] = pd.to_numeric(
+        weekend_df.get("rank_C_continuous"), errors="coerce"
+    )
+    weekend_state = default_review_state(result.mode)
+    weekend_counts = build_review_filter_counts(weekend_df, weekend_state)
+
+    assert weekend_state["mode"] == "WEEKEND"
+    assert weekend_state["scope"] == "ALL_SIGNALS"
+    assert weekend_state["sort_mode"] == "C Rank"
+    assert weekend_counts["status"] == {
+        "ACTIONABLE": 27,
+        "UNCONFIRMED": 64,
+        "BELOW_TRIGGER": 0,
+        "EXTENDED": 15,
+    }
+    assert weekend_counts["result"] == 106
+
 
 def test_analyze_without_valid_baseline_never_carries_complete_signal(tmp_path):
     complete_path = tmp_path / "breakout_follow_pool.csv"
