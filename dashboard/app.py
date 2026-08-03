@@ -213,7 +213,7 @@ def _render_header_bar(
         total_pool = len(df) if df is not None else 0
         active_signals = int(df["signal"].sum()) if df is not None and "signal" in df.columns else 0
         st.markdown(
-            f'<h3 class="dashboard-title">Breakout Pool {badge_html}</h3>'
+            f'<div class="dashboard-title" role="heading" aria-level="1">Breakout Pool {badge_html}</div>'
             f'<div class="dashboard-snapshot">{snapshot_html} · <b>{total_pool}</b> Total Pool · <b>{active_signals}</b> Active Signals</div>',
             unsafe_allow_html=True,
         )
@@ -300,7 +300,7 @@ def _render_ibd_review_view(
             )
         with actions_col:
             with st.container(key="results_actions"):
-                copy_col, sort_col = st.columns([1.35, 1], vertical_alignment="center")
+                copy_col, sort_col = st.columns([0.9, 1.1], vertical_alignment="center")
                 with copy_col:
                     _render_copy_codes_control(
                         filtered_df["code"].tolist(),
@@ -609,6 +609,12 @@ def _render_filter_bar(
     active_count = _active_filter_count(state)
     summary = "No filters applied" if active_count == 0 else f"{active_count} active"
     with st.container(key="filters_header"):
+        st.markdown(
+            '<span class="filters-state-marker" '
+            f'data-expanded="{str(state["filters_expanded"]).lower()}" '
+            'aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         if st.button(
             f"Filters · {summary}",
             key="btn_filters_toggle",

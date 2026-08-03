@@ -549,6 +549,10 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
 .st-key-status_cards div[class*="st-key-flow_card_"]
     > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
     button[kind] p {
+    display: grid !important;
+    grid-template-columns: 19px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
     margin: 0 !important;
     color: #d6dce3 !important;
     font-size: 15px !important;
@@ -570,7 +574,9 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     display: inline-block;
     width: 19px;
     height: 19px;
-    margin-right: 7px;
+    grid-column: 1;
+    grid-row: 1;
+    margin-right: 0;
     border-radius: 50%;
     box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), 0 0 5px currentColor;
     vertical-align: middle;
@@ -686,6 +692,14 @@ div[class*="st-key-flow_card_"] > div[data-testid="stElementContainer"]:has(.flo
     font-size: 14px;
 }
 
+.st-key-filters_header:has(.filters-state-marker[data-expanded="true"]) button::after {
+    content: "⌃";
+}
+
+.filters-state-marker {
+    display: none;
+}
+
 .st-key-filters_header button:hover {
     border-color: #465463 !important;
     background: #141b23 !important;
@@ -730,14 +744,14 @@ div[class*="st-key-flow_card_"] > div[data-testid="stElementContainer"]:has(.flo
 }
 
 .st-key-results_toolbar iframe {
-    min-width: 160px;
-    max-width: 180px;
+    min-width: 144px;
+    max-width: 160px;
     height: 44px !important;
 }
 
 .st-key-results_toolbar div[data-baseweb="select"] > div {
-    min-width: 110px;
-    max-width: 146px;
+    min-width: 170px;
+    max-width: 190px;
     height: 44px !important;
 }
 

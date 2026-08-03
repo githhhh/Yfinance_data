@@ -161,6 +161,13 @@ def test_header_markup_and_control_surfaces_follow_reference_hierarchy():
     assert "<hr" not in source
 
 
+def test_breakout_pool_title_uses_non_heading_markup_to_avoid_streamlit_anchor():
+    source = _function_source("_render_header_bar", "_render_flow_rules_dialog")
+
+    assert '<div class="dashboard-title" role="heading" aria-level="1">' in source
+    assert '<h3 class="dashboard-title">' not in source
+
+
 def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
     css = _compact_css()
 
@@ -272,16 +279,50 @@ def test_filters_and_results_actions_use_fixed_compact_slots():
 
     assert 'f"Filters · {summary}"' in filter_source
     assert "                                      " not in filter_source
+    assert 'class="filters-state-marker"' in filter_source
+    assert 'data-expanded="{str(state["filters_expanded"]).lower()}"' in filter_source
     assert ".st-key-filters_headerbutton::after{content:\"⌄\"" in css
+    assert (
+        '.st-key-filters_header:has(.filters-state-marker[data-expanded="true"])'
+        'button::after{content:"⌃"'
+    ) in css
     assert "right:14px" in css
     assert "justify-content:flex-start!important" in css
 
     assert "st.columns([1,0.34]" in re.sub(r"\s+", "", view_source)
-    assert "st.columns([1.35,1]" in re.sub(r"\s+", "", view_source)
-    assert "min-width:160px" in css
-    assert "max-width:180px" in css
-    assert "min-width:110px" in css
-    assert "max-width:146px" in css
+    assert "st.columns([0.9,1.1]" in re.sub(r"\s+", "", view_source)
+    assert "min-width:144px" in css
+    assert "max-width:160px" in css
+    assert "min-width:170px" in css
+    assert "max-width:190px" in css
+
+
+def test_filters_disclosure_state_is_synchronized_to_native_button_aria():
+    tooltip_source = (DASHBOARD_DIR / "review_tooltip.py").read_text(encoding="utf-8")
+
+    assert 'querySelector(".filters-state-marker")' in tooltip_source
+    assert 'button.setAttribute("aria-expanded", marker.dataset.expanded)' in tooltip_source
+    assert "MutationObserver" in tooltip_source
+
+
+def test_tooltip_hover_is_delayed_but_focus_and_click_remain_immediate():
+    tooltip_source = (DASHBOARD_DIR / "review_tooltip.py").read_text(encoding="utf-8")
+
+    assert "const hoverDelayMs = 275" in tooltip_source
+    assert "hoverTimer = parentWindow.setTimeout" in tooltip_source
+    assert "parentWindow.clearTimeout(hoverTimer)" in tooltip_source
+    assert "const onFocusIn" in tooltip_source
+    assert "showTooltip(card" in tooltip_source
+    assert "const onClick" in tooltip_source
+
+
+def test_status_orb_and_two_line_text_use_independent_grid_regions():
+    css = _compact_css()
+
+    assert "display:grid!important" in css
+    assert "grid-template-columns:19pxminmax(0,1fr)" in css
+    assert "column-gap:10px" in css
+    assert "grid-column:1" in css
 
 
 def test_flow_card_main_and_info_buttons_have_separate_fixed_layout_contracts():

@@ -25,6 +25,17 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     let activeCard = null;
     let pinned = false;
     let describedElements = [];
+    const hoverDelayMs = 275;
+    let hoverTimer = null;
+    let pendingCard = null;
+
+    const cancelHoverTimer = () => {
+        if (hoverTimer !== null) {
+            parentWindow.clearTimeout(hoverTimer);
+            hoverTimer = null;
+        }
+        pendingCard = null;
+    };
 
     const cardFor = target => target instanceof parentWindow.Element
         ? target.closest('div[class*="st-key-flow_card_"]')
@@ -77,6 +88,7 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     };
 
     const hideTooltip = () => {
+        cancelHoverTimer();
         if (activeCard) {
             const trigger = activeCard.querySelector(".flow-info-trigger");
             if (trigger) trigger.setAttribute("aria-expanded", "false");
@@ -109,19 +121,36 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
         positionTooltip(card);
     };
 
+    const scheduleTooltip = card => {
+        if (pendingCard === card) return;
+        cancelHoverTimer();
+        pendingCard = card;
+        hoverTimer = parentWindow.setTimeout(() => {
+            hoverTimer = null;
+            pendingCard = null;
+            showTooltip(card, false);
+        }, hoverDelayMs);
+    };
+
     const onPointerOver = event => {
         const card = cardFor(event.target);
         if (!card || (pinned && activeCard !== card)) return;
-        showTooltip(card, pinned && activeCard === card);
+        if (event.relatedTarget instanceof parentWindow.Node && card.contains(event.relatedTarget)) return;
+        if (pinned && activeCard === card) return;
+        scheduleTooltip(card);
     };
 
     const onPointerOut = event => {
-        if (!activeCard || pinned) return;
+        const card = cardFor(event.target);
         const nextTarget = event.relatedTarget;
         if (
             nextTarget instanceof parentWindow.Node
-            && (activeCard.contains(nextTarget) || tooltip.contains(nextTarget))
+            && card
+            && card.contains(nextTarget)
         ) return;
+        if (card && pendingCard === card) cancelHoverTimer();
+        if (!activeCard || pinned) return;
+        if (nextTarget instanceof parentWindow.Node && tooltip.contains(nextTarget)) return;
         if (activeCard.contains(parentDocument.activeElement)) return;
         hideTooltip();
     };
@@ -129,6 +158,7 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     const onFocusIn = event => {
         const card = cardFor(event.target);
         if (!card || (pinned && activeCard !== card)) return;
+        cancelHoverTimer();
         showTooltip(card, pinned && activeCard === card);
     };
 
@@ -146,6 +176,7 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
         if (trigger) {
             event.preventDefault();
             event.stopPropagation();
+            cancelHoverTimer();
             const card = cardFor(trigger);
             if (!card) return;
             if (activeCard === card && pinned) {
@@ -173,6 +204,19 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
         if (activeCard) positionTooltip(activeCard);
     };
 
+    const syncFiltersDisclosure = () => {
+        const filterHeader = parentDocument.querySelector(".st-key-filters_header");
+        const marker = filterHeader && filterHeader.querySelector(".filters-state-marker");
+        const button = filterHeader && filterHeader.querySelector("button");
+        if (button && marker) {
+            button.setAttribute("aria-expanded", marker.dataset.expanded);
+        }
+    };
+
+    const filterObserver = new parentWindow.MutationObserver(syncFiltersDisclosure);
+    filterObserver.observe(parentDocument.body, {childList: true, subtree: true});
+    parentWindow.requestAnimationFrame(syncFiltersDisclosure);
+
     parentDocument.addEventListener("pointerover", onPointerOver);
     parentDocument.addEventListener("pointerout", onPointerOut);
     parentDocument.addEventListener("focusin", onFocusIn);
@@ -184,6 +228,8 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
 
     parentWindow[controllerKey] = {
         destroy: () => {
+            cancelHoverTimer();
+            filterObserver.disconnect();
             parentDocument.removeEventListener("pointerover", onPointerOver);
             parentDocument.removeEventListener("pointerout", onPointerOut);
             parentDocument.removeEventListener("focusin", onFocusIn);
