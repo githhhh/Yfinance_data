@@ -34,6 +34,15 @@ def test_visits_are_isolated_by_view_and_deduplicated():
     assert store == {"MIDWEEK": {"ACU"}, "WEEKEND": {"NVDA"}}
 
 
+def test_review_selection_survives_reruns_and_respects_current_filter():
+    full = pd.DataFrame({"code": ["ACU", "NVDA"]})
+    filtered = full.loc[full["code"].eq("ACU")]
+
+    assert dashboard_app.resolve_review_selection(full, None, "NVDA") == "NVDA"
+    assert dashboard_app.resolve_review_selection(full, "ACU", "NVDA") == "ACU"
+    assert dashboard_app.resolve_review_selection(filtered, None, "NVDA") is None
+
+
 def _selected_detail_markup(monkeypatch, **overrides):
     row = {
         "code": "TEST",

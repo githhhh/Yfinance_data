@@ -34,9 +34,9 @@ python dashboard/run_app.py --csv us/breakout_follow_pool.csv
 
 - 点击状态卡进入对应 Review 队列；各筛选条件按 **AND** 组合。
 - 点击表格行的其他单元格，更新上方 Selected Row Detail。
-- 点击 `Code` 只复制单个股票代码，不切换选中行。
+- 点击表格行（包括 `Code`）更新 Selected Row Detail；仅点击 Code 右侧复制图标时复制单个代码。
 - 悬停 Selected Code 查看 CANSLIM / Base、Pullback 与 Daily Entry 详情。
-- `Copy N Codes` 按当前筛选及排序复制全部代码；失败时使用 `Manual`。
+- `Copy N Codes` 按当前筛选及排序复制全部代码，并在成功后显示绿色反馈。
 - `C Rank Reference` 是独立对照视图，不改变 IBD Review 的筛选状态。
 
 ## 自检

@@ -110,11 +110,11 @@ def build_review_position(
     selected = str(selected_code).strip() if selected_code is not None else ""
     if not selected or "code" not in df.columns:
         return {"code": "", "position": None, "total": total, "label": ""}
-    codes = df["code"].map(lambda value: str(value).strip())
+    codes = df["code"].map(lambda value: str(value).strip()).reset_index(drop=True)
     matches = codes[codes.eq(selected)]
     if matches.empty:
         return {"code": "", "position": None, "total": total, "label": ""}
-    position = int(codes.index.get_loc(matches.index[0])) + 1
+    position = int(matches.index[0]) + 1
     return {
         "code": selected,
         "position": position,
@@ -135,6 +135,21 @@ def _record_review_visit(
     return result
 
 
+def resolve_review_selection(
+    df: pd.DataFrame,
+    current_code: str | None,
+    previous_code: str | None,
+) -> str | None:
+    if "code" not in df.columns:
+        return None
+    available = set(df["code"].map(lambda value: str(value).strip()))
+    for candidate in (current_code, previous_code):
+        code = str(candidate).strip() if candidate is not None else ""
+        if code and code in available:
+            return code
+    return None
+
+
 def _visited_codes(view_key: str) -> set[str]:
     store = st.session_state.get("review_visited_codes", {})
     return set(store.get(view_key, set()))
@@ -146,6 +161,19 @@ def _store_review_visit(view_key: str, selected_code: str | None) -> None:
         view_key,
         selected_code,
     )
+
+
+def _stored_review_selection(view_key: str) -> str | None:
+    return st.session_state.get("review_selected_codes", {}).get(view_key)
+
+
+def _remember_review_selection(view_key: str, selected_code: str | None) -> None:
+    code = str(selected_code).strip() if selected_code is not None else ""
+    if not code:
+        return
+    selections = dict(st.session_state.get("review_selected_codes", {}))
+    selections[view_key] = code
+    st.session_state["review_selected_codes"] = selections
 
 
 def main() -> None:
@@ -415,7 +443,7 @@ def _render_ibd_review_view(
     with st.container(key="selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(
+        grid_selected_code = render_table(
             filtered_df,
             columns,
             grid_key=grid_key,
@@ -424,6 +452,12 @@ def _render_ibd_review_view(
             visited_codes=_visited_codes(state["mode"]),
         )
 
+    selected_code = resolve_review_selection(
+        filtered_df,
+        grid_selected_code,
+        _stored_review_selection(state["mode"]),
+    )
+    _remember_review_selection(state["mode"], grid_selected_code)
     _store_review_visit(state["mode"], selected_code)
 
     with detail_container.container():
@@ -1101,7 +1135,7 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     with st.container(key="selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(
+        grid_selected_code = render_table(
             ranked,
             [column for column in columns if column in ranked.columns],
             grid_key="c_rank_reference_grid",
@@ -1110,6 +1144,12 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
             visited_codes=_visited_codes("C_RANK"),
         )
 
+    selected_code = resolve_review_selection(
+        ranked,
+        grid_selected_code,
+        _stored_review_selection("C_RANK"),
+    )
+    _remember_review_selection("C_RANK", grid_selected_code)
     _store_review_visit("C_RANK", selected_code)
 
     with detail_container.container():
