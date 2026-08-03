@@ -166,14 +166,33 @@ def test_header_markup_and_control_surfaces_follow_reference_hierarchy():
 def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
     css = _compact_css()
 
-    assert ".st-key-dashboard_header>div[data-testid=\"stVerticalBlock\"]" in css
-    assert ".st-key-results_toolbar>div[data-testid=\"stVerticalBlock\"]" in css
-    assert ".st-key-results_actions>div[data-testid=\"stVerticalBlock\"]" in css
+    assert '.st-key-dashboard_header>div[data-testid="stHorizontalBlock"]' in css
+    assert '.st-key-results_toolbar>div[data-testid="stHorizontalBlock"]' in css
+    assert '.st-key-results_actions>div[data-testid="stHorizontalBlock"]' in css
+    assert '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]' in css
+    assert (
+        '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]'
+        '>div[data-testid="stColumn"]{width:100%!important;min-width:0!important;flex:none!important;}'
+    ) in css
+    assert (
+        '.st-key-quick_context_row>div[data-testid="stHorizontalBlock"]'
+        '{min-width:max-content;height:48px;align-items:center;gap:6px!important;}'
+    ) in css
+    assert (
+        '.st-key-review_context_slotdiv[class*="st-key-flow_card_"]'
+        '{position:relative;min-width:154px;}'
+    ) in css
+    for selector in [
+        '.st-key-dashboard_header>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
+        '.st-key-results_toolbar>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
+        '.st-key-results_actions>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
+    ]:
+        assert selector + '{width:100%!important;min-width:0!important;flex:none!important;}' in css
     assert "grid-template-columns:minmax(180px,1.5fr)minmax(120px,1fr)" in css
     assert "font-size:25px" in css
 
 
-def test_status_card_grid_targets_streamlits_nested_horizontal_block():
+def test_status_card_grid_targets_streamlits_direct_horizontal_block():
     css = _compact_css()
     direct = '.st-key-status_cards>div[data-testid="stHorizontalBlock"]'
     nested = (
@@ -181,5 +200,71 @@ def test_status_card_grid_targets_streamlits_nested_horizontal_block():
         '>div[data-testid="stElementContainer"]>div[data-testid="stHorizontalBlock"]'
     )
 
-    assert direct not in css
-    assert nested in css
+    assert direct in css
+    assert nested not in css
+    assert (
+        direct + '>div[data-testid="stColumn"]{width:100%!important;min-width:0!important;flex:none!important;}'
+    ) in css
+
+
+def test_keyed_vertical_blocks_remove_streamlits_default_density_gap():
+    css = _compact_css()
+
+    for selector in [
+        ".st-key-dashboard_shell{gap:0!important;}",
+        ".st-key-review_queue{gap:0!important;}",
+        ".st-key-filters{gap:0!important;}",
+        ".st-key-results_toolbar{gap:0!important;}",
+        ".st-key-selected_row{gap:0!important;}",
+        ".st-key-results_grid{gap:0!important;}",
+    ]:
+        assert selector in css
+    title_rule = css.split(".dashboard-title{", 1)[1].split("}", 1)[0]
+    assert "padding:0!important" in title_rule
+    assert (
+        'div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)'
+        '>div[data-testid="stVerticalBlockBorderWrapper"]'
+        '>div[data-testid="stVerticalBlock"]{gap:0!important;}'
+    ) in css
+
+
+def test_header_actions_are_right_aligned_to_the_content_edge():
+    css = _compact_css()
+
+    assert "grid-template-columns:45px235px" in css
+    assert "justify-content:end" in css
+    assert (
+        '.st-key-dashboard_headerdiv[data-testid="stColumn"]:has(.st-key-btn_info_rules)'
+        '>div[data-testid="stVerticalBlockBorderWrapper"]'
+        '>div[data-testid="stVerticalBlock"]'
+        '>div[data-testid="stHorizontalBlock"]{display:grid!important'
+    ) in css
+    assert "grid-template-columns:99px136px" in css
+    assert "max-width:99px" in css
+    assert "max-width:136px" in css
+    assert "padding:010px!important" in css
+
+
+def test_status_card_size_rule_excludes_the_popover_button():
+    css = _compact_css()
+
+    assert (
+        '.st-key-status_cardsdiv[class*="st-key-flow_card_"]'
+        'button[kind]:not([data-testid="stPopoverButton"]){width:100%!important'
+    ) in css
+    for card in [
+        "became_actionable",
+        "left_actionable",
+        "other_changes",
+        "new",
+        "carry",
+        "reconfirmed",
+        "actionable",
+        "unconfirmed",
+        "below_trigger",
+        "extended",
+    ]:
+        assert (
+            f'.st-key-flow_card_{card}button[kind]'
+            ':not([data-testid="stPopoverButton"])p::before'
+        ) in css

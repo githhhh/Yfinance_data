@@ -373,9 +373,12 @@ def build_grid_options(columns: list[str]) -> dict:
         "enableBrowserTooltips": False,
         "tooltipShowDelay": 300,
         "tooltipHideDelay": 5000,
-        "enableRangeSelection": False,
-        "rowSelection": "single",
-        "suppressRowClickSelection": False,
+        "rowSelection": {
+            "mode": "singleRow",
+            "enableClickSelection": True,
+            "checkboxes": False,
+            "headerCheckbox": False,
+        },
         "suppressDragLeaveHidesColumns": True,
         "animateRows": False,
     }
@@ -447,6 +450,7 @@ def render_table(df: pd.DataFrame, columns: list[str], height: int = 620) -> str
     grid_response = AgGrid(
         grid_df,
         gridOptions=build_grid_options(display_columns),
+        key="review_results_grid",
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=HAS_JS_CODE,

@@ -248,8 +248,13 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     columns = get_column_view_fields("IBD Decision")
     options = build_grid_options(columns)
 
-    assert options["rowSelection"] == "single"
-    assert options["suppressRowClickSelection"] is False
+    assert options["rowSelection"] == {
+        "mode": "singleRow",
+        "enableClickSelection": True,
+        "checkboxes": False,
+        "headerCheckbox": False,
+    }
+    assert "suppressRowClickSelection" not in options
     assert options["columnDefs"][0]["field"] == "code"
     assert options["columnDefs"][0]["pinned"] == "left"
     assert "onGridReady" not in options

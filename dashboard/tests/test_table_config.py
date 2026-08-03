@@ -328,7 +328,14 @@ def test_grid_options_pin_code_left_and_keep_table_capabilities():
     assert code_col["pinned"] == "left"
     assert options["defaultColDef"]["sortable"] is True
     assert options["defaultColDef"]["resizable"] is True
-    assert options["enableRangeSelection"] is False
+    assert options["rowSelection"] == {
+        "mode": "singleRow",
+        "enableClickSelection": True,
+        "checkboxes": False,
+        "headerCheckbox": False,
+    }
+    assert "enableRangeSelection" not in options
+    assert "suppressRowClickSelection" not in options
 
 
 def test_breakout_quality_column_uses_custom_dom_components_when_js_is_available():
@@ -443,6 +450,25 @@ def test_render_table_preserves_hidden_breakout_quality_precision(monkeypatch):
     assert captured["df"].loc[1, "ibd_entry_close_vs_trigger_pct"] == 0.00523
     assert captured["df"].loc[1, "ibd_entry_close_position"] == 0.869565
     assert captured["df"].loc[1, "ibd_entry_breakout_range_ratio"] == 0.652174
+
+
+def test_render_table_uses_a_stable_component_key_for_selection_events(monkeypatch):
+    import pandas as pd
+    import sys
+    import types
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_aggrid(df, **kwargs):
+        captured["kwargs"] = kwargs
+        return {}
+
+    monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
+
+    render_table(pd.DataFrame({"code": ["AAA"]}), ["code"])
+
+    assert captured["kwargs"]["key"] == "review_results_grid"
 
 
 def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeypatch):
