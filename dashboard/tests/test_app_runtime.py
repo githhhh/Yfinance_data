@@ -102,6 +102,15 @@ def _run_with_review_argv(app):
         sys.argv = old_argv
 
 
+def _header_markup(app):
+    return next(
+        item.value
+        for item in app.markdown
+        if '<div class="dashboard-title"' in item.value
+        and '<div class="dashboard-snapshot"' in item.value
+    )
+
+
 def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filters():
     app = _midweek_app()
 
@@ -258,6 +267,56 @@ def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review
     assert app.session_state["global_mode_selector"] == "IBD Review"
     assert any("Review Queue" in item.value for item in app.markdown)
     assert not any(widget.label == "Top N Slice" for widget in app.selectbox)
+
+
+def test_runtime_header_tracks_midweek_weekend_and_c_rank_data_sources():
+    app = _midweek_app()
+
+    midweek_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-30</b>" in midweek_header
+    assert "<b>751</b> Total Pool" in midweek_header
+    assert "<b>190</b> Active Signals" in midweek_header
+
+    _click(app, "btn_mode_weekend")
+    weekend_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-24</b>" in weekend_header
+    assert "<b>745</b> Total Pool" in weekend_header
+    assert "<b>106</b> Active Signals" in weekend_header
+
+    _click(app, "btn_mode_midweek")
+    app.get("button_group")[0].set_value(["C Rank Reference"])
+    _run_with_review_argv(app)
+
+    c_rank_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-24</b>" in c_rank_header
+    assert "<b>745</b> Total Pool" in c_rank_header
+    assert "<b>106</b> Active Signals" in c_rank_header
+    assert "snapshot-mode-segment--midweek" not in c_rank_header
+
+
+def test_c_rank_top_n_keeps_result_summary_complete():
+    app = _midweek_app()
+    app.get("button_group")[0].set_value(["C Rank Reference"])
+    _run_with_review_argv(app)
+
+    assert any(
+        "Showing: 106 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
+
+    app.selectbox(key="c_rank_top_n_select").select("Top 10")
+    _run_widget_change(app)
+    assert any(
+        "Showing: 10 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
+
+    app.selectbox(key="c_rank_top_n_select").select("Top 25")
+    _run_widget_change(app)
+    assert any(
+        "Showing: 25 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
 
 
 def test_runtime_surfaces_missing_baseline_warning(tmp_path):

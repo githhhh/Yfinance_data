@@ -139,9 +139,16 @@ def main() -> None:
     except Exception as exc:
         load_err = str(exc)
 
+    mode = st.session_state.get("global_mode_selector", "IBD Review")
+    header_df = (
+        analysis.complete_pool
+        if mode == "C Rank Reference" and analysis is not None
+        else df
+    )
+
     with st.container(key="dashboard_shell"):
         with st.container(key="dashboard_header"):
-            _render_header_bar(df, load_err, analysis)
+            _render_header_bar(header_df, load_err, analysis, mode)
 
         if analysis is not None:
             for warning in analysis.warnings:
@@ -151,7 +158,6 @@ def main() -> None:
             st.error(f"Could not load breakout pool data: {load_err}")
             return
 
-        mode = st.session_state.get("global_mode_selector", "IBD Review")
         if mode == "C Rank Reference":
             reference_df = analysis.complete_pool if analysis is not None else df
             _render_c_rank_reference_view(reference_df)
@@ -182,6 +188,7 @@ def _render_header_bar(
     df: pd.DataFrame | None,
     load_err: str | None,
     analysis: PoolAnalysisResult | None = None,
+    global_mode: str = "IBD Review",
 ) -> None:
     col_l, col_r = st.columns([3, 1.5])
     with col_l:
@@ -191,7 +198,11 @@ def _render_header_bar(
             else '<span class="data-badge data-badge--error">Schema / Data Error</span>'
         )
         state = st.session_state.get("review_ui_state", {})
-        is_midweek = state.get("mode") == "MIDWEEK" and analysis is not None
+        is_midweek = (
+            global_mode == "IBD Review"
+            and state.get("mode") == "MIDWEEK"
+            and analysis is not None
+        )
         if is_midweek:
             snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
             baseline_value = (
@@ -975,17 +986,25 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 )
             )
 
-    with st.container(key="results_toolbar"):
-        col_limit, col_summary, col_copy = st.columns([1.3, 2.3, 2.4], vertical_alignment="bottom")
+    with st.container(key="c_rank_results_toolbar"):
+        col_limit, col_summary, col_copy = st.columns(
+            [1.3, 2.3, 2.4],
+            vertical_alignment="bottom",
+        )
         with col_limit:
-            limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
+            limit_label = st.selectbox(
+                "Top N Slice",
+                ["All rows", "Top 10", "Top 25", "Top 50"],
+                index=0,
+                key="c_rank_top_n_select",
+            )
             limit = None if limit_label == "All rows" else int(limit_label.split()[1])
 
         ranked = apply_c_rank_mode(df, limit=limit)
 
         with col_summary:
             st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
+                f'<div class="results-summary">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
                 unsafe_allow_html=True,
             )
         with col_copy:

@@ -43,6 +43,20 @@ def test_c_rank_reference_denominator_uses_active_signals_count():
     assert 'Showing: {len(ranked)} of {denom} Active Signals · Reference Only' in source
 
 
+def test_c_rank_result_summary_stays_in_spaced_toolbar_row():
+    assert 'with st.container(key="c_rank_results_toolbar")' in APP_SOURCE
+    assert "col_limit, col_summary, col_copy = st.columns" in APP_SOURCE
+    assert "with col_summary:" in APP_SOURCE
+    assert 'with st.container(key="c_rank_results_summary")' not in APP_SOURCE
+    assert ".st-key-c_rank_results_toolbar" in STYLE_SOURCE
+    assert "min-height: 80px" in STYLE_SOURCE
+    assert "padding-bottom: 12px" in STYLE_SOURCE
+    assert (
+        '.st-key-c_rank_results_toolbar div[data-testid="stMarkdownContainer"]:has(.results-summary)'
+        in STYLE_SOURCE
+    )
+
+
 def test_csv_cache_fingerprint_changes_when_same_path_is_rewritten(tmp_path):
     csv_path = tmp_path / "breakout_follow_pool.csv"
     csv_path.write_text("code,signal,rank_C_continuous\nAAA,True,1\n", encoding="utf-8")
