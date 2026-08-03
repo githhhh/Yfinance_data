@@ -44,6 +44,7 @@ from dashboard.services.bf_midweek_review import (
     clear_quick_filters,
     default_review_state,
     materialize_review_view,
+    reconcile_review_state,
     reset_to_all_signals,
     sort_review_rows,
     switch_review_mode,
@@ -118,13 +119,14 @@ def main() -> None:
         if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
             state = default_review_state(PoolMode.COMPLETE)
             st.session_state["review_ui_state"] = state
-        elif (
-            state.get("mode") == "MIDWEEK"
-            and _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
-            and state.get("scope") == "CHANGES"
-        ):
-            state = default_review_state(PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
-            st.session_state["review_ui_state"] = state
+        elif _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE):
+            reconciled_state = reconcile_review_state(
+                state,
+                PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE,
+            )
+            if reconciled_state != state:
+                st.session_state["review_ui_state"] = reconciled_state
+            state = reconciled_state
         df = _view_dataframe(analysis, state)
     except Exception as exc:
         load_err = str(exc)

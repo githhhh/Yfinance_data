@@ -9,6 +9,25 @@ import pytest
 import yfinance_data
 
 
+def _valid_complete_signal(code: str, *, rank: int) -> dict[str, object]:
+    return {
+        "code": code,
+        "snapshot_date": "2026-07-24",
+        "signal": True,
+        "latest_close": 101.0,
+        "ibd_candidate_price": 100.0,
+        "ibd_entry_valid": 1,
+        "ibd_entry_status": "ACTIONABLE",
+        "current_vs_ibd_candidate_pct": 1.0,
+        "ibd_candidate_rule": "pivot",
+        "ibd_entry_volume_ratio": 2.0,
+        "ibd_entry_reject_reason": None,
+        "volume_ratio": 1.2,
+        "rank_C_continuous": rank,
+        "C_continuous": float(rank),
+    }
+
+
 def test_quant_trade_import_path_and_zero_argument_contract_are_available():
     pool_type = yfinance_data.BreakoutFollowPoolRun
 
@@ -42,10 +61,10 @@ def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_
     midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
     pd.DataFrame(
         [
-            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CARRY_EXTENDED", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "EXITED", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CURRENT_OVERRIDE", "snapshot_date": "2026-07-24", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 100.0, "ibd_entry_status": "ACTIONABLE"},
+            _valid_complete_signal("CARRY_ACTION", rank=1),
+            _valid_complete_signal("CARRY_EXTENDED", rank=2),
+            _valid_complete_signal("EXITED", rank=3),
+            _valid_complete_signal("CURRENT_OVERRIDE", rank=4),
         ]
     ).to_csv(complete_path, index=False)
     current = pd.DataFrame(

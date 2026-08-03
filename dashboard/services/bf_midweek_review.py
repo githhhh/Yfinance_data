@@ -10,7 +10,12 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from dashboard.data_utils import load_pool_csv, normalize_pool_df
+from dashboard.data_utils import (
+    load_pool_csv,
+    normalize_pool_df,
+    validate_pool_schema,
+    validate_pool_semantics,
+)
 
 
 BUSINESS_TIMEZONE = "Asia/Shanghai"
@@ -355,6 +360,24 @@ def default_review_state(mode: PoolMode) -> dict[str, Any]:
     }
 
 
+def reconcile_review_state(state: dict[str, Any], mode: PoolMode) -> dict[str, Any]:
+    """Remove comparison-only state when a midweek baseline is unavailable."""
+    result = dict(state)
+    mode_value = getattr(mode, "value", mode)
+    if (
+        mode_value != PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE.value
+        or str(result.get("mode", "")).upper() != "MIDWEEK"
+    ):
+        return result
+    result["scope"] = "ALL_SIGNALS"
+    result["change_filter"] = "ALL"
+    result["origin_filter"] = "ALL"
+    if result.get("sort_mode") == "Review Priority":
+        result["sort_mode"] = "C Rank"
+        result["widget_generation"] = int(result.get("widget_generation", 0)) + 1
+    return result
+
+
 def switch_review_mode(
     state: dict[str, Any],
     target_mode: str,
@@ -445,14 +468,18 @@ def apply_review_filters(
     active_field = "review_watch_active" if "review_watch_active" in result.columns else "signal"
     result = result.loc[result[active_field].map(_to_bool).eq(True)].copy()
     is_midweek = str(state.get("mode", "MIDWEEK")).upper() == "MIDWEEK"
-    if is_midweek and state.get("scope") == "CHANGES" and "review_change_group" in result.columns:
+    has_comparison = is_midweek and (
+        "review_baseline_available" not in result.columns
+        or result["review_baseline_available"].map(_to_bool).eq(True).all()
+    )
+    if has_comparison and state.get("scope") == "CHANGES" and "review_change_group" in result.columns:
         result = result.loc[result["review_change_group"].ne("UNCHANGED")].copy()
 
-    if is_midweek and exclude_dimension != "change":
+    if has_comparison and exclude_dimension != "change":
         selected_change = state.get("change_filter", "ALL")
         if selected_change != "ALL" and "review_change_group" in result.columns:
             result = result.loc[result["review_change_group"].eq(selected_change)].copy()
-    if is_midweek and exclude_dimension != "origin":
+    if has_comparison and exclude_dimension != "origin":
         selected_origin = state.get("origin_filter", "ALL")
         if selected_origin != "ALL" and "review_signal_origin" in result.columns:
             result = result.loc[result["review_signal_origin"].eq(selected_origin)].copy()
@@ -591,6 +618,8 @@ def build_midweek_review_for_snapshots(
     if complete_pool is not None and not complete_pool.empty:
         try:
             complete = _normalized_pool(complete_pool, label="complete")
+            validate_pool_schema(complete)
+            validate_pool_semantics(complete)
             complete_date = _snapshot_date(complete, label="complete")
             if _has_valid_complete_baseline(complete_date, current_date):
                 baseline = complete

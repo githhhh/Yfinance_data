@@ -223,6 +223,18 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
     ]
     try:
         app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+        stale_state = dict(app.session_state["review_ui_state"])
+        stale_state.update(
+            {
+                "scope": "ALL_SIGNALS",
+                "change_filter": "BECAME_ACTIONABLE",
+                "origin_filter": "CARRY",
+                "sort_mode": "Review Priority",
+            }
+        )
+        app.session_state["review_ui_state"] = stale_state
+        _prepare_app_test_interaction(app)
+        app = app.run(timeout=30)
     finally:
         sys.argv = old_argv
 
@@ -234,6 +246,9 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
         "ALL_SIGNALS",
         "C Rank",
     )
+    assert state["change_filter"] == "ALL"
+    assert state["origin_filter"] == "ALL"
+    assert not any("0 results ·" in item.value for item in app.markdown)
     assert app.button(key="btn_scope_changes").disabled is True
     assert not any(button.key == "btn_change_filter_BECAME_ACTIONABLE" for button in app.button)
     assert any("Change and Origin comparison is unavailable" in item.value for item in app.markdown)

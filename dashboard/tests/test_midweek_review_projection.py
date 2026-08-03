@@ -10,6 +10,7 @@ from dashboard.services.bf_midweek_review import (
     PoolWindow,
     analyze_breakout_follow_pool,
     build_midweek_review,
+    build_midweek_review_for_snapshots,
     complete_target_week,
     materialize_review_view,
     resolve_window,
@@ -194,6 +195,50 @@ def test_projection_without_baseline_suppresses_comparison_facts():
     assert result.summary["NEW"] == 0
     assert result.summary["BECAME_ACTIONABLE"] == 0
     assert result.actionable_codes == ("CURRENT",)
+
+
+@pytest.mark.parametrize("invalid_baseline", ["semantic_mismatch", "missing_enrichment"])
+def test_snapshot_builder_discards_a_schema_or_semantically_invalid_baseline(invalid_baseline):
+    complete = pd.DataFrame(
+        [
+            _row(
+                "OLD_CARRY",
+                snapshot_date="2026-07-24",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=101,
+                rule="pivot",
+            )
+        ]
+    )
+    if invalid_baseline == "semantic_mismatch":
+        complete.loc[0, "ibd_entry_status"] = "UNCONFIRMED"
+    else:
+        complete = complete.drop(columns=["ibd_entry_valid"])
+    current = pd.DataFrame(
+        [
+            _row(
+                "CURRENT",
+                snapshot_date="2026-07-29",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=50,
+                close=51,
+                rule="pivot",
+            ),
+            _row("OLD_CARRY", snapshot_date="2026-07-29", signal=False, close=101),
+        ]
+    )
+
+    result = build_midweek_review_for_snapshots(current, complete)
+    review = result.current_review.set_index("code")
+
+    assert result.baseline_available is False
+    assert result.actionable_codes == ("CURRENT",)
+    assert review.loc["OLD_CARRY", "review_signal_origin"] == "NONE"
 
 
 @pytest.mark.parametrize(

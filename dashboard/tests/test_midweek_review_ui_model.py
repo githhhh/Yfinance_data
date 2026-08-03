@@ -8,6 +8,7 @@ from dashboard.services.bf_midweek_review import (
     build_review_filter_counts,
     clear_quick_filters,
     default_review_state,
+    reconcile_review_state,
     reset_to_all_signals,
     sort_review_rows,
     switch_review_mode,
@@ -112,6 +113,49 @@ def test_change_origin_and_status_filters_combine_with_and_semantics():
     filtered = apply_review_filters(_review_rows(), state)
 
     assert filtered["code"].tolist() == ["B"]
+
+
+def test_no_baseline_rows_ignore_hidden_comparison_filters():
+    rows = _review_rows().copy()
+    rows["review_baseline_available"] = False
+    rows["review_signal_origin"] = "NONE"
+    rows["review_change_group"] = "UNCHANGED"
+    state = default_review_state(PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE)
+    state.update(
+        {
+            "change_filter": "BECAME_ACTIONABLE",
+            "origin_filter": "CARRY",
+        }
+    )
+
+    filtered = apply_review_filters(rows, state)
+
+    assert filtered["code"].tolist() == ["A", "B", "C", "D", "E"]
+
+
+def test_no_baseline_state_clears_only_incompatible_comparison_state():
+    state = default_review_state(PoolMode.MIDWEEK)
+    state.update(
+        {
+            "scope": "ALL_SIGNALS",
+            "change_filter": "BECAME_ACTIONABLE",
+            "origin_filter": "CARRY",
+            "status_filter": "ACTIONABLE",
+            "route_filter": "pivot",
+        }
+    )
+
+    reconciled = reconcile_review_state(
+        state,
+        PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE,
+    )
+
+    assert reconciled["scope"] == "ALL_SIGNALS"
+    assert reconciled["change_filter"] == "ALL"
+    assert reconciled["origin_filter"] == "ALL"
+    assert reconciled["sort_mode"] == "C Rank"
+    assert reconciled["status_filter"] == "ACTIONABLE"
+    assert reconciled["route_filter"] == "pivot"
 
 
 def test_filter_counts_use_the_same_composed_filter_model_as_results():
