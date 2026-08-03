@@ -700,6 +700,11 @@ div[class*="st-key-flow_card_"] > div[data-testid="stElementContainer"]:has(.flo
     display: none;
 }
 
+.st-key-filters_header > div[data-testid="stVerticalBlock"]
+    > div[data-testid="stElementContainer"]:has(.filters-state-marker) {
+    display: none;
+}
+
 .st-key-filters_header button:hover {
     border-color: #465463 !important;
     background: #141b23 !important;
@@ -867,8 +872,9 @@ select:focus-visible,
 
     .st-key-results_actions > div[data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: minmax(180px, 1.5fr) minmax(120px, 1fr);
+        grid-template-columns: minmax(140px, 1fr) minmax(170px, 1fr);
         width: 100%;
+        overflow-x: auto;
     }
 
     .st-key-results_actions > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
@@ -877,10 +883,14 @@ select:focus-visible,
         flex: none !important;
     }
 
-    .st-key-results_toolbar iframe,
-    .st-key-results_toolbar div[data-baseweb="select"] > div {
+    .st-key-results_toolbar iframe {
         width: 100% !important;
         min-width: 0;
+    }
+
+    .st-key-results_toolbar div[data-baseweb="select"] > div {
+        width: 100% !important;
+        min-width: 170px;
     }
 
     .st-key-review_queue_heading > div[data-testid="stHorizontalBlock"] {

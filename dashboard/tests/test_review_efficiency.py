@@ -57,7 +57,7 @@ def test_status_meta_consistency():
 
 def test_header_tooltip_config():
     expected_tooltips = {
-        "code": "点击 Code 复制单个代码；点击该行其他位置查看详情。",
+        "code": "点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。",
         "ibd_entry_status": "当前 IBD Review 状态。",
         "ibd_candidate_rule": "IBD Candidate 触发价的结构来源。",
         "current_vs_ibd_candidate_pct": "最新收盘价相对 Candidate Price 的距离。",

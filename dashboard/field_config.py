@@ -420,7 +420,7 @@ def _field(
 
 FIELD_CONFIG = OrderedDict(
     [
-        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="点击 Code 复制单个代码；点击该行其他位置查看详情。")),
+        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。")),
         (
             "review_change_label",
             _field(

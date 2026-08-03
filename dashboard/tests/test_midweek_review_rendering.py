@@ -5,8 +5,8 @@ import re
 
 import pandas as pd
 
-from dashboard.app import _render_selected_row_detail
-from dashboard.field_config import FLOW_CARD_META, STATUS_META, get_midweek_table_columns
+from dashboard.app import _render_selected_row_detail, _review_grid_key
+from dashboard.field_config import FIELD_CONFIG, FLOW_CARD_META, STATUS_META, get_midweek_table_columns
 from dashboard.table_view import _code_renderer_jscode, _column_def, build_grid_options
 
 
@@ -145,6 +145,16 @@ def test_app_uses_distinct_grid_identities_and_only_enables_origin_for_valid_mid
     assert "grid_key=grid_key" in APP_SOURCE
     assert "show_origin_badge=has_comparison" in APP_SOURCE
     assert "show_origin_badge=False" in APP_SOURCE
+    assert _review_grid_key("MIDWEEK") == "review_results_grid_midweek"
+    assert _review_grid_key("WEEKEND") == "review_results_grid_weekend"
+
+
+def test_code_header_help_matches_row_selection_and_copy_button_behavior():
+    help_text = FIELD_CONFIG["code"]["help"]
+
+    assert "Origin 标签或空白处选择该行" in help_text
+    assert "仅点击右侧复制按钮复制代码" in help_text
+    assert "点击 Code 复制" not in help_text
 
 
 def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monkeypatch):

@@ -93,6 +93,14 @@ def _midweek_has_comparison(analysis: PoolAnalysisResult | None) -> bool:
     )
 
 
+def _review_grid_key(mode: str) -> str:
+    return (
+        "review_results_grid_midweek"
+        if mode == "MIDWEEK"
+        else "review_results_grid_weekend"
+    )
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -323,11 +331,7 @@ def _render_ibd_review_view(
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
-    grid_key = (
-        "review_results_grid_midweek"
-        if has_comparison
-        else "review_results_grid_weekend"
-    )
+    grid_key = _review_grid_key(state["mode"])
 
     with st.container(key="selected_row"):
         detail_container = st.empty()

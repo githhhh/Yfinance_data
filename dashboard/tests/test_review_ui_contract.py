@@ -193,7 +193,7 @@ def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
         '.st-key-results_actions>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
     ]:
         assert selector + '{width:100%!important;min-width:0!important;flex:none!important;}' in css
-    assert "grid-template-columns:minmax(180px,1.5fr)minmax(120px,1fr)" in css
+    assert "grid-template-columns:minmax(140px,1fr)minmax(170px,1fr)" in css
     assert "font-size:25px" in css
 
 
@@ -314,6 +314,28 @@ def test_tooltip_hover_is_delayed_but_focus_and_click_remain_immediate():
     assert "const onFocusIn" in tooltip_source
     assert "showTooltip(card" in tooltip_source
     assert "const onClick" in tooltip_source
+    assert "if (activeCard) hideTooltip();\n        else cancelHoverTimer();" in tooltip_source
+    assert "activeCard || hoverTimer !== null" in tooltip_source
+
+
+def test_compact_and_narrow_results_actions_reserve_the_full_sort_label():
+    css = _compact_css()
+
+    assert "grid-template-columns:minmax(140px,1fr)minmax(170px,1fr)" in css
+    assert (
+        '.st-key-results_toolbardiv[data-baseweb="select"]>div'
+        '{width:100%!important;min-width:170px;}'
+    ) in css
+
+
+def test_hidden_filters_state_marker_does_not_add_vertical_layout_space():
+    css = _compact_css()
+
+    assert (
+        '.st-key-filters_header>div[data-testid="stVerticalBlock"]'
+        '>div[data-testid="stElementContainer"]:has(.filters-state-marker)'
+        '{display:none;}'
+    ) in css
 
 
 def test_status_orb_and_two_line_text_use_independent_grid_regions():

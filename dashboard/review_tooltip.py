@@ -187,17 +187,20 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
             return;
         }
         if (activeCard && !tooltip.contains(event.target)) hideTooltip();
+        else cancelHoverTimer();
     };
 
     const onKeyDown = event => {
-        if (event.key === "Escape" && activeCard) {
+        if (event.key === "Escape" && (activeCard || hoverTimer !== null)) {
             event.preventDefault();
-            hideTooltip();
+            if (activeCard) hideTooltip();
+            else cancelHoverTimer();
         }
     };
 
     const onScroll = () => {
         if (activeCard) hideTooltip();
+        else cancelHoverTimer();
     };
 
     const onResize = () => {
