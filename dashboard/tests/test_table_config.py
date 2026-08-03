@@ -1,3 +1,5 @@
+import dashboard.field_config as field_config
+
 from dashboard.field_config import (
     EXCLUDED_CUSTOM_FIELDS,
     FIELD_CONFIG,
@@ -21,6 +23,30 @@ def test_custom_mode_excludes_c_rank_reference_fields_everywhere():
         get_sortable_fields(),
     ):
         assert not EXCLUDED_CUSTOM_FIELDS.intersection(fields)
+
+
+def test_internal_values_are_rendered_as_simple_english():
+    assert field_config.format_display_value("ibd_candidate_rule", "ceiling_pullback") == "Ceiling Pullback"
+    assert field_config.format_display_value("ibd_candidate_rule", "ma10_touch_confirm") == "MA10 Touch"
+    assert (
+        field_config.format_display_value("ibd_entry_reject_reason", "daily_volume_not_confirmed")
+        == "Volume Not Confirmed"
+    )
+    assert field_config.format_display_value("signal", True) == "Active Signal"
+
+
+def test_internal_value_columns_keep_raw_fields_and_add_display_formatters():
+    options = build_grid_options(
+        ["ibd_candidate_rule", "ibd_entry_reject_reason", "signal"]
+    )
+
+    assert [column["field"] for column in options["columnDefs"]] == [
+        "ibd_candidate_rule",
+        "ibd_entry_reject_reason",
+        "signal",
+    ]
+    for column in options["columnDefs"]:
+        assert "valueFormatter" in column
 
 
 def test_filterable_fields_follow_trading_decision_funnel():

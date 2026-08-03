@@ -29,6 +29,7 @@ from dashboard.data_utils import (
 from dashboard.field_config import (
     FLOW_CARD_META,
     STATUS_META,
+    format_display_value,
     get_all_table_columns,
     get_column_view_fields,
     get_field_label,
@@ -184,6 +185,22 @@ def _view_dataframe(analysis: PoolAnalysisResult, state: dict[str, Any]) -> pd.D
     return complete
 
 
+def _data_badge(
+    freshness: dict[str, object] | None,
+    *,
+    loaded: bool,
+) -> tuple[str, str]:
+    if not loaded:
+        return "Schema / Data Error", "error"
+    status = str((freshness or {}).get("status", "UNKNOWN")).upper()
+    labels = {
+        "FRESH": ("Data Fresh", "fresh"),
+        "AGING": ("Data Aging", "aging"),
+        "STALE": ("Data Stale", "stale"),
+    }
+    return labels.get(status, ("Data Loaded", "loaded"))
+
+
 def _render_header_bar(
     df: pd.DataFrame | None,
     load_err: str | None,
@@ -192,16 +209,21 @@ def _render_header_bar(
 ) -> None:
     col_l, col_r = st.columns([3, 1.5])
     with col_l:
-        badge_html = (
-            '<span class="data-badge data-badge--ready">Data Ready</span>'
-            if df is not None
-            else '<span class="data-badge data-badge--error">Schema / Data Error</span>'
-        )
         state = st.session_state.get("review_ui_state", {})
         is_midweek = (
             global_mode == "IBD Review"
             and state.get("mode") == "MIDWEEK"
             and analysis is not None
+        )
+        freshness = (
+            None
+            if is_midweek
+            else build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+        )
+        badge_label, badge_tone = _data_badge(freshness, loaded=df is not None)
+        badge_html = (
+            f'<span class="data-badge data-badge--{badge_tone}">'
+            f'{html.escape(badge_label)}</span>'
         )
         if is_midweek:
             snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
@@ -216,7 +238,7 @@ def _render_header_bar(
                 f'<span class="snapshot-mode-segment snapshot-mode-segment--midweek">Midweek · baseline {baseline_value}</span>'
             )
         else:
-            freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+            assert freshness is not None
             age_label = (
                 "Unknown"
                 if freshness["age_days"] is None
@@ -622,7 +644,7 @@ def _render_filter_bar(
     counts: dict[str, Any],
 ) -> None:
     active_count = _active_filter_count(state)
-    summary = "No filters applied" if active_count == 0 else f"{active_count} active"
+    summary = "None" if active_count == 0 else f"{active_count} active"
     with st.container(key="filters_header"):
         st.markdown(
             '<span class="filters-state-marker" '
@@ -631,7 +653,7 @@ def _render_filter_bar(
             unsafe_allow_html=True,
         )
         if st.button(
-            f"Filters · {summary}",
+            f"More Filters · {summary}",
             key="btn_filters_toggle",
             use_container_width=True,
         ):
@@ -652,6 +674,7 @@ def _render_filter_bar(
             routes,
             index=routes.index(current_route) if current_route in routes else 0,
             key=f"review_route_{generation}",
+            format_func=lambda value: "All" if value == "All" else format_display_value("ibd_candidate_rule", value),
         )
         if selected_route != current_route:
             state["route_filter"] = selected_route
@@ -740,11 +763,13 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
 
     code = html.escape(str(row.get("code", "N/A")))
     cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
-    cand_rule = html.escape(str(row.get("ibd_candidate_rule", "N/A")))
+    cand_rule = html.escape(format_display_value("ibd_candidate_rule", row.get("ibd_candidate_rule")) or "N/A")
     dist_pct = html.escape(_format_number(row.get("current_vs_ibd_candidate_pct"), "%"))
     latest_close = html.escape(_format_number(row.get("latest_close"), ""))
     status_name = html.escape(str(row.get("ibd_entry_status", "N/A")))
-    vol_or_reject = html.escape(str(row.get("ibd_entry_vol_or_reject", "N/A")))
+    vol_or_reject = html.escape(
+        format_display_value("ibd_entry_vol_or_reject", row.get("ibd_entry_vol_or_reject")) or "N/A"
+    )
     rank_c = html.escape(str(row.get("rank_C_continuous", "N/A")))
     c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
 
@@ -809,7 +834,9 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     is_entry_valid = bool(pd.notna(raw_valid) and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1")))
     trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
     raw_reason = row.get("ibd_entry_reject_reason")
-    reject_reason_str = html.escape(str(raw_reason).strip() if (raw_reason is not None and not pd.isna(raw_reason) and str(raw_reason).strip() not in ("", "nan", "None", "N/A")) else "n/a")
+    reject_reason_str = html.escape(
+        format_display_value("ibd_entry_reject_reason", raw_reason) or "n/a"
+    )
 
     if is_entry_valid:
         raw_date = row.get("ibd_entry_date")
@@ -957,7 +984,7 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
 def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)
     denom = active_signals_count if active_signals_count > 0 else len(df)
-    st.markdown("##### C Rank Reference View (`signal=True` · Sorted by `rank_C_continuous` asc)")
+    st.markdown("##### C Rank Reference View · Active Signals · C Rank · Best First")
     
     with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=False):
         c1, c2 = st.columns(2)
@@ -966,8 +993,8 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 "\n".join(
                     [
                         "**Fixed Mode Rules**",
-                        "- Exclusively evaluates Active Signals (`signal=True`) across the pool.",
-                        "- Sorted by `rank_C_continuous` asc to horizontally benchmark quality.",
+                        "- Exclusively evaluates Active Signals across the pool.",
+                        "- C Rank · Best First for horizontal quality comparison.",
                         "- Top N slice selector only (custom filters ignored).",
                         "- Auxiliary benchmark; does not replace IBD review status.",
                     ]

@@ -118,9 +118,24 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     letter-spacing: 0;
 }
 
-.data-badge--ready {
+.data-badge--fresh {
     background: #e8f7eb;
     color: #27783b;
+}
+
+.data-badge--aging {
+    background: #fff4df;
+    color: #a85b00;
+}
+
+.data-badge--stale {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.data-badge--loaded {
+    background: #e8eef6;
+    color: #50647b;
 }
 
 .data-badge--error {

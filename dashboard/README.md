@@ -46,4 +46,4 @@ python dashboard/self_check.py --csv us/breakout_follow_pool.csv
 python -m pytest dashboard/tests -q
 ```
 
-只有数据契约校验通过时才显示 `Data Ready`。
+数据契约通过后，完整周视图按快照时效显示 `Data Fresh`、`Data Aging` 或 `Data Stale`；Midweek 双日期上下文显示中性的 `Data Loaded`。

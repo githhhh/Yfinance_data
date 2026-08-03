@@ -1,6 +1,74 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import Any
+
+
+DISPLAY_VALUE_MAPS: dict[str, dict[str, str]] = {
+    "signal": {
+        "True": "Active Signal",
+        "False": "Inactive",
+    },
+    "signal_source": {
+        "10_wk_ema_touch_confirm": "10W EMA Touch",
+        "ceiling_breakout": "Ceiling Breakout",
+        "pivot": "Pivot",
+        "three_weeks_tight_breakout": "Three Weeks Tight Breakout",
+    },
+    "ibd_candidate_signal_source": {
+        "10_wk_ema_touch_confirm": "10W EMA Touch",
+        "ceiling_breakout": "Ceiling Breakout",
+        "pivot": "Pivot",
+        "three_weeks_tight_breakout": "Three Weeks Tight Breakout",
+    },
+    "ibd_candidate_rule": {
+        "ceiling": "Ceiling",
+        "ceiling_pullback": "Ceiling Pullback",
+        "ma10_touch_confirm": "MA10 Touch",
+        "pivot": "Pivot",
+        "three_weeks_tight": "Three Weeks Tight",
+    },
+    "ibd_entry_rule": {
+        "ceiling": "Ceiling",
+        "ceiling_pullback": "Ceiling Pullback",
+        "ma10_touch_confirm": "MA10 Touch",
+        "pivot": "Pivot",
+        "three_weeks_tight": "Three Weeks Tight",
+    },
+    "ibd_entry_reject_reason": {
+        "daily_volume_not_confirmed": "Volume Not Confirmed",
+        "insufficient_volume_history": "Insufficient Volume History",
+    },
+    "ibd_entry_vol_or_reject": {
+        "daily_volume_not_confirmed": "Volume Not Confirmed",
+        "insufficient_volume_history": "Insufficient Volume History",
+    },
+}
+
+DISPLAY_FORMAT_FIELDS = frozenset(DISPLAY_VALUE_MAPS)
+
+
+def format_display_value(field: str, value: Any) -> str:
+    """Return concise display copy without mutating raw dataframe values."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "<na>"}:
+        return ""
+    mapped = DISPLAY_VALUE_MAPS.get(field, {}).get(text)
+    if mapped is not None:
+        return mapped
+    if "_" not in text:
+        return text
+    words = []
+    acronym_map = {
+        "ema10": "EMA10",
+        "ma10": "MA10",
+        "wk": "W",
+    }
+    for word in text.split("_"):
+        words.append(acronym_map.get(word.lower(), word.capitalize()))
+    return " ".join(words)
 
 
 def _tooltip_meta(

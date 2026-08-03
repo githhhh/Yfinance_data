@@ -120,6 +120,7 @@ def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filte
     assert state["scope"] == "CHANGES"
     assert state["sort_mode"] == "Review Priority"
     assert state["filters_expanded"] is False
+    assert app.button(key="btn_filters_toggle").label == "More Filters · None"
     assert not any(widget.label == "Route (Rule)" for widget in app.selectbox)
     assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
 
@@ -235,7 +236,7 @@ def test_runtime_status_filter_expansion_and_reset_flow():
     assert state["status_filter"] == "ALL"
     assert state["entry_volume_min"] == ""
     assert state["widget_generation"] == 1
-    assert "No filters applied" in app.button(key="btn_filters_toggle").label
+    assert app.button(key="btn_filters_toggle").label == "More Filters · None"
 
 
 def test_runtime_sort_selector_updates_results_summary():

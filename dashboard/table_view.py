@@ -5,11 +5,14 @@ import json
 import pandas as pd
 
 from dashboard.field_config import (
+    DISPLAY_FORMAT_FIELDS,
+    DISPLAY_VALUE_MAPS,
     FIELD_CONFIG,
     QUALITY_ALIASES,
     QUALITY_META,
     QUALITY_ORDER,
     STATUS_META,
+    format_display_value,
     get_field_label,
 )
 
@@ -156,6 +159,28 @@ def _get_value_formatter(fmt: str | None):
         }
         """)
     return None
+
+
+def _display_value_formatter_jscode(column: str):
+    if not HAS_JS_CODE or column not in DISPLAY_FORMAT_FIELDS:
+        return None
+    mapping_json = json.dumps(DISPLAY_VALUE_MAPS.get(column, {}))
+    return JsCode(f"""
+    function(params) {{
+        if (params.value === null || params.value === undefined || params.value === '') return '';
+        const raw = String(params.value);
+        const mapping = {mapping_json};
+        if (Object.prototype.hasOwnProperty.call(mapping, raw)) return mapping[raw];
+        if (!raw.includes('_')) return raw;
+        return raw.split('_').map(function(word) {{
+            const lower = word.toLowerCase();
+            if (lower === 'ma10') return 'MA10';
+            if (lower === 'ema10') return 'EMA10';
+            if (lower === 'wk') return 'W';
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }}).join(' ');
+    }}
+    """)
 
 
 def _breakout_quality_header_jscode():
@@ -481,6 +506,10 @@ def render_table(
         import streamlit as st
 
         visible_df = grid_df[display_columns].copy() if display_columns else grid_df
+        for column in DISPLAY_FORMAT_FIELDS.intersection(visible_df.columns):
+            visible_df[column] = visible_df[column].map(
+                lambda value, field=column: format_display_value(field, value)
+            )
         st.dataframe(visible_df, use_container_width=True, height=height)
         st.caption("Install streamlit-aggrid to enable pinning, drag columns, range selection, and copy support.")
         return None
@@ -532,6 +561,8 @@ def _column_def(column: str, *, show_origin_badge: bool = False) -> dict:
         formatter = _get_value_formatter(fmt)
         if formatter:
             definition["valueFormatter"] = formatter
+    elif HAS_JS_CODE and column in DISPLAY_FORMAT_FIELDS:
+        definition["valueFormatter"] = _display_value_formatter_jscode(column)
     if column == "code":
         definition["pinned"] = "left"
         definition["width"] = 155

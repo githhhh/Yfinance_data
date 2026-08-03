@@ -1,6 +1,7 @@
 from pathlib import Path
 import ast
 import re
+import dashboard.app as dashboard_app
 from dashboard.app import _csv_cache_fingerprint
 
 
@@ -31,10 +32,20 @@ def test_custom_filter_ui_removes_sort_bar_from_custom_mode():
 def test_c_rank_mode_displays_fixed_rules_and_formula_reference():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert "Fixed Mode Rules" in source
-    assert "Exclusively evaluates Active Signals (`signal=True`)" in source
-    assert "Sorted by `rank_C_continuous` asc" in source
+    assert "Exclusively evaluates Active Signals across the pool." in source
+    assert "C Rank · Best First" in source
+    assert "`signal=True`" not in source
+    assert "`rank_C_continuous`" not in source
     assert "Top N slice selector only" in source
     assert "2.5 x pct(base_depth_abs)" in source
+
+
+def test_loaded_badge_follows_complete_snapshot_freshness():
+    assert dashboard_app._data_badge({"status": "FRESH"}, loaded=True) == ("Data Fresh", "fresh")
+    assert dashboard_app._data_badge({"status": "AGING"}, loaded=True) == ("Data Aging", "aging")
+    assert dashboard_app._data_badge({"status": "STALE"}, loaded=True) == ("Data Stale", "stale")
+    assert dashboard_app._data_badge(None, loaded=True) == ("Data Loaded", "loaded")
+    assert dashboard_app._data_badge(None, loaded=False) == ("Schema / Data Error", "error")
 
 
 def test_c_rank_reference_denominator_uses_active_signals_count():
