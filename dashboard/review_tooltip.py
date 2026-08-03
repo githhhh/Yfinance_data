@@ -90,12 +90,19 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
 
     const showTooltip = (card, shouldPin = false) => {
         const trigger = card && card.querySelector(".flow-info-trigger");
+        const title = trigger && trigger.dataset.flowTooltipTitle;
         const content = trigger && trigger.dataset.flowTooltip;
-        if (!content) return;
+        if (!title || !content) return;
         if (activeCard && activeCard !== card) hideTooltip();
         activeCard = card;
         pinned = shouldPin;
-        tooltip.textContent = content;
+        tooltip.textContent = "";
+        const titleElement = parentDocument.createElement("strong");
+        titleElement.textContent = title;
+        titleElement.style.display = "block";
+        const body = parentDocument.createElement("span");
+        body.textContent = content;
+        tooltip.append(titleElement, body);
         tooltip.hidden = false;
         trigger.setAttribute("aria-expanded", shouldPin ? "true" : "false");
         describeCard(card);

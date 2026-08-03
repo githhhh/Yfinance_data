@@ -440,11 +440,12 @@ def _render_filter_card(
             type="primary" if selected else "secondary",
         )
         tooltip_text = html.escape(metadata["tooltip"], quote=True)
-        tooltip_label = html.escape(f"{metadata['label']}说明", quote=True)
+        tooltip_title = html.escape(metadata["tooltip_title"], quote=True)
+        tooltip_label = html.escape(f"{metadata['tooltip_title']} info", quote=True)
         st.markdown(
             '<button type="button" class="flow-info-trigger" '
-            f'data-flow-tooltip="{tooltip_text}" aria-label="{tooltip_label}" '
-            'aria-expanded="false">ⓘ</button>',
+            f'data-flow-tooltip-title="{tooltip_title}" data-flow-tooltip="{tooltip_text}" '
+            f'aria-label="{tooltip_label}" aria-expanded="false">i</button>',
             unsafe_allow_html=True,
         )
         return clicked

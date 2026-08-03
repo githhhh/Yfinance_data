@@ -118,12 +118,12 @@ def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filte
 def test_midweek_runtime_exposes_all_ten_structured_tooltips():
     app = _midweek_app()
     card_names = [
-        "进入买区",
-        "离开买区",
-        "其他变化",
-        "新信号",
-        "延续",
-        "再确认",
+        "Entered Buy Zone",
+        "Left Buy Zone",
+        "Other Changes",
+        "New Signal",
+        "Carry Over",
+        "Confirmed Again",
         "ACTIONABLE",
         "UNCONFIRMED",
         "BELOW TRIGGER",
@@ -139,10 +139,12 @@ def test_midweek_runtime_exposes_all_ten_structured_tooltips():
     for card_name in card_names:
         button = _button_starting_with(app, card_name)
         assert not button.help
-        markup = next(value for value in trigger_markup if f'aria-label="{card_name}说明"' in value)
+        markup = next(value for value in trigger_markup if f'data-flow-tooltip-title="{card_name}"' in value)
         assert "含义：" in markup
         assert "数量：" in markup
         assert "点击：" in markup
+        assert f'aria-label="{card_name} info"' in markup
+        assert ">i</button>" in markup
     assert not any(button.key and button.key.startswith("btn_flow_info_") for button in app.button)
 
 

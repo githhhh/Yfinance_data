@@ -3,8 +3,14 @@ from __future__ import annotations
 from collections import OrderedDict
 
 
-def _tooltip_meta(definition: str, count_basis: str, click_effect: str) -> dict[str, str]:
+def _tooltip_meta(
+    tooltip_title: str,
+    definition: str,
+    count_basis: str,
+    click_effect: str,
+) -> dict[str, str]:
     return {
+        "tooltip_title": tooltip_title,
         "definition": definition,
         "count_basis": count_basis,
         "click_effect": click_effect,
@@ -15,10 +21,11 @@ def _tooltip_meta(definition: str, count_basis: str, click_effect: str) -> dict[
 STATUS_META = {
     "ACTIONABLE": {
         "label": "ACTIONABLE",
-        "subtitle": "买点上方 0%–5%",
+        "subtitle": "In 0%–5% Buy Zone",
         "tone": "green",
         "color": "#35df65",
         **_tooltip_meta(
+            "ACTIONABLE",
             "含义：已完成入场确认，当前价位于买点上方 0%–5%。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
@@ -26,10 +33,11 @@ STATUS_META = {
     },
     "UNCONFIRMED": {
         "label": "UNCONFIRMED",
-        "subtitle": "等待日线确认",
+        "subtitle": "Waiting for Confirmation",
         "tone": "yellow",
         "color": "#ffd21f",
         **_tooltip_meta(
+            "UNCONFIRMED",
             "含义：尚未满足日线入场确认条件。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
@@ -37,10 +45,11 @@ STATUS_META = {
     },
     "BELOW_TRIGGER": {
         "label": "BELOW TRIGGER",
-        "subtitle": "低于买点",
+        "subtitle": "Below Buy Point",
         "tone": "red",
         "color": "#f04444",
         **_tooltip_meta(
+            "BELOW TRIGGER",
             "含义：当前价低于有效买点。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
@@ -48,10 +57,11 @@ STATUS_META = {
     },
     "EXTENDED": {
         "label": "EXTENDED",
-        "subtitle": "高于买点 5%，不追",
+        "subtitle": "Over 5% — Don't Chase",
         "tone": "blue",
         "color": "#2791ff",
         **_tooltip_meta(
+            "EXTENDED",
             "含义：当前价已超过买点 5%，不宜追高。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
@@ -62,54 +72,60 @@ STATUS_META = {
 
 FLOW_CARD_META = {
     "BECAME_ACTIONABLE": {
-        "label": "进入买区",
+        "label": "Entered Buy Zone",
         "color": "#22c55e",
         **_tooltip_meta(
-            "含义：上周不在买区，本次进入 0%–5% 买区。",
+            "Entered Buy Zone",
+            "含义：上周不在买区，本次进入买点上方 0%–5% 的买区。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "LEFT_ACTIONABLE": {
-        "label": "离开买区",
+        "label": "Left Buy Zone",
         "color": "#ef5350",
         **_tooltip_meta(
-            "含义：上周在买区，本次已跌破、未确认或涨超 5%。",
+            "Left Buy Zone",
+            "含义：上周在买区，本次已经离开买区。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "OTHER_CHANGES": {
-        "label": "其他变化",
+        "label": "Other Changes",
         "color": "#2dd4bf",
         **_tooltip_meta(
-            "含义：状态和上周不同，但不属于进入或离开买区。",
+            "Other Changes",
+            "含义：状态和上周不同，但不是进入或离开买区。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "NEW": {
-        "label": "新信号",
+        "label": "New Signal",
         "color": "#22d3ee",
         **_tooltip_meta(
+            "New Signal",
             "含义：完整周没有信号，周中首次出现信号。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "CARRY": {
-        "label": "延续",
+        "label": "Carry Over",
         "color": "#94a3b8",
         **_tooltip_meta(
-            "含义：周中没有新信号，但完整周信号仍在观察，状态按当前价格更新。",
+            "Carry Over",
+            "含义：周中没有新信号，但完整周信号继续观察，状态按当前价格更新。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "RECONFIRMED": {
-        "label": "再确认",
+        "label": "Confirmed Again",
         "color": "#93c5fd",
         **_tooltip_meta(
+            "Confirmed Again",
             "含义：完整周和周中都有信号，以周中数据为准。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",

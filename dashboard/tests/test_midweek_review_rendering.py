@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -35,27 +36,31 @@ def test_ten_flow_cards_share_structured_definition_count_and_click_tooltips():
         )
 
 
-def test_flow_cards_use_the_approved_chinese_labels_subtitles_and_tooltip_copy():
+def test_flow_cards_use_english_visible_copy_and_exact_chinese_tooltip_body():
     assert {key: value["label"] for key, value in FLOW_CARD_META.items()} == {
-        "BECAME_ACTIONABLE": "进入买区",
-        "LEFT_ACTIONABLE": "离开买区",
-        "OTHER_CHANGES": "其他变化",
-        "NEW": "新信号",
-        "CARRY": "延续",
-        "RECONFIRMED": "再确认",
+        "BECAME_ACTIONABLE": "Entered Buy Zone",
+        "LEFT_ACTIONABLE": "Left Buy Zone",
+        "OTHER_CHANGES": "Other Changes",
+        "NEW": "New Signal",
+        "CARRY": "Carry Over",
+        "RECONFIRMED": "Confirmed Again",
     }
     assert {key: value["subtitle"] for key, value in STATUS_META.items()} == {
-        "ACTIONABLE": "买点上方 0%–5%",
-        "UNCONFIRMED": "等待日线确认",
-        "BELOW_TRIGGER": "低于买点",
-        "EXTENDED": "高于买点 5%，不追",
+        "ACTIONABLE": "In 0%–5% Buy Zone",
+        "UNCONFIRMED": "Waiting for Confirmation",
+        "BELOW_TRIGGER": "Below Buy Point",
+        "EXTENDED": "Over 5% — Don't Chase",
     }
+    for metadata in [*FLOW_CARD_META.values(), *STATUS_META.values()]:
+        assert not re.search(r"[\u4e00-\u9fff]", metadata["label"])
+        assert not re.search(r"[\u4e00-\u9fff]", metadata.get("subtitle", ""))
+
     expected_definitions = {
-        "BECAME_ACTIONABLE": "含义：上周不在买区，本次进入 0%–5% 买区。",
-        "LEFT_ACTIONABLE": "含义：上周在买区，本次已跌破、未确认或涨超 5%。",
-        "OTHER_CHANGES": "含义：状态和上周不同，但不属于进入或离开买区。",
+        "BECAME_ACTIONABLE": "含义：上周不在买区，本次进入买点上方 0%–5% 的买区。",
+        "LEFT_ACTIONABLE": "含义：上周在买区，本次已经离开买区。",
+        "OTHER_CHANGES": "含义：状态和上周不同，但不是进入或离开买区。",
         "NEW": "含义：完整周没有信号，周中首次出现信号。",
-        "CARRY": "含义：周中没有新信号，但完整周信号仍在观察，状态按当前价格更新。",
+        "CARRY": "含义：周中没有新信号，但完整周信号继续观察，状态按当前价格更新。",
         "RECONFIRMED": "含义：完整周和周中都有信号，以周中数据为准。",
         "ACTIONABLE": "含义：已完成入场确认，当前价位于买点上方 0%–5%。",
         "UNCONFIRMED": "含义：尚未满足日线入场确认条件。",
@@ -174,9 +179,11 @@ def test_cards_use_one_shared_tooltip_system_with_a_separate_info_button():
     assert "help=metadata[\"tooltip\"]" not in APP_SOURCE
     assert 'class="flow-info-trigger"' in APP_SOURCE
     assert 'data-flow-tooltip="{tooltip_text}"' in APP_SOURCE
+    assert 'data-flow-tooltip-title="{tooltip_title}"' in APP_SOURCE
     assert 'aria-label="{tooltip_label}"' in APP_SOURCE
     assert 'key=f"btn_flow_info_{card_id.lower()}"' not in APP_SOURCE
-    assert 'st.popover("ⓘ"' not in APP_SOURCE
+    assert ">ⓘ</button>" not in APP_SOURCE
+    assert ">i</button>" in APP_SOURCE
     assert "flow_tooltip_content_" not in APP_SOURCE
     assert "FLOW_TOOLTIP_BRIDGE_HTML" in APP_SOURCE
     assert "prefers-reduced-motion" in STYLE_SOURCE
@@ -194,7 +201,8 @@ def test_flow_tooltip_controller_covers_hover_focus_touch_and_dismissal_contract
         "event.preventDefault()",
         "event.stopPropagation()",
         'event.key === "Escape"',
-        "tooltip.textContent = content",
+        "titleElement.textContent = title",
+        "body.textContent = content",
         "window.parent.document",
     ]:
         assert contract in source
