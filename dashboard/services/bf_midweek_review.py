@@ -617,8 +617,11 @@ def build_midweek_review_for_snapshots(
     baseline = pd.DataFrame()
     if complete_pool is not None and not complete_pool.empty:
         try:
+            validate_pool_schema(complete_pool)
             complete = _normalized_pool(complete_pool, label="complete")
-            validate_pool_schema(complete)
+            active_complete = complete.loc[complete["signal"].map(_to_bool).eq(True)]
+            if active_complete["ibd_entry_valid"].map(_to_bool).isna().any():
+                raise ValueError("complete pool IBD enrichment is incomplete")
             validate_pool_semantics(complete)
             complete_date = _snapshot_date(complete, label="complete")
             if _has_valid_complete_baseline(complete_date, current_date):

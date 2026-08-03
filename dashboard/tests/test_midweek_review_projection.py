@@ -197,7 +197,15 @@ def test_projection_without_baseline_suppresses_comparison_facts():
     assert result.actionable_codes == ("CURRENT",)
 
 
-@pytest.mark.parametrize("invalid_baseline", ["semantic_mismatch", "missing_enrichment"])
+@pytest.mark.parametrize(
+    "invalid_baseline",
+    [
+        "semantic_mismatch",
+        "missing_enrichment",
+        "missing_status",
+        "null_entry_valid",
+    ],
+)
 def test_snapshot_builder_discards_a_schema_or_semantically_invalid_baseline(invalid_baseline):
     complete = pd.DataFrame(
         [
@@ -215,8 +223,14 @@ def test_snapshot_builder_discards_a_schema_or_semantically_invalid_baseline(inv
     )
     if invalid_baseline == "semantic_mismatch":
         complete.loc[0, "ibd_entry_status"] = "UNCONFIRMED"
-    else:
+    elif invalid_baseline == "missing_enrichment":
         complete = complete.drop(columns=["ibd_entry_valid"])
+    elif invalid_baseline == "missing_status":
+        complete = complete.drop(columns=["ibd_entry_status"])
+    else:
+        complete["ibd_entry_valid"] = complete["ibd_entry_valid"].astype("object")
+        complete.loc[0, "ibd_entry_valid"] = None
+        complete.loc[0, "ibd_entry_status"] = "UNCONFIRMED"
     current = pd.DataFrame(
         [
             _row(
