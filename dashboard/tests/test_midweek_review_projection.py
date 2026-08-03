@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -9,11 +10,14 @@ from dashboard.services.bf_midweek_review import (
     PoolMode,
     PoolWindow,
     analyze_breakout_follow_pool,
+    build_review_filter_counts,
     build_midweek_review,
     build_midweek_review_for_snapshots,
     complete_target_week,
+    default_review_state,
     materialize_review_view,
     resolve_window,
+    switch_review_mode,
 )
 
 
@@ -309,6 +313,7 @@ def test_analyze_uses_valid_midweek_in_window_and_preserves_source_files(tmp_pat
 
     assert result.mode is PoolMode.MIDWEEK
     assert result.midweek_available is True
+    assert result.midweek_baseline_available is True
     assert result.complete_snapshot_date == date(2026, 7, 24)
     assert result.midweek_snapshot_date == date(2026, 7, 29)
     assert result.review_week_start == date(2026, 7, 27)
@@ -335,6 +340,7 @@ def test_analyze_ignores_stale_midweek_without_deleting_it(tmp_path):
 
     assert result.mode is PoolMode.COMPLETE
     assert result.midweek_available is False
+    assert result.midweek_baseline_available is False
     assert result.actionable_codes == ("CURRENT",)
     assert midweek_path.exists()
 
@@ -357,7 +363,88 @@ def test_analyze_defaults_to_complete_outside_midweek_but_keeps_valid_review_ava
 
     assert result.mode is PoolMode.COMPLETE
     assert result.midweek_available is True
+    assert result.midweek_baseline_available is True
     assert result.actionable_codes == ("BASE",)
+
+
+def test_complete_window_keeps_valid_midweek_baseline_available_for_manual_review(tmp_path):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    pd.DataFrame(
+        [
+            _row(
+                "BASE",
+                snapshot_date="2026-07-24",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=102,
+                rule="pivot",
+            )
+        ]
+    ).to_csv(complete_path, index=False)
+    pd.DataFrame(
+        [
+            _row(
+                "MID",
+                snapshot_date="2026-07-30",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=50,
+                close=51,
+                rule="pivot",
+            )
+        ]
+    ).to_csv(midweek_path, index=False)
+
+    result = analyze_breakout_follow_pool(
+        complete_path,
+        midweek_path,
+        window_date=date(2026, 8, 3),
+    )
+
+    assert result.mode is PoolMode.COMPLETE
+    assert result.midweek_available is True
+    assert result.midweek_baseline_available is True
+
+
+def test_attached_sample_complete_window_manual_midweek_counts_are_derived_from_rows():
+    root = Path(__file__).resolve().parents[2]
+    result = analyze_breakout_follow_pool(
+        root / "us/breakout_follow_pool.csv",
+        root / "us/breakout_follow_pool_midweek.csv",
+        window_date=date(2026, 8, 3),
+    )
+    state = switch_review_mode(
+        default_review_state(result.mode),
+        "MIDWEEK",
+        midweek_has_baseline=result.midweek_baseline_available,
+    )
+    counts = build_review_filter_counts(
+        materialize_review_view(result.midweek_review),
+        state,
+    )
+
+    assert result.mode is PoolMode.COMPLETE
+    assert result.complete_snapshot_date == date(2026, 7, 24)
+    assert result.midweek_snapshot_date == date(2026, 7, 30)
+    assert result.summary["ACTIVE_SIGNALS"] == 190
+    assert counts["change"] == {
+        "BECAME_ACTIONABLE": 34,
+        "LEFT_ACTIONABLE": 11,
+        "OTHER_CHANGES": 66,
+        "UNCHANGED": 0,
+    }
+    assert counts["origin"] == {"NEW": 90, "CARRY": 9, "RECONFIRMED": 12}
+    assert counts["status"] == {
+        "ACTIONABLE": 34,
+        "UNCONFIRMED": 51,
+        "BELOW_TRIGGER": 2,
+        "EXTENDED": 24,
+    }
+    assert counts["result"] == 111
 
 
 def test_analyze_without_valid_baseline_never_carries_complete_signal(tmp_path):
@@ -380,6 +467,7 @@ def test_analyze_without_valid_baseline_never_carries_complete_signal(tmp_path):
     )
 
     assert result.mode is PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE
+    assert result.midweek_baseline_available is False
     assert result.actionable_codes == ("CURRENT_SIGNAL",)
     assert set(result.midweek_review.loc[result.midweek_review["review_watch_active"], "code"]) == {"CURRENT_SIGNAL"}
     assert result.summary["NEW"] == 0

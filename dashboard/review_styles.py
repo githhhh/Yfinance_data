@@ -35,7 +35,7 @@ div[data-testid="stApp"]:has(.st-key-dashboard_shell) [data-testid="stSidebar"] 
 
 div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell) {
     max-width: none !important;
-    padding: 29px 28px 34px !important;
+    padding: 24px 24px 30px !important;
 }
 
 div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
@@ -78,7 +78,7 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
 }
 
 .st-key-dashboard_header {
-    min-height: 78px;
+    min-height: 80px;
     border-bottom: 1px solid #aab1bb;
 }
 
@@ -127,7 +127,7 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     display: flex;
     align-items: center;
     gap: 5px;
-    margin-top: 23px;
+    margin-top: 20px;
     color: #8d9bab;
     font-size: 12px;
     white-space: nowrap;
@@ -235,8 +235,9 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
 .st-key-dashboard_header div[class*="st-key-global_mode_selector"] button[aria-pressed="true"],
 .st-key-dashboard_header div[class*="st-key-global_mode_selector"] label:has(input:checked) {
     border-color: #00d897 !important;
-    background: rgb(0 216 151 / 4%) !important;
-    color: #00dc98 !important;
+    background: rgb(0 216 151 / 12%) !important;
+    color: #29f2b0 !important;
+    box-shadow: inset 0 0 0 1px #00d897 !important;
 }
 
 .snapshot-segment {
@@ -349,6 +350,14 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     overflow: auto hidden !important;
 }
 
+.st-key-review_context_slot:has(.st-key-quick_context_row) {
+    border: 1px solid #303a46;
+    border-radius: 7px;
+    padding: 0 10px;
+    background: #11171e;
+    box-sizing: border-box;
+}
+
 .st-key-review_context_slot > div[data-testid="stVerticalBlock"] {
     height: 48px;
     min-height: 48px !important;
@@ -357,13 +366,13 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
 }
 
 .st-key-quick_context_row > div[data-testid="stVerticalBlock"] {
-    height: 48px;
+    height: 46px;
     gap: 0 !important;
 }
 
 .st-key-quick_context_row > div[data-testid="stHorizontalBlock"] {
     min-width: max-content;
-    height: 48px;
+    height: 46px;
     align-items: center;
     gap: 6px !important;
 }
@@ -392,13 +401,15 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     min-width: 154px;
 }
 
-.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) {
+.st-key-review_context_slot div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind] {
     width: 100% !important;
     height: 31px !important;
     min-height: 31px !important;
     border: 1px solid #35414d !important;
     border-radius: 6px !important;
-    padding: 0 22px 0 18px !important;
+    padding: 0 32px 0 18px !important;
     background: #151c24 !important;
     color: #bac4cf !important;
     font-size: 11px !important;
@@ -407,18 +418,24 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     font-variant-numeric: tabular-nums;
 }
 
-.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind="primary"]:not([data-testid="stPopoverButton"]) {
+.st-key-review_context_slot div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind="primary"] {
     border-color: #2d8f7f !important;
     background: #16302e !important;
     color: #e7f8f4 !important;
 }
 
-.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]):hover {
+.st-key-review_context_slot div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind]:hover {
     border-color: #536273 !important;
     background: #19222c !important;
 }
 
-.st-key-review_context_slot div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-review_context_slot div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind] p::before {
     content: "";
     display: inline-block;
     width: 7px;
@@ -429,27 +446,27 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     vertical-align: middle;
 }
 
-.st-key-flow_card_became_actionable button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_became_actionable > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: var(--green) !important;
 }
 
-.st-key-flow_card_left_actionable button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_left_actionable > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: linear-gradient(135deg, var(--blue) 0 49%, var(--red) 51% 100%) !important;
 }
 
-.st-key-flow_card_other_changes button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_other_changes > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: var(--cyan) !important;
 }
 
-.st-key-flow_card_new button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_new > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: #22d3ee !important;
 }
 
-.st-key-flow_card_carry button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_carry > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: #94a3b8 !important;
 }
 
-.st-key-flow_card_reconfirmed button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_reconfirmed > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     background: #93c5fd !important;
 }
 
@@ -498,7 +515,9 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     flex: none !important;
 }
 
-.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) {
+.st-key-status_cards div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind] {
     width: 100% !important;
     height: 70px;
     min-height: 70px !important;
@@ -506,24 +525,30 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     justify-content: center !important;
     border: 1px solid #36414e !important;
     border-radius: 8px !important;
-    padding: 0 28px !important;
+    padding: 0 32px 0 28px !important;
     background: var(--panel) !important;
     color: #d6dce3 !important;
     white-space: pre-line !important;
     box-shadow: none !important;
 }
 
-.st-key-status_cards div[class*="st-key-flow_card_"] button[kind="primary"]:not([data-testid="stPopoverButton"]) {
+.st-key-status_cards div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind="primary"] {
     border-color: #527060 !important;
     background: #19251f !important;
 }
 
-.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]):hover {
+.st-key-status_cards div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind]:hover {
     border-color: #536172 !important;
     background: #19212a !important;
 }
 
-.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p {
+.st-key-status_cards div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind] p {
     margin: 0 !important;
     color: #d6dce3 !important;
     font-size: 15px !important;
@@ -538,7 +563,9 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     position: relative;
 }
 
-.st-key-status_cards div[class*="st-key-flow_card_"] button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-status_cards div[class*="st-key-flow_card_"]
+    > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))
+    button[kind] p::before {
     content: "";
     display: inline-block;
     width: 19px;
@@ -549,66 +576,114 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     vertical-align: middle;
 }
 
-.st-key-flow_card_actionable button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_actionable > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     color: var(--green);
     background: #16c832;
 }
 
-.st-key-flow_card_unconfirmed button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_unconfirmed > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     color: var(--yellow);
     background: #ffc800;
 }
 
-.st-key-flow_card_below_trigger button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_below_trigger > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     color: var(--red);
     background: #e71920;
 }
 
-.st-key-flow_card_extended button[kind]:not([data-testid="stPopoverButton"]) p::before {
+.st-key-flow_card_extended > div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger)) button[kind] p::before {
     color: var(--blue);
     background: #0968d5;
 }
 
-div[class*="st-key-flow_card_"] div[data-testid="stPopover"] {
+div[class*="st-key-flow_card_"] > div[data-testid="stElementContainer"]:has(.flow-info-trigger) {
     position: absolute;
     top: 7px;
     right: 7px;
     z-index: 4;
-    width: 16px;
-    height: 16px;
+    width: 16px !important;
+    height: 16px !important;
 }
 
-div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] {
+.flow-info-trigger {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 16px !important;
     min-width: 16px !important;
+    max-width: 16px !important;
     height: 16px !important;
     min-height: 16px !important;
+    max-height: 16px !important;
     border: 1px solid #4c5967 !important;
     border-radius: 50% !important;
     padding: 0 !important;
     background: #121921 !important;
     color: #82909f !important;
+    cursor: pointer;
+    font-family: inherit;
     font-size: 10px !important;
+    line-height: 1;
 }
 
-div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
-    display: none;
+.flow-info-trigger:hover,
+.flow-info-trigger[aria-expanded="true"] {
+    border-color: #6a7a8b !important;
+    background: #1a242e !important;
+    color: #d4dde6 !important;
+}
+
+.flow-tooltip-surface {
+    position: fixed;
+    z-index: 1000000;
+    max-width: min(320px, calc(100vw - 24px));
+    box-sizing: border-box;
+    border: 1px solid #455261;
+    border-radius: 7px;
+    padding: 10px 12px;
+    background: #202831;
+    color: #f2f5f8;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 38%);
+    font-family: Arial Narrow, Roboto Condensed, Inter, ui-sans-serif,
+        -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-line !important;
+    pointer-events: none;
+}
+
+.flow-tooltip-surface[hidden] {
+    display: none !important;
 }
 
 .st-key-filters_header button {
+    position: relative;
     width: 100% !important;
     height: 45px;
     min-height: 45px !important;
     max-height: 45px !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
     border: 1px solid #313b47 !important;
     border-radius: 7px !important;
-    padding: 0 14px !important;
+    padding: 0 40px 0 14px !important;
     background: #11161d !important;
     color: #dfe4e9 !important;
     font-size: 14px !important;
     font-weight: 600 !important;
     text-align: left !important;
+}
+
+.st-key-filters_header button::after {
+    content: "⌄";
+    position: absolute;
+    top: 0;
+    right: 14px;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    color: #91a0af;
+    font-size: 14px;
 }
 
 .st-key-filters_header button:hover {
@@ -655,12 +730,14 @@ div[class*="st-key-flow_card_"] button[data-testid="stPopoverButton"] svg {
 }
 
 .st-key-results_toolbar iframe {
-    min-width: 180px;
+    min-width: 160px;
+    max-width: 180px;
     height: 44px !important;
 }
 
 .st-key-results_toolbar div[data-baseweb="select"] > div {
-    min-width: 120px;
+    min-width: 110px;
+    max-width: 146px;
     height: 44px !important;
 }
 
@@ -818,12 +895,6 @@ select:focus-visible,
         overflow-x: auto;
     }
 
-    div[data-baseweb="popover"]:has(div[class*="st-key-flow_tooltip_content_"]) {
-        position: fixed !important;
-        inset: auto 12px 14px !important;
-        width: auto !important;
-        max-width: none !important;
-    }
 }
 
 @media (width <= 480px) {

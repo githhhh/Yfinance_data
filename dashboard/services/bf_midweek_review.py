@@ -58,6 +58,7 @@ class PoolAnalysisResult:
     actionable_codes: tuple[str, ...]
     warnings: tuple[str, ...]
     midweek_available: bool
+    midweek_baseline_available: bool = False
 
 
 SOURCE_FACT_FIELDS = (
@@ -728,4 +729,7 @@ def analyze_breakout_follow_pool(
         actionable_codes=actionable,
         warnings=tuple(warnings),
         midweek_available=midweek_available,
+        midweek_baseline_available=bool(
+            review_result is not None and review_result.baseline_available
+        ),
     )

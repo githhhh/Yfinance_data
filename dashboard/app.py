@@ -51,6 +51,7 @@ from dashboard.services.bf_midweek_review import (
     toggle_status_filter,
 )
 from dashboard.review_styles import REVIEW_UI_CSS
+from dashboard.review_tooltip import FLOW_TOOLTIP_BRIDGE_HTML
 from dashboard.table_view import render_table
 
 st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -85,19 +86,18 @@ def _csv_cache_fingerprint(path: str | Path) -> tuple[int, int]:
     return (stat.st_mtime_ns, stat.st_size)
 
 
-def _analysis_mode_is(
-    analysis: PoolAnalysisResult | None,
-    target: PoolMode,
-) -> bool:
-    if analysis is None:
-        return False
-    return getattr(analysis.mode, "value", analysis.mode) == target.value
+def _midweek_has_comparison(analysis: PoolAnalysisResult | None) -> bool:
+    return bool(
+        analysis is not None
+        and getattr(analysis, "midweek_baseline_available", False)
+    )
 
 
 def main() -> None:
     args = _parse_args()
 
     st.markdown(f"<style>{REVIEW_UI_CSS}</style>", unsafe_allow_html=True)
+    st.components.v1.html(FLOW_TOOLTIP_BRIDGE_HTML, height=0, scrolling=False)
 
     df: pd.DataFrame | None = None
     analysis: PoolAnalysisResult | None = None
@@ -119,7 +119,7 @@ def main() -> None:
         if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
             state = default_review_state(PoolMode.COMPLETE)
             st.session_state["review_ui_state"] = state
-        elif _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE):
+        elif state.get("mode") == "MIDWEEK" and not _midweek_has_comparison(analysis):
             reconciled_state = reconcile_review_state(
                 state,
                 PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE,
@@ -188,7 +188,7 @@ def _render_header_bar(
             snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
             baseline_value = (
                 analysis.complete_snapshot_date.isoformat()
-                if _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+                if _midweek_has_comparison(analysis)
                 and analysis.complete_snapshot_date
                 else "unavailable"
             )
@@ -288,11 +288,11 @@ def _render_ibd_review_view(
     filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
     has_comparison = (
         state["mode"] == "MIDWEEK"
-        and _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+        and _midweek_has_comparison(analysis)
     )
 
     with st.container(key="results_toolbar"):
-        summary_col, actions_col = st.columns([1, 0.42], vertical_alignment="center")
+        summary_col, actions_col = st.columns([1, 0.34], vertical_alignment="center")
         with summary_col:
             st.markdown(
                 f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(state["sort_mode"])}</div>',
@@ -300,7 +300,7 @@ def _render_ibd_review_view(
             )
         with actions_col:
             with st.container(key="results_actions"):
-                copy_col, sort_col = st.columns([1.5, 1], vertical_alignment="center")
+                copy_col, sort_col = st.columns([1.35, 1], vertical_alignment="center")
                 with copy_col:
                     _render_copy_codes_control(
                         filtered_df["code"].tolist(),
@@ -344,7 +344,7 @@ def _render_mode_scope_controls(
     is_midweek = state["mode"] == "MIDWEEK"
     has_comparison = (
         is_midweek
-        and _analysis_mode_is(analysis, PoolMode.MIDWEEK)
+        and _midweek_has_comparison(analysis)
     )
     change_total = 0
     if analysis is not None:
@@ -373,9 +373,7 @@ def _render_mode_scope_controls(
                             switch_review_mode(
                                 state,
                                 "MIDWEEK",
-                                midweek_has_baseline=(
-                                    _analysis_mode_is(analysis, PoolMode.MIDWEEK)
-                                ),
+                                midweek_has_baseline=_midweek_has_comparison(analysis),
                             )
                         )
                         st.rerun()
@@ -440,14 +438,15 @@ def _render_filter_card(
             key=button_key,
             use_container_width=True,
             type="primary" if selected else "secondary",
-            help=metadata["tooltip"],
         )
-        with st.popover("ⓘ", help=metadata["tooltip"]):
-            with st.container(key=f"flow_tooltip_content_{card_id.lower()}"):
-                st.markdown(f"**{metadata['label']}**")
-                st.caption(metadata["definition"])
-                st.caption(metadata["count_basis"])
-                st.caption(metadata["click_effect"])
+        tooltip_text = html.escape(metadata["tooltip"], quote=True)
+        tooltip_label = html.escape(f"{metadata['label']}说明", quote=True)
+        st.markdown(
+            '<button type="button" class="flow-info-trigger" '
+            f'data-flow-tooltip="{tooltip_text}" aria-label="{tooltip_label}" '
+            'aria-expanded="false">ⓘ</button>',
+            unsafe_allow_html=True,
+        )
         return clicked
 
 
@@ -471,7 +470,7 @@ def _render_quick_group(
         with column:
             if _render_filter_card(
                 card_id,
-                f"{metadata['label']}  {counts[count_field][card_id]}",
+                f"{metadata['label']} · {counts[count_field][card_id]}",
                 metadata,
                 selected=state[state_field] == card_id,
                 button_key=f"btn_{state_field}_{card_id}",
@@ -496,7 +495,7 @@ def _render_review_context(
                 unsafe_allow_html=True,
             )
             return
-        if _analysis_mode_is(analysis, PoolMode.MIDWEEK_WITHOUT_VALID_BASELINE):
+        if not _midweek_has_comparison(analysis):
             st.markdown(
                 '<div class="weekend-context-bar"><strong>Midweek Snapshot</strong>'
                 '<span>No valid complete-week baseline</span>'
@@ -558,12 +557,6 @@ def _render_status_queue(
     with st.container(key="status_cards"):
         cols = st.columns(4)
         statuses = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]
-        sub_map = {
-            "ACTIONABLE": "0%–5% above candidate",
-            "UNCONFIRMED": "Within trigger watch zone",
-            "BELOW_TRIGGER": "Below candidate trigger",
-            "EXTENDED": "\\> +5% chase limit",
-        }
         for i, status_name in enumerate(statuses):
             with cols[i]:
                 count = counts["status"].get(status_name, 0)
@@ -571,7 +564,7 @@ def _render_status_queue(
                 prefix = "✓ " if is_active else "  "
                 display_name = status_name.replace("_", " ")
                 meta = STATUS_META[status_name]
-                btn_label = f"{prefix}{display_name} · {count}\n{sub_map[status_name]}"
+                btn_label = f"{prefix}{display_name} · {count}\n{meta['subtitle']}"
                 if _render_filter_card(
                     status_name,
                     btn_label,
@@ -605,7 +598,7 @@ def _render_filter_bar(
     summary = "No filters applied" if active_count == 0 else f"{active_count} active"
     with st.container(key="filters_header"):
         if st.button(
-            f"Filters   ·   {summary}                                      {'⌃' if state['filters_expanded'] else '⌄'}",
+            f"Filters · {summary}",
             key="btn_filters_toggle",
             use_container_width=True,
         ):

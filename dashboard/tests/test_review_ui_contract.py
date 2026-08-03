@@ -45,8 +45,8 @@ def test_reference_tokens_and_desktop_geometry_are_explicit():
         "--blue:#2791ff",
         "--yellow:#ffd21f",
         "--red:#f04444",
-        "padding:29px28px34px",
-        "min-height:78px",
+        "padding:24px24px30px",
+        "min-height:80px",
         "grid-template-columns:minmax(0,1fr)276px268px",
         "height:48px",
         "grid-template-columns:repeat(4,minmax(0,1fr))",
@@ -57,7 +57,7 @@ def test_reference_tokens_and_desktop_geometry_are_explicit():
         "grid-template-columns:194pxrepeat(4,minmax(0,1fr))",
         "font-size:29px",
         "font-weight:800",
-        "margin-top:23px",
+        "margin-top:20px",
     ]:
         assert declaration in css
 
@@ -108,7 +108,7 @@ def test_status_labels_use_fixed_text_slots_without_emoji():
     assert 'prefix = "✓ " if is_active else "  "' in source
 
 
-def test_quick_dots_status_orbs_and_mobile_tooltip_are_styled():
+def test_quick_dots_and_status_orbs_are_styled():
     css = _compact_css()
 
     for declaration in [
@@ -117,8 +117,6 @@ def test_quick_dots_status_orbs_and_mobile_tooltip_are_styled():
         "width:19px",
         "height:19px",
         "box-shadow:inset02px3px",
-        "position:fixed",
-        "inset:auto12px14px",
     ]:
         assert declaration in css
 
@@ -176,7 +174,7 @@ def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
     ) in css
     assert (
         '.st-key-quick_context_row>div[data-testid="stHorizontalBlock"]'
-        '{min-width:max-content;height:48px;align-items:center;gap:6px!important;}'
+        '{min-width:max-content;height:46px;align-items:center;gap:6px!important;}'
     ) in css
     assert (
         '.st-key-review_context_slotdiv[class*="st-key-flow_card_"]'
@@ -245,13 +243,67 @@ def test_header_actions_are_right_aligned_to_the_content_edge():
     assert "padding:010px!important" in css
 
 
-def test_status_card_size_rule_excludes_the_popover_button():
+def test_selected_ibd_review_and_context_bar_have_explicit_active_surfaces():
+    css = _compact_css()
+
+    selected_rule = css.split(
+        '.st-key-dashboard_headerdiv[class*="st-key-global_mode_selector"]button[aria-pressed="true"],',
+        1,
+    )[1].split("}", 1)[0]
+    for declaration in [
+        "border-color:#00d897!important",
+        "background:rgb(0216151/12%)!important",
+        "color:#29f2b0!important",
+        "box-shadow:inset0001px#00d897!important",
+    ]:
+        assert declaration in selected_rule
+
+    assert (
+        ".st-key-review_context_slot:has(.st-key-quick_context_row)"
+        "{border:1pxsolid#303a46;border-radius:7px;padding:010px;"
+        "background:#11171e;box-sizing:border-box;}"
+    ) in css
+
+
+def test_filters_and_results_actions_use_fixed_compact_slots():
+    css = _compact_css()
+    filter_source = _function_source("_render_filter_bar", "_unique_values")
+    view_source = _function_source("_render_ibd_review_view", "_render_mode_scope_controls")
+
+    assert 'f"Filters · {summary}"' in filter_source
+    assert "                                      " not in filter_source
+    assert ".st-key-filters_headerbutton::after{content:\"⌄\"" in css
+    assert "right:14px" in css
+    assert "justify-content:flex-start!important" in css
+
+    assert "st.columns([1,0.34]" in re.sub(r"\s+", "", view_source)
+    assert "st.columns([1.35,1]" in re.sub(r"\s+", "", view_source)
+    assert "min-width:160px" in css
+    assert "max-width:180px" in css
+    assert "min-width:110px" in css
+    assert "max-width:146px" in css
+
+
+def test_flow_card_main_and_info_buttons_have_separate_fixed_layout_contracts():
     css = _compact_css()
 
     assert (
         '.st-key-status_cardsdiv[class*="st-key-flow_card_"]'
-        'button[kind]:not([data-testid="stPopoverButton"]){width:100%!important'
+        '>div[data-testid="stElementContainer"]:not(:has(.flow-info-trigger))'
+        'button[kind]{width:100%!important'
     ) in css
+    assert (
+        'div[class*="st-key-flow_card_"]>div[data-testid="stElementContainer"]:has(.flow-info-trigger)'
+        '{position:absolute;top:7px;right:7px;z-index:4;width:16px!important;height:16px!important;}'
+    ) in css
+    assert (
+        '.flow-info-trigger{appearance:none;display:flex;align-items:center;justify-content:center;'
+        'width:16px!important;min-width:16px!important;max-width:16px!important;'
+        'height:16px!important;min-height:16px!important;max-height:16px!important'
+    ) in css
+    assert '.flow-tooltip-surface{position:fixed;z-index:1000000;max-width:min(320px,calc(100vw-24px));' in css
+    assert "white-space:pre-line!important" in css
+    assert 'stPopoverButton' not in css
     for card in [
         "became_actionable",
         "left_actionable",
@@ -265,6 +317,6 @@ def test_status_card_size_rule_excludes_the_popover_button():
         "extended",
     ]:
         assert (
-            f'.st-key-flow_card_{card}button[kind]'
-            ':not([data-testid="stPopoverButton"])p::before'
+            f'.st-key-flow_card_{card}>div[data-testid="stElementContainer"]'
+            ':not(:has(.flow-info-trigger))button[kind]p::before'
         ) in css

@@ -1,8 +1,8 @@
 # Breakout Pool Midweek Review UI 对齐规格
 
-状态：方案 1 与书面规格均已批准，实施中
+状态：方案 1 与修订书面规格均已批准，实施验收中
 
-日期：2026-08-02
+日期：2026-08-03
 
 范围：`Yfinance_data` 现有 Streamlit Dashboard 的展示层与浏览器验收
 
@@ -57,6 +57,7 @@
 ### 4.1 允许改动
 
 - `dashboard/app.py` 中与页面组合、按钮呈现、Tooltip、复制控件和响应式标记有关的代码；
+- `dashboard/review_tooltip.py` 中只服务于 10 个心流入口的统一 Tooltip 控制器；
 - 新增 `dashboard/review_styles.py`；
 - 与展示层契约相关的 Dashboard 测试；
 - 必要的可访问性属性和稳定选择器；
@@ -112,25 +113,25 @@
 
 | 区域 | 几何契约 |
 | --- | --- |
-| 页面壳 | `padding: 29px 28px 34px` |
-| Header | `min-height: 78px`，底部分隔线，标题与右侧导航同一行 |
+| 页面壳 | `padding: 24px 24px 30px` |
+| Header | `min-height: 80px`，底部分隔线，标题与右侧导航同一行 |
 | 标题 | `29px / 800`，Data Ready 紧邻标题 |
-| Snapshot | 上边距 `23px`；日期槽 `139px`，上下文槽 `211px` |
+| Snapshot | 上边距 `20px`；日期槽 `139px`，上下文槽 `211px`，不得与 Header 分隔线重叠 |
 | 顶部导航 | Info `45×45px`；IBD Review/C Rank Reference 高 `45px` |
 | Review section | 顶部内边距 `9px` |
 | Section heading | `min-height: 50px` |
 | Queue actions | 两列 `276px 268px`，列间距 `9px` |
 | Mode switch | `276×40px`，两段式统一外壳 |
 | Scope switch | `268×40px`，两段式统一外壳 |
-| Context slot | 高 `48px`，外边距 `6px 0 8px` |
+| Context slot | 高 `48px`，外边距 `6px 0 8px`；Midweek 快捷栏使用完整边框、背景和内边距 |
 | Quick chips | 单行，高 `31px`；Change 与 Origin 之间有竖分隔线 |
 | Subsection label | `10px`，位于 Status 卡片之前 |
 | Status cards | 四列，间距 `16px`，每卡高 `70px` |
 | Status orb | CSS 圆球 `19×19px`，带内高光和外发光，不用 emoji |
 | Filters toggle | 高 `45px` |
 | Results toolbar | `min-height: 56px` |
-| Copy | `min-width: 180px; height: 44px` |
-| Sort | `min-width: 120px; height: 44px` |
+| Copy | `160–180px; height: 44px` |
+| Sort | `110–146px; height: 44px` |
 | Selected Row | 高 `60px`，列为 `194px repeat(4, minmax(0, 1fr))` |
 | Grid | 紧接 Selected Row，下方保留现有 AG Grid 高度和能力 |
 
@@ -143,6 +144,7 @@ Mode、Scope、Status、Filters 顶边和 Results 顶边在 Midweek 与 Weekend 
 - 左侧显示 Breakout Pool、Data Ready 和动态 Snapshot 摘要；
 - Snapshot 的固定文字槽避免日期、陈旧天数和计数变化导致右侧内容跳动；
 - 右侧保留 Info、IBD Review、C Rank Reference；
+- IBD Review 选中态必须同时使用绿色文字、绿色边框和清晰的选中背景，不能呈现为禁用态；
 - 当前页面必须同时用选中样式和可访问状态表达，不能只依赖颜色。
 
 ### 7.2 Mode 与 Scope
@@ -151,6 +153,9 @@ Mode、Scope、Status、Filters 顶边和 Results 顶边在 Midweek 与 Weekend 
 - 底层仍使用原生 Streamlit button 与现有 callback/rerun；
 - 每一段预留固定对勾槽，选中前后按钮宽度和文字位置不变；
 - Midweek 默认 Scope 为 Changes；Weekend 默认 Scope 为 All Signals；
+- `PoolAnalysisResult.mode` 只决定首次进入页面时的默认 Mode，不代表 Midweek 基线是否有效；
+- `PoolAnalysisResult.midweek_baseline_available` 独立表达 Midweek 快照与完整周基线能否比较，Header、Changes、Context、默认排序、周中列和手动 Mode 切换统一读取该字段；
+- 在周一等完整周默认窗口中，只要 Midweek 与完整周属于同一 Review 周，手动进入 Midweek 仍必须启用 Changes 并使用 Review Priority；
 - Weekend 保留完整 Scope 外壳，Changes 在原位置禁用，All Signals 的位置和宽度不变；
 - 重复点击当前 Mode 不重置任何用户状态；
 - 真正切换 Mode 才重置不兼容筛选、Copy 反馈、Filters 展开状态和默认排序；
@@ -162,7 +167,7 @@ Context slot 在两种模式中始终占同一高度和纵向位置。
 
 Midweek 使用一条连续单行快捷栏，顺序固定为：
 
-`CHANGE` → Became Actionable → Left Actionable → Other Changes → 分隔线 → `ORIGIN` → New → Carry → Reconfirmed → Clear。
+`CHANGE` → 进入买区 → 离开买区 → 其他变化 → 分隔线 → `ORIGIN` → 新信号 → 延续 → 再确认 → Clear。
 
 每个 chip 包含：
 
@@ -171,25 +176,40 @@ Midweek 使用一条连续单行快捷栏，顺序固定为：
 - 动态数量；
 - 独立的 16px 信息触发器。
 
+快捷项的数量使用等宽数字，并为数量和信息按钮预留固定槽位；信息按钮固定在右上角且绝不参与 chip 宽度计算。Clear 固定在整条快捷栏最右侧。
+
 点击 chip 切换对应 Change 或 Origin 值；同一维度单选，不同维度可组合。Clear 只清除 Change 与 Origin，不清除 Status 或高级 Filters。
 
 Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说明当前是完整周 Pool，未应用周中比较。Weekend 不显示或暗示 Change/Origin 数据。
 
 ### 7.4 Status Queue
 
-固定显示 ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED 四张卡。每卡显示 CSS orb、状态名称、动态数量和状态说明。卡片点击只切换 Status，且可与 Change/Origin 组合。
+固定显示 ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED 四张等宽等高卡片。副标题依次为“买点上方 0%–5%”“等待日线确认”“低于买点”“高于买点 5%，不追”。每卡显示 CSS orb、标准英文状态名称、动态数量和状态说明。卡片点击只切换 Status，且可与 Change/Origin 组合。
 
-状态卡不得把 emoji 写入按钮标签。选中标记使用固定槽，不能改变卡片内部布局。Status 对应的 entry-volume 和 near-trigger 状态清理继续沿用现有业务规则。
+状态卡不得把 emoji 写入按钮标签。选中标记使用固定槽，不能改变卡片内部布局。独立信息按钮固定在卡片右上角 `16×16px`，不得建立额外布局列、切割主点击区域或影响卡片宽度。Status 对应的 entry-volume 和 near-trigger 状态清理继续沿用现有业务规则。
 
 ### 7.5 Tooltip
 
-以下 10 个心流入口必须有统一 Tooltip：
+以下 10 个心流入口必须使用同一套页面 Tooltip 控制器：
 
-- Became Actionable、Left Actionable、Other Changes；
-- New、Carry、Reconfirmed；
+- 进入买区、离开买区、其他变化；
+- 新信号、延续、再确认；
 - ACTIONABLE、UNCONFIRMED、BELOW TRIGGER、EXTENDED。
 
-每个 Tooltip 必须包含定义、数字统计口径和点击后的筛选效果。交互必须满足：
+每个 Tooltip 固定使用三行中文短说明：`含义：……`、`数量：当前范围内符合条件的标的数。`、`点击：只看这类标的，并保留其他已选条件。`。“含义”分别为：
+
+- 进入买区：上周不在买区，本次进入 0%–5% 买区；
+- 离开买区：上周在买区，本次已跌破、未确认或涨超 5%；
+- 其他变化：状态和上周不同，但不属于进入或离开买区；
+- 新信号：完整周没有信号，周中首次出现信号；
+- 延续：周中没有新信号，但完整周信号仍在观察，状态按当前价格更新；
+- 再确认：完整周和周中都有信号，以周中数据为准；
+- ACTIONABLE：已完成入场确认，当前价位于买点上方 0%–5%；
+- UNCONFIRMED：尚未满足日线入场确认条件；
+- BELOW TRIGGER：当前价低于有效买点；
+- EXTENDED：当前价已超过买点 5%，不宜追高。
+
+同一 Tooltip 内容由元数据生成一次，并同时绑定原生 Streamlit 主筛选按钮与独立信息按钮；不再并存按钮 `help` 与 `st.popover` 两套内容源。独立信息按钮不进入 Streamlit 筛选事件链，点击时只控制同一个 Tooltip 浮层。交互必须满足：
 
 - 鼠标 hover；
 - 键盘 focus；
@@ -198,21 +218,24 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 - Esc 关闭；
 - 点击信息按钮不得触发对应筛选；
 - 不使用浏览器原生 `title` 作为 Tooltip；
-- 桌面浮层避免越过视口边界；760px 及以下呈现为底部浮层。
+- 最大宽度约 `320px`，中文三行短说明保留换行；
+- 浮层避免越过视口边界，窄屏仍保持内容可读且不遮挡当前触发器。
 
-优先保留 Streamlit 原生按钮的键盘与点击语义，使用稳定的外层 key/class 和独立信息触发器实现视觉分组与 Tooltip。不得以不可交互的 Markdown 假按钮替代筛选按钮。
+主筛选动作必须保留 Streamlit 原生按钮的键盘、点击和 rerun 语义；统一控制器只接管 Tooltip 显示、定位、`aria-describedby` 和关闭事件。独立信息触发器使用可聚焦的原生 HTML `button`，不得用不可交互的 Markdown 假按钮替代。控制器不得访问外部网站或引入新依赖。
 
 ### 7.6 Filters
 
 - 周中与周末初次进入都默认收起；
 - 真正切换 Mode 后恢复收起；
 - 展开按钮始终为整行 45px 控件，显示 Filters、当前活动筛选数量和 chevron；
+- Filters 摘要靠左，chevron 使用固定的最右槽位，不能依赖空格推位；
 - 现有高级筛选字段和业务约束不变；
 - 展开/收起不能影响 Mode、Scope、Context 或 Status 的几何稳定性。
 
 ### 7.7 Results、Copy 与 Sort
 
 - Results 左侧显示当前过滤结果数量，右侧只保留 Copy Codes 与 Sort；
+- Copy 与 Sort 使用紧凑固定宽度并整体靠右，不得由 Copy 占据过宽区域；
 - 移除始终可见的 Manual 控件；
 - Copy Codes 复制当前过滤结果、按当前结果顺序生成的 code 列表；
 - Clipboard API 失败时继续尝试 `execCommand('copy')` 兼容路径；
@@ -236,13 +259,15 @@ Weekend 在完全相同的 slot 中显示 Weekend Baseline 说明条，内容说
 
 ```text
 CSV / 投影服务
-  → PoolAnalysisResult
+  → PoolAnalysisResult（默认 mode + 独立 midweek_baseline_available）
   → Review state（mode、scope、quick filters、status、advanced filters、sort）
   → 当前结果 DataFrame 与动态计数
   → Mode/Scope/Context/Status/Results/Selected Row/AG Grid
 ```
 
 不允许某个视觉组件自己重新计算另一套业务计数。所有 chip、Status、Results 和 Copy 数量都必须来源于同一过滤模型。Selected Row 必须来源于当前模式下的实际表格选中 code。
+
+默认业务窗口与比较能力是两个正交事实：`mode` 只负责首次进入 Weekend 或 Midweek；`midweek_baseline_available` 只负责判定 Midweek 的 Changes、基线日期、Review Priority 和周中列能否启用。两者不得互相替代。以 2026-08-03 周一进入为例，页面初始仍是 Weekend；若数据为 Midweek 2026-07-30、Baseline 2026-07-24，则手动进入 Midweek 后必须进入有效 Changes 语境。
 
 切换规则：
 
@@ -272,7 +297,7 @@ CSV / 投影服务
 - Status 改为一列；
 - Copy 与 Sort 占满结果区宽度；
 - Selected Row 水平滚动；
-- Tooltip 变为固定底部浮层。
+- Tooltip 保持在约 `320px` 最大宽度内并避免越过视口边界。
 
 ### 480px 及以下
 
@@ -304,7 +329,7 @@ CSV / 投影服务
 6. 对齐 Filters、Results、Copy/Sort 和 Selected Row；
 7. 完成响应式、focus-visible、reduced-motion；
 8. 运行完整自动化检查；
-9. 在真实 Chrome 中完成桌面与窄屏验收。
+9. 在可用的本地浏览器中完成桌面与窄屏验收；若浏览器不可用，由用户用新截图复验。
 
 ### 11.1 静态契约测试
 
@@ -338,9 +363,9 @@ CSV / 投影服务
 - 过期 midweek、缺失 baseline、无效价格/candidate、重复 code；
 - Futu ACTIONABLE code 与统一投影结果。
 
-### 11.4 真实 Chrome 验收
+### 11.4 浏览器与截图验收
 
-真实 Chrome 是最终 UI/交互验收环境，不能只以源码测试或 Streamlit AppTest 代替。验收矩阵包括：
+真实浏览器仍是最终 UI/交互验收环境，不能只以源码测试或 Streamlit AppTest 代替。禁止连接云浏览器或访问外部原型站点；只在本地环境可用时运行页面。验收矩阵包括：
 
 - 1365px 桌面：分别截图 Midweek 与 Weekend，与本地 HTML/参考截图并排对照；
 - 1120px、760px、480px：检查布局断点、横向滚动和不可重排约束；
@@ -351,7 +376,7 @@ CSV / 投影服务
 - 验证 Midweek Review Priority 实际排序；
 - 验证选中态、禁用态、focus-visible 和 reduced-motion。
 
-若 Chrome 因权限未连接，自动化测试可继续推进，但不得据此宣称 UI 验收完成。最终完成声明必须附上真实 Chrome 的截图、几何测量和交互结果。
+若本地浏览器未连接，自动化测试可继续推进，但不得据此宣称视觉验收完成；交付时必须明确标注“尚需用户截图复验”，由用户提供新截图后继续核对 UI 与交互。
 
 ## 12. 完成判定
 
@@ -362,6 +387,6 @@ CSV / 投影服务
 - 10 个 Tooltip 满足统一内容与可访问交互要求；
 - AG Grid 能力无回退；
 - Dashboard 测试与 `dashboard/self_check.py` 在 Conda `quant_env` 中通过；
-- 真实 Chrome 完成桌面、窄屏、交互和 `getBoundingClientRect()` 验收；
+- 本地浏览器完成桌面、窄屏、交互和 `getBoundingClientRect()` 验收，或在浏览器不可用时明确进入用户截图复验；
 - 未修改 `quant_trade`、`us/`、`results_pkl/` 或源 CSV；
 - 所有计数来自真实数据，不硬编码原型 fixture。

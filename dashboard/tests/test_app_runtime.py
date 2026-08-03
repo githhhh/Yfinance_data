@@ -1,5 +1,6 @@
 import sys
 import warnings
+from html import unescape
 
 import pandas as pd
 import pytest
@@ -39,6 +40,27 @@ def _midweek_app():
         "us/breakout_follow_pool_midweek.csv",
         "--window-date",
         "2026-07-30",
+    ]
+    try:
+        app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+        app._review_argv = list(sys.argv)
+        return app
+    finally:
+        sys.argv = old_argv
+
+
+def _complete_window_with_valid_midweek_app():
+    from streamlit.testing.v1 import AppTest
+
+    old_argv = sys.argv[:]
+    sys.argv = [
+        "dashboard/app.py",
+        "--csv",
+        "us/breakout_follow_pool.csv",
+        "--midweek-csv",
+        "us/breakout_follow_pool_midweek.csv",
+        "--window-date",
+        "2026-08-03",
     ]
     try:
         app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
@@ -96,23 +118,32 @@ def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filte
 def test_midweek_runtime_exposes_all_ten_structured_tooltips():
     app = _midweek_app()
     card_names = [
-        "Became Actionable",
-        "Left Actionable",
-        "Other Changes",
-        "New",
-        "Carry",
-        "Reconfirmed",
+        "进入买区",
+        "离开买区",
+        "其他变化",
+        "新信号",
+        "延续",
+        "再确认",
         "ACTIONABLE",
         "UNCONFIRMED",
         "BELOW TRIGGER",
         "EXTENDED",
     ]
 
+    trigger_markup = [
+        unescape(item.value)
+        for item in app.markdown
+        if 'class="flow-info-trigger"' in item.value
+    ]
+    assert len(trigger_markup) == 10
     for card_name in card_names:
         button = _button_starting_with(app, card_name)
-        assert "Definition:" in button.help
-        assert "Count:" in button.help
-        assert "Click:" in button.help
+        assert not button.help
+        markup = next(value for value in trigger_markup if f'aria-label="{card_name}说明"' in value)
+        assert "含义：" in markup
+        assert "数量：" in markup
+        assert "点击：" in markup
+    assert not any(button.key and button.key.startswith("btn_flow_info_") for button in app.button)
 
 
 def test_runtime_scope_buttons_expose_expected_enabled_states():
@@ -149,6 +180,26 @@ def test_runtime_mode_scope_and_quick_filter_flow():
     assert state["change_filter"] == "ALL"
     assert state["origin_filter"] == "ALL"
     assert app.button(key="btn_clear_quick").disabled is True
+
+
+def test_complete_window_manual_midweek_uses_the_valid_baseline_comparison():
+    app = _complete_window_with_valid_midweek_app()
+
+    initial = app.session_state["review_ui_state"]
+    assert initial["mode"] == "WEEKEND"
+    assert initial["scope"] == "ALL_SIGNALS"
+    assert initial["sort_mode"] == "C Rank"
+
+    _click(app, "btn_mode_midweek")
+
+    state = app.session_state["review_ui_state"]
+    assert len(app.exception) == 0
+    assert state["mode"] == "MIDWEEK"
+    assert state["scope"] == "CHANGES"
+    assert state["sort_mode"] == "Review Priority"
+    assert app.button(key="btn_scope_changes").disabled is False
+    assert any("Midweek · baseline 2026-07-24" in item.value for item in app.markdown)
+    assert any("111 results · Sorted by Review Priority" in item.value for item in app.markdown)
 
 
 def test_runtime_status_filter_expansion_and_reset_flow():
