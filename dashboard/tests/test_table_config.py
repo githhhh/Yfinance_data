@@ -327,6 +327,19 @@ def test_c_rank_reference_view_columns():
     assert get_column_view_fields("C Rank Reference") == expected
 
 
+def test_c_rank_and_continuous_c_are_adjacent_without_right_pinning():
+    options = build_grid_options(get_column_view_fields("C Rank Reference"))
+    columns = options["columnDefs"]
+
+    assert [column["field"] for column in columns[:3]] == [
+        "code",
+        "rank_C_continuous",
+        "C_continuous",
+    ]
+    assert columns[0]["pinned"] == "left"
+    assert columns[1]["pinned"] is None
+
+
 def test_table_views_cover_all_fields_without_scattering_related_columns():
     all_fields = set(get_all_table_columns())
     grouped_fields: set[str] = set()

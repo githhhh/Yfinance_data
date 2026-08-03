@@ -168,6 +168,9 @@ def test_runtime_scope_buttons_expose_expected_enabled_states():
 def test_runtime_mode_scope_and_quick_filter_flow():
     app = _midweek_app()
 
+    assert app.button(key="btn_clear_quick").label == "Clear filters"
+    assert app.button(key="btn_clear_quick").disabled is True
+
     _click(app, "btn_mode_weekend")
     state = app.session_state["review_ui_state"]
     assert len(app.exception) == 0
@@ -186,11 +189,18 @@ def test_runtime_mode_scope_and_quick_filter_flow():
     _click(app, "btn_change_filter_BECAME_ACTIONABLE")
     assert app.session_state["review_ui_state"]["change_filter"] == "BECAME_ACTIONABLE"
     assert app.button(key="btn_clear_quick").disabled is False
+    assert app.button(key="btn_clear_quick").label == "Clear 1"
+
+    _click(app, "btn_origin_filter_NEW")
+    assert app.button(key="btn_clear_quick").label == "Clear 2"
 
     _click(app, "btn_clear_quick")
     state = app.session_state["review_ui_state"]
     assert state["change_filter"] == "ALL"
     assert state["origin_filter"] == "ALL"
+    assert state["mode"] == "MIDWEEK"
+    assert state["scope"] == "CHANGES"
+    assert app.button(key="btn_clear_quick").label == "Clear filters"
     assert app.button(key="btn_clear_quick").disabled is True
 
 

@@ -505,6 +505,13 @@ def _toggle_dimension(state: dict[str, Any], field: str, value: str) -> dict[str
     return result
 
 
+def _quick_filter_count(state: dict[str, Any]) -> int:
+    return sum(
+        state.get(field, "ALL") != "ALL"
+        for field in ("change_filter", "origin_filter")
+    )
+
+
 def _render_quick_group(
     card_ids: tuple[str, str, str],
     *,
@@ -583,11 +590,12 @@ def _render_review_context(
                     state=state,
                 )
             with clear_col:
+                quick_filter_count = _quick_filter_count(state)
                 if st.button(
-                    "Clear",
+                    f"Clear {quick_filter_count}" if quick_filter_count else "Clear filters",
                     key="btn_clear_quick",
                     use_container_width=True,
-                    disabled=(state["change_filter"] == "ALL" and state["origin_filter"] == "ALL"),
+                    disabled=quick_filter_count == 0,
                 ):
                     _store_review_state(clear_quick_filters(state))
                     st.rerun()
@@ -1091,9 +1099,9 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
             width: 100%;
         }}
         .copy-btn {{
-            background: #2e7d32;
-            color: #fff;
-            border: none;
+            background: #151b23;
+            color: #c7d0db;
+            border: 1px solid #465365;
             border-radius: 8px;
             padding: 0 14px;
             font-size: 13px;
@@ -1114,7 +1122,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
         .copy-btn:disabled {{
             cursor: not-allowed;
             opacity: 0.58;
-            background: #29462f;
+            background: #111720;
         }}
     </style>
     </head>
@@ -1154,14 +1162,18 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                     }}
                 }}
                 if (success) {{
-                    btn.style.background = '#1b5e20';
-                    btn.innerText = '✓ Copied ({n})';
+                    btn.style.background = '#163d2b';
+                    btn.style.borderColor = '#35df65';
+                    btn.style.color = '#d8ffe2';
+                    btn.innerText = 'Copied {n} Codes';
                 }} else {{
                     btn.style.background = '#c62828';
                     btn.innerText = 'Copy failed';
                 }}
                 setTimeout(() => {{
-                    btn.style.background = '#2e7d32';
+                    btn.style.background = '#151b23';
+                    btn.style.borderColor = '#465365';
+                    btn.style.color = '#c7d0db';
                     btn.innerText = 'Copy {n} Codes';
                 }}, 2000);
             }});

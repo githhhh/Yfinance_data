@@ -571,7 +571,6 @@ def _column_def(column: str, *, show_origin_badge: bool = False) -> dict:
         if HAS_JS_CODE:
             definition["cellRenderer"] = _code_renderer_jscode(show_origin_badge)
     elif column == "rank_C_continuous":
-        definition["pinned"] = "right"
         definition["width"] = 85
         definition["minWidth"] = 85
     elif column == "ibd_candidate_rule":

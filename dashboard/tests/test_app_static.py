@@ -48,6 +48,15 @@ def test_loaded_badge_follows_complete_snapshot_freshness():
     assert dashboard_app._data_badge(None, loaded=False) == ("Schema / Data Error", "error")
 
 
+def test_quick_filter_count_only_counts_change_and_origin_chips():
+    assert dashboard_app._quick_filter_count(
+        {"change_filter": "ALL", "origin_filter": "ALL", "scope": "CHANGES"}
+    ) == 0
+    assert dashboard_app._quick_filter_count(
+        {"change_filter": "OTHER_CHANGES", "origin_filter": "NEW", "scope": "CHANGES"}
+    ) == 2
+
+
 def test_c_rank_reference_denominator_uses_active_signals_count():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert 'active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)' in source
