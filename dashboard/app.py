@@ -437,7 +437,7 @@ def _render_ibd_review_view(
     )
 
     with st.container(key="results_toolbar"):
-        summary_col, actions_col = st.columns([1, 0.18], vertical_alignment="center")
+        summary_col, actions_col, _ = st.columns([0.24, 0.14, 1], vertical_alignment="center")
         with summary_col:
             st.markdown(
                 f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(fixed_sort)}</div>',
@@ -783,14 +783,6 @@ def _store_advanced_filter(state: dict[str, Any], field: str, value: Any) -> Non
     st.rerun()
 
 
-def _clear_advanced_filter(state: dict[str, Any], field: str) -> None:
-    updated = dict(state)
-    updated[field] = "All" if field == "route_filter" else None
-    updated["widget_generation"] = int(state.get("widget_generation", 0)) + 1
-    _store_review_state(updated)
-    st.rerun()
-
-
 def _render_filter_bar(
     df: pd.DataFrame,
     state: dict[str, Any],
@@ -806,20 +798,45 @@ def _render_filter_bar(
             'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if st.button(
-            f"More Filters · {summary}",
-            key="btn_filters_toggle",
-            use_container_width=True,
-        ):
-            state["filters_expanded"] = not state["filters_expanded"]
-            _store_review_state(state)
-            st.rerun()
+        header_cols = st.columns(
+            [0.24, 0.08, 1] if active_count > 1 else [0.24, 1],
+            gap="small",
+            vertical_alignment="center",
+        )
+        with header_cols[0]:
+            if st.button(
+                f"More Filters · {summary}",
+                key="btn_filters_toggle",
+                use_container_width=True,
+            ):
+                state["filters_expanded"] = not state["filters_expanded"]
+                _store_review_state(state)
+                st.rerun()
+        if active_count > 1:
+            with header_cols[1]:
+                if st.button(
+                    "Reset",
+                    key="btn_filters_reset",
+                    use_container_width=True,
+                ):
+                    reset = dict(state)
+                    reset.update(
+                        {
+                            "route_filter": "All",
+                            "distance_range": None,
+                            "entry_volume_min": None,
+                            "weekly_volume_min": None,
+                            "widget_generation": int(state.get("widget_generation", 0)) + 1,
+                        }
+                    )
+                    _store_review_state(reset)
+                    st.rerun()
     if not state["filters_expanded"]:
         return
 
     generation = int(state.get("widget_generation", 0))
     controls = st.container(key="filter_controls")
-    cols = controls.columns([1.25, 2.0, 2.3, 0.7], vertical_alignment="top")
+    cols = controls.columns([1.25, 2.0, 2.3], vertical_alignment="top")
     with cols[0]:
         st.caption("SETUP")
         current_route = state.get("route_filter", "All")
@@ -846,6 +863,10 @@ def _render_filter_bar(
         )
         if distance_bounds is not None:
             current_range = _clamped_range(state.get("distance_range"), distance_bounds)
+            st.markdown(
+                '<div class="filter-slider-heading filter-slider-heading--range">Vs Buy Point</div>',
+                unsafe_allow_html=True,
+            )
             selected_range = st.slider(
                 "Vs Buy Point",
                 min_value=distance_bounds[0],
@@ -854,6 +875,7 @@ def _render_filter_bar(
                 step=0.1,
                 format="%+.1f%%",
                 key=f"review_distance_{generation}",
+                label_visibility="collapsed",
             )
             selected_value = None if selected_range == distance_bounds else tuple(selected_range)
             if selected_value != state.get("distance_range"):
@@ -874,81 +896,61 @@ def _render_filter_bar(
             ceiling_value=1.0,
         )
         with volume_cols[0]:
-            if entry_bounds is not None:
-                entry_state = state.get("entry_volume_min")
-                entry_value = entry_bounds[0] if entry_state is None else float(entry_state)
-                entry_value = min(max(entry_value, entry_bounds[0]), entry_bounds[1])
-                entry_label = "Entry Volume ≥ Any" if entry_state is None else f"Entry Volume ≥ {entry_value:.1f}×"
-                selected_entry = st.slider(
-                    entry_label,
-                    min_value=entry_bounds[0],
-                    max_value=entry_bounds[1],
-                    value=entry_value,
-                    step=0.1,
-                    format="%.1fx",
-                    key=f"review_entry_vol_{generation}",
-                )
-                selected_value = None if selected_entry == entry_bounds[0] else round(float(selected_entry), 1)
-                if selected_value != entry_state:
-                    _store_advanced_filter(state, "entry_volume_min", selected_value)
+            with st.container(key="filter_entry_volume"):
+                if entry_bounds is not None:
+                    entry_state = state.get("entry_volume_min")
+                    entry_value = entry_bounds[0] if entry_state is None else float(entry_state)
+                    entry_value = min(max(entry_value, entry_bounds[0]), entry_bounds[1])
+                    entry_label = "Entry Volume ≥ Any" if entry_state is None else f"Entry Volume ≥ {entry_value:.1f}×"
+                    entry_current = "Any" if entry_state is None else f"{entry_value:.1f}×"
+                    entry_active_class = " filter-volume-value--active" if entry_state is not None else ""
+                    st.markdown(
+                        f'<div class="filter-slider-heading">{entry_label}</div>'
+                        f'<div class="filter-volume-value{entry_active_class}">'
+                        f'<span>{entry_current}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    selected_entry = st.slider(
+                        entry_label,
+                        min_value=entry_bounds[0],
+                        max_value=entry_bounds[1],
+                        value=entry_value,
+                        step=0.1,
+                        format="%.1fx",
+                        key=f"review_entry_vol_{generation}",
+                        label_visibility="collapsed",
+                    )
+                    selected_value = None if selected_entry == entry_bounds[0] else round(float(selected_entry), 1)
+                    if selected_value != entry_state:
+                        _store_advanced_filter(state, "entry_volume_min", selected_value)
         with volume_cols[1]:
-            if weekly_bounds is not None:
-                weekly_state = state.get("weekly_volume_min")
-                weekly_value = weekly_bounds[0] if weekly_state is None else float(weekly_state)
-                weekly_value = min(max(weekly_value, weekly_bounds[0]), weekly_bounds[1])
-                weekly_label = "Weekly Volume ≥ Any" if weekly_state is None else f"Weekly Volume ≥ {weekly_value:.1f}×"
-                selected_weekly = st.slider(
-                    weekly_label,
-                    min_value=weekly_bounds[0],
-                    max_value=weekly_bounds[1],
-                    value=weekly_value,
-                    step=0.1,
-                    format="%.1fx",
-                    key=f"review_weekly_vol_{generation}",
-                )
-                selected_value = None if selected_weekly == weekly_bounds[0] else round(float(selected_weekly), 1)
-                if selected_value != weekly_state:
-                    _store_advanced_filter(state, "weekly_volume_min", selected_value)
-    with cols[3]:
-        st.caption("RESET")
-        if st.button(
-            "Reset",
-            key="btn_filters_reset",
-            use_container_width=True,
-            disabled=active_count == 0,
-        ):
-            reset = dict(state)
-            reset.update(
-                {
-                    "route_filter": "All",
-                    "distance_range": None,
-                    "entry_volume_min": None,
-                    "weekly_volume_min": None,
-                    "widget_generation": generation + 1,
-                }
-            )
-            _store_review_state(reset)
-            st.rerun()
-
-    active_filters: list[tuple[str, str]] = []
-    if state.get("route_filter", "All") != "All":
-        active_filters.append(("route_filter", f"Setup: {format_display_value('ibd_candidate_rule', state['route_filter'])} ×"))
-    if state.get("distance_range") is not None:
-        low, high = state["distance_range"]
-        active_filters.append(("distance_range", f"Vs Buy Point: {low:+.1f}%–{high:+.1f}% ×"))
-    if state.get("entry_volume_min") is not None:
-        active_filters.append(("entry_volume_min", f"Entry Vol ≥ {float(state['entry_volume_min']):.1f}× ×"))
-    if state.get("weekly_volume_min") is not None:
-        active_filters.append(("weekly_volume_min", f"Weekly Vol ≥ {float(state['weekly_volume_min']):.1f}× ×"))
-    if active_filters:
-        with st.container(key="active_filter_chips"):
-            chip_cols = st.columns([1] * len(active_filters) + [max(1, 5 - len(active_filters))], gap="small")
-            for column, (field, label) in zip(chip_cols, active_filters, strict=False):
-                with column:
-                    if st.button(label, key=f"btn_filter_chip_{field}", use_container_width=True):
-                        _clear_advanced_filter(state, field)
-
-
+            with st.container(key="filter_weekly_volume"):
+                if weekly_bounds is not None:
+                    weekly_state = state.get("weekly_volume_min")
+                    weekly_value = weekly_bounds[0] if weekly_state is None else float(weekly_state)
+                    weekly_value = min(max(weekly_value, weekly_bounds[0]), weekly_bounds[1])
+                    weekly_label = "Weekly Volume ≥ Any" if weekly_state is None else f"Weekly Volume ≥ {weekly_value:.1f}×"
+                    weekly_current = "Any" if weekly_state is None else f"{weekly_value:.1f}×"
+                    weekly_active_class = " filter-volume-value--active" if weekly_state is not None else ""
+                    st.markdown(
+                        f'<div class="filter-slider-heading">{weekly_label}</div>'
+                        f'<div class="filter-volume-value{weekly_active_class}">'
+                        f'<span>{weekly_current}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    selected_weekly = st.slider(
+                        weekly_label,
+                        min_value=weekly_bounds[0],
+                        max_value=weekly_bounds[1],
+                        value=weekly_value,
+                        step=0.1,
+                        format="%.1fx",
+                        key=f"review_weekly_vol_{generation}",
+                        label_visibility="collapsed",
+                    )
+                    selected_value = None if selected_weekly == weekly_bounds[0] else round(float(selected_weekly), 1)
+                    if selected_value != weekly_state:
+                        _store_advanced_filter(state, "weekly_volume_min", selected_value)
 def _render_ibd_selected_row_detail(
     filtered_df: pd.DataFrame,
     selected_code: str | None,
@@ -1002,9 +1004,80 @@ def _render_ibd_selected_row_detail(
     )
     rank_c = html.escape(rank_text)
     c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
+    eps_yoy = html.escape(_format_card_val(row.get("eps_yoy_growth"), "%"))
+    dist_52w = html.escape(_format_card_val(row.get("dist_to_52w_high_pct"), "%"))
+    p_52w = html.escape(_format_card_val(row.get("price_52_week_high"), ""))
+    base_depth = html.escape(_format_card_val(row.get("base_depth_pct"), "%"))
+    base_dur = html.escape(_format_card_val(row.get("base_duration_weeks"), "w"))
+    pb_depth = html.escape(_format_card_val(row.get("pullback_pct"), "%"))
+    pb_off_peak = html.escape(_format_card_val(row.get("pullback_pct_off_peak"), "%"))
+    pullback_section = (
+        '<div class="code-popup-section" data-popup-section="pullback">'
+        '<div class="code-popup-title">2. 回撤</div>'
+        '<div class="code-popup-grid-2">'
+        f'<div><div class="code-popup-item">回撤深度</div><div class="code-popup-val">{pb_depth}</div></div>'
+        f'<div><div class="code-popup-item">距回撤高点</div><div class="code-popup-val">{pb_off_peak}</div></div>'
+        '</div></div>'
+        if pb_depth != "n/a" or pb_off_peak != "n/a"
+        else ""
+    )
+    trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
+    raw_valid = row.get("ibd_entry_valid")
+    is_entry_valid = bool(
+        pd.notna(raw_valid)
+        and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1"))
+    )
+    if is_entry_valid:
+        raw_date = row.get("ibd_entry_date")
+        entry_date = html.escape(
+            str(raw_date).split("T")[0]
+            if raw_date is not None and not pd.isna(raw_date) and str(raw_date).strip() not in ("", "nan", "None", "N/A")
+            else "n/a"
+        )
+        daily_vol = html.escape(_format_card_val(row.get("ibd_entry_volume_ratio"), "x"))
+        reject_section = ""
+    else:
+        entry_date = "n/a"
+        daily_vol = "n/a"
+        reject_reason = html.escape(
+            format_display_value("ibd_entry_reject_reason", row.get("ibd_entry_reject_reason")) or "n/a"
+        )
+        reject_section = (
+            '<div class="code-popup-reject" role="alert">'
+            '<div class="code-popup-item">未确认原因</div>'
+            f'<div class="code-popup-val">{reject_reason}</div></div>'
+        )
     markup = f"""
         <div class="ibd-selected-strip">
-            <div class="selected-summary-cell selected-code-cell"><div class="selected-code">{code}</div></div>
+            <div class="selected-summary-cell selected-code-cell">
+                <details class="code-detail" data-selected-code="{code}">
+                    <summary class="code-hover-trigger" aria-label="{code} 股票详情">{code}</summary>
+                    <div class="code-hover-popup" role="region" aria-label="{code} 股票详情">
+                        <div class="code-hover-surface">
+                            <div class="code-popup-section" data-popup-section="daily-entry">
+                                <div class="code-popup-title">1. 日线入场</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">触发价</div><div class="code-popup-val">{trigger_p}</div></div>
+                                    <div><div class="code-popup-item">入场日期</div><div class="code-popup-val">{entry_date}</div></div>
+                                    <div><div class="code-popup-item">日线量比</div><div class="code-popup-val">{daily_vol}</div></div>
+                                </div>
+                                {reject_section}
+                            </div>
+                            {pullback_section}
+                            <div class="code-popup-section" data-popup-section="canslim-base">
+                                <div class="code-popup-title">3. 基本面 / 形态</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">EPS 同比</div><div class="code-popup-val">{eps_yoy}</div></div>
+                                    <div><div class="code-popup-item">距 52 周高点</div><div class="code-popup-val">{dist_52w}</div></div>
+                                    <div><div class="code-popup-item">52 周高点</div><div class="code-popup-val">{p_52w}</div></div>
+                                    <div><div class="code-popup-item">平台深度</div><div class="code-popup-val">{base_depth}</div></div>
+                                    <div><div class="code-popup-item">平台时长</div><div class="code-popup-val">{base_dur}</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
             <div class="selected-summary-cell"><div class="selected-label">Buy Point</div><div class="selected-value">{cand_price} <span class="selected-secondary">({cand_rule})</span></div></div>
             <div class="selected-summary-cell"><div class="selected-label">Vs Buy Point</div><div class="selected-value">{dist_pct} <span class="selected-secondary">(Close {latest_close})</span></div></div>
             <div class="selected-summary-cell"><div class="selected-label">Entry Status</div><div class="selected-value">{status_transition} <span class="selected-secondary">({vol_or_reject})</span></div></div>
@@ -1354,6 +1427,8 @@ def _render_copy_codes_control(
     n = len(valid_codes)
     disabled_attr = " disabled" if n == 0 else ""
     copied_label = f"✓ Copied {n}" if compact_feedback else f"Copied {n} Codes"
+    control_height = 36 if compact_feedback else 44
+    control_justify = "flex-start" if compact_feedback else "flex-end"
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -1365,20 +1440,20 @@ def _render_copy_codes_control(
             padding: 0;
         }}
         html, body {{
-            height: 44px;
+            height: {control_height}px;
             width: 100%;
             overflow: hidden;
             background: transparent;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: {control_justify};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }}
         .copy-wrapper {{
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            height: 44px;
+            justify-content: {control_justify};
+            height: {control_height}px;
             width: 100%;
         }}
         .copy-btn {{
@@ -1390,7 +1465,7 @@ def _render_copy_codes_control(
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            height: 44px;
+            height: {control_height}px;
             width: 100%;
             display: flex;
             align-items: center;
@@ -1465,7 +1540,7 @@ def _render_copy_codes_control(
     </body>
     </html>
     """
-    st.components.v1.html(html_code, height=44, scrolling=False)
+    st.components.v1.html(html_code, height=control_height, scrolling=False)
 
 
 def _download_current_rows(df: pd.DataFrame, filename: str) -> None:

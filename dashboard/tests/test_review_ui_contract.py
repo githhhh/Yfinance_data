@@ -186,7 +186,7 @@ def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
 
     assert '.st-key-dashboard_header>div[data-testid="stHorizontalBlock"]' in css
     assert '.st-key-results_toolbar>div[data-testid="stHorizontalBlock"]' in css
-    assert ".st-key-results_actions{width:100%;display:flex;justify-content:flex-end;}" in css
+    assert ".st-key-results_actions{width:100%;display:flex;justify-content:flex-start;}" in css
     assert '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]' in css
     assert (
         '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]'
@@ -273,7 +273,7 @@ def test_selected_ibd_review_and_context_bar_have_explicit_active_surfaces():
 
     assert (
         ".st-key-review_context_slot:has(.st-key-quick_context_row)"
-        "{border:1pxsolid#303a46;border-radius:7px;padding:010px;"
+        "{border:1pxsolid#303a46;border-radius:7px;padding:3px10px;"
         "background:#11171e;box-sizing:border-box;}"
     ) in css
 
@@ -287,20 +287,75 @@ def test_filters_and_results_actions_use_fixed_compact_slots():
     assert "                                      " not in filter_source
     assert 'class="filters-state-marker"' in filter_source
     assert 'data-expanded="{str(state["filters_expanded"]).lower()}"' in filter_source
-    assert ".st-key-filters_headerbutton::after{content:\"⌄\"" in css
+    assert 'div[class*="st-key-btn_filters_toggle"]button::after{content:"⌄"' in css
     assert (
         '.st-key-filters_header:has(.filters-state-marker[data-expanded="true"])'
-        'button::after{content:"⌃"'
+        'div[class*="st-key-btn_filters_toggle"]button::after{content:"⌃"'
     ) in css
-    assert "right:14px" in css
+    assert (
+        '.st-key-filters_header:has(.filters-state-marker[data-expanded="true"])'
+        'div[class*="st-key-btn_filters_reset"]button::after'
+    ) not in css
+    assert "right:8px" in css
     assert "justify-content:flex-start!important" in css
 
-    assert "st.columns([1,0.18]" in re.sub(r"\s+", "", view_source)
+    assert "st.columns([0.24,0.14,1]" in re.sub(r"\s+", "", view_source)
     assert "review_sort_" not in view_source
-    assert "min-width:144px" in css
-    assert "max-width:160px" in css
+    assert "grid-template-columns:max-content154pxminmax(0,1fr)" in css
+    assert "justify-content:flex-start" in css
+    assert "height:36px!important" in css
+    assert (
+        '.st-key-results_toolbardiv[data-testid="stMarkdownContainer"]:has(.results-summary)'
+        '{margin-bottom:0!important;}'
+    ) in css
     assert "min-width:170px" in css
     assert "max-width:190px" in css
+
+
+def test_filters_header_reset_and_controls_follow_final_flow_contract():
+    css = _compact_css()
+    filter_source = _function_source("_render_filter_bar", "_render_ibd_selected_row_detail")
+
+    assert "ifactive_count>1:" in re.sub(r"\s+", "", filter_source)
+    assert 'key="btn_filters_reset"' in filter_source
+    assert 'key="active_filter_chips"' not in filter_source
+    assert "btn_filter_chip_" not in filter_source
+    assert "SETUP_FILTER_OPTIONS" in filter_source
+    assert "st.popover(" in filter_source
+    assert "st.radio(" in filter_source
+    assert "st.text_input(" not in filter_source
+    assert 'class="filter-slider-heading"' in filter_source
+    assert 'filter-slider-heading--range' in filter_source
+    assert 'class="filter-volume-value' in filter_source
+    assert 'key="filter_entry_volume"' in filter_source
+    assert 'key="filter_weekly_volume"' in filter_source
+    assert ".st-key-active_filter_chips" not in css
+    assert "padding:12px12px16px" in css
+    assert '[data-testid="stSliderTickBar"]{display:none!important;}' in css
+    assert '.st-key-filter_entry_volume:has(.filter-volume-value:not(.filter-volume-value--active))' in css
+    assert '.st-key-filter_weekly_volume:has(.filter-volume-value:not(.filter-volume-value--active))' in css
+    assert 'div[data-testid="stColumn"]:has(.filter-volume-value:not(.filter-volume-value--active))' not in css
+
+
+def test_ibd_code_details_are_focusable_unclipped_and_escape_closable():
+    css = _compact_css()
+    detail_source = _function_source("_render_ibd_selected_row_detail", "_render_selected_row_detail")
+    tooltip_source = (DASHBOARD_DIR / "review_tooltip.py").read_text(encoding="utf-8")
+
+    assert '<details class="code-detail"' in detail_source
+    assert '<summary class="code-hover-trigger"' in detail_source
+    assert "position:fixed" in css
+    assert "z-index:999999" in css
+    assert ".st-key-ibd_selected_row.code-hover-trigger" in css
+    assert "border-bottom:1pxdotted#56a8ff" in css
+    assert ".st-key-ibd_selected_row.code-detail:hover>.code-hover-popup" in css
+    assert '.closest(".st-key-ibd_selected_row .code-detail")' in tooltip_source
+    assert 'event.key === "Escape"' in tooltip_source
+    assert "details.open = false" in tooltip_source
+    assert 'details.dataset.escapeDismissed = "true"' in tooltip_source
+    assert 'trigger.focus({preventScroll: true})' in tooltip_source
+    assert "trigger.blur()" not in tooltip_source
+    assert '.code-detail:not([data-escape-dismissed="true"])' in css
 
 
 def test_review_views_wire_session_visits_and_current_result_positions():

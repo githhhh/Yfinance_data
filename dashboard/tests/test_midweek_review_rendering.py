@@ -161,7 +161,7 @@ def test_code_header_help_matches_row_selection_and_copy_button_behavior():
     assert "点击 Code 复制" not in help_text
 
 
-def test_selected_row_midweek_markup_is_a_compact_noninteractive_five_cell_summary(monkeypatch):
+def test_selected_row_midweek_markup_is_a_compact_five_cell_summary_with_code_only_details(monkeypatch):
     row = {
         "code": "TEST",
         "ibd_candidate_price": 100.0,
@@ -177,6 +177,8 @@ def test_selected_row_midweek_markup_is_a_compact_noninteractive_five_cell_summa
         "review_change_label": "NEW → ACTIONABLE",
         "review_baseline_entry_status": "UNCONFIRMED",
         "review_effective_entry_status": "ACTIONABLE",
+        "pullback_pct": -6.0,
+        "pullback_pct_off_peak": -2.0,
     }
     rendered: list[str] = []
     monkeypatch.setattr("streamlit.markdown", lambda value, **kwargs: rendered.append(value))
@@ -188,17 +190,20 @@ def test_selected_row_midweek_markup_is_a_compact_noninteractive_five_cell_summa
     assert "UNCONFIRMED →" in markup
     assert 'class="ibd-selected-strip"' in markup
     assert markup.count('class="selected-summary-cell') == 5
-    assert 'class="selected-code">TEST</div>' in markup
+    assert '<details class="code-detail" data-selected-code="TEST">' in markup
+    assert '<summary class="code-hover-trigger" aria-label="TEST 股票详情">TEST</summary>' in markup
     assert "1 of 1" not in markup
     assert "RECONF." not in markup
     assert "NEW → ACTIONABLE" not in markup
-    assert "<details" not in markup
-    assert "<summary" not in markup
     assert "▾" not in markup
     assert 'class="selected-secondary"' in markup
     assert "(2.00×)" in markup
     assert "#1 " in markup
     assert "#1.0" not in markup
+    assert 'role="region" aria-label="TEST 股票详情"' in markup
+    assert "日线入场" in markup
+    assert "回撤" in markup
+    assert "基本面 / 形态" in markup
 
 
 def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):

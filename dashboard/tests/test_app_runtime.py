@@ -239,13 +239,21 @@ def test_runtime_status_filter_expansion_and_reset_flow():
     _run_widget_change(app)
     assert app.session_state["review_ui_state"]["entry_volume_min"] == 1.5
     assert "1 active" in app.button(key="btn_filters_toggle").label
+    assert not any(button.key == "btn_filters_reset" for button in app.button)
+
+    app.slider(key="review_weekly_vol_0").set_value(1.0)
+    _run_widget_change(app)
+    assert app.button(key="btn_filters_toggle").label == "More Filters · 2 active"
+    assert app.button(key="btn_filters_reset").label == "Reset"
 
     _click(app, "btn_filters_reset")
     state = app.session_state["review_ui_state"]
     assert state["status_filter"] == "ACTIONABLE"
     assert state["entry_volume_min"] is None
+    assert state["weekly_volume_min"] is None
     assert state["widget_generation"] == 1
     assert app.button(key="btn_filters_toggle").label == "More Filters · None"
+    assert app.session_state["review_ui_state"]["filters_expanded"] is True
 
 
 def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
@@ -269,6 +277,10 @@ def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
     assert app.button(key="btn_filters_toggle").label == "More Filters · 4 active"
     assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
     assert app.button(key="btn_filters_reset").disabled is False
+    assert not any(
+        button.key and str(button.key).startswith("btn_filter_chip_")
+        for button in app.button
+    )
 
 
 def test_runtime_uses_fixed_view_sort_without_toolbar_selector():
