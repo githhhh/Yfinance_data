@@ -5,7 +5,11 @@ import re
 
 import pandas as pd
 
-from dashboard.app import _render_selected_row_detail, _review_grid_key
+from dashboard.app import (
+    _render_ibd_selected_row_detail,
+    _render_selected_row_detail,
+    _review_grid_key,
+)
 from dashboard.field_config import FIELD_CONFIG, FLOW_CARD_META, STATUS_META, get_midweek_table_columns
 from dashboard.table_view import _code_renderer_jscode, _column_def, build_grid_options
 
@@ -157,7 +161,7 @@ def test_code_header_help_matches_row_selection_and_copy_button_behavior():
     assert "点击 Code 复制" not in help_text
 
 
-def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monkeypatch):
+def test_selected_row_midweek_markup_is_a_compact_noninteractive_five_cell_summary(monkeypatch):
     row = {
         "code": "TEST",
         "ibd_candidate_price": 100.0,
@@ -166,7 +170,7 @@ def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monke
         "latest_close": 102.0,
         "ibd_entry_status": "ACTIONABLE",
         "ibd_entry_vol_or_reject": "2.00x",
-        "rank_C_continuous": 1,
+        "rank_C_continuous": 1.0,
         "C_continuous": 2.0,
         "ibd_entry_valid": True,
         "review_signal_origin": "NEW",
@@ -178,14 +182,23 @@ def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monke
     monkeypatch.setattr("streamlit.markdown", lambda value, **kwargs: rendered.append(value))
     monkeypatch.setattr("streamlit.info", lambda value, **kwargs: rendered.append(value))
 
-    _render_selected_row_detail(pd.DataFrame([row]), "TEST")
+    _render_ibd_selected_row_detail(pd.DataFrame([row]), "TEST")
     markup = rendered[-1]
 
-    assert 'data-origin="NEW"' in markup
-    assert "NEW → ACTIONABLE" in markup
     assert "UNCONFIRMED →" in markup
-    assert 'class="selected-strip"' in markup
+    assert 'class="ibd-selected-strip"' in markup
     assert markup.count('class="selected-summary-cell') == 5
+    assert 'class="selected-code">TEST</div>' in markup
+    assert "1 of 1" not in markup
+    assert "RECONF." not in markup
+    assert "NEW → ACTIONABLE" not in markup
+    assert "<details" not in markup
+    assert "<summary" not in markup
+    assert "▾" not in markup
+    assert 'class="selected-secondary"' in markup
+    assert "(2.00×)" in markup
+    assert "#1 " in markup
+    assert "#1.0" not in markup
 
 
 def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):
@@ -196,10 +209,10 @@ def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):
         lambda value, **kwargs: rendered.append(f"unexpected-info:{value}"),
     )
 
-    _render_selected_row_detail(pd.DataFrame(), None)
+    _render_ibd_selected_row_detail(pd.DataFrame(), None)
 
     assert rendered == [
-        '<div class="selected-strip selected-strip--empty" role="status">'
+        '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
         '<span>No matching records found with current filter criteria.</span></div>'
     ]
 

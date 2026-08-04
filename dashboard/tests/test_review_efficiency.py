@@ -43,6 +43,18 @@ def test_review_selection_survives_reruns_and_respects_current_filter():
     assert dashboard_app.resolve_review_selection(filtered, None, "NVDA") is None
 
 
+def test_invalid_stored_ibd_selection_is_removed_before_results_expand_again():
+    store = {"MIDWEEK": "NVDA", "WEEKEND": "ACU", "C_RANK": "MSFT"}
+
+    reconciled = dashboard_app._reconcile_review_selections(
+        store,
+        "MIDWEEK",
+        ["ACU"],
+    )
+
+    assert reconciled == {"WEEKEND": "ACU", "C_RANK": "MSFT"}
+
+
 def _selected_detail_markup(monkeypatch, **overrides):
     row = {
         "code": "TEST",

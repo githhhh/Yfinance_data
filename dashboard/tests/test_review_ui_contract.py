@@ -280,7 +280,7 @@ def test_selected_ibd_review_and_context_bar_have_explicit_active_surfaces():
 
 def test_filters_and_results_actions_use_fixed_compact_slots():
     css = _compact_css()
-    filter_source = _function_source("_render_filter_bar", "_unique_values")
+    filter_source = _function_source("_render_filter_bar", "_render_ibd_selected_row_detail")
     view_source = _function_source("_render_ibd_review_view", "_render_mode_scope_controls")
 
     assert 'f"More Filters · {summary}"' in filter_source

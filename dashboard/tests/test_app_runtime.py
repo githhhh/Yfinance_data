@@ -233,20 +233,42 @@ def test_runtime_status_filter_expansion_and_reset_flow():
 
     _click(app, "btn_filters_toggle")
     assert app.session_state["review_ui_state"]["filters_expanded"] is True
-    entry_volume = app.text_input(key="review_entry_vol_0")
-    assert entry_volume.disabled is False
+    entry_volume = app.slider(key="review_entry_vol_0")
 
-    entry_volume.input("1.5")
+    entry_volume.set_value(1.5)
     _run_widget_change(app)
-    assert app.session_state["review_ui_state"]["entry_volume_min"] == "1.5"
+    assert app.session_state["review_ui_state"]["entry_volume_min"] == 1.5
     assert "1 active" in app.button(key="btn_filters_toggle").label
 
     _click(app, "btn_filters_reset")
     state = app.session_state["review_ui_state"]
-    assert state["status_filter"] == "ALL"
-    assert state["entry_volume_min"] == ""
+    assert state["status_filter"] == "ACTIONABLE"
+    assert state["entry_volume_min"] is None
     assert state["widget_generation"] == 1
     assert app.button(key="btn_filters_toggle").label == "More Filters · None"
+
+
+def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
+    app = _midweek_app()
+    _click(app, "btn_filters_toggle")
+
+    app.radio(key="review_route_0").set_value("pivot")
+    _run_widget_change(app)
+    app.slider(key="review_distance_0").set_value((0.0, 5.0))
+    _run_widget_change(app)
+    app.slider(key="review_entry_vol_0").set_value(1.5)
+    _run_widget_change(app)
+    app.slider(key="review_weekly_vol_0").set_value(1.0)
+    _run_widget_change(app)
+
+    state = app.session_state["review_ui_state"]
+    assert state["route_filter"] == "pivot"
+    assert state["distance_range"] == (0.0, 5.0)
+    assert state["entry_volume_min"] == 1.5
+    assert state["weekly_volume_min"] == 1.0
+    assert app.button(key="btn_filters_toggle").label == "More Filters · 4 active"
+    assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
+    assert app.button(key="btn_filters_reset").disabled is False
 
 
 def test_runtime_uses_fixed_view_sort_without_toolbar_selector():

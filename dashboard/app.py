@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import sys
 from datetime import date
 from pathlib import Path
@@ -36,9 +37,9 @@ from dashboard.field_config import (
     get_midweek_table_columns,
 )
 from dashboard.services.bf_midweek_review import (
-    ENTRY_VOL_ENABLED_STATUSES,
     PoolAnalysisResult,
     PoolMode,
+    SETUP_FILTER_OPTIONS,
     analyze_breakout_follow_pool,
     apply_review_filters,
     build_review_filter_counts,
@@ -46,6 +47,7 @@ from dashboard.services.bf_midweek_review import (
     default_sort_mode,
     default_review_state,
     materialize_review_view,
+    normalize_review_state,
     reconcile_review_state,
     reset_to_all_signals,
     sort_review_rows,
@@ -177,6 +179,19 @@ def _remember_review_selection(view_key: str, selected_code: str | None) -> None
     st.session_state["review_selected_codes"] = selections
 
 
+def _reconcile_review_selections(
+    selections: dict[str, str],
+    view_key: str,
+    available_codes: list[str],
+) -> dict[str, str]:
+    result = dict(selections)
+    selected = str(result.get(view_key, "")).strip()
+    available = {str(code).strip() for code in available_codes}
+    if selected and selected not in available:
+        result.pop(view_key, None)
+    return result
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -199,7 +214,9 @@ def main() -> None:
         )
         if "review_ui_state" not in st.session_state:
             st.session_state["review_ui_state"] = default_review_state(analysis.mode)
-        state = dict(st.session_state["review_ui_state"])
+        state = normalize_review_state(dict(st.session_state["review_ui_state"]))
+        if state != st.session_state["review_ui_state"]:
+            st.session_state["review_ui_state"] = state
         if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
             state = default_review_state(PoolMode.COMPLETE)
             st.session_state["review_ui_state"] = state
@@ -387,7 +404,9 @@ def _render_ibd_review_view(
         st.session_state["review_ui_state"] = default_review_state(
             analysis.mode if analysis is not None else PoolMode.COMPLETE
         )
-    state = dict(st.session_state["review_ui_state"])
+    state = normalize_review_state(dict(st.session_state["review_ui_state"]))
+    if state != st.session_state["review_ui_state"]:
+        st.session_state["review_ui_state"] = state
     counts = build_review_filter_counts(df, state)
 
     with st.container(key="review_queue"):
@@ -411,6 +430,11 @@ def _render_ibd_review_view(
 
     filtered_df = apply_review_filters(df, state)
     filtered_df = sort_review_rows(filtered_df, fixed_sort)
+    st.session_state["review_selected_codes"] = _reconcile_review_selections(
+        st.session_state.get("review_selected_codes", {}),
+        state["mode"],
+        filtered_df["code"].tolist(),
+    )
 
     with st.container(key="results_toolbar"):
         summary_col, actions_col = st.columns([1, 0.18], vertical_alignment="center")
@@ -424,13 +448,14 @@ def _render_ibd_review_view(
                 _render_copy_codes_control(
                     filtered_df["code"].tolist(),
                     key_prefix=f'ibd_review_{state["mode"].lower()}',
+                    compact_feedback=True,
                 )
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
     grid_key = _review_grid_key(state["mode"])
 
-    with st.container(key="selected_row"):
+    with st.container(key="ibd_selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
         grid_selected_code = render_table(
@@ -447,11 +472,12 @@ def _render_ibd_review_view(
         grid_selected_code,
         _stored_review_selection(state["mode"]),
     )
-    _remember_review_selection(state["mode"], grid_selected_code)
+    if grid_selected_code in set(filtered_df["code"].astype(str)):
+        _remember_review_selection(state["mode"], grid_selected_code)
     _store_review_visit(state["mode"], selected_code)
 
     with detail_container.container():
-        _render_selected_row_detail(filtered_df, selected_code)
+        _render_ibd_selected_row_detail(filtered_df, selected_code)
 
     st.markdown("---")
     _download_current_rows(filtered_df, "ibd_review_filtered.csv")
@@ -717,13 +743,52 @@ def _active_filter_count(state: dict[str, Any]) -> int:
     return sum(
         [
             state.get("route_filter", "All") != "All",
-            bool(state.get("distance_min")),
-            bool(state.get("distance_max")),
-            bool(state.get("entry_volume_min")),
-            bool(state.get("weekly_volume_min")),
-            bool(state.get("near_trigger_only")),
+            state.get("distance_range") is not None,
+            state.get("entry_volume_min") is not None,
+            state.get("weekly_volume_min") is not None,
         ]
     )
+
+
+def _slider_bounds(
+    df: pd.DataFrame,
+    field: str,
+    *,
+    floor_value: float,
+    ceiling_value: float,
+) -> tuple[float, float] | None:
+    if field not in df.columns:
+        return None
+    values = pd.to_numeric(df[field], errors="coerce").dropna()
+    values = values[values.map(math.isfinite)]
+    if values.empty:
+        return None
+    lower = min(floor_value, math.floor(float(values.min()) * 10.0) / 10.0)
+    upper = max(ceiling_value, math.ceil(float(values.max()) * 10.0) / 10.0)
+    return (round(lower, 1), round(upper, 1))
+
+
+def _clamped_range(value: Any, bounds: tuple[float, float]) -> tuple[float, float]:
+    if not isinstance(value, (tuple, list)) or len(value) != 2:
+        return bounds
+    lower = min(max(float(value[0]), bounds[0]), bounds[1])
+    upper = min(max(float(value[1]), lower), bounds[1])
+    return (round(lower, 1), round(upper, 1))
+
+
+def _store_advanced_filter(state: dict[str, Any], field: str, value: Any) -> None:
+    updated = dict(state)
+    updated[field] = value
+    _store_review_state(updated)
+    st.rerun()
+
+
+def _clear_advanced_filter(state: dict[str, Any], field: str) -> None:
+    updated = dict(state)
+    updated[field] = "All" if field == "route_filter" else None
+    updated["widget_generation"] = int(state.get("widget_generation", 0)) + 1
+    _store_review_state(updated)
+    st.rerun()
 
 
 def _render_filter_bar(
@@ -731,6 +796,7 @@ def _render_filter_bar(
     state: dict[str, Any],
     counts: dict[str, Any],
 ) -> None:
+    del counts
     active_count = _active_filter_count(state)
     summary = "None" if active_count == 0 else f"{active_count} active"
     with st.container(key="filters_header"):
@@ -751,83 +817,204 @@ def _render_filter_bar(
     if not state["filters_expanded"]:
         return
 
-    generation = state.get("widget_generation", 0)
+    generation = int(state.get("widget_generation", 0))
     controls = st.container(key="filter_controls")
-    cols = controls.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8], vertical_alignment="bottom")
+    cols = controls.columns([1.25, 2.0, 2.3, 0.7], vertical_alignment="top")
     with cols[0]:
-        routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
+        st.caption("SETUP")
         current_route = state.get("route_filter", "All")
-        selected_route = st.selectbox(
-            "Setup",
-            routes,
-            index=routes.index(current_route) if current_route in routes else 0,
-            key=f"review_route_{generation}",
-            format_func=lambda value: "All" if value == "All" else format_display_value("ibd_candidate_rule", value),
-        )
+        routes = list(SETUP_FILTER_OPTIONS)
+        route_label = "All" if current_route == "All" else format_display_value("ibd_candidate_rule", current_route)
+        with st.popover(route_label, use_container_width=True):
+            selected_route = st.radio(
+                "Setup",
+                routes,
+                index=routes.index(current_route) if current_route in routes else 0,
+                key=f"review_route_{generation}",
+                format_func=lambda value: "All" if value == "All" else format_display_value("ibd_candidate_rule", value),
+                label_visibility="collapsed",
+            )
         if selected_route != current_route:
-            state["route_filter"] = selected_route
-            _store_review_state(state)
-            st.rerun()
+            _store_advanced_filter(state, "route_filter", selected_route)
     with cols[1]:
-        val = st.text_input("Vs Buy Point Min %", value=state.get("distance_min", ""), key=f"review_dist_min_{generation}")
-        if val != state.get("distance_min", ""):
-            state["distance_min"] = val
-            _store_review_state(state)
-            st.rerun()
+        st.caption("PRICE POSITION")
+        distance_bounds = _slider_bounds(
+            df,
+            "current_vs_ibd_candidate_pct",
+            floor_value=-5.0,
+            ceiling_value=5.0,
+        )
+        if distance_bounds is not None:
+            current_range = _clamped_range(state.get("distance_range"), distance_bounds)
+            selected_range = st.slider(
+                "Vs Buy Point",
+                min_value=distance_bounds[0],
+                max_value=distance_bounds[1],
+                value=current_range,
+                step=0.1,
+                format="%+.1f%%",
+                key=f"review_distance_{generation}",
+            )
+            selected_value = None if selected_range == distance_bounds else tuple(selected_range)
+            if selected_value != state.get("distance_range"):
+                _store_advanced_filter(state, "distance_range", selected_value)
     with cols[2]:
-        val = st.text_input("Vs Buy Point Max %", value=state.get("distance_max", ""), key=f"review_dist_max_{generation}")
-        if val != state.get("distance_max", ""):
-            state["distance_max"] = val
-            _store_review_state(state)
-            st.rerun()
+        st.caption("VOLUME")
+        volume_cols = st.columns(2, gap="small")
+        entry_bounds = _slider_bounds(
+            df,
+            "ibd_entry_volume_ratio",
+            floor_value=0.0,
+            ceiling_value=1.0,
+        )
+        weekly_bounds = _slider_bounds(
+            df,
+            "volume_ratio",
+            floor_value=0.0,
+            ceiling_value=1.0,
+        )
+        with volume_cols[0]:
+            if entry_bounds is not None:
+                entry_state = state.get("entry_volume_min")
+                entry_value = entry_bounds[0] if entry_state is None else float(entry_state)
+                entry_value = min(max(entry_value, entry_bounds[0]), entry_bounds[1])
+                entry_label = "Entry Volume ≥ Any" if entry_state is None else f"Entry Volume ≥ {entry_value:.1f}×"
+                selected_entry = st.slider(
+                    entry_label,
+                    min_value=entry_bounds[0],
+                    max_value=entry_bounds[1],
+                    value=entry_value,
+                    step=0.1,
+                    format="%.1fx",
+                    key=f"review_entry_vol_{generation}",
+                )
+                selected_value = None if selected_entry == entry_bounds[0] else round(float(selected_entry), 1)
+                if selected_value != entry_state:
+                    _store_advanced_filter(state, "entry_volume_min", selected_value)
+        with volume_cols[1]:
+            if weekly_bounds is not None:
+                weekly_state = state.get("weekly_volume_min")
+                weekly_value = weekly_bounds[0] if weekly_state is None else float(weekly_state)
+                weekly_value = min(max(weekly_value, weekly_bounds[0]), weekly_bounds[1])
+                weekly_label = "Weekly Volume ≥ Any" if weekly_state is None else f"Weekly Volume ≥ {weekly_value:.1f}×"
+                selected_weekly = st.slider(
+                    weekly_label,
+                    min_value=weekly_bounds[0],
+                    max_value=weekly_bounds[1],
+                    value=weekly_value,
+                    step=0.1,
+                    format="%.1fx",
+                    key=f"review_weekly_vol_{generation}",
+                )
+                selected_value = None if selected_weekly == weekly_bounds[0] else round(float(selected_weekly), 1)
+                if selected_value != weekly_state:
+                    _store_advanced_filter(state, "weekly_volume_min", selected_value)
     with cols[3]:
-        current_status = state.get("status_filter", "ALL")
-        if current_status == "UNCONFIRMED":
-            val = st.checkbox(
-                "Near Trigger ≤ +3%",
-                value=state.get("near_trigger_only", False),
-                key=f"review_near_{generation}",
-            )
-            if val != state.get("near_trigger_only", False):
-                state["near_trigger_only"] = val
-                _store_review_state(state)
-                st.rerun()
-        else:
-            is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
-            val = st.text_input(
-                "Entry Vol Min (x)",
-                value="" if is_disabled else state.get("entry_volume_min", ""),
-                placeholder="N/A (Disabled)" if is_disabled else "",
-                disabled=is_disabled,
-                key=f"review_entry_vol_{generation}",
-            )
-            if not is_disabled and val != state.get("entry_volume_min", ""):
-                state["entry_volume_min"] = val
-                _store_review_state(state)
-                st.rerun()
-    with cols[4]:
-        val = st.text_input("Weekly Vol Min (x)", value=state.get("weekly_volume_min", ""), key=f"review_weekly_vol_{generation}")
-        if val != state.get("weekly_volume_min", ""):
-            state["weekly_volume_min"] = val
-            _store_review_state(state)
-            st.rerun()
-    with cols[5]:
-        if st.button("Reset", key="btn_filters_reset", use_container_width=True):
+        st.caption("RESET")
+        if st.button(
+            "Reset",
+            key="btn_filters_reset",
+            use_container_width=True,
+            disabled=active_count == 0,
+        ):
             reset = dict(state)
             reset.update(
                 {
                     "route_filter": "All",
-                    "status_filter": "ALL",
-                    "distance_min": "",
-                    "distance_max": "",
-                    "entry_volume_min": "",
-                    "weekly_volume_min": "",
-                    "near_trigger_only": False,
+                    "distance_range": None,
+                    "entry_volume_min": None,
+                    "weekly_volume_min": None,
                     "widget_generation": generation + 1,
                 }
             )
             _store_review_state(reset)
             st.rerun()
+
+    active_filters: list[tuple[str, str]] = []
+    if state.get("route_filter", "All") != "All":
+        active_filters.append(("route_filter", f"Setup: {format_display_value('ibd_candidate_rule', state['route_filter'])} ×"))
+    if state.get("distance_range") is not None:
+        low, high = state["distance_range"]
+        active_filters.append(("distance_range", f"Vs Buy Point: {low:+.1f}%–{high:+.1f}% ×"))
+    if state.get("entry_volume_min") is not None:
+        active_filters.append(("entry_volume_min", f"Entry Vol ≥ {float(state['entry_volume_min']):.1f}× ×"))
+    if state.get("weekly_volume_min") is not None:
+        active_filters.append(("weekly_volume_min", f"Weekly Vol ≥ {float(state['weekly_volume_min']):.1f}× ×"))
+    if active_filters:
+        with st.container(key="active_filter_chips"):
+            chip_cols = st.columns([1] * len(active_filters) + [max(1, 5 - len(active_filters))], gap="small")
+            for column, (field, label) in zip(chip_cols, active_filters, strict=False):
+                with column:
+                    if st.button(label, key=f"btn_filter_chip_{field}", use_container_width=True):
+                        _clear_advanced_filter(state, field)
+
+
+def _render_ibd_selected_row_detail(
+    filtered_df: pd.DataFrame,
+    selected_code: str | None,
+) -> None:
+    if filtered_df.empty:
+        st.markdown(
+            '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
+            '<span>No matching records found with current filter criteria.</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+    if selected_code is None or selected_code not in filtered_df["code"].values:
+        st.markdown(
+            '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
+            '<span>Select a row · Use ↑↓ to review</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    row = filtered_df.loc[filtered_df["code"].eq(selected_code)].iloc[0]
+    code = html.escape(str(row.get("code", "N/A")))
+    cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
+    cand_rule = html.escape(format_display_value("ibd_candidate_rule", row.get("ibd_candidate_rule")) or "N/A")
+    dist_pct = html.escape(_format_number(row.get("current_vs_ibd_candidate_pct"), "%"))
+    latest_close = html.escape(_format_number(row.get("latest_close"), ""))
+    status_name = html.escape(str(row.get("ibd_entry_status", "N/A")).replace("_", " "))
+    vol_or_reject_text = format_display_value(
+        "ibd_entry_vol_or_reject",
+        row.get("ibd_entry_vol_or_reject"),
+    ) or "N/A"
+    if vol_or_reject_text.endswith("x"):
+        vol_or_reject_text = f"{vol_or_reject_text[:-1]}×"
+    vol_or_reject = html.escape(vol_or_reject_text)
+    baseline_raw = row.get("review_baseline_entry_status")
+    baseline_status = (
+        str(baseline_raw).strip().replace("_", " ")
+        if baseline_raw is not None and not pd.isna(baseline_raw) and str(baseline_raw).strip()
+        else ""
+    )
+    status_color = STATUS_META.get(str(row.get("ibd_entry_status", "N/A")), {}).get("color", "#f2f5f9")
+    status_transition = (
+        f'{html.escape(baseline_status)} → <span style="color:{status_color};">{status_name}</span>'
+        if baseline_status
+        else f'<span style="color:{status_color};">{status_name}</span>'
+    )
+    rank_raw = pd.to_numeric(row.get("rank_C_continuous"), errors="coerce")
+    rank_text = (
+        str(int(rank_raw))
+        if pd.notna(rank_raw) and float(rank_raw).is_integer()
+        else str(row.get("rank_C_continuous", "N/A"))
+    )
+    rank_c = html.escape(rank_text)
+    c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
+    markup = f"""
+        <div class="ibd-selected-strip">
+            <div class="selected-summary-cell selected-code-cell"><div class="selected-code">{code}</div></div>
+            <div class="selected-summary-cell"><div class="selected-label">Buy Point</div><div class="selected-value">{cand_price} <span class="selected-secondary">({cand_rule})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">Vs Buy Point</div><div class="selected-value">{dist_pct} <span class="selected-secondary">(Close {latest_close})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">Entry Status</div><div class="selected-value">{status_transition} <span class="selected-secondary">({vol_or_reject})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">C Rank &amp; Continuous</div><div class="selected-value">#{rank_c} <span class="selected-secondary">({c_cont})</span></div></div>
+        </div>
+    """
+    st.markdown(
+        "\n".join(line.strip() for line in markup.splitlines() if line.strip()),
+        unsafe_allow_html=True,
+    )
 
 
 def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
@@ -1156,11 +1343,17 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     _download_current_rows(ranked, "c_rank_reference.csv")
 
 
-def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
+def _render_copy_codes_control(
+    codes: list[str],
+    key_prefix: str = "",
+    *,
+    compact_feedback: bool = False,
+) -> None:
     valid_codes = [str(code).strip() for code in codes if pd.notna(code) and str(code).strip()]
     codes_str = ", ".join(valid_codes)
     n = len(valid_codes)
     disabled_attr = " disabled" if n == 0 else ""
+    copied_label = f"✓ Copied {n}" if compact_feedback else f"Copied {n} Codes"
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -1255,7 +1448,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                     btn.style.background = '#163d2b';
                     btn.style.borderColor = '#35df65';
                     btn.style.color = '#d8ffe2';
-                    btn.innerText = 'Copied {n} Codes';
+                    btn.innerText = {json.dumps(copied_label, ensure_ascii=False)};
                 }} else {{
                     btn.style.background = '#c62828';
                     btn.innerText = 'Copy failed';
@@ -1282,13 +1475,6 @@ def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
         file_name=filename,
         mime="text/csv",
     )
-
-
-def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
-    if field not in df.columns:
-        return []
-    values = df[field].dropna().astype(str).sort_values().unique().tolist()
-    return [value for value in values if value]
 
 
 def _get_snapshot_date(df: pd.DataFrame) -> str:

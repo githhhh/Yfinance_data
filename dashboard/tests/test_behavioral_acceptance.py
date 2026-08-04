@@ -376,6 +376,22 @@ def test_copy_codes_control_rendering(monkeypatch):
     assert rendered_codes == []
 
 
+def test_ibd_copy_feedback_is_compact_without_changing_default_reference_copy(monkeypatch):
+    rendered_components = []
+    monkeypatch.setattr(
+        "streamlit.components.v1.html",
+        lambda value, **kwargs: rendered_components.append(value),
+    )
+
+    _render_copy_codes_control(["ACU", "NVDA"], key_prefix="ibd", compact_feedback=True)
+    assert "Copy 2 Codes" in rendered_components[-1]
+    assert "✓ Copied 2" in rendered_components[-1]
+
+    _render_copy_codes_control(["ACU", "NVDA"], key_prefix="c_rank")
+    assert "Copied 2 Codes" in rendered_components[-1]
+    assert "✓ Copied 2" not in rendered_components[-1]
+
+
 def test_copy_codes_control_counts_only_non_blank_codes_and_disables_empty(monkeypatch):
     rendered_components = []
     monkeypatch.setattr(
@@ -393,13 +409,13 @@ def test_copy_codes_control_counts_only_non_blank_codes_and_disables_empty(monke
     assert " disabled" in rendered_components[-1].split("</button>", 1)[0]
 
 
-# 11. Entry Vol rules: enabled for ACTIONABLE, BELOW_TRIGGER, EXTENDED; disabled/cleared for UNCONFIRMED/All
-def test_entry_vol_enabled_for_actionable_below_trigger_and_extended_only():
-    from dashboard.app import ENTRY_VOL_ENABLED_STATUSES
+# 11. Entry Volume is a direct minimum threshold in every status view.
+def test_entry_volume_control_is_a_slider_without_disabled_placeholder():
+    source = Path("dashboard/app.py").read_text(encoding="utf-8")
 
-    assert ENTRY_VOL_ENABLED_STATUSES == {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
-    assert "UNCONFIRMED" not in ENTRY_VOL_ENABLED_STATUSES
-    assert "All" not in ENTRY_VOL_ENABLED_STATUSES
+    assert '"Entry Volume ≥ Any"' in source
+    assert 'key=f"review_entry_vol_{generation}"' in source
+    assert "N/A (Disabled)" not in source
 
 
 def test_snapshot_freshness_boundaries():

@@ -57,6 +57,17 @@ def test_quick_filter_count_only_counts_change_and_origin_chips():
     ) == 2
 
 
+def test_advanced_filter_count_treats_price_range_as_one_condition():
+    state = {
+        "route_filter": "pivot",
+        "distance_range": (0.0, 5.0),
+        "entry_volume_min": 1.3,
+        "weekly_volume_min": None,
+    }
+
+    assert dashboard_app._active_filter_count(state) == 3
+
+
 def test_c_rank_reference_denominator_uses_active_signals_count():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert 'active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)' in source
