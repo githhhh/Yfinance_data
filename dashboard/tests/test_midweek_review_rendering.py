@@ -143,14 +143,28 @@ def test_code_renderer_only_copy_button_click_stops_row_selection_bubbling():
 
 
 def test_app_uses_distinct_grid_identities_and_only_enables_origin_for_valid_midweek():
-    assert '"review_results_grid_midweek"' in APP_SOURCE
-    assert '"review_results_grid_weekend"' in APP_SOURCE
+    assert 'return f"review_results_grid_{view}_{result_digest}"' in APP_SOURCE
     assert 'grid_key="c_rank_reference_grid"' in APP_SOURCE
     assert "grid_key=grid_key" in APP_SOURCE
     assert "show_origin_badge=has_comparison" in APP_SOURCE
     assert "show_origin_badge=False" in APP_SOURCE
-    assert _review_grid_key("MIDWEEK") == "review_results_grid_midweek"
-    assert _review_grid_key("WEEKEND") == "review_results_grid_weekend"
+    rows = pd.DataFrame(
+        {
+            "code": ["AAA", "BBB"],
+            "ibd_entry_status": ["ACTIONABLE", "UNCONFIRMED"],
+        }
+    )
+    same_rows = rows.copy()
+    filtered_rows = rows.iloc[[0]].copy()
+    reversed_rows = rows.iloc[::-1].copy()
+
+    weekend_key = _review_grid_key("WEEKEND", rows)
+    assert weekend_key.startswith("review_results_grid_weekend_")
+    assert _review_grid_key("WEEKEND", same_rows) == weekend_key
+    assert _review_grid_key("MIDWEEK", rows).startswith("review_results_grid_midweek_")
+    assert _review_grid_key("WEEKEND", filtered_rows) != weekend_key
+    assert _review_grid_key("WEEKEND", reversed_rows) != weekend_key
+    assert '_review_grid_key(state["mode"], filtered_df)' in APP_SOURCE
 
 
 def test_code_header_help_matches_row_selection_and_copy_button_behavior():

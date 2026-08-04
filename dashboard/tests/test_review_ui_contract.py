@@ -94,23 +94,16 @@ def test_review_context_has_semantic_responsive_groups_and_stable_clear_slot():
     assert "No valid complete-week baseline" in source
 
 
-def test_midweek_unavailable_context_is_compact_and_amber():
+def test_midweek_unavailable_is_only_explained_by_the_disabled_period_control():
     source = _function_source("_render_review_context", "_render_status_queue")
     css = _compact_css()
 
-    assert 'class="weekend-context-bar weekend-context-bar--unavailable"' in source
-    assert 'class="midweek-unavailable-icon"' in source
-    assert "Midweek unavailable" in source
-    assert "No current midweek snapshot. Showing Weekend Pool instead." in source
-    assert "Midweek comparison is not applied." in source
-    for declaration in [
-        ".weekend-context-bar--unavailable",
-        ".midweek-unavailable-icon",
-        ".st-key-review_mode_controlsbutton:disabled",
-        "color:#f5a623",
-        "height:48px",
-    ]:
-        assert declaration in css
+    assert 'class="weekend-context-bar weekend-context-bar--unavailable"' not in source
+    assert 'class="midweek-unavailable-icon"' not in source
+    assert "Midweek unavailable" not in source
+    assert ".weekend-context-bar--unavailable" not in css
+    assert ".midweek-unavailable-icon" not in css
+    assert ".st-key-review_mode_controlsbutton:disabled" in css
 
 
 def test_queue_controls_have_stable_heading_and_segmented_group_slots():
@@ -336,7 +329,7 @@ def test_filters_header_reset_and_controls_follow_final_flow_contract():
     css = _compact_css()
     filter_source = _function_source("_render_filter_bar", "_render_ibd_selected_row_detail")
 
-    assert "ifactive_count>1:" in re.sub(r"\s+", "", filter_source)
+    assert "ifactive_count>0:" in re.sub(r"\s+", "", filter_source)
     assert 'key="btn_filters_reset"' in filter_source
     assert 'key="active_filter_chips"' not in filter_source
     assert "btn_filter_chip_" not in filter_source
@@ -346,15 +339,13 @@ def test_filters_header_reset_and_controls_follow_final_flow_contract():
     assert "st.text_input(" not in filter_source
     assert 'class="filter-slider-heading"' in filter_source
     assert 'filter-slider-heading--range' in filter_source
-    assert 'class="filter-volume-value' in filter_source
+    assert 'class="filter-volume-value' not in filter_source
     assert 'key="filter_entry_volume"' in filter_source
     assert 'key="filter_weekly_volume"' in filter_source
     assert ".st-key-active_filter_chips" not in css
     assert "padding:12px12px16px" in css
     assert '[data-testid="stSliderTickBar"]{display:none!important;}' in css
-    assert '.st-key-filter_entry_volume:has(.filter-volume-value:not(.filter-volume-value--active))' in css
-    assert '.st-key-filter_weekly_volume:has(.filter-volume-value:not(.filter-volume-value--active))' in css
-    assert 'div[data-testid="stColumn"]:has(.filter-volume-value:not(.filter-volume-value--active))' not in css
+    assert ".filter-volume-value" not in css
 
 
 def test_ibd_code_details_are_focusable_unclipped_and_escape_closable():
@@ -410,6 +401,17 @@ def test_tooltip_hover_is_delayed_but_focus_and_click_remain_immediate():
     assert "const onClick" in tooltip_source
     assert "if (activeCard) hideTooltip();\n        else cancelHoverTimer();" in tooltip_source
     assert "activeCard || hoverTimer !== null" in tooltip_source
+
+
+def test_flow_tooltip_is_trigger_only_and_positioned_outside_the_card():
+    tooltip_source = (DASHBOARD_DIR / "review_tooltip.py").read_text(encoding="utf-8")
+
+    assert 'target.closest(".flow-info-trigger")' in tooltip_source
+    assert "const trigger = triggerFor(event.target)" in tooltip_source
+    assert "const cardBox = card.getBoundingClientRect()" in tooltip_source
+    assert "let top = cardBox.bottom + 8" in tooltip_source
+    assert "cardBox.top - tooltipBox.height - 8" in tooltip_source
+    assert "anchorBox.bottom + 8" not in tooltip_source
 
 
 def test_results_actions_reserve_copy_only_and_never_scroll_horizontally():

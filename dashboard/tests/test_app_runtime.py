@@ -239,7 +239,7 @@ def test_runtime_status_filter_expansion_and_reset_flow():
     _run_widget_change(app)
     assert app.session_state["review_ui_state"]["entry_volume_min"] == 1.5
     assert "1 active" in app.button(key="btn_filters_toggle").label
-    assert not any(button.key == "btn_filters_reset" for button in app.button)
+    assert app.button(key="btn_filters_reset").label == "Reset"
 
     app.slider(key="review_weekly_vol_0").set_value(1.0)
     _run_widget_change(app)
@@ -422,7 +422,7 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
 
 
 @pytest.mark.parametrize("midweek_state", ["missing", "outdated"])
-def test_unavailable_midweek_falls_back_with_compact_context(tmp_path, midweek_state):
+def test_unavailable_midweek_falls_back_as_a_normal_weekend_state(tmp_path, midweek_state):
     from streamlit.testing.v1 import AppTest
 
     complete = pd.read_csv("us/breakout_follow_pool.csv")
@@ -464,20 +464,18 @@ def test_unavailable_midweek_falls_back_with_compact_context(tmp_path, midweek_s
     )
     assert not any("Midweek snapshot" in warning.value for warning in app.warning)
 
-    context = next(
-        item.value
+    assert not any(
+        "weekend-context-bar--unavailable" in item.value
+        or "Midweek unavailable" in item.value
         for item in app.markdown
-        if 'class="weekend-context-bar weekend-context-bar--unavailable"' in item.value
     )
-    assert 'class="midweek-unavailable-icon"' in context
-    assert "Midweek unavailable" in context
-    assert "No current midweek snapshot. Showing Weekend Pool instead." in context
-    assert "Complete weekly pool" in context
-    assert "Midweek comparison is not applied." in context
     assert any("All Signals ·" in item.value for item in app.markdown)
 
     header = _header_markup(app)
-    assert "Data Aging" in header
-    assert "4d old" in header
+    assert "Snapshot <b>2026-07-31</b>" in header
+    assert "data-badge" not in header
+    assert "Data Aging" not in header
+    assert "4d old" not in header
+    assert "Aging" not in header
     assert "Data Stale" not in header
     assert "Midweek" not in header

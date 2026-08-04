@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import math
@@ -101,12 +102,18 @@ def _midweek_has_comparison(analysis: PoolAnalysisResult | None) -> bool:
     )
 
 
-def _review_grid_key(mode: str) -> str:
-    return (
-        "review_results_grid_midweek"
-        if mode == "MIDWEEK"
-        else "review_results_grid_weekend"
+def _review_grid_key(mode: str, rows: pd.DataFrame) -> str:
+    view = "midweek" if mode == "MIDWEEK" else "weekend"
+    ordered_codes = (
+        "\x1f".join(rows["code"].map(lambda value: str(value).strip()))
+        if "code" in rows.columns
+        else str(len(rows))
     )
+    result_digest = hashlib.blake2s(
+        ordered_codes.encode("utf-8"),
+        digest_size=6,
+    ).hexdigest()
+    return f"review_results_grid_{view}_{result_digest}"
 
 
 def build_review_position(
@@ -321,7 +328,14 @@ def _render_header_bar(
             else build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
         )
         badge_label, badge_tone = _data_badge(freshness, loaded=df is not None)
-        badge_html = (
+        normal_complete_week = bool(
+            not is_midweek
+            and analysis is not None
+            and not analysis.midweek_available
+            and freshness is not None
+            and freshness.get("status") in {"FRESH", "AGING"}
+        )
+        badge_html = "" if normal_complete_week else (
             f'<span class="data-badge data-badge--{badge_tone}">'
             f'{html.escape(badge_label)}</span>'
         )
@@ -336,6 +350,12 @@ def _render_header_bar(
             snapshot_html = (
                 f'<span class="snapshot-segment">Snapshot <b>{snapshot_value}</b></span> · '
                 f'<span class="snapshot-mode-segment snapshot-mode-segment--midweek">Midweek · baseline {baseline_value}</span>'
+            )
+        elif normal_complete_week:
+            assert freshness is not None
+            snapshot_html = (
+                '<span class="snapshot-segment">Snapshot '
+                f'<b>{html.escape(freshness["snapshot_date_str"])}</b></span>'
             )
         else:
             assert freshness is not None
@@ -461,7 +481,7 @@ def _render_ibd_review_view(
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
-    grid_key = _review_grid_key(state["mode"])
+    grid_key = _review_grid_key(state["mode"], filtered_df)
 
     with st.container(key="ibd_selected_row"):
         detail_container = st.empty()
@@ -662,14 +682,7 @@ def _render_review_context(
     with st.container(key="review_context_slot"):
         if state["mode"] != "MIDWEEK":
             if analysis is not None and not analysis.midweek_available:
-                st.markdown(
-                    '<div class="weekend-context-bar weekend-context-bar--unavailable" role="status">'
-                    '<span class="midweek-unavailable-icon" aria-hidden="true">⚠</span>'
-                    '<strong>Midweek unavailable</strong>'
-                    '<span>No current midweek snapshot. Showing Weekend Pool instead.</span>'
-                    '<span>Complete weekly pool · Midweek comparison is not applied.</span></div>',
-                    unsafe_allow_html=True,
-                )
+                return
             else:
                 st.markdown(
                     '<div class="weekend-context-bar"><strong>Weekend Baseline</strong>'
@@ -818,7 +831,7 @@ def _render_filter_bar(
             unsafe_allow_html=True,
         )
         header_cols = st.columns(
-            [0.24, 0.08, 1] if active_count > 1 else [0.24, 1],
+            [0.24, 0.08, 1] if active_count > 0 else [0.24, 1],
             gap="small",
             vertical_alignment="center",
         )
@@ -831,7 +844,7 @@ def _render_filter_bar(
                 state["filters_expanded"] = not state["filters_expanded"]
                 _store_review_state(state)
                 st.rerun()
-        if active_count > 1:
+        if active_count > 0:
             with header_cols[1]:
                 if st.button(
                     "Reset",
@@ -921,12 +934,14 @@ def _render_filter_bar(
                     entry_value = entry_bounds[0] if entry_state is None else float(entry_state)
                     entry_value = min(max(entry_value, entry_bounds[0]), entry_bounds[1])
                     entry_label = "Entry Volume ≥ Any" if entry_state is None else f"Entry Volume ≥ {entry_value:.1f}×"
-                    entry_current = "Any" if entry_state is None else f"{entry_value:.1f}×"
-                    entry_active_class = " filter-volume-value--active" if entry_state is not None else ""
+                    inactive_marker = (
+                        '<span class="filter-volume-inactive-marker" aria-hidden="true"></span>'
+                        if entry_state is None
+                        else ""
+                    )
                     st.markdown(
                         f'<div class="filter-slider-heading">{entry_label}</div>'
-                        f'<div class="filter-volume-value{entry_active_class}">'
-                        f'<span>{entry_current}</span></div>',
+                        f'{inactive_marker}',
                         unsafe_allow_html=True,
                     )
                     selected_entry = st.slider(
@@ -949,12 +964,14 @@ def _render_filter_bar(
                     weekly_value = weekly_bounds[0] if weekly_state is None else float(weekly_state)
                     weekly_value = min(max(weekly_value, weekly_bounds[0]), weekly_bounds[1])
                     weekly_label = "Weekly Volume ≥ Any" if weekly_state is None else f"Weekly Volume ≥ {weekly_value:.1f}×"
-                    weekly_current = "Any" if weekly_state is None else f"{weekly_value:.1f}×"
-                    weekly_active_class = " filter-volume-value--active" if weekly_state is not None else ""
+                    inactive_marker = (
+                        '<span class="filter-volume-inactive-marker" aria-hidden="true"></span>'
+                        if weekly_state is None
+                        else ""
+                    )
                     st.markdown(
                         f'<div class="filter-slider-heading">{weekly_label}</div>'
-                        f'<div class="filter-volume-value{weekly_active_class}">'
-                        f'<span>{weekly_current}</span></div>',
+                        f'{inactive_marker}',
                         unsafe_allow_html=True,
                     )
                     selected_weekly = st.slider(

@@ -41,6 +41,10 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
         ? target.closest('div[class*="st-key-flow_card_"]')
         : null;
 
+    const triggerFor = target => target instanceof parentWindow.Element
+        ? target.closest(".flow-info-trigger")
+        : null;
+
     const ibdDetailsFor = target => target instanceof parentWindow.Element
         ? target.closest(".st-key-ibd_selected_row .code-detail")
         : null;
@@ -72,6 +76,7 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     const positionTooltip = card => {
         const anchor = card.querySelector(".flow-info-trigger") || card;
         const anchorBox = anchor.getBoundingClientRect();
+        const cardBox = card.getBoundingClientRect();
         const viewportPadding = 12;
         tooltip.style.left = `${viewportPadding}px`;
         tooltip.style.top = `${viewportPadding}px`;
@@ -82,9 +87,9 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
             parentWindow.innerWidth - tooltipBox.width - viewportPadding,
         );
         const left = Math.min(Math.max(anchorBox.right - tooltipBox.width, viewportPadding), maxLeft);
-        let top = anchorBox.bottom + 8;
+        let top = cardBox.bottom + 8;
         if (top + tooltipBox.height > parentWindow.innerHeight - viewportPadding) {
-            top = Math.max(viewportPadding, anchorBox.top - tooltipBox.height - 8);
+            top = Math.max(viewportPadding, cardBox.top - tooltipBox.height - 8);
         }
         tooltip.style.left = `${Math.round(left)}px`;
         tooltip.style.top = `${Math.round(top)}px`;
@@ -139,20 +144,22 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     const onPointerOver = event => {
         const ibdDetails = ibdDetailsFor(event.target);
         if (ibdDetails) delete ibdDetails.dataset.escapeDismissed;
-        const card = cardFor(event.target);
-        if (!card || (pinned && activeCard !== card)) return;
-        if (event.relatedTarget instanceof parentWindow.Node && card.contains(event.relatedTarget)) return;
+        const trigger = triggerFor(event.target);
+        const card = cardFor(trigger);
+        if (!trigger || !card || (pinned && activeCard !== card)) return;
+        if (event.relatedTarget instanceof parentWindow.Node && trigger.contains(event.relatedTarget)) return;
         if (pinned && activeCard === card) return;
         scheduleTooltip(card);
     };
 
     const onPointerOut = event => {
-        const card = cardFor(event.target);
+        const trigger = triggerFor(event.target);
+        const card = cardFor(trigger);
         const nextTarget = event.relatedTarget;
         if (
             nextTarget instanceof parentWindow.Node
-            && card
-            && card.contains(nextTarget)
+            && trigger
+            && trigger.contains(nextTarget)
         ) return;
         if (card && pendingCard === card) cancelHoverTimer();
         if (!activeCard || pinned) return;
@@ -162,8 +169,9 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     };
 
     const onFocusIn = event => {
-        const card = cardFor(event.target);
-        if (!card || (pinned && activeCard !== card)) return;
+        const trigger = triggerFor(event.target);
+        const card = cardFor(trigger);
+        if (!trigger || !card || (pinned && activeCard !== card)) return;
         cancelHoverTimer();
         showTooltip(card, pinned && activeCard === card);
     };
