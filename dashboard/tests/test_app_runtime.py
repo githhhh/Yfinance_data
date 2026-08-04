@@ -22,10 +22,10 @@ def test_default_dashboard_screen_renders_with_real_csv():
 
     assert len(app.exception) == 0
     assert [title.value for title in app.title] == []
-    assert any("results · Sorted by C Rank" in item.value for item in app.markdown)
-    assert any("Weekend Baseline" in item.value for item in app.markdown)
+    assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
+    assert any("Midweek · baseline" in item.value for item in app.markdown)
     assert not any(widget.label == "Route (Rule)" for widget in app.selectbox)
-    assert len(app.selectbox) > 0
+    assert not any(widget.key and str(widget.key).startswith("review_sort_") for widget in app.selectbox)
 
 
 def _midweek_app():
@@ -71,7 +71,7 @@ def _complete_window_with_valid_midweek_app():
 
 
 def _button_starting_with(app, label: str):
-    normalized = lambda value: value.lstrip("✓  ")
+    normalized = lambda value: value.replace("**", "").lstrip("✓  ↘↗↔+→")
     return next(button for button in app.button if normalized(button.label).startswith(label))
 
 
@@ -102,6 +102,15 @@ def _run_with_review_argv(app):
         sys.argv = old_argv
 
 
+def _header_markup(app):
+    return next(
+        item.value
+        for item in app.markdown
+        if '<div class="dashboard-title"' in item.value
+        and '<div class="dashboard-snapshot"' in item.value
+    )
+
+
 def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filters():
     app = _midweek_app()
 
@@ -111,6 +120,7 @@ def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filte
     assert state["scope"] == "CHANGES"
     assert state["sort_mode"] == "Review Priority"
     assert state["filters_expanded"] is False
+    assert app.button(key="btn_filters_toggle").label == "More Filters · None"
     assert not any(widget.label == "Route (Rule)" for widget in app.selectbox)
     assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
 
@@ -122,8 +132,8 @@ def test_midweek_runtime_exposes_all_ten_structured_tooltips():
         "Left Buy Zone",
         "Other Changes",
         "New Signal",
-        "Carry Over",
-        "Confirmed Again",
+        "Carried Over",
+        "Reconfirmed",
         "ACTIONABLE",
         "UNCONFIRMED",
         "BELOW TRIGGER",
@@ -158,13 +168,18 @@ def test_runtime_scope_buttons_expose_expected_enabled_states():
 def test_runtime_mode_scope_and_quick_filter_flow():
     app = _midweek_app()
 
+    assert app.session_state["review_ui_state"]["change_filter"] == "ALL"
+    assert app.session_state["review_ui_state"]["origin_filter"] == "ALL"
+    assert not any(button.key == "btn_clear_quick" for button in app.button)
+
     _click(app, "btn_mode_weekend")
     state = app.session_state["review_ui_state"]
     assert len(app.exception) == 0
     assert state["mode"] == "WEEKEND"
     assert state["scope"] == "ALL_SIGNALS"
     assert state["sort_mode"] == "C Rank"
-    assert app.button(key="btn_scope_changes").disabled is True
+    assert not any(button.key == "btn_scope_changes" for button in app.button)
+    assert any("All Signals · 106" in item.value for item in app.markdown)
     assert any("Weekend Baseline" in item.value for item in app.markdown)
 
     _click(app, "btn_mode_midweek")
@@ -175,13 +190,18 @@ def test_runtime_mode_scope_and_quick_filter_flow():
 
     _click(app, "btn_change_filter_BECAME_ACTIONABLE")
     assert app.session_state["review_ui_state"]["change_filter"] == "BECAME_ACTIONABLE"
-    assert app.button(key="btn_clear_quick").disabled is False
+    assert app.button(key="btn_clear_quick").label == "Clear 1"
+
+    _click(app, "btn_origin_filter_NEW")
+    assert app.button(key="btn_clear_quick").label == "Clear 2"
 
     _click(app, "btn_clear_quick")
     state = app.session_state["review_ui_state"]
     assert state["change_filter"] == "ALL"
     assert state["origin_filter"] == "ALL"
-    assert app.button(key="btn_clear_quick").disabled is True
+    assert state["mode"] == "MIDWEEK"
+    assert state["scope"] == "CHANGES"
+    assert not any(button.key == "btn_clear_quick" for button in app.button)
 
 
 def test_complete_window_manual_midweek_uses_the_valid_baseline_comparison():
@@ -209,35 +229,69 @@ def test_runtime_status_filter_expansion_and_reset_flow():
 
     _click(app, "btn_status_ACTIONABLE")
     assert app.session_state["review_ui_state"]["status_filter"] == "ACTIONABLE"
-    assert _button_starting_with(app, "ACTIONABLE").label.startswith("✓ ")
+    assert _button_starting_with(app, "ACTIONABLE").label.startswith("ACTIONABLE")
 
     _click(app, "btn_filters_toggle")
     assert app.session_state["review_ui_state"]["filters_expanded"] is True
-    entry_volume = app.text_input(key="review_entry_vol_0")
-    assert entry_volume.disabled is False
+    entry_volume = app.slider(key="review_entry_vol_0")
 
-    entry_volume.input("1.5")
+    entry_volume.set_value(1.5)
     _run_widget_change(app)
-    assert app.session_state["review_ui_state"]["entry_volume_min"] == "1.5"
+    assert app.session_state["review_ui_state"]["entry_volume_min"] == 1.5
     assert "1 active" in app.button(key="btn_filters_toggle").label
+    assert not any(button.key == "btn_filters_reset" for button in app.button)
+
+    app.slider(key="review_weekly_vol_0").set_value(1.0)
+    _run_widget_change(app)
+    assert app.button(key="btn_filters_toggle").label == "More Filters · 2 active"
+    assert app.button(key="btn_filters_reset").label == "Reset"
 
     _click(app, "btn_filters_reset")
     state = app.session_state["review_ui_state"]
-    assert state["status_filter"] == "ALL"
-    assert state["entry_volume_min"] == ""
+    assert state["status_filter"] == "ACTIONABLE"
+    assert state["entry_volume_min"] is None
+    assert state["weekly_volume_min"] is None
     assert state["widget_generation"] == 1
-    assert "No filters applied" in app.button(key="btn_filters_toggle").label
+    assert app.button(key="btn_filters_toggle").label == "More Filters · None"
+    assert app.session_state["review_ui_state"]["filters_expanded"] is True
 
 
-def test_runtime_sort_selector_updates_results_summary():
+def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
     app = _midweek_app()
+    _click(app, "btn_filters_toggle")
 
-    app.selectbox(key="review_sort_0").select("Distance")
+    app.radio(key="review_route_0").set_value("pivot")
+    _run_widget_change(app)
+    app.slider(key="review_distance_0").set_value((0.0, 5.0))
+    _run_widget_change(app)
+    app.slider(key="review_entry_vol_0").set_value(1.5)
+    _run_widget_change(app)
+    app.slider(key="review_weekly_vol_0").set_value(1.0)
     _run_widget_change(app)
 
+    state = app.session_state["review_ui_state"]
+    assert state["route_filter"] == "pivot"
+    assert state["distance_range"] == (0.0, 5.0)
+    assert state["entry_volume_min"] == 1.5
+    assert state["weekly_volume_min"] == 1.0
+    assert app.button(key="btn_filters_toggle").label == "More Filters · 4 active"
+    assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
+    assert app.button(key="btn_filters_reset").disabled is False
+    assert not any(
+        button.key and str(button.key).startswith("btn_filter_chip_")
+        for button in app.button
+    )
+
+
+def test_runtime_uses_fixed_view_sort_without_toolbar_selector():
+    app = _midweek_app()
+
+    assert not any(widget.key and str(widget.key).startswith("review_sort_") for widget in app.selectbox)
+    _click(app, "btn_scope_all_signals")
+
     assert len(app.exception) == 0
-    assert app.session_state["review_ui_state"]["sort_mode"] == "Distance"
-    assert any("results · Sorted by Distance" in item.value for item in app.markdown)
+    assert app.session_state["review_ui_state"]["sort_mode"] == "C Rank"
+    assert any("results · Sorted by C Rank" in item.value for item in app.markdown)
 
 
 def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review():
@@ -258,6 +312,56 @@ def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review
     assert app.session_state["global_mode_selector"] == "IBD Review"
     assert any("Review Queue" in item.value for item in app.markdown)
     assert not any(widget.label == "Top N Slice" for widget in app.selectbox)
+
+
+def test_runtime_header_tracks_midweek_weekend_and_c_rank_data_sources():
+    app = _midweek_app()
+
+    midweek_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-30</b>" in midweek_header
+    assert "<b>751</b> Total Pool" in midweek_header
+    assert "<b>190</b> Active Signals" in midweek_header
+
+    _click(app, "btn_mode_weekend")
+    weekend_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-24</b>" in weekend_header
+    assert "<b>745</b> Total Pool" in weekend_header
+    assert "<b>106</b> Active Signals" in weekend_header
+
+    _click(app, "btn_mode_midweek")
+    app.get("button_group")[0].set_value(["C Rank Reference"])
+    _run_with_review_argv(app)
+
+    c_rank_header = _header_markup(app)
+    assert "Snapshot <b>2026-07-24</b>" in c_rank_header
+    assert "<b>745</b> Total Pool" in c_rank_header
+    assert "<b>106</b> Active Signals" in c_rank_header
+    assert "snapshot-mode-segment--midweek" not in c_rank_header
+
+
+def test_c_rank_top_n_keeps_result_summary_complete():
+    app = _midweek_app()
+    app.get("button_group")[0].set_value(["C Rank Reference"])
+    _run_with_review_argv(app)
+
+    assert any(
+        "Showing: 106 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
+
+    app.selectbox(key="c_rank_top_n_select").select("Top 10")
+    _run_widget_change(app)
+    assert any(
+        "Showing: 10 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
+
+    app.selectbox(key="c_rank_top_n_select").select("Top 25")
+    _run_widget_change(app)
+    assert any(
+        "Showing: 25 of 106 Active Signals · Reference Only" in item.value
+        for item in app.markdown
+    )
 
 
 def test_runtime_surfaces_missing_baseline_warning(tmp_path):
@@ -310,7 +414,8 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
     assert state["change_filter"] == "ALL"
     assert state["origin_filter"] == "ALL"
     assert not any("0 results ·" in item.value for item in app.markdown)
-    assert app.button(key="btn_scope_changes").disabled is True
+    assert not any(button.key == "btn_scope_changes" for button in app.button)
+    assert any("All Signals ·" in item.value for item in app.markdown)
     assert not any(button.key == "btn_change_filter_BECAME_ACTIONABLE" for button in app.button)
     assert any("Change and Origin comparison is unavailable" in item.value for item in app.markdown)
     assert any("Midweek · baseline unavailable" in item.value for item in app.markdown)

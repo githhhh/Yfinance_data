@@ -5,7 +5,11 @@ import re
 
 import pandas as pd
 
-from dashboard.app import _render_selected_row_detail, _review_grid_key
+from dashboard.app import (
+    _render_ibd_selected_row_detail,
+    _render_selected_row_detail,
+    _review_grid_key,
+)
 from dashboard.field_config import FIELD_CONFIG, FLOW_CARD_META, STATUS_META, get_midweek_table_columns
 from dashboard.table_view import _code_renderer_jscode, _column_def, build_grid_options
 
@@ -42,8 +46,8 @@ def test_flow_cards_use_english_visible_copy_and_exact_chinese_tooltip_body():
         "LEFT_ACTIONABLE": "Left Buy Zone",
         "OTHER_CHANGES": "Other Changes",
         "NEW": "New Signal",
-        "CARRY": "Carry Over",
-        "RECONFIRMED": "Confirmed Again",
+        "CARRY": "Carried Over",
+        "RECONFIRMED": "Reconfirmed",
     }
     assert {key: value["subtitle"] for key, value in STATUS_META.items()} == {
         "ACTIONABLE": "In 0%–5% Buy Zone",
@@ -56,12 +60,12 @@ def test_flow_cards_use_english_visible_copy_and_exact_chinese_tooltip_body():
         assert not re.search(r"[\u4e00-\u9fff]", metadata.get("subtitle", ""))
 
     expected_definitions = {
-        "BECAME_ACTIONABLE": "含义：上周不在买区，本次进入买点上方 0%–5% 的买区。",
-        "LEFT_ACTIONABLE": "含义：上周在买区，本次已经离开买区。",
-        "OTHER_CHANGES": "含义：状态和上周不同，但不是进入或离开买区。",
-        "NEW": "含义：完整周没有信号，周中首次出现信号。",
-        "CARRY": "含义：周中没有新信号，但完整周信号继续观察，状态按当前价格更新。",
-        "RECONFIRMED": "含义：完整周和周中都有信号，以周中数据为准。",
+        "BECAME_ACTIONABLE": "含义：本次进入买点上方 0%–5% 区间。",
+        "LEFT_ACTIONABLE": "含义：上次在买区，本次已离开买区。",
+        "OTHER_CHANGES": "含义：状态发生变化，但不属于进入或离开买区。",
+        "NEW": "含义：本次首次出现。",
+        "CARRY": "含义：周末已有，本次继续保留。",
+        "RECONFIRMED": "含义：原有信号本次再次确认。",
         "ACTIONABLE": "含义：已完成入场确认，当前价位于买点上方 0%–5%。",
         "UNCONFIRMED": "含义：尚未满足日线入场确认条件。",
         "BELOW_TRIGGER": "含义：当前价低于有效买点。",
@@ -157,7 +161,7 @@ def test_code_header_help_matches_row_selection_and_copy_button_behavior():
     assert "点击 Code 复制" not in help_text
 
 
-def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monkeypatch):
+def test_selected_row_midweek_markup_is_a_compact_five_cell_summary_with_code_only_details(monkeypatch):
     row = {
         "code": "TEST",
         "ibd_candidate_price": 100.0,
@@ -166,26 +170,40 @@ def test_selected_row_midweek_markup_keeps_five_cells_and_shows_transition(monke
         "latest_close": 102.0,
         "ibd_entry_status": "ACTIONABLE",
         "ibd_entry_vol_or_reject": "2.00x",
-        "rank_C_continuous": 1,
+        "rank_C_continuous": 1.0,
         "C_continuous": 2.0,
         "ibd_entry_valid": True,
         "review_signal_origin": "NEW",
         "review_change_label": "NEW → ACTIONABLE",
         "review_baseline_entry_status": "UNCONFIRMED",
         "review_effective_entry_status": "ACTIONABLE",
+        "pullback_pct": -6.0,
+        "pullback_pct_off_peak": -2.0,
     }
     rendered: list[str] = []
     monkeypatch.setattr("streamlit.markdown", lambda value, **kwargs: rendered.append(value))
     monkeypatch.setattr("streamlit.info", lambda value, **kwargs: rendered.append(value))
 
-    _render_selected_row_detail(pd.DataFrame([row]), "TEST")
+    _render_ibd_selected_row_detail(pd.DataFrame([row]), "TEST")
     markup = rendered[-1]
 
-    assert 'data-origin="NEW"' in markup
-    assert "NEW → ACTIONABLE" in markup
     assert "UNCONFIRMED →" in markup
-    assert 'class="selected-strip"' in markup
+    assert 'class="ibd-selected-strip"' in markup
     assert markup.count('class="selected-summary-cell') == 5
+    assert '<details class="code-detail" data-selected-code="TEST">' in markup
+    assert '<summary class="code-hover-trigger" aria-label="TEST 股票详情">TEST</summary>' in markup
+    assert "1 of 1" not in markup
+    assert "RECONF." not in markup
+    assert "NEW → ACTIONABLE" not in markup
+    assert "▾" not in markup
+    assert 'class="selected-secondary"' in markup
+    assert "(2.00×)" in markup
+    assert "#1 " in markup
+    assert "#1.0" not in markup
+    assert 'role="region" aria-label="TEST 股票详情"' in markup
+    assert "日线入场" in markup
+    assert "回撤" in markup
+    assert "基本面 / 形态" in markup
 
 
 def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):
@@ -196,10 +214,10 @@ def test_selected_row_empty_state_keeps_the_same_fixed_surface(monkeypatch):
         lambda value, **kwargs: rendered.append(f"unexpected-info:{value}"),
     )
 
-    _render_selected_row_detail(pd.DataFrame(), None)
+    _render_ibd_selected_row_detail(pd.DataFrame(), None)
 
     assert rendered == [
-        '<div class="selected-strip selected-strip--empty" role="status">'
+        '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
         '<span>No matching records found with current filter criteria.</span></div>'
     ]
 
@@ -213,11 +231,11 @@ def test_app_declares_stable_mode_scope_context_filter_and_layout_slots():
     ]:
         assert f'key="{key}"' in APP_SOURCE
     assert 'key="btn_scope_changes"' in APP_SOURCE
-    assert "disabled=not has_comparison" in APP_SOURCE
+    assert 'class="weekend-scope-static"' in APP_SOURCE
     assert 'state["filters_expanded"]' in APP_SOURCE
     assert "Weekend Baseline" in APP_SOURCE
-    assert "Review Priority" in APP_SOURCE
-    assert "C Rank" in APP_SOURCE
+    assert "default_sort_mode" in APP_SOURCE
+    assert "fixed_sort" in APP_SOURCE
 
 
 def test_cards_use_one_shared_tooltip_system_with_a_separate_info_button():

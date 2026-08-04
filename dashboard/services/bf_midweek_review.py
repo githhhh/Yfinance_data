@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
+import math
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -20,7 +21,14 @@ from dashboard.data_utils import (
 
 BUSINESS_TIMEZONE = "Asia/Shanghai"
 ENTRY_STATUSES = ("ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED")
-ENTRY_VOL_ENABLED_STATUSES = {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
+SETUP_FILTER_OPTIONS = (
+    "All",
+    "ceiling",
+    "ceiling_pullback",
+    "ma10_touch_confirm",
+    "pivot",
+    "three_weeks_tight",
+)
 
 
 class PoolWindow(Enum):
@@ -349,16 +357,59 @@ def default_review_state(mode: PoolMode) -> dict[str, Any]:
         "origin_filter": "ALL",
         "status_filter": "ALL",
         "route_filter": "All",
-        "distance_min": "",
-        "distance_max": "",
-        "entry_volume_min": "",
-        "weekly_volume_min": "",
-        "near_trigger_only": False,
+        "distance_range": None,
+        "entry_volume_min": None,
+        "weekly_volume_min": None,
         "filters_expanded": False,
         "copy_state": "IDLE",
         "sort_mode": "Review Priority" if has_comparison else "C Rank",
         "widget_generation": 0,
     }
+
+
+def normalize_review_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Migrate persisted text-input state to the slider-based filter model."""
+    result = dict(state)
+    distance = result.get("distance_range")
+    if isinstance(distance, (tuple, list)) and len(distance) == 2:
+        try:
+            lower, upper = float(distance[0]), float(distance[1])
+            distance = (lower, upper) if math.isfinite(lower) and math.isfinite(upper) and lower <= upper else None
+        except (TypeError, ValueError):
+            distance = None
+    else:
+        distance = None
+    result["distance_range"] = distance
+
+    for field in ("entry_volume_min", "weekly_volume_min"):
+        raw_value = result.get(field)
+        try:
+            value = None if raw_value is None or str(raw_value).strip() == "" else float(raw_value)
+        except (TypeError, ValueError):
+            value = None
+        result[field] = value if value is not None and math.isfinite(value) else None
+
+    if result.get("route_filter", "All") not in SETUP_FILTER_OPTIONS:
+        result["route_filter"] = "All"
+    for legacy_field in ("distance_min", "distance_max", "near_trigger_only"):
+        result.pop(legacy_field, None)
+    return result
+
+
+def default_sort_mode(
+    mode: str,
+    scope: str,
+    *,
+    has_comparison: bool,
+) -> str:
+    """Return the fixed public default order for a review view."""
+    if (
+        str(mode).upper() == "MIDWEEK"
+        and str(scope).upper() == "CHANGES"
+        and has_comparison
+    ):
+        return "Review Priority"
+    return "C Rank"
 
 
 def reconcile_review_state(state: dict[str, Any], mode: PoolMode) -> dict[str, Any]:
@@ -406,10 +457,6 @@ def clear_quick_filters(state: dict[str, Any]) -> dict[str, Any]:
 def select_status_filter(state: dict[str, Any], status: str) -> dict[str, Any]:
     result = dict(state)
     result["status_filter"] = status
-    if status not in ENTRY_VOL_ENABLED_STATUSES:
-        result["entry_volume_min"] = ""
-    if status != "UNCONFIRMED":
-        result["near_trigger_only"] = False
     return result
 
 
@@ -427,16 +474,16 @@ def reset_to_all_signals(state: dict[str, Any]) -> dict[str, Any]:
             "origin_filter": "ALL",
             "status_filter": "ALL",
             "route_filter": "All",
-            "distance_min": "",
-            "distance_max": "",
-            "entry_volume_min": "",
-            "weekly_volume_min": "",
-            "near_trigger_only": False,
+            "distance_range": None,
+            "entry_volume_min": None,
+            "weekly_volume_min": None,
             "filters_expanded": False,
             "copy_state": "IDLE",
             "widget_generation": int(state.get("widget_generation", 0)) + 1,
         }
     )
+    for legacy_field in ("distance_min", "distance_max", "near_trigger_only"):
+        result.pop(legacy_field, None)
     return result
 
 
@@ -499,34 +546,32 @@ def apply_review_filters(
         route = state.get("route_filter", "All")
         if route != "All" and "ibd_candidate_rule" in result.columns:
             result = result.loc[result["ibd_candidate_rule"].eq(route)].copy()
-        result = _number_filter(
-            result,
-            "current_vs_ibd_candidate_pct",
-            state.get("distance_min", ""),
-            minimum=True,
-        )
-        result = _number_filter(
-            result,
-            "current_vs_ibd_candidate_pct",
-            state.get("distance_max", ""),
-            minimum=False,
-        )
-        if state.get("status_filter") in {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}:
+        distance_range = state.get("distance_range")
+        if isinstance(distance_range, (tuple, list)) and len(distance_range) == 2:
             result = _number_filter(
                 result,
-                "ibd_entry_volume_ratio",
-                state.get("entry_volume_min", ""),
+                "current_vs_ibd_candidate_pct",
+                distance_range[0],
                 minimum=True,
+            )
+            result = _number_filter(
+                result,
+                "current_vs_ibd_candidate_pct",
+                distance_range[1],
+                minimum=False,
             )
         result = _number_filter(
             result,
-            "volume_ratio",
-            state.get("weekly_volume_min", ""),
+            "ibd_entry_volume_ratio",
+            state.get("entry_volume_min"),
             minimum=True,
         )
-        if state.get("status_filter") == "UNCONFIRMED" and state.get("near_trigger_only"):
-            distance = pd.to_numeric(result.get("current_vs_ibd_candidate_pct"), errors="coerce")
-            result = result.loc[distance.between(0.0, 3.0, inclusive="both")].copy()
+        result = _number_filter(
+            result,
+            "volume_ratio",
+            state.get("weekly_volume_min"),
+            minimum=True,
+        )
     return result
 
 

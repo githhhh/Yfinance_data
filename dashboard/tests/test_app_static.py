@@ -1,6 +1,7 @@
 from pathlib import Path
 import ast
 import re
+import dashboard.app as dashboard_app
 from dashboard.app import _csv_cache_fingerprint
 
 
@@ -31,16 +32,60 @@ def test_custom_filter_ui_removes_sort_bar_from_custom_mode():
 def test_c_rank_mode_displays_fixed_rules_and_formula_reference():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert "Fixed Mode Rules" in source
-    assert "Exclusively evaluates Active Signals (`signal=True`)" in source
-    assert "Sorted by `rank_C_continuous` asc" in source
+    assert "Exclusively evaluates Active Signals across the pool." in source
+    assert "C Rank · Best First" in source
+    assert "`signal=True`" not in source
+    assert "`rank_C_continuous`" not in source
     assert "Top N slice selector only" in source
     assert "2.5 x pct(base_depth_abs)" in source
+
+
+def test_loaded_badge_follows_complete_snapshot_freshness():
+    assert dashboard_app._data_badge({"status": "FRESH"}, loaded=True) == ("Data Fresh", "fresh")
+    assert dashboard_app._data_badge({"status": "AGING"}, loaded=True) == ("Data Aging", "aging")
+    assert dashboard_app._data_badge({"status": "STALE"}, loaded=True) == ("Data Stale", "stale")
+    assert dashboard_app._data_badge(None, loaded=True) == ("Data Loaded", "loaded")
+    assert dashboard_app._data_badge(None, loaded=False) == ("Schema / Data Error", "error")
+
+
+def test_quick_filter_count_only_counts_change_and_origin_chips():
+    assert dashboard_app._quick_filter_count(
+        {"change_filter": "ALL", "origin_filter": "ALL", "scope": "CHANGES"}
+    ) == 0
+    assert dashboard_app._quick_filter_count(
+        {"change_filter": "OTHER_CHANGES", "origin_filter": "NEW", "scope": "CHANGES"}
+    ) == 2
+
+
+def test_advanced_filter_count_treats_price_range_as_one_condition():
+    state = {
+        "route_filter": "pivot",
+        "distance_range": (0.0, 5.0),
+        "entry_volume_min": 1.3,
+        "weekly_volume_min": None,
+    }
+
+    assert dashboard_app._active_filter_count(state) == 3
 
 
 def test_c_rank_reference_denominator_uses_active_signals_count():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert 'active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)' in source
     assert 'Showing: {len(ranked)} of {denom} Active Signals · Reference Only' in source
+
+
+def test_c_rank_result_summary_stays_in_spaced_toolbar_row():
+    assert 'with st.container(key="c_rank_results_toolbar")' in APP_SOURCE
+    assert "col_limit, col_summary, col_copy = st.columns" in APP_SOURCE
+    assert "with col_summary:" in APP_SOURCE
+    assert 'with st.container(key="c_rank_results_summary")' not in APP_SOURCE
+    assert ".st-key-c_rank_results_toolbar" in STYLE_SOURCE
+    assert "min-height: 80px" in STYLE_SOURCE
+    assert "padding-bottom: 12px" in STYLE_SOURCE
+    assert (
+        '.st-key-c_rank_results_toolbar div[data-testid="stMarkdownContainer"]:has(.results-summary)'
+        in STYLE_SOURCE
+    )
 
 
 def test_csv_cache_fingerprint_changes_when_same_path_is_rewritten(tmp_path):
@@ -99,5 +144,5 @@ def test_density_css_is_scoped_and_has_no_visual_compensation_hacks():
 
 
 def test_status_cards_render_exactly_two_text_lines():
-    assert 'btn_label = f"{prefix}{display_name} · {count}\\n{meta[\'subtitle\']}"' in APP_SOURCE
+    assert 'btn_label = f"{display_name} · {count}\\n{meta[\'subtitle\']}"' in APP_SOURCE
     assert 'btn_label = f"{prefix}{display_name}\\n{count}\\n{sub_map[status_name]}"' not in APP_SOURCE

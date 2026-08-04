@@ -41,6 +41,10 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
         ? target.closest('div[class*="st-key-flow_card_"]')
         : null;
 
+    const ibdDetailsFor = target => target instanceof parentWindow.Element
+        ? target.closest(".st-key-ibd_selected_row .code-detail")
+        : null;
+
     const restoreDescriptions = () => {
         for (const [element, priorValue] of describedElements) {
             if (!element.isConnected) continue;
@@ -133,6 +137,8 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     };
 
     const onPointerOver = event => {
+        const ibdDetails = ibdDetailsFor(event.target);
+        if (ibdDetails) delete ibdDetails.dataset.escapeDismissed;
         const card = cardFor(event.target);
         if (!card || (pinned && activeCard !== card)) return;
         if (event.relatedTarget instanceof parentWindow.Node && card.contains(event.relatedTarget)) return;
@@ -170,6 +176,8 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     };
 
     const onClick = event => {
+        const ibdDetails = ibdDetailsFor(event.target);
+        if (ibdDetails) delete ibdDetails.dataset.escapeDismissed;
         const trigger = event.target instanceof parentWindow.Element
             ? event.target.closest(".flow-info-trigger")
             : null;
@@ -191,6 +199,22 @@ FLOW_TOOLTIP_BRIDGE_HTML = r"""
     };
 
     const onKeyDown = event => {
+        const targetDetails = ibdDetailsFor(event.target);
+        if (targetDetails && event.key !== "Escape") {
+            delete targetDetails.dataset.escapeDismissed;
+        }
+        if (event.key === "Escape") {
+            const details = targetDetails
+                || parentDocument.querySelector(".st-key-ibd_selected_row .code-detail[open]");
+            if (details) {
+                event.preventDefault();
+                details.open = false;
+                details.dataset.escapeDismissed = "true";
+                const trigger = details.querySelector(".code-hover-trigger");
+                if (trigger) trigger.focus({preventScroll: true});
+                return;
+            }
+        }
         if (event.key === "Escape" && (activeCard || hoverTimer !== null)) {
             event.preventDefault();
             if (activeCard) hideTooltip();

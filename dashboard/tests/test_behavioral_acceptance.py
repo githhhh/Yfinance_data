@@ -258,7 +258,19 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     assert options["columnDefs"][0]["field"] == "code"
     assert options["columnDefs"][0]["pinned"] == "left"
     assert "onGridReady" not in options
-    assert "onCellFocused" not in options
+
+    from dashboard.table_view import HAS_JS_CODE
+
+    if HAS_JS_CODE:
+        assert "_review_visited" in options["getRowStyle"].js_code
+        keyboard_source = options["onCellKeyDown"].js_code
+        assert "ArrowUp" in keyboard_source
+        assert "ArrowDown" in keyboard_source
+        assert "setSelected(true, true)" in keyboard_source
+        assert "ensureIndexVisible" in keyboard_source
+        focus_source = options["onCellFocused"].js_code
+        assert "getDisplayedRowAtIndex" in focus_source
+        assert "setSelected(true, true)" in focus_source
 
 
 # 8. Selected Row Detail never fabricates a selection
@@ -279,14 +291,14 @@ def test_selected_row_detail_uses_placeholder_when_selected_missing(monkeypatch)
     _render_selected_row_detail(filtered_df, "MISSING_CODE")
     assert rendered_markdowns == [
         '<div class="selected-strip selected-strip--empty" role="status">'
-        '<span>Select a row to inspect review details.</span></div>'
+        '<span>Select a row · Use ↑↓ to review</span></div>'
     ]
 
     rendered_markdowns.clear()
     _render_selected_row_detail(filtered_df, None)
     assert rendered_markdowns == [
         '<div class="selected-strip selected-strip--empty" role="status">'
-        '<span>Select a row to inspect review details.</span></div>'
+        '<span>Select a row · Use ↑↓ to review</span></div>'
     ]
 
 
@@ -355,9 +367,29 @@ def test_copy_codes_control_rendering(monkeypatch):
     assert 'textToCopy = "AAPL, NVDA, TSLA"' in rendered_components[0]
     assert "navigator.clipboard.writeText" in rendered_components[0]
     assert "document.execCommand('copy')" in rendered_components[0]
+    assert "background: #151b23" in rendered_components[0]
+    assert "border: 1px solid #465365" in rendered_components[0]
+    assert "Copied 3 Codes" in rendered_components[0]
+    assert "Copied (3)" not in rendered_components[0]
     assert "Manual" not in rendered_components[0]
     assert rendered_popovers == []
     assert rendered_codes == []
+
+
+def test_ibd_copy_feedback_is_compact_without_changing_default_reference_copy(monkeypatch):
+    rendered_components = []
+    monkeypatch.setattr(
+        "streamlit.components.v1.html",
+        lambda value, **kwargs: rendered_components.append(value),
+    )
+
+    _render_copy_codes_control(["ACU", "NVDA"], key_prefix="ibd", compact_feedback=True)
+    assert "Copy 2 Codes" in rendered_components[-1]
+    assert "✓ Copied 2" in rendered_components[-1]
+
+    _render_copy_codes_control(["ACU", "NVDA"], key_prefix="c_rank")
+    assert "Copied 2 Codes" in rendered_components[-1]
+    assert "✓ Copied 2" not in rendered_components[-1]
 
 
 def test_copy_codes_control_counts_only_non_blank_codes_and_disables_empty(monkeypatch):
@@ -377,13 +409,13 @@ def test_copy_codes_control_counts_only_non_blank_codes_and_disables_empty(monke
     assert " disabled" in rendered_components[-1].split("</button>", 1)[0]
 
 
-# 11. Entry Vol rules: enabled for ACTIONABLE, BELOW_TRIGGER, EXTENDED; disabled/cleared for UNCONFIRMED/All
-def test_entry_vol_enabled_for_actionable_below_trigger_and_extended_only():
-    from dashboard.app import ENTRY_VOL_ENABLED_STATUSES
+# 11. Entry Volume is a direct minimum threshold in every status view.
+def test_entry_volume_control_is_a_slider_without_disabled_placeholder():
+    source = Path("dashboard/app.py").read_text(encoding="utf-8")
 
-    assert ENTRY_VOL_ENABLED_STATUSES == {"ACTIONABLE", "BELOW_TRIGGER", "EXTENDED"}
-    assert "UNCONFIRMED" not in ENTRY_VOL_ENABLED_STATUSES
-    assert "All" not in ENTRY_VOL_ENABLED_STATUSES
+    assert '"Entry Volume ≥ Any"' in source
+    assert 'key=f"review_entry_vol_{generation}"' in source
+    assert "N/A (Disabled)" not in source
 
 
 def test_snapshot_freshness_boundaries():

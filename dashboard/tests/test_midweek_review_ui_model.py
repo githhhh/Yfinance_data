@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import pandas as pd
 
+import dashboard.services.bf_midweek_review as review_service
+
 from dashboard.services.bf_midweek_review import (
     PoolMode,
     apply_review_filters,
     build_review_filter_counts,
     clear_quick_filters,
     default_review_state,
+    normalize_review_state,
     reconcile_review_state,
     reset_to_all_signals,
     sort_review_rows,
@@ -100,6 +103,37 @@ def _review_rows() -> pd.DataFrame:
     )
 
 
+def test_public_view_default_sort_is_deterministic():
+    resolver = getattr(review_service, "default_sort_mode", None)
+    assert callable(resolver)
+    assert resolver("MIDWEEK", "CHANGES", has_comparison=True) == "Review Priority"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=True) == "C Rank"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=False) == "C Rank"
+    assert resolver("WEEKEND", "ALL_SIGNALS", has_comparison=False) == "C Rank"
+
+
+def test_legacy_text_filter_state_is_normalized_for_slider_widgets():
+    state = default_review_state(PoolMode.MIDWEEK)
+    state.update(
+        {
+            "distance_min": "0",
+            "distance_max": "5",
+            "entry_volume_min": "1.5",
+            "weekly_volume_min": "",
+            "near_trigger_only": True,
+        }
+    )
+
+    normalized = normalize_review_state(state)
+
+    assert normalized["distance_range"] is None
+    assert normalized["entry_volume_min"] == 1.5
+    assert normalized["weekly_volume_min"] is None
+    assert "distance_min" not in normalized
+    assert "distance_max" not in normalized
+    assert "near_trigger_only" not in normalized
+
+
 def test_change_origin_and_status_filters_combine_with_and_semantics():
     state = default_review_state(PoolMode.MIDWEEK)
     state.update(
@@ -113,6 +147,37 @@ def test_change_origin_and_status_filters_combine_with_and_semantics():
     filtered = apply_review_filters(_review_rows(), state)
 
     assert filtered["code"].tolist() == ["B"]
+
+
+def test_advanced_filters_combine_setup_price_and_volume_with_and_semantics():
+    state = default_review_state(PoolMode.MIDWEEK)
+    state.update(
+        {
+            "scope": "ALL_SIGNALS",
+            "route_filter": "pivot",
+            "distance_range": (0.0, 2.0),
+            "entry_volume_min": 1.9,
+            "weekly_volume_min": 1.4,
+        }
+    )
+
+    filtered = apply_review_filters(_review_rows(), state)
+
+    assert filtered["code"].tolist() == ["A"]
+
+
+def test_entry_volume_threshold_applies_without_status_preselection():
+    state = default_review_state(PoolMode.MIDWEEK)
+    state.update(
+        {
+            "scope": "ALL_SIGNALS",
+            "entry_volume_min": 1.9,
+        }
+    )
+
+    filtered = apply_review_filters(_review_rows(), state)
+
+    assert filtered["code"].tolist() == ["A", "C", "E"]
 
 
 def test_no_baseline_rows_ignore_hidden_comparison_filters():
@@ -171,7 +236,7 @@ def test_filter_counts_use_the_same_composed_filter_model_as_results():
     assert counts["result"] == len(apply_review_filters(_review_rows(), state)) == 1
 
 
-def test_status_facet_counts_apply_the_target_status_cleanup_rules():
+def test_status_facet_counts_keep_advanced_filters_in_the_same_and_model():
     rows = _review_rows()
     state = default_review_state(PoolMode.MIDWEEK)
     state.update(
@@ -184,17 +249,9 @@ def test_status_facet_counts_apply_the_target_status_cleanup_rules():
 
     counts = build_review_filter_counts(rows, state)
 
-    assert counts["status"]["UNCONFIRMED"] == 1
-
-    state.update(
-        {
-            "status_filter": "UNCONFIRMED",
-            "entry_volume_min": "",
-            "near_trigger_only": True,
-        }
-    )
-    counts = build_review_filter_counts(rows, state)
     assert counts["status"]["ACTIONABLE"] == 3
+    assert counts["status"]["UNCONFIRMED"] == 0
+    assert counts["status"]["EXTENDED"] == 1
 
 
 def test_clear_only_resets_change_and_origin_without_touching_status_or_filters():
@@ -226,10 +283,9 @@ def test_all_signals_performs_explicit_scope_and_filter_reset():
             "origin_filter": "CARRY",
             "status_filter": "EXTENDED",
             "route_filter": "ceiling",
-            "distance_min": "1",
-            "distance_max": "9",
-            "entry_volume_min": "2",
-            "weekly_volume_min": "1.5",
+            "distance_range": (1.0, 9.0),
+            "entry_volume_min": 2.0,
+            "weekly_volume_min": 1.5,
             "near_trigger_only": True,
             "filters_expanded": True,
         }
@@ -242,11 +298,10 @@ def test_all_signals_performs_explicit_scope_and_filter_reset():
     assert reset["origin_filter"] == "ALL"
     assert reset["status_filter"] == "ALL"
     assert reset["route_filter"] == "All"
-    assert reset["distance_min"] == ""
-    assert reset["distance_max"] == ""
-    assert reset["entry_volume_min"] == ""
-    assert reset["weekly_volume_min"] == ""
-    assert reset["near_trigger_only"] is False
+    assert reset["distance_range"] is None
+    assert reset["entry_volume_min"] is None
+    assert reset["weekly_volume_min"] is None
+    assert "near_trigger_only" not in reset
     assert reset["filters_expanded"] is False
 
 
@@ -272,6 +327,9 @@ def test_default_modes_choose_compatible_scope_sort_and_collapsed_filters():
     )
     assert midweek["filters_expanded"] is False
     assert weekend["filters_expanded"] is False
+    assert midweek["distance_range"] is None
+    assert midweek["entry_volume_min"] is None
+    assert midweek["weekly_volume_min"] is None
 
 
 def test_repeated_mode_click_preserves_state_but_real_switch_resets_incompatible_state():

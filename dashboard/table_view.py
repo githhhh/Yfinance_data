@@ -5,11 +5,15 @@ import json
 import pandas as pd
 
 from dashboard.field_config import (
+    C_RANK_REFERENCE_COLUMNS,
+    DISPLAY_FORMAT_FIELDS,
+    DISPLAY_VALUE_MAPS,
     FIELD_CONFIG,
     QUALITY_ALIASES,
     QUALITY_META,
     QUALITY_ORDER,
     STATUS_META,
+    format_display_value,
     get_field_label,
 )
 
@@ -156,6 +160,28 @@ def _get_value_formatter(fmt: str | None):
         }
         """)
     return None
+
+
+def _display_value_formatter_jscode(column: str):
+    if not HAS_JS_CODE or column not in DISPLAY_FORMAT_FIELDS:
+        return None
+    mapping_json = json.dumps(DISPLAY_VALUE_MAPS.get(column, {}))
+    return JsCode(f"""
+    function(params) {{
+        if (params.value === null || params.value === undefined || params.value === '') return '';
+        const raw = String(params.value);
+        const mapping = {mapping_json};
+        if (Object.prototype.hasOwnProperty.call(mapping, raw)) return mapping[raw];
+        if (!raw.includes('_')) return raw;
+        return raw.split('_').map(function(word) {{
+            const lower = word.toLowerCase();
+            if (lower === 'ma10') return 'MA10';
+            if (lower === 'ema10') return 'EMA10';
+            if (lower === 'wk') return 'W';
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }}).join(' ');
+    }}
+    """)
 
 
 def _breakout_quality_header_jscode():
@@ -404,6 +430,10 @@ def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -
         "suppressDragLeaveHidesColumns": True,
         "animateRows": False,
     }
+    if columns == C_RANK_REFERENCE_COLUMNS:
+        for definition in options["columnDefs"]:
+            if definition["field"] != "code":
+                definition["flex"] = 1
     if HAS_JS_CODE:
         options["getRowId"] = JsCode("""
         function(params) {
@@ -414,6 +444,38 @@ def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -
             "breakoutQualityHeader": _breakout_quality_header_jscode(),
             "breakoutQualityCellRenderer": _breakout_quality_cell_renderer_jscode(),
         }
+        options["getRowStyle"] = JsCode("""
+        function(params) {
+            if (params.data && params.data._review_visited) {
+                return { backgroundColor: 'rgba(56, 189, 248, 0.06)' };
+            }
+            return null;
+        }
+        """)
+        options["onCellKeyDown"] = JsCode("""
+        function(params) {
+            const event = params.event;
+            if (!event || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+            const currentIndex = params.node ? params.node.rowIndex : -1;
+            if (currentIndex < 0) return;
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            const targetIndex = currentIndex + delta;
+            if (targetIndex < 0 || targetIndex >= params.api.getDisplayedRowCount()) return;
+            const target = params.api.getDisplayedRowAtIndex(targetIndex);
+            if (!target) return;
+            target.setSelected(true, true);
+            params.api.ensureIndexVisible(targetIndex);
+            event.preventDefault();
+        }
+        """)
+        options["onCellFocused"] = JsCode("""
+        function(params) {
+            if (!params || params.rowIndex === null || params.rowIndex === undefined) return;
+            const target = params.api.getDisplayedRowAtIndex(params.rowIndex);
+            if (!target || target.isSelected()) return;
+            target.setSelected(true, true);
+        }
+        """)
     return options
 
 
@@ -460,6 +522,7 @@ def render_table(
     grid_key: str,
     show_origin_badge: bool,
     height: int = 620,
+    visited_codes: set[str] | None = None,
 ) -> str | None:
     display_columns = [column for column in columns if column in df.columns]
     row_columns = _row_data_columns(
@@ -469,6 +532,12 @@ def render_table(
     )
     grid_df = df[row_columns].copy() if row_columns else df.copy()
     grid_df = _normalize_breakout_quality_display_values(grid_df)
+    visited = {str(code).strip() for code in (visited_codes or set())}
+    grid_df["_review_visited"] = (
+        grid_df["code"].map(lambda value: str(value).strip() in visited)
+        if "code" in grid_df.columns
+        else False
+    )
     grid_df.index = range(1, len(grid_df) + 1)
 
     for col in grid_df.columns:
@@ -481,6 +550,10 @@ def render_table(
         import streamlit as st
 
         visible_df = grid_df[display_columns].copy() if display_columns else grid_df
+        for column in DISPLAY_FORMAT_FIELDS.intersection(visible_df.columns):
+            visible_df[column] = visible_df[column].map(
+                lambda value, field=column: format_display_value(field, value)
+            )
         st.dataframe(visible_df, use_container_width=True, height=height)
         st.caption("Install streamlit-aggrid to enable pinning, drag columns, range selection, and copy support.")
         return None
@@ -532,6 +605,8 @@ def _column_def(column: str, *, show_origin_badge: bool = False) -> dict:
         formatter = _get_value_formatter(fmt)
         if formatter:
             definition["valueFormatter"] = formatter
+    elif HAS_JS_CODE and column in DISPLAY_FORMAT_FIELDS:
+        definition["valueFormatter"] = _display_value_formatter_jscode(column)
     if column == "code":
         definition["pinned"] = "left"
         definition["width"] = 155
@@ -540,7 +615,6 @@ def _column_def(column: str, *, show_origin_badge: bool = False) -> dict:
         if HAS_JS_CODE:
             definition["cellRenderer"] = _code_renderer_jscode(show_origin_badge)
     elif column == "rank_C_continuous":
-        definition["pinned"] = "right"
         definition["width"] = 85
         definition["minWidth"] = 85
     elif column == "ibd_candidate_rule":

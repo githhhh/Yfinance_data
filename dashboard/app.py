@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import sys
 from datetime import date
 from pathlib import Path
@@ -29,21 +30,24 @@ from dashboard.data_utils import (
 from dashboard.field_config import (
     FLOW_CARD_META,
     STATUS_META,
+    format_display_value,
     get_all_table_columns,
     get_column_view_fields,
     get_field_label,
     get_midweek_table_columns,
 )
 from dashboard.services.bf_midweek_review import (
-    ENTRY_VOL_ENABLED_STATUSES,
     PoolAnalysisResult,
     PoolMode,
+    SETUP_FILTER_OPTIONS,
     analyze_breakout_follow_pool,
     apply_review_filters,
     build_review_filter_counts,
     clear_quick_filters,
+    default_sort_mode,
     default_review_state,
     materialize_review_view,
+    normalize_review_state,
     reconcile_review_state,
     reset_to_all_signals,
     sort_review_rows,
@@ -101,6 +105,93 @@ def _review_grid_key(mode: str) -> str:
     )
 
 
+def build_review_position(
+    df: pd.DataFrame,
+    selected_code: str | None,
+) -> dict[str, object]:
+    total = len(df)
+    selected = str(selected_code).strip() if selected_code is not None else ""
+    if not selected or "code" not in df.columns:
+        return {"code": "", "position": None, "total": total, "label": ""}
+    codes = df["code"].map(lambda value: str(value).strip()).reset_index(drop=True)
+    matches = codes[codes.eq(selected)]
+    if matches.empty:
+        return {"code": "", "position": None, "total": total, "label": ""}
+    position = int(matches.index[0]) + 1
+    return {
+        "code": selected,
+        "position": position,
+        "total": total,
+        "label": f"{selected} · {position} of {total}",
+    }
+
+
+def _record_review_visit(
+    store: dict[str, set[str]],
+    view_key: str,
+    selected_code: str | None,
+) -> dict[str, set[str]]:
+    result = {key: set(values) for key, values in store.items()}
+    code = str(selected_code).strip() if selected_code is not None else ""
+    if code:
+        result.setdefault(view_key, set()).add(code)
+    return result
+
+
+def resolve_review_selection(
+    df: pd.DataFrame,
+    current_code: str | None,
+    previous_code: str | None,
+) -> str | None:
+    if "code" not in df.columns:
+        return None
+    available = set(df["code"].map(lambda value: str(value).strip()))
+    for candidate in (current_code, previous_code):
+        code = str(candidate).strip() if candidate is not None else ""
+        if code and code in available:
+            return code
+    return None
+
+
+def _visited_codes(view_key: str) -> set[str]:
+    store = st.session_state.get("review_visited_codes", {})
+    return set(store.get(view_key, set()))
+
+
+def _store_review_visit(view_key: str, selected_code: str | None) -> None:
+    st.session_state["review_visited_codes"] = _record_review_visit(
+        st.session_state.get("review_visited_codes", {}),
+        view_key,
+        selected_code,
+    )
+
+
+def _stored_review_selection(view_key: str) -> str | None:
+    return st.session_state.get("review_selected_codes", {}).get(view_key)
+
+
+def _remember_review_selection(view_key: str, selected_code: str | None) -> None:
+    code = str(selected_code).strip() if selected_code is not None else ""
+    if not code:
+        return
+    selections = dict(st.session_state.get("review_selected_codes", {}))
+    selections[view_key] = code
+    st.session_state["review_selected_codes"] = selections
+
+
+def _reconcile_review_selections(
+    selections: dict[str, str],
+    view_key: str,
+    available_codes: list[str],
+) -> dict[str, str]:
+    result = dict(selections)
+    selected = str(result.get(view_key, "")).strip()
+    available = {str(code).strip() for code in available_codes}
+    if selected and selected not in available:
+        result.pop(view_key, None)
+    return result
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -123,7 +214,9 @@ def main() -> None:
         )
         if "review_ui_state" not in st.session_state:
             st.session_state["review_ui_state"] = default_review_state(analysis.mode)
-        state = dict(st.session_state["review_ui_state"])
+        state = normalize_review_state(dict(st.session_state["review_ui_state"]))
+        if state != st.session_state["review_ui_state"]:
+            st.session_state["review_ui_state"] = state
         if state.get("mode") == "MIDWEEK" and not analysis.midweek_available:
             state = default_review_state(PoolMode.COMPLETE)
             st.session_state["review_ui_state"] = state
@@ -139,9 +232,16 @@ def main() -> None:
     except Exception as exc:
         load_err = str(exc)
 
+    mode = st.session_state.get("global_mode_selector", "IBD Review")
+    header_df = (
+        analysis.complete_pool
+        if mode == "C Rank Reference" and analysis is not None
+        else df
+    )
+
     with st.container(key="dashboard_shell"):
         with st.container(key="dashboard_header"):
-            _render_header_bar(df, load_err, analysis)
+            _render_header_bar(header_df, load_err, analysis, mode)
 
         if analysis is not None:
             for warning in analysis.warnings:
@@ -151,7 +251,6 @@ def main() -> None:
             st.error(f"Could not load breakout pool data: {load_err}")
             return
 
-        mode = st.session_state.get("global_mode_selector", "IBD Review")
         if mode == "C Rank Reference":
             reference_df = analysis.complete_pool if analysis is not None else df
             _render_c_rank_reference_view(reference_df)
@@ -178,20 +277,46 @@ def _view_dataframe(analysis: PoolAnalysisResult, state: dict[str, Any]) -> pd.D
     return complete
 
 
+def _data_badge(
+    freshness: dict[str, object] | None,
+    *,
+    loaded: bool,
+) -> tuple[str, str]:
+    if not loaded:
+        return "Schema / Data Error", "error"
+    status = str((freshness or {}).get("status", "UNKNOWN")).upper()
+    labels = {
+        "FRESH": ("Data Fresh", "fresh"),
+        "AGING": ("Data Aging", "aging"),
+        "STALE": ("Data Stale", "stale"),
+    }
+    return labels.get(status, ("Data Loaded", "loaded"))
+
+
 def _render_header_bar(
     df: pd.DataFrame | None,
     load_err: str | None,
     analysis: PoolAnalysisResult | None = None,
+    global_mode: str = "IBD Review",
 ) -> None:
     col_l, col_r = st.columns([3, 1.5])
     with col_l:
-        badge_html = (
-            '<span class="data-badge data-badge--ready">Data Ready</span>'
-            if df is not None
-            else '<span class="data-badge data-badge--error">Schema / Data Error</span>'
-        )
         state = st.session_state.get("review_ui_state", {})
-        is_midweek = state.get("mode") == "MIDWEEK" and analysis is not None
+        is_midweek = (
+            global_mode == "IBD Review"
+            and state.get("mode") == "MIDWEEK"
+            and analysis is not None
+        )
+        freshness = (
+            None
+            if is_midweek
+            else build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+        )
+        badge_label, badge_tone = _data_badge(freshness, loaded=df is not None)
+        badge_html = (
+            f'<span class="data-badge data-badge--{badge_tone}">'
+            f'{html.escape(badge_label)}</span>'
+        )
         if is_midweek:
             snapshot_value = analysis.midweek_snapshot_date.isoformat() if analysis.midweek_snapshot_date else "N/A"
             baseline_value = (
@@ -205,7 +330,7 @@ def _render_header_bar(
                 f'<span class="snapshot-mode-segment snapshot-mode-segment--midweek">Midweek · baseline {baseline_value}</span>'
             )
         else:
-            freshness = build_snapshot_freshness(_get_snapshot_date(df) if df is not None else "N/A")
+            assert freshness is not None
             age_label = (
                 "Unknown"
                 if freshness["age_days"] is None
@@ -261,7 +386,7 @@ def _render_flow_rules_dialog() -> None:
 
         ### Volume Definition
         - **Entry / Reason**：日线突破确认和日线量比。
-        - **W Vol**：当前周成交量相对 10 周均量。
+        - **Weekly Vol**：当前周成交量相对 10 周均量。
         - **C Rank**：质量对照，不代替 IBD 入场状态。
         """
     )
@@ -269,10 +394,6 @@ def _render_flow_rules_dialog() -> None:
 
 def _store_review_state(state: dict[str, Any]) -> None:
     st.session_state["review_ui_state"] = dict(state)
-
-
-def _selected_button_label(selected: bool, label: str) -> str:
-    return f"{'✓' if selected else ' '} {label}"
 
 
 def _render_ibd_review_view(
@@ -283,7 +404,9 @@ def _render_ibd_review_view(
         st.session_state["review_ui_state"] = default_review_state(
             analysis.mode if analysis is not None else PoolMode.COMPLETE
         )
-    state = dict(st.session_state["review_ui_state"])
+    state = normalize_review_state(dict(st.session_state["review_ui_state"]))
+    if state != st.session_state["review_ui_state"]:
+        st.session_state["review_ui_state"] = state
     counts = build_review_filter_counts(df, state)
 
     with st.container(key="review_queue"):
@@ -292,60 +415,69 @@ def _render_ibd_review_view(
     with st.container(key="filters"):
         _render_filter_bar(df, state, counts)
 
-    filtered_df = apply_review_filters(df, state)
-    filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
     has_comparison = (
         state["mode"] == "MIDWEEK"
         and _midweek_has_comparison(analysis)
     )
+    fixed_sort = default_sort_mode(
+        state["mode"],
+        state["scope"],
+        has_comparison=has_comparison,
+    )
+    if state.get("sort_mode") != fixed_sort:
+        state["sort_mode"] = fixed_sort
+        _store_review_state(state)
+
+    filtered_df = apply_review_filters(df, state)
+    filtered_df = sort_review_rows(filtered_df, fixed_sort)
+    st.session_state["review_selected_codes"] = _reconcile_review_selections(
+        st.session_state.get("review_selected_codes", {}),
+        state["mode"],
+        filtered_df["code"].tolist(),
+    )
 
     with st.container(key="results_toolbar"):
-        summary_col, actions_col = st.columns([1, 0.34], vertical_alignment="center")
+        summary_col, actions_col, _ = st.columns([0.24, 0.14, 1], vertical_alignment="center")
         with summary_col:
             st.markdown(
-                f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(state["sort_mode"])}</div>',
+                f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(fixed_sort)}</div>',
                 unsafe_allow_html=True,
             )
         with actions_col:
             with st.container(key="results_actions"):
-                copy_col, sort_col = st.columns([0.9, 1.1], vertical_alignment="center")
-                with copy_col:
-                    _render_copy_codes_control(
-                        filtered_df["code"].tolist(),
-                        key_prefix=f'ibd_review_{state["mode"].lower()}',
-                    )
-                with sort_col:
-                    options = ["Review Priority", "C Rank", "Distance"] if has_comparison else ["C Rank", "Distance"]
-                    current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
-                    selected_sort = st.selectbox(
-                        "Sort",
-                        options,
-                        index=options.index(current_sort),
-                        key=f'review_sort_{state.get("widget_generation", 0)}',
-                        label_visibility="collapsed",
-                    )
-                    if selected_sort != state["sort_mode"]:
-                        state["sort_mode"] = selected_sort
-                        _store_review_state(state)
-                        st.rerun()
+                _render_copy_codes_control(
+                    filtered_df["code"].tolist(),
+                    key_prefix=f'ibd_review_{state["mode"].lower()}',
+                    compact_feedback=True,
+                )
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
     grid_key = _review_grid_key(state["mode"])
 
-    with st.container(key="selected_row"):
+    with st.container(key="ibd_selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(
+        grid_selected_code = render_table(
             filtered_df,
             columns,
             grid_key=grid_key,
             show_origin_badge=has_comparison,
             height=480,
+            visited_codes=_visited_codes(state["mode"]),
         )
 
+    selected_code = resolve_review_selection(
+        filtered_df,
+        grid_selected_code,
+        _stored_review_selection(state["mode"]),
+    )
+    if grid_selected_code in set(filtered_df["code"].astype(str)):
+        _remember_review_selection(state["mode"], grid_selected_code)
+    _store_review_visit(state["mode"], selected_code)
+
     with detail_container.container():
-        _render_selected_row_detail(filtered_df, selected_code)
+        _render_ibd_selected_row_detail(filtered_df, selected_code)
 
     st.markdown("---")
     _download_current_rows(filtered_df, "ibd_review_filtered.csv")
@@ -374,56 +506,65 @@ def _render_mode_scope_controls(
         with title_col:
             st.markdown("##### Review Queue")
         with mode_col:
-            with st.container(key="review_mode_controls"):
-                mode_cols = st.columns(2, gap="small")
-                with mode_cols[0]:
-                    if st.button(
-                        _selected_button_label(state["mode"] == "MIDWEEK", "Midweek Review"),
-                        key="btn_mode_midweek",
-                        use_container_width=True,
-                        disabled=not midweek_available,
-                        type="primary" if state["mode"] == "MIDWEEK" else "secondary",
-                    ):
-                        _store_review_state(
-                            switch_review_mode(
-                                state,
-                                "MIDWEEK",
-                                midweek_has_baseline=_midweek_has_comparison(analysis),
+            with st.container(key="review_period_group"):
+                st.caption("PERIOD")
+                with st.container(key="review_mode_controls"):
+                    mode_cols = st.columns(2, gap="small")
+                    with mode_cols[0]:
+                        if st.button(
+                            "Midweek Review",
+                            key="btn_mode_midweek",
+                            use_container_width=True,
+                            disabled=not midweek_available,
+                            type="primary" if state["mode"] == "MIDWEEK" else "secondary",
+                        ):
+                            _store_review_state(
+                                switch_review_mode(
+                                    state,
+                                    "MIDWEEK",
+                                    midweek_has_baseline=_midweek_has_comparison(analysis),
+                                )
                             )
-                        )
-                        st.rerun()
-                with mode_cols[1]:
-                    if st.button(
-                        _selected_button_label(state["mode"] == "WEEKEND", "Weekend Full Pool"),
-                        key="btn_mode_weekend",
-                        use_container_width=True,
-                        type="primary" if state["mode"] == "WEEKEND" else "secondary",
-                    ):
-                        _store_review_state(switch_review_mode(state, "WEEKEND"))
-                        st.rerun()
+                            st.rerun()
+                    with mode_cols[1]:
+                        if st.button(
+                            "Weekend Pool",
+                            key="btn_mode_weekend",
+                            use_container_width=True,
+                            type="primary" if state["mode"] == "WEEKEND" else "secondary",
+                        ):
+                            _store_review_state(switch_review_mode(state, "WEEKEND"))
+                            st.rerun()
         with scope_col:
-            with st.container(key="review_scope_controls"):
-                scope_cols = st.columns(2, gap="small")
-                with scope_cols[0]:
-                    if st.button(
-                        _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
-                        key="btn_scope_changes",
-                        use_container_width=True,
-                        disabled=not has_comparison,
-                        type="primary" if state["scope"] == "CHANGES" else "secondary",
-                    ):
-                        state["scope"] = "CHANGES"
-                        _store_review_state(state)
-                        st.rerun()
-                with scope_cols[1]:
-                    if st.button(
-                        _selected_button_label(state["scope"] == "ALL_SIGNALS", f"All Signals ({all_total})"),
-                        key="btn_scope_all_signals",
-                        use_container_width=True,
-                        type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
-                    ):
-                        _store_review_state(reset_to_all_signals(state))
-                        st.rerun()
+            with st.container(key="review_scope_group"):
+                st.caption("SCOPE")
+                with st.container(key="review_scope_controls"):
+                    if not has_comparison:
+                        st.markdown(
+                            f'<div class="weekend-scope-static">All Signals · {all_total}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        scope_cols = st.columns(2, gap="small")
+                        with scope_cols[0]:
+                            if st.button(
+                                f"Changes · {change_total}",
+                                key="btn_scope_changes",
+                                use_container_width=True,
+                                type="primary" if state["scope"] == "CHANGES" else "secondary",
+                            ):
+                                state["scope"] = "CHANGES"
+                                _store_review_state(state)
+                                st.rerun()
+                        with scope_cols[1]:
+                            if st.button(
+                                f"All Signals · {all_total}",
+                                key="btn_scope_all_signals",
+                                use_container_width=True,
+                                type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
+                            ):
+                                _store_review_state(reset_to_all_signals(state))
+                                st.rerun()
 
 
 def df_active_count_for_state(
@@ -472,6 +613,13 @@ def _toggle_dimension(state: dict[str, Any], field: str, value: str) -> dict[str
     return result
 
 
+def _quick_filter_count(state: dict[str, Any]) -> int:
+    return sum(
+        state.get(field, "ALL") != "ALL"
+        for field in ("change_filter", "origin_filter")
+    )
+
+
 def _render_quick_group(
     card_ids: tuple[str, str, str],
     *,
@@ -486,7 +634,7 @@ def _render_quick_group(
         with column:
             if _render_filter_card(
                 card_id,
-                f"{metadata['label']} · {counts[count_field][card_id]}",
+                f"**{metadata['symbol']}** {metadata['label']} **{counts[count_field][card_id]}**",
                 metadata,
                 selected=state[state_field] == card_id,
                 button_key=f"btn_{state_field}_{card_id}",
@@ -521,43 +669,43 @@ def _render_review_context(
             return
 
         with st.container(key="quick_context_row"):
-            change_label, change_group, divider, origin_label, origin_group, clear_col = st.columns(
-                [0.48, 3.95, 0.16, 0.48, 3.95, 0.72], gap="small"
-            )
-            with change_label:
-                with st.container(key="quick_label_change"):
-                    st.caption("CHANGE")
+            change_group, origin_group, clear_col = st.columns([1, 1, 0.13], gap="small")
             with change_group:
-                _render_quick_group(
-                    ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"),
-                    count_field="change",
-                    state_field="change_filter",
-                    counts=counts,
-                    state=state,
-                )
-            with divider:
-                with st.container(key="quick_divider"):
-                    st.markdown('<span aria-hidden="true"></span>', unsafe_allow_html=True)
-            with origin_label:
-                with st.container(key="quick_label_origin"):
-                    st.caption("ORIGIN")
+                with st.container(key="quick_change_group"):
+                    st.caption("WHAT CHANGED")
+                    _render_quick_group(
+                        ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"),
+                        count_field="change",
+                        state_field="change_filter",
+                        counts=counts,
+                        state=state,
+                    )
             with origin_group:
-                _render_quick_group(
-                    ("NEW", "CARRY", "RECONFIRMED"),
-                    count_field="origin",
-                    state_field="origin_filter",
-                    counts=counts,
-                    state=state,
-                )
+                with st.container(key="quick_origin_group"):
+                    st.caption("SIGNAL SOURCE")
+                    _render_quick_group(
+                        ("NEW", "CARRY", "RECONFIRMED"),
+                        count_field="origin",
+                        state_field="origin_filter",
+                        counts=counts,
+                        state=state,
+                    )
             with clear_col:
-                if st.button(
-                    "Clear",
-                    key="btn_clear_quick",
-                    use_container_width=True,
-                    disabled=(state["change_filter"] == "ALL" and state["origin_filter"] == "ALL"),
-                ):
-                    _store_review_state(clear_quick_filters(state))
-                    st.rerun()
+                with st.container(key="quick_clear_slot"):
+                    quick_filter_count = _quick_filter_count(state)
+                    if quick_filter_count:
+                        if st.button(
+                            f"Clear {quick_filter_count}",
+                            key="btn_clear_quick",
+                            use_container_width=True,
+                        ):
+                            _store_review_state(clear_quick_filters(state))
+                            st.rerun()
+                    else:
+                        st.markdown(
+                            '<span class="quick-clear-placeholder" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
 
 
 def _render_status_queue(
@@ -577,10 +725,9 @@ def _render_status_queue(
             with cols[i]:
                 count = counts["status"].get(status_name, 0)
                 is_active = state["status_filter"] == status_name
-                prefix = "✓ " if is_active else "  "
                 display_name = status_name.replace("_", " ")
                 meta = STATUS_META[status_name]
-                btn_label = f"{prefix}{display_name} · {count}\n{meta['subtitle']}"
+                btn_label = f"{display_name} · {count}\n{meta['subtitle']}"
                 if _render_filter_card(
                     status_name,
                     btn_label,
@@ -596,13 +743,44 @@ def _active_filter_count(state: dict[str, Any]) -> int:
     return sum(
         [
             state.get("route_filter", "All") != "All",
-            bool(state.get("distance_min")),
-            bool(state.get("distance_max")),
-            bool(state.get("entry_volume_min")),
-            bool(state.get("weekly_volume_min")),
-            bool(state.get("near_trigger_only")),
+            state.get("distance_range") is not None,
+            state.get("entry_volume_min") is not None,
+            state.get("weekly_volume_min") is not None,
         ]
     )
+
+
+def _slider_bounds(
+    df: pd.DataFrame,
+    field: str,
+    *,
+    floor_value: float,
+    ceiling_value: float,
+) -> tuple[float, float] | None:
+    if field not in df.columns:
+        return None
+    values = pd.to_numeric(df[field], errors="coerce").dropna()
+    values = values[values.map(math.isfinite)]
+    if values.empty:
+        return None
+    lower = min(floor_value, math.floor(float(values.min()) * 10.0) / 10.0)
+    upper = max(ceiling_value, math.ceil(float(values.max()) * 10.0) / 10.0)
+    return (round(lower, 1), round(upper, 1))
+
+
+def _clamped_range(value: Any, bounds: tuple[float, float]) -> tuple[float, float]:
+    if not isinstance(value, (tuple, list)) or len(value) != 2:
+        return bounds
+    lower = min(max(float(value[0]), bounds[0]), bounds[1])
+    upper = min(max(float(value[1]), lower), bounds[1])
+    return (round(lower, 1), round(upper, 1))
+
+
+def _store_advanced_filter(state: dict[str, Any], field: str, value: Any) -> None:
+    updated = dict(state)
+    updated[field] = value
+    _store_review_state(updated)
+    st.rerun()
 
 
 def _render_filter_bar(
@@ -610,8 +788,9 @@ def _render_filter_bar(
     state: dict[str, Any],
     counts: dict[str, Any],
 ) -> None:
+    del counts
     active_count = _active_filter_count(state)
-    summary = "No filters applied" if active_count == 0 else f"{active_count} active"
+    summary = "None" if active_count == 0 else f"{active_count} active"
     with st.container(key="filters_header"):
         st.markdown(
             '<span class="filters-state-marker" '
@@ -619,93 +798,296 @@ def _render_filter_bar(
             'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if st.button(
-            f"Filters · {summary}",
-            key="btn_filters_toggle",
-            use_container_width=True,
-        ):
-            state["filters_expanded"] = not state["filters_expanded"]
-            _store_review_state(state)
-            st.rerun()
+        header_cols = st.columns(
+            [0.24, 0.08, 1] if active_count > 1 else [0.24, 1],
+            gap="small",
+            vertical_alignment="center",
+        )
+        with header_cols[0]:
+            if st.button(
+                f"More Filters · {summary}",
+                key="btn_filters_toggle",
+                use_container_width=True,
+            ):
+                state["filters_expanded"] = not state["filters_expanded"]
+                _store_review_state(state)
+                st.rerun()
+        if active_count > 1:
+            with header_cols[1]:
+                if st.button(
+                    "Reset",
+                    key="btn_filters_reset",
+                    use_container_width=True,
+                ):
+                    reset = dict(state)
+                    reset.update(
+                        {
+                            "route_filter": "All",
+                            "distance_range": None,
+                            "entry_volume_min": None,
+                            "weekly_volume_min": None,
+                            "widget_generation": int(state.get("widget_generation", 0)) + 1,
+                        }
+                    )
+                    _store_review_state(reset)
+                    st.rerun()
     if not state["filters_expanded"]:
         return
 
-    generation = state.get("widget_generation", 0)
+    generation = int(state.get("widget_generation", 0))
     controls = st.container(key="filter_controls")
-    cols = controls.columns([1.6, 1.1, 1.1, 1.1, 1.1, 0.8], vertical_alignment="bottom")
+    cols = controls.columns([1.25, 2.0, 2.3], vertical_alignment="top")
     with cols[0]:
-        routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
+        st.caption("SETUP")
         current_route = state.get("route_filter", "All")
-        selected_route = st.selectbox(
-            "Route (Rule)",
-            routes,
-            index=routes.index(current_route) if current_route in routes else 0,
-            key=f"review_route_{generation}",
-        )
+        routes = list(SETUP_FILTER_OPTIONS)
+        route_label = "All" if current_route == "All" else format_display_value("ibd_candidate_rule", current_route)
+        with st.popover(route_label, use_container_width=True):
+            selected_route = st.radio(
+                "Setup",
+                routes,
+                index=routes.index(current_route) if current_route in routes else 0,
+                key=f"review_route_{generation}",
+                format_func=lambda value: "All" if value == "All" else format_display_value("ibd_candidate_rule", value),
+                label_visibility="collapsed",
+            )
         if selected_route != current_route:
-            state["route_filter"] = selected_route
-            _store_review_state(state)
-            st.rerun()
+            _store_advanced_filter(state, "route_filter", selected_route)
     with cols[1]:
-        val = st.text_input("Distance Min %", value=state.get("distance_min", ""), key=f"review_dist_min_{generation}")
-        if val != state.get("distance_min", ""):
-            state["distance_min"] = val
-            _store_review_state(state)
-            st.rerun()
+        st.caption("PRICE POSITION")
+        distance_bounds = _slider_bounds(
+            df,
+            "current_vs_ibd_candidate_pct",
+            floor_value=-5.0,
+            ceiling_value=5.0,
+        )
+        if distance_bounds is not None:
+            current_range = _clamped_range(state.get("distance_range"), distance_bounds)
+            st.markdown(
+                '<div class="filter-slider-heading filter-slider-heading--range">Vs Buy Point</div>',
+                unsafe_allow_html=True,
+            )
+            selected_range = st.slider(
+                "Vs Buy Point",
+                min_value=distance_bounds[0],
+                max_value=distance_bounds[1],
+                value=current_range,
+                step=0.1,
+                format="%+.1f%%",
+                key=f"review_distance_{generation}",
+                label_visibility="collapsed",
+            )
+            selected_value = None if selected_range == distance_bounds else tuple(selected_range)
+            if selected_value != state.get("distance_range"):
+                _store_advanced_filter(state, "distance_range", selected_value)
     with cols[2]:
-        val = st.text_input("Distance Max %", value=state.get("distance_max", ""), key=f"review_dist_max_{generation}")
-        if val != state.get("distance_max", ""):
-            state["distance_max"] = val
-            _store_review_state(state)
-            st.rerun()
-    with cols[3]:
-        current_status = state.get("status_filter", "ALL")
-        if current_status == "UNCONFIRMED":
-            val = st.checkbox(
-                "Near Trigger ≤ +3%",
-                value=state.get("near_trigger_only", False),
-                key=f"review_near_{generation}",
-            )
-            if val != state.get("near_trigger_only", False):
-                state["near_trigger_only"] = val
-                _store_review_state(state)
-                st.rerun()
-        else:
-            is_disabled = current_status not in ENTRY_VOL_ENABLED_STATUSES
-            val = st.text_input(
-                "Entry Vol Min (x)",
-                value="" if is_disabled else state.get("entry_volume_min", ""),
-                placeholder="N/A (Disabled)" if is_disabled else "",
-                disabled=is_disabled,
-                key=f"review_entry_vol_{generation}",
-            )
-            if not is_disabled and val != state.get("entry_volume_min", ""):
-                state["entry_volume_min"] = val
-                _store_review_state(state)
-                st.rerun()
-    with cols[4]:
-        val = st.text_input("Weekly Vol Min (x)", value=state.get("weekly_volume_min", ""), key=f"review_weekly_vol_{generation}")
-        if val != state.get("weekly_volume_min", ""):
-            state["weekly_volume_min"] = val
-            _store_review_state(state)
-            st.rerun()
-    with cols[5]:
-        if st.button("Reset", key="btn_filters_reset", use_container_width=True):
-            reset = dict(state)
-            reset.update(
-                {
-                    "route_filter": "All",
-                    "status_filter": "ALL",
-                    "distance_min": "",
-                    "distance_max": "",
-                    "entry_volume_min": "",
-                    "weekly_volume_min": "",
-                    "near_trigger_only": False,
-                    "widget_generation": generation + 1,
-                }
-            )
-            _store_review_state(reset)
-            st.rerun()
+        st.caption("VOLUME")
+        volume_cols = st.columns(2, gap="small")
+        entry_bounds = _slider_bounds(
+            df,
+            "ibd_entry_volume_ratio",
+            floor_value=0.0,
+            ceiling_value=1.0,
+        )
+        weekly_bounds = _slider_bounds(
+            df,
+            "volume_ratio",
+            floor_value=0.0,
+            ceiling_value=1.0,
+        )
+        with volume_cols[0]:
+            with st.container(key="filter_entry_volume"):
+                if entry_bounds is not None:
+                    entry_state = state.get("entry_volume_min")
+                    entry_value = entry_bounds[0] if entry_state is None else float(entry_state)
+                    entry_value = min(max(entry_value, entry_bounds[0]), entry_bounds[1])
+                    entry_label = "Entry Volume ≥ Any" if entry_state is None else f"Entry Volume ≥ {entry_value:.1f}×"
+                    entry_current = "Any" if entry_state is None else f"{entry_value:.1f}×"
+                    entry_active_class = " filter-volume-value--active" if entry_state is not None else ""
+                    st.markdown(
+                        f'<div class="filter-slider-heading">{entry_label}</div>'
+                        f'<div class="filter-volume-value{entry_active_class}">'
+                        f'<span>{entry_current}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    selected_entry = st.slider(
+                        entry_label,
+                        min_value=entry_bounds[0],
+                        max_value=entry_bounds[1],
+                        value=entry_value,
+                        step=0.1,
+                        format="%.1fx",
+                        key=f"review_entry_vol_{generation}",
+                        label_visibility="collapsed",
+                    )
+                    selected_value = None if selected_entry == entry_bounds[0] else round(float(selected_entry), 1)
+                    if selected_value != entry_state:
+                        _store_advanced_filter(state, "entry_volume_min", selected_value)
+        with volume_cols[1]:
+            with st.container(key="filter_weekly_volume"):
+                if weekly_bounds is not None:
+                    weekly_state = state.get("weekly_volume_min")
+                    weekly_value = weekly_bounds[0] if weekly_state is None else float(weekly_state)
+                    weekly_value = min(max(weekly_value, weekly_bounds[0]), weekly_bounds[1])
+                    weekly_label = "Weekly Volume ≥ Any" if weekly_state is None else f"Weekly Volume ≥ {weekly_value:.1f}×"
+                    weekly_current = "Any" if weekly_state is None else f"{weekly_value:.1f}×"
+                    weekly_active_class = " filter-volume-value--active" if weekly_state is not None else ""
+                    st.markdown(
+                        f'<div class="filter-slider-heading">{weekly_label}</div>'
+                        f'<div class="filter-volume-value{weekly_active_class}">'
+                        f'<span>{weekly_current}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    selected_weekly = st.slider(
+                        weekly_label,
+                        min_value=weekly_bounds[0],
+                        max_value=weekly_bounds[1],
+                        value=weekly_value,
+                        step=0.1,
+                        format="%.1fx",
+                        key=f"review_weekly_vol_{generation}",
+                        label_visibility="collapsed",
+                    )
+                    selected_value = None if selected_weekly == weekly_bounds[0] else round(float(selected_weekly), 1)
+                    if selected_value != weekly_state:
+                        _store_advanced_filter(state, "weekly_volume_min", selected_value)
+def _render_ibd_selected_row_detail(
+    filtered_df: pd.DataFrame,
+    selected_code: str | None,
+) -> None:
+    if filtered_df.empty:
+        st.markdown(
+            '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
+            '<span>No matching records found with current filter criteria.</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+    if selected_code is None or selected_code not in filtered_df["code"].values:
+        st.markdown(
+            '<div class="ibd-selected-strip ibd-selected-strip--empty" role="status">'
+            '<span>Select a row · Use ↑↓ to review</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    row = filtered_df.loc[filtered_df["code"].eq(selected_code)].iloc[0]
+    code = html.escape(str(row.get("code", "N/A")))
+    cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
+    cand_rule = html.escape(format_display_value("ibd_candidate_rule", row.get("ibd_candidate_rule")) or "N/A")
+    dist_pct = html.escape(_format_number(row.get("current_vs_ibd_candidate_pct"), "%"))
+    latest_close = html.escape(_format_number(row.get("latest_close"), ""))
+    status_name = html.escape(str(row.get("ibd_entry_status", "N/A")).replace("_", " "))
+    vol_or_reject_text = format_display_value(
+        "ibd_entry_vol_or_reject",
+        row.get("ibd_entry_vol_or_reject"),
+    ) or "N/A"
+    if vol_or_reject_text.endswith("x"):
+        vol_or_reject_text = f"{vol_or_reject_text[:-1]}×"
+    vol_or_reject = html.escape(vol_or_reject_text)
+    baseline_raw = row.get("review_baseline_entry_status")
+    baseline_status = (
+        str(baseline_raw).strip().replace("_", " ")
+        if baseline_raw is not None and not pd.isna(baseline_raw) and str(baseline_raw).strip()
+        else ""
+    )
+    status_color = STATUS_META.get(str(row.get("ibd_entry_status", "N/A")), {}).get("color", "#f2f5f9")
+    status_transition = (
+        f'{html.escape(baseline_status)} → <span style="color:{status_color};">{status_name}</span>'
+        if baseline_status
+        else f'<span style="color:{status_color};">{status_name}</span>'
+    )
+    rank_raw = pd.to_numeric(row.get("rank_C_continuous"), errors="coerce")
+    rank_text = (
+        str(int(rank_raw))
+        if pd.notna(rank_raw) and float(rank_raw).is_integer()
+        else str(row.get("rank_C_continuous", "N/A"))
+    )
+    rank_c = html.escape(rank_text)
+    c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
+    eps_yoy = html.escape(_format_card_val(row.get("eps_yoy_growth"), "%"))
+    dist_52w = html.escape(_format_card_val(row.get("dist_to_52w_high_pct"), "%"))
+    p_52w = html.escape(_format_card_val(row.get("price_52_week_high"), ""))
+    base_depth = html.escape(_format_card_val(row.get("base_depth_pct"), "%"))
+    base_dur = html.escape(_format_card_val(row.get("base_duration_weeks"), "w"))
+    pb_depth = html.escape(_format_card_val(row.get("pullback_pct"), "%"))
+    pb_off_peak = html.escape(_format_card_val(row.get("pullback_pct_off_peak"), "%"))
+    pullback_section = (
+        '<div class="code-popup-section" data-popup-section="pullback">'
+        '<div class="code-popup-title">2. 回撤</div>'
+        '<div class="code-popup-grid-2">'
+        f'<div><div class="code-popup-item">回撤深度</div><div class="code-popup-val">{pb_depth}</div></div>'
+        f'<div><div class="code-popup-item">距回撤高点</div><div class="code-popup-val">{pb_off_peak}</div></div>'
+        '</div></div>'
+        if pb_depth != "n/a" or pb_off_peak != "n/a"
+        else ""
+    )
+    trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
+    raw_valid = row.get("ibd_entry_valid")
+    is_entry_valid = bool(
+        pd.notna(raw_valid)
+        and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1"))
+    )
+    if is_entry_valid:
+        raw_date = row.get("ibd_entry_date")
+        entry_date = html.escape(
+            str(raw_date).split("T")[0]
+            if raw_date is not None and not pd.isna(raw_date) and str(raw_date).strip() not in ("", "nan", "None", "N/A")
+            else "n/a"
+        )
+        daily_vol = html.escape(_format_card_val(row.get("ibd_entry_volume_ratio"), "x"))
+        reject_section = ""
+    else:
+        entry_date = "n/a"
+        daily_vol = "n/a"
+        reject_reason = html.escape(
+            format_display_value("ibd_entry_reject_reason", row.get("ibd_entry_reject_reason")) or "n/a"
+        )
+        reject_section = (
+            '<div class="code-popup-reject" role="alert">'
+            '<div class="code-popup-item">未确认原因</div>'
+            f'<div class="code-popup-val">{reject_reason}</div></div>'
+        )
+    markup = f"""
+        <div class="ibd-selected-strip">
+            <div class="selected-summary-cell selected-code-cell">
+                <details class="code-detail" data-selected-code="{code}">
+                    <summary class="code-hover-trigger" aria-label="{code} 股票详情">{code}</summary>
+                    <div class="code-hover-popup" role="region" aria-label="{code} 股票详情">
+                        <div class="code-hover-surface">
+                            <div class="code-popup-section" data-popup-section="daily-entry">
+                                <div class="code-popup-title">1. 日线入场</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">触发价</div><div class="code-popup-val">{trigger_p}</div></div>
+                                    <div><div class="code-popup-item">入场日期</div><div class="code-popup-val">{entry_date}</div></div>
+                                    <div><div class="code-popup-item">日线量比</div><div class="code-popup-val">{daily_vol}</div></div>
+                                </div>
+                                {reject_section}
+                            </div>
+                            {pullback_section}
+                            <div class="code-popup-section" data-popup-section="canslim-base">
+                                <div class="code-popup-title">3. 基本面 / 形态</div>
+                                <div class="code-popup-grid">
+                                    <div><div class="code-popup-item">EPS 同比</div><div class="code-popup-val">{eps_yoy}</div></div>
+                                    <div><div class="code-popup-item">距 52 周高点</div><div class="code-popup-val">{dist_52w}</div></div>
+                                    <div><div class="code-popup-item">52 周高点</div><div class="code-popup-val">{p_52w}</div></div>
+                                    <div><div class="code-popup-item">平台深度</div><div class="code-popup-val">{base_depth}</div></div>
+                                    <div><div class="code-popup-item">平台时长</div><div class="code-popup-val">{base_dur}</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            <div class="selected-summary-cell"><div class="selected-label">Buy Point</div><div class="selected-value">{cand_price} <span class="selected-secondary">({cand_rule})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">Vs Buy Point</div><div class="selected-value">{dist_pct} <span class="selected-secondary">(Close {latest_close})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">Entry Status</div><div class="selected-value">{status_transition} <span class="selected-secondary">({vol_or_reject})</span></div></div>
+            <div class="selected-summary-cell"><div class="selected-label">C Rank &amp; Continuous</div><div class="selected-value">#{rank_c} <span class="selected-secondary">({c_cont})</span></div></div>
+        </div>
+    """
+    st.markdown(
+        "\n".join(line.strip() for line in markup.splitlines() if line.strip()),
+        unsafe_allow_html=True,
+    )
 
 
 def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | None) -> None:
@@ -720,20 +1102,23 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     if selected_code is None or selected_code not in filtered_df["code"].values:
         st.markdown(
             '<div class="selected-strip selected-strip--empty" role="status">'
-            '<span>Select a row to inspect review details.</span></div>',
+            '<span>Select a row · Use ↑↓ to review</span></div>',
             unsafe_allow_html=True,
         )
         return
 
     row = filtered_df[filtered_df["code"] == selected_code].iloc[0]
+    position_label = html.escape(str(build_review_position(filtered_df, selected_code)["label"]))
 
     code = html.escape(str(row.get("code", "N/A")))
     cand_price = html.escape(_format_number(row.get("ibd_candidate_price"), ""))
-    cand_rule = html.escape(str(row.get("ibd_candidate_rule", "N/A")))
+    cand_rule = html.escape(format_display_value("ibd_candidate_rule", row.get("ibd_candidate_rule")) or "N/A")
     dist_pct = html.escape(_format_number(row.get("current_vs_ibd_candidate_pct"), "%"))
     latest_close = html.escape(_format_number(row.get("latest_close"), ""))
     status_name = html.escape(str(row.get("ibd_entry_status", "N/A")))
-    vol_or_reject = html.escape(str(row.get("ibd_entry_vol_or_reject", "N/A")))
+    vol_or_reject = html.escape(
+        format_display_value("ibd_entry_vol_or_reject", row.get("ibd_entry_vol_or_reject")) or "N/A"
+    )
     rank_c = html.escape(str(row.get("rank_C_continuous", "N/A")))
     c_cont = html.escape(_format_number(row.get("C_continuous"), ""))
 
@@ -798,7 +1183,9 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
     is_entry_valid = bool(pd.notna(raw_valid) and (raw_valid is True or str(raw_valid).strip().lower() in ("true", "1")))
     trigger_p = html.escape(_format_card_val(row.get("ibd_trigger_price"), ""))
     raw_reason = row.get("ibd_entry_reject_reason")
-    reject_reason_str = html.escape(str(raw_reason).strip() if (raw_reason is not None and not pd.isna(raw_reason) and str(raw_reason).strip() not in ("", "nan", "None", "N/A")) else "n/a")
+    reject_reason_str = html.escape(
+        format_display_value("ibd_entry_reject_reason", raw_reason) or "n/a"
+    )
 
     if is_entry_valid:
         raw_date = row.get("ibd_entry_date")
@@ -889,7 +1276,7 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                 <div class="selected-summary-cell selected-code-cell">
                     <div class="code-hover-wrapper">
                         <details class="code-detail" data-selected-code="{code}">
-                            <summary class="code-hover-trigger" aria-label="{code} secondary details">{code} ▾ {origin_badge}</summary>
+                            <summary class="code-hover-trigger" aria-label="{code} secondary details">{position_label} ▾ {origin_badge}</summary>
                             <div class="code-hover-popup" role="region" aria-label="{code} secondary details">
                             <div class="code-hover-surface">
                             <div class="code-popup-section" data-popup-section="daily-entry">
@@ -919,11 +1306,11 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                     {change_markup}
                 </div>
                 <div class="selected-summary-cell">
-                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Buy Point</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{cand_price} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({cand_rule})</span></div>
                 </div>
                 <div class="selected-summary-cell">
-                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Current vs Candidate</div>
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Vs Buy Point</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{dist_pct} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">(Close: {latest_close})</span></div>
                 </div>
                 <div class="selected-summary-cell">
@@ -946,7 +1333,7 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
 def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     active_signals_count = int((df["signal"] == True).sum()) if "signal" in df.columns else len(df)
     denom = active_signals_count if active_signals_count > 0 else len(df)
-    st.markdown("##### C Rank Reference View (`signal=True` · Sorted by `rank_C_continuous` asc)")
+    st.markdown("##### C Rank Reference View · Active Signals · C Rank · Best First")
     
     with st.expander("ℹ️ C Rank Selection & Reference Rules", expanded=False):
         c1, c2 = st.columns(2)
@@ -955,8 +1342,8 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 "\n".join(
                     [
                         "**Fixed Mode Rules**",
-                        "- Exclusively evaluates Active Signals (`signal=True`) across the pool.",
-                        "- Sorted by `rank_C_continuous` asc to horizontally benchmark quality.",
+                        "- Exclusively evaluates Active Signals across the pool.",
+                        "- C Rank · Best First for horizontal quality comparison.",
                         "- Top N slice selector only (custom filters ignored).",
                         "- Auxiliary benchmark; does not replace IBD review status.",
                     ]
@@ -975,17 +1362,25 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
                 )
             )
 
-    with st.container(key="results_toolbar"):
-        col_limit, col_summary, col_copy = st.columns([1.3, 2.3, 2.4], vertical_alignment="bottom")
+    with st.container(key="c_rank_results_toolbar"):
+        col_limit, col_summary, col_copy = st.columns(
+            [1.3, 2.3, 2.4],
+            vertical_alignment="bottom",
+        )
         with col_limit:
-            limit_label = st.selectbox("Top N Slice", ["All rows", "Top 10", "Top 20", "Top 30", "Top 50"], index=0, key="c_rank_top_n_select")
+            limit_label = st.selectbox(
+                "Top N Slice",
+                ["All rows", "Top 10", "Top 25", "Top 50"],
+                index=0,
+                key="c_rank_top_n_select",
+            )
             limit = None if limit_label == "All rows" else int(limit_label.split()[1])
 
         ranked = apply_c_rank_mode(df, limit=limit)
 
         with col_summary:
             st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#c5ceda;">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
+                f'<div class="results-summary">Showing: {len(ranked)} of {denom} Active Signals · Reference Only</div>',
                 unsafe_allow_html=True,
             )
         with col_copy:
@@ -997,13 +1392,22 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     with st.container(key="selected_row"):
         detail_container = st.empty()
     with st.container(key="results_grid"):
-        selected_code = render_table(
+        grid_selected_code = render_table(
             ranked,
             [column for column in columns if column in ranked.columns],
             grid_key="c_rank_reference_grid",
             show_origin_badge=False,
             height=520,
+            visited_codes=_visited_codes("C_RANK"),
         )
+
+    selected_code = resolve_review_selection(
+        ranked,
+        grid_selected_code,
+        _stored_review_selection("C_RANK"),
+    )
+    _remember_review_selection("C_RANK", grid_selected_code)
+    _store_review_visit("C_RANK", selected_code)
 
     with detail_container.container():
         _render_selected_row_detail(ranked, selected_code)
@@ -1012,11 +1416,19 @@ def _render_c_rank_reference_view(df: pd.DataFrame) -> None:
     _download_current_rows(ranked, "c_rank_reference.csv")
 
 
-def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
+def _render_copy_codes_control(
+    codes: list[str],
+    key_prefix: str = "",
+    *,
+    compact_feedback: bool = False,
+) -> None:
     valid_codes = [str(code).strip() for code in codes if pd.notna(code) and str(code).strip()]
     codes_str = ", ".join(valid_codes)
     n = len(valid_codes)
     disabled_attr = " disabled" if n == 0 else ""
+    copied_label = f"✓ Copied {n}" if compact_feedback else f"Copied {n} Codes"
+    control_height = 36 if compact_feedback else 44
+    control_justify = "flex-start" if compact_feedback else "flex-end"
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -1028,32 +1440,32 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
             padding: 0;
         }}
         html, body {{
-            height: 44px;
+            height: {control_height}px;
             width: 100%;
             overflow: hidden;
             background: transparent;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: {control_justify};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }}
         .copy-wrapper {{
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            height: 44px;
+            justify-content: {control_justify};
+            height: {control_height}px;
             width: 100%;
         }}
         .copy-btn {{
-            background: #2e7d32;
-            color: #fff;
-            border: none;
+            background: #151b23;
+            color: #c7d0db;
+            border: 1px solid #465365;
             border-radius: 8px;
             padding: 0 14px;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            height: 44px;
+            height: {control_height}px;
             width: 100%;
             display: flex;
             align-items: center;
@@ -1068,7 +1480,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
         .copy-btn:disabled {{
             cursor: not-allowed;
             opacity: 0.58;
-            background: #29462f;
+            background: #111720;
         }}
     </style>
     </head>
@@ -1108,14 +1520,18 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
                     }}
                 }}
                 if (success) {{
-                    btn.style.background = '#1b5e20';
-                    btn.innerText = '✓ Copied ({n})';
+                    btn.style.background = '#163d2b';
+                    btn.style.borderColor = '#35df65';
+                    btn.style.color = '#d8ffe2';
+                    btn.innerText = {json.dumps(copied_label, ensure_ascii=False)};
                 }} else {{
                     btn.style.background = '#c62828';
                     btn.innerText = 'Copy failed';
                 }}
                 setTimeout(() => {{
-                    btn.style.background = '#2e7d32';
+                    btn.style.background = '#151b23';
+                    btn.style.borderColor = '#465365';
+                    btn.style.color = '#c7d0db';
                     btn.innerText = 'Copy {n} Codes';
                 }}, 2000);
             }});
@@ -1124,7 +1540,7 @@ def _render_copy_codes_control(codes: list[str], key_prefix: str = "") -> None:
     </body>
     </html>
     """
-    st.components.v1.html(html_code, height=44, scrolling=False)
+    st.components.v1.html(html_code, height=control_height, scrolling=False)
 
 
 def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
@@ -1134,13 +1550,6 @@ def _download_current_rows(df: pd.DataFrame, filename: str) -> None:
         file_name=filename,
         mime="text/csv",
     )
-
-
-def _unique_values(df: pd.DataFrame, field: str) -> list[str]:
-    if field not in df.columns:
-        return []
-    values = df[field].dropna().astype(str).sort_values().unique().tolist()
-    return [value for value in values if value]
 
 
 def _get_snapshot_date(df: pd.DataFrame) -> str:

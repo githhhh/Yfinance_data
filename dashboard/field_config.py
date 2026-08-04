@@ -1,6 +1,74 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import Any
+
+
+DISPLAY_VALUE_MAPS: dict[str, dict[str, str]] = {
+    "signal": {
+        "True": "Active Signal",
+        "False": "Inactive",
+    },
+    "signal_source": {
+        "10_wk_ema_touch_confirm": "10W EMA Touch",
+        "ceiling_breakout": "Ceiling Breakout",
+        "pivot": "Pivot",
+        "three_weeks_tight_breakout": "Three Weeks Tight Breakout",
+    },
+    "ibd_candidate_signal_source": {
+        "10_wk_ema_touch_confirm": "10W EMA Touch",
+        "ceiling_breakout": "Ceiling Breakout",
+        "pivot": "Pivot",
+        "three_weeks_tight_breakout": "Three Weeks Tight Breakout",
+    },
+    "ibd_candidate_rule": {
+        "ceiling": "Ceiling",
+        "ceiling_pullback": "Ceiling Pullback",
+        "ma10_touch_confirm": "MA10 Touch",
+        "pivot": "Pivot",
+        "three_weeks_tight": "Three Weeks Tight",
+    },
+    "ibd_entry_rule": {
+        "ceiling": "Ceiling",
+        "ceiling_pullback": "Ceiling Pullback",
+        "ma10_touch_confirm": "MA10 Touch",
+        "pivot": "Pivot",
+        "three_weeks_tight": "Three Weeks Tight",
+    },
+    "ibd_entry_reject_reason": {
+        "daily_volume_not_confirmed": "Volume Not Confirmed",
+        "insufficient_volume_history": "Insufficient Volume History",
+    },
+    "ibd_entry_vol_or_reject": {
+        "daily_volume_not_confirmed": "Volume Not Confirmed",
+        "insufficient_volume_history": "Insufficient Volume History",
+    },
+}
+
+DISPLAY_FORMAT_FIELDS = frozenset(DISPLAY_VALUE_MAPS)
+
+
+def format_display_value(field: str, value: Any) -> str:
+    """Return concise display copy without mutating raw dataframe values."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "<na>"}:
+        return ""
+    mapped = DISPLAY_VALUE_MAPS.get(field, {}).get(text)
+    if mapped is not None:
+        return mapped
+    if "_" not in text:
+        return text
+    words = []
+    acronym_map = {
+        "ema10": "EMA10",
+        "ma10": "MA10",
+        "wk": "W",
+    }
+    for word in text.split("_"):
+        words.append(acronym_map.get(word.lower(), word.capitalize()))
+    return " ".join(words)
 
 
 def _tooltip_meta(
@@ -73,60 +141,66 @@ STATUS_META = {
 FLOW_CARD_META = {
     "BECAME_ACTIONABLE": {
         "label": "Entered Buy Zone",
+        "symbol": "↘",
         "color": "#22c55e",
         **_tooltip_meta(
             "Entered Buy Zone",
-            "含义：上周不在买区，本次进入买点上方 0%–5% 的买区。",
+            "含义：本次进入买点上方 0%–5% 区间。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "LEFT_ACTIONABLE": {
         "label": "Left Buy Zone",
-        "color": "#ef5350",
+        "symbol": "↗",
+        "color": "#ff6f61",
         **_tooltip_meta(
             "Left Buy Zone",
-            "含义：上周在买区，本次已经离开买区。",
+            "含义：上次在买区，本次已离开买区。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "OTHER_CHANGES": {
         "label": "Other Changes",
-        "color": "#2dd4bf",
+        "symbol": "↔",
+        "color": "#f59e0b",
         **_tooltip_meta(
             "Other Changes",
-            "含义：状态和上周不同，但不是进入或离开买区。",
+            "含义：状态发生变化，但不属于进入或离开买区。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "NEW": {
         "label": "New Signal",
+        "symbol": "+",
         "color": "#22d3ee",
         **_tooltip_meta(
             "New Signal",
-            "含义：完整周没有信号，周中首次出现信号。",
+            "含义：本次首次出现。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "CARRY": {
-        "label": "Carry Over",
+        "label": "Carried Over",
+        "symbol": "→",
         "color": "#94a3b8",
         **_tooltip_meta(
-            "Carry Over",
-            "含义：周中没有新信号，但完整周信号继续观察，状态按当前价格更新。",
+            "Carried Over",
+            "含义：周末已有，本次继续保留。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
     "RECONFIRMED": {
-        "label": "Confirmed Again",
-        "color": "#93c5fd",
+        "label": "Reconfirmed",
+        "symbol": "✓",
+        "color": "#a78bfa",
         **_tooltip_meta(
-            "Confirmed Again",
-            "含义：完整周和周中都有信号，以周中数据为准。",
+            "Reconfirmed",
+            "含义：原有信号本次再次确认。",
             "数量：当前范围内符合条件的标的数。",
             "点击：只看这类标的，并保留其他已选条件。",
         ),
@@ -435,13 +509,22 @@ FIELD_CONFIG = OrderedDict(
         ),
         ("review_signal_origin", _field("Origin", "category", "Review", default_table=False)),
         ("review_change_group", _field("Change Group", "category", "Review", default_table=False)),
-        ("review_priority", _field("Review Priority", "number", "Review", default_table=False)),
+        (
+            "review_priority",
+            _field(
+                "Review Priority",
+                "number",
+                "Review",
+                default_table=False,
+                help_text="周中变化的默认复盘顺序；数值越小越应优先检查。",
+            ),
+        ),
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
-        ("ibd_candidate_rule", _field("Route", "category", "Candidate", default_table=True, help_text="IBD Candidate 触发价的结构来源。")),
-        ("ibd_candidate_price", _field("IBD Candidate Price", "number", "Candidate", default_table=True, fmt="0.00")),
+        ("ibd_candidate_rule", _field("Setup", "category", "Buy Point", default_table=True, help_text="买点所依据的形态或触发结构。")),
+        ("ibd_candidate_price", _field("Buy Point", "number", "Buy Point", default_table=True, fmt="0.00", help_text="当前复盘使用的有效买点价格。")),
         ("ibd_candidate_signal_source", _field("IBD Candidate Signal Source", "category", "Candidate")),
         (
             "ibd_candidate_extra",
@@ -559,14 +642,14 @@ FIELD_CONFIG = OrderedDict(
         (
             "current_vs_ibd_candidate_pct",
             _field(
-                "Vs Candidate",
+                "Vs Buy Point",
                 "number",
                 "IBD Entry",
                 filterable=True,
                 default_table=True,
                 advanced_filter=True,
                 fmt="0.00%",
-                help_text="最新收盘价相对 Candidate Price 的距离。",
+                help_text="最新收盘价相对 Buy Point 的距离。",
             ),
         ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
@@ -585,7 +668,7 @@ FIELD_CONFIG = OrderedDict(
         (
             "volume_ratio",
             _field(
-                "W Vol",
+                "Weekly Vol",
                 "number",
                 "Volume/Pullback",
                 filterable=True,

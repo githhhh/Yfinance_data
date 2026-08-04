@@ -1,10 +1,58 @@
 import pytest
 import pandas as pd
 import numpy as np
+import dashboard.app as dashboard_app
 
 from dashboard.field_config import STATUS_META, FIELD_CONFIG
 from dashboard.table_view import _column_def
 from dashboard.app import _format_card_val, _render_selected_row_detail
+
+
+def test_review_position_follows_current_dataframe_order():
+    df = pd.DataFrame({"code": ["ACU", "NVDA", "TSLA"]})
+
+    assert dashboard_app.build_review_position(df, "NVDA") == {
+        "code": "NVDA",
+        "position": 2,
+        "total": 3,
+        "label": "NVDA · 2 of 3",
+    }
+    assert dashboard_app.build_review_position(df.iloc[[2, 0]], "ACU")["position"] == 2
+    assert dashboard_app.build_review_position(df, "MISSING") == {
+        "code": "",
+        "position": None,
+        "total": 3,
+        "label": "",
+    }
+
+
+def test_visits_are_isolated_by_view_and_deduplicated():
+    store = dashboard_app._record_review_visit({}, "MIDWEEK", "ACU")
+    store = dashboard_app._record_review_visit(store, "MIDWEEK", "ACU")
+    store = dashboard_app._record_review_visit(store, "WEEKEND", "NVDA")
+
+    assert store == {"MIDWEEK": {"ACU"}, "WEEKEND": {"NVDA"}}
+
+
+def test_review_selection_survives_reruns_and_respects_current_filter():
+    full = pd.DataFrame({"code": ["ACU", "NVDA"]})
+    filtered = full.loc[full["code"].eq("ACU")]
+
+    assert dashboard_app.resolve_review_selection(full, None, "NVDA") == "NVDA"
+    assert dashboard_app.resolve_review_selection(full, "ACU", "NVDA") == "ACU"
+    assert dashboard_app.resolve_review_selection(filtered, None, "NVDA") is None
+
+
+def test_invalid_stored_ibd_selection_is_removed_before_results_expand_again():
+    store = {"MIDWEEK": "NVDA", "WEEKEND": "ACU", "C_RANK": "MSFT"}
+
+    reconciled = dashboard_app._reconcile_review_selections(
+        store,
+        "MIDWEEK",
+        ["ACU"],
+    )
+
+    assert reconciled == {"WEEKEND": "ACU", "C_RANK": "MSFT"}
 
 
 def _selected_detail_markup(monkeypatch, **overrides):
@@ -59,8 +107,8 @@ def test_header_tooltip_config():
     expected_tooltips = {
         "code": "点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。",
         "ibd_entry_status": "当前 IBD Review 状态。",
-        "ibd_candidate_rule": "IBD Candidate 触发价的结构来源。",
-        "current_vs_ibd_candidate_pct": "最新收盘价相对 Candidate Price 的距离。",
+        "ibd_candidate_rule": "买点所依据的形态或触发结构。",
+        "current_vs_ibd_candidate_pct": "最新收盘价相对 Buy Point 的距离。",
         "latest_close": "当前数据快照的最新收盘价，不是实时价格。",
         "ibd_entry_vol_or_reject": "日线突破确认：成功显示日线量比，未确认显示原因。",
         "volume_ratio": "当前周成交量相对 10 周均量的倍数。",
@@ -121,6 +169,7 @@ def test_selected_row_popup_is_semantic_viewport_aware_and_ordered(monkeypatch):
     assert markup.index("Daily Entry") < markup.index("Pullback") < markup.index("CANSLIM / Base")
     assert "Daily Entry Vol" in markup
     assert "Ceiling/Base Depth" in markup
+    assert "TEST · 1 of 1" in markup
 
 
 def test_selected_row_markup_has_no_blank_lines_that_end_raw_html(monkeypatch):

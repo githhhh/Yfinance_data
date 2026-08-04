@@ -1,3 +1,5 @@
+import dashboard.field_config as field_config
+
 from dashboard.field_config import (
     EXCLUDED_CUSTOM_FIELDS,
     FIELD_CONFIG,
@@ -21,6 +23,30 @@ def test_custom_mode_excludes_c_rank_reference_fields_everywhere():
         get_sortable_fields(),
     ):
         assert not EXCLUDED_CUSTOM_FIELDS.intersection(fields)
+
+
+def test_internal_values_are_rendered_as_simple_english():
+    assert field_config.format_display_value("ibd_candidate_rule", "ceiling_pullback") == "Ceiling Pullback"
+    assert field_config.format_display_value("ibd_candidate_rule", "ma10_touch_confirm") == "MA10 Touch"
+    assert (
+        field_config.format_display_value("ibd_entry_reject_reason", "daily_volume_not_confirmed")
+        == "Volume Not Confirmed"
+    )
+    assert field_config.format_display_value("signal", True) == "Active Signal"
+
+
+def test_internal_value_columns_keep_raw_fields_and_add_display_formatters():
+    options = build_grid_options(
+        ["ibd_candidate_rule", "ibd_entry_reject_reason", "signal"]
+    )
+
+    assert [column["field"] for column in options["columnDefs"]] == [
+        "ibd_candidate_rule",
+        "ibd_entry_reject_reason",
+        "signal",
+    ]
+    for column in options["columnDefs"]:
+        assert "valueFormatter" in column
 
 
 def test_filterable_fields_follow_trading_decision_funnel():
@@ -301,6 +327,20 @@ def test_c_rank_reference_view_columns():
     assert get_column_view_fields("C Rank Reference") == expected
 
 
+def test_c_rank_and_continuous_c_are_adjacent_without_right_pinning():
+    options = build_grid_options(get_column_view_fields("C Rank Reference"))
+    columns = options["columnDefs"]
+
+    assert [column["field"] for column in columns[:3]] == [
+        "code",
+        "rank_C_continuous",
+        "C_continuous",
+    ]
+    assert columns[0]["pinned"] == "left"
+    assert columns[1]["pinned"] is None
+    assert all(column.get("flex") == 1 for column in columns[1:])
+
+
 def test_table_views_cover_all_fields_without_scattering_related_columns():
     all_fields = set(get_all_table_columns())
     grouped_fields: set[str] = set()
@@ -548,3 +588,30 @@ def test_render_table_normalizes_breakout_quality_aliases_before_display(monkeyp
     )
 
     assert captured["df"].loc[1, "ibd_breakout_quality"] == "Constructive Breakout"
+
+
+def test_render_table_adds_hidden_visited_support_values(monkeypatch):
+    import pandas as pd
+    import sys
+    import types
+    from dashboard.table_view import render_table
+
+    captured = {}
+
+    def mock_aggrid(df, **kwargs):
+        captured["df"] = df
+        captured["options"] = kwargs["gridOptions"]
+        return {}
+
+    monkeypatch.setitem(sys.modules, "st_aggrid", types.SimpleNamespace(AgGrid=mock_aggrid))
+
+    render_table(
+        pd.DataFrame({"code": ["AAA", "BBB"]}),
+        ["code"],
+        grid_key="visited_support",
+        show_origin_badge=False,
+        visited_codes={"BBB"},
+    )
+
+    assert captured["df"]["_review_visited"].tolist() == [False, True]
+    assert [column["field"] for column in captured["options"]["columnDefs"]] == ["code"]
