@@ -60,6 +60,10 @@ from dashboard.table_view import render_table
 
 st.set_page_config(page_title="Breakout Pool Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
+MIDWEEK_UNAVAILABLE_HELP = (
+    "当前没有可与周末基线比较的周中数据，已自动显示最新的周末完整候选池。"
+)
+
 
 @st.cache_data
 def cached_load_pool_csv(path: str, cache_fingerprint: tuple[int, int]) -> pd.DataFrame:
@@ -243,7 +247,11 @@ def main() -> None:
         with st.container(key="dashboard_header"):
             _render_header_bar(header_df, load_err, analysis, mode)
 
-        if analysis is not None:
+        if (
+            analysis is not None
+            and mode == "IBD Review"
+            and st.session_state.get("review_ui_state", {}).get("mode") == "MIDWEEK"
+        ):
             for warning in analysis.warnings:
                 st.warning(warning, icon="⚠️")
 
@@ -516,6 +524,7 @@ def _render_mode_scope_controls(
                             key="btn_mode_midweek",
                             use_container_width=True,
                             disabled=not midweek_available,
+                            help=None if midweek_available else MIDWEEK_UNAVAILABLE_HELP,
                             type="primary" if state["mode"] == "MIDWEEK" else "secondary",
                         ):
                             _store_review_state(
@@ -652,12 +661,22 @@ def _render_review_context(
     del df
     with st.container(key="review_context_slot"):
         if state["mode"] != "MIDWEEK":
-            st.markdown(
-                '<div class="weekend-context-bar"><strong>Weekend Baseline</strong>'
-                '<span>Complete weekly pool</span>'
-                '<span>Midweek comparison is not applied in this view.</span></div>',
-                unsafe_allow_html=True,
-            )
+            if analysis is not None and not analysis.midweek_available:
+                st.markdown(
+                    '<div class="weekend-context-bar weekend-context-bar--unavailable" role="status">'
+                    '<span class="midweek-unavailable-icon" aria-hidden="true">⚠</span>'
+                    '<strong>Midweek unavailable</strong>'
+                    '<span>No current midweek snapshot. Showing Weekend Pool instead.</span>'
+                    '<span>Complete weekly pool · Midweek comparison is not applied.</span></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div class="weekend-context-bar"><strong>Weekend Baseline</strong>'
+                    '<span>Complete weekly pool</span>'
+                    '<span>Midweek comparison is not applied in this view.</span></div>',
+                    unsafe_allow_html=True,
+                )
             return
         if not _midweek_has_comparison(analysis):
             st.markdown(

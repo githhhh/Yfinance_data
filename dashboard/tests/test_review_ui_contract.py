@@ -94,6 +94,25 @@ def test_review_context_has_semantic_responsive_groups_and_stable_clear_slot():
     assert "No valid complete-week baseline" in source
 
 
+def test_midweek_unavailable_context_is_compact_and_amber():
+    source = _function_source("_render_review_context", "_render_status_queue")
+    css = _compact_css()
+
+    assert 'class="weekend-context-bar weekend-context-bar--unavailable"' in source
+    assert 'class="midweek-unavailable-icon"' in source
+    assert "Midweek unavailable" in source
+    assert "No current midweek snapshot. Showing Weekend Pool instead." in source
+    assert "Midweek comparison is not applied." in source
+    for declaration in [
+        ".weekend-context-bar--unavailable",
+        ".midweek-unavailable-icon",
+        ".st-key-review_mode_controlsbutton:disabled",
+        "color:#f5a623",
+        "height:48px",
+    ]:
+        assert declaration in css
+
+
 def test_queue_controls_have_stable_heading_and_segmented_group_slots():
     source = _function_source("_render_mode_scope_controls", "df_active_count_for_state")
 
@@ -107,6 +126,7 @@ def test_queue_controls_have_stable_heading_and_segmented_group_slots():
     assert 'st.caption("SCOPE")' in source
     assert 'class="weekend-scope-static"' in source
     assert 'disabled=not has_comparison' not in source
+    assert "MIDWEEK_UNAVAILABLE_HELP" in source
 
 
 def test_status_labels_do_not_duplicate_selected_feedback_with_checkmarks():

@@ -737,7 +737,9 @@ def analyze_breakout_follow_pool(
                 no_baseline = True
                 warnings.append("Midweek snapshot has no valid complete-week baseline; Carry is disabled.")
             else:
-                warnings.append("Midweek snapshot is stale for the current complete-week baseline.")
+                warnings.append(
+                    "Midweek snapshot is unavailable for the current complete-week baseline."
+                )
         except Exception as exc:
             warnings.append(f"Midweek projection failed closed: {exc}")
 

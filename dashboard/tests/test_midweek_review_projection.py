@@ -343,6 +343,12 @@ def test_analyze_ignores_stale_midweek_without_deleting_it(tmp_path):
     assert result.midweek_baseline_available is False
     assert result.actionable_codes == ("CURRENT",)
     assert midweek_path.exists()
+    assert any(
+        "Midweek snapshot is unavailable for the current complete-week baseline."
+        in warning
+        for warning in result.warnings
+    )
+    assert not any("stale" in warning.lower() for warning in result.warnings)
 
 
 def test_analyze_defaults_to_complete_outside_midweek_but_keeps_valid_review_available(tmp_path):

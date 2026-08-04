@@ -419,3 +419,65 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
     assert not any(button.key == "btn_change_filter_BECAME_ACTIONABLE" for button in app.button)
     assert any("Change and Origin comparison is unavailable" in item.value for item in app.markdown)
     assert any("Midweek · baseline unavailable" in item.value for item in app.markdown)
+
+
+@pytest.mark.parametrize("midweek_state", ["missing", "outdated"])
+def test_unavailable_midweek_falls_back_with_compact_context(tmp_path, midweek_state):
+    from streamlit.testing.v1 import AppTest
+
+    complete = pd.read_csv("us/breakout_follow_pool.csv")
+    midweek = pd.read_csv("us/breakout_follow_pool_midweek.csv")
+    complete["snapshot_date"] = "2026-07-31"
+    midweek["snapshot_date"] = "2026-07-30"
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    complete.to_csv(complete_path, index=False)
+    if midweek_state == "outdated":
+        midweek.to_csv(midweek_path, index=False)
+
+    old_argv = sys.argv[:]
+    sys.argv = [
+        "dashboard/app.py",
+        "--csv",
+        str(complete_path),
+        "--midweek-csv",
+        str(midweek_path),
+        "--window-date",
+        "2026-08-04",
+    ]
+    try:
+        app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+    finally:
+        sys.argv = old_argv
+
+    assert len(app.exception) == 0
+    state = app.session_state["review_ui_state"]
+    assert (state["mode"], state["scope"], state["sort_mode"]) == (
+        "WEEKEND",
+        "ALL_SIGNALS",
+        "C Rank",
+    )
+    midweek_button = app.button(key="btn_mode_midweek")
+    assert midweek_button.disabled is True
+    assert midweek_button.help == (
+        "当前没有可与周末基线比较的周中数据，已自动显示最新的周末完整候选池。"
+    )
+    assert not any("Midweek snapshot" in warning.value for warning in app.warning)
+
+    context = next(
+        item.value
+        for item in app.markdown
+        if 'class="weekend-context-bar weekend-context-bar--unavailable"' in item.value
+    )
+    assert 'class="midweek-unavailable-icon"' in context
+    assert "Midweek unavailable" in context
+    assert "No current midweek snapshot. Showing Weekend Pool instead." in context
+    assert "Complete weekly pool" in context
+    assert "Midweek comparison is not applied." in context
+    assert any("All Signals ·" in item.value for item in app.markdown)
+
+    header = _header_markup(app)
+    assert "Data Aging" in header
+    assert "4d old" in header
+    assert "Data Stale" not in header
+    assert "Midweek" not in header

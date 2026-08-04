@@ -355,6 +355,12 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
     box-shadow: inset 0 0 0 1px rgb(71 143 255 / 38%) !important;
 }
 
+.st-key-review_mode_controls button:disabled {
+    cursor: not-allowed !important;
+    color: #536170 !important;
+    background: #10161e !important;
+}
+
 .st-key-review_scope_controls button[kind="primary"] {
     color: #f4f7fa !important;
     background: #1c2f48 !important;
@@ -596,6 +602,25 @@ div[data-testid="stMainBlockContainer"]:has(.st-key-dashboard_shell)
 
 .weekend-context-bar span:first-of-type {
     color: #8f9ba8;
+}
+
+.weekend-context-bar--unavailable {
+    border-color: rgb(245 166 35 / 42%);
+    background: rgb(245 166 35 / 7%);
+}
+
+.weekend-context-bar--unavailable strong {
+    color: #f5a623;
+}
+
+.weekend-context-bar--unavailable span:first-of-type {
+    color: #c8d0d9;
+}
+
+.midweek-unavailable-icon {
+    color: #f5a623 !important;
+    font-size: 14px;
+    line-height: 1;
 }
 
 .st-key-status_cards > div[data-testid="stHorizontalBlock"] {
