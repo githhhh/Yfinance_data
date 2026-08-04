@@ -1,166 +1,161 @@
 ---
 name: ibd-candidate-prescreen
-description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视角执行 IBD 对齐的分层检查表 (IBD-aligned Tiered Checklist) 筛选，结合大盘报告与突破日线图几何结构（Breakout Geometry）优中选优精选最多 3 只符合经验规则的最优标的并输出极简复盘报告。当用户请求"预筛标的"、"IBD 分析"、"突破池分析"、"review 候选池"时触发。
+description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视角执行分层检查表，结合大盘报告与突破日几何，精选最多 3 只优先复核标的并输出极简复盘报告。当用户请求“预筛标的”“IBD 分析”“突破池分析”或“review 候选池”时触发。
 ---
 
-# IBD Candidate Pre-screen Skill Specification
+# IBD Candidate Pre-screen
 
-## Mission
+## 任务边界
 
-本 Skill 的核心职责是 **突破候选池快速预筛 (Pre-screen Review)**。
+- 对候选池执行 IBD 对齐的快速预筛，输出 0～3 只“优先复核”；可另列少量“值得留意”和“暂不优先”作为上下文；宁缺毋滥。
+- 规则优先，经验只用于规则比较后仍接近的候选；不得覆盖 Critical、字段路由、Geometry 或正式 PASS/FAIL。
+- 不预测走势或目标价，不给仓位与买卖指令，不修改原始数据，不使用未提供字段推导新指标。
 
-* **定位**：针对 Dashboard 突破候选池的高效筛选与结构研判关卡。
-* **目标**：应用 O'Neil / IBD 经典图表与基本面卡尺，剔除不合格标的，精选**最多 3 只**具备高质量突破特征的标的供人工 Review。
-* **原则 (宁缺毋滥)**：推荐上限 3 只（允许输出 0~3 只）。若无高质量标的或抛压风险过高，严禁凑数推荐。
+## 输入与前置步骤
 
----
+1. 先运行 `git submodule update --remote market_analysis`。若父仓库的 submodule 指针变化，在交付中说明。
+2. 大盘唯一来源：`market_analysis/output/market_report.json`。直接继承市场状态、派发日和板块信息；不得重新判断趋势，也不得仅因 Correction 淘汰合格候选。更新失败、文件缺失或 JSON 无效时停止，不得改用其他信源。
+3. 候选池：`us/breakout_follow_pool.csv`，优先通过 `dashboard.data_utils.load_pool_csv` 加载。
+4. CSV 必须用支持引号和转义的标准读取方式；`ibd_candidate_extra` 含带逗号 JSON，禁止按逗号手工切分。若解析列数与 Header 不一致，停止并报告“候选池解析失败”。
+5. 核心 Header 为 `code`、`signal`、`ibd_candidate_rule`、`ibd_entry_status`、`current_vs_ibd_candidate_pct`、`ibd_entry_volume_ratio`、`ibd_entry_close_position`、`ibd_entry_breakout_range_ratio`、`sector`；缺少任一项时停止。其他评估字段缺失按 UNKNOWN/N/A 处理，不视为 CSV 解析失败。
+6. 逐行规范化字段：字符串去除首尾空白，`ibd_entry_status` 转大写；`signal`、`pullback_v_is_dry` 接受布尔值、大小写不敏感的 `true/false` 或 `1/0`。无法识别的 `signal` 作为数据错误转人工补数；无法识别的 `pullback_v_is_dry` 记 UNKNOWN。参与比较的数值若为空、非数字、NaN 或正负 Infinity，均视为缺失，不得参与运算或排序。
 
-## Non-goals
+## 判定状态
 
-本 Skill 明确**不负责**以下事项：
-- 预测股票未来走势或目标价位；
-- 给出仓位配比或建仓/卖出操作指令；
-- 修改 Dashboard 或策略池原始数据；
-- 覆盖 Hard Checklist 的硬性过滤结果；
-- 使用未提供的数据字段自行推导新指标。
+| 状态 | 含义 |
+|---|---|
+| PASS | 检查适用、字段存在、存在正式标准且满足 |
+| FAIL | 检查适用、字段存在、存在正式标准但不满足 |
+| CONTEXT | 路由字段存在，但无正式阈值；只展示数值，不作 PASS/FAIL |
+| UNKNOWN | 检查适用，但路由要求的正式字段为空或不存在 |
+| N/A | 检查不适用 |
 
----
+CONTEXT、N/A 不参与 Major FAIL/UNKNOWN 比较。无 Critical FAIL 时，Critical UNKNOWN 不进入报告排序，转人工补数；Major FAIL 不超过 1 时，Major UNKNOWN 不进入“优先复核”，归入“值得留意”竞争。
 
-## Decision Philosophy
+## 候选范围与板块风控
 
-**Rule-based First, Experience-assisted Second**：
-1. **规则优先**：严格依据 Dashboard 数据与 IBD 对齐的分层检查表 (Tiered Checklist) 进行过滤；
-2. **经验辅助**：仅在规则允许范围内，结合 O'Neil 原著经验对突破几何质量进行解释；
-3. **不可覆盖**：当规则与经验冲突时，必须以规则过滤结果为准；
-4. **Signal-aware Interpretation**：同一检查点可根据不同 Signal 使用不同阶段字段进行评估，但不得改变检查点本身的 IBD 核心含义。
+- 候选集合仅包含 `signal == True` 且 `ibd_candidate_rule` 非空的行；其他行不参与预筛。
+- 非 ACTIONABLE 不进入“优先复核”：Critical UNKNOWN 转人工补数；Critical FAIL，或 Critical 全部 PASS 但非 ACTIONABLE，才可作为代表列入“暂不优先”。
+- 板块占比以候选集合中的 ACTIONABLE 行计算：`该板块 ACTIONABLE 数 / 全部 ACTIONABLE 数`；空 `sector` 统一记为 UNKNOWN 板块。
+- 板块数量上限只作用于“优先复核”：单一板块最多 2 只；占比 `> 50%` 时最多 1 只并提示拥挤。ACTIONABLE 集合为空时不触发。“值得留意”不受硬上限，同质量时优先分散。
 
----
+## #4 / #5 阶段字段路由
 
-## Market Context
+本节区分的是标的入池后的生命周期阶段，不是 IBD 底部形态分类，只约束 Checklist #4 Depth 与 #5 Duration，不约束 #6 缩量。
 
-* **前置子仓库更新**：在预筛前，必须优先运行 `git submodule update --remote market_analysis` 自动更新并获取最新大盘研报；该步骤会刷新 `market_analysis` 子仓库 checkout，若父仓库因此出现 submodule 指针变更，须在报告或交付中显式说明。
-* **唯一权威大盘信源**：大盘环境与市场状态统一来源于只读文件 `market_analysis/output/market_report.json`（直接继承状态、派发日及板块拥挤度，作为背景参考，严禁 AI 重新判断大盘趋势或单纯因 Correction 淘汰合格候选）。
+- 标的必须先由 Ceiling 突破进入候选池。`ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_*` 字段衡量这次入池突破的原始基底。
+- 后续规则使用 `pullback_*` 字段跟踪入池后的回撤/巩固；不得再用原始基底字段代替。标的是否跌破 Ceiling 并出池由上游候选池决定，Skill 不重新推导。
 
----
+| `ibd_candidate_rule` | 阶段 | #4 / #5 唯一字段 |
+|---|---|---|
+| `ceiling`、`ceiling_breakout`、`ceiling_pullback` | 入池基底 | `base_depth_pct` / `base_duration_weeks` |
+| 其他非空值（如 `pivot`、`ma10_touch_confirm`、`three_weeks_tight`） | 后续回撤 | `pullback_pct` / `pullback_duration_weeks` |
+| 空或缺失 | UNKNOWN | 不读取另一组字段 |
 
-## Data Sources
+严禁跨阶段替代、计算替代值或因字段缺失改读另一组字段。
 
-1. **`market_analysis/output/market_report.json`**：大盘环境、派发日及板块拥挤度背景。
-2. **`us/breakout_follow_pool.csv` (Dashboard 候选池)**：提取 Header、DAILY ENTRY、PULLBACK、CANSLIM / BASE 面板数据。
+- 路由字段存在时，#4/#5 记 CONTEXT，只展示对应深度和时长，供人工复核；字段缺失记 UNKNOWN。
+- 不得把深度、时长或信号名解释成额外的形态分类，也不得创造“过深”“偏长”“太短”等未定义阈值。
 
----
+## Breakout Geometry
 
-## Core Principles
+只使用正式字段：
 
-1. **精选上限与宁缺毋滥**：最终推荐最多 3 只（0~3 只）。
-2. **心流状态优先**：优先遴选 Dashboard 中 `ibd_entry_status == 'ACTIONABLE'` 的标的；若非 ACTIONABLE，须显式说明瓶颈。
-3. **行业分散与拥挤风控**：单一板块不超过 2 只；某板块占比 > 50% 时触发拥挤风控，该板块推荐**最多 1 只**并发出风险预警。
-4. **分层卡尺制 (Tiered Checklist)**：按照 Critical (淘汰门槛)、Major (质量权衡)、Minor (辅助提示) 关卡执行结构化判定；Minor 中 #10 仅执行下述正向加分语义。
-
----
-
-## Breakout Geometry (突破日线图几何结构)
-
-结合 Dashboard 中由上游正式产出的价格行为字段（`ibd_entry_close_position`, `ibd_entry_breakout_range_ratio`），导出核心几何参数；`ibd_entry_close_vs_trigger_pct` 只作为上游突破有效性上下文，不参与本 Geometry 分类：
-* **买点位置分位**：$trigger\_pos = pos - range\_ratio = \frac{Trigger - Low}{High - Low}$
-* **上影线区间占比**：$CloseToHighGapRatio = 1 - pos = \frac{High - Close}{High - Low}$
-
-### 核心分类与防御规则
-* **Full-range 突破 (Gap / Full-range Breakout)**：`trigger_pos <= 0`（即 `range_ratio >= pos`），且 `pos >= 0.80`
-* **光头强突破 (Strong Finish)**：`pos >= 0.80` 且 `range_ratio >= 0.50`，但 `trigger_pos > 0`
-* **缺口回落 (Faded Gap)**：`trigger_pos <= 0`（全天在 Trigger 之上），但 `pos ∈ [0.65, 0.80)`。仍为 Strong Breakout，但收盘回落意味着日内存在卖压。
-* **扎实突破 (Constructive Breakout)**：满足以下之一：(a) `pos >= 0.80` 但 `rr < 0.50` 且 `trigger_pos > 0`（光头收盘但穿透薄）；(b) `pos ∈ [0.65, 0.80)` 且 `rr >= 0.50` 且 `trigger_pos > 0`（收盘合格且穿透实质）。
-* **薄穿突破 (Marginal Breakout)**：`pos ∈ [0.65, 0.80)` 且 `rr < 0.50`。收盘刚过及格线、穿透力不足，需其他条件补强。
-* **冲高回落/上影线抛压 (Squat / Upper Shadow)**：`pos < 0.65`（上影线 $> 35\%$）。此项为一票否决：无论 `range_ratio` 多大，均不得升级为 Gap / Full-range Breakout。
-* **防御规则 (Defensive Rule)**：若 $range\_ratio \le 0$ ($Close \le Trigger$)，触发防守断路器，直接判定破位失败。
-
----
-
-## IBD 对齐的分层检查表 (IBD-aligned Tiered Checklist)
-
-| 级别 | # | 检查点 | 判定标准 (Pass / Fail) | 规则依据与权威引用源 (Citations & Rules) |
-|:--:|:--:|:--|:--|:--|
-| **Critical** | 1 | 买点新鲜度 | 距 Candidate Price ≤ 5.0% | **IBD Standard Buy Zone**：O'Neil 标准买入窗口为 Pivot 0%–5%（原著 Chapter 2），与 Dashboard ACTIONABLE 状态一致；≤ 2% 为 Fresh Zone，排序中优先。 |
-| **Critical** | 2 | 突破日放量 | Entry Volume Ratio ≥ 1.5x | **IBD Heavy Volume**：机构建仓放量确认（IBD 官方标准为至少高于均量 40%~50%，即 1.40x~1.50x）。 |
-| **Critical** | 3 | 突破日质量 | Close Position ≥ 0.65 | **Project Strict Rule**：O'Neil 底线为 Upper Half (≥0.50)（原著 Chapter 2）；Top Third (≥0.67) 为 IBD 教学实战经验；本项目取 ≥0.65 作为折中阈值；光头强需 pos ≥ 0.80。 |
-| **Major** | 4 | Base / Handle 深度健康 | 符合对应 Base / Handle 的经典 IBD 深度特征 | 对 `ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_depth_pct`，结合具体 Base 类型（Cup 12%–33%（原著 Chapter 2）/ Flat Base ≤15% / Double Bottom 等）原著区间判定；其他 Continuation 信号使用 `pullback_pct` 评估近期巩固 (Pullback) 深度。严禁混用！ |
-| **Major** | 5 | 基底/巩固时长合理 | 符合对应 Base / Handle 的经典 IBD 持续时间特征 | **IBD Base Duration**：对 Base 信号强制使用 `base_duration_weeks`（Cup ≥7周、Flat Base ≥5周），对 Continuation 信号使用上游正式产出的 `pullback_duration_weeks`。严禁混用！ |
-| **Major** | 6 | 巩固期地量缩量 | `pullback_v_is_dry == True` | **Project Rule**：经典 IBD 底部/柄部地量缩量沉淀 (Volume Dry-up)。若上游未来正式产出缩量比例字段，可作为补充说明，不得自行推导。 |
-| **Minor** | 7 | 价格紧贴 52 周高点 | 距 52 周高点 > -5.0% | **Project Rule**：对应 `dist_to_52w_high_pct`，测量价格距高点距离（注意：非 RS Rating / RS Line 独立指标）。 |
-| **Major** | 8 | 基本面支撑 | EPS YoY 增长 ≥ 25% | **CANSLIM (C Rule)**：O'Neil 经典 C 规则要求最近季度 EPS YoY 增长至少 25%（注：年度 EPS 增长需独立字段）。 |
-| **Minor** | 9 | 净筹码吸纳 | 近 10 周上涨周成交量 > 下跌周成交量 | **Project Rule**：机构资金持续积累代理指标 (Accumulation Proxy)。 |
-| **Minor** | 10 | 周线量能跟进 | 当周 Volume Ratio ≥ 1.3x | **Project Rule**：周线级别的放量跟进确认 (对应 `volume_ratio`)。 |
-
-> **执行语义 & 字段路由 (Signal-aware Evaluation)**：
-> 1. **关卡分级**：Critical 为硬性淘汰；Major 作为主要权衡；Minor #7 / #9 用于内部排序与风险提示，#10 仅作正向加分。若所需且适用的字段不存在或为空，则标记为 UNKNOWN，严禁自行推导或假设其结果。
-> 2. **阶段路由**：Checklist #4 (Depth) 与 #5 (Duration) 必须根据 `ibd_candidate_rule` 与真实回撤阶段自动路由对应字段：
->    - 初始 Base 突破 (`ibd_candidate_rule == 'ceiling'`) → 强制使用 `base_depth_pct` / `base_duration_weeks`；
->    - 回踩确认 (`ceiling_pullback`, `ma10_touch_confirm`) → 强制使用 `pullback_pct` / `pullback_duration_weeks`；
->    - Pivot / Three-Weeks-Tight → 仅当 `pullback_count > 0` 时评估 `pullback_pct` / `pullback_duration_weeks`。严禁跨阶段混用！
-> 3. **字段适用性先于缺失判断**：`ceiling` 首次突破只评估 `base_depth_pct` / `base_duration_weeks`；这是刚站上大型平台的阶段，不得读取或报告 `pullback_v_is_dry`、`pullback_pct`、`pullback_duration_weeks` 缺失。回撤缩量、回撤深度和回撤持续时间仅当信号存在实际回撤阶段时才评估。
-> 4. **上游正式字段约束**：`pullback_duration_weeks` 必须来自上游正式导出；若 Continuation 信号确实需要该字段但 CSV 未提供，才可写作“回撤时长数据未导出”，不得自行用其它字段替代。
-> 5. **日线优先**：先判断突破质量、买点距离与突破日量能，再评估 Base / Pullback、缩量和 EPS；周线量能不参与硬性淘汰。
-> 6. **周线量能仅加分**：周线量能达到 `1.3x` 时，作为“优势”中的加分项展示；低于 `1.3x` 或缺失时直接省略，不得作为拒绝、降级或风险理由。
-> 7. **内部状态不外显**：Critical / Major / Minor 与 PASS / FAIL / UNKNOWN 仅供内部判定；最终报告须翻译为带数字的中文理由。缺失字段仅在确实影响结论时写作“数据缺失”。
-
----
-
-## 标准执行流程 (Workflow)
-
-```mermaid
-graph TD
-    Phase1[Phase 1: Market Context<br/>更新并继承 market_report.json 状态] --> Phase2[Phase 2: Candidate Pool<br/>加载 breakout_follow_pool.csv 面板数据]
-    Phase2 --> Phase3[Phase 3: Hard Checklist<br/>按 Critical/Major/Minor 关卡过筛与 Geometry 还原]
-    Phase3 --> Phase4[Phase 4: Final Selection<br/>输出极简中文决策卡片]
+```text
+pos = ibd_entry_close_position
+rr = ibd_entry_breakout_range_ratio
+trigger_pos = pos - rr
 ```
 
----
+严格按顺序首次命中，禁止仅凭 `rr` 或主观观感升级分类：
 
-## 输出格式 (Output Format)
+| 顺序 | 条件 | 分类 | 结果 |
+|---:|---|---|---|
+| 1 | `rr <= 0` | Defensive Failure | Critical FAIL |
+| 2 | `pos < 0.65` | Squat / Upper Shadow | Critical FAIL |
+| 3 | `trigger_pos <= 0` 且 `pos >= 0.80` | Full-range Breakout | PASS |
+| 4 | `trigger_pos <= 0` 且 `0.65 <= pos < 0.80` | Faded Gap | PASS |
+| 5 | `trigger_pos > 0` 且 `pos >= 0.80` 且 `rr >= 0.50` | Strong Finish | PASS |
+| 6 | `trigger_pos > 0` 且 `pos >= 0.80` 且 `rr < 0.50` | Constructive Breakout | PASS |
+| 7 | `trigger_pos > 0` 且 `0.65 <= pos < 0.80` 且 `rr >= 0.50` | Constructive Breakout | PASS |
+| 8 | `trigger_pos > 0` 且 `0.65 <= pos < 0.80` 且 `rr < 0.50` | Marginal Breakout | PASS |
 
-按以下顺序输出，先给决定，再给依据：
+Geometry 排序：`Full-range Breakout > Strong Finish > Faded Gap > Constructive Breakout > Marginal Breakout`。报告只使用这些英文名称。若有限数值已触发 `rr <= 0` 或 `pos < 0.65`，即使另一字段缺失仍为 Critical FAIL；其余 `pos` / `rr` 缺失或非有限数值情况为 Critical UNKNOWN。
 
-- **长度**：正文最多 20 行；省略空区块及没有影响结论的数据。
-- **结论**：一句话说明优先复核谁、谁值得留意；不凑数。
-- **背景**：仅当大盘状态或板块拥挤实际影响结论时补充一句。
-- **优先复核**：0~3 只。每只固定 3 行，依次为“突破日 / 优势 / 判断”。
-- **值得留意**：0~2 只。仅收录日线突破突出但结构、基本面或关键数据证据不完整的标的；不等同于推荐。每只固定 3 行，依次为“突破日 / 顾虑 / 判断”。
-- **暂不优先**：最多列 3 只代表性标的，每只只写一个真正影响优先级的主要原因；若仍有明显亮点，先写亮点再写原因。
-- **名称**：Breakout Quality 使用 Dashboard 原始名称，不自行翻译或创造同义等级。
-- **语言**：判断只写自然语言结论，不复述内部层级、计数或检查过程。
-- **数字**：只保留原始业务数据，不输出检查项数量或通过/失败统计。
+## IBD 分层检查表
+
+| 级别 | # | 检查点 | 唯一标准 |
+|---|---:|---|---|
+| Critical | 1 | 买点新鲜度 | 仅用 `current_vs_ibd_candidate_pct`；`0%～5%` PASS，`>5%` 或 `<0%` FAIL，`<=2%` 排序优先 |
+| Critical | 2 | 突破日放量 | `ibd_entry_volume_ratio >= 1.5` |
+| Critical | 3 | 突破日质量 | Geometry 非 Defensive Failure、非 Squat / Upper Shadow |
+| Major | 4 | 阶段深度 | 严格按 #4/#5 路由；字段存在为 CONTEXT，缺失为 UNKNOWN |
+| Major | 5 | 阶段时长 | 严格按 #4/#5 路由；字段存在为 CONTEXT，缺失为 UNKNOWN |
+| Major | 6 | 巩固期缩量 | `pullback_v_is_dry == True` PASS，`False` FAIL；`ceiling` / `ceiling_breakout` 为 N/A，`ceiling_pullback` 与非空 Continuation 适用，缺失为 UNKNOWN |
+| Minor | 7 | 紧贴 52 周高点 | `dist_to_52w_high_pct > -5.0` |
+| Major | 8 | 基本面支撑 | `eps_yoy_growth >= 25` |
+| Minor | 9 | 净筹码吸纳 | 仅使用上游正式字段；当前未导出时 N/A，不自行推导 |
+| Minor | 10 | 周线量能跟进 | `volume_ratio >= 1.3` 时仅作正向加分；否则省略 |
+
+补充语义：
+
+- Critical 任一 FAIL 即淘汰出“优先复核”和“值得留意”，但可选代表列入“暂不优先”；只有 Critical 全部明确 PASS 才能进入前两组。
+- 字段缺失不得写成 FAIL，UNKNOWN 不得写成 PASS。
+- #6 独立于 #4/#5 路由：`ceiling_pullback` 的 #4/#5 仍读 Base 字段，但 #6 读取 `pullback_v_is_dry`。
+- Minor 不作淘汰条件；周线量能低于 1.3 或缺失不得成为顾虑。
+- `ibd_entry_close_vs_trigger_pct` 只作突破上下文，不参与 Geometry，也不得替代 `current_vs_ibd_candidate_pct`。
+
+## 分组、排序与入选
+
+按以下顺序首次命中并停止，确保每行只归入一组：
+
+1. **人工补数**：`signal` 无法识别；排除在候选集合和报告排序之外。
+2. **暂不优先**：候选存在任一 Critical FAIL；已知失败优先于同时存在的 UNKNOWN。
+3. **人工补数**：无 Critical FAIL，但存在 Critical UNKNOWN；不与已确认突破候选混排。
+4. **暂不优先**：Critical 全部 PASS，但不是 ACTIONABLE。
+5. **暂不优先**：ACTIONABLE、Critical 全部 PASS，但 Major FAIL 至少 2 项。
+6. **值得留意池**：ACTIONABLE、Critical 全部 PASS、Major FAIL 不超过 1，但存在 Major UNKNOWN；明确写出关键缺口。
+7. **优先复核池**：ACTIONABLE、Critical 全部 PASS、Major FAIL 不超过 1，且 Major UNKNOWN 为 0。
+
+Major FAIL 为 1 时，报告必须在“判断”或“顾虑”中写明该项；Major FAIL 至少 2 项时不得进入前两组。组内依次比较：更少 Major FAIL → 更少 Major UNKNOWN（CONTEXT、N/A 不计）→ Geometry 层级 → 新鲜区 `current_vs_ibd_candidate_pct <= 2%` → EPS（`>=25%` 优于 UNKNOWN，UNKNOWN 优于 `<25%`）→ Minor（#7 按 PASS、UNKNOWN、FAIL 排序，再看 #10 正向加分）。完全并列时按 `code` 字典序、再按 CSV 原始行序，保证同一快照结果稳定。最后按排序顺序逐只接收“优先复核”，触及板块上限时跳过并继续考察下一只；不为填满名额而降低质量。
+
+## 执行流程
+
+1. 更新并读取 Market Context。
+2. 合规加载 CSV，建立 ACTIONABLE 板块占比。
+3. 先执行 Critical 与 Geometry，再执行适用的 Major / Minor。
+4. 按统一顺序排序并应用板块限制。
+5. 输出极简中文报告；不外显 PASS/FAIL/CONTEXT/UNKNOWN/N/A、检查数量或内部计分。
+
+## 输出格式
+
+- 正文最多 30 个非空行；省略空区块和不影响结论的数据。
+- **结论**：一句话说明最优先、值得留意及是否宁缺毋滥。
+- **背景**：仅在市场状态或板块拥挤实际影响结论时写一句。
+- **优先复核**：0～3 只，每只固定“突破日 / 优势 / 判断”3 行。
+- **值得留意**：0～2 只，仅收录突破突出但结构、基本面或关键证据不完整者，每只固定“突破日 / 顾虑 / 判断”3 行。
+- **暂不优先**：最多 3 只代表，每只仅写一个决定性原因；有亮点时先写亮点。
+- 只引用正式字段和明确规则，不扩展字段含义、创造阈值或使用“完全共振”等超出证据的表述。
 
 ```markdown
 # IBD 候选预筛
 
 ## 结论
-
-[一句话说明最优先标的、值得留意标的及是否宁缺毋滥。]
-
-[背景：大盘或板块影响结论时补充；其余情况省略。]
+[一句话结论]
+[必要时写市场或板块背景]
 
 ## 优先复核
-
 ### [TICKER]
-- **突破日：** [Breakout Quality]｜收盘位置 [pos]｜突破幅度 [range_ratio]｜量能 [entry volume]x
-- **优势：** [最多两个带数字的主要理由；周线量能仅在 ≥1.3x 时作为加分]
-- **判断：** [一句话说明为什么值得先做人工 Review]
+- **突破日：** [Geometry]｜收盘位置 [pos]｜突破幅度 [rr]｜量能 [entry volume]x
+- **优势：** [最多两个带数字的理由]
+- **判断：** [为何值得先人工 Review]
 
 ## 值得留意
-
 ### [TICKER]
-- **突破日：** [Breakout Quality]｜收盘位置 [pos]｜突破幅度 [range_ratio]｜量能 [entry volume]x
-- **顾虑：** [最多两个真正影响判断的结构、基本面或数据缺口]
-- **判断：** [一句话说明为何观察但不列第一优先]
+- **突破日：** [Geometry]｜收盘位置 [pos]｜突破幅度 [rr]｜量能 [entry volume]x
+- **顾虑：** [最多两个关键顾虑或数据缺口]
+- **判断：** [为何观察但不列第一优先]
 
 ## 暂不优先
-
-- **[TICKER]：** [可选亮点]，但 [一个决定性原因 + 数字]
+- **[TICKER]：** [亮点可选]，但 [一个决定性原因 + 数字]
 ```
-
----
-
-## Implementation Notes
-
-1. **大盘报告路径**：`market_analysis/output/market_report.json`。
-2. **候选池 CSV 路径**：`us/breakout_follow_pool.csv` (加载入口 `dashboard.data_utils.load_pool_csv`)。
