@@ -361,6 +361,22 @@ def default_review_state(mode: PoolMode) -> dict[str, Any]:
     }
 
 
+def default_sort_mode(
+    mode: str,
+    scope: str,
+    *,
+    has_comparison: bool,
+) -> str:
+    """Return the fixed public default order for a review view."""
+    if (
+        str(mode).upper() == "MIDWEEK"
+        and str(scope).upper() == "CHANGES"
+        and has_comparison
+    ):
+        return "Review Priority"
+    return "C Rank"
+
+
 def reconcile_review_state(state: dict[str, Any], mode: PoolMode) -> dict[str, Any]:
     """Remove comparison-only state when a midweek baseline is unavailable."""
     result = dict(state)

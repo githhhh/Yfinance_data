@@ -43,6 +43,7 @@ from dashboard.services.bf_midweek_review import (
     apply_review_filters,
     build_review_filter_counts,
     clear_quick_filters,
+    default_sort_mode,
     default_review_state,
     materialize_review_view,
     reconcile_review_state,
@@ -368,7 +369,7 @@ def _render_flow_rules_dialog() -> None:
 
         ### Volume Definition
         - **Entry / Reason**：日线突破确认和日线量比。
-        - **W Vol**：当前周成交量相对 10 周均量。
+        - **Weekly Vol**：当前周成交量相对 10 周均量。
         - **C Rank**：质量对照，不代替 IBD 入场状态。
         """
     )
@@ -376,10 +377,6 @@ def _render_flow_rules_dialog() -> None:
 
 def _store_review_state(state: dict[str, Any]) -> None:
     st.session_state["review_ui_state"] = dict(state)
-
-
-def _selected_button_label(selected: bool, label: str) -> str:
-    return f"{'✓' if selected else ' '} {label}"
 
 
 def _render_ibd_review_view(
@@ -399,42 +396,35 @@ def _render_ibd_review_view(
     with st.container(key="filters"):
         _render_filter_bar(df, state, counts)
 
-    filtered_df = apply_review_filters(df, state)
-    filtered_df = sort_review_rows(filtered_df, state["sort_mode"])
     has_comparison = (
         state["mode"] == "MIDWEEK"
         and _midweek_has_comparison(analysis)
     )
+    fixed_sort = default_sort_mode(
+        state["mode"],
+        state["scope"],
+        has_comparison=has_comparison,
+    )
+    if state.get("sort_mode") != fixed_sort:
+        state["sort_mode"] = fixed_sort
+        _store_review_state(state)
+
+    filtered_df = apply_review_filters(df, state)
+    filtered_df = sort_review_rows(filtered_df, fixed_sort)
 
     with st.container(key="results_toolbar"):
-        summary_col, actions_col = st.columns([1, 0.34], vertical_alignment="center")
+        summary_col, actions_col = st.columns([1, 0.18], vertical_alignment="center")
         with summary_col:
             st.markdown(
-                f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(state["sort_mode"])}</div>',
+                f'<div class="results-summary">{len(filtered_df)} results · Sorted by {html.escape(fixed_sort)}</div>',
                 unsafe_allow_html=True,
             )
         with actions_col:
             with st.container(key="results_actions"):
-                copy_col, sort_col = st.columns([0.9, 1.1], vertical_alignment="center")
-                with copy_col:
-                    _render_copy_codes_control(
-                        filtered_df["code"].tolist(),
-                        key_prefix=f'ibd_review_{state["mode"].lower()}',
-                    )
-                with sort_col:
-                    options = ["Review Priority", "C Rank", "Distance"] if has_comparison else ["C Rank", "Distance"]
-                    current_sort = state["sort_mode"] if state["sort_mode"] in options else options[0]
-                    selected_sort = st.selectbox(
-                        "Sort",
-                        options,
-                        index=options.index(current_sort),
-                        key=f'review_sort_{state.get("widget_generation", 0)}',
-                        label_visibility="collapsed",
-                    )
-                    if selected_sort != state["sort_mode"]:
-                        state["sort_mode"] = selected_sort
-                        _store_review_state(state)
-                        st.rerun()
+                _render_copy_codes_control(
+                    filtered_df["code"].tolist(),
+                    key_prefix=f'ibd_review_{state["mode"].lower()}',
+                )
 
     from dashboard.field_config import get_default_table_columns
     columns = get_midweek_table_columns() if has_comparison else get_default_table_columns()
@@ -490,56 +480,65 @@ def _render_mode_scope_controls(
         with title_col:
             st.markdown("##### Review Queue")
         with mode_col:
-            with st.container(key="review_mode_controls"):
-                mode_cols = st.columns(2, gap="small")
-                with mode_cols[0]:
-                    if st.button(
-                        _selected_button_label(state["mode"] == "MIDWEEK", "Midweek Review"),
-                        key="btn_mode_midweek",
-                        use_container_width=True,
-                        disabled=not midweek_available,
-                        type="primary" if state["mode"] == "MIDWEEK" else "secondary",
-                    ):
-                        _store_review_state(
-                            switch_review_mode(
-                                state,
-                                "MIDWEEK",
-                                midweek_has_baseline=_midweek_has_comparison(analysis),
+            with st.container(key="review_period_group"):
+                st.caption("PERIOD")
+                with st.container(key="review_mode_controls"):
+                    mode_cols = st.columns(2, gap="small")
+                    with mode_cols[0]:
+                        if st.button(
+                            "Midweek Review",
+                            key="btn_mode_midweek",
+                            use_container_width=True,
+                            disabled=not midweek_available,
+                            type="primary" if state["mode"] == "MIDWEEK" else "secondary",
+                        ):
+                            _store_review_state(
+                                switch_review_mode(
+                                    state,
+                                    "MIDWEEK",
+                                    midweek_has_baseline=_midweek_has_comparison(analysis),
+                                )
                             )
-                        )
-                        st.rerun()
-                with mode_cols[1]:
-                    if st.button(
-                        _selected_button_label(state["mode"] == "WEEKEND", "Weekend Full Pool"),
-                        key="btn_mode_weekend",
-                        use_container_width=True,
-                        type="primary" if state["mode"] == "WEEKEND" else "secondary",
-                    ):
-                        _store_review_state(switch_review_mode(state, "WEEKEND"))
-                        st.rerun()
+                            st.rerun()
+                    with mode_cols[1]:
+                        if st.button(
+                            "Weekend Pool",
+                            key="btn_mode_weekend",
+                            use_container_width=True,
+                            type="primary" if state["mode"] == "WEEKEND" else "secondary",
+                        ):
+                            _store_review_state(switch_review_mode(state, "WEEKEND"))
+                            st.rerun()
         with scope_col:
-            with st.container(key="review_scope_controls"):
-                scope_cols = st.columns(2, gap="small")
-                with scope_cols[0]:
-                    if st.button(
-                        _selected_button_label(state["scope"] == "CHANGES", f"Changes ({change_total})"),
-                        key="btn_scope_changes",
-                        use_container_width=True,
-                        disabled=not has_comparison,
-                        type="primary" if state["scope"] == "CHANGES" else "secondary",
-                    ):
-                        state["scope"] = "CHANGES"
-                        _store_review_state(state)
-                        st.rerun()
-                with scope_cols[1]:
-                    if st.button(
-                        _selected_button_label(state["scope"] == "ALL_SIGNALS", f"All Signals ({all_total})"),
-                        key="btn_scope_all_signals",
-                        use_container_width=True,
-                        type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
-                    ):
-                        _store_review_state(reset_to_all_signals(state))
-                        st.rerun()
+            with st.container(key="review_scope_group"):
+                st.caption("SCOPE")
+                with st.container(key="review_scope_controls"):
+                    if not has_comparison:
+                        st.markdown(
+                            f'<div class="weekend-scope-static">All Signals · {all_total}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        scope_cols = st.columns(2, gap="small")
+                        with scope_cols[0]:
+                            if st.button(
+                                f"Changes · {change_total}",
+                                key="btn_scope_changes",
+                                use_container_width=True,
+                                type="primary" if state["scope"] == "CHANGES" else "secondary",
+                            ):
+                                state["scope"] = "CHANGES"
+                                _store_review_state(state)
+                                st.rerun()
+                        with scope_cols[1]:
+                            if st.button(
+                                f"All Signals · {all_total}",
+                                key="btn_scope_all_signals",
+                                use_container_width=True,
+                                type="primary" if state["scope"] == "ALL_SIGNALS" else "secondary",
+                            ):
+                                _store_review_state(reset_to_all_signals(state))
+                                st.rerun()
 
 
 def df_active_count_for_state(
@@ -609,7 +608,7 @@ def _render_quick_group(
         with column:
             if _render_filter_card(
                 card_id,
-                f"{metadata['label']} · {counts[count_field][card_id]}",
+                f"**{metadata['symbol']}** {metadata['label']} **{counts[count_field][card_id]}**",
                 metadata,
                 selected=state[state_field] == card_id,
                 button_key=f"btn_{state_field}_{card_id}",
@@ -644,44 +643,43 @@ def _render_review_context(
             return
 
         with st.container(key="quick_context_row"):
-            change_label, change_group, divider, origin_label, origin_group, clear_col = st.columns(
-                [0.48, 3.95, 0.16, 0.48, 3.95, 0.72], gap="small"
-            )
-            with change_label:
-                with st.container(key="quick_label_change"):
-                    st.caption("CHANGE")
+            change_group, origin_group, clear_col = st.columns([1, 1, 0.13], gap="small")
             with change_group:
-                _render_quick_group(
-                    ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"),
-                    count_field="change",
-                    state_field="change_filter",
-                    counts=counts,
-                    state=state,
-                )
-            with divider:
-                with st.container(key="quick_divider"):
-                    st.markdown('<span aria-hidden="true"></span>', unsafe_allow_html=True)
-            with origin_label:
-                with st.container(key="quick_label_origin"):
-                    st.caption("ORIGIN")
+                with st.container(key="quick_change_group"):
+                    st.caption("WHAT CHANGED")
+                    _render_quick_group(
+                        ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"),
+                        count_field="change",
+                        state_field="change_filter",
+                        counts=counts,
+                        state=state,
+                    )
             with origin_group:
-                _render_quick_group(
-                    ("NEW", "CARRY", "RECONFIRMED"),
-                    count_field="origin",
-                    state_field="origin_filter",
-                    counts=counts,
-                    state=state,
-                )
+                with st.container(key="quick_origin_group"):
+                    st.caption("SIGNAL SOURCE")
+                    _render_quick_group(
+                        ("NEW", "CARRY", "RECONFIRMED"),
+                        count_field="origin",
+                        state_field="origin_filter",
+                        counts=counts,
+                        state=state,
+                    )
             with clear_col:
-                quick_filter_count = _quick_filter_count(state)
-                if st.button(
-                    f"Clear {quick_filter_count}" if quick_filter_count else "Clear filters",
-                    key="btn_clear_quick",
-                    use_container_width=True,
-                    disabled=quick_filter_count == 0,
-                ):
-                    _store_review_state(clear_quick_filters(state))
-                    st.rerun()
+                with st.container(key="quick_clear_slot"):
+                    quick_filter_count = _quick_filter_count(state)
+                    if quick_filter_count:
+                        if st.button(
+                            f"Clear {quick_filter_count}",
+                            key="btn_clear_quick",
+                            use_container_width=True,
+                        ):
+                            _store_review_state(clear_quick_filters(state))
+                            st.rerun()
+                    else:
+                        st.markdown(
+                            '<span class="quick-clear-placeholder" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
 
 
 def _render_status_queue(
@@ -701,10 +699,9 @@ def _render_status_queue(
             with cols[i]:
                 count = counts["status"].get(status_name, 0)
                 is_active = state["status_filter"] == status_name
-                prefix = "✓ " if is_active else "  "
                 display_name = status_name.replace("_", " ")
                 meta = STATUS_META[status_name]
-                btn_label = f"{prefix}{display_name} · {count}\n{meta['subtitle']}"
+                btn_label = f"{display_name} · {count}\n{meta['subtitle']}"
                 if _render_filter_card(
                     status_name,
                     btn_label,
@@ -761,7 +758,7 @@ def _render_filter_bar(
         routes = ["All"] + _unique_values(df, "ibd_candidate_rule")
         current_route = state.get("route_filter", "All")
         selected_route = st.selectbox(
-            "Route (Rule)",
+            "Setup",
             routes,
             index=routes.index(current_route) if current_route in routes else 0,
             key=f"review_route_{generation}",
@@ -772,13 +769,13 @@ def _render_filter_bar(
             _store_review_state(state)
             st.rerun()
     with cols[1]:
-        val = st.text_input("Distance Min %", value=state.get("distance_min", ""), key=f"review_dist_min_{generation}")
+        val = st.text_input("Vs Buy Point Min %", value=state.get("distance_min", ""), key=f"review_dist_min_{generation}")
         if val != state.get("distance_min", ""):
             state["distance_min"] = val
             _store_review_state(state)
             st.rerun()
     with cols[2]:
-        val = st.text_input("Distance Max %", value=state.get("distance_max", ""), key=f"review_dist_max_{generation}")
+        val = st.text_input("Vs Buy Point Max %", value=state.get("distance_max", ""), key=f"review_dist_max_{generation}")
         if val != state.get("distance_max", ""):
             state["distance_max"] = val
             _store_review_state(state)
@@ -1049,11 +1046,11 @@ def _render_selected_row_detail(filtered_df: pd.DataFrame, selected_code: str | 
                     {change_markup}
                 </div>
                 <div class="selected-summary-cell">
-                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Candidate Price</div>
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Buy Point</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{cand_price} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">({cand_rule})</span></div>
                 </div>
                 <div class="selected-summary-cell">
-                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Current vs Candidate</div>
+                    <div style="font-size:11px; color:#8899a6; text-transform:uppercase;">Vs Buy Point</div>
                     <div style="font-size:15px; font-weight:700; color:#f2f5f9;">{dist_pct} <span style="font-size:11px; font-weight:normal; color:#a0aec0;">(Close: {latest_close})</span></div>
                 </div>
                 <div class="selected-summary-cell">

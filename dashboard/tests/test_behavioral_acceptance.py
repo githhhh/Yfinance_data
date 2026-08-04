@@ -258,7 +258,6 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
     assert options["columnDefs"][0]["field"] == "code"
     assert options["columnDefs"][0]["pinned"] == "left"
     assert "onGridReady" not in options
-    assert "onCellFocused" not in options
 
     from dashboard.table_view import HAS_JS_CODE
 
@@ -269,6 +268,9 @@ def test_aggrid_build_grid_options_single_selection_and_stable_id():
         assert "ArrowDown" in keyboard_source
         assert "setSelected(true, true)" in keyboard_source
         assert "ensureIndexVisible" in keyboard_source
+        focus_source = options["onCellFocused"].js_code
+        assert "getDisplayedRowAtIndex" in focus_source
+        assert "setSelected(true, true)" in focus_source
 
 
 # 8. Selected Row Detail never fabricates a selection

@@ -133,5 +133,5 @@ def test_density_css_is_scoped_and_has_no_visual_compensation_hacks():
 
 
 def test_status_cards_render_exactly_two_text_lines():
-    assert 'btn_label = f"{prefix}{display_name} · {count}\\n{meta[\'subtitle\']}"' in APP_SOURCE
+    assert 'btn_label = f"{display_name} · {count}\\n{meta[\'subtitle\']}"' in APP_SOURCE
     assert 'btn_label = f"{prefix}{display_name}\\n{count}\\n{sub_map[status_name]}"' not in APP_SOURCE

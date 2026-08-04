@@ -468,6 +468,14 @@ def build_grid_options(columns: list[str], *, show_origin_badge: bool = False) -
             event.preventDefault();
         }
         """)
+        options["onCellFocused"] = JsCode("""
+        function(params) {
+            if (!params || params.rowIndex === null || params.rowIndex === undefined) return;
+            const target = params.api.getDisplayedRowAtIndex(params.rowIndex);
+            if (!target || target.isSelected()) return;
+            target.setSelected(true, true);
+        }
+        """)
     return options
 
 

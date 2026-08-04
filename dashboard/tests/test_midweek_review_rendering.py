@@ -42,8 +42,8 @@ def test_flow_cards_use_english_visible_copy_and_exact_chinese_tooltip_body():
         "LEFT_ACTIONABLE": "Left Buy Zone",
         "OTHER_CHANGES": "Other Changes",
         "NEW": "New Signal",
-        "CARRY": "Carry Over",
-        "RECONFIRMED": "Confirmed Again",
+        "CARRY": "Carried Over",
+        "RECONFIRMED": "Reconfirmed",
     }
     assert {key: value["subtitle"] for key, value in STATUS_META.items()} == {
         "ACTIONABLE": "In 0%–5% Buy Zone",
@@ -56,12 +56,12 @@ def test_flow_cards_use_english_visible_copy_and_exact_chinese_tooltip_body():
         assert not re.search(r"[\u4e00-\u9fff]", metadata.get("subtitle", ""))
 
     expected_definitions = {
-        "BECAME_ACTIONABLE": "含义：上周不在买区，本次进入买点上方 0%–5% 的买区。",
-        "LEFT_ACTIONABLE": "含义：上周在买区，本次已经离开买区。",
-        "OTHER_CHANGES": "含义：状态和上周不同，但不是进入或离开买区。",
-        "NEW": "含义：完整周没有信号，周中首次出现信号。",
-        "CARRY": "含义：周中没有新信号，但完整周信号继续观察，状态按当前价格更新。",
-        "RECONFIRMED": "含义：完整周和周中都有信号，以周中数据为准。",
+        "BECAME_ACTIONABLE": "含义：本次进入买点上方 0%–5% 区间。",
+        "LEFT_ACTIONABLE": "含义：上次在买区，本次已离开买区。",
+        "OTHER_CHANGES": "含义：状态发生变化，但不属于进入或离开买区。",
+        "NEW": "含义：本次首次出现。",
+        "CARRY": "含义：周末已有，本次继续保留。",
+        "RECONFIRMED": "含义：原有信号本次再次确认。",
         "ACTIONABLE": "含义：已完成入场确认，当前价位于买点上方 0%–5%。",
         "UNCONFIRMED": "含义：尚未满足日线入场确认条件。",
         "BELOW_TRIGGER": "含义：当前价低于有效买点。",
@@ -213,11 +213,11 @@ def test_app_declares_stable_mode_scope_context_filter_and_layout_slots():
     ]:
         assert f'key="{key}"' in APP_SOURCE
     assert 'key="btn_scope_changes"' in APP_SOURCE
-    assert "disabled=not has_comparison" in APP_SOURCE
+    assert 'class="weekend-scope-static"' in APP_SOURCE
     assert 'state["filters_expanded"]' in APP_SOURCE
     assert "Weekend Baseline" in APP_SOURCE
-    assert "Review Priority" in APP_SOURCE
-    assert "C Rank" in APP_SOURCE
+    assert "default_sort_mode" in APP_SOURCE
+    assert "fixed_sort" in APP_SOURCE
 
 
 def test_cards_use_one_shared_tooltip_system_with_a_separate_info_button():

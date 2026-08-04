@@ -13,19 +13,19 @@ python dashboard/run_app.py --csv us/breakout_follow_pool.csv
 **状态 → 价格位置 → 日线确认 → 周线量能 → C Rank 对照**
 
 1. **选状态**
-   - `ACTIONABLE`：已确认，位于 Candidate 上方 0%–5%，优先 Review。
+   - `ACTIONABLE`：已确认，位于 Buy Point 上方 0%–5%，优先 Review。
    - `UNCONFIRMED`：尚未满足日线确认；优先查看 `Near Trigger ≤ +3%`。
-   - `BELOW TRIGGER`：曾有效确认，但当前回到 Candidate 下方。
-   - `EXTENDED`：已超过 Candidate +5%，避免追高。
+   - `BELOW TRIGGER`：曾有效确认，但当前回到 Buy Point 下方。
+   - `EXTENDED`：已超过 Buy Point +5%，避免追高。
 
 2. **看价格位置**
-   - `Vs Candidate` 显示最新收盘价相对 Candidate Price 的距离。
+   - `Vs Buy Point` 显示最新收盘价相对 Buy Point 的距离。
 
 3. **看突破确认**
    - `Entry / Reason`：日线突破确认。成功显示日线量比，未确认显示原因。
 
 4. **看周线量能**
-   - `W Vol`：当前周成交量相对 10 周均量的倍数。
+   - `Weekly Vol`：当前周成交量相对 10 周均量的倍数。
 
 5. **用 C Rank 对照**
    - `C Rank` 越小越靠前，仅用于同状态候选之间的质量对照。

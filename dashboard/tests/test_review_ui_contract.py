@@ -45,19 +45,21 @@ def test_reference_tokens_and_desktop_geometry_are_explicit():
         "--blue:#2791ff",
         "--yellow:#ffd21f",
         "--red:#f04444",
-        "padding:24px24px30px",
-        "min-height:80px",
+        "padding:8px24px30px",
+        "min-height:64px",
         "grid-template-columns:minmax(0,1fr)276px268px",
-        "height:48px",
+        "min-height:48px",
         "grid-template-columns:repeat(4,minmax(0,1fr))",
         "height:70px",
         "height:45px",
-        "min-height:56px",
-        "height:60px",
+        "min-height:48px",
+        "height:auto",
+        "min-height:72px",
         "grid-template-columns:194pxrepeat(4,minmax(0,1fr))",
         "font-size:29px",
         "font-weight:800",
-        "margin-top:20px",
+        "margin-top:12px",
+        "padding-top:8px",
     ]:
         assert declaration in css
 
@@ -66,6 +68,7 @@ def test_reference_breakpoints_focus_and_reduced_motion_are_explicit():
     css = _compact_css()
     for rule in [
         "@media(width<=1120px)",
+        "@media(width<1280px)",
         "@media(width<=760px)",
         "@media(width<=480px)",
         "@media(prefers-reduced-motion:reduce)",
@@ -74,16 +77,19 @@ def test_reference_breakpoints_focus_and_reduced_motion_are_explicit():
         assert rule in css
 
 
-def test_review_context_is_one_horizontal_flow_with_stable_slots():
+def test_review_context_has_semantic_responsive_groups_and_stable_clear_slot():
     source = _function_source("_render_review_context", "_render_status_queue")
 
     assert "rows = [" not in source
     assert 'key="quick_context_row"' in source
-    assert 'key="quick_label_change"' in source
-    assert 'key="quick_divider"' in source
-    assert 'key="quick_label_origin"' in source
+    assert 'key="quick_change_group"' in source
+    assert 'key="quick_origin_group"' in source
+    assert 'st.caption("WHAT CHANGED")' in source
+    assert 'st.caption("SIGNAL SOURCE")' in source
     assert source.count("_render_quick_group(") == 2
     assert 'key="btn_clear_quick"' in source
+    assert 'key="quick_clear_slot"' in source
+    assert "if quick_filter_count:" in source
     assert "Weekend Baseline" in source
     assert "No valid complete-week baseline" in source
 
@@ -97,23 +103,27 @@ def test_queue_controls_have_stable_heading_and_segmented_group_slots():
         "review_scope_controls",
     ]:
         assert f'key="{key}"' in source
-    assert "disabled=not has_comparison" in source
+    assert 'st.caption("PERIOD")' in source
+    assert 'st.caption("SCOPE")' in source
+    assert 'class="weekend-scope-static"' in source
+    assert 'disabled=not has_comparison' not in source
 
 
-def test_status_labels_use_fixed_text_slots_without_emoji():
+def test_status_labels_do_not_duplicate_selected_feedback_with_checkmarks():
     source = _function_source("_render_status_queue", "_active_filter_count")
 
     for emoji in ["🟢", "🟡", "🔴", "🔵", "⚪"]:
         assert emoji not in source
-    assert 'prefix = "✓ " if is_active else "  "' in source
+    assert 'prefix = "✓ " if is_active else "  "' not in source
+    assert 'btn_label = f"{display_name} · {count}' in source
 
 
-def test_quick_dots_and_status_orbs_are_styled():
+def test_quick_symbols_counts_and_status_orbs_are_styled():
     css = _compact_css()
 
     for declaration in [
-        "width:7px",
-        "height:7px",
+        "grid-template-columns:16pxminmax(0,1fr)30px",
+        "button[kind]pstrong",
         "width:19px",
         "height:19px",
         "box-shadow:inset02px3px",
@@ -176,27 +186,20 @@ def test_mobile_header_results_and_actions_have_explicit_stack_contracts():
 
     assert '.st-key-dashboard_header>div[data-testid="stHorizontalBlock"]' in css
     assert '.st-key-results_toolbar>div[data-testid="stHorizontalBlock"]' in css
-    assert '.st-key-results_actions>div[data-testid="stHorizontalBlock"]' in css
+    assert ".st-key-results_actions{width:100%;display:flex;justify-content:flex-end;}" in css
     assert '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]' in css
     assert (
         '.st-key-review_queue_heading>div[data-testid="stHorizontalBlock"]'
         '>div[data-testid="stColumn"]{width:100%!important;min-width:0!important;flex:none!important;}'
     ) in css
-    assert (
-        '.st-key-quick_context_row>div[data-testid="stHorizontalBlock"]'
-        '{min-width:max-content;height:46px;align-items:center;gap:6px!important;}'
-    ) in css
-    assert (
-        '.st-key-review_context_slotdiv[class*="st-key-flow_card_"]'
-        '{position:relative;min-width:154px;}'
-    ) in css
+    assert "grid-template-columns:minmax(0,1fr)minmax(0,1fr)74px" in css
+    assert "grid-template-columns:repeat(3,minmax(0,1fr))" in css
+    assert '.st-key-review_context_slotdiv[class*="st-key-flow_card_"]{position:relative;min-width:0;}' in css
     for selector in [
         '.st-key-dashboard_header>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
         '.st-key-results_toolbar>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
-        '.st-key-results_actions>div[data-testid="stHorizontalBlock"]>div[data-testid="stColumn"]',
     ]:
         assert selector + '{width:100%!important;min-width:0!important;flex:none!important;}' in css
-    assert "grid-template-columns:minmax(140px,1fr)minmax(170px,1fr)" in css
     assert "font-size:25px" in css
 
 
@@ -292,8 +295,8 @@ def test_filters_and_results_actions_use_fixed_compact_slots():
     assert "right:14px" in css
     assert "justify-content:flex-start!important" in css
 
-    assert "st.columns([1,0.34]" in re.sub(r"\s+", "", view_source)
-    assert "st.columns([0.9,1.1]" in re.sub(r"\s+", "", view_source)
+    assert "st.columns([1,0.18]" in re.sub(r"\s+", "", view_source)
+    assert "review_sort_" not in view_source
     assert "min-width:144px" in css
     assert "max-width:160px" in css
     assert "min-width:170px" in css
@@ -334,14 +337,32 @@ def test_tooltip_hover_is_delayed_but_focus_and_click_remain_immediate():
     assert "activeCard || hoverTimer !== null" in tooltip_source
 
 
-def test_compact_and_narrow_results_actions_reserve_the_full_sort_label():
+def test_results_actions_reserve_copy_only_and_never_scroll_horizontally():
     css = _compact_css()
 
-    assert "grid-template-columns:minmax(140px,1fr)minmax(170px,1fr)" in css
+    assert "overflow-x:auto" not in css.split(".st-key-results_actions", 1)[1].split("}", 1)[0]
+    assert '.st-key-results_toolbardiv[data-baseweb="select"]>div' not in css
+
+
+def test_selected_detail_auto_height_never_clips_the_table_boundary():
+    css = _compact_css()
+    selected_rule = css.split(".st-key-selected_row.selected-strip{", 1)[1].split("}", 1)[0]
+
+    assert "height:auto" in selected_rule
+    assert "min-height:72px" in selected_rule
+    assert "overflow:visible" in selected_rule
+    assert "position:absolute" not in selected_rule
     assert (
-        '.st-key-results_toolbardiv[data-baseweb="select"]>div'
-        '{width:100%!important;min-width:170px;}'
+        '.st-key-selected_rowdiv[data-testid="stMarkdownContainer"]:has(.selected-strip)'
+        '{margin-bottom:0!important;}'
     ) in css
+
+
+def test_public_buy_point_terminology_is_used_in_primary_ui():
+    assert "Candidate Price" not in APP_SOURCE
+    assert "Current vs Candidate" not in APP_SOURCE
+    assert ">Buy Point<" in APP_SOURCE
+    assert ">Vs Buy Point<" in APP_SOURCE
 
 
 def test_hidden_filters_state_marker_does_not_add_vertical_layout_space():
@@ -390,11 +411,12 @@ def test_flow_card_main_and_info_buttons_have_separate_fixed_layout_contracts():
         "new",
         "carry",
         "reconfirmed",
-        "actionable",
-        "unconfirmed",
-        "below_trigger",
-        "extended",
     ]:
+        assert (
+            f'.st-key-flow_card_{card}>div[data-testid="stElementContainer"]'
+            ':not(:has(.flow-info-trigger))button[kind]pstrong:first-child'
+        ) in css
+    for card in ["actionable", "unconfirmed", "below_trigger", "extended"]:
         assert (
             f'.st-key-flow_card_{card}>div[data-testid="stElementContainer"]'
             ':not(:has(.flow-info-trigger))button[kind]p::before'

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+import dashboard.services.bf_midweek_review as review_service
+
 from dashboard.services.bf_midweek_review import (
     PoolMode,
     apply_review_filters,
@@ -98,6 +100,15 @@ def _review_rows() -> pd.DataFrame:
             },
         ]
     )
+
+
+def test_public_view_default_sort_is_deterministic():
+    resolver = getattr(review_service, "default_sort_mode", None)
+    assert callable(resolver)
+    assert resolver("MIDWEEK", "CHANGES", has_comparison=True) == "Review Priority"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=True) == "C Rank"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=False) == "C Rank"
+    assert resolver("WEEKEND", "ALL_SIGNALS", has_comparison=False) == "C Rank"
 
 
 def test_change_origin_and_status_filters_combine_with_and_semantics():
