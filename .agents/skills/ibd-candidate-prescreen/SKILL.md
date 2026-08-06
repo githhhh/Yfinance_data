@@ -41,20 +41,21 @@ CONTEXT、N/A 不参与 Major FAIL/UNKNOWN 比较。无 Critical FAIL 时，Crit
 
 ## #4 / #5 阶段字段路由
 
-本节区分的是标的入池后的生命周期阶段，不是 IBD 底部形态分类，只约束 Checklist #4 Depth 与 #5 Duration，不约束 #6 缩量。
+本节区分的是当前候选所处的生命周期阶段，不是 IBD 底部形态分类，只约束 Checklist #4 Depth 与 #5 Duration，不约束 #6 缩量。
 
-- 标的必须先由 Ceiling 突破进入候选池。`ceiling` / `ceiling_breakout` / `ceiling_pullback` 使用 `base_*` 字段衡量这次入池突破的原始基底。
-- 后续规则使用 `pullback_*` 字段跟踪入池后的回撤/巩固；不得再用原始基底字段代替。标的是否跌破 Ceiling 并出池由上游候选池决定，Skill 不重新推导。
+- 标的必须先由 Ceiling 突破进入候选池。`ceiling` / `ceiling_breakout` 使用 `base_*` 字段衡量这次入池突破的原始基底。
+- `ceiling_pullback` 与后续 Continuation 规则使用 `pullback_*` 字段衡量当前回踩/巩固；不得用原始基底字段代替。标的是否跌破 Ceiling 并出池由上游候选池决定，Skill 不重新推导。
 
 | `ibd_candidate_rule` | 阶段 | #4 / #5 唯一字段 |
 |---|---|---|
-| `ceiling`、`ceiling_breakout`、`ceiling_pullback` | 入池基底 | `base_depth_pct` / `base_duration_weeks` |
-| 其他非空值（如 `pivot`、`ma10_touch_confirm`、`three_weeks_tight`） | 后续回撤 | `pullback_pct` / `pullback_duration_weeks` |
+| `ceiling`、`ceiling_breakout` | 初始突破基底 | `base_depth_pct` / `base_duration_weeks` |
+| `ceiling_pullback` 及其他非空值（如 `pivot`、`ma10_touch_confirm`、`three_weeks_tight`） | 当前回踩 / 巩固 | `pullback_pct` / `pullback_duration_weeks` |
 | 空或缺失 | UNKNOWN | 不读取另一组字段 |
 
 严禁跨阶段替代、计算替代值或因字段缺失改读另一组字段。
 
 - 路由字段存在时，#4/#5 记 CONTEXT，只展示对应深度和时长，供人工复核；字段缺失记 UNKNOWN。
+- `ceiling_pullback` 可额外展示 `base_depth_pct` / `base_duration_weeks` 作为母基底背景，但它们不替代当前 #4/#5，也不参与 Major 状态或排序。
 - 不得把深度、时长或信号名解释成额外的形态分类，也不得创造“过深”“偏长”“太短”等未定义阈值。
 
 ## Breakout Geometry
@@ -91,7 +92,7 @@ Geometry 排序：`Full-range Breakout > Strong Finish > Faded Gap > Constructiv
 | Critical | 3 | 突破日质量 | Geometry 非 Defensive Failure、非 Squat / Upper Shadow |
 | Major | 4 | 阶段深度 | 严格按 #4/#5 路由；字段存在为 CONTEXT，缺失为 UNKNOWN |
 | Major | 5 | 阶段时长 | 严格按 #4/#5 路由；字段存在为 CONTEXT，缺失为 UNKNOWN |
-| Major | 6 | 巩固期缩量 | `pullback_v_is_dry == True` PASS，`False` FAIL；`ceiling` / `ceiling_breakout` 为 N/A，`ceiling_pullback` 与非空 Continuation 适用，缺失为 UNKNOWN |
+| Major | 6 | 巩固期缩量 | `pullback_v_is_dry == True` PASS，`False` FAIL；`ceiling` / `ceiling_breakout` 为 N/A，其余非空规则适用；字段缺失或明确对应旧回撤/错误窗口时 UNKNOWN |
 | Minor | 7 | 紧贴 52 周高点 | `dist_to_52w_high_pct > -5.0` |
 | Major | 8 | 基本面支撑 | `eps_yoy_growth >= 25` |
 | Minor | 9 | 净筹码吸纳 | 仅使用上游正式字段；当前未导出时 N/A，不自行推导 |
@@ -101,7 +102,7 @@ Geometry 排序：`Full-range Breakout > Strong Finish > Faded Gap > Constructiv
 
 - Critical 任一 FAIL 即淘汰出“优先复核”和“值得留意”，但可选代表列入“暂不优先”；只有 Critical 全部明确 PASS 才能进入前两组。
 - 字段缺失不得写成 FAIL，UNKNOWN 不得写成 PASS。
-- #6 独立于 #4/#5 路由：`ceiling_pullback` 的 #4/#5 仍读 Base 字段，但 #6 读取 `pullback_v_is_dry`。
+- #6 只评价当前候选对应的回踩/巩固段，不评价确认突破日的放量；不得用明显错位的历史回撤窗口判 PASS/FAIL。
 - Minor 不作淘汰条件；周线量能低于 1.3 或缺失不得成为顾虑。
 - `ibd_entry_close_vs_trigger_pct` 只作突破上下文，不参与 Geometry，也不得替代 `current_vs_ibd_candidate_pct`。
 
@@ -135,6 +136,7 @@ Major FAIL 为 1 时，报告必须在“判断”或“顾虑”中写明该项
 - **优先复核**：0～3 只，每只固定“突破日 / 优势 / 判断”3 行。
 - **值得留意**：0～2 只，仅收录突破突出但结构、基本面或关键证据不完整者，每只固定“突破日 / 顾虑 / 判断”3 行。
 - **暂不优先**：最多 3 只代表，每只仅写一个决定性原因；有亮点时先写亮点。
+- 引用 #4/#5 时必须使用路由后的字段并只写客观数值；`ceiling_pullback` 可另补一项母基底背景，不得与当前回撤混写。
 - 只引用正式字段和明确规则，不扩展字段含义、创造阈值或使用“完全共振”等超出证据的表述。
 
 ```markdown
