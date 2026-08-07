@@ -130,6 +130,23 @@ def validate_pool_semantics(df: pd.DataFrame) -> None:
                 raise ValueError("Schema / Data Error: ibd_entry_status must be empty for non-signal rows")
 
 
+def _extract_snapshot_date_from_csv(path: Path) -> str | None:
+    try:
+        import csv
+        with open(path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                val = row.get("snapshot_date")
+                if val:
+                    val_str = str(val).strip()
+                    if val_str and val_str.lower() != "nan":
+                        return val_str
+                break
+    except Exception:
+        pass
+    return None
+
+
 def get_latest_pool_csv_path(
     complete_path: str | Path = "us/breakout_follow_pool.csv",
     midweek_path: str | Path = "us/breakout_follow_pool_midweek.csv",
@@ -137,7 +154,13 @@ def get_latest_pool_csv_path(
     c_path = Path(complete_path)
     m_path = Path(midweek_path)
     if m_path.exists() and c_path.exists():
-        if m_path.stat().st_mtime > c_path.stat().st_mtime:
+        m_date = _extract_snapshot_date_from_csv(m_path)
+        c_date = _extract_snapshot_date_from_csv(c_path)
+        if m_date and c_date:
+            if m_date > c_date:
+                return m_path
+            return c_path
+        if m_date and not c_date:
             return m_path
         return c_path
     if m_path.exists():
