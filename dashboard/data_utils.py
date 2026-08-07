@@ -130,6 +130,21 @@ def validate_pool_semantics(df: pd.DataFrame) -> None:
                 raise ValueError("Schema / Data Error: ibd_entry_status must be empty for non-signal rows")
 
 
+def get_latest_pool_csv_path(
+    complete_path: str | Path = "us/breakout_follow_pool.csv",
+    midweek_path: str | Path = "us/breakout_follow_pool_midweek.csv",
+) -> Path:
+    c_path = Path(complete_path)
+    m_path = Path(midweek_path)
+    if m_path.exists() and c_path.exists():
+        if m_path.stat().st_mtime > c_path.stat().st_mtime:
+            return m_path
+        return c_path
+    if m_path.exists():
+        return m_path
+    return c_path
+
+
 def load_pool_csv(path: str | Path) -> pd.DataFrame:
     csv_path = Path(path)
     if not csv_path.exists():

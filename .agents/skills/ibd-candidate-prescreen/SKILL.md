@@ -16,7 +16,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 1. 先运行 `git submodule update --remote market_analysis`。若父仓库的 submodule 指针变化，在交付中说明。
 2. 大盘唯一来源：`market_analysis/output/market_report.json`。直接继承市场状态、派发日和板块信息；不得重新判断趋势，也不得仅因 Correction 淘汰合格候选。更新失败、文件缺失或 JSON 无效时停止，不得改用其他信源。
-3. 候选池：`us/breakout_follow_pool.csv`，优先通过 `dashboard.data_utils.load_pool_csv` 加载。
+3. 候选池：对比 `us/breakout_follow_pool.csv` 与 `us/breakout_follow_pool_midweek.csv` 的最后更新时间（`st_mtime`），读取最新更新的文件（可通过 `dashboard.data_utils.get_latest_pool_csv_path()` 自动获取，也可直接对比两者 mtime），优先通过 `dashboard.data_utils.load_pool_csv` 加载。
 4. CSV 必须用支持引号和转义的标准读取方式；`ibd_candidate_extra` 含带逗号 JSON，禁止按逗号手工切分。若解析列数与 Header 不一致，停止并报告“候选池解析失败”。
 5. 核心 Header 为 `code`、`signal`、`ibd_candidate_rule`、`ibd_entry_status`、`current_vs_ibd_candidate_pct`、`ibd_entry_volume_ratio`、`ibd_entry_close_position`、`ibd_entry_breakout_range_ratio`、`sector`；缺少任一项时停止。其他评估字段缺失按 UNKNOWN/N/A 处理，不视为 CSV 解析失败。
 6. 逐行规范化字段：字符串去除首尾空白，`ibd_entry_status` 转大写；`signal`、`pullback_v_is_dry` 接受布尔值、大小写不敏感的 `true/false` 或 `1/0`。无法识别的 `signal` 作为数据错误转人工补数；无法识别的 `pullback_v_is_dry` 记 UNKNOWN。参与比较的数值若为空、非数字、NaN 或正负 Infinity，均视为缺失，不得参与运算或排序。
@@ -127,11 +127,12 @@ Major FAIL 为 1 时，报告必须在“判断”或“顾虑”中写明该项
 2. 合规加载 CSV，建立 ACTIONABLE 板块占比。
 3. 先执行 Critical 与 Geometry，再执行适用的 Major / Minor。
 4. 按统一顺序排序并应用板块限制。
-5. 输出极简中文报告；不外显 PASS/FAIL/CONTEXT/UNKNOWN/N/A、检查数量或内部计分。
+5. 输出极简中文报告；报告标题与结论中必须明确指出当前使用的是“周中分析”还是“完整周分析”（例如根据读取的文件为 `breakout_follow_pool_midweek.csv` 标注 `（周中分析）`，读取 `breakout_follow_pool.csv` 标注 `（完整周分析）`）；不外显 PASS/FAIL/CONTEXT/UNKNOWN/N/A、检查数量或内部计分。
 
 ## 输出格式
 
 - 正文最多 30 个非空行；省略空区块和不影响结论的数据。
+- **标题**：必须明确标注分析类型，如 `# IBD 候选预筛（周中分析）` 或 `# IBD 候选预筛（完整周分析）`。
 - **结论**：一句话说明最优先、值得留意及是否宁缺毋滥。
 - **背景**：仅在市场状态或板块拥挤实际影响结论时写一句。
 - **优先复核**：0～3 只，每只固定“突破日 / 优势 / 判断”3 行。
@@ -141,7 +142,7 @@ Major FAIL 为 1 时，报告必须在“判断”或“顾虑”中写明该项
 - 只引用正式字段和明确规则，不扩展字段含义、创造阈值或使用“完全共振”等超出证据的表述。
 
 ```markdown
-# IBD 候选预筛
+# IBD 候选预筛（[周中分析 | 完整周分析]）
 
 ## 结论
 [一句话结论]
