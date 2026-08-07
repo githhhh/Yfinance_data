@@ -16,7 +16,7 @@ description: 从 Dashboard 突破候选池中，以 IBD 资深图表分析师视
 
 1. 先运行 `git submodule update --remote market_analysis`。若父仓库的 submodule 指针变化，在交付中说明。
 2. 大盘唯一来源：`market_analysis/output/market_report.json`。直接继承市场状态、派发日和板块信息；不得重新判断趋势，也不得仅因 Correction 淘汰合格候选。更新失败、文件缺失或 JSON 无效时停止，不得改用其他信源。
-3. 候选池：对比 `us/breakout_follow_pool.csv` 与 `us/breakout_follow_pool_midweek.csv` 的最后更新时间（`st_mtime`），读取最新更新的文件（可通过 `dashboard.data_utils.get_latest_pool_csv_path()` 自动获取，也可直接对比两者 mtime），优先通过 `dashboard.data_utils.load_pool_csv` 加载。
+3. 候选池：调用 `dashboard.data_utils.get_latest_pool_csv_path()`（对比 `us/breakout_follow_pool.csv` 与 `us/breakout_follow_pool_midweek.csv` 内容中的快照日期 `snapshot_date`）自动获取最新的文件，优先通过 `dashboard.data_utils.load_pool_csv` 加载。
 4. CSV 必须用支持引号和转义的标准读取方式；`ibd_candidate_extra` 含带逗号 JSON，禁止按逗号手工切分。若解析列数与 Header 不一致，停止并报告“候选池解析失败”。
 5. 核心 Header 为 `code`、`signal`、`ibd_candidate_rule`、`ibd_entry_status`、`current_vs_ibd_candidate_pct`、`ibd_entry_volume_ratio`、`ibd_entry_close_position`、`ibd_entry_breakout_range_ratio`、`sector`；缺少任一项时停止。其他评估字段缺失按 UNKNOWN/N/A 处理，不视为 CSV 解析失败。
 6. 逐行规范化字段：字符串去除首尾空白，`ibd_entry_status` 转大写；`signal`、`pullback_v_is_dry` 接受布尔值、大小写不敏感的 `true/false` 或 `1/0`。无法识别的 `signal` 作为数据错误转人工补数；无法识别的 `pullback_v_is_dry` 记 UNKNOWN。参与比较的数值若为空、非数字、NaN 或正负 Infinity，均视为缺失，不得参与运算或排序。
