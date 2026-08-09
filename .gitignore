@@ -1,8 +1,14 @@
 __pycache__/
 *.pyc
 .DS_Store
+# OAuth & Credential Tokens
+token.json
+token_*.json
+*.token
+
 # EPUB Unpacked Book
 .ibd_book_unpacked/
 
 # Big EPUB and unpacked cache
 How_to_Make_Money_in_Stocks.epub
+

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
 from eps_screener import run_screener as run_eps_screener
 from stage2_screener import run_screener as run_stage2_screener, load_whitelist, WHITELIST_PATH
+from data_providers import DataProviderFactory, YahooDataProvider
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
@@ -59,85 +60,14 @@ def read_stock_list(stock_list_dir="us"):
     return final_list
 
 def download_single_stock(stock_code, period, interval):
-    """Download data for a single stock with retries."""
-    attempt = 0
-    while attempt <= MAX_RETRIES:
-        try:
-            ticker = yf.Ticker(stock_code)
-            data = ticker.history(
-                period=period,
-                interval=interval,
-                auto_adjust=True,
-                rounding=True,
-                timeout=5,
-            )
-            if not data.empty:
-                return stock_code, data.round(2)
-        except Exception as e:
-            print(f"Error downloading {stock_code} (attempt {attempt+1}): {e}")
-        attempt += 1
-        time.sleep(0.5 * attempt)  # exponential backoff
-    return stock_code, None
+    """Download data for a single stock using default Yahoo provider (legacy alias)."""
+    provider = YahooDataProvider(batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES)
+    return provider.download_single_stock(stock_code, period=period, interval=interval)
 
 def download_batch_stocks(tickers, period="1y", interval="1d"):
-    """Download stock data in parallel batches with retries and timing per batch."""
-    all_data = {}
-    failed = []
-    total = len(tickers)
-    print(f"[Batch Download] Starting download for {total} stocks, batch size {BATCH_SIZE}, workers {MAX_WORKERS}")
-    overall_start = time.time()
-
-    for batch_start in range(0, total, BATCH_SIZE):
-        batch = tickers[batch_start:batch_start+BATCH_SIZE]
-        print(f"[Batch Download] Processing batch {batch_start//BATCH_SIZE+1}: {len(batch)} stocks")
-        batch_start_time = time.time()
-        batch_success = 0
-        batch_failed = 0
-
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            future_to_ticker = {
-                executor.submit(download_single_stock, ticker, period, interval): ticker
-                for ticker in batch
-            }
-            for future in as_completed(future_to_ticker):
-                stock_code, data = future.result()
-                if data is not None:
-                    all_data[stock_code] = data
-                    batch_success += 1
-                else:
-                    failed.append(stock_code)
-                    batch_failed += 1
-
-        batch_end_time = time.time()
-        print(f"[Batch Download] Batch finished: Downloaded {batch_success}, Failed {batch_failed} "
-              f"(Time: {batch_end_time - batch_start_time:.2f}s)")
-
-    # Retry failed tickers once more
-    if failed:
-        print(f"[Batch Download] Retrying {len(failed)} failed stocks...")
-        retry_failed = []
-        retry_start_time = time.time()
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            future_to_ticker = {
-                executor.submit(download_single_stock, ticker, period, interval): ticker
-                for ticker in failed
-            }
-            for future in as_completed(future_to_ticker):
-                stock_code, data = future.result()
-                if data is not None:
-                    all_data[stock_code] = data
-                else:
-                    retry_failed.append(stock_code)
-        retry_end_time = time.time()
-        print(f"[Batch Download] Retry finished: "
-              f"Recovered {len(failed) - len(retry_failed)}, Still failed {len(retry_failed)} "
-              f"(Time: {retry_end_time - retry_start_time:.2f}s)")
-        failed = retry_failed
-
-    overall_end = time.time()
-    print(f"[Batch Download] Finished: {len(all_data)} downloaded, {len(failed)} failed. "
-          f"Total time: {overall_end - overall_start:.2f} seconds")
-    return all_data, failed
+    """Download stock data in parallel batches using default Yahoo provider (legacy alias)."""
+    provider = YahooDataProvider(batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES)
+    return provider.download_batch_stocks(tickers, period=period, interval=interval)
 
 def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR, interval="1d"):
     """Save stock data dict to a pickle file."""
@@ -192,6 +122,11 @@ def get_stock_pkl_path(interval="1d"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download stock data')
+    parser.add_argument('--provider', default='yahoo', choices=['yahoo', 'schwab'], help='Data provider to use (yahoo, schwab)')
+    parser.add_argument('--app-key', default=None, help='Schwab App Key (Client ID)')
+    parser.add_argument('--app-secret', default=None, help='Schwab App Secret')
+    parser.add_argument('--token-path', default=None, help='Path to schwab OAuth token json file')
+    parser.add_argument('--callback-url', default=None, help='Schwab App Callback / Redirect URL')
     parser.add_argument('--period', default='2y', help='Data period (1y, 2y, etc.)')
     parser.add_argument('--interval', default='1d', help='Data interval (1d, 1wk, etc.)')
     parser.add_argument('--skip-screener', action='store_true', help='Skip the screener step')
@@ -269,6 +204,13 @@ if __name__ == "__main__":
                 tickers.remove(idx)
             tickers.insert(0, idx)
 
-        stock_data, failed = download_batch_stocks(tickers, period=args.period, interval=args.interval)
+        provider = DataProviderFactory.get_provider(
+            provider_type=args.provider,
+            app_key=args.app_key,
+            app_secret=args.app_secret,
+            token_path=args.token_path,
+            callback_url=args.callback_url,
+        )
+        stock_data, failed = provider.download_batch_stocks(tickers, period=args.period, interval=args.interval)
         save_path = save_stock_data(stock_data, interval=args.interval)
         loaded_data = load_stock_data(save_path) if save_path else None
