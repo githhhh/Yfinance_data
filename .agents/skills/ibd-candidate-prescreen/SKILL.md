@@ -62,7 +62,7 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 | N/A | 检查不适用 |
 
 - CONTEXT、INFO_MISSING、N/A 不计入 Major FAIL 或 Major UNKNOWN，也不得作为原始质量排序键。
-- EPS 缺失是 INFO_MISSING，不是基本面差，不得写成 FAIL，也不降低原始质量顺位。只有候选凭其他证据进入本轮复核前沿时，EPS 缺失才使其具备“值得留意”资格；EPS 缺失本身不得提升低顺位候选。
+- EPS 缺失是 INFO_MISSING，不是基本面差，不得写成 FAIL，也不降低原始质量顺位。只有候选凭其他证据进入本轮人工关注前沿时，EPS 缺失才使其具备“值得留意”资格；EPS 缺失本身不得提升前沿之外的低顺位候选。
 - Critical UNKNOWN 不得伪装为 FAIL；无 Critical FAIL 时转人工补数。
 - 所有适用检查必须保留 PASS / FAIL / UNKNOWN 三态，禁止用 `bool(None)`、`not pass`、默认 `False` 等方式把缺失折叠成失败。
 
@@ -179,7 +179,7 @@ trigger_pos = pos - rr
 - Critical 任一 FAIL 即不能进入“优先复核”或“值得留意”；只有 Critical 全部明确 PASS 才能进入这两组。
 - #4/#5 的 CONTEXT 表示已有阶段事实，不是 PASS；缺失才构成 Major UNKNOWN。
 - #6 只读取当前行正式字段 `pullback_v_is_dry`，不评价突破日放量。当前未导出可验证的窗口日期或有效性字段，因此不得凭观感判断“旧窗口错位”；字段有效即按真值判定，缺失才记 UNKNOWN。
-- EPS 是辅助信息而非决定项。已知低于 25% 只作客观披露，不记 Major FAIL；缺失不降低原始顺位，也不会自动进入“值得留意”，只在候选已凭其他证据进入复核前沿时提示人工核验。
+- EPS 是辅助信息而非决定项。已知低于 25% 只作客观披露，不记 Major FAIL；缺失不降低原始顺位，也不会自动进入“值得留意”，只在候选已凭其他证据进入人工关注前沿时提示人工核验。
 - Minor 不作淘汰条件。#10 只比较“有加分 / 无加分”；所有 `volume_ratio >= 1.3` 的候选在该层完全并列，不得按 1.70、1.50、1.30 的实际大小继续排序。
 - `ibd_entry_close_vs_trigger_pct` 只作可读上下文，不参与 Geometry，也不得替代当前买点新鲜度。
 
@@ -211,9 +211,9 @@ trigger_pos = pos - rr
 
 ## 最终分组与 Industry 覆盖
 
-先冻结完整原始质量排序，再执行两个阶段。不得边排序边因 EPS 或 Industry 改变顺位。
+先冻结完整原始质量排序，再执行三个阶段。不得边排序边因 EPS 或 Industry 改变顺位。
 
-### 阶段一：确定优先复核与复核前沿
+### 阶段一：确定优先复核与优先截断位
 
 按原始顺位逐只接收，只有同时满足以下条件的候选才能进入“优先复核”：
 
@@ -223,29 +223,48 @@ trigger_pos = pos - rr
 - 该 Industry 尚未被优先复核覆盖；
 - 优先复核尚未满 3 只。
 
-若成功选出 3 只，`review_cutline_rank` 为第 3 只优先复核候选的原始顺位；若最终不足 3 只，则设为 ACTIONABLE 原始排序的末位。这个截断位只用于判断哪些未入选候选确实处在本轮复核前沿，不改变任何原始顺位。
+若成功选出 3 只，`priority_cutline_rank` 为第 3 只优先复核候选的原始顺位；若最终不足 3 只，则设为 ACTIONABLE 原始排序的末位。该值表示优先复核选择为凑齐 3 个不同且信息完整的 Industry 实际扫描到哪里，不得直接作为“值得留意”的截止位。
 
-### 阶段二：从复核前沿精选值得留意
+### 阶段二：建立独立人工关注前沿
+
+固定 `priority_limit = 3`、`watch_limit = 2`、`base_attention_capacity = priority_limit + watch_limit = 5`，然后计算：
+
+```text
+base_attention_rank = min(last_raw_rank, base_attention_capacity)
+attention_frontier_rank = max(priority_cutline_rank, base_attention_rank)
+```
+
+- ACTIONABLE 排序为空时，`last_raw_rank`、`priority_cutline_rank`、`attention_frontier_rank` 均为 0。
+- 该前沿至少覆盖原始排序前 5 名（若有），对应最多 3 只优先复核加最多 2 只值得留意的总人工关注容量。
+- 若 EPS、Industry 或 Industry 覆盖使第 3 只优先复核顺延到 #6、#7 等更后顺位，前沿同步扩展至第 3 只优先复核的顺位，保留扫描过程中被跳过的高顺位候选。
+- 若不足 3 只优先复核，`priority_cutline_rank = last_raw_rank`，表示已扫描完整排序；值得留意仍只按原始顺序最多接收 2 只，不为凑数降低资格门槛。
+- 人工关注前沿只是有限人工复核容量的资格窗口，不是新的评分键，不改变原始顺位，也不保证窗口内每只候选都会展示。
+
+硬性示例：若原始 #1～#3 全部进入优先复核且总候选不少于 5 只，则 `priority_cutline_rank = 3`、`attention_frontier_rank = 5`；不得再以“#4 超过第 3 只优先复核的顺位”为由，把符合下述条件的 #4 或 #5 直接归入暂不优先。
+
+### 阶段三：从人工关注前沿精选值得留意
 
 未进入优先复核的候选必须同时满足以下条件，才具备“值得留意”资格：
 
-- 原始顺位 `<= review_cutline_rank`；
+- 原始顺位 `<= attention_frontier_rank`；
 - Critical 全部明确 PASS；
 - 技术分层为 A 或 B；
 - 存在至少一个明确路由原因：阶段结构信息缺口、EPS 信息缺失、Industry 信息缺失，或其 Industry 已被更高原始顺位候选覆盖。
 
-将具备资格的候选保持原始顺序，最多接收 2 只进入“值得留意”。同业补强最多保留每个已覆盖 Industry 的最高原始顺位 1 只。把同一候选的所有缺失项逐项列出，不得首次命中后遗漏另一项。
+将具备资格的候选保持原始顺序，最多接收 2 只进入“值得留意”。同业补强最多保留每个已覆盖 Industry 的最高原始顺位 1 只。把同一候选所有适用 Checklist 与覆盖字段缺口逐项列出，不得首次命中后遗漏另一项；`sector` 等可选描述性背景缺失不列为人工核验项。
 
-- EPS 缺失只能解释为什么一个**已经处在复核前沿**的候选需要人工核验，不能让复核前沿之外、关键条件失败或非 ACTIONABLE 的候选升级。
-- 值得留意已满 2 只后，其余候选保留在完整决策轨迹，最终写“暂不优先—本轮复核顺位未进入有限名额”，不得声称其技术质量不合格。
-- 排在复核截断位之后（`raw_rank > review_cutline_rank`）的信息缺失候选只在决策轨迹逐项记录全部缺失字段，不进入“值得留意”。信息缺失不得成为淘汰原因。
+- EPS 缺失只能解释为什么一个**已经凭技术质量进入人工关注前沿**的候选需要人工核验，不能让前沿之外、关键条件失败或非 ACTIONABLE 的候选升级。
+- 值得留意已满 2 只后，其余具备资格的候选保留在完整决策轨迹，最终写“暂不优先—值得留意名额已满”；不得声称其技术质量不合格。
+- 排在人工关注前沿之后（`raw_rank > attention_frontier_rank`）的信息缺失候选只在决策轨迹逐项记录全部缺失字段，不进入“值得留意”。信息缺失不得成为淘汰原因。
+- 候选进入“值得留意”后，除路由原因外，还要列出该行所有其他适用 Checklist 与覆盖字段缺口。例如 EPS 或 Industry 缺失触发路由时，若 `dist_to_52w_high_pct` 同时缺失，也必须列为额外人工核验项，但 Minor 缺失本身不单独触发入组；不列 `sector` 等不参与检查或覆盖的可选背景字段。
 - 第一个进入优先复核的 Industry 候选只能描述为“本次候选池内该 Industry 原始质量顺位更靠前且信息完整的候选”，不得称为该行业最强或行业领导者。
 
 其他最终路由：
 
 - 技术分层 D → **暂不优先**，写一个决定性 Critical 原因。
 - 技术分层 C → **人工补数**，写明缺失的关键字段。
-- 未达到复核前沿或未进入有限名额 → **暂不优先**，原因写“本轮复核顺位未进入有限名额”；不得把 EPS 缺失写成淘汰原因。
+- 未达到人工关注前沿 → **暂不优先**，原因写“原始顺位超出本轮人工关注前沿”；不得把 EPS 缺失写成淘汰原因。
+- 位于人工关注前沿内但没有明确值得留意路由原因，或值得留意名额已满 → **暂不优先**，分别写“优先复核名额已满且无信息核验/同业补强路由”或“值得留意名额已满”。
 - 非 ACTIONABLE 不进入上述 ACTIONABLE 原始排序或覆盖循环；在单独的“排除记录”中写明当前状态，不分配原始顺位。
 
 参考伪代码：
@@ -253,6 +272,8 @@ trigger_pos = pos - rr
 ```text
 selected = []
 covered_industries = set()
+priority_limit = 3
+watch_limit = 2
 for item in raw_quality_ranking:
     if item.technical_tier != "A":
         continue
@@ -262,15 +283,17 @@ for item in raw_quality_ranking:
         continue
     selected.append(item)
     covered_industries.add(item.industry_key)
-    if len(selected) == 3:
+    if len(selected) == priority_limit:
         break
 
 last_raw_rank = raw_quality_ranking[-1].raw_rank if raw_quality_ranking else 0
-review_cutline_rank = selected[-1].raw_rank if len(selected) == 3 else last_raw_rank
+priority_cutline_rank = selected[-1].raw_rank if len(selected) == priority_limit else last_raw_rank
+base_attention_rank = min(last_raw_rank, priority_limit + watch_limit)
+attention_frontier_rank = max(priority_cutline_rank, base_attention_rank)
 
 watch_eligible = []
 for item in raw_quality_ranking:
-    if item in selected or item.raw_rank > review_cutline_rank:
+    if item in selected or item.raw_rank > attention_frontier_rank:
         continue
     if item.critical_all_pass and item.technical_tier in {"A", "B"}:
         reasons = collect_structure_eps_industry_and_same_industry_reasons(item)
@@ -293,16 +316,16 @@ watch = take_first_two_by_raw_rank(
 6. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
 7. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
 8. 由同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字。
-9. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部结构、EPS 与 Industry 缺失，不能只保留首次命中的缺口。
+9. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
 10. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
 
 决策轨迹使用可读链路，例如：
 
 ```text
 可进入覆盖选择 → EPS 已知 → Industry 未覆盖 → 优先复核
-复核前沿内 → EPS 已知 → Industry 已覆盖 → 值得留意（同业补强）
-复核前沿内 → EPS 缺失 → 值得留意（需人工核验）
-复核前沿外 → EPS 缺失 → 暂不优先（仅在轨迹记录缺失）
+人工关注前沿内 → EPS 已知 → Industry 已覆盖 → 值得留意（同业补强）
+人工关注前沿内 → EPS 缺失 → 值得留意（需人工核验）
+人工关注前沿外 → EPS 缺失 → 暂不优先（仅在轨迹记录缺失）
 突破日量能 1.22×均量 < 1.50× → 暂不优先
 ```
 
@@ -331,10 +354,11 @@ watch = take_first_two_by_raw_rank(
 6. 原始顺位不含 Industry、Sector 或 EPS 缺失因素；最终分组与覆盖决策没有反向污染原始顺位。
 7. 优先复核不超过 3 只，且每个已知 Industry 最多 1 只；未凑满时没有降低门槛。
 8. 因同 Industry 未入选的候选确实排在已入选同业候选之后，或更高顺位候选存在 EPS / Industry 信息缺口；决策轨迹必须能解释例外。
-9. EPS 缺失没有被记失败或降低原始顺位；只有复核前沿内且最终进入“值得留意”的候选写出“EPS 数据缺失，需人工复核”。
+9. EPS 缺失没有被记失败或降低原始顺位；只有人工关注前沿内且最终进入“值得留意”的候选写出“EPS 数据缺失，需人工复核”。若该候选还有其他字段缺口，已全部列出。
 10. 报告未从候选数量、占比或 Pool 内同业顺位推断行业强弱或行业领导者，也未出现“行业代表”“Industry 代表”或“覆盖代表”。
 11. 市场背景忠于 `market_report.json`，没有自行补充市场判断；报告日期与 Pool 日期不一致时已同时展示实际日期并明确其不影响预筛。
-12. ACTIONABLE 排序为空时，`last_raw_rank` 与 `review_cutline_rank` 均为 0，并输出空的优先复核、值得留意和决策轨迹，不得访问不存在的末项。
+12. ACTIONABLE 排序为空时，`last_raw_rank`、`priority_cutline_rank` 与 `attention_frontier_rank` 均为 0，并输出空的优先复核、值得留意和决策轨迹，不得访问不存在的末项。
+13. 当原始 #1～#3 全部进入优先复核且总候选不少于 5 只时，人工关注前沿仍为 #5；没有把 #4、#5 误判为“超出第 3 只优先复核截断位”。
 
 ## 输出规范
 
@@ -342,7 +366,7 @@ watch = take_first_two_by_raw_rank(
 - 项目模式在结论后固定输出一行独立大盘背景。更新成功且报告可读时写：`大盘背景（独立展示）：Market Report [market date/日期无法确定]｜Pool [pool date]｜已先执行 market_analysis 更新[｜commit short hash]｜不参与候选排序与分组`。日期不同可照实并列，不评价“过期”或“失配”。
 - 更新命令失败时写：`大盘背景：market_analysis 更新失败（[简短原因]）；候选预筛继续，市场信息不参与排序与分组`。报告缺失或无效时写：`大盘背景不可用，本次未纳入；候选预筛不受影响`。独立 CSV 且无报告时固定写“大盘背景未提供，本次未纳入”。这些情况都不得停止候选输出。
 - “优先复核”完整展示 0～3 只，每只固定“突破日 / 优势 / 判断”3 行。
-- “值得留意”完整展示 0～2 只详细卡片；每只必须已经处在复核前沿，并明确写原因：结构信息缺口、EPS 人工核验、Industry 信息缺口或同业补强。
+- “值得留意”完整展示 0～2 只详细卡片；每只必须已经处在人工关注前沿，并明确写原因：结构信息缺口、EPS 人工核验、Industry 信息缺口或同业补强，同时列出当前行其他适用 Checklist 与覆盖字段缺口。
 - “暂不优先”正文最多展示 3 只，固定取该最终分组中原始顺位最靠前的 3 只；每只只写一个或两个决定性原因。全部候选仍保留在完整决策轨迹中。
 - 非停止路径最后始终输出“完整候选排序与决策轨迹”表，覆盖所有 ACTIONABLE 候选；不可只输出最终 3 只。
 - Review Universe 中的非 ACTIONABLE 候选如需展示，放入不编号的“排除记录”，不得混入 ACTIONABLE 原始质量排序。
@@ -352,7 +376,7 @@ watch = take_first_two_by_raw_rank(
 - 引用 #4/#5 时只写路由后的客观数值。Continuation 可另列母基底背景，但不得混写。
 - “优势”和“判断”只使用正式 Geometry 名称与当前 ticker 的客观字段事实。不得使用“完美”“健康”“完全共振”“几何饱满”“形态平稳”“结构完整”“穿透充分”“综合质量领先”等无正式字段支撑的评价。
 - 描述 Industry 覆盖时不得写“作为某 Industry 行业代表进入”。写“该候选进入本次优先复核，且其 Industry 尚未被本次名单覆盖”。
-- 不把“值得留意”理解成评分降低：同业补强与信息缺口只是复核前沿内的人工路由原因；信息缺失本身也不得把低顺位候选提升进本组。
+- 不把“值得留意”理解成评分降低：同业补强与信息缺口只是人工关注前沿内的路由原因；信息缺失本身也不得把前沿外的低顺位候选提升进本组。
 
 ```markdown
 # IBD 候选预筛（[周中分析 | 完整周分析 | 指定快照分析]）
