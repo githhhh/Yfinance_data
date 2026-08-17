@@ -9,9 +9,10 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 
 - 目标固定为：**从当前 ACTIONABLE Pool 中，选出量价结构、买点新鲜度和阶段质量证据最强的最多 3 只，供人工优先复核。**
 - 先产生完整、确定性的原始质量排序，再应用 Industry 覆盖规则；不得把最终展示顺序冒充原始质量顺序。
-- 输出 0～3 只“优先复核”、0～2 只“值得留意”、代表性“暂不优先”和完整候选决策轨迹；宁缺毋滥，不为凑满名额放宽规则。
+- 输出 0～3 只“优先复核”、0～2 只“值得留意”、独立“Alpha Radar（非 ACTIONABLE，仅观察）”、代表性“暂不优先”和完整候选决策轨迹；宁缺毋滥，不为凑满名额放宽规则。
 - 只评估当前正式导出字段，不预测未来收益、走势或目标价，不给仓位与买卖指令，不完成完整 CAN SLIM 认证，不替代图表人工判断。
-- 规则优先。经验只用于正式规则完全并列后的文字解释，不得覆盖 Critical、阶段字段路由、Geometry、原始排序或覆盖选择。
+- 规则优先。历史复盘经验只能改进证据簇推理顺序，不得把事后收益、样本中位数或个别 ticker 的数值范围写成新门槛，也不得覆盖 Critical、阶段字段路由或覆盖选择。
+- 跨模型一致性优先：候选名单、原始顺位、最终分组、理由码和数字必须来自确定性 artifact；模型只能解释 artifact，不得凭自然语言权衡重新排序或替换名单。
 - 不修改原始数据，不用未提供字段推导新指标。所有计算在内存中完成，不在项目目录遗留临时脚本、中间文件或数据副本。
 - 单次预筛不能证明所选三只未来表现最好。始终保留 `snapshot_date`、原始质量顺位、最终分组与决策原因，使后续历史回测可以检验规则；实时预筛中严禁读取未来价格或事后收益。
 
@@ -78,8 +79,11 @@ else:
 ## 候选范围与双层结果
 
 - Review Universe 仅包含 `signal == True` 且 `ibd_candidate_rule` 非空的行。
-- “完整原始质量排序”只对其中 `ibd_entry_status == ACTIONABLE` 的候选编号；非 ACTIONABLE 保留在排除记录，但不与 ACTIONABLE 混排。
-- 第一层是**个股原始质量排序**：只使用当前 ticker 的技术、量价、新鲜度和阶段证据；不使用 `industry`、`sector`、行业候选数量、EPS 缺失状态或最终展示名额。
+- “完整原始质量排序”只对其中 `ibd_entry_status == ACTIONABLE` 的候选编号；非 ACTIONABLE 不与 ACTIONABLE 混排。
+- 非 ACTIONABLE Review Universe 行可进入单独的 **Alpha Radar**：只用于发现值得后续人工观察的强量价或高质量 pullback 线索，不编号为 ACTIONABLE 原始顺位，不进入优先复核/值得留意，不给买卖结论。
+- Alpha Radar 拥有独立容量，必须从非 ACTIONABLE Review Universe 独立排序生成；不得用 ACTIONABLE 原始排序的剩余候选或最终分组 leftovers 占用、替代或遮蔽非 ACTIONABLE 发现名单。
+- 评估非 ACTIONABLE Alpha Radar 时，突破日字段缺失是人工看图/补数提示，不是自动压制理由；若周线量能、EPS 辅助、接近 52 周高点、回踩/巩固结构等证据形成一致链路，可进入 radar，但必须标注缺失项和状态限制。
+- 第一层是**个股原始质量排序**：只使用当前 ticker 的技术、量价、新鲜度、阶段证据和辅助确认簇；不使用 `industry`、`sector`、行业候选数量或最终展示名额。
 - 第二层是**人工复核覆盖选择**：从原始排序顺次处理，最终最多 3 只“优先复核”，每个已知 Industry 最多 1 只。
 - 两层结果必须同时保留。若 Industry 覆盖导致原始高顺位候选未进入优先复核，必须在决策轨迹中说明，不能改写其原始顺位。
 
@@ -154,7 +158,8 @@ trigger_pos = pos - rr
 | 9 | `trigger_pos > 0` 且 `0.65 <= pos < 0.80` 且 `rr >= 0.50` | Constructive Breakout | PASS |
 | 10 | `trigger_pos > 0` 且 `0.65 <= pos < 0.80` 且 `rr < 0.50` | Marginal Breakout | PASS |
 
-- PASS Geometry 层级为 `Full-range Breakout > Strong Finish > Faded Gap > Constructive Breakout > Marginal Breakout`。为保证全量排序确定性，完整顺序固定为 `Full-range Breakout > Strong Finish > Faded Gap > Constructive Breakout > Marginal Breakout > UNKNOWN > Squat / Upper Shadow > Defensive Failure`；后三项顺序仅作稳定排序，不代表可交易质量判断。
+- PASS Geometry 分类用于解释突破日路径质量和人工看图重点，不代表天然收益排序。`Full-range Breakout`、`Strong Finish`、`Faded Gap`、`Constructive Breakout`、`Marginal Breakout` 均为非失败路径证据；其中 `Faded Gap` / `Constructive Breakout` / `Marginal Breakout` 只能写成“需人工确认突破后是否正常消化”，不得自动解释成弱势。
+- 为保证全量排序确定性，完整 Geometry tie-breaker 顺序固定为 `Full-range Breakout > Strong Finish > Faded Gap > Constructive Breakout > Marginal Breakout > UNKNOWN > Squat / Upper Shadow > Defensive Failure`；该顺序只在证据簇与证据完整度仍并列时使用，不能越过更强的 Fresh Demand 或 Pullback 证据簇。
 - `pos` 越界优先作为数据错误处理，不得把负数误判成 `pos < 0.65`。除此之外，`rr <= 0` 或有效 `pos < 0.65` 一旦确认，即使另一字段缺失仍为 Critical FAIL。
 - 报告只使用上述英文分类，不得仅凭 `rr` 或主观观感升级分类。
 - `rr` 极低但大于 0 时仍按正式 Geometry 分类；可客观说明“仅小幅越过触发位”，不得另创淘汰阈值。
@@ -183,6 +188,28 @@ trigger_pos = pos - rr
 - Minor 不作淘汰条件。#10 只比较“有加分 / 无加分”；所有 `volume_ratio >= 1.3` 的候选在该层完全并列，不得按 1.70、1.50、1.30 的实际大小继续排序。
 - `ibd_entry_close_vs_trigger_pct` 只作可读上下文，不参与 Geometry，也不得替代当前买点新鲜度。
 
+## 证据簇推理顺序
+
+在完成 Critical、阶段路由和 Geometry 分类后，先判断候选属于哪类证据簇，再排序；不得把“图形更漂亮”单独置于“需求、跟进、基本面辅助和阶段证据更完整”之前。
+
+| 证据簇 | 触发含义 | 排序含义 |
+|---|---|---|
+| Fresh Demand Alpha | 近买点、突破日放量明确，且 EPS 辅助、周线量能、接近 52 周高点或恢复强度中有多项确认 | 优先寻找旧规则能抓到的 IMAX 型需求扩张；Geometry 不完美只作人工看图提示 |
+| Constructive Pullback | `ceiling_pullback`、`pivot`、`ma10_touch_confirm`、`three_weeks_tight` 等延续/回踩规则，近买点且量价证据明确 | 优先判断是突破后正常消化还是失败；dry pullback 是支持证据，非 dry 是风险提示 |
+| Standard Breakout | Critical 通过但辅助确认较少 | 可进入排序，但不得因单一完美 Geometry 压过证据簇更完整的候选 |
+| Incomplete Evidence | 关键字段通过但辅助证据不足或多项缺失 | 保留轨迹，通常不应进入优先复核前沿 |
+
+证据完整度只使用二元/三态事实，不使用数值大小作过度拟合排序：买点新鲜、突破日放量达标、EPS 是否达到辅助门槛、周线量能是否跟进、是否接近 52 周高点、回踩是否缩量。EPS 仍然是辅助信息：不得作为淘汰条件，不得按 EPS 数值高低排序；但在其他关键证据已经通过时，`EPS >= 25` 可作为 Fresh Demand 证据簇的一项辅助确认。
+
+非 ACTIONABLE Alpha Radar 的推理顺序：
+
+1. 先剔除明确结构失败：Geometry Defensive Failure / Squat、当前低于候选买点、或其它可由当前字段确认的失败路径。
+2. 再寻找证据链，而不是单项打分：接近买点或处在可解释的延伸/回踩状态、周线量能跟进、EPS 辅助达标、接近 52 周高点、pullback 结构或缩量证据。
+3. 对 `EXTENDED` 与 `UNCONFIRMED` 分状态展示，保持 radar 属性；不得因它历史表现好而回填成 ACTIONABLE，也不得因 entry-volume 缺失直接排除。
+4. 另设非 ACTIONABLE **Pullback Scout** 视角：`ceiling_pullback`、`pivot`、`ma10_touch_confirm`、`three_weeks_tight` 若近买点，且 pullback 结构与接近 52 周高点、周线量能跟进或缩量证据中至少形成一条一致链路，可进入人工看图观察；`pullback_v_is_dry == False`、Geometry caution、entry-volume 缺失均写入风险标签，不作为硬压制或自动淘汰。
+5. Pullback Scout 不替代 ACTIONABLE 原始排序、优先复核或主 Alpha Radar；它只回答“哪些未确认回踩值得后续看图跟踪”，不能写成当前买点确认。
+6. 排序解释必须写成“为何值得后续人工看图”，不是“为何现在应买入”。重点是没有先被明确失败打掉、过程和最终路径相对强，而不是事后收益最高。
+
 ## 原始质量分层与排序
 
 先为每个 ACTIONABLE 候选建立技术分层：
@@ -197,15 +224,18 @@ trigger_pos = pos - rr
 1. 技术分层 A > B > C > D；
 2. 更少 Major FAIL；
 3. 更少 Major UNKNOWN；
-4. Geometry 层级；Geometry UNKNOWN 排在已知 PASS 分类之后；
-5. 新鲜区 `0 <= current_vs_ibd_candidate_pct <= 2%`；
-6. Minor #7：PASS > UNKNOWN > FAIL；
-7. Minor #10：有二元加分 > 无加分；
-8. `code` 字典序，再按 CSV 原始行序。
+4. 证据簇：Fresh Demand Alpha > Constructive Pullback > Standard Breakout > Incomplete Evidence；
+5. 更完整的证据确认项数量：买点新鲜、突破日放量达标、EPS 辅助达标、周线量能跟进、接近 52 周高点、适用时回踩缩量；
+6. 更少非淘汰风险提示：例如当前巩固段未确认缩量、EPS 缺失、Industry 缺失、仅小幅越过触发位等；
+7. 新鲜区 `0 <= current_vs_ibd_candidate_pct <= 2%`；
+8. Geometry tie-breaker；Geometry UNKNOWN 排在已知 PASS 分类之后；
+9. Minor #7：PASS > UNKNOWN > FAIL；
+10. Minor #10：有二元加分 > 无加分；
+11. `code` 字典序，再按 CSV 原始行序。
 
 硬性约束：
 
-- `industry`、`sector`、行业候选数量、EPS 数值、EPS 缺失状态和最终展示名额均不得进入上述排序键。
+- `industry`、`sector`、行业候选数量、EPS 数值大小和最终展示名额均不得进入上述排序键。EPS 只能以“辅助门槛是否达标/是否缺失”的状态参与证据完整度或风险提示，不能按实际同比数值排序。
 - 原始顺位一经产生不得因 Industry 覆盖、EPS 人工核验或 Top 3 名额重排。
 - 不得把原始质量顺位命名为预测排名、收益排名、行业排名或领导者排名。
 
@@ -265,7 +295,7 @@ attention_frontier_rank = max(priority_cutline_rank, base_attention_rank)
 - 技术分层 C → **人工补数**，写明缺失的关键字段。
 - 未达到人工关注前沿 → **暂不优先**，原因写“原始顺位超出本轮人工关注前沿”；不得把 EPS 缺失写成淘汰原因。
 - 位于人工关注前沿内但没有明确值得留意路由原因，或值得留意名额已满 → **暂不优先**，分别写“优先复核名额已满且无信息核验/同业补强路由”或“值得留意名额已满”。
-- 非 ACTIONABLE 不进入上述 ACTIONABLE 原始排序或覆盖循环；在单独的“排除记录”中写明当前状态，不分配原始顺位。
+- 非 ACTIONABLE 不进入上述 ACTIONABLE 原始排序或覆盖循环；若具备强 Fresh Demand 或 Constructive Pullback 证据，放入单独的 Alpha Radar；否则在“排除记录”中写明当前状态。不论哪种情况，都不分配 ACTIONABLE 原始顺位。
 
 参考伪代码：
 
@@ -312,12 +342,15 @@ watch = take_first_two_by_raw_rank(
 2. 更新尝试后，项目模式读取可用的 `market_report.json` 并将其作为独立背景；报告旧、缺失、无效或日期无法确定时如实披露并继续。独立 CSV 模式只在用户提供报告时读取，否则记录“大盘背景未提供，本次未纳入”。
 3. 合规加载目标 CSV，确认唯一 `snapshot_date`，并按前置规则确定“周中分析”“完整周分析”或“指定快照分析”。
 4. 建立来源记录：`market_analysis_update_result + market_analysis_commit（若可得）+ market_snapshot_date（若可得）+ pool_snapshot_date + pool_path`。该记录只用于披露来源，任何字段都不得传入候选评分、排序或分组函数。
-5. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配原始顺位。
-6. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
-7. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
-8. 由同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字。
-9. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
-10. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
+5. 生成确定性预筛 artifact，作为所有模型的唯一排序与报告骨架来源。项目内可运行：
+   `conda run --no-capture-output -n quant_env python -m backtest.ibd_skill_iteration.deterministic_prescreen --pool [pool.csv] --snapshot-date [YYYY-MM-DD] --version v3 --json-out [artifact.json] --markdown-out [artifact.md]`
+   若该脚本不可用，必须用同一套代码路径或停止说明，不能退回模型手工排序。
+6. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、证据簇、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、Alpha Radar 资格、非 ACTIONABLE radar 顺位、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配 ACTIONABLE 原始顺位。
+7. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
+8. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
+9. 由 artifact 中同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字，不得重排 `priority_top3`、`actionable_raw_top5`、`alpha_radar_top5`、`non_actionable_alpha_radar_top10` 或 `pullback_scout_top10`。
+10. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
+11. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
 
 决策轨迹使用可读链路，例如：
 
@@ -351,7 +384,7 @@ watch = take_first_two_by_raw_rank(
 3. 每个候选数字来自当前标题 ticker 的同一原始行，尤其逐一复核 `ibd_entry_volume_ratio`、`current_vs_ibd_candidate_pct` 与 `dist_to_52w_high_pct`，不得跨 ticker 复制或错位小数点。
 4. 完成双向数字审计：从最终文本的每个候选数字反查 `ticker + source_field + raw_value + formatted_value` 四元组，同时从四元组检查最终文本中的格式化值。必须逐字符核对数字串与小数位；例如 MTUS 原值 `dist_to_52w_high_pct=-4.0301...` 只能渲染为“低于52周高点4.03%”，不得漂移为 0.43%。
 5. 突破日量能与周线量能未混用；`ibd_entry_breakout_range_ratio` 未被写成百分比。
-6. 原始顺位不含 Industry、Sector 或 EPS 缺失因素；最终分组与覆盖决策没有反向污染原始顺位。
+6. 原始顺位不含 Industry、Sector、行业候选数量或 EPS 数值大小；EPS 缺失只作为非淘汰风险提示，最终分组与覆盖决策没有反向污染原始顺位。
 7. 优先复核不超过 3 只，且每个已知 Industry 最多 1 只；未凑满时没有降低门槛。
 8. 因同 Industry 未入选的候选确实排在已入选同业候选之后，或更高顺位候选存在 EPS / Industry 信息缺口；决策轨迹必须能解释例外。
 9. EPS 缺失没有被记失败或降低原始顺位；只有人工关注前沿内且最终进入“值得留意”的候选写出“EPS 数据缺失，需人工复核”。若该候选还有其他字段缺口，已全部列出。
@@ -369,7 +402,8 @@ watch = take_first_two_by_raw_rank(
 - “值得留意”完整展示 0～2 只详细卡片；每只必须已经处在人工关注前沿，并明确写原因：结构信息缺口、EPS 人工核验、Industry 信息缺口或同业补强，同时列出当前行其他适用 Checklist 与覆盖字段缺口。
 - “暂不优先”正文最多展示 3 只，固定取该最终分组中原始顺位最靠前的 3 只；每只只写一个或两个决定性原因。全部候选仍保留在完整决策轨迹中。
 - 非停止路径最后始终输出“完整候选排序与决策轨迹”表，覆盖所有 ACTIONABLE 候选；不可只输出最终 3 只。
-- Review Universe 中的非 ACTIONABLE 候选如需展示，放入不编号的“排除记录”，不得混入 ACTIONABLE 原始质量排序。
+- 若 Review Universe 中存在非 ACTIONABLE radar 候选，必须输出独立“Alpha Radar（非 ACTIONABLE，仅观察）”小节；若没有候选，也写明“本轮无非 ACTIONABLE radar 候选通过证据链”。该小节不受 ACTIONABLE 优先复核/值得留意名额影响。
+- Review Universe 中的非 ACTIONABLE 候选如需展示，放入不编号的“Alpha Radar”或“排除记录”，不得混入 ACTIONABLE 原始质量排序；Alpha Radar 必须明确写“非 ACTIONABLE，仅供后续观察/人工看图”，不得写成优先复核。
 - 入选详情不外显 Critical / Major / Minor、PASS / FAIL / UNKNOWN / INFO_MISSING 等内部状态；决策轨迹改用人类可读原因。
 - 优先复核或值得留意候选若 #6 明确为 False，必须客观写明当前巩固段未确认缩量；不得因它仍获有限名额而隐藏该事实。
 - EPS 已知但低于 25% 时可客观显示实际同比值与辅助门槛，但不得把它写成淘汰原因或用于解释原始顺位。
@@ -400,6 +434,12 @@ watch = take_first_two_by_raw_rank(
 - **突破日：** [同上]
 - **需核验或补强：** [EPS/Industry/结构信息缺口，或同业补强/名额原因]
 - **判断：** [为什么仍值得人工观察；不改变原始质量顺位]
+
+## Alpha Radar（非 ACTIONABLE，仅观察）
+### [TICKER]
+- **状态：** [EXTENDED / UNCONFIRMED]｜[rule]｜非 ACTIONABLE，不进入优先复核
+- **证据链：** [周线量能/EPS/接近高点/pullback 结构等当前字段事实]
+- **需人工确认：** [突破日字段缺失、延伸、未确认、非缩量等风险提示]
 
 ## 暂不优先
 - **[TICKER]：** [亮点可选]，但 [决定性原因 + 规范化数字]

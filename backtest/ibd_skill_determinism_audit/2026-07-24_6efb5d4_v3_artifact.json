@@ -1,0 +1,1833 @@
+{
+  "schema_version": "ibd-prescreen-artifact-v1",
+  "snapshot_date": "2026-07-24",
+  "version": "v3",
+  "deterministic_contract": {
+    "ordered_lists_are_authoritative": true,
+    "models_must_not_reorder": true,
+    "models_may_only_summarize_reason_codes": true
+  },
+  "priority_top3": [
+    {
+      "rank": 1,
+      "code": "IMAX",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "PRIORITY",
+      "industry": "Electronics/Appliances",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        0,
+        0,
+        0,
+        -5.816685398052541,
+        "IMAX",
+        45
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.51,
+        "ibd_entry_volume_ratio": 5.816685398052541,
+        "ibd_entry_close_position": 0.6629213483146075,
+        "ibd_entry_breakout_range_ratio": 0.224719101123597,
+        "eps_yoy_growth": 33.48039215686275,
+        "volume_ratio": 2.2938727555498537,
+        "dist_to_52w_high_pct": -5.448997384481258,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 2,
+      "code": "NWFL",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "PRIORITY",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        0,
+        1,
+        -1.9000390037332144,
+        "NWFL",
+        25
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 2.67,
+        "ibd_entry_volume_ratio": 1.9000390037332144,
+        "ibd_entry_close_position": 0.9138755980861244,
+        "ibd_entry_breakout_range_ratio": 0.1961722488038264,
+        "eps_yoy_growth": 27.65325812676266,
+        "volume_ratio": 1.2283995257241331,
+        "dist_to_52w_high_pct": -1.0312405216863718,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 3,
+      "code": "PKG",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "PRIORITY",
+      "industry": "Containers/Packaging",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        1,
+        0,
+        -1.8609151130028176,
+        "PKG",
+        26
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 3.23,
+        "ibd_entry_volume_ratio": 1.8609151130028176,
+        "ibd_entry_close_position": 0.99757281553398,
+        "ibd_entry_breakout_range_ratio": 0.3868932038834952,
+        "eps_yoy_growth": -19.756963918489436,
+        "volume_ratio": 1.578781529173657,
+        "dist_to_52w_high_pct": -0.0392942748241642,
+        "pullback_v_is_dry": NaN
+      }
+    }
+  ],
+  "actionable_raw_top5": [
+    {
+      "rank": 1,
+      "code": "IMAX",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "OTHER",
+      "industry": "Electronics/Appliances",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        0,
+        0,
+        0,
+        -5.816685398052541,
+        "IMAX",
+        45
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.51,
+        "ibd_entry_volume_ratio": 5.816685398052541,
+        "ibd_entry_close_position": 0.6629213483146075,
+        "ibd_entry_breakout_range_ratio": 0.224719101123597,
+        "eps_yoy_growth": 33.48039215686275,
+        "volume_ratio": 2.2938727555498537,
+        "dist_to_52w_high_pct": -5.448997384481258,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 2,
+      "code": "NWFL",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "OTHER",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        0,
+        1,
+        -1.9000390037332144,
+        "NWFL",
+        25
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 2.67,
+        "ibd_entry_volume_ratio": 1.9000390037332144,
+        "ibd_entry_close_position": 0.9138755980861244,
+        "ibd_entry_breakout_range_ratio": 0.1961722488038264,
+        "eps_yoy_growth": 27.65325812676266,
+        "volume_ratio": 1.2283995257241331,
+        "dist_to_52w_high_pct": -1.0312405216863718,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 3,
+      "code": "PKG",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "OTHER",
+      "industry": "Containers/Packaging",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        1,
+        0,
+        -1.8609151130028176,
+        "PKG",
+        26
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 3.23,
+        "ibd_entry_volume_ratio": 1.8609151130028176,
+        "ibd_entry_close_position": 0.99757281553398,
+        "ibd_entry_breakout_range_ratio": 0.3868932038834952,
+        "eps_yoy_growth": -19.756963918489436,
+        "volume_ratio": 1.578781529173657,
+        "dist_to_52w_high_pct": -0.0392942748241642,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 4,
+      "code": "PCAR",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "OTHER",
+      "industry": "Trucks/Construction/Farm Machinery",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        1,
+        0,
+        -1.556774180995064,
+        "PCAR",
+        67
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 3.25,
+        "ibd_entry_volume_ratio": 1.556774180995064,
+        "ibd_entry_close_position": 0.8528827037773399,
+        "ibd_entry_breakout_range_ratio": 0.602385685884692,
+        "eps_yoy_growth": 19.726684748591687,
+        "volume_ratio": 1.3351416603798207,
+        "dist_to_52w_high_pct": -1.239731142643763,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 5,
+      "code": "BLFS",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "OTHER",
+      "industry": "Medical Specialties",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -3,
+        0,
+        0,
+        1,
+        0,
+        -11.10657439130653,
+        "BLFS",
+        22
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_needs_manual_check",
+        "weekly_volume_follow_through"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.22,
+        "ibd_entry_volume_ratio": 11.10657439130653,
+        "ibd_entry_close_position": 0.8152173913043479,
+        "ibd_entry_breakout_range_ratio": 0.8315217391304335,
+        "eps_yoy_growth": NaN,
+        "volume_ratio": 3.1688814204373283,
+        "dist_to_52w_high_pct": -6.981073533974547,
+        "pullback_v_is_dry": NaN
+      }
+    }
+  ],
+  "alpha_radar_top5": [
+    {
+      "rank": 1,
+      "code": "PCAR",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Trucks/Construction/Farm Machinery",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -4,
+        0,
+        1,
+        1,
+        0,
+        -1.556774180995064,
+        "PCAR",
+        67
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 3.25,
+        "ibd_entry_volume_ratio": 1.556774180995064,
+        "ibd_entry_close_position": 0.8528827037773399,
+        "ibd_entry_breakout_range_ratio": 0.602385685884692,
+        "eps_yoy_growth": 19.726684748591687,
+        "volume_ratio": 1.3351416603798207,
+        "dist_to_52w_high_pct": -1.239731142643763,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 2,
+      "code": "BLFS",
+      "entry_status": "ACTIONABLE",
+      "lane": "fresh_demand_alpha",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Medical Specialties",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        0,
+        0,
+        -3,
+        0,
+        0,
+        1,
+        0,
+        -11.10657439130653,
+        "BLFS",
+        22
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_needs_manual_check",
+        "weekly_volume_follow_through"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.22,
+        "ibd_entry_volume_ratio": 11.10657439130653,
+        "ibd_entry_close_position": 0.8152173913043479,
+        "ibd_entry_breakout_range_ratio": 0.8315217391304335,
+        "eps_yoy_growth": NaN,
+        "volume_ratio": 3.1688814204373283,
+        "dist_to_52w_high_pct": -6.981073533974547,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 3,
+      "code": "CCBG",
+      "entry_status": "ACTIONABLE",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -5,
+        0,
+        0,
+        1,
+        0,
+        -1.7772309009201797,
+        "CCBG",
+        85
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.1,
+        "ibd_entry_volume_ratio": 1.7772309009201797,
+        "ibd_entry_close_position": 0.8168316831683149,
+        "ibd_entry_breakout_range_ratio": 0.39108910891089,
+        "eps_yoy_growth": 7.950931394820543,
+        "volume_ratio": 1.325478604655384,
+        "dist_to_52w_high_pct": -1.1872845653006503,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 4,
+      "code": "EDRY",
+      "entry_status": "ACTIONABLE",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Marine Shipping",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -4,
+        0,
+        1,
+        1,
+        0,
+        -13.883701461781184,
+        "EDRY",
+        42
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_needs_manual_check",
+        "weekly_volume_follow_through",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 2.95,
+        "ibd_entry_volume_ratio": 13.883701461781184,
+        "ibd_entry_close_position": 0.847389558232932,
+        "ibd_entry_breakout_range_ratio": 0.2851405622489965,
+        "eps_yoy_growth": NaN,
+        "volume_ratio": 4.641863865359249,
+        "dist_to_52w_high_pct": -13.928571428571423,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 5,
+      "code": "TMP",
+      "entry_status": "ACTIONABLE",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -4,
+        1,
+        1,
+        0,
+        0,
+        -2.0913323868421685,
+        "TMP",
+        66
+      ],
+      "reason_codes": [
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 4.12,
+        "ibd_entry_volume_ratio": 2.0913323868421685,
+        "ibd_entry_close_position": 0.9472934472934488,
+        "ibd_entry_breakout_range_ratio": 0.5698005698005701,
+        "eps_yoy_growth": 32.234592156006684,
+        "volume_ratio": 1.3611192895632316,
+        "dist_to_52w_high_pct": -0.3645679377278443,
+        "pullback_v_is_dry": false
+      }
+    }
+  ],
+  "non_actionable_alpha_radar_top10": [
+    {
+      "rank": 1,
+      "code": "NMM",
+      "entry_status": "EXTENDED",
+      "lane": "incomplete_evidence",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Marine Shipping",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        3,
+        1,
+        -2,
+        2,
+        2,
+        0,
+        1,
+        -1.69992733908988,
+        "NMM",
+        11
+      ],
+      "reason_codes": [
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "extended_from_buy_point"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 8.79,
+        "ibd_entry_volume_ratio": 1.69992733908988,
+        "ibd_entry_close_position": 0.930851063829786,
+        "ibd_entry_breakout_range_ratio": 1.0930851063829772,
+        "eps_yoy_growth": 163.78711078928313,
+        "volume_ratio": 1.174626153584334,
+        "dist_to_52w_high_pct": -2.309497344695577,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 2,
+      "code": "SXT",
+      "entry_status": "EXTENDED",
+      "lane": "incomplete_evidence",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Food: Specialty/Candy",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        3,
+        1,
+        -2,
+        2,
+        2,
+        0,
+        0,
+        -3.5835192119015677,
+        "SXT",
+        21
+      ],
+      "reason_codes": [
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "extended_from_buy_point"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 5.61,
+        "ibd_entry_volume_ratio": 3.5835192119015677,
+        "ibd_entry_close_position": 0.8666114333057168,
+        "ibd_entry_breakout_range_ratio": 0.5575807787903894,
+        "eps_yoy_growth": 35.93112822836429,
+        "volume_ratio": 2.079540085544683,
+        "dist_to_52w_high_pct": -1.9791264012369416,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 3,
+      "code": "DAC",
+      "entry_status": "EXTENDED",
+      "lane": "incomplete_evidence",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Marine Shipping",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        3,
+        1,
+        -2,
+        2,
+        2,
+        0,
+        0,
+        -1.8751229320104028,
+        "DAC",
+        89
+      ],
+      "reason_codes": [
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "extended_from_buy_point"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 5.17,
+        "ibd_entry_volume_ratio": 1.8751229320104028,
+        "ibd_entry_close_position": 0.8837209302325579,
+        "ibd_entry_breakout_range_ratio": 0.6372093023255803,
+        "eps_yoy_growth": 25.61572337302234,
+        "volume_ratio": 1.3275270158223291,
+        "dist_to_52w_high_pct": -0.3092673562973269,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 4,
+      "code": "BHB",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        0,
+        3,
+        0,
+        0,
+        1,
+        -0.0,
+        "BHB",
+        55
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.99,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 128.5137522079233,
+        "volume_ratio": 0.89501196078295,
+        "dist_to_52w_high_pct": -1.6385177716158217,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 5,
+      "code": "CR",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Aerospace & Defense",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        1,
+        3,
+        0,
+        1,
+        1,
+        -0.0,
+        "CR",
+        47
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.9,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -6.341663252765254,
+        "volume_ratio": 1.2276716572018584,
+        "dist_to_52w_high_pct": -0.3744658354993713,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 6,
+      "code": "JNJ",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Pharmaceuticals: Major",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        1,
+        3,
+        0,
+        1,
+        1,
+        -0.0,
+        "JNJ",
+        103
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.49,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -0.9174712744112852,
+        "volume_ratio": 0.9967949296069446,
+        "dist_to_52w_high_pct": -2.2380581227035012,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 7,
+      "code": "CZFS",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        0,
+        -0.0,
+        "CZFS",
+        20
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.55,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 36.160967315322125,
+        "volume_ratio": 1.656874053455935,
+        "dist_to_52w_high_pct": -0.1600000000000045,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 8,
+      "code": "ATI",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Other Metals/Minerals",
+      "ibd_candidate_rule": "ma10_touch_confirm",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        1,
+        -0.0,
+        "ATI",
+        27
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.44,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 26.77270700163521,
+        "volume_ratio": 0.8148979206235644,
+        "dist_to_52w_high_pct": -3.6578832010131017,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 9,
+      "code": "MMM",
+      "entry_status": "UNCONFIRMED",
+      "lane": "incomplete_evidence",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Industrial Conglomerates",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        3,
+        1,
+        -2,
+        2,
+        0,
+        0,
+        0,
+        -0.0,
+        "MMM",
+        61
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.76,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 33.54269478091821,
+        "volume_ratio": 1.538712118732116,
+        "dist_to_52w_high_pct": -2.6999605433741025,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 10,
+      "code": "IBCP",
+      "entry_status": "UNCONFIRMED",
+      "lane": "incomplete_evidence",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "ceiling",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        3,
+        1,
+        -1,
+        2,
+        0,
+        1,
+        0,
+        -0.0,
+        "IBCP",
+        33
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "weekly_volume_follow_through",
+        "near_52w_high"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.81,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 11.704108228869313,
+        "volume_ratio": 1.4070364415488923,
+        "dist_to_52w_high_pct": -3.8427167113494254,
+        "pullback_v_is_dry": NaN
+      }
+    }
+  ],
+  "pullback_scout_top10": [
+    {
+      "rank": 1,
+      "code": "BHB",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        0,
+        3,
+        0,
+        0,
+        1,
+        -0.0,
+        "BHB",
+        55
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.99,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 128.5137522079233,
+        "volume_ratio": 0.89501196078295,
+        "dist_to_52w_high_pct": -1.6385177716158217,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 2,
+      "code": "CR",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Aerospace & Defense",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        1,
+        3,
+        0,
+        1,
+        1,
+        -0.0,
+        "CR",
+        47
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.9,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -6.341663252765254,
+        "volume_ratio": 1.2276716572018584,
+        "dist_to_52w_high_pct": -0.3744658354993713,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 3,
+      "code": "JNJ",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Pharmaceuticals: Major",
+      "ibd_candidate_rule": "ceiling_pullback",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        1,
+        3,
+        0,
+        1,
+        1,
+        -0.0,
+        "JNJ",
+        103
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.49,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -0.9174712744112852,
+        "volume_ratio": 0.9967949296069446,
+        "dist_to_52w_high_pct": -2.2380581227035012,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 4,
+      "code": "CZFS",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        0,
+        -0.0,
+        "CZFS",
+        20
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.55,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 36.160967315322125,
+        "volume_ratio": 1.656874053455935,
+        "dist_to_52w_high_pct": -0.1600000000000045,
+        "pullback_v_is_dry": NaN
+      }
+    },
+    {
+      "rank": 5,
+      "code": "ATI",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Other Metals/Minerals",
+      "ibd_candidate_rule": "ma10_touch_confirm",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        1,
+        -0.0,
+        "ATI",
+        27
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.44,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 26.77270700163521,
+        "volume_ratio": 0.8148979206235644,
+        "dist_to_52w_high_pct": -3.6578832010131017,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 6,
+      "code": "VIK",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Hotels/Resorts/Cruise lines",
+      "ibd_candidate_rule": "ma10_touch_confirm",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        1,
+        -0.0,
+        "VIK",
+        65
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.45,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 48.76102477950441,
+        "volume_ratio": 0.685707193595605,
+        "dist_to_52w_high_pct": -4.774872139629494,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 7,
+      "code": "FXNC",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -2,
+        2,
+        0,
+        0,
+        1,
+        -0.0,
+        "FXNC",
+        48
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.27,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 204.5095828635851,
+        "volume_ratio": 0.5184971053752409,
+        "dist_to_52w_high_pct": -4.677682402058325,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 8,
+      "code": "CB",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Property/Casualty Insurance",
+      "ibd_candidate_rule": "ma10_touch_confirm",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        0,
+        3,
+        0,
+        1,
+        0,
+        -0.0,
+        "CB",
+        105
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.14,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -0.757895309757402,
+        "volume_ratio": 1.466267760439459,
+        "dist_to_52w_high_pct": -1.5166032467354706,
+        "pullback_v_is_dry": false
+      }
+    },
+    {
+      "rank": 9,
+      "code": "PAA",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Oil & Gas Pipelines",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        -1,
+        2,
+        0,
+        1,
+        1,
+        -0.0,
+        "PAA",
+        31
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 1.4,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": -70.93596059113301,
+        "volume_ratio": 1.0570916676747066,
+        "dist_to_52w_high_pct": -1.0856453558504175,
+        "pullback_v_is_dry": true
+      }
+    },
+    {
+      "rank": 10,
+      "code": "CARE",
+      "entry_status": "UNCONFIRMED",
+      "lane": "constructive_pullback",
+      "final_group": "ALPHA_RADAR",
+      "industry": "Regional Banks",
+      "ibd_candidate_rule": "pivot",
+      "sort_key_labels": [
+        "clear_failure",
+        "lane_order",
+        "status_bucket",
+        "negative_net_evidence",
+        "risk_count",
+        "fresh_bucket",
+        "eps_missing_or_below_25",
+        "weekly_volume_missing_or_below_1_3",
+        "negative_entry_volume",
+        "code",
+        "row_index"
+      ],
+      "sort_key": [
+        0,
+        1,
+        0,
+        0,
+        3,
+        0,
+        0,
+        1,
+        -0.0,
+        "CARE",
+        69
+      ],
+      "reason_codes": [
+        "geometry_caution_not_failure",
+        "near_buy_point",
+        "eps_acceleration_support",
+        "near_52w_high",
+        "pullback_structure"
+      ],
+      "risk_codes": [
+        "non_actionable_radar_only",
+        "entry_volume_missing",
+        "pullback_not_dry"
+      ],
+      "fields": {
+        "current_vs_ibd_candidate_pct": 0.41,
+        "ibd_entry_volume_ratio": NaN,
+        "ibd_entry_close_position": NaN,
+        "ibd_entry_breakout_range_ratio": NaN,
+        "eps_yoy_growth": 258.85063702900516,
+        "volume_ratio": 1.0207635175726806,
+        "dist_to_52w_high_pct": -3.215708594194655,
+        "pullback_v_is_dry": false
+      }
+    }
+  ]
+}
