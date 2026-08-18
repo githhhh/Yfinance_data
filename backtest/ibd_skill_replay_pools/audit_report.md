@@ -8,6 +8,7 @@
 - Boundary check: passed (first=2026-01-02, last=2026-08-07, excluded_2026_08_14=True)
 - Future-date leak check after clip: passed
 - Schema check: passed
+- IBD resolver field check: passed (signal_candidates=3817, ibd_entry_valid_nonempty=3817, valid_entries=1619, valid_entry_price_nonempty=1619, invalid_entries=2198, invalid_reject_nonempty=2198)
 - Side-effect isolation check: passed
 - Production pool write/publish/commit/Futu/Telegram/database side effects: disabled by replay wrapper.
 - Old `ibd_skill_replay_pools` contents are treated as untrusted and replaced by this clean replay baseline.

@@ -60,6 +60,24 @@ OPTIONAL_FIELDS = [
     "pullback_pct",
     "pullback_pct_off_peak",
 ]
+IBD_RESOLVER_FIELDS = [
+    "ibd_entry_valid",
+    "ibd_entry_date",
+    "ibd_entry_price",
+    "ibd_trigger_price",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+    "ibd_entry_reject_reason",
+]
+VALID_IBD_ENTRY_FIELDS = [
+    "ibd_entry_date",
+    "ibd_entry_price",
+    "ibd_trigger_price",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+]
 
 REPLAY_STRATEGY_ENV = {
     "STRATEGY_TYPE": "1",
@@ -250,6 +268,16 @@ def _truthy_series(series: pd.Series) -> pd.Series:
     return series.map(lambda value: str(value).strip().lower() in {"true", "1", "1.0"})
 
 
+def _has_value_series(series: pd.Series) -> pd.Series:
+    return series.map(lambda value: not (pd.isna(value) or str(value).strip() == ""))
+
+
+def _signal_candidate_mask(pool: pd.DataFrame) -> pd.Series:
+    if "signal" not in pool.columns or "ibd_candidate_rule" not in pool.columns:
+        return pd.Series(False, index=pool.index)
+    return _truthy_series(pool["signal"]) & _has_value_series(pool["ibd_candidate_rule"])
+
+
 def audit_pool_schema(pool: pd.DataFrame) -> SchemaAudit:
     missing_critical = []
     for col in CRITICAL_FIELDS:
@@ -263,6 +291,28 @@ def audit_pool_schema(pool: pd.DataFrame) -> SchemaAudit:
             continue
         if pool[col].isna().any():
             missing_critical.append(col)
+    signal_candidate_mask = _signal_candidate_mask(pool)
+    if signal_candidate_mask.any():
+        for col in IBD_RESOLVER_FIELDS:
+            if col not in pool.columns:
+                missing_critical.append(col)
+                continue
+        if "ibd_entry_valid" in pool.columns and pool.loc[signal_candidate_mask, "ibd_entry_valid"].isna().any():
+            missing_critical.append("ibd_entry_valid")
+        if "ibd_entry_valid" in pool.columns:
+            valid_mask = signal_candidate_mask & _truthy_series(pool["ibd_entry_valid"])
+            for col in VALID_IBD_ENTRY_FIELDS:
+                if col not in pool.columns:
+                    continue
+                if pool.loc[valid_mask, col].isna().any():
+                    missing_critical.append(col)
+            invalid_mask = signal_candidate_mask & ~_truthy_series(pool["ibd_entry_valid"])
+            if "ibd_entry_reject_reason" in pool.columns and (
+                pool.loc[invalid_mask, "ibd_entry_reject_reason"].isna()
+                | (pool.loc[invalid_mask, "ibd_entry_reject_reason"].astype(str).str.strip() == "")
+            ).any():
+                missing_critical.append("ibd_entry_reject_reason")
+    missing_critical = sorted(set(missing_critical))
     missing_repairable = [col for col in REPAIRABLE_FIELDS if col not in pool.columns]
     missing_optional = [col for col in OPTIONAL_FIELDS if col not in pool.columns]
     repaired_fields: list[str] = []

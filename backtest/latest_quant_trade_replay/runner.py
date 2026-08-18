@@ -43,6 +43,32 @@ def load_pickle_data(path: Path) -> dict[str, pd.DataFrame]:
     return out
 
 
+def _normalized_index(df: pd.DataFrame) -> pd.DatetimeIndex:
+    idx = pd.DatetimeIndex(pd.to_datetime(df.index, errors="coerce"))
+    if idx.tz is not None:
+        idx = idx.tz_convert(None)
+    return idx.normalize()
+
+
+def _daily_map_from_price_data(
+    data: dict[str, pd.DataFrame],
+    codes: set[str],
+) -> dict[str, pd.DataFrame]:
+    out: dict[str, pd.DataFrame] = {}
+    required = {"Open", "High", "Low", "Close"}
+    for code in codes:
+        df = data.get(code)
+        if df is None or df.empty or not required.issubset(df.columns):
+            continue
+        cur = df.loc[:, ["Open", "High", "Low", "Close"]].copy()
+        cur["Volume"] = df["Volume"] if "Volume" in df.columns else pd.NA
+        cur["_date"] = _normalized_index(df)
+        for col in ["Open", "High", "Low", "Close", "Volume"]:
+            cur[col] = pd.to_numeric(cur[col], errors="coerce")
+        out[code] = cur.dropna(subset=["_date", "High", "Low"]).sort_values("_date").reset_index(drop=True)
+    return out
+
+
 def git_commit(path: Path) -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
 
@@ -100,6 +126,7 @@ def run_one_week(
         from data.stock_data import StockPeriod
         from strategy.executor import core_run
         from strategy.run_context import RunContext
+        from strategy_analysis.breakout_follow import weekly_job
 
         ctx = RunContext.replay(snapshot_date, old_pool=set())
         ctx.output_dir = str(run_output_dir)
@@ -114,12 +141,22 @@ def run_one_week(
             }
         )
         error_counts = {str(k): v for k, v in results.get("error_counts", {}).items()}
-        if pool_path.exists():
+        preview = run_output_dir / "breakout_follow_signal_weekly.csv"
+        pool = pd.read_csv(preview, dtype={"code": str}, encoding="utf-8-sig") if preview.exists() else pd.DataFrame()
+        sink.save_snapshot(pool)
+
+        if preview.exists() and not pool.empty:
+            original_daily_map = weekly_job._daily_map
+            weekly_job._daily_map = lambda codes: _daily_map_from_price_data(daily_clip.data, set(codes))
+            try:
+                weekly_job._enrich_current_outputs_from_signal_csv(
+                    str(preview),
+                    pd.Timestamp(snapshot_date).normalize(),
+                    str(pool_path),
+                )
+            finally:
+                weekly_job._daily_map = original_daily_map
             pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
-        else:
-            preview = run_output_dir / "breakout_follow_signal_weekly.csv"
-            pool = pd.read_csv(preview, dtype={"code": str}, encoding="utf-8-sig") if preview.exists() else pd.DataFrame()
-            sink.save_snapshot(pool)
 
         pool = repair_research_fields(pool)
         pool.to_csv(pool_path, index=False, encoding="utf-8-sig")
@@ -160,6 +197,10 @@ def run_one_week(
         "output_pool_path": str(pool_path),
         "output_row_count": output_row_count,
         "output_fields": output_fields,
+        "schema_validation_status": schema_audit.get("schema_validation_status"),
+        "missing_critical_fields": schema_audit.get("missing_critical_fields", []),
+        "missing_repairable_fields": schema_audit.get("missing_repairable_fields", []),
+        "missing_optional_fields": schema_audit.get("missing_optional_fields", []),
         "schema_audit": schema_audit,
         "error_counts": error_counts,
         "status": status,
@@ -215,12 +256,50 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     schema_ok = all(r.get("schema_audit", {}).get("schema_validation_status") == "passed" for r in rows)
     side_effects_ok = all(all(r.get("side_effects_disabled", {}).values()) for r in rows)
     future_leak_ok = True
+    ibd_totals = {
+        "signal_candidates": 0,
+        "ibd_valid_nonempty": 0,
+        "valid_entries": 0,
+        "valid_entry_price_nonempty": 0,
+        "invalid_entries": 0,
+        "invalid_reject_nonempty": 0,
+    }
+    ibd_resolver_ok = True
     for row in rows:
         expected = pd.Timestamp(row["expected_last_trading_day"])
         for key in ("daily_max_date_after_clip", "weekly_max_date_after_clip"):
             value = row.get(key)
             if value and pd.Timestamp(value) > expected:
                 future_leak_ok = False
+        pool_path = Path(row["output_pool_path"])
+        if pool_path.exists():
+            pool = pd.read_csv(pool_path)
+            signal_mask = pool["signal"].astype(str).str.lower().isin(["true", "1", "1.0"])
+            candidate_mask = pool["ibd_candidate_rule"].notna()
+            signal_candidates = pool[signal_mask & candidate_mask]
+            valid_mask = signal_candidates["ibd_entry_valid"].astype(str).str.lower().isin(["true", "1", "1.0"])
+            valid_entries = signal_candidates[valid_mask]
+            invalid_entries = signal_candidates[~valid_mask]
+            ibd_totals["signal_candidates"] += int(len(signal_candidates))
+            ibd_totals["ibd_valid_nonempty"] += int(signal_candidates["ibd_entry_valid"].notna().sum())
+            ibd_totals["valid_entries"] += int(len(valid_entries))
+            ibd_totals["valid_entry_price_nonempty"] += int(valid_entries["ibd_entry_price"].notna().sum())
+            ibd_totals["invalid_entries"] += int(len(invalid_entries))
+            ibd_totals["invalid_reject_nonempty"] += int(invalid_entries["ibd_entry_reject_reason"].notna().sum())
+            if signal_candidates["ibd_entry_valid"].isna().any():
+                ibd_resolver_ok = False
+            valid_required = [
+                "ibd_entry_date",
+                "ibd_entry_price",
+                "ibd_trigger_price",
+                "ibd_entry_volume_ratio",
+                "ibd_entry_close_position",
+                "ibd_entry_breakout_range_ratio",
+            ]
+            if not valid_entries.empty and valid_entries[valid_required].isna().any().any():
+                ibd_resolver_ok = False
+            if not invalid_entries.empty and invalid_entries["ibd_entry_reject_reason"].isna().any():
+                ibd_resolver_ok = False
     lines = [
         "# Latest Quant Trade Replay Pool Audit",
         "",
@@ -234,6 +313,13 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
         f"excluded_2026_08_14={excluded_ok})",
         f"- Future-date leak check after clip: {'passed' if future_leak_ok else 'failed'}",
         f"- Schema check: {'passed' if schema_ok else 'failed'}",
+        f"- IBD resolver field check: {'passed' if ibd_resolver_ok else 'failed'} "
+        f"(signal_candidates={ibd_totals['signal_candidates']}, "
+        f"ibd_entry_valid_nonempty={ibd_totals['ibd_valid_nonempty']}, "
+        f"valid_entries={ibd_totals['valid_entries']}, "
+        f"valid_entry_price_nonempty={ibd_totals['valid_entry_price_nonempty']}, "
+        f"invalid_entries={ibd_totals['invalid_entries']}, "
+        f"invalid_reject_nonempty={ibd_totals['invalid_reject_nonempty']})",
         f"- Side-effect isolation check: {'passed' if side_effects_ok else 'failed'}",
         "- Production pool write/publish/commit/Futu/Telegram/database side effects: disabled by replay wrapper.",
         "- Old `ibd_skill_replay_pools` contents are treated as untrusted and replaced by this clean replay baseline.",

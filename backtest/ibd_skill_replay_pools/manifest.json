@@ -3,7 +3,7 @@
     "snapshot_date": "2026-01-02",
     "expected_last_trading_day": "2026-01-02",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -116,13 +116,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-01-09",
     "expected_last_trading_day": "2026-01-09",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -235,13 +239,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-01-16",
     "expected_last_trading_day": "2026-01-16",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -354,13 +362,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-01-23",
     "expected_last_trading_day": "2026-01-23",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -473,13 +485,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-01-30",
     "expected_last_trading_day": "2026-01-30",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -592,13 +608,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-02-06",
     "expected_last_trading_day": "2026-02-06",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -711,13 +731,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-02-13",
     "expected_last_trading_day": "2026-02-13",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -830,13 +854,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-02-20",
     "expected_last_trading_day": "2026-02-20",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -949,13 +977,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-02-27",
     "expected_last_trading_day": "2026-02-27",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1068,13 +1100,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-03-06",
     "expected_last_trading_day": "2026-03-06",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1187,13 +1223,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-03-13",
     "expected_last_trading_day": "2026-03-13",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1306,13 +1346,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-03-20",
     "expected_last_trading_day": "2026-03-20",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1425,13 +1469,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-03-27",
     "expected_last_trading_day": "2026-03-27",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1544,13 +1592,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-04-02",
     "expected_last_trading_day": "2026-04-02",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1663,13 +1715,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-04-10",
     "expected_last_trading_day": "2026-04-10",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1782,13 +1838,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-04-17",
     "expected_last_trading_day": "2026-04-17",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -1901,13 +1961,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-04-24",
     "expected_last_trading_day": "2026-04-24",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2020,13 +2084,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-05-01",
     "expected_last_trading_day": "2026-05-01",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2139,13 +2207,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-05-08",
     "expected_last_trading_day": "2026-05-08",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2258,13 +2330,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-05-15",
     "expected_last_trading_day": "2026-05-15",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2377,13 +2453,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-05-22",
     "expected_last_trading_day": "2026-05-22",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2496,13 +2576,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-05-29",
     "expected_last_trading_day": "2026-05-29",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2615,13 +2699,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-06-05",
     "expected_last_trading_day": "2026-06-05",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2734,13 +2822,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-06-12",
     "expected_last_trading_day": "2026-06-12",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2853,13 +2945,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-06-18",
     "expected_last_trading_day": "2026-06-18",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -2972,13 +3068,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-06-26",
     "expected_last_trading_day": "2026-06-26",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3091,13 +3191,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-07-02",
     "expected_last_trading_day": "2026-07-02",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3210,13 +3314,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-07-10",
     "expected_last_trading_day": "2026-07-10",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3329,13 +3437,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-07-17",
     "expected_last_trading_day": "2026-07-17",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3448,13 +3560,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-07-24",
     "expected_last_trading_day": "2026-07-24",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3567,13 +3683,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-07-31",
     "expected_last_trading_day": "2026-07-31",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3686,13 +3806,17 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   },
   {
     "snapshot_date": "2026-08-07",
     "expected_last_trading_day": "2026-08-07",
     "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-    "Yfinance_data_commit": "a7f2aa5cc2f7d9b1d00eac693671b09cdaa6c781",
+    "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
     "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
     "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
     "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -3805,6 +3929,10 @@
       "TARGET_GROUP_NAME_TREND",
       "TARGET_GROUP_NAME_VOL",
       "TARGET_GROUP_NAME_WEEKLY"
-    ]
+    ],
+    "schema_validation_status": "passed",
+    "missing_critical_fields": [],
+    "missing_repairable_fields": [],
+    "missing_optional_fields": []
   }
 ]

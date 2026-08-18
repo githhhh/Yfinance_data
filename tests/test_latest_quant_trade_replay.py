@@ -139,3 +139,55 @@ def test_schema_audit_allows_blank_signal_source_on_non_signal_rows():
 
     assert audit.schema_validation_status == "passed_with_repairs_or_optional_gaps"
     assert "signal_source" not in audit.missing_critical_fields
+
+
+def test_schema_audit_requires_ibd_resolver_fields_for_signal_candidates():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "signal": [True],
+            "signal_source": ["ceiling_breakout"],
+            "ibd_candidate_rule": ["ceiling"],
+            "ibd_entry_valid": [pd.NA],
+            "latest_close": [28.0],
+            "volume_ratio": [2.1],
+            "ceiling": [26.0],
+            "industry": ["Entertainment"],
+            "sector": ["Consumer Services"],
+        }
+    )
+
+    audit = audit_pool_schema(pool)
+
+    assert audit.schema_validation_status == "failed_critical_schema"
+    assert "ibd_entry_valid" in audit.missing_critical_fields
+
+
+def test_schema_audit_requires_follow_on_fields_when_ibd_entry_is_valid():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "signal": [True],
+            "signal_source": ["ceiling_breakout"],
+            "ibd_candidate_rule": ["ceiling"],
+            "ibd_entry_valid": [1],
+            "ibd_entry_date": ["2026-07-20"],
+            "ibd_entry_price": [pd.NA],
+            "ibd_trigger_price": [26.0],
+            "ibd_entry_volume_ratio": [2.1],
+            "ibd_entry_close_position": [0.9],
+            "ibd_entry_breakout_range_ratio": [0.7],
+            "latest_close": [28.0],
+            "volume_ratio": [2.1],
+            "ceiling": [26.0],
+            "industry": ["Entertainment"],
+            "sector": ["Consumer Services"],
+        }
+    )
+
+    audit = audit_pool_schema(pool)
+
+    assert audit.schema_validation_status == "failed_critical_schema"
+    assert "ibd_entry_price" in audit.missing_critical_fields
