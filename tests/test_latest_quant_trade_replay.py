@@ -9,6 +9,8 @@ from backtest.latest_quant_trade_replay import (
     audit_pool_schema,
     apply_replay_strategy_env,
     clip_price_data_asof,
+    clear_snapshot_contaminated_eps,
+    enrich_pool_with_asof_52w_high,
     enumerate_complete_snapshot_weeks,
 )
 
@@ -257,6 +259,78 @@ def test_null_semantics_flags_signal_eps_missing_as_repair_needed():
 
     assert audit["status"] == "failed"
     assert audit["abnormal_empty_fields"]["eps_yoy_growth_signal"] == 1
+
+
+def test_clear_snapshot_contaminated_eps_blanks_stage2_snapshot_values():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX", "AAPL"],
+            "eps_yoy_growth": [33.4, 29.1],
+        }
+    )
+
+    cleaned = clear_snapshot_contaminated_eps(pool)
+
+    assert cleaned["eps_yoy_growth"].isna().all()
+
+
+def test_enrich_pool_with_asof_52w_high_uses_clipped_daily_prices():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "latest_close": [27.5],
+            "price_52_week_high": [999.0],
+            "dist_to_52w_high_pct": [123.0],
+        }
+    )
+    daily = {
+        "IMAX": pd.DataFrame(
+            {
+                "High": [20.0, 30.0, 40.0],
+                "Close": [19.0, 27.5, 39.0],
+            },
+            index=pd.to_datetime(["2025-08-01", "2026-07-24", "2026-07-27"]),
+        )
+    }
+
+    enriched = enrich_pool_with_asof_52w_high(pool, daily, "2026-07-24")
+
+    assert enriched.loc[0, "price_52_week_high"] == 30.0
+    assert enriched.loc[0, "dist_to_52w_high_pct"] == (27.5 / 30.0 - 1.0) * 100.0
+
+
+def test_null_semantics_flags_52w_high_missing_as_abnormal():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "signal": [False],
+            "latest_close": [27.5],
+            "volume_ratio": [1.2],
+            "hold_return": [0.0],
+            "breakout_date": ["2026-07-24"],
+            "pct_above_ceiling": [1.0],
+            "touched_ema10_count": [0],
+            "mbox_count": [1],
+            "ceiling": [26.0],
+            "ceiling_date": ["2026-07-24"],
+            "base_depth_pct": [10.0],
+            "base_mbox_count": [1],
+            "base_duration_weeks": [10],
+            "pullback_count": [0],
+            "is_bullish": [True],
+            "is_priority": [False],
+            "price_52_week_high": [pd.NA],
+            "dist_to_52w_high_pct": [pd.NA],
+        }
+    )
+
+    audit = audit_pool_null_semantics(pool)
+
+    assert audit["status"] == "failed"
+    assert audit["abnormal_empty_fields"]["price_52_week_high"] == 1
+    assert audit["abnormal_empty_fields"]["dist_to_52w_high_pct"] == 1
 
 
 def test_null_semantics_flags_valid_ibd_entry_missing_follow_on_fields():

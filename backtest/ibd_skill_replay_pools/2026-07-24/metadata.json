@@ -2,7 +2,7 @@
   "snapshot_date": "2026-07-24",
   "expected_last_trading_day": "2026-07-24",
   "quant_trade_commit": "4c0840186ef7bb213bc8d13a849005bb97b7da35",
-  "Yfinance_data_commit": "f4b1299910a6592e6f6c64960d66061a4fd59d62",
+  "Yfinance_data_commit": "52cefa015255ca32cd69b37b4b5b05c8dc625aa2",
   "daily_pkl_file": "results_pkl/stock_data_150826_1d.pkl",
   "weekly_pkl_file": "results_pkl/stock_data_150826_1wk.pkl",
   "daily_pkl_sha256": "313a9fc077be11aee9ff3a04b4fde612aa91788aba9856e5030d81b7ff9411cd",
@@ -64,6 +64,10 @@
     "sector",
     "industry"
   ],
+  "schema_validation_status": "passed",
+  "missing_critical_fields": [],
+  "missing_repairable_fields": [],
+  "missing_optional_fields": [],
   "schema_audit": {
     "schema_validation_status": "passed",
     "missing_critical_fields": [],
@@ -115,9 +119,5 @@
     "TARGET_GROUP_NAME_TREND",
     "TARGET_GROUP_NAME_VOL",
     "TARGET_GROUP_NAME_WEEKLY"
-  ],
-  "schema_validation_status": "passed",
-  "missing_critical_fields": [],
-  "missing_repairable_fields": [],
-  "missing_optional_fields": []
+  ]
 }

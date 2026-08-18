@@ -21,6 +21,8 @@ from . import (
     audit_pool_null_semantics,
     audit_pool_schema,
     clip_price_data_asof,
+    clear_snapshot_contaminated_eps,
+    enrich_pool_with_asof_52w_high,
     enumerate_complete_snapshot_weeks,
     repair_research_fields,
 )
@@ -161,6 +163,8 @@ def run_one_week(
             pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
 
         pool = repair_research_fields(pool)
+        pool = clear_snapshot_contaminated_eps(pool)
+        pool = enrich_pool_with_asof_52w_high(pool, daily_clip.data, expected_last_trading_day)
         pool.to_csv(pool_path, index=False, encoding="utf-8-sig")
         audit = audit_pool_schema(pool)
         schema_audit = audit.to_dict()
@@ -360,7 +364,7 @@ def write_data_source_audit_report(
                     "code": code,
                     "supplement_source": source_name,
                     "supplement_value": source_value,
-                    "status": "local_supplement_available" if source_name else "unresolved",
+                    "status": "current_snapshot_available_not_pit_safe" if source_name else "unresolved",
                 }
             )
         audit_row = {
@@ -425,7 +429,8 @@ def write_data_source_audit_report(
         "- signal 行的 `eps_yoy_growth` 空值: 不正常，必须补充；非 signal 行 EPS 空值视为正常。",
         "- signal 行的 IBD candidate / entry 判断字段必须完整；非 signal 行对应空值视为正常。",
         "- `industry` / `sector` 允许用 `Unknown` 作为 repairable fallback，但会单独计数。",
-        "- pullback、52w high、dryness 等解释增强字段空值计为 optional gap，不阻断 pool 基准使用。",
+        "- `price_52_week_high` / `dist_to_52w_high_pct` 是价格 as-of 派生字段，必须由已裁剪 daily pkl 重算且不得为空。",
+        "- pullback、dryness 等解释增强字段空值计为 optional gap，不阻断 pool 基准使用。",
         "",
         "## 总览",
         "",
@@ -434,9 +439,9 @@ def write_data_source_audit_report(
         f"- Weeks requiring supplement/repair: {len(audit_rows) - passed_weeks}",
         f"- Abnormal empty values needing supplement/repair: {total_abnormal}",
         f"- Signal EPS gaps needing supplement: {total_eps_missing}",
-        f"- Signal EPS gaps with local supplement source: {total_eps_supplement_available}",
+        f"- Signal EPS gaps with current snapshot-only source: {total_eps_supplement_available}",
         f"- Signal EPS gaps unresolved: {total_eps_unresolved}",
-        "- EPS supplement sources are reported separately and are not silently written back into historical replay pools.",
+        "- Current snapshot EPS supplement sources are reported separately and are not point-in-time safe.",
         "",
         "## 每周审计",
         "",

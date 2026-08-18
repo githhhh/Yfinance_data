@@ -143,6 +143,8 @@ CORE_NON_EMPTY_FIELDS = [
     "base_depth_pct",
     "base_mbox_count",
     "base_duration_weeks",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
     "pullback_count",
     "is_bullish",
     "is_priority",
@@ -166,8 +168,6 @@ VALID_IBD_ENTRY_EXTRA_FIELDS = [
 OPTIONAL_GAP_FIELDS = [
     "pullback_v_is_dry",
     "ibd_candidate_extra",
-    "price_52_week_high",
-    "dist_to_52w_high_pct",
     "pullback_duration_weeks",
     "pullback_pct",
     "pullback_pct_off_peak",
@@ -322,6 +322,49 @@ def clip_price_data_asof(
         has_future_data_before_clip=has_future,
         replay_used_clipped_data=used_clip,
     )
+
+
+def enrich_pool_with_asof_52w_high(
+    pool: pd.DataFrame,
+    daily_data: dict[str, pd.DataFrame],
+    expected_last_trading_day: str,
+) -> pd.DataFrame:
+    result = pool.copy()
+    if "code" not in result.columns:
+        result["price_52_week_high"] = pd.NA
+        result["dist_to_52w_high_pct"] = pd.NA
+        return result
+
+    cutoff = pd.Timestamp(expected_last_trading_day).normalize()
+    start = cutoff - pd.Timedelta(days=364)
+    high_by_code: dict[str, float] = {}
+
+    for code, df in daily_data.items():
+        if df is None or df.empty or "High" not in df.columns:
+            continue
+        idx = _normalize_dates(df.index)
+        high = pd.to_numeric(df["High"], errors="coerce")
+        mask = (idx >= start) & (idx <= cutoff) & high.notna()
+        if not bool(mask.any()):
+            continue
+        max_high = high.loc[mask].max()
+        if pd.notna(max_high) and float(max_high) > 0:
+            high_by_code[str(code)] = float(max_high)
+
+    result["price_52_week_high"] = result["code"].astype(str).map(high_by_code)
+    latest_close = pd.to_numeric(
+        result.get("latest_close", pd.Series(pd.NA, index=result.index)),
+        errors="coerce",
+    )
+    high_52w = pd.to_numeric(result["price_52_week_high"], errors="coerce")
+    result["dist_to_52w_high_pct"] = ((latest_close / high_52w - 1.0) * 100.0).where(high_52w > 0, pd.NA)
+    return result
+
+
+def clear_snapshot_contaminated_eps(pool: pd.DataFrame) -> pd.DataFrame:
+    result = pool.copy()
+    result["eps_yoy_growth"] = pd.NA
+    return result
 
 
 class ReplayPoolSink:
