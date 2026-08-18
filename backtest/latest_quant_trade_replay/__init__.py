@@ -60,6 +60,55 @@ OPTIONAL_FIELDS = [
     "pullback_pct",
     "pullback_pct_off_peak",
 ]
+EXPECTED_POOL_FIELDS = [
+    "code",
+    "snapshot_date",
+    "signal",
+    "signal_source",
+    "pullback_v_is_dry",
+    "ibd_candidate_rule",
+    "ibd_candidate_price",
+    "ibd_candidate_signal_source",
+    "ibd_candidate_extra",
+    "ibd_entry_valid",
+    "ibd_entry_date",
+    "ibd_entry_price",
+    "ibd_trigger_price",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+    "ibd_entry_rule",
+    "ibd_entry_reject_reason",
+    "latest_close",
+    "current_vs_ibd_candidate_pct",
+    "ibd_entry_status",
+    "volume_ratio",
+    "hold_return",
+    "breakout_date",
+    "pct_above_ceiling",
+    "touched_ema10_count",
+    "mbox_count",
+    "ceiling",
+    "ceiling_date",
+    "base_depth_pct",
+    "base_mbox_count",
+    "base_duration_weeks",
+    "base_depth_abs",
+    "C_continuous",
+    "rank_C_continuous",
+    "pullback_count",
+    "pullback_duration_weeks",
+    "pullback_pct",
+    "pullback_pct_off_peak",
+    "is_bullish",
+    "is_priority",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "sector",
+    "industry",
+]
 IBD_RESOLVER_FIELDS = [
     "ibd_entry_valid",
     "ibd_entry_date",
@@ -77,6 +126,51 @@ VALID_IBD_ENTRY_FIELDS = [
     "ibd_entry_volume_ratio",
     "ibd_entry_close_position",
     "ibd_entry_breakout_range_ratio",
+]
+CORE_NON_EMPTY_FIELDS = [
+    "code",
+    "snapshot_date",
+    "signal",
+    "latest_close",
+    "volume_ratio",
+    "hold_return",
+    "breakout_date",
+    "pct_above_ceiling",
+    "touched_ema10_count",
+    "mbox_count",
+    "ceiling",
+    "ceiling_date",
+    "base_depth_pct",
+    "base_mbox_count",
+    "base_duration_weeks",
+    "pullback_count",
+    "is_bullish",
+    "is_priority",
+]
+SIGNAL_REQUIRED_FIELDS = [
+    "signal_source",
+    "ibd_candidate_rule",
+    "ibd_candidate_price",
+    "ibd_candidate_signal_source",
+    "ibd_entry_valid",
+    "current_vs_ibd_candidate_pct",
+    "ibd_entry_status",
+    "base_depth_abs",
+    "C_continuous",
+    "rank_C_continuous",
+]
+VALID_IBD_ENTRY_EXTRA_FIELDS = [
+    "ibd_entry_close_vs_trigger_pct",
+    "ibd_entry_rule",
+]
+OPTIONAL_GAP_FIELDS = [
+    "pullback_v_is_dry",
+    "ibd_candidate_extra",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "pullback_duration_weeks",
+    "pullback_pct",
+    "pullback_pct_off_peak",
 ]
 
 REPLAY_STRATEGY_ENV = {
@@ -276,6 +370,97 @@ def _signal_candidate_mask(pool: pd.DataFrame) -> pd.Series:
     if "signal" not in pool.columns or "ibd_candidate_rule" not in pool.columns:
         return pd.Series(False, index=pool.index)
     return _truthy_series(pool["signal"]) & _has_value_series(pool["ibd_candidate_rule"])
+
+
+def _empty_mask(pool: pd.DataFrame, col: str) -> pd.Series:
+    if col not in pool.columns:
+        return pd.Series(True, index=pool.index)
+    series = pool[col]
+    return series.isna() | series.astype(str).str.strip().eq("")
+
+
+def _add_count(target: dict[str, int], key: str, count: int) -> None:
+    if count:
+        target[key] = int(count)
+
+
+def audit_pool_null_semantics(
+    pool: pd.DataFrame,
+    *,
+    expected_fields: list[str] | None = None,
+) -> dict[str, Any]:
+    """Classify empty pool values by whether they violate replay semantics."""
+
+    missing_fields = [field for field in expected_fields or [] if field not in pool.columns]
+    abnormal: dict[str, int] = {}
+    normal: dict[str, int] = {}
+    repairable_fallbacks: dict[str, int] = {}
+    optional_gaps: dict[str, int] = {}
+
+    signal_mask = _truthy_series(pool["signal"]) if "signal" in pool.columns else pd.Series(False, index=pool.index)
+    valid_entry_mask = (
+        signal_mask & _truthy_series(pool["ibd_entry_valid"])
+        if "ibd_entry_valid" in pool.columns
+        else pd.Series(False, index=pool.index)
+    )
+    invalid_entry_mask = signal_mask & ~valid_entry_mask
+
+    for field in CORE_NON_EMPTY_FIELDS:
+        if field in pool.columns:
+            _add_count(abnormal, field, int(_empty_mask(pool, field).sum()))
+
+    if "signal_source" in pool.columns:
+        empty = _empty_mask(pool, "signal_source")
+        _add_count(abnormal, "signal_source_signal", int((signal_mask & empty).sum()))
+        _add_count(normal, "signal_source_non_signal", int((~signal_mask & empty).sum()))
+
+    for field in SIGNAL_REQUIRED_FIELDS:
+        if field in pool.columns:
+            empty = _empty_mask(pool, field)
+            _add_count(abnormal, f"{field}_signal", int((signal_mask & empty).sum()))
+            _add_count(normal, f"{field}_non_signal", int((~signal_mask & empty).sum()))
+
+    for field in VALID_IBD_ENTRY_FIELDS + VALID_IBD_ENTRY_EXTRA_FIELDS:
+        if field in pool.columns:
+            empty = _empty_mask(pool, field)
+            _add_count(abnormal, f"{field}_valid_entry", int((valid_entry_mask & empty).sum()))
+            _add_count(normal, f"{field}_invalid_or_non_signal", int((~valid_entry_mask & empty).sum()))
+
+    if "ibd_entry_reject_reason" in pool.columns:
+        empty = _empty_mask(pool, "ibd_entry_reject_reason")
+        _add_count(abnormal, "ibd_entry_reject_reason_invalid_entry", int((invalid_entry_mask & empty).sum()))
+        _add_count(normal, "ibd_entry_reject_reason_valid_or_non_signal", int((~invalid_entry_mask & empty).sum()))
+
+    if "eps_yoy_growth" in pool.columns:
+        empty = _empty_mask(pool, "eps_yoy_growth")
+        _add_count(abnormal, "eps_yoy_growth_signal", int((signal_mask & empty).sum()))
+        _add_count(normal, "eps_yoy_growth_non_signal", int((~signal_mask & empty).sum()))
+
+    for field in REPAIRABLE_FIELDS:
+        if field in pool.columns:
+            empty = _empty_mask(pool, field)
+            unknown = pool[field].astype(str).str.strip().eq("Unknown")
+            _add_count(abnormal, field, int(empty.sum()))
+            _add_count(repairable_fallbacks, field, int(unknown.sum()))
+
+    for field in OPTIONAL_GAP_FIELDS:
+        if field in pool.columns:
+            _add_count(optional_gaps, field, int(_empty_mask(pool, field).sum()))
+
+    status = "failed" if missing_fields or abnormal else "passed"
+    return {
+        "status": status,
+        "row_count": int(len(pool)),
+        "column_count": int(len(pool.columns)),
+        "missing_fields": missing_fields,
+        "abnormal_empty_fields": abnormal,
+        "normal_empty_fields": normal,
+        "repairable_fallback_fields": repairable_fallbacks,
+        "optional_gap_fields": optional_gaps,
+        "signal_rows": int(signal_mask.sum()),
+        "valid_ibd_entry_rows": int(valid_entry_mask.sum()),
+        "invalid_ibd_entry_rows": int(invalid_entry_mask.sum()),
+    }
 
 
 def audit_pool_schema(pool: pd.DataFrame) -> SchemaAudit:

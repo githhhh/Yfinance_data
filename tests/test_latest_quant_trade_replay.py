@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from backtest.latest_quant_trade_replay.runner import write_data_source_audit_report
 from backtest.latest_quant_trade_replay import (
     ReplayPoolSink,
+    audit_pool_null_semantics,
     audit_pool_schema,
     apply_replay_strategy_env,
     clip_price_data_asof,
@@ -130,6 +132,7 @@ def test_schema_audit_allows_blank_signal_source_on_non_signal_rows():
             "latest_close": [28.0, 210.0],
             "volume_ratio": [2.1, 1.2],
             "ceiling": [26.0, 200.0],
+            "eps_yoy_growth": [pd.NA, pd.NA],
             "industry": ["Entertainment", "Hardware"],
             "sector": ["Consumer Services", "Technology"],
         }
@@ -191,3 +194,143 @@ def test_schema_audit_requires_follow_on_fields_when_ibd_entry_is_valid():
 
     assert audit.schema_validation_status == "failed_critical_schema"
     assert "ibd_entry_price" in audit.missing_critical_fields
+
+
+def test_null_semantics_treats_non_signal_ibd_blanks_as_normal():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX", "AAPL"],
+            "snapshot_date": ["2026-07-24", "2026-07-24"],
+            "signal": [True, False],
+            "signal_source": ["ceiling_breakout", pd.NA],
+            "ibd_candidate_rule": ["ceiling", pd.NA],
+            "ibd_candidate_price": [26.0, pd.NA],
+            "ibd_candidate_signal_source": ["ceiling_breakout", pd.NA],
+            "ibd_entry_valid": [0, pd.NA],
+            "ibd_entry_date": [pd.NA, pd.NA],
+            "ibd_entry_price": [pd.NA, pd.NA],
+            "ibd_trigger_price": [pd.NA, pd.NA],
+            "ibd_entry_volume_ratio": [pd.NA, pd.NA],
+            "ibd_entry_close_position": [pd.NA, pd.NA],
+            "ibd_entry_breakout_range_ratio": [pd.NA, pd.NA],
+            "ibd_entry_reject_reason": ["daily_volume_not_confirmed", pd.NA],
+            "latest_close": [28.0, 210.0],
+            "volume_ratio": [2.1, 1.2],
+            "ceiling": [26.0, 200.0],
+            "eps_yoy_growth": [12.0, pd.NA],
+            "industry": ["Entertainment", "Hardware"],
+            "sector": ["Consumer Services", "Technology"],
+        }
+    )
+
+    audit = audit_pool_null_semantics(pool)
+
+    assert audit["status"] == "passed"
+    assert audit["abnormal_empty_fields"] == {}
+    assert audit["normal_empty_fields"]["signal_source_non_signal"] == 1
+    assert audit["normal_empty_fields"]["ibd_entry_price_invalid_or_non_signal"] == 2
+    assert audit["normal_empty_fields"]["eps_yoy_growth_non_signal"] == 1
+
+
+def test_null_semantics_flags_signal_eps_missing_as_repair_needed():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "signal": [True],
+            "signal_source": ["ceiling_breakout"],
+            "ibd_candidate_rule": ["ceiling"],
+            "ibd_candidate_price": [26.0],
+            "ibd_candidate_signal_source": ["ceiling_breakout"],
+            "ibd_entry_valid": [0],
+            "ibd_entry_reject_reason": ["daily_volume_not_confirmed"],
+            "latest_close": [28.0],
+            "volume_ratio": [2.1],
+            "ceiling": [26.0],
+            "eps_yoy_growth": [pd.NA],
+            "industry": ["Entertainment"],
+            "sector": ["Consumer Services"],
+        }
+    )
+
+    audit = audit_pool_null_semantics(pool)
+
+    assert audit["status"] == "failed"
+    assert audit["abnormal_empty_fields"]["eps_yoy_growth_signal"] == 1
+
+
+def test_null_semantics_flags_valid_ibd_entry_missing_follow_on_fields():
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX"],
+            "snapshot_date": ["2026-07-24"],
+            "signal": [True],
+            "signal_source": ["ceiling_breakout"],
+            "ibd_candidate_rule": ["ceiling"],
+            "ibd_candidate_price": [26.0],
+            "ibd_candidate_signal_source": ["ceiling_breakout"],
+            "ibd_entry_valid": [1],
+            "ibd_entry_date": ["2026-07-20"],
+            "ibd_entry_price": [pd.NA],
+            "ibd_trigger_price": [26.0],
+            "ibd_entry_volume_ratio": [2.1],
+            "ibd_entry_close_position": [0.9],
+            "ibd_entry_breakout_range_ratio": [0.7],
+            "ibd_entry_reject_reason": [pd.NA],
+            "latest_close": [28.0],
+            "volume_ratio": [2.1],
+            "ceiling": [26.0],
+            "industry": ["Entertainment"],
+            "sector": ["Consumer Services"],
+        }
+    )
+
+    audit = audit_pool_null_semantics(pool)
+
+    assert audit["status"] == "failed"
+    assert audit["abnormal_empty_fields"]["ibd_entry_price_valid_entry"] == 1
+
+
+def test_data_source_audit_report_lists_each_week_and_null_classification(tmp_path):
+    root = tmp_path / "replay"
+    week = root / "2026-07-24"
+    week.mkdir(parents=True)
+    pool = pd.DataFrame(
+        {
+            "code": ["IMAX", "AAPL"],
+            "snapshot_date": ["2026-07-24", "2026-07-24"],
+            "signal": [True, False],
+            "signal_source": ["ceiling_breakout", pd.NA],
+            "ibd_candidate_rule": ["ceiling", pd.NA],
+            "ibd_candidate_price": [26.0, pd.NA],
+            "ibd_candidate_signal_source": ["ceiling_breakout", pd.NA],
+            "ibd_entry_valid": [0, pd.NA],
+            "ibd_entry_date": [pd.NA, pd.NA],
+            "ibd_entry_price": [pd.NA, pd.NA],
+            "ibd_trigger_price": [pd.NA, pd.NA],
+            "ibd_entry_volume_ratio": [pd.NA, pd.NA],
+            "ibd_entry_close_position": [pd.NA, pd.NA],
+            "ibd_entry_breakout_range_ratio": [pd.NA, pd.NA],
+            "ibd_entry_reject_reason": ["daily_volume_not_confirmed", pd.NA],
+            "latest_close": [28.0, 210.0],
+            "volume_ratio": [2.1, 1.2],
+            "ceiling": [26.0, 200.0],
+            "eps_yoy_growth": [12.0, pd.NA],
+            "industry": ["Unknown", "Hardware"],
+            "sector": ["Unknown", "Technology"],
+        }
+    )
+    pool.to_csv(week / "breakout_follow_pool.csv", index=False)
+    rows = [
+        {
+            "snapshot_date": "2026-07-24",
+            "output_pool_path": str(week / "breakout_follow_pool.csv"),
+        }
+    ]
+
+    write_data_source_audit_report(root, rows, expected_fields=list(pool.columns))
+
+    report = (root / "data_source_audit_report.md").read_text(encoding="utf-8")
+    assert "| 2026-07-24 | passed | 2 | 21 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |" in report
+    assert "正常空值" in report
+    assert "需要补充/修复" in report

@@ -15,8 +15,10 @@ from typing import Any
 import pandas as pd
 
 from . import (
+    EXPECTED_POOL_FIELDS,
     ReplayPoolSink,
     apply_replay_strategy_env,
+    audit_pool_null_semantics,
     audit_pool_schema,
     clip_price_data_asof,
     enumerate_complete_snapshot_weeks,
@@ -247,6 +249,212 @@ def write_manifest(output_root: Path, rows: list[dict[str, Any]]) -> None:
     pd.DataFrame(flat_rows).to_csv(output_root / "manifest.csv", index=False)
 
 
+def _total_counts(counts: dict[str, int]) -> int:
+    return int(sum(int(v) for v in counts.values()))
+
+
+def _format_counts(counts: dict[str, int], *, limit: int = 8) -> str:
+    if not counts:
+        return "-"
+    items = sorted(counts.items(), key=lambda item: (-int(item[1]), item[0]))
+    shown = [f"{key}={value}" for key, value in items[:limit]]
+    if len(items) > limit:
+        shown.append(f"...+{len(items) - limit}")
+    return "; ".join(shown)
+
+
+def _field_codes(pool: pd.DataFrame, field: str, mask: pd.Series) -> list[str]:
+    if field not in pool.columns or "code" not in pool.columns:
+        return []
+    empty = pool[field].isna() | pool[field].astype(str).str.strip().eq("")
+    return sorted(pool.loc[mask & empty, "code"].astype(str).unique().tolist())
+
+
+def _load_local_eps_supplement_sources(base_path: Path) -> dict[str, dict[str, float]]:
+    specs = [
+        ("us/eps_growth_screener_results.csv", "eps_growth"),
+        ("us/stage2/stage2_whitelist.csv", "eps_yoy_growth"),
+        ("us/52wk_new_high_results.csv", "eps_growth"),
+        ("us/weekly_vol_screener_results.csv", "eps_growth"),
+    ]
+    sources: dict[str, dict[str, float]] = {}
+    for relative_path, eps_col in specs:
+        path = base_path / relative_path
+        if not path.exists():
+            continue
+        df = pd.read_csv(path, dtype={"code": str})
+        if "code" not in df.columns or eps_col not in df.columns:
+            continue
+        cur = df.loc[:, ["code", eps_col]].copy()
+        cur[eps_col] = pd.to_numeric(cur[eps_col], errors="coerce")
+        cur = cur.dropna(subset=[eps_col]).drop_duplicates(subset=["code"])
+        sources[relative_path] = dict(zip(cur["code"].astype(str), cur[eps_col].astype(float)))
+    return sources
+
+
+def _lookup_eps_supplement(
+    code: str,
+    sources: dict[str, dict[str, float]],
+) -> tuple[str, float | None]:
+    for source_name, values in sources.items():
+        if code in values:
+            return source_name, values[code]
+    return "", None
+
+
+def write_data_source_audit_report(
+    output_root: Path,
+    rows: list[dict[str, Any]],
+    *,
+    expected_fields: list[str] | None = None,
+    eps_supplement_sources: dict[str, dict[str, float]] | None = None,
+) -> list[dict[str, Any]]:
+    expected = EXPECTED_POOL_FIELDS if expected_fields is None else expected_fields
+    eps_sources = eps_supplement_sources
+    if eps_sources is None:
+        eps_sources = _load_local_eps_supplement_sources(Path.cwd())
+    audit_rows: list[dict[str, Any]] = []
+    eps_gap_rows: list[dict[str, Any]] = []
+    details: list[str] = []
+
+    for row in rows:
+        snapshot_date = str(row["snapshot_date"])
+        pool_path = Path(row["output_pool_path"])
+        if not pool_path.exists():
+            audit = {
+                "status": "failed",
+                "row_count": 0,
+                "column_count": 0,
+                "missing_fields": ["breakout_follow_pool.csv"],
+                "abnormal_empty_fields": {},
+                "normal_empty_fields": {},
+                "repairable_fallback_fields": {},
+                "optional_gap_fields": {},
+                "signal_rows": 0,
+                "valid_ibd_entry_rows": 0,
+                "invalid_ibd_entry_rows": 0,
+            }
+            pool = pd.DataFrame()
+            signal_mask = pd.Series(dtype=bool)
+        else:
+            pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
+            audit = audit_pool_null_semantics(pool, expected_fields=expected)
+            signal_mask = (
+                pool["signal"].fillna(False).astype(bool)
+                if "signal" in pool.columns
+                else pd.Series(False, index=pool.index)
+            )
+
+        signal_eps_missing_codes = _field_codes(pool, "eps_yoy_growth", signal_mask)
+        signal_eps_supplement_available = 0
+        signal_eps_unresolved = 0
+        for code in signal_eps_missing_codes:
+            source_name, source_value = _lookup_eps_supplement(code, eps_sources)
+            if source_name:
+                signal_eps_supplement_available += 1
+            else:
+                signal_eps_unresolved += 1
+            eps_gap_rows.append(
+                {
+                    "snapshot_date": snapshot_date,
+                    "code": code,
+                    "supplement_source": source_name,
+                    "supplement_value": source_value,
+                    "status": "local_supplement_available" if source_name else "unresolved",
+                }
+            )
+        audit_row = {
+            "snapshot_date": snapshot_date,
+            "status": audit["status"],
+            "row_count": audit["row_count"],
+            "column_count": audit["column_count"],
+            "signal_rows": audit["signal_rows"],
+            "valid_ibd_entry_rows": audit["valid_ibd_entry_rows"],
+            "invalid_ibd_entry_rows": audit["invalid_ibd_entry_rows"],
+            "missing_field_count": len(audit["missing_fields"]),
+            "abnormal_empty_total": _total_counts(audit["abnormal_empty_fields"]),
+            "signal_eps_missing": int(audit["abnormal_empty_fields"].get("eps_yoy_growth_signal", 0)),
+            "signal_eps_supplement_available": signal_eps_supplement_available,
+            "signal_eps_unresolved": signal_eps_unresolved,
+            "normal_empty_total": _total_counts(audit["normal_empty_fields"]),
+            "repairable_fallback_total": _total_counts(audit["repairable_fallback_fields"]),
+            "optional_gap_total": _total_counts(audit["optional_gap_fields"]),
+            "missing_fields": ";".join(audit["missing_fields"]),
+            "abnormal_empty_fields": _format_counts(audit["abnormal_empty_fields"]),
+            "normal_empty_fields": _format_counts(audit["normal_empty_fields"]),
+            "repairable_fallback_fields": _format_counts(audit["repairable_fallback_fields"]),
+            "optional_gap_fields": _format_counts(audit["optional_gap_fields"]),
+            "signal_eps_missing_codes": ";".join(signal_eps_missing_codes),
+            "output_pool_path": str(pool_path),
+        }
+        audit_rows.append(audit_row)
+        details.extend(
+            [
+                f"### {snapshot_date}",
+                "",
+                f"- 状态: `{audit_row['status']}`",
+                f"- 需要补充/修复: {audit_row['abnormal_empty_fields']}",
+                f"- 正常空值: {audit_row['normal_empty_fields']}",
+                f"- repairable fallback: {audit_row['repairable_fallback_fields']}",
+                f"- optional gap: {audit_row['optional_gap_fields']}",
+                f"- signal EPS 缺失代码: {audit_row['signal_eps_missing_codes'] or '-'}",
+                f"- signal EPS 本地补源覆盖: {signal_eps_supplement_available}; unresolved: {signal_eps_unresolved}",
+                "",
+            ]
+        )
+
+    (output_root / "data_source_audit_manifest.json").write_text(
+        json.dumps(audit_rows, indent=2, ensure_ascii=False, default=str) + "\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(audit_rows).to_csv(output_root / "data_source_audit_manifest.csv", index=False)
+    pd.DataFrame(eps_gap_rows).to_csv(output_root / "signal_eps_gap_supplement_plan.csv", index=False)
+
+    total_abnormal = sum(int(row["abnormal_empty_total"]) for row in audit_rows)
+    total_eps_missing = sum(int(row["signal_eps_missing"]) for row in audit_rows)
+    total_eps_supplement_available = sum(int(row["signal_eps_supplement_available"]) for row in audit_rows)
+    total_eps_unresolved = sum(int(row["signal_eps_unresolved"]) for row in audit_rows)
+    passed_weeks = sum(1 for row in audit_rows if row["status"] == "passed")
+    lines = [
+        "# Replay Pool Data Source Audit",
+        "",
+        "## 判定规则",
+        "",
+        "- 字段列缺失: 不正常，必须修复。",
+        "- 核心价格/结构字段空值: 不正常，必须修复。",
+        "- signal 行的 `eps_yoy_growth` 空值: 不正常，必须补充；非 signal 行 EPS 空值视为正常。",
+        "- signal 行的 IBD candidate / entry 判断字段必须完整；非 signal 行对应空值视为正常。",
+        "- `industry` / `sector` 允许用 `Unknown` 作为 repairable fallback，但会单独计数。",
+        "- pullback、52w high、dryness 等解释增强字段空值计为 optional gap，不阻断 pool 基准使用。",
+        "",
+        "## 总览",
+        "",
+        f"- Weeks audited: {len(audit_rows)}",
+        f"- Passed weeks: {passed_weeks}",
+        f"- Weeks requiring supplement/repair: {len(audit_rows) - passed_weeks}",
+        f"- Abnormal empty values needing supplement/repair: {total_abnormal}",
+        f"- Signal EPS gaps needing supplement: {total_eps_missing}",
+        f"- Signal EPS gaps with local supplement source: {total_eps_supplement_available}",
+        f"- Signal EPS gaps unresolved: {total_eps_unresolved}",
+        "- EPS supplement sources are reported separately and are not silently written back into historical replay pools.",
+        "",
+        "## 每周审计",
+        "",
+        "| snapshot_date | status | rows | cols | signal | missing_fields | abnormal_empty | signal_eps_missing | eps_supp_available | eps_unresolved | repairable_fallback | optional_gap |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for row in audit_rows:
+        lines.append(
+            f"| {row['snapshot_date']} | {row['status']} | {row['row_count']} | {row['column_count']} | "
+            f"{row['signal_rows']} | {row['missing_field_count']} | {row['abnormal_empty_total']} | "
+            f"{row['signal_eps_missing']} | {row['signal_eps_supplement_available']} | "
+            f"{row['signal_eps_unresolved']} | {row['repairable_fallback_total']} | {row['optional_gap_total']} |"
+        )
+    lines.extend(["", "## 每周明细", "", *details])
+    (output_root / "data_source_audit_report.md").write_text("\n".join(lines), encoding="utf-8")
+    return audit_rows
+
+
 def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     success = [r for r in rows if r["status"] == "success"]
     failed = [r for r in rows if r["status"] != "success"]
@@ -382,4 +590,5 @@ def main(argv: list[str] | None = None) -> int:
         )
     write_manifest(output_root, rows)
     write_report(output_root, rows)
+    write_data_source_audit_report(output_root, rows)
     return 0
