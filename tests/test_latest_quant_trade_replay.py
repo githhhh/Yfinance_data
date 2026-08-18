@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest.latest_quant_trade_replay.runner import write_data_source_audit_report
+from backtest.latest_quant_trade_replay.runner import normalize_pickle_data, write_data_source_audit_report
 from backtest.latest_quant_trade_replay import (
+    HistoricalPklCandidate,
     ReplayPoolSink,
     audit_pool_null_semantics,
     audit_pool_schema,
@@ -12,6 +13,8 @@ from backtest.latest_quant_trade_replay import (
     clear_snapshot_contaminated_eps,
     enrich_pool_with_asof_52w_high,
     enumerate_complete_snapshot_weeks,
+    normalize_empty_pool_schema,
+    select_historical_pkl_pair,
 )
 
 
@@ -39,6 +42,81 @@ def test_enumerates_complete_weeks_before_latest_production_week():
     assert "2026-08-14" not in [week.snapshot_date for week in weeks]
 
 
+def test_select_historical_pkl_pair_uses_earliest_valid_git_pair():
+    chosen = select_historical_pkl_pair(
+        snapshot_date="2026-01-09",
+        expected_last_trading_day="2026-01-09",
+        candidates=[
+            HistoricalPklCandidate(
+                commit="later",
+                commit_date="2026-01-11T00:00:00+00:00",
+                daily_path="results_pkl/stock_data_110126_1d.pkl",
+                weekly_path="results_pkl/stock_data_110126_1wk.pkl",
+                daily_max_date="2026-01-09",
+                weekly_max_date="2026-01-05",
+            ),
+            HistoricalPklCandidate(
+                commit="bad_future_daily",
+                commit_date="2026-01-10T00:00:00+00:00",
+                daily_path="results_pkl/stock_data_100126_1d.pkl",
+                weekly_path="results_pkl/stock_data_100126_1wk.pkl",
+                daily_max_date="2026-01-12",
+                weekly_max_date="2026-01-05",
+            ),
+            HistoricalPklCandidate(
+                commit="earlier",
+                commit_date="2026-01-09T23:00:00+00:00",
+                daily_path="results_pkl/stock_data_090126_1d.pkl",
+                weekly_path="results_pkl/stock_data_090126_1wk.pkl",
+                daily_max_date="2026-01-09",
+                weekly_max_date="2026-01-05",
+            ),
+        ],
+    )
+
+    assert chosen is not None
+    assert chosen.commit == "earlier"
+
+
+def test_select_historical_pkl_pair_rejects_wrong_weekly_label():
+    chosen = select_historical_pkl_pair(
+        snapshot_date="2026-01-09",
+        expected_last_trading_day="2026-01-09",
+        candidates=[
+            HistoricalPklCandidate(
+                commit="wrong_week",
+                commit_date="2026-01-09T23:00:00+00:00",
+                daily_path="results_pkl/stock_data_090126_1d.pkl",
+                weekly_path="results_pkl/stock_data_090126_1wk.pkl",
+                daily_max_date="2026-01-09",
+                weekly_max_date="2025-12-29",
+            )
+        ],
+    )
+
+    assert chosen is None
+
+
+def test_select_historical_pkl_pair_accepts_short_week_weekly_label_inside_week():
+    chosen = select_historical_pkl_pair(
+        snapshot_date="2026-01-02",
+        expected_last_trading_day="2026-01-02",
+        candidates=[
+            HistoricalPklCandidate(
+                commit="short_week",
+                commit_date="2026-01-04T09:41:31+00:00",
+                daily_path="results_pkl/stock_data_040126_1d.pkl",
+                weekly_path="results_pkl/stock_data_040126_1wk.pkl",
+                daily_max_date="2026-01-02",
+                weekly_max_date="2026-01-02",
+            )
+        ],
+    )
+
+    assert chosen is not None
+    assert chosen.commit == "short_week"
+
+
 def test_clips_price_data_before_quant_trade_receives_it():
     raw = {
         "AAA": _frame(["2026-08-06", "2026-08-07", "2026-08-10"]),
@@ -53,6 +131,20 @@ def test_clips_price_data_before_quant_trade_receives_it():
     assert list(result.data["AAA"].index.strftime("%Y-%m-%d")) == ["2026-08-06", "2026-08-07"]
 
 
+def test_normalize_pickle_data_accepts_serialized_dataframe_dicts():
+    raw = {
+        "IMAX": {
+            "index": pd.to_datetime(["2026-07-24"]),
+            "columns": ["High", "Close"],
+            "data": [[30.0, 28.0]],
+        }
+    }
+
+    data = normalize_pickle_data(raw)
+
+    assert data["IMAX"].loc[pd.Timestamp("2026-07-24"), "High"] == 30.0
+
+
 def test_replay_pool_sink_writes_only_to_replay_directory(tmp_path):
     sink = ReplayPoolSink(tmp_path / "2026-08-07" / "breakout_follow_pool.csv")
     pool = pd.DataFrame({"code": ["IMAX"], "signal": [True], "latest_close": [28.0]})
@@ -62,6 +154,17 @@ def test_replay_pool_sink_writes_only_to_replay_directory(tmp_path):
     assert sink.path == str(tmp_path / "2026-08-07" / "breakout_follow_pool.csv")
     assert Path(sink.path).exists()
     assert pd.read_csv(sink.path)["code"].tolist() == ["IMAX"]
+
+
+def test_normalize_empty_pool_schema_keeps_zero_row_weeks_auditable():
+    pool = normalize_empty_pool_schema(pd.DataFrame())
+
+    audit = audit_pool_schema(pool)
+
+    assert pool.empty
+    assert "signal" in pool.columns
+    assert "code" in pool.columns
+    assert audit.schema_validation_status == "passed"
 
 
 def test_replay_pool_sink_rejects_publish_and_commit_side_effects(tmp_path):

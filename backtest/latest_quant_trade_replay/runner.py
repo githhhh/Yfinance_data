@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pickle
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,7 @@ import pandas as pd
 
 from . import (
     EXPECTED_POOL_FIELDS,
+    HistoricalPklCandidate,
     ReplayPoolSink,
     apply_replay_strategy_env,
     audit_pool_null_semantics,
@@ -24,7 +26,10 @@ from . import (
     clear_snapshot_contaminated_eps,
     enrich_pool_with_asof_52w_high,
     enumerate_complete_snapshot_weeks,
+    max_price_date,
+    normalize_empty_pool_schema,
     repair_research_fields,
+    select_historical_pkl_pair,
 )
 
 
@@ -36,15 +41,30 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def load_pickle_data(path: Path) -> dict[str, pd.DataFrame]:
-    with path.open("rb") as f:
-        data = pickle.load(f)
+def normalize_pickle_data(data: Any) -> dict[str, pd.DataFrame]:
     out: dict[str, pd.DataFrame] = {}
     for code, value in data.items():
-        if isinstance(value, dict) and set(value.keys()) == {"index", "columns", "data"}:
-            value = pd.DataFrame(**value)
+        if isinstance(value, dict) and {"index", "columns", "data"}.issubset(value.keys()):
+            value = pd.DataFrame(index=value["index"], columns=value["columns"], data=value["data"])
         out[str(code)] = value
     return out
+
+
+def load_pickle_data(path: Path) -> dict[str, pd.DataFrame]:
+    with path.open("rb") as f:
+        return normalize_pickle_data(pickle.load(f))
+
+
+def git_blob_bytes(repo_path: Path, commit: str, path: str) -> bytes:
+    return subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=repo_path)
+
+
+def load_git_pickle_data(repo_path: Path, commit: str, path: str) -> dict[str, pd.DataFrame]:
+    return normalize_pickle_data(pickle.loads(git_blob_bytes(repo_path, commit, path)))
+
+
+def git_blob_sha256(repo_path: Path, commit: str, path: str) -> str:
+    return hashlib.sha256(git_blob_bytes(repo_path, commit, path)).hexdigest()
 
 
 def _normalized_index(df: pd.DataFrame) -> pd.DatetimeIndex:
@@ -77,28 +97,175 @@ def git_commit(path: Path) -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
 
 
+PKL_NAME_RE = re.compile(r"stock_data_(\d{6})_(1d|1wk)\.pkl$")
+
+
+def _history_commit_rows(repo_path: Path, start_date: str, end_date: str) -> list[tuple[str, str]]:
+    output = subprocess.check_output(
+        [
+            "git",
+            "log",
+            "--all",
+            "--reverse",
+            "--date=iso-strict",
+            f"--since={start_date}T00:00:00+00:00",
+            f"--until={end_date}T23:59:59+00:00",
+            "--pretty=format:%H%x00%cI",
+            "--",
+            "results_pkl",
+        ],
+        cwd=repo_path,
+        text=True,
+    )
+    rows: list[tuple[str, str]] = []
+    for line in output.splitlines():
+        if "\x00" not in line:
+            continue
+        commit, commit_date = line.split("\x00", 1)
+        rows.append((commit, commit_date))
+    return rows
+
+
+def _pkl_tag_date(tag: str) -> pd.Timestamp | None:
+    try:
+        return pd.Timestamp(pd.to_datetime(tag, format="%d%m%y")).normalize()
+    except Exception:
+        return None
+
+
+def _pkl_paths_at_commit(repo_path: Path, commit: str) -> list[tuple[str, str, str]]:
+    output = subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", commit, "results_pkl"],
+        cwd=repo_path,
+        text=True,
+    )
+    paths: list[tuple[str, str, str]] = []
+    for path in output.splitlines():
+        match = PKL_NAME_RE.search(path)
+        if not match:
+            continue
+        tag, period = match.groups()
+        paths.append((tag, period, path))
+    return sorted(paths)
+
+
+def _candidate_paths_for_window(
+    paths: list[tuple[str, str, str]],
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> tuple[list[str], list[str]]:
+    daily_paths: list[str] = []
+    weekly_paths: list[str] = []
+    for tag, period, path in paths:
+        tag_date = _pkl_tag_date(tag)
+        if tag_date is None or tag_date < start or tag_date > end:
+            continue
+        if period == "1d":
+            daily_paths.append(path)
+        elif period == "1wk":
+            weekly_paths.append(path)
+    return daily_paths, weekly_paths
+
+
+def discover_historical_pkl_pair(
+    *,
+    repo_path: Path,
+    snapshot_date: str,
+    expected_last_trading_day: str,
+    search_days: int = 7,
+) -> tuple[HistoricalPklCandidate | None, list[HistoricalPklCandidate]]:
+    start = pd.Timestamp(expected_last_trading_day).normalize()
+    end = start + pd.Timedelta(days=search_days)
+    candidates: list[HistoricalPklCandidate] = []
+    seen: set[tuple[str, str, str]] = set()
+    for commit, commit_date in _history_commit_rows(
+        repo_path,
+        start.strftime("%Y-%m-%d"),
+        end.strftime("%Y-%m-%d"),
+    ):
+        daily_paths, weekly_paths = _candidate_paths_for_window(_pkl_paths_at_commit(repo_path, commit), start, end)
+        daily_by_path: dict[str, str | None] = {}
+        weekly_by_path: dict[str, str | None] = {}
+        for daily_path in daily_paths:
+            try:
+                daily_data = load_git_pickle_data(repo_path, commit, daily_path)
+            except Exception:
+                continue
+            daily_by_path[daily_path] = max_price_date(daily_data)
+        for weekly_path in weekly_paths:
+            try:
+                weekly_data = load_git_pickle_data(repo_path, commit, weekly_path)
+            except Exception:
+                continue
+            weekly_by_path[weekly_path] = max_price_date(weekly_data)
+        for daily_path, daily_max_date in daily_by_path.items():
+            for weekly_path, weekly_max_date in weekly_by_path.items():
+                key = (commit, daily_path, weekly_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(
+                    HistoricalPklCandidate(
+                        commit=commit,
+                        commit_date=commit_date,
+                        daily_path=daily_path,
+                        weekly_path=weekly_path,
+                        daily_max_date=daily_max_date,
+                        weekly_max_date=weekly_max_date,
+                    )
+                )
+    return (
+        select_historical_pkl_pair(
+            snapshot_date=snapshot_date,
+            expected_last_trading_day=expected_last_trading_day,
+            candidates=candidates,
+        ),
+        candidates,
+    )
+
+
 def run_one_week(
     *,
     snapshot_date: str,
     expected_last_trading_day: str,
-    daily_pkl: Path,
-    weekly_pkl: Path,
+    daily_pkl: Path | None,
+    weekly_pkl: Path | None,
     output_root: Path,
     quant_trade_path: Path,
     quant_trade_env: Path | None,
     yfinance_data_path: Path,
     quant_trade_commit: str,
+    daily_data: dict[str, pd.DataFrame] | None = None,
+    weekly_data: dict[str, pd.DataFrame] | None = None,
+    data_source_mode: str = "current_files",
+    historical_pkl_commit: str | None = None,
+    historical_pkl_commit_date: str | None = None,
+    historical_pkl_candidate_count: int | None = None,
+    daily_pkl_file: str | None = None,
+    weekly_pkl_file: str | None = None,
+    daily_pkl_sha256: str | None = None,
+    weekly_pkl_sha256: str | None = None,
 ) -> dict[str, Any]:
-    daily_raw = load_pickle_data(daily_pkl)
-    weekly_raw = load_pickle_data(weekly_pkl)
+    if daily_data is None:
+        if daily_pkl is None:
+            raise ValueError("daily_pkl is required when daily_data is not provided")
+        daily_raw = load_pickle_data(daily_pkl)
+    else:
+        daily_raw = daily_data
+    if weekly_data is None:
+        if weekly_pkl is None:
+            raise ValueError("weekly_pkl is required when weekly_data is not provided")
+        weekly_raw = load_pickle_data(weekly_pkl)
+    else:
+        weekly_raw = weekly_data
     daily_clip = clip_price_data_asof(daily_raw, expected_last_trading_day)
     weekly_clip = clip_price_data_asof(weekly_raw, expected_last_trading_day)
 
     week_dir = output_root / snapshot_date
     pool_path = week_dir / "breakout_follow_pool.csv"
     sink = ReplayPoolSink(pool_path)
-    run_output_dir = week_dir / "quant_trade_outputs"
-    run_output_dir.mkdir(parents=True, exist_ok=True)
+    run_output_tmp = tempfile.TemporaryDirectory(prefix=f"quant_trade_replay_{snapshot_date}_")
+    run_output_dir = Path(run_output_tmp.name)
 
     old_sys_path = list(sys.path)
     old_env = os.environ.copy()
@@ -163,6 +330,7 @@ def run_one_week(
             pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
 
         pool = repair_research_fields(pool)
+        pool = normalize_empty_pool_schema(pool)
         pool = clear_snapshot_contaminated_eps(pool)
         pool = enrich_pool_with_asof_52w_high(pool, daily_clip.data, expected_last_trading_day)
         pool.to_csv(pool_path, index=False, encoding="utf-8-sig")
@@ -180,16 +348,21 @@ def run_one_week(
         sys.path[:] = old_sys_path
         os.environ.clear()
         os.environ.update(old_env)
+        run_output_tmp.cleanup()
 
     metadata = {
         "snapshot_date": snapshot_date,
         "expected_last_trading_day": expected_last_trading_day,
         "quant_trade_commit": quant_trade_commit,
         "Yfinance_data_commit": git_commit(yfinance_data_path),
-        "daily_pkl_file": str(daily_pkl),
-        "weekly_pkl_file": str(weekly_pkl),
-        "daily_pkl_sha256": sha256_file(daily_pkl),
-        "weekly_pkl_sha256": sha256_file(weekly_pkl),
+        "data_source_mode": data_source_mode,
+        "historical_pkl_commit": historical_pkl_commit,
+        "historical_pkl_commit_date": historical_pkl_commit_date,
+        "historical_pkl_candidate_count": historical_pkl_candidate_count,
+        "daily_pkl_file": daily_pkl_file or str(daily_pkl),
+        "weekly_pkl_file": weekly_pkl_file or str(weekly_pkl),
+        "daily_pkl_sha256": daily_pkl_sha256 or (sha256_file(daily_pkl) if daily_pkl is not None else ""),
+        "weekly_pkl_sha256": weekly_pkl_sha256 or (sha256_file(weekly_pkl) if weekly_pkl is not None else ""),
         "daily_max_date_before_clip": daily_clip.max_date_before_clip,
         "weekly_max_date_before_clip": weekly_clip.max_date_before_clip,
         "daily_max_date_after_clip": daily_clip.max_date_after_clip,
@@ -229,6 +402,65 @@ def run_one_week(
     return metadata
 
 
+def metadata_for_missing_historical_pkl(
+    *,
+    snapshot_date: str,
+    expected_last_trading_day: str,
+    output_root: Path,
+    yfinance_data_path: Path,
+    quant_trade_commit: str,
+    candidate_count: int,
+) -> dict[str, Any]:
+    week_dir = output_root / snapshot_date
+    week_dir.mkdir(parents=True, exist_ok=True)
+    pool_path = week_dir / "breakout_follow_pool.csv"
+    metadata = {
+        "snapshot_date": snapshot_date,
+        "expected_last_trading_day": expected_last_trading_day,
+        "quant_trade_commit": quant_trade_commit,
+        "Yfinance_data_commit": git_commit(yfinance_data_path),
+        "data_source_mode": "historical_git",
+        "historical_pkl_commit": None,
+        "historical_pkl_commit_date": None,
+        "historical_pkl_candidate_count": candidate_count,
+        "daily_pkl_file": "",
+        "weekly_pkl_file": "",
+        "daily_pkl_sha256": "",
+        "weekly_pkl_sha256": "",
+        "daily_max_date_before_clip": None,
+        "weekly_max_date_before_clip": None,
+        "daily_max_date_after_clip": None,
+        "weekly_max_date_after_clip": None,
+        "has_future_data_before_clip": False,
+        "replay_used_clipped_data": False,
+        "output_pool_path": str(pool_path),
+        "output_row_count": 0,
+        "output_fields": [],
+        "schema_validation_status": "failed_missing_historical_pkl",
+        "missing_critical_fields": [],
+        "missing_repairable_fields": [],
+        "missing_optional_fields": [],
+        "schema_audit": {"schema_validation_status": "failed_missing_historical_pkl"},
+        "error_counts": {},
+        "status": "failed_missing_historical_pkl",
+        "failure_reason": "No git-history daily/weekly pkl pair with matching internal as-of dates",
+        "side_effects_disabled": {
+            "futu": True,
+            "telegram": True,
+            "database": True,
+            "production_pool_write": True,
+            "pool_publish": True,
+            "pool_commit": True,
+        },
+        "replay_strategy_env_keys": [],
+    }
+    (week_dir / "metadata.json").write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    return metadata
+
+
 def write_manifest(output_root: Path, rows: list[dict[str, Any]]) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     (output_root / "manifest.json").write_text(
@@ -245,6 +477,15 @@ def write_manifest(output_root: Path, rows: list[dict[str, Any]]) -> None:
                 "output_pool_path": row["output_pool_path"],
                 "output_row_count": row["output_row_count"],
                 "failure_reason": row["failure_reason"],
+                "data_source_mode": row.get("data_source_mode"),
+                "historical_pkl_commit": row.get("historical_pkl_commit"),
+                "historical_pkl_commit_date": row.get("historical_pkl_commit_date"),
+                "daily_pkl_file": row.get("daily_pkl_file"),
+                "weekly_pkl_file": row.get("weekly_pkl_file"),
+                "daily_max_date_before_clip": row.get("daily_max_date_before_clip"),
+                "weekly_max_date_before_clip": row.get("weekly_max_date_before_clip"),
+                "daily_max_date_after_clip": row.get("daily_max_date_after_clip"),
+                "weekly_max_date_after_clip": row.get("weekly_max_date_after_clip"),
                 "replay_used_clipped_data": row["replay_used_clipped_data"],
                 "has_future_data_before_clip": row["has_future_data_before_clip"],
                 "schema_validation_status": row.get("schema_audit", {}).get("schema_validation_status"),
@@ -349,6 +590,15 @@ def write_data_source_audit_report(
                 else pd.Series(False, index=pool.index)
             )
 
+        non_eps_abnormal = {
+            key: value
+            for key, value in audit["abnormal_empty_fields"].items()
+            if not key.startswith("eps_yoy_growth")
+        }
+        report_status = audit["status"]
+        if audit["status"] == "failed" and not audit["missing_fields"] and not non_eps_abnormal:
+            report_status = "passed_except_eps"
+
         signal_eps_missing_codes = _field_codes(pool, "eps_yoy_growth", signal_mask)
         signal_eps_supplement_available = 0
         signal_eps_unresolved = 0
@@ -369,7 +619,7 @@ def write_data_source_audit_report(
             )
         audit_row = {
             "snapshot_date": snapshot_date,
-            "status": audit["status"],
+            "status": report_status,
             "row_count": audit["row_count"],
             "column_count": audit["column_count"],
             "signal_rows": audit["signal_rows"],
@@ -377,6 +627,7 @@ def write_data_source_audit_report(
             "invalid_ibd_entry_rows": audit["invalid_ibd_entry_rows"],
             "missing_field_count": len(audit["missing_fields"]),
             "abnormal_empty_total": _total_counts(audit["abnormal_empty_fields"]),
+            "non_eps_abnormal_empty_total": _total_counts(non_eps_abnormal),
             "signal_eps_missing": int(audit["abnormal_empty_fields"].get("eps_yoy_growth_signal", 0)),
             "signal_eps_supplement_available": signal_eps_supplement_available,
             "signal_eps_unresolved": signal_eps_unresolved,
@@ -385,6 +636,7 @@ def write_data_source_audit_report(
             "optional_gap_total": _total_counts(audit["optional_gap_fields"]),
             "missing_fields": ";".join(audit["missing_fields"]),
             "abnormal_empty_fields": _format_counts(audit["abnormal_empty_fields"]),
+            "non_eps_abnormal_empty_fields": _format_counts(non_eps_abnormal),
             "normal_empty_fields": _format_counts(audit["normal_empty_fields"]),
             "repairable_fallback_fields": _format_counts(audit["repairable_fallback_fields"]),
             "optional_gap_fields": _format_counts(audit["optional_gap_fields"]),
@@ -414,11 +666,11 @@ def write_data_source_audit_report(
     pd.DataFrame(audit_rows).to_csv(output_root / "data_source_audit_manifest.csv", index=False)
     pd.DataFrame(eps_gap_rows).to_csv(output_root / "signal_eps_gap_supplement_plan.csv", index=False)
 
-    total_abnormal = sum(int(row["abnormal_empty_total"]) for row in audit_rows)
+    total_abnormal = sum(int(row["non_eps_abnormal_empty_total"]) for row in audit_rows)
     total_eps_missing = sum(int(row["signal_eps_missing"]) for row in audit_rows)
     total_eps_supplement_available = sum(int(row["signal_eps_supplement_available"]) for row in audit_rows)
     total_eps_unresolved = sum(int(row["signal_eps_unresolved"]) for row in audit_rows)
-    passed_weeks = sum(1 for row in audit_rows if row["status"] == "passed")
+    passed_weeks = sum(1 for row in audit_rows if row["status"] in {"passed", "passed_except_eps"})
     lines = [
         "# Replay Pool Data Source Audit",
         "",
@@ -426,7 +678,7 @@ def write_data_source_audit_report(
         "",
         "- 字段列缺失: 不正常，必须修复。",
         "- 核心价格/结构字段空值: 不正常，必须修复。",
-        "- signal 行的 `eps_yoy_growth` 空值: 不正常，必须补充；非 signal 行 EPS 空值视为正常。",
+        "- signal 行的 `eps_yoy_growth` 空值: 单独隔离；只有 point-in-time EPS 源可安全补充，当前快照源不得回填。",
         "- signal 行的 IBD candidate / entry 判断字段必须完整；非 signal 行对应空值视为正常。",
         "- `industry` / `sector` 允许用 `Unknown` 作为 repairable fallback，但会单独计数。",
         "- `price_52_week_high` / `dist_to_52w_high_pct` 是价格 as-of 派生字段，必须由已裁剪 daily pkl 重算且不得为空。",
@@ -435,23 +687,23 @@ def write_data_source_audit_report(
         "## 总览",
         "",
         f"- Weeks audited: {len(audit_rows)}",
-        f"- Passed weeks: {passed_weeks}",
+        f"- Passed weeks including EPS-isolated weeks: {passed_weeks}",
         f"- Weeks requiring supplement/repair: {len(audit_rows) - passed_weeks}",
-        f"- Abnormal empty values needing supplement/repair: {total_abnormal}",
-        f"- Signal EPS gaps needing supplement: {total_eps_missing}",
+        f"- Non-EPS abnormal empty values needing supplement/repair: {total_abnormal}",
+        f"- Signal EPS gaps isolated pending point-in-time supplement: {total_eps_missing}",
         f"- Signal EPS gaps with current snapshot-only source: {total_eps_supplement_available}",
         f"- Signal EPS gaps unresolved: {total_eps_unresolved}",
         "- Current snapshot EPS supplement sources are reported separately and are not point-in-time safe.",
         "",
         "## 每周审计",
         "",
-        "| snapshot_date | status | rows | cols | signal | missing_fields | abnormal_empty | signal_eps_missing | eps_supp_available | eps_unresolved | repairable_fallback | optional_gap |",
+        "| snapshot_date | status | rows | cols | signal | missing_fields | non_eps_abnormal | signal_eps_missing | eps_supp_available | eps_unresolved | repairable_fallback | optional_gap |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in audit_rows:
         lines.append(
             f"| {row['snapshot_date']} | {row['status']} | {row['row_count']} | {row['column_count']} | "
-            f"{row['signal_rows']} | {row['missing_field_count']} | {row['abnormal_empty_total']} | "
+            f"{row['signal_rows']} | {row['missing_field_count']} | {row['non_eps_abnormal_empty_total']} | "
             f"{row['signal_eps_missing']} | {row['signal_eps_supplement_available']} | "
             f"{row['signal_eps_unresolved']} | {row['repairable_fallback_total']} | {row['optional_gap_total']} |"
         )
@@ -468,7 +720,9 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     excluded_ok = "2026-08-14" not in {r["snapshot_date"] for r in rows}
     schema_ok = all(r.get("schema_audit", {}).get("schema_validation_status") == "passed" for r in rows)
     side_effects_ok = all(all(r.get("side_effects_disabled", {}).values()) for r in rows)
+    historical_git_ok = all(r.get("data_source_mode") == "historical_git" for r in rows)
     future_leak_ok = True
+    historical_source_ok = True
     ibd_totals = {
         "signal_candidates": 0,
         "ibd_valid_nonempty": 0,
@@ -480,6 +734,22 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     ibd_resolver_ok = True
     for row in rows:
         expected = pd.Timestamp(row["expected_last_trading_day"])
+        if row["status"] == "success":
+            if not row.get("historical_pkl_commit") or not row.get("daily_pkl_file") or not row.get("weekly_pkl_file"):
+                historical_source_ok = False
+            if row.get("daily_max_date_before_clip") != row.get("expected_last_trading_day"):
+                historical_source_ok = False
+            expected_week_start = (
+                pd.Timestamp(row["expected_last_trading_day"]).normalize()
+                - pd.Timedelta(days=pd.Timestamp(row["expected_last_trading_day"]).weekday())
+            )
+            weekly_max_date = row.get("weekly_max_date_before_clip")
+            if (
+                not weekly_max_date
+                or pd.Timestamp(weekly_max_date).normalize() < expected_week_start
+                or pd.Timestamp(weekly_max_date).normalize() > expected
+            ):
+                historical_source_ok = False
         for key in ("daily_max_date_after_clip", "weekly_max_date_after_clip"):
             value = row.get(key)
             if value and pd.Timestamp(value) > expected:
@@ -526,6 +796,7 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
         f"excluded_2026_08_14={excluded_ok})",
         f"- Future-date leak check after clip: {'passed' if future_leak_ok else 'failed'}",
         f"- Schema check: {'passed' if schema_ok else 'failed'}",
+        f"- Historical git pkl source check: {'passed' if historical_git_ok and historical_source_ok else 'failed'}",
         f"- IBD resolver field check: {'passed' if ibd_resolver_ok else 'failed'} "
         f"(signal_candidates={ibd_totals['signal_candidates']}, "
         f"ibd_entry_valid_nonempty={ibd_totals['ibd_valid_nonempty']}, "
@@ -539,22 +810,73 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
         "",
         "## Week Status",
         "",
-        "| snapshot_date | status | rows | clipped | schema | failure_reason |",
-        "|---|---:|---:|---:|---|---|",
+        "| snapshot_date | status | rows | data_source | pkl_commit | daily_pkl | weekly_pkl | daily_max | weekly_max | clipped | schema | failure_reason |",
+        "|---|---:|---:|---|---|---|---|---|---|---:|---|---|",
     ]
     for row in rows:
         schema_status = row.get("schema_audit", {}).get("schema_validation_status", "")
+        commit = str(row.get("historical_pkl_commit") or "")
         lines.append(
             f"| {row['snapshot_date']} | {row['status']} | {row['output_row_count']} | "
+            f"{row.get('data_source_mode', '')} | {commit[:8]} | "
+            f"{Path(str(row.get('daily_pkl_file') or '')).name} | {Path(str(row.get('weekly_pkl_file') or '')).name} | "
+            f"{row.get('daily_max_date_before_clip')} | {row.get('weekly_max_date_before_clip')} | "
             f"{row['replay_used_clipped_data']} | {schema_status} | {row['failure_reason']} |"
         )
     (output_root / "audit_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_execution_log(output_root: Path, rows: list[dict[str, Any]], *, quant_trade_path: Path) -> None:
+    lines = [
+        "# Latest Quant Trade Historical Pkl Replay Execution Log",
+        "",
+        "## Scope",
+        "",
+        "- Rebuild 2026 year-to-date complete-week breakout/follow pools before the production week ending 2026-08-14.",
+        "- Use the latest checked-out quant_trade dev logic for pool generation.",
+        "- Use git-history pkl blobs from this Yfinance_data repository as point-in-time market data.",
+        "- Do not use existing historical pool CSV files as inputs.",
+        "- Do not write production `us/` pool files, publish, commit from the strategy pipeline, send Telegram, connect Futu, or update databases.",
+        "",
+        "## Procedure",
+        "",
+        "1. Enumerate complete NYSE weeks from 2026-01-01 up to but excluding 2026-08-14.",
+        "2. For each snapshot week, scan git history commits touching `results_pkl` from the expected close date through the configured search window.",
+        "3. In each candidate commit tree, inspect available `stock_data_*_1d.pkl` and `stock_data_*_1wk.pkl` blobs by reading their internal price dates.",
+        "4. Select the earliest commit whose daily pkl max date equals the snapshot close and whose weekly pkl max date stays inside the snapshot week without exceeding the close.",
+        "5. Load selected pkl blobs directly with `git show <commit>:<path>`, run quant_trade `core_run`, then run the IBD entry enrichment helper against the replay output only.",
+        "6. Clear current-snapshot EPS values, recompute 52-week-high fields from the selected as-of daily pkl, validate schema/null semantics, and write per-week metadata.",
+        "",
+        "## Commits",
+        "",
+        f"- quant_trade repo: `{quant_trade_path}`",
+        f"- quant_trade commit: `{rows[0]['quant_trade_commit'] if rows else ''}`",
+        f"- Yfinance_data commit at run start: `{rows[0]['Yfinance_data_commit'] if rows else ''}`",
+        "",
+        "## Weekly Pkl Mapping",
+        "",
+        "| snapshot_date | status | pkl_commit | commit_date | daily_pkl | daily_max | weekly_pkl | weekly_max | future_before_clip | clipped | rows |",
+        "|---|---|---|---|---|---|---|---|---:|---:|---:|",
+    ]
+    for row in rows:
+        commit = str(row.get("historical_pkl_commit") or "")
+        lines.append(
+            f"| {row['snapshot_date']} | {row['status']} | {commit[:12]} | "
+            f"{row.get('historical_pkl_commit_date') or ''} | "
+            f"{row.get('daily_pkl_file') or ''} | {row.get('daily_max_date_before_clip')} | "
+            f"{row.get('weekly_pkl_file') or ''} | {row.get('weekly_max_date_before_clip')} | "
+            f"{row.get('has_future_data_before_clip')} | {row.get('replay_used_clipped_data')} | "
+            f"{row.get('output_row_count')} |"
+        )
+    (output_root / "execution_log.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-date", default="2026-01-01")
     parser.add_argument("--exclude-week-ending", default="2026-08-14")
+    parser.add_argument("--pkl-source", choices=["historical-git", "current-files"], default="historical-git")
+    parser.add_argument("--history-search-days", type=int, default=7)
     parser.add_argument("--daily-pkl", default="results_pkl/stock_data_150826_1d.pkl")
     parser.add_argument("--weekly-pkl", default="results_pkl/stock_data_150826_1wk.pkl")
     parser.add_argument("--output-root", default="backtest/ibd_skill_replay_pools")
@@ -565,8 +887,8 @@ def main(argv: list[str] | None = None) -> int:
 
     yfinance_data_path = Path.cwd()
     output_root = Path(args.output_root)
-    daily_pkl = Path(args.daily_pkl)
-    weekly_pkl = Path(args.weekly_pkl)
+    daily_pkl = Path(args.daily_pkl) if args.pkl_source == "current-files" else None
+    weekly_pkl = Path(args.weekly_pkl) if args.pkl_source == "current-files" else None
     quant_trade_path = Path(args.quant_trade_path)
     quant_trade_env = Path(args.quant_trade_env) if args.quant_trade_env else None
     quant_trade_commit = git_commit(quant_trade_path)
@@ -580,6 +902,51 @@ def main(argv: list[str] | None = None) -> int:
 
     rows = []
     for week in weeks:
+        if args.pkl_source == "historical-git":
+            chosen, candidates = discover_historical_pkl_pair(
+                repo_path=yfinance_data_path,
+                snapshot_date=week.snapshot_date,
+                expected_last_trading_day=week.expected_last_trading_day,
+                search_days=args.history_search_days,
+            )
+            if chosen is None:
+                rows.append(
+                    metadata_for_missing_historical_pkl(
+                        snapshot_date=week.snapshot_date,
+                        expected_last_trading_day=week.expected_last_trading_day,
+                        output_root=output_root,
+                        yfinance_data_path=yfinance_data_path,
+                        quant_trade_commit=quant_trade_commit,
+                        candidate_count=len(candidates),
+                    )
+                )
+                continue
+            daily_blob = git_blob_bytes(yfinance_data_path, chosen.commit, chosen.daily_path)
+            weekly_blob = git_blob_bytes(yfinance_data_path, chosen.commit, chosen.weekly_path)
+            rows.append(
+                run_one_week(
+                    snapshot_date=week.snapshot_date,
+                    expected_last_trading_day=week.expected_last_trading_day,
+                    daily_pkl=None,
+                    weekly_pkl=None,
+                    daily_data=normalize_pickle_data(pickle.loads(daily_blob)),
+                    weekly_data=normalize_pickle_data(pickle.loads(weekly_blob)),
+                    data_source_mode="historical_git",
+                    historical_pkl_commit=chosen.commit,
+                    historical_pkl_commit_date=chosen.commit_date,
+                    historical_pkl_candidate_count=len(candidates),
+                    daily_pkl_file=chosen.daily_path,
+                    weekly_pkl_file=chosen.weekly_path,
+                    daily_pkl_sha256=hashlib.sha256(daily_blob).hexdigest(),
+                    weekly_pkl_sha256=hashlib.sha256(weekly_blob).hexdigest(),
+                    output_root=output_root,
+                    quant_trade_path=quant_trade_path,
+                    quant_trade_env=quant_trade_env,
+                    yfinance_data_path=yfinance_data_path,
+                    quant_trade_commit=quant_trade_commit,
+                )
+            )
+            continue
         rows.append(
             run_one_week(
                 snapshot_date=week.snapshot_date,
@@ -591,9 +958,15 @@ def main(argv: list[str] | None = None) -> int:
                 quant_trade_env=quant_trade_env,
                 yfinance_data_path=yfinance_data_path,
                 quant_trade_commit=quant_trade_commit,
+                data_source_mode="current_files",
             )
         )
     write_manifest(output_root, rows)
     write_report(output_root, rows)
     write_data_source_audit_report(output_root, rows)
+    write_execution_log(output_root, rows, quant_trade_path=quant_trade_path)
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

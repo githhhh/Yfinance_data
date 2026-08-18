@@ -40,6 +40,16 @@ class SchemaAudit:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class HistoricalPklCandidate:
+    commit: str
+    commit_date: str
+    daily_path: str
+    weekly_path: str
+    daily_max_date: str | None
+    weekly_max_date: str | None
+
+
 CRITICAL_FIELDS = [
     "code",
     "snapshot_date",
@@ -249,6 +259,31 @@ def enumerate_complete_snapshot_weeks(
     ]
 
 
+def select_historical_pkl_pair(
+    *,
+    snapshot_date: str,
+    expected_last_trading_day: str,
+    candidates: list[HistoricalPklCandidate],
+) -> HistoricalPklCandidate | None:
+    expected = pd.Timestamp(expected_last_trading_day).normalize()
+    expected_week_label = expected - pd.Timedelta(days=expected.weekday())
+    valid = []
+    for candidate in candidates:
+        if candidate.daily_max_date != expected.strftime("%Y-%m-%d"):
+            continue
+        if candidate.weekly_max_date is None:
+            continue
+        weekly_max = pd.Timestamp(candidate.weekly_max_date).normalize()
+        if weekly_max < expected_week_label or weekly_max > expected:
+            continue
+        commit_date = pd.Timestamp(candidate.commit_date).tz_localize(None)
+        if commit_date.normalize() < pd.Timestamp(snapshot_date).normalize():
+            continue
+        valid.append(candidate)
+    valid.sort(key=lambda item: (pd.Timestamp(item.commit_date).tz_localize(None), item.commit, item.daily_path, item.weekly_path))
+    return valid[0] if valid else None
+
+
 def _read_env_file(env_path: str | Path | None) -> dict[str, str]:
     if env_path is None:
         return {}
@@ -365,6 +400,12 @@ def clear_snapshot_contaminated_eps(pool: pd.DataFrame) -> pd.DataFrame:
     result = pool.copy()
     result["eps_yoy_growth"] = pd.NA
     return result
+
+
+def normalize_empty_pool_schema(pool: pd.DataFrame) -> pd.DataFrame:
+    if not pool.empty:
+        return pool
+    return pd.DataFrame(columns=EXPECTED_POOL_FIELDS)
 
 
 class ReplayPoolSink:
