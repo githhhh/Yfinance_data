@@ -12,3 +12,6 @@ token_*.json
 # Big EPUB and unpacked cache
 How_to_Make_Money_in_Stocks.epub
 
+# Generated outputs and intermediate caches
+outputs/
+

@@ -112,6 +112,14 @@ def _reasoned_item(row: pd.Series, row_idx: int, *, version: str) -> ReasonedCan
     entry_vol = to_float(row.get("ibd_entry_volume_ratio"))
     weekly_vol = to_float(row.get("volume_ratio"))
     eps = to_float(row.get("eps_yoy_growth"))
+    if eps is None:
+        snap = str(row.get("snapshot_date", "")).strip()
+        if snap and code:
+            try:
+                from eps_pit.lookup import get_signal_eps
+                eps = get_signal_eps(snap, code)
+            except Exception:
+                pass
     dist = to_float(row.get("dist_to_52w_high_pct"))
     rule = str(row.get("ibd_candidate_rule", "") or "").strip()
 

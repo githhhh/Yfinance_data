@@ -203,6 +203,15 @@ def repair_pool_fields(pool: pd.DataFrame, prices: dict[str, pd.DataFrame], *, s
         if to_float(row.get("dist_to_52w_high_pct")) is None and latest_close is not None and high_52:
             repaired.at[idx, "dist_to_52w_high_pct"] = round((latest_close / high_52 - 1.0) * 100.0, 6)
             repaired.at[idx, "dist_to_52w_high_pct_repair_method"] = "snapshot_close_vs_52w_high"
+        if to_float(row.get("eps_yoy_growth")) is None:
+            try:
+                from eps_pit.lookup import get_signal_eps
+                eps_val = get_signal_eps(snapshot_date, code)
+                if eps_val is not None:
+                    repaired.at[idx, "eps_yoy_growth"] = eps_val
+                    repaired.at[idx, "eps_yoy_growth_repair_method"] = "pit_signal_supplement"
+            except Exception:
+                pass
         repaired.at[idx, "repair_source_cutoff"] = snapshot_date
         repaired.at[idx, "lookahead_risk"] = "none_for_price_repairs"
     return repaired
@@ -222,7 +231,16 @@ def select_current_skill_top3(pool: pd.DataFrame) -> ReplayResult:
     selected: list[ReplayItem] = []
     covered = set()
     for item in raw:
-        eps = to_float(pool.loc[item.sort_key[-1]].get("eps_yoy_growth")) if item.sort_key[-1] in pool.index else None
+        row_obj = pool.loc[item.sort_key[-1]] if item.sort_key[-1] in pool.index else None
+        eps = to_float(row_obj.get("eps_yoy_growth")) if row_obj is not None else None
+        if eps is None and row_obj is not None:
+            snap = str(row_obj.get("snapshot_date", "")).strip()
+            if snap:
+                try:
+                    from eps_pit.lookup import get_signal_eps
+                    eps = get_signal_eps(snap, item.code)
+                except Exception:
+                    pass
         industry_key = item.industry.strip().lower()
         if not industry_key or eps is None:
             continue
@@ -237,7 +255,17 @@ def select_current_skill_top3(pool: pd.DataFrame) -> ReplayResult:
     for item in raw:
         if item.final_group == "PRIORITY":
             continue
-        if item.raw_rank <= 5 and to_float(pool.loc[item.sort_key[-1]].get("eps_yoy_growth")) is None:
+        row_obj = pool.loc[item.sort_key[-1]] if item.sort_key[-1] in pool.index else None
+        eps = to_float(row_obj.get("eps_yoy_growth")) if row_obj is not None else None
+        if eps is None and row_obj is not None:
+            snap = str(row_obj.get("snapshot_date", "")).strip()
+            if snap:
+                try:
+                    from eps_pit.lookup import get_signal_eps
+                    eps = get_signal_eps(snap, item.code)
+                except Exception:
+                    pass
+        if item.raw_rank <= 5 and eps is None:
             item.final_group = "WATCH"
         else:
             item.final_group = "OTHER"
@@ -384,6 +412,15 @@ def select_old_skill_proxy_top3(pool: pd.DataFrame) -> ReplayResult:
 
 def _old_item(row: pd.Series, row_idx: int) -> ReplayItem:
     eps = to_float(row.get("eps_yoy_growth"))
+    if eps is None:
+        snap = str(row.get("snapshot_date", "")).strip()
+        code = str(row.get("code", "")).strip()
+        if snap and code:
+            try:
+                from eps_pit.lookup import get_signal_eps
+                eps = get_signal_eps(snap, code)
+            except Exception:
+                pass
     cur = to_float(row.get("current_vs_ibd_candidate_pct"))
     vol = to_float(row.get("ibd_entry_volume_ratio"))
     dist = to_float(row.get("dist_to_52w_high_pct"))

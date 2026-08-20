@@ -438,6 +438,43 @@ def run_report(args):
             json.dump(data, f, indent=2)
 
 
+def run_export_signal_eps(args):
+    print("=== Exporting 32-Week Signal PIT EPS Dataset ===")
+    import glob
+    prov_path = os.path.join(args.output_dir, "audit", "weekly_eps_provenance.parquet")
+    if not os.path.exists(prov_path):
+        print(f"Provenance file not found at {prov_path}. Running backfill first...")
+        run_backfill(args)
+
+    df_prov = pd.read_parquet(prov_path)
+
+    # Scan weekly pool files for signal rows
+    pattern = os.path.join(args.pool_dir, "*", "breakout_follow_pool.csv")
+    pool_files = sorted(glob.glob(pattern))
+    signal_rows = []
+    for f in pool_files:
+        snap_date = os.path.basename(os.path.dirname(f))
+        try:
+            df = pd.read_csv(f)
+        except Exception:
+            continue
+        sig_col = "signal" if "signal" in df.columns else ("breakout_signal" if "breakout_signal" in df.columns else None)
+        if sig_col:
+            sig_df = df[df[sig_col] == True]
+            for _, r in sig_df.iterrows():
+                code = str(r["code"]).strip().upper()
+                signal_rows.append({"snapshot_date": snap_date, "code": code})
+
+    df_sig = pd.DataFrame(signal_rows).drop_duplicates(subset=["snapshot_date", "code"])
+    merged = df_sig.merge(df_prov, on=["snapshot_date", "code"], how="inner")
+    merged = merged.sort_values(by=["snapshot_date", "code"]).reset_index(drop=True)
+
+    target_csv = os.path.join(args.pool_dir, "signal_eps_pit.csv")
+    merged.to_csv(target_csv, index=False)
+    print(f"Exported {len(merged)} signal PIT EPS records -> {target_csv}")
+    return merged
+
+
 def main():
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument("--pool-dir", default="backtest/ibd_skill_replay_pools", help="Path to weekly pool folders")
@@ -454,6 +491,7 @@ def main():
     subparsers.add_parser("fetch", parents=[parent_parser], help="Phase 2: Fetch fundamentals data")
     subparsers.add_parser("build-events", parents=[parent_parser], help="Build PIT growth events")
     subparsers.add_parser("backfill", parents=[parent_parser], help="Backfill 32 weekly CSVs")
+    subparsers.add_parser("export-signal-eps", parents=[parent_parser], help="Export 32-week signal PIT EPS dataset")
     subparsers.add_parser("report", parents=[parent_parser], help="Print audit reports")
     subparsers.add_parser("all", parents=[parent_parser], help="Run full pipeline end-to-end")
 
@@ -470,6 +508,9 @@ def main():
         run_build_events(args)
     elif args.command == "backfill":
         run_backfill(args)
+        run_export_signal_eps(args)
+    elif args.command == "export-signal-eps":
+        run_export_signal_eps(args)
     elif args.command == "report":
         run_report(args)
     elif args.command == "all" or not args.command:
@@ -484,6 +525,7 @@ def main():
         run_fetch(args)
         events_df = run_build_events(args)
         run_backfill(args)
+        run_export_signal_eps(args)
         run_report(args)
 
 
