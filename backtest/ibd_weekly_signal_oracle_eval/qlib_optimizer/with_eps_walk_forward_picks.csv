@@ -1,0 +1,64 @@
+snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max_gain_pct,top5_return,top5_gain,bottom5,hit_stop_8pct
+2026-03-06,technical_balanced,1,RTX,Aerospace & Defense,4.632944645667412,8.818936,10.727184,True,True,True,True
+2026-03-06,technical_balanced,2,MPC,Oil Refining/Marketing,3.9464134369948787,67.682582,69.890545,True,True,True,False
+2026-03-13,technical_balanced,1,DOCN,Packaged Software,3.620529713054585,96.076064,182.976155,True,True,True,False
+2026-03-20,technical_balanced,1,STX,Computer Peripherals,3.6162282519113944,138.763797,180.642629,True,True,True,True
+2026-03-27,eps_pass_quality,1,DELL,Computer Processing Hardware,4.104429466746846,193.529095,207.397883,True,True,True,False
+2026-03-27,eps_pass_quality,2,CASY,Specialty Stores,4.060016812467091,22.673913,34.369565,True,True,True,False
+2026-03-27,eps_pass_quality,3,PFIS,Regional Banks,3.972622478386167,35.38228,39.195599,True,True,True,False
+2026-04-02,eps_pass_quality,1,MRVL,Semiconductors,4.943617125234679,116.183057,221.129503,True,True,False,False
+2026-04-02,eps_pass_quality,2,PFIS,Regional Banks,4.926682001150087,32.46705,36.198255,False,False,False,False
+2026-04-02,eps_pass_quality,3,ECO,Marine Shipping,4.707928549044187,20.507695,31.661003,False,False,False,True
+2026-04-10,eps_pass_quality,1,FRAF,Regional Banks,6.051126067822936,15.840868,17.106691,False,False,False,False
+2026-04-10,eps_pass_quality,2,SMTC,Semiconductors,3.477205642926507,68.345928,112.7264,False,False,False,False
+2026-04-17,eps_pass_quality,1,AMLX,Pharmaceuticals: Major,4.916306200026216,23.670669,40.651801,False,False,False,True
+2026-04-17,eps_pass_quality,2,CVEO,Hotels/Resorts/Cruise lines,4.728509650880709,12.163073,22.978437,False,False,False,False
+2026-04-17,eps_pass_quality,3,GHM,Industrial Machinery,4.560304193595413,24.023501,36.894788,False,False,False,False
+2026-04-24,eps_pass_quality,1,MCRI,Hotels/Resorts/Cruise lines,6.178713792187084,9.951263,20.451927,False,False,False,False
+2026-04-24,eps_pass_quality,2,CHMG,Regional Banks,5.834715639810426,29.967477,31.640081,False,False,False,False
+2026-04-24,eps_pass_quality,3,HCSG,Miscellaneous Commercial Services,5.023694390715667,-1.144689,17.90293,False,False,True,True
+2026-05-01,fresh_demand,1,PHVS,Biotechnology,7.817744008814618,21.214212,27.388755,False,False,False,False
+2026-05-01,fresh_demand,2,RBB,Regional Banks,5.497796837749706,14.671654,16.666667,False,False,False,False
+2026-05-01,fresh_demand,3,KRG,Real Estate Investment Trusts,5.184994677110706,1.379839,14.679954,False,False,False,False
+2026-05-08,fresh_demand,1,HWBK,Regional Banks,5.386289900575615,10.710322,12.652608,False,False,False,False
+2026-05-08,fresh_demand,2,HFBL,Savings Banks,5.328440366972477,25.026069,25.182482,False,False,False,False
+2026-05-08,fresh_demand,3,ESCA,Recreational Products,5.2509267165603495,3.881988,19.409938,False,False,False,True
+2026-05-15,eps_pass_quality,1,HLIO,Industrial Machinery,5.265190336749634,7.294273,24.963792,False,False,False,False
+2026-05-15,eps_pass_quality,2,CAPL,Wholesale Distributors,4.788952540866216,4.102338,5.116895,False,False,False,False
+2026-05-15,eps_pass_quality,3,JBHT,Trucking,4.681673923501043,9.38991,17.035589,False,False,False,False
+2026-05-22,eps_pass_quality,1,PDLB,Savings Banks,5.532999410724809,15.269295,16.379789,False,False,False,False
+2026-05-22,eps_pass_quality,2,ELMD,Medical Specialties,5.069267515923567,10.066756,26.568758,False,False,False,False
+2026-05-22,eps_pass_quality,3,NMM,Marine Shipping,4.856284394964893,12.611745,13.106863,False,False,False,False
+2026-05-29,eps_pass_quality,1,ATLC,Finance/Rental/Leasing,5.086431994711617,19.182061,32.845358,False,False,False,True
+2026-05-29,eps_pass_quality,2,CSTM,Aluminum,4.814609418152023,-12.658601,9.147241,False,False,False,True
+2026-05-29,eps_pass_quality,3,GHM,Industrial Machinery,4.717995192124242,15.714141,27.723074,False,False,False,True
+2026-06-05,eps_pass_quality,1,EFSI,Regional Banks,4.870961696146187,7.935723,11.124845,False,False,False,False
+2026-06-05,eps_pass_quality,2,TWIN,Trucks/Construction/Farm Machinery,4.777812287683199,27.546778,29.93763,False,False,False,False
+2026-06-05,eps_pass_quality,3,MCRI,Hotels/Resorts/Cruise lines,4.05006209584172,2.477701,12.264618,False,False,False,False
+2026-06-12,eps_pass_quality,1,FDSB,Savings Banks,14.541119860017497,20.710059,21.56476,False,False,False,False
+2026-06-12,eps_pass_quality,2,SENEA,Food: Specialty/Candy,5.91101081953494,14.564035,17.36688,False,False,False,True
+2026-06-12,eps_pass_quality,3,FNRN,Regional Banks,5.271877469612012,-2.391546,7.063404,False,False,False,True
+2026-06-18,eps_pass_quality,1,SWBI,Unknown,7.980861909671067,-8.958069,10.609911,False,False,False,True
+2026-06-18,eps_pass_quality,2,TER,Electronic Production Equipment,6.3260113523882655,-0.748904,15.632184,False,False,False,True
+2026-06-18,eps_pass_quality,3,CW,Aerospace & Defense,5.9499426587732085,-8.990226,5.175757,False,False,False,True
+2026-06-26,eps_pass_quality,1,ACA,Construction Materials,12.7947697100774,5.545877,5.966899,False,False,False,False
+2026-06-26,eps_pass_quality,2,RMBI,Major Banks,8.431401686110874,0.31506,4.536862,False,False,False,True
+2026-06-26,eps_pass_quality,3,WTBA,Regional Banks,8.363356659759958,15.307306,17.240046,False,False,False,False
+2026-07-02,eps_pass_quality,1,NUTX,Medical/Nursing Services,4.584615067985675,-2.385417,6.25,False,False,False,True
+2026-07-02,eps_pass_quality,2,EZPW,Finance/Rental/Leasing,4.5821240234712475,-13.74671,7.13659,False,False,True,True
+2026-07-02,eps_pass_quality,3,LGND,Pharmaceuticals: Major,4.550038940809969,-3.634163,6.843087,False,False,False,False
+2026-07-10,technical_balanced,1,RAPP,Biotechnology,5.098561822374223,15.884653,20.967742,False,False,False,False
+2026-07-10,technical_balanced,2,FR,Real Estate Investment Trusts,4.722795289852445,-1.007715,10.029917,False,False,False,False
+2026-07-10,technical_balanced,3,BSVN,Regional Banks,4.544257703081231,4.705647,10.953144,False,False,False,False
+2026-07-17,technical_balanced,1,GHRS,Pharmaceuticals: Major,7.043911591729871,4.131356,11.016949,False,False,False,False
+2026-07-17,technical_balanced,2,GPRE,Chemicals: Specialty,5.7074324050359175,-17.687434,3.74868,False,False,True,True
+2026-07-17,technical_balanced,3,TRVI,Biotechnology,5.587957144615582,0.764192,10.371179,False,False,False,True
+2026-07-24,technical_balanced,1,EDRY,Marine Shipping,13.445916992718121,52.375,66.666667,True,True,False,False
+2026-07-24,technical_balanced,2,BLFS,Medical Specialties,11.211346469566964,18.39973,19.345037,False,False,False,False
+2026-07-24,technical_balanced,3,IMAX,Electronics/Appliances,6.918516857767876,22.520853,25.741427,False,False,False,False
+2026-07-31,technical_balanced,1,RCKY,Apparel/Footwear,6.448842869880715,-1.634934,9.706126,False,False,False,False
+2026-07-31,technical_balanced,2,MTX,Chemicals: Specialty,6.3293313835203,-2.92631,3.551476,False,False,False,False
+2026-07-31,technical_balanced,3,CZFS,Regional Banks,5.327474844322821,10.053333,11.8,False,False,False,False
+2026-08-07,technical_balanced,1,CFFI,Regional Banks,42.53059820454737,2.279565,3.679704,False,False,False,False
+2026-08-07,technical_balanced,2,HBB,Electronics/Appliances,7.085932914950228,9.887937,12.920237,False,False,False,False
+2026-08-07,technical_balanced,3,WTTR,Oil & Gas Production,5.543458446703778,3.523573,8.337469,False,False,False,False
