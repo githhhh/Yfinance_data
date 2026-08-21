@@ -1,0 +1,2 @@
+eps_mode,variant,weeks,picks,median_week_avg_latest_return_pct,avg_week_avg_latest_return_pct,median_week_worst_pick_return_pct,week_latest_top5_hit_rate,week_gain_top5_hit_rate,pick_latest_top5_rate,week_bottom5_hit_rate,pick_bottom5_rate,week_stop_rate,pick_stop_rate,score
+no_eps,v3_core_top3,31,86,12.620913,21.646164689655173,9.482204,0.25806451612903225,0.3225806451612903,0.11627906976744186,0.3225806451612903,0.13953488372093023,0.3870967741935484,0.1744186046511628,0.15317837231057746
