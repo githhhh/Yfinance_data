@@ -30,6 +30,7 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 1. 先确定输入模式：
    - **项目模式**：当前工作区存在目标项目与 `market_analysis`，或用户要求自动分析项目内最新 Pool。
    - **独立 CSV 模式**：用户明确上传或指定某个 CSV，且项目仓库或 `market_analysis` 不可用。
+   - **历史 EPS 对照模式**：用户要求用同一份历史 Pool 同时评估“无 EPS”和“含 EPS”两组结果，用于优化 skill 推理或审计 EPS 增量影响。
 2. **项目模式必须先尝试更新 Market Analysis，之后才能选择 Pool、读取报告或开始候选计算：**
    - 只运行一次 `git submodule update --init --remote market_analysis`，并记录命令成功或失败；不得用 `git -C market_analysis pull` 替代。
    - 命令成功后可记录 `git -C market_analysis rev-parse HEAD`。命令成功但 commit 未变化，或更新后报告仍是旧快照，都是允许的。
@@ -50,6 +51,21 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 12. 数值为空、非数字、NaN 或正负 Infinity 时视为缺失，不参与运算或排序。所有判断使用未四舍五入原值，只在报告中格式化。
 13. EPS 只读取当前 ticker 当前行正式列 `eps_yoy_growth`。不得从 `ibd_candidate_extra`、其他 ticker、旧报告或模型记忆回填；缺失严格记 INFO_MISSING，等待数据层补齐。
 14. 为每个候选绑定唯一原始 CSV 行。后续所有字段、判断和报告数字必须直接引用该评估记录，不得从自然语言摘要或另一 ticker 的记录重建。
+
+## 历史 EPS 对照模式
+
+当用户明确要求基于 32 周或其他历史 Pool 对比“无 EPS / 含 EPS”时，目标是评估 EPS 信息对同一套基础技术推荐逻辑的增量影响，而不是重新拟合规则。
+
+- 两份报告必须使用同一套基础候选范围、字段解析、Critical、阶段路由、Geometry 与排序框架；唯一允许的输入差异是 EPS 是否可见。
+- **无 EPS 子模式**：在内存中屏蔽 `eps_yoy_growth`，并关闭 `eps_pit.lookup.get_signal_eps` 或任何等价 EPS 补源；EPS 全部按 INFO_MISSING 记录。不得因 EPS 全部缺失而清空技术基础推荐；该报告必须明确标注为 EPS-blind 技术基础评估，不冒充正式信息完整预筛。
+- **含 EPS 子模式**：若用户明确说明先假设补充 EPS 正确，可读取当前行正式 `eps_yoy_growth` 或项目指定的 point-in-time EPS 补源；仍不得从 `ibd_candidate_extra`、旧报告、其他 ticker 或模型记忆回填。EPS `>=25` 只能作为辅助确认，已知但 `<25` 只作 CONTEXT，缺失仍是 INFO_MISSING。
+- 对照报告至少披露：Review Universe 行数、ACTIONABLE 行数、EPS 已知/达标覆盖、各输出列表的名单变化周数、EPS-blind 与 EPS-enriched 的推荐列表表现摘要，以及由 EPS 触发的排序/路由差异。
+- 做历史规则迭代时必须执行**按周 Signal Oracle 评估**：每周 universe 是每周所有 `signal == True` 行，ACTIONABLE 与非 ACTIONABLE 都用于建立当周 winner / loser 背景；winner / loser 必须只在同一 `snapshot_date` 内排序。不得把不同周的 ACTIONABLE 或推荐样本先合并后再计算大赢家/大输家命中率。
+- 按周评估至少记录：推荐命中当周 latest-return Top3/Top5、max-gain Top5、latest-return Bottom3/Bottom5、-8% stop 暴露、推荐组合当周平均收益、最差推荐收益，以及每个 variant 在周层面的覆盖周数。优先选择在周内 winner 命中、bottom loser 暴露、stop 暴露和周内收益之间综合更稳的通用规则。
+- 每次历史迭代必须记录评估 run log，至少包含输入 pool、价格源、收益窗口、winner/loser 定义、variant 定义、评分函数、发现的问题和修正记录；该 run log 是审查材料，不是 skill 新规则本身。
+- 优化 skill 时只能把对照结果沉淀为证据簇推理顺序、风险提示、报告审计和缺失信息路由；不得把 32 周样本中的 ticker、日期、收益率、中位数、命中率或个别数值范围写成新门槛。
+- EPS 数值大小不得作为连续排序键，不得按 EPS 高低重新排序；只允许使用“达标 / 未达标但已知 / 缺失”的离散状态参与辅助证据和人工核验路由。
+- 当前历史迭代结论只允许沉淀为以下通用规则：EPS 已知优先于 EPS 缺失，但 `EPS >=25` 不得升级为优先复核硬门槛；`pullback_not_dry` 与 `geometry_caution_not_failure` 默认作为风险披露或同分压制，不得仅因二者存在就把 Critical 通过的候选硬排除。
 
 ## 状态语义
 
