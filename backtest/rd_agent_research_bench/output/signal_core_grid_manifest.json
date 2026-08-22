@@ -1,0 +1,38 @@
+{
+  "backend": "deterministic_signal_core_grid_plus_backtrader",
+  "oracle_end_date": "2026-08-14",
+  "initial_capital": 10000.0,
+  "stop_loss_pct": 8.0,
+  "grid": {
+    "axes": [
+      "scope",
+      "eps_gate",
+      "industry_cover",
+      "research_order",
+      "risk_filter",
+      "fill"
+    ],
+    "no_eps_configs": 64,
+    "with_eps_configs": 224
+  },
+  "non_coupling_boundary": [
+    "no ticker-specific rules",
+    "no date-specific rules",
+    "no return-derived thresholds inside selection",
+    "historical returns are used only after replay for comparison"
+  ],
+  "outputs": {
+    "profiles": "backtest/rd_agent_research_bench/output/signal_core_grid_profiles.csv",
+    "quality": "backtest/rd_agent_research_bench/output/signal_core_grid_quality.csv",
+    "weekly": "backtest/rd_agent_research_bench/output/signal_core_grid_weekly.csv",
+    "picks": "backtest/rd_agent_research_bench/output/signal_core_grid_picks.csv",
+    "backtrader": "backtest/rd_agent_research_bench/output/signal_core_grid_backtrader_summary.csv",
+    "trades": "backtest/rd_agent_research_bench/output/signal_core_grid_backtrader_trades.csv",
+    "imax": "backtest/rd_agent_research_bench/output/signal_core_grid_imax_audit.csv",
+    "coverage": "backtest/rd_agent_research_bench/output/signal_core_grid_rule_status_coverage.csv",
+    "semiconductor": "backtest/rd_agent_research_bench/output/signal_core_grid_semiconductor_capture.csv",
+    "summary": "backtest/rd_agent_research_bench/output/signal_core_grid_summary.csv",
+    "selected": "backtest/rd_agent_research_bench/output/signal_core_grid_selected.csv",
+    "report": "backtest/rd_agent_research_bench/output/signal_core_grid_report.md"
+  }
+}

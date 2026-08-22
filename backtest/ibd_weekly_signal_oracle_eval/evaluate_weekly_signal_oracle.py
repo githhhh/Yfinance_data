@@ -237,7 +237,7 @@ def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, objec
             industry_key = str(item.industry or "").strip().lower()
             if cfg.get("industry_cover") and industry_key and industry_key in covered:
                 continue
-            if not item_allowed(item, row, enabled, cfg, relaxed=True):
+            if not item_allowed_for_relaxed_fill(item, row, enabled, cfg):
                 continue
             out.append(item)
             chosen.add(item.code)
@@ -246,6 +246,23 @@ def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, objec
             if len(out) == 3:
                 return out
     return out
+
+
+def item_allowed_for_relaxed_fill(item, row: pd.Series, enabled: bool, cfg: dict[str, object]) -> bool:
+    if item_allowed(item, row, enabled, cfg, relaxed=True):
+        return True
+    fallback = cfg.get("fill_eps_fallback")
+    if not fallback or not cfg.get("require_eps_pass"):
+        return False
+    fill_cfg = dict(cfg)
+    fill_cfg.pop("require_eps_pass", None)
+    if fallback == "known":
+        fill_cfg["require_eps_known"] = True
+    elif fallback == "none":
+        fill_cfg.pop("require_eps_known", None)
+    else:
+        raise ValueError(f"unsupported fill_eps_fallback: {fallback}")
+    return item_allowed(item, row, enabled, fill_cfg, relaxed=True)
 
 
 def _research_ordered_items(items: list, cfg: dict[str, object]) -> list:
