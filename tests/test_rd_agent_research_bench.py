@@ -6,10 +6,14 @@ from backtest.rd_agent_research_bench.metrics import (
     robust_weekly_summary,
 )
 from backtest.rd_agent_research_bench.research import (
+    absorption_candidate_matrix,
+    intuitive_variant_summary,
     imax_rank_audit,
+    pair_outcome_audit,
     render_markdown_report,
     rule_status_coverage,
     summarize_variant_quality,
+    stop_loss_capital_backtest,
 )
 from backtest.rd_agent_research_bench.hypotheses import hypothesis_space
 
@@ -147,6 +151,93 @@ def test_imax_rank_audit_reports_selected_order_and_oracle_rank():
     assert audit.loc[audit["variant"].eq("skill"), "pick_order"].item() == 2
     assert audit.loc[audit["variant"].eq("skill"), "latest_rank"].item() == 6
     assert audit.loc[audit["variant"].eq("other"), "selected"].item() is False
+
+
+def test_pair_outcome_audit_shows_imax_returned_more_than_blfs_despite_lower_baseline_rank():
+    universe = pd.DataFrame(
+        [
+            {"snapshot_date": "2026-07-24", "code": "BLFS", "latest_return_pct": 18.4, "max_gain_pct": 19.3, "latest_rank": 8, "gain_rank": 14},
+            {"snapshot_date": "2026-07-24", "code": "IMAX", "latest_return_pct": 22.5, "max_gain_pct": 25.7, "latest_rank": 6, "gain_rank": 8},
+        ]
+    )
+    picks = pd.DataFrame(
+        [
+            {"snapshot_date": "2026-07-24", "variant": "skill_industry_eps_known", "pick_order": 1, "code": "BLFS", "reason_codes": "near_buy_point;volume_confirms_breakout", "risk_codes": ""},
+            {"snapshot_date": "2026-07-24", "variant": "skill_industry_eps_known", "pick_order": 2, "code": "IMAX", "reason_codes": "geometry_caution_not_failure;near_buy_point", "risk_codes": ""},
+            {"snapshot_date": "2026-07-24", "variant": "research_fresh_demand_proximity_first", "pick_order": 1, "code": "IMAX", "reason_codes": "geometry_caution_not_failure;near_buy_point", "risk_codes": ""},
+        ]
+    )
+
+    audit = pair_outcome_audit(universe, picks, snapshot_date="2026-07-24", codes=("BLFS", "IMAX"))
+
+    imax = audit[audit["code"].eq("IMAX")].iloc[0]
+    blfs = audit[audit["code"].eq("BLFS")].iloc[0]
+    assert imax["latest_return_pct"] > blfs["latest_return_pct"]
+    assert imax["max_gain_pct"] > blfs["max_gain_pct"]
+    assert imax["latest_return_delta_vs_peer"] == 4.1
+    assert "research_fresh_demand_proximity_first:1" in imax["variant_orders"]
+    assert "skill_industry_eps_known:1" in blfs["variant_orders"]
+
+
+def test_intuitive_variant_summary_explains_positive_negative_week_distribution():
+    weekly = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-02", "picks": 3, "avg_latest_return_pct": 10.0, "worst_latest_return_pct": 1.0},
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-09", "picks": 3, "avg_latest_return_pct": -4.0, "worst_latest_return_pct": -8.0},
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-16", "picks": 2, "avg_latest_return_pct": 0.0, "worst_latest_return_pct": 0.0},
+        ]
+    )
+
+    summary = intuitive_variant_summary(weekly, eps_mode="with_eps", variant="skill_industry_eps_known")
+
+    assert summary["positive_weeks"] == 1
+    assert summary["negative_weeks"] == 1
+    assert summary["flat_weeks"] == 1
+    assert summary["weeks_with_less_than_3_picks"] == 1
+    assert summary["positive_week_rate"] == 1 / 3
+
+
+def test_absorption_candidate_matrix_separates_candidate_audit_and_reject():
+    quality = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "weeks": 40, "picks": 100, "median_week_avg_latest_return_pct": 16.0, "min_week_avg_latest_return_pct": -4.0, "pick_bottom5_precision_bad": 0.15, "pick_stop_rate": 0.15},
+            {"eps_mode": "with_eps", "variant": "guarded", "weeks": 36, "picks": 82, "median_week_avg_latest_return_pct": 16.5, "min_week_avg_latest_return_pct": 1.0, "pick_bottom5_precision_bad": 0.10, "pick_stop_rate": 0.09},
+            {"eps_mode": "with_eps", "variant": "shadow", "weeks": 42, "picks": 126, "median_week_avg_latest_return_pct": 22.0, "min_week_avg_latest_return_pct": -12.0, "pick_bottom5_precision_bad": 0.23, "pick_stop_rate": 0.21},
+            {"eps_mode": "with_eps", "variant": "thin", "weeks": 10, "picks": 12, "median_week_avg_latest_return_pct": 19.0, "min_week_avg_latest_return_pct": 2.0, "pick_bottom5_precision_bad": 0.01, "pick_stop_rate": 0.01},
+        ]
+    )
+
+    matrix = absorption_candidate_matrix(quality, eps_mode="with_eps", baseline_variant="skill_industry_eps_known")
+    statuses = dict(zip(matrix["variant"], matrix["absorption_status"]))
+
+    assert statuses["guarded"] == "candidate_absorbable"
+    assert statuses["shadow"] == "audit_only"
+    assert statuses["thin"] == "reject_low_coverage"
+    assert "ticker" not in " ".join(matrix["decision_reason"].str.lower())
+
+
+def test_stop_loss_capital_backtest_caps_stopped_picks_and_compounds_weekly():
+    picks = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-02", "code": "A", "latest_return_pct": 20.0, "hit_stop_8pct": False},
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-02", "code": "B", "latest_return_pct": 50.0, "hit_stop_8pct": True},
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "snapshot_date": "2026-01-09", "code": "C", "latest_return_pct": 10.0, "hit_stop_8pct": False},
+        ]
+    )
+
+    result = stop_loss_capital_backtest(
+        picks,
+        eps_mode="with_eps",
+        variant="skill_industry_eps_known",
+        initial_capital=1000.0,
+        stop_loss_pct=-8.0,
+    )
+
+    assert result["weeks"] == 2
+    assert result["initial_capital"] == 1000.0
+    assert result["first_week_return_pct"] == 6.0
+    assert round(result["final_equity"], 2) == 1166.0
+    assert round(result["total_return_pct"], 2) == 16.6
 
 
 def test_rule_status_coverage_keeps_pullback_and_status_visible():

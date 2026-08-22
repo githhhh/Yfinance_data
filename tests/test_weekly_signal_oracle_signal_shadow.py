@@ -50,6 +50,24 @@ def test_research_pullback_interleave_can_promote_high_quality_constructive_pull
     assert "PULL1" in [item.code for item in selected[:2]]
 
 
+def test_proximity_floor_guard_does_not_relax_eps_or_pullback_risk_to_fill_slots():
+    pool = pd.DataFrame(
+        [
+            _row("GOOD1", "ACTIONABLE", 0.8, 2.0, 1.6),
+            _row("GOOD2", "ACTIONABLE", 1.1, 2.1, 1.7),
+            _row("MISS1", "ACTIONABLE", 0.2, 7.0, 2.2, eps=None),
+            _row("NODRY", "ACTIONABLE", 0.3, 6.0, 2.0, rule="ceiling_pullback", dry=False),
+        ]
+    )
+    ranked = rank_reasoning_candidates(pool, universe="review", version="v3")
+
+    selected = variant_items(ranked, pool, enabled=True, cfg=VARIANTS["research_proximity_eps_pass_floor_guard"])
+
+    codes = [item.code for item in selected]
+    assert codes == ["GOOD1", "GOOD2"]
+    assert len(codes) < 3
+
+
 def _row(
     code: str,
     status: str,
@@ -59,6 +77,7 @@ def _row(
     *,
     rule: str = "ceiling",
     dry: bool | None = None,
+    eps: float | None = 30.0,
 ) -> dict[str, object]:
     return {
         "snapshot_date": "2026-07-24",
@@ -72,7 +91,7 @@ def _row(
         "ibd_entry_breakout_range_ratio": 0.7,
         "dist_to_52w_high_pct": -1.0,
         "volume_ratio": weekly_volume,
-        "eps_yoy_growth": 30.0,
+        "eps_yoy_growth": eps,
         "industry": f"{code} Industry",
         "pullback_v_is_dry": dry,
     }

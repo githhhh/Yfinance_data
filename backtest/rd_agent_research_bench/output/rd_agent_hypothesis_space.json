@@ -25,6 +25,19 @@
     "official_skill_absorption": "candidate_only"
   },
   {
+    "name": "proximity_floor_guard",
+    "question": "Can buy-point proximity keep its ranking benefit while hard-gating weak floor risks instead of filling every week to three picks?",
+    "features": [
+      "current_vs_ibd_candidate_pct",
+      "eps_state",
+      "pullback_not_dry",
+      "geometry_caution_not_failure",
+      "ibd_entry_status",
+      "ibd_entry_volume_ratio_pass"
+    ],
+    "official_skill_absorption": "candidate_only"
+  },
+  {
     "name": "displacement_quality_proxy",
     "question": "Can breakout geometry proxy displacement without adding chart-derived subjective labels?",
     "features": [

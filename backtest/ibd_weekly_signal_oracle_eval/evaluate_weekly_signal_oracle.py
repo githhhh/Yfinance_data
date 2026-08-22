@@ -69,6 +69,26 @@ VARIANTS = {
         "industry_cover": True,
         "research_order": "pullback_interleave",
     },
+    "research_proximity_structural_floor_guard": {
+        "industry_cover": True,
+        "exclude_pullback_not_dry": True,
+        "exclude_geometry_caution": True,
+        "research_order": "fresh_proximity",
+    },
+    "research_proximity_eps_known_floor_guard": {
+        "industry_cover": True,
+        "require_eps_known": True,
+        "exclude_pullback_not_dry": True,
+        "exclude_geometry_caution": True,
+        "research_order": "fresh_proximity",
+    },
+    "research_proximity_eps_pass_floor_guard": {
+        "industry_cover": True,
+        "require_eps_pass": True,
+        "exclude_pullback_not_dry": True,
+        "exclude_geometry_caution": True,
+        "research_order": "fresh_proximity",
+    },
     "signal_shadow_top3": {
         "industry_cover": True,
         "allow_non_actionable": True,

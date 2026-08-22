@@ -127,11 +127,228 @@ def rule_status_coverage(universe: pd.DataFrame, picks: pd.DataFrame) -> pd.Data
     return result.sort_values(["rule", "entry_status"]).reset_index(drop=True)
 
 
+def pair_outcome_audit(
+    universe: pd.DataFrame,
+    picks: pd.DataFrame,
+    *,
+    snapshot_date: str,
+    codes: tuple[str, str] = ("BLFS", "IMAX"),
+) -> pd.DataFrame:
+    rows = []
+    scoped_universe = universe[
+        universe["snapshot_date"].astype(str).eq(str(snapshot_date))
+        & universe["code"].astype(str).isin(codes)
+    ].copy()
+    if scoped_universe.empty:
+        return pd.DataFrame()
+    scoped_picks = picks[
+        picks["snapshot_date"].astype(str).eq(str(snapshot_date))
+        & picks["code"].astype(str).isin(codes)
+    ].copy()
+    latest_values = pd.to_numeric(scoped_universe["latest_return_pct"], errors="coerce")
+    gain_values = pd.to_numeric(scoped_universe["max_gain_pct"], errors="coerce")
+    best_latest = latest_values.max()
+    best_gain = gain_values.max()
+    by_code = {str(row["code"]): row for _, row in scoped_universe.iterrows()}
+    for code in codes:
+        if code not in by_code:
+            continue
+        row = by_code[code]
+        peer_codes = [item for item in codes if item != code and item in by_code]
+        peer_return = pd.NA
+        if peer_codes:
+            peer_return = to_numeric_or_na(by_code[peer_codes[0]].get("latest_return_pct"))
+        latest_return = to_numeric_or_na(row.get("latest_return_pct"))
+        pick_rows = scoped_picks[scoped_picks["code"].astype(str).eq(code)].sort_values(["variant", "pick_order"])
+        variant_orders = ";".join(
+            f"{pick['variant']}:{int(pick['pick_order'])}"
+            for _, pick in pick_rows.iterrows()
+            if pd.notna(pick.get("pick_order"))
+        )
+        rows.append(
+            {
+                "snapshot_date": snapshot_date,
+                "code": code,
+                "latest_return_pct": latest_return,
+                "max_gain_pct": to_numeric_or_na(row.get("max_gain_pct")),
+                "latest_rank": row.get("latest_rank"),
+                "gain_rank": row.get("gain_rank"),
+                "latest_return_delta_vs_peer": _delta(latest_return, peer_return),
+                "best_latest_return_in_pair": bool(pd.notna(latest_return) and latest_return == best_latest),
+                "best_max_gain_in_pair": bool(pd.notna(row.get("max_gain_pct")) and to_numeric_or_na(row.get("max_gain_pct")) == best_gain),
+                "variant_orders": variant_orders,
+                "reason_codes": _first_nonempty(pick_rows.get("reason_codes")),
+                "risk_codes": _first_nonempty(pick_rows.get("risk_codes")),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def intuitive_variant_summary(weekly: pd.DataFrame, *, eps_mode: str, variant: str) -> dict[str, object]:
+    frame = _filter_variant(weekly, eps_mode, variant)
+    frame = frame.copy()
+    frame["avg_latest_return_pct"] = pd.to_numeric(frame.get("avg_latest_return_pct"), errors="coerce")
+    frame["picks"] = pd.to_numeric(frame.get("picks"), errors="coerce")
+    valid = frame[frame["avg_latest_return_pct"].notna()]
+    weeks = int(len(frame))
+    valid_weeks = int(len(valid))
+    positive = int(valid["avg_latest_return_pct"].gt(0).sum())
+    negative = int(valid["avg_latest_return_pct"].lt(0).sum())
+    flat = int(valid["avg_latest_return_pct"].eq(0).sum())
+    less_than_3 = int(valid["picks"].lt(3).sum()) if "picks" in valid else 0
+    return {
+        "eps_mode": eps_mode,
+        "variant": variant,
+        "weeks": weeks,
+        "valid_return_weeks": valid_weeks,
+        "missing_path_weeks": weeks - valid_weeks,
+        "positive_weeks": positive,
+        "negative_weeks": negative,
+        "flat_weeks": flat,
+        "positive_week_rate": positive / valid_weeks if valid_weeks else 0.0,
+        "negative_week_rate": negative / valid_weeks if valid_weeks else 0.0,
+        "weeks_with_less_than_3_picks": less_than_3,
+    }
+
+
+def absorption_candidate_matrix(
+    quality: pd.DataFrame,
+    *,
+    eps_mode: str,
+    baseline_variant: str,
+    min_week_coverage_ratio: float = 0.70,
+    min_pick_coverage_ratio: float = 0.60,
+) -> pd.DataFrame:
+    baseline = _quality_row(quality, eps_mode, baseline_variant)
+    if baseline is None:
+        return pd.DataFrame()
+    frame = quality[quality["eps_mode"].astype(str).eq(eps_mode)].copy()
+    rows = []
+    for _, row in frame.iterrows():
+        variant = str(row.get("variant"))
+        if variant == baseline_variant:
+            continue
+        week_ratio = _safe_ratio(row.get("weeks"), baseline.get("weeks"))
+        pick_ratio = _safe_ratio(row.get("picks"), baseline.get("picks"))
+        median_ok = _leq_or_equal(baseline.get("median_week_avg_latest_return_pct"), row.get("median_week_avg_latest_return_pct"))
+        floor_ok = _leq_or_equal(baseline.get("min_week_avg_latest_return_pct"), row.get("min_week_avg_latest_return_pct"))
+        bottom_ok = _leq_or_equal(row.get("pick_bottom5_precision_bad"), baseline.get("pick_bottom5_precision_bad"))
+        stop_ok = _leq_or_equal(row.get("pick_stop_rate"), baseline.get("pick_stop_rate"))
+        coverage_ok = week_ratio >= min_week_coverage_ratio and pick_ratio >= min_pick_coverage_ratio
+        if not coverage_ok:
+            status = "reject_low_coverage"
+        elif median_ok and floor_ok and bottom_ok and stop_ok:
+            status = "candidate_absorbable"
+        elif floor_ok and bottom_ok and stop_ok:
+            status = "high_confidence_audit"
+        elif row.get("median_week_avg_latest_return_pct", 0) > baseline.get("median_week_avg_latest_return_pct", 0):
+            status = "audit_only"
+        else:
+            status = "reject_quality"
+        rows.append(
+            {
+                "eps_mode": eps_mode,
+                "baseline_variant": baseline_variant,
+                "variant": variant,
+                "absorption_status": status,
+                "week_coverage_ratio": week_ratio,
+                "pick_coverage_ratio": pick_ratio,
+                "median_delta": _delta(row.get("median_week_avg_latest_return_pct"), baseline.get("median_week_avg_latest_return_pct")),
+                "floor_delta": _delta(row.get("min_week_avg_latest_return_pct"), baseline.get("min_week_avg_latest_return_pct")),
+                "bottom5_delta": _delta(row.get("pick_bottom5_precision_bad"), baseline.get("pick_bottom5_precision_bad")),
+                "stop_delta": _delta(row.get("pick_stop_rate"), baseline.get("pick_stop_rate")),
+                "decision_reason": _candidate_reason(status, coverage_ok, median_ok, floor_ok, bottom_ok, stop_ok),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["absorption_status", "variant"]).reset_index(drop=True)
+
+
+def stop_loss_capital_backtest(
+    picks: pd.DataFrame,
+    *,
+    eps_mode: str,
+    variant: str,
+    initial_capital: float = 100000.0,
+    stop_loss_pct: float = -8.0,
+) -> dict[str, object]:
+    frame = _filter_variant(picks, eps_mode, variant)
+    input_picks = int(len(frame))
+    if frame.empty:
+        return {
+            "eps_mode": eps_mode,
+            "variant": variant,
+            "initial_capital": float(initial_capital),
+            "stop_loss_pct": float(stop_loss_pct),
+            "weeks": 0,
+            "input_picks": 0,
+            "priced_picks": 0,
+            "picks": 0,
+            "final_equity": float(initial_capital),
+            "total_return_pct": 0.0,
+            "first_week_return_pct": pd.NA,
+            "positive_weeks": 0,
+            "negative_weeks": 0,
+        }
+    frame = frame.copy()
+    frame["latest_return_pct"] = pd.to_numeric(frame.get("latest_return_pct"), errors="coerce")
+    frame = frame[frame["latest_return_pct"].notna()]
+    if frame.empty:
+        return {
+            "eps_mode": eps_mode,
+            "variant": variant,
+            "initial_capital": float(initial_capital),
+            "stop_loss_pct": float(stop_loss_pct),
+            "weeks": 0,
+            "input_picks": input_picks,
+            "priced_picks": 0,
+            "picks": 0,
+            "final_equity": float(initial_capital),
+            "total_return_pct": 0.0,
+            "first_week_return_pct": pd.NA,
+            "positive_weeks": 0,
+            "negative_weeks": 0,
+        }
+    frame["hit_stop_8pct"] = frame.get("hit_stop_8pct", False)
+    frame["realized_return_pct"] = frame["latest_return_pct"]
+    frame.loc[frame["hit_stop_8pct"].fillna(False).astype(bool), "realized_return_pct"] = float(stop_loss_pct)
+    weekly_returns = (
+        frame.groupby("snapshot_date", sort=True)["realized_return_pct"]
+        .mean()
+        .reset_index(name="weekly_return_pct")
+    )
+    equity = float(initial_capital)
+    first_week_return = pd.NA
+    for idx, row in weekly_returns.iterrows():
+        weekly_return = float(row["weekly_return_pct"])
+        if idx == 0:
+            first_week_return = weekly_return
+        equity *= 1.0 + weekly_return / 100.0
+    return {
+        "eps_mode": eps_mode,
+        "variant": variant,
+        "initial_capital": float(initial_capital),
+        "stop_loss_pct": float(stop_loss_pct),
+        "weeks": int(len(weekly_returns)),
+        "input_picks": input_picks,
+        "priced_picks": int(len(frame)),
+        "picks": int(len(frame)),
+        "final_equity": float(equity),
+        "total_return_pct": (float(equity) / float(initial_capital) - 1.0) * 100.0 if initial_capital else 0.0,
+        "first_week_return_pct": first_week_return,
+        "positive_weeks": int(weekly_returns["weekly_return_pct"].gt(0).sum()),
+        "negative_weeks": int(weekly_returns["weekly_return_pct"].lt(0).sum()),
+    }
+
+
 def render_markdown_report(
     quality: pd.DataFrame,
     imax: pd.DataFrame,
     coverage: pd.DataFrame,
     *,
+    pair_audit: pd.DataFrame | None = None,
+    intuitive_summary: pd.DataFrame | None = None,
+    absorption_matrix: pd.DataFrame | None = None,
+    stop_loss_backtest: pd.DataFrame | None = None,
     title: str = "RD-Agent Research Bench Audit",
 ) -> str:
     lines = [
@@ -147,8 +364,22 @@ def render_markdown_report(
         "",
     ]
     lines.extend(_markdown_table(_round_frame(quality)).splitlines())
+    if intuitive_summary is not None:
+        lines.extend(["", "## Intuitive Baseline Summary", ""])
+        lines.extend(_markdown_table(_round_frame(intuitive_summary)).splitlines())
+    if stop_loss_backtest is not None:
+        lines.extend(["", "## Stop-Loss Capital Replay", ""])
+        lines.append("- Replay lens: each snapshot allocates equal capital across selected picks; stopped picks realize the configured stop-loss return, then weekly returns compound from the initial capital.")
+        lines.append("- This is not a live portfolio simulation: replay paths overlap and all path returns use the fixed oracle end date.")
+        lines.extend(_markdown_table(_round_frame(stop_loss_backtest)).splitlines())
+    if pair_audit is not None:
+        lines.extend(["", "## BLFS / IMAX Pair Audit", ""])
+        lines.extend(_markdown_table(_round_frame(pair_audit)).splitlines())
     lines.extend(["", "## Skill Absorption Reading", ""])
     lines.extend(_skill_absorption_reading(quality, imax))
+    if absorption_matrix is not None:
+        lines.extend(["", "## Candidate Absorption Matrix", ""])
+        lines.extend(_markdown_table(_round_frame(absorption_matrix)).splitlines())
     lines.extend(["", "## IMAX Rank Audit", ""])
     lines.extend(_markdown_table(_round_frame(imax)).splitlines())
     lines.extend(["", "## Rule / Status Coverage", ""])
@@ -191,6 +422,63 @@ def _markdown_table(frame: pd.DataFrame) -> str:
     return frame.to_markdown(index=False)
 
 
+def to_numeric_or_na(value: object) -> float | object:
+    result = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(result):
+        return pd.NA
+    return float(result)
+
+
+def _delta(value: object, baseline: object) -> float | object:
+    value_num = to_numeric_or_na(value)
+    baseline_num = to_numeric_or_na(baseline)
+    if pd.isna(value_num) or pd.isna(baseline_num):
+        return pd.NA
+    return round(float(value_num) - float(baseline_num), 6)
+
+
+def _first_nonempty(series: pd.Series | None) -> str:
+    if series is None:
+        return ""
+    for value in series:
+        if pd.notna(value) and str(value).strip():
+            return str(value)
+    return ""
+
+
+def _safe_ratio(value: object, denominator: object) -> float:
+    value_num = to_numeric_or_na(value)
+    denominator_num = to_numeric_or_na(denominator)
+    if pd.isna(value_num) or pd.isna(denominator_num) or float(denominator_num) == 0:
+        return 0.0
+    return float(value_num) / float(denominator_num)
+
+
+def _leq_or_equal(left: object, right: object) -> bool:
+    left_num = to_numeric_or_na(left)
+    right_num = to_numeric_or_na(right)
+    if pd.isna(left_num) or pd.isna(right_num):
+        return False
+    return float(left_num) <= float(right_num)
+
+
+def _candidate_reason(status: str, coverage_ok: bool, median_ok: bool, floor_ok: bool, bottom_ok: bool, stop_ok: bool) -> str:
+    failed = []
+    if not coverage_ok:
+        failed.append("coverage")
+    if not median_ok:
+        failed.append("median")
+    if not floor_ok:
+        failed.append("weekly_floor")
+    if not bottom_ok:
+        failed.append("bottom5")
+    if not stop_ok:
+        failed.append("stop")
+    if not failed:
+        return f"{status}: non-coupled factor gates pass against baseline"
+    return f"{status}: failed " + ",".join(failed)
+
+
 def _skill_absorption_reading(quality: pd.DataFrame, imax: pd.DataFrame) -> list[str]:
     lines = [
         "- `signal_shadow_top3` is audit-only: it captures more big winners, but also carries materially higher Bottom5 and stop exposure.",
@@ -199,6 +487,7 @@ def _skill_absorption_reading(quality: pd.DataFrame, imax: pd.DataFrame) -> list
     skill = _quality_row(quality, "with_eps", "skill_industry_eps_known")
     fresh = _quality_row(quality, "with_eps", "research_fresh_demand_proximity_first")
     pullback = _quality_row(quality, "with_eps", "research_pullback_vcp_lane_interleave")
+    floor_guard = _quality_row(quality, "with_eps", "research_proximity_eps_known_floor_guard")
     if skill is not None and fresh is not None:
         better_median = fresh["median_week_avg_latest_return_pct"] > skill["median_week_avg_latest_return_pct"]
         lower_stop = fresh["pick_stop_rate"] < skill["pick_stop_rate"]
@@ -214,6 +503,13 @@ def _skill_absorption_reading(quality: pd.DataFrame, imax: pd.DataFrame) -> list
     if pullback is not None:
         lines.append(
             "- `research_pullback_vcp_lane_interleave` is not ready for official ranking: it raises Top5 precision, but the current pullback/VCP proxy also raises Bottom5 and stop exposure."
+        )
+    if skill is not None and floor_guard is not None:
+        floor_delta = _delta(floor_guard["min_week_avg_latest_return_pct"], skill["min_week_avg_latest_return_pct"])
+        stop_delta = _delta(floor_guard["pick_stop_rate"], skill["pick_stop_rate"])
+        pick_ratio = _safe_ratio(floor_guard["picks"], skill["picks"])
+        lines.append(
+            f"- `research_proximity_eps_known_floor_guard` is a high-confidence audit lane: weekly floor improves by {floor_delta} pct points and stop rate changes by {stop_delta}, but pick coverage is {pick_ratio:.2f}x of the formal baseline."
         )
     imax_selected = _imax_selected_row(imax, "with_eps", "research_fresh_demand_proximity_first")
     if imax_selected is not None:

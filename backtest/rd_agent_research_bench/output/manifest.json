@@ -7,12 +7,19 @@
     "clean_eps_pass_no_dry_no_geom_caution",
     "signal_shadow_top3",
     "research_fresh_demand_proximity_first",
-    "research_pullback_vcp_lane_interleave"
+    "research_pullback_vcp_lane_interleave",
+    "research_proximity_structural_floor_guard",
+    "research_proximity_eps_known_floor_guard",
+    "research_proximity_eps_pass_floor_guard"
   ],
   "outputs": {
     "quality": "backtest/rd_agent_research_bench/output/variant_quality_summary.csv",
     "coverage": "backtest/rd_agent_research_bench/output/rule_status_coverage.csv",
     "imax": "backtest/rd_agent_research_bench/output/imax_rank_audit.csv",
+    "pair_audit": "backtest/rd_agent_research_bench/output/pair_outcome_audit.csv",
+    "intuitive": "backtest/rd_agent_research_bench/output/intuitive_variant_summary.csv",
+    "stop_loss": "backtest/rd_agent_research_bench/output/stop_loss_capital_replay.csv",
+    "absorption": "backtest/rd_agent_research_bench/output/candidate_absorption_matrix.csv",
     "hypotheses_csv": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.csv",
     "hypotheses_json": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.json",
     "report": "backtest/rd_agent_research_bench/output/research_bench_report.md"
