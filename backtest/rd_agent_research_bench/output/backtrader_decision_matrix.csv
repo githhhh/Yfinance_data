@@ -1,0 +1,17 @@
+eps_mode,baseline_variant,variant,backtrader_status,rebalance_coverage_ratio,pick_coverage_ratio,final_value_delta,total_return_delta,max_drawdown_delta,stop_events_delta,decision_reason
+with_eps,skill_industry_eps_known,clean_eps_pass_no_dry_no_geom_caution,high_confidence_candidate,0.95,0.8712871287128713,2728.2872,27.282872,10.293003,-3.0,high_confidence_candidate: failed coverage
+with_eps,skill_industry_eps_known,research_proximity_eps_known_floor_guard,high_confidence_candidate,0.9,0.8118811881188119,22.31,0.2231,6.888569,-4.0,high_confidence_candidate: failed coverage
+with_eps,skill_industry_eps_known,research_proximity_eps_pass_floor_guard,high_confidence_candidate,0.775,0.6633663366336634,1967.748,19.67748,13.031261,-4.0,high_confidence_candidate: failed coverage
+with_eps,skill_industry_eps_known,research_fresh_demand_proximity_first,reject_backtrader,1.0,1.0,-522.9772,-5.229772,0.0,0.0,reject_backtrader: failed final_value
+with_eps,skill_industry_eps_known,research_proximity_structural_floor_guard,reject_backtrader,0.9,0.8217821782178217,-146.12,-1.4612,6.888569,-4.0,"reject_backtrader: failed coverage,final_value"
+with_eps,skill_industry_eps_known,research_pullback_vcp_lane_interleave,reject_backtrader,1.0,1.0,-1947.2544,-19.472544,-1.018925,3.0,"reject_backtrader: failed final_value,drawdown,stop_events"
+with_eps,skill_industry_eps_known,signal_shadow_top3,reject_backtrader,1.05,1.2475247524752475,-3503.9488,-35.039488,2.956684,0.0,reject_backtrader: failed final_value
+with_eps,skill_industry_eps_known,v3_core_top3,reject_backtrader,1.0,1.0495049504950495,-838.116,-8.38116,0.0,1.0,"reject_backtrader: failed final_value,stop_events"
+no_eps,v3_core_top3,research_fresh_demand_proximity_first,direct_replacement_candidate,1.0,0.9528301886792453,3625.1408,36.251408,2.950245,0.0,direct_replacement_candidate: Backtrader return/risk/coverage gates pass
+no_eps,v3_core_top3,research_proximity_structural_floor_guard,high_confidence_candidate,0.9,0.7830188679245284,1368.3352,13.683352,5.172518,-5.0,high_confidence_candidate: failed coverage
+no_eps,v3_core_top3,clean_eps_pass_no_dry_no_geom_caution,reject_backtrader,0.0,0.0,-3354.292,-33.54292,19.920964,-7.0,"reject_backtrader: failed coverage,final_value"
+no_eps,v3_core_top3,research_proximity_eps_known_floor_guard,reject_backtrader,0.0,0.0,-3354.292,-33.54292,19.920964,-7.0,"reject_backtrader: failed coverage,final_value"
+no_eps,v3_core_top3,research_proximity_eps_pass_floor_guard,reject_backtrader,0.0,0.0,-3354.292,-33.54292,19.920964,-7.0,"reject_backtrader: failed coverage,final_value"
+no_eps,v3_core_top3,research_pullback_vcp_lane_interleave,reject_backtrader,1.0,0.9528301886792453,-2625.518,-26.25518,0.301217,4.0,"reject_backtrader: failed final_value,stop_events"
+no_eps,v3_core_top3,signal_shadow_top3,reject_backtrader,1.05,1.1886792452830188,-2619.85,-26.1985,1.078038,0.0,reject_backtrader: failed final_value
+no_eps,v3_core_top3,skill_industry_eps_known,reject_backtrader,0.0,0.0,-3354.292,-33.54292,19.920964,-7.0,"reject_backtrader: failed coverage,final_value"

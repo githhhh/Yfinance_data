@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
+from eps_pit.lookup import enrich_pool_with_signal_eps
 
 
 DATA_ROOT = str(Path(__file__).resolve().parents[1])
@@ -91,6 +92,25 @@ def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
     return codes
 
 
+def _signal_eps_missing_count(pool: pd.DataFrame) -> int:
+    if "signal" not in pool.columns or "eps_yoy_growth" not in pool.columns:
+        return 0
+    signal_mask = pool["signal"].map(_is_truthy)
+    return int(pool.loc[signal_mask, "eps_yoy_growth"].isna().sum())
+
+
+def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
+    before = _signal_eps_missing_count(pool)
+    enriched = enrich_pool_with_signal_eps(pool)
+    after = _signal_eps_missing_count(enriched)
+    repaired = before - after
+    if repaired:
+        logging.info("BF Pool signal EPS supplemented: %s repaired, %s unresolved", repaired, after)
+    elif before:
+        logging.warning("BF Pool signal EPS still missing after supplement: %s unresolved", after)
+    return enriched
+
+
 class BreakoutFollowPoolRun:
     """Run-scoped access to the weekend or midweek BreakoutFollow Pool."""
 
@@ -115,6 +135,7 @@ class BreakoutFollowPoolRun:
         return BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH if self._midweek else BREAKOUT_FOLLOW_POOL_PATH
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
+        pool = _enrich_signal_eps(pool)
         _pool_codes(pool)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         pool.to_csv(self.path, index=False, encoding="utf-8-sig")

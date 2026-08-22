@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 import yfinance_data
+from eps_pit.lookup import SignalEPSLookup
 
 
 def _valid_complete_signal(code: str, *, rank: int) -> dict[str, object]:
@@ -54,6 +55,38 @@ def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, mo
     pool_run.save_snapshot(snapshot)
 
     assert pool_run.load_actionable_codes() == ["SECOND", "FIRST"]
+
+
+def test_pool_run_supplements_signal_eps_before_publishing(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pit_path = tmp_path / "signal_eps_pit.csv"
+    stage2_path = tmp_path / "stage2_whitelist.csv"
+
+    pd.DataFrame(
+        [{"snapshot_date": "2026-08-14", "code": "PIT", "eps_yoy_growth": 31.5}]
+    ).to_csv(pit_path, index=False)
+    pd.DataFrame([{"code": "STAGE", "eps_yoy_growth": 42.0}]).to_csv(stage2_path, index=False)
+
+    SignalEPSLookup.clear_cache()
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(pit_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_STAGE2_PATH", str(stage2_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    pool_run.save_snapshot(
+        pd.DataFrame(
+            [
+                {"code": "PIT", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                {"code": "STAGE", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                {"code": "QUIET", "snapshot_date": "2026-08-14", "signal": False, "eps_yoy_growth": pd.NA},
+            ]
+        )
+    )
+
+    saved = pd.read_csv(pool_path)
+    assert saved.loc[saved["code"].eq("PIT"), "eps_yoy_growth"].item() == 31.5
+    assert saved.loc[saved["code"].eq("STAGE"), "eps_yoy_growth"].item() == 42.0
+    assert pd.isna(saved.loc[saved["code"].eq("QUIET"), "eps_yoy_growth"].item())
 
 
 def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_path, monkeypatch):
