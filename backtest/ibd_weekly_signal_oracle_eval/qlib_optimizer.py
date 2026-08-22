@@ -14,11 +14,11 @@ sys.path.insert(0, str(Path.cwd()))
 
 from backtest.ibd_skill_replay.core import compute_path_metrics, to_bool, to_float
 from backtest.ibd_skill_replay.run_ytd_replay import _load_price_cache
+from backtest.ibd_weekly_signal_oracle_eval.price_cache import resolve_price_cache
 import eps_pit.lookup as eps_lookup
 
 
 POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
-PRICE_CACHE = Path("results_pkl/stock_data_150826_1d.pkl")
 DEFAULT_END_DATE = "2026-08-14"
 
 
@@ -77,10 +77,11 @@ def load_signal_rows(
     *,
     eps_enabled: bool,
     pool_root: Path = POOL_ROOT,
-    price_cache: Path = PRICE_CACHE,
+    price_cache: str | Path | None = None,
     end_date: str = DEFAULT_END_DATE,
 ) -> pd.DataFrame:
-    prices = _load_price_cache(price_cache)
+    resolved_price_cache = resolve_price_cache(price_cache)
+    prices = _load_price_cache(resolved_price_cache)
     rows: list[dict[str, object]] = []
     with eps_lookup_mode(eps_enabled):
         for pool_path in sorted(pool_root.glob("*/breakout_follow_pool.csv")):
@@ -509,9 +510,16 @@ def summarize_strategy(name: str, picks: pd.DataFrame, choices: pd.DataFrame | N
     return pd.DataFrame([row])
 
 
-def run_mode(eps_mode: str, *, output_dir: Path, top_k: int, min_train_weeks: int) -> dict[str, object]:
+def run_mode(
+    eps_mode: str,
+    *,
+    output_dir: Path,
+    top_k: int,
+    min_train_weeks: int,
+    price_cache: Path,
+) -> dict[str, object]:
     eps_enabled = eps_mode == "with_eps"
-    rows = load_signal_rows(eps_enabled=eps_enabled)
+    rows = load_signal_rows(eps_enabled=eps_enabled, price_cache=price_cache)
     panel = build_qlib_panel(rows)
     eval_panel, coverage = filter_valid_return_panel(panel)
     coverage["pool_file_weeks"] = len(list(POOL_ROOT.glob("*/breakout_follow_pool.csv")))
@@ -545,6 +553,7 @@ def run_mode(eps_mode: str, *, output_dir: Path, top_k: int, min_train_weeks: in
         "summary_path": str(summary_path),
         "risk_path": str(risk_path),
         "coverage": coverage,
+        "price_cache": str(price_cache),
         "summary": summary.iloc[0].to_dict() if not summary.empty else {},
     }
 
@@ -582,6 +591,7 @@ def render_comparison(results: list[dict[str, object]], backend: dict[str, objec
         "# Qlib-Compatible Replay Pool Optimization",
         "",
         f"- Replay pool files: `{int(total_pool_weeks)}`",
+        f"- Price cache: `{results[0].get('price_cache', 'unknown') if results else 'unknown'}`",
         f"- Qlib backend available: `{backend.get('available')}`",
         f"- Qlib version: `{backend.get('version', 'unknown')}`",
     ]
@@ -629,18 +639,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", default="backtest/ibd_weekly_signal_oracle_eval/qlib_optimizer")
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--min-train-weeks", type=int, default=8)
+    parser.add_argument("--price-cache", default=None)
     args = parser.parse_args(argv)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     modes = ["no_eps", "with_eps"] if args.eps_mode == "both" else [args.eps_mode]
+    price_cache = resolve_price_cache(args.price_cache)
     backend = require_qlib_backend()
-    results = [run_mode(mode, output_dir=output_dir, top_k=args.top_k, min_train_weeks=args.min_train_weeks) for mode in modes]
+    results = [
+        run_mode(mode, output_dir=output_dir, top_k=args.top_k, min_train_weeks=args.min_train_weeks, price_cache=price_cache)
+        for mode in modes
+    ]
     manifest = {
         "backend": backend,
         "eps_modes": modes,
         "top_k": args.top_k,
         "min_train_weeks": args.min_train_weeks,
+        "price_cache": str(price_cache),
         "results": results,
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")

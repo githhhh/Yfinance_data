@@ -80,6 +80,34 @@ def rank_non_actionable_pullback_scout(
     return candidates
 
 
+def rank_signal_shadow_top3(
+    pool: pd.DataFrame,
+    *,
+    version: str = "v3",
+    limit: int = 3,
+    industry_cap: bool = True,
+) -> list[ReasonedCandidate]:
+    """Qlib-inspired audit layer over all signal rows, without changing official picks."""
+    ranked = rank_reasoning_candidates(pool, universe="review", version=version)
+    selected: list[ReasonedCandidate] = []
+    covered: set[str] = set()
+    for item in ranked:
+        if _has_clear_failure(item):
+            continue
+        industry_key = str(item.industry or "").strip().lower()
+        if industry_cap and industry_key and industry_key in covered:
+            continue
+        item.final_group = "SIGNAL_SHADOW"
+        selected.append(item)
+        if industry_cap and industry_key:
+            covered.add(industry_key)
+        if len(selected) >= limit:
+            break
+    for rank, item in enumerate(selected, 1):
+        item.raw_rank = rank
+    return selected
+
+
 def build_reasoning_skill_picks(
     pool: pd.DataFrame,
     *,

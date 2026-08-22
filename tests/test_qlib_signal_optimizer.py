@@ -1,5 +1,6 @@
 import pandas as pd
 
+from backtest.ibd_weekly_signal_oracle_eval.price_cache import latest_daily_price_cache, resolve_price_cache
 from backtest.ibd_weekly_signal_oracle_eval.qlib_optimizer import (
     PortfolioRule,
     build_qlib_panel,
@@ -195,3 +196,15 @@ def test_walk_forward_chooses_rules_from_prior_weeks_only():
     assert choices["snapshot_date"].tolist() == ["2026-01-09", "2026-01-16"]
     assert set(rule_scores["candidate_rule"]) == {"eps_rule", "below_eps_rule"}
     assert summary.loc[summary["strategy"].eq("walk_forward_best_rule"), "weeks"].item() == 2
+
+
+def test_latest_daily_price_cache_uses_filename_date(tmp_path):
+    older = tmp_path / "stock_data_150826_1d.pkl"
+    latest = tmp_path / "stock_data_220826_1d.pkl"
+    weekly = tmp_path / "stock_data_220826_1wk.pkl"
+    older.write_bytes(b"old")
+    latest.write_bytes(b"new")
+    weekly.write_bytes(b"weekly")
+
+    assert latest_daily_price_cache(tmp_path) == latest
+    assert resolve_price_cache(older) == older

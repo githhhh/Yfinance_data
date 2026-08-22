@@ -10,6 +10,7 @@
   ],
   "top_k": 3,
   "min_train_weeks": 8,
+  "price_cache": "results_pkl/stock_data_220826_1d.pkl",
   "results": [
     {
       "eps_mode": "no_eps",
@@ -21,26 +22,27 @@
       "risk_path": "backtest/ibd_weekly_signal_oracle_eval/qlib_optimizer/no_eps_qlib_risk_analysis.csv",
       "coverage": {
         "signal_rows": 2738,
-        "valid_return_rows": 2074,
-        "missing_return_rows": 664,
+        "valid_return_rows": 2058,
+        "missing_return_rows": 680,
         "signal_weeks": 42,
         "valid_return_weeks": 42,
         "pool_file_weeks": 43,
         "training_window_weeks": 8
       },
+      "price_cache": "results_pkl/stock_data_220826_1d.pkl",
       "summary": {
         "eps_mode": "no_eps",
         "strategy": "walk_forward_best_rule",
         "weeks": 34,
         "picks": 83,
-        "avg_return_pct": 27.981070397058826,
-        "median_week_return_pct": 18.548276666666666,
-        "median_worst_pick_return_pct": 7.556402,
-        "top5_return_week_rate": 0.4411764705882353,
-        "top5_gain_week_rate": 0.4411764705882353,
+        "avg_return_pct": 29.245372083333333,
+        "median_week_return_pct": 18.774313333333332,
+        "median_worst_pick_return_pct": 9.737011500000001,
+        "top5_return_week_rate": 0.4117647058823529,
+        "top5_gain_week_rate": 0.4117647058823529,
         "bottom5_week_rate": 0.38235294117647056,
         "stop_week_rate": 0.6470588235294118,
-        "unique_rules": 3
+        "unique_rules": 2
       }
     },
     {
@@ -53,26 +55,27 @@
       "risk_path": "backtest/ibd_weekly_signal_oracle_eval/qlib_optimizer/with_eps_qlib_risk_analysis.csv",
       "coverage": {
         "signal_rows": 2738,
-        "valid_return_rows": 2074,
-        "missing_return_rows": 664,
+        "valid_return_rows": 2058,
+        "missing_return_rows": 680,
         "signal_weeks": 42,
         "valid_return_weeks": 42,
         "pool_file_weeks": 43,
         "training_window_weeks": 8
       },
+      "price_cache": "results_pkl/stock_data_220826_1d.pkl",
       "summary": {
         "eps_mode": "with_eps",
         "strategy": "walk_forward_best_rule",
         "weeks": 33,
-        "picks": 81,
-        "avg_return_pct": 28.04994134848485,
-        "median_week_return_pct": 18.637170666666666,
-        "median_worst_pick_return_pct": 6.639839,
-        "top5_return_week_rate": 0.3939393939393939,
-        "top5_gain_week_rate": 0.36363636363636365,
-        "bottom5_week_rate": 0.42424242424242425,
+        "picks": 79,
+        "avg_return_pct": 29.643924762626266,
+        "median_week_return_pct": 18.911456,
+        "median_worst_pick_return_pct": 8.818936,
+        "top5_return_week_rate": 0.36363636363636365,
+        "top5_gain_week_rate": 0.3333333333333333,
+        "bottom5_week_rate": 0.3939393939393939,
         "stop_week_rate": 0.6666666666666666,
-        "unique_rules": 4
+        "unique_rules": 3
       }
     }
   ]

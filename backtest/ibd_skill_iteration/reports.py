@@ -8,6 +8,7 @@ from backtest.ibd_skill_iteration.core import (
     rank_non_actionable_alpha_radar,
     rank_non_actionable_pullback_scout,
     rank_reasoning_candidates,
+    rank_signal_shadow_top3,
 )
 from backtest.ibd_skill_replay.core import compute_path_metrics, to_float
 
@@ -26,11 +27,13 @@ def build_reasoning_pick_metric_rows(
     picks = build_reasoning_skill_picks(pool, snapshot_date=snapshot_date, version=version)
     actionable_raw = rank_reasoning_candidates(pool, universe="actionable", version=version)
     non_actionable_alpha = rank_non_actionable_alpha_radar(pool, version=version)
+    signal_shadow = rank_signal_shadow_top3(pool, version=version)
     prefix = f"reasoning_{version}"
     lists = {
         f"{prefix}_priority_top3": [item for item in picks if item.final_group == "PRIORITY"][:3],
         f"{prefix}_actionable_raw_top5": actionable_raw[:5],
         f"{prefix}_alpha_radar_top5": [item for item in picks if item.final_group == "ALPHA_RADAR"][:5],
+        f"{prefix}_signal_shadow_top3": signal_shadow,
         f"{prefix}_non_actionable_alpha_radar_top10": non_actionable_alpha[:10],
         f"{prefix}_pullback_radar_top5": [
             item for item in picks if _is_pullback_rule(item.feature_values.get("ibd_candidate_rule"))

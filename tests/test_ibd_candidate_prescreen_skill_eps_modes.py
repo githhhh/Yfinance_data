@@ -68,3 +68,17 @@ def test_skill_records_weekly_iteration_rule_learnings_without_overfitting():
     )
     for guidance in required_guidance:
         assert guidance in skill
+
+
+def test_skill_defines_signal_shadow_layer_without_expanding_official_recommendations():
+    skill = _skill_text()
+
+    required_guidance = (
+        "Signal Shadow Top3",
+        "每周所有 `signal == True` 行",
+        "不要求 `ibd_entry_status == ACTIONABLE`",
+        "不得扩大 0～3 只优先复核和 0～2 只值得留意的正式容量",
+        "不得写成当前买点确认或正式推荐",
+    )
+    for guidance in required_guidance:
+        assert guidance in skill

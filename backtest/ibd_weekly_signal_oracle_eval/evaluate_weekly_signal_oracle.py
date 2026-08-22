@@ -12,13 +12,13 @@ sys.path.insert(0, str(Path.cwd()))
 from backtest.ibd_skill_iteration.core import rank_reasoning_candidates
 from backtest.ibd_skill_replay.core import compute_path_metrics, to_float
 from backtest.ibd_skill_replay.run_ytd_replay import _load_price_cache
+from backtest.ibd_weekly_signal_oracle_eval.price_cache import resolve_price_cache
 import eps_pit.lookup as eps_lookup
 
 
 ROOT = Path("backtest/ibd_skill_replay_pools")
 OUT = Path("backtest/ibd_weekly_signal_oracle_eval")
 END_DATE = "2026-08-14"
-PRICE_CACHE = Path("results_pkl/stock_data_150826_1d.pkl")
 VERSION = "v3"
 
 
@@ -61,6 +61,11 @@ VARIANTS = {
         "exclude_geometry_caution": True,
         "fill_relaxed": True,
     },
+    "signal_shadow_top3": {
+        "industry_cover": True,
+        "allow_non_actionable": True,
+        "allow_extended_from_buy_point": True,
+    },
 }
 
 
@@ -99,15 +104,6 @@ def signal_mask(frame: pd.DataFrame) -> pd.Series:
     return frame["signal"].astype(str).str.strip().str.lower().isin({"true", "1"})
 
 
-def has_clear_failure(item) -> bool:
-    risks = set(item.risk_codes)
-    return (
-        "clear_geometry_failure" in risks
-        or "below_candidate_buy_point" in risks
-        or "extended_from_buy_point" in risks
-    )
-
-
 def item_eps_state(item, row: pd.Series, enabled: bool) -> tuple[str, float | None]:
     snapshot = item.snapshot_date or str(row.get("snapshot_date", ""))
     eps = effective_eps(snapshot, item.code, row.get("eps_yoy_growth"), enabled)
@@ -119,9 +115,12 @@ def item_eps_state(item, row: pd.Series, enabled: bool) -> tuple[str, float | No
 
 
 def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *, relaxed: bool = False) -> bool:
-    if item.entry_status != "ACTIONABLE":
+    if item.entry_status != "ACTIONABLE" and not cfg.get("allow_non_actionable"):
         return False
-    if has_clear_failure(item):
+    risks = set(item.risk_codes)
+    if "clear_geometry_failure" in risks or "below_candidate_buy_point" in risks:
+        return False
+    if "extended_from_buy_point" in risks and not cfg.get("allow_extended_from_buy_point"):
         return False
     eps_state, _ = item_eps_state(item, row, enabled)
     risks = set(item.risk_codes)
@@ -242,8 +241,13 @@ def add_oracle_ranks(universe: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def evaluate(enabled: bool) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    prices = _load_price_cache(PRICE_CACHE)
+def evaluate(
+    enabled: bool,
+    *,
+    price_cache: str | Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    resolved_price_cache = resolve_price_cache(price_cache)
+    prices = _load_price_cache(resolved_price_cache)
     universe_rows = []
     pick_rows = []
     with eps_mode(enabled):
@@ -438,7 +442,7 @@ def render_mode_report(suffix: str, universe: pd.DataFrame, weekly: pd.DataFrame
     return "\n".join(lines) + "\n"
 
 
-def render_run_log(combined: pd.DataFrame) -> str:
+def render_run_log(combined: pd.DataFrame, *, price_cache: Path) -> str:
     scope = pool_scope()
     return "\n".join(
         [
@@ -451,10 +455,10 @@ def render_run_log(combined: pd.DataFrame) -> str:
             "## Step Logic",
             "",
             f"1. 固定输入：`backtest/ibd_skill_replay_pools/*/breakout_follow_pool.csv` 的 {scope['pool_weeks']} 个成功 replay pool，范围 {scope['first_week']} 至 {scope['last_week']}；不修改 pool。",
-            f"2. 固定收益窗口：从每个 `snapshot_date` 的 `ibd_candidate_price` 到 `{END_DATE}`，使用 `results_pkl/stock_data_150826_1d.pkl` 计算 latest return、max gain、max drawdown、-8% stop。",
+            f"2. 固定收益窗口：从每个 `snapshot_date` 的 `ibd_candidate_price` 到 `{END_DATE}`，使用 `{price_cache}` 计算 latest return、max gain、max drawdown、-8% stop。",
             "3. 每周 universe：该周所有 `signal == True` 行；ACTIONABLE 与非 ACTIONABLE 都进入 winner/loser oracle。",
             "4. 每周 winner/loser：latest return Top3/Top5、max gain Top5、latest return Bottom3/Bottom5、以及是否触发 -8% stop。所有排名只在同一周内比较。",
-            "5. 推荐生成：对同一 pool 调用 `rank_reasoning_candidates(..., universe='review', version='v3')`，再用可解释 variant 选择最多 3 个 ACTIONABLE 推荐。",
+            "5. 推荐生成：对同一 pool 调用 `rank_reasoning_candidates(..., universe='review', version='v3')`，比较现有 ACTIONABLE variants 与 `signal_shadow_top3`（所有 signal，保留 entry_status，最多 3 只的审计层；非正式推荐）。",
             "6. EPS-blind 模式：在内存中关闭 `eps_pit.lookup.get_signal_eps`，所有 CSV 空 EPS 保持 missing。",
             "7. EPS-enriched 模式：允许 `eps_pit.lookup.get_signal_eps(snapshot, code)` 作为 point-in-time 补源，按用户要求先假设其正确。",
             "8. Variant 比较：测试行业覆盖、EPS 已知、EPS>=25、排除 `pullback_not_dry`、排除 `geometry_caution_not_failure`、Fresh Demand/Constructive Pullback 限定等组合。",
@@ -475,10 +479,11 @@ def render_run_log(combined: pd.DataFrame) -> str:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    price_cache = resolve_price_cache(None)
     outputs = []
     for enabled in [False, True]:
         suffix = "with_eps" if enabled else "no_eps"
-        universe, picks, weekly, summary = evaluate(enabled)
+        universe, picks, weekly, summary = evaluate(enabled, price_cache=price_cache)
         universe.to_csv(OUT / f"{suffix}_signal_universe_oracle.csv", index=False)
         picks.to_csv(OUT / f"{suffix}_variant_picks.csv", index=False)
         weekly.to_csv(OUT / f"{suffix}_weekly_variant_metrics.csv", index=False)
@@ -491,8 +496,9 @@ def main() -> int:
 
     combined = pd.concat(outputs, ignore_index=True, sort=False).sort_values("score", ascending=False)
     combined.to_csv(OUT / "combined_variant_summary.csv", index=False)
-    (OUT / "run_log.md").write_text(render_run_log(combined), encoding="utf-8")
-    (OUT / "combined_weekly_iteration_report.md").write_text(render_run_log(combined), encoding="utf-8")
+    run_log = render_run_log(combined, price_cache=price_cache)
+    (OUT / "run_log.md").write_text(run_log, encoding="utf-8")
+    (OUT / "combined_weekly_iteration_report.md").write_text(run_log, encoding="utf-8")
     print(f"OUT {OUT}")
     print(combined.head(12).to_string(index=False))
     return 0

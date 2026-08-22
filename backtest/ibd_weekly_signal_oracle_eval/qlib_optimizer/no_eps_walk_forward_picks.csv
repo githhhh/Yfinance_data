@@ -1,25 +1,25 @@
 snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max_gain_pct,top5_return,top5_gain,bottom5,hit_stop_8pct
 2025-12-12,technical_balanced,1,ROKU,Packaged Software,2.522970984289945,50.228659,50.400152,True,True,False,True
-2025-12-19,technical_balanced,1,MNST,Beverages: Non-Alcoholic,5.293373878526642,-37.797263,33.306762,False,True,True,True
-2025-12-19,technical_balanced,2,SCHW,Investment Banks/Brokers,4.996557443607782,14.207875,14.300401,False,False,True,True
-2025-12-19,technical_balanced,3,MU,Semiconductors,4.904454163402672,277.974871,388.119967,True,True,False,False
+2025-12-19,technical_balanced,1,SCHW,Investment Banks/Brokers,4.996557443607782,14.207875,14.300401,False,False,True,True
+2025-12-19,technical_balanced,2,MU,Semiconductors,4.904454163402672,277.974871,388.119967,True,True,False,False
+2025-12-19,technical_balanced,3,RTX,Aerospace & Defense,4.785676972518264,24.016909,25.774515,True,True,False,False
 2025-12-26,technical_balanced,1,HEI,Aerospace & Defense,3.4679588129720695,14.690217,15.360598,False,False,True,True
 2026-01-02,technical_balanced,1,ASML,Semiconductors,3.791348381012482,62.591476,76.107849,True,True,False,False
-2026-01-09,technical_balanced,1,GH,Medical Specialties,4.378944079196329,49.709551,65.774688,False,False,False,True
+2026-01-09,technical_balanced,1,GH,Medical Specialties,4.378944079196329,49.709551,68.155414,False,False,False,True
 2026-01-09,technical_balanced,2,TROW,Investment Managers,3.469974325961747,4.027098,14.791118,False,False,True,True
-2026-01-16,technical_balanced,1,IBKR,Investment Banks/Brokers,4.1678115737423065,25.799399,33.697732,True,False,False,True
-2026-01-23,technical_balanced,1,MTB,Regional Banks,4.340011089554371,18.911456,19.65556,True,True,True,True
-2026-01-30,technical_balanced,1,KO,Beverages: Non-Alcoholic,4.219392781839649,20.052012,24.445661,True,True,False,False
-2026-01-30,technical_balanced,2,PFG,Investment Managers,4.121266965313905,23.850918,26.708682,True,True,False,True
-2026-01-30,technical_balanced,3,AAPL,Telecommunications Equipment,3.924804558044606,18.151624,32.958715,True,True,True,False
+2026-01-16,technical_balanced,1,IBKR,Investment Banks/Brokers,4.1678115737423065,25.799399,33.697732,True,False,True,True
+2026-01-23,technical_balanced,1,MTB,Regional Banks,4.340011089554371,18.911456,19.65556,False,False,True,True
+2026-01-30,technical_balanced,1,ALM,Other Metals/Minerals,5.158185740989797,34.252669,117.170819,True,True,False,False
+2026-01-30,technical_balanced,2,KO,Beverages: Non-Alcoholic,4.219392781839649,20.052012,24.445661,True,True,False,False
+2026-01-30,technical_balanced,3,PFG,Investment Managers,4.121266965313905,23.850918,26.708682,True,True,False,True
 2026-02-13,technical_balanced,1,WULF,Unknown,4.169227553521333,7.749535,84.9969,False,True,True,True
-2026-02-20,technical_balanced,1,FANG,Oil & Gas Production,4.376651638523769,19.458375,25.181427,True,True,True,False
-2026-02-20,technical_balanced,2,RTX,Aerospace & Defense,4.308492234479536,10.655087,12.595533,False,False,True,True
+2026-02-20,technical_balanced,1,FANG,Oil & Gas Production,4.376651638523769,19.458375,25.181427,True,True,False,False
+2026-02-20,technical_balanced,2,RTX,Aerospace & Defense,4.308492234479536,10.655087,12.223325,False,False,True,True
 2026-02-27,technical_balanced,1,CASY,Specialty Stores,8.789319080963613,24.721883,36.612787,True,True,False,False
 2026-02-27,technical_balanced,2,VVX,Miscellaneous Commercial Services,5.222781588169474,19.82099,35.672008,True,False,False,True
 2026-02-27,technical_balanced,3,BTSG,Medical/Nursing Services,5.083327166099241,49.057971,78.140097,True,True,False,True
-2026-03-06,technical_balanced,1,RTX,Aerospace & Defense,4.632944645667412,8.818936,10.727184,True,True,True,True
-2026-03-06,technical_balanced,2,MPC,Oil Refining/Marketing,3.9464134369948787,67.682582,69.890545,True,True,True,False
+2026-03-06,technical_balanced,1,RTX,Aerospace & Defense,4.632944645667412,8.818936,10.361152,True,True,True,True
+2026-03-06,technical_balanced,2,MPC,Oil Refining/Marketing,3.9464134369948787,67.224948,69.428194,True,True,True,False
 2026-03-13,technical_balanced,1,DOCN,Packaged Software,3.620529713054585,96.076064,182.976155,True,True,True,False
 2026-03-20,technical_balanced,1,STX,Computer Peripherals,3.6162282519113944,138.763797,180.642629,True,True,True,True
 2026-03-27,technical_balanced,1,DELL,Computer Processing Hardware,3.835089355930199,193.529095,207.397883,True,True,True,False
@@ -29,32 +29,32 @@ snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max
 2026-04-02,technical_balanced,2,MRVL,Semiconductors,4.863326235006783,116.183057,221.129503,True,True,False,False
 2026-04-02,technical_balanced,3,ECO,Marine Shipping,4.381404732058916,20.507695,31.661003,False,False,False,True
 2026-04-10,technical_balanced,1,FRAF,Regional Banks,6.383590976002721,15.840868,17.106691,False,False,False,False
-2026-04-10,technical_balanced,2,BVFL,Savings Banks,4.293681574239718,6.639839,11.519115,False,False,True,False
+2026-04-10,technical_balanced,2,BVFL,Savings Banks,4.293681574239718,6.639839,11.519115,False,False,False,False
 2026-04-10,technical_balanced,3,NHC,Hospital/Nursing Management,4.256747712537999,33.430805,38.849436,False,False,False,False
 2026-04-17,technical_balanced,1,JBHT,Trucking,4.8438797298059155,19.544406,27.89982,False,False,False,False
 2026-04-17,technical_balanced,2,AMLX,Pharmaceuticals: Major,4.821118547075453,23.670669,40.651801,False,False,False,True
 2026-04-17,technical_balanced,3,CVEO,Hotels/Resorts/Cruise lines,4.576788378045027,12.163073,22.978437,False,False,False,False
-2026-04-24,fresh_demand,1,MCRI,Hotels/Resorts/Cruise lines,7.164522986978475,9.951263,20.451927,False,False,False,False
-2026-04-24,fresh_demand,2,AZZ,Industrial Specialties,6.300873195854439,7.363269,14.868412,False,False,False,False
-2026-04-24,fresh_demand,3,CHMG,Regional Banks,5.5245260663507105,29.967477,31.640081,False,False,False,False
-2026-05-01,fresh_demand,1,PHVS,Biotechnology,7.817744008814618,21.214212,27.388755,False,False,False,False
-2026-05-01,fresh_demand,2,RBB,Regional Banks,5.497796837749706,14.671654,16.666667,False,False,False,False
-2026-05-01,fresh_demand,3,KRG,Real Estate Investment Trusts,5.184994677110706,1.379839,14.679954,False,False,False,False
-2026-05-08,fresh_demand,1,HWBK,Regional Banks,5.386289900575615,10.710322,12.652608,False,False,False,False
-2026-05-08,fresh_demand,2,HFBL,Savings Banks,5.328440366972477,25.026069,25.182482,False,False,False,False
-2026-05-08,fresh_demand,3,ESCA,Recreational Products,5.2509267165603495,3.881988,19.409938,False,False,False,True
+2026-04-24,technical_balanced,1,MCRI,Hotels/Resorts/Cruise lines,6.5705536158471975,9.951263,20.451927,False,False,False,False
+2026-04-24,technical_balanced,2,CHMG,Regional Banks,6.002390083849799,29.967477,31.640081,False,False,False,False
+2026-04-24,technical_balanced,3,AZZ,Industrial Specialties,5.859581494709565,7.363269,14.868412,False,False,True,False
+2026-05-01,technical_balanced,1,PHVS,Biotechnology,6.713071611546075,21.214212,27.388755,False,False,False,False
+2026-05-01,technical_balanced,2,IRM,Real Estate Investment Trusts,5.625848737831112,4.471709,8.709339,False,False,False,False
+2026-05-01,technical_balanced,3,ATLO,Regional Banks,5.410897350950358,12.455516,14.697509,False,False,False,False
+2026-05-08,technical_balanced,1,HFBL,Savings Banks,6.296660923019606,25.026069,25.182482,False,False,False,False
+2026-05-08,technical_balanced,2,HWBK,Regional Banks,6.2560494643201405,10.710322,12.652608,False,False,False,False
+2026-05-08,technical_balanced,3,CON,Medical/Nursing Services,5.949137024207928,49.429658,49.809886,False,False,False,False
 2026-05-15,technical_balanced,1,HLIO,Industrial Machinery,5.222941954375855,7.294273,24.963792,False,False,False,False
 2026-05-15,technical_balanced,2,JBHT,Trucking,4.5432261418527755,9.38991,17.035589,False,False,False,False
-2026-05-15,technical_balanced,3,CAPL,Wholesale Distributors,4.456308305854408,4.102338,5.116895,False,False,False,False
-2026-05-22,technical_balanced,1,PDLB,Savings Banks,5.701574971875502,15.269295,16.379789,False,False,False,False
-2026-05-22,technical_balanced,2,RXO,Packaged Software,5.433885977140675,0.641849,27.770646,False,False,False,True
+2026-05-15,technical_balanced,3,CAPL,Wholesale Distributors,4.456308305854408,4.102338,5.116895,False,False,False,True
+2026-05-22,technical_balanced,1,PDLB,Savings Banks,5.701574971875502,15.269295,16.435314,False,False,False,False
+2026-05-22,technical_balanced,2,RXO,Packaged Software,5.433885977140675,0.641849,27.941806,False,False,False,True
 2026-05-22,technical_balanced,3,ELMD,Medical Specialties,5.029898216137291,10.066756,26.568758,False,False,False,False
 2026-05-29,technical_balanced,1,FUSB,Regional Banks,10.937962636587946,3.39196,6.721106,False,False,False,False
 2026-05-29,technical_balanced,2,NVRI,Other Metals/Minerals,5.173711743185162,3.104657,21.181773,False,False,False,True
 2026-05-29,technical_balanced,3,BUUU,Miscellaneous Commercial Services,5.163224686402408,59.135135,78.216216,True,True,False,True
-2026-06-05,technical_balanced,1,TBBB,Food Retail,5.912317971123811,21.325209,27.392739,False,False,False,False
+2026-06-05,technical_balanced,1,TBBB,Food Retail,5.912317971123811,21.325209,27.443514,False,False,False,False
 2026-06-05,technical_balanced,2,NTB,Regional Banks,5.275108679517821,11.49686,11.950454,False,False,False,False
-2026-06-05,technical_balanced,3,TWIN,Trucks/Construction/Farm Machinery,4.683749716910933,27.546778,29.93763,False,False,False,False
+2026-06-05,technical_balanced,3,TWIN,Trucks/Construction/Farm Machinery,4.683749716910933,27.286902,29.677755,False,False,False,False
 2026-06-12,risk_conservative,1,FDSB,Savings Banks,11.200933216681248,20.710059,21.56476,False,False,False,False
 2026-06-12,risk_conservative,2,IVT,Real Estate Investment Trusts,4.922183036273143,-0.473513,10.150932,False,False,False,False
 2026-06-12,risk_conservative,3,CZWI,Regional Banks,4.579303059614112,-2.004662,13.333333,False,False,False,True
@@ -64,12 +64,12 @@ snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max
 2026-06-26,risk_conservative,1,ACA,Construction Materials,9.745641425064502,5.545877,5.966899,False,False,False,False
 2026-06-26,risk_conservative,2,NWFL,Regional Banks,8.136458497401165,7.412021,10.401744,False,False,False,False
 2026-06-26,risk_conservative,3,RMBI,Major Banks,6.109501405092395,0.31506,4.536862,False,False,False,True
-2026-07-02,risk_conservative,1,BSET,Home Furnishings,4.273251345119139,-4.256385,11.467201,False,False,False,True
+2026-07-02,risk_conservative,1,BSET,Home Furnishings,4.273251345119139,-4.256385,10.315473,False,False,False,True
 2026-07-02,risk_conservative,2,IDA,Electric Utilities,3.3433122739931003,-6.717687,0.712977,False,False,False,True
 2026-07-02,risk_conservative,3,MATX,Marine Shipping,3.026141676487126,7.002167,13.408509,False,False,False,False
 2026-07-10,risk_conservative,1,RAPP,Biotechnology,3.367463970842296,15.884653,20.967742,False,False,False,False
-2026-07-10,risk_conservative,2,FR,Real Estate Investment Trusts,3.20588612900546,-1.007715,10.029917,False,False,False,False
-2026-07-10,risk_conservative,3,BSVN,Regional Banks,3.0098039215686274,4.705647,10.953144,False,False,False,False
+2026-07-10,risk_conservative,2,BSVN,Regional Banks,3.0098039215686274,4.705647,10.953144,False,False,False,False
+2026-07-10,risk_conservative,3,PNTG,Medical/Nursing Services,2.352233463250131,-0.253678,8.295282,False,False,False,False
 2026-07-17,risk_conservative,1,GHRS,Pharmaceuticals: Major,4.5625474845571965,4.131356,11.016949,False,False,False,False
 2026-07-17,risk_conservative,2,GPRE,Chemicals: Specialty,3.739020253147449,-17.687434,3.74868,False,False,True,True
 2026-07-17,risk_conservative,3,TRVI,Biotechnology,3.588627061538585,0.764192,10.371179,False,False,False,True
@@ -77,8 +77,8 @@ snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max
 2026-07-24,risk_conservative,2,BLFS,Medical Specialties,7.053287195653265,18.39973,19.345037,False,False,False,False
 2026-07-24,risk_conservative,3,IMAX,Electronics/Appliances,4.408342699026271,22.520853,25.741427,False,False,False,False
 2026-07-31,risk_conservative,1,RCKY,Apparel/Footwear,4.2786385761527885,-1.634934,9.706126,False,False,False,False
-2026-07-31,risk_conservative,2,MTX,Chemicals: Specialty,4.074568498142453,-2.92631,3.551476,False,False,False,False
-2026-07-31,risk_conservative,3,CZFS,Regional Banks,3.4573793589292006,10.053333,11.8,False,False,False,False
+2026-07-31,risk_conservative,2,CZFS,Regional Banks,3.4573793589292006,10.053333,11.8,False,False,False,False
+2026-07-31,risk_conservative,3,AMTB,Major Banks,3.381670460293374,1.886133,5.029689,False,False,False,False
 2026-08-07,risk_conservative,1,CFFI,Regional Banks,26.78448275862069,2.279565,3.679704,False,False,False,False
 2026-08-07,risk_conservative,2,HBB,Electronics/Appliances,4.530581608143658,9.887937,12.920237,False,False,False,False
 2026-08-07,risk_conservative,3,WTTR,Oil & Gas Production,3.4863033202346374,3.523573,8.337469,False,False,False,False

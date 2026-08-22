@@ -1,6 +1,7 @@
 # Qlib-Compatible Replay Pool Optimization
 
 - Replay pool files: `43`
+- Price cache: `results_pkl/stock_data_220826_1d.pkl`
 - Qlib backend available: `True`
 - Qlib version: `0.9.7`
 - Data modes: no-EPS and with-EPS are optimized independently, then compared.
@@ -23,15 +24,15 @@ Rows without realized return are excluded from walk-forward optimization and por
 
 | eps_mode   |   signal_rows |   valid_return_rows |   missing_return_rows |   signal_weeks |   valid_return_weeks |   pool_file_weeks |   training_window_weeks |
 |:-----------|--------------:|--------------------:|----------------------:|---------------:|---------------------:|------------------:|------------------------:|
-| no_eps     |          2738 |                2074 |                   664 |             42 |                   42 |                43 |                       8 |
-| with_eps   |          2738 |                2074 |                   664 |             42 |                   42 |                43 |                       8 |
+| no_eps     |          2738 |                2058 |                   680 |             42 |                   42 |                43 |                       8 |
+| with_eps   |          2738 |                2058 |                   680 |             42 |                   42 |                43 |                       8 |
 
 ## Summary
 
 | eps_mode   | strategy               |   weeks |   picks |   avg_return_pct |   median_week_return_pct |   median_worst_pick_return_pct |   top5_return_week_rate |   top5_gain_week_rate |   bottom5_week_rate |   stop_week_rate |   unique_rules |
 |:-----------|:-----------------------|--------:|--------:|-----------------:|-------------------------:|-------------------------------:|------------------------:|----------------------:|--------------------:|-----------------:|---------------:|
-| no_eps     | walk_forward_best_rule |      34 |      83 |          27.9811 |                  18.5483 |                        7.5564  |                0.441176 |              0.441176 |            0.382353 |         0.647059 |              3 |
-| with_eps   | walk_forward_best_rule |      33 |      81 |          28.0499 |                  18.6372 |                        6.63984 |                0.393939 |              0.363636 |            0.424242 |         0.666667 |              4 |
+| no_eps     | walk_forward_best_rule |      34 |      83 |          29.2454 |                  18.7743 |                        9.73701 |                0.411765 |              0.411765 |            0.382353 |         0.647059 |              2 |
+| with_eps   | walk_forward_best_rule |      33 |      79 |          29.6439 |                  18.9115 |                        8.81894 |                0.363636 |              0.333333 |            0.393939 |         0.666667 |              3 |
 
 ## Rule Space
 

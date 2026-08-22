@@ -6,6 +6,7 @@ from backtest.ibd_skill_iteration.deterministic_prescreen import (
     build_prescreen_artifact,
     render_prescreen_artifact_markdown,
 )
+from backtest.ibd_skill_iteration.core import rank_signal_shadow_top3
 
 
 def test_clean_replay_pool_can_render_deterministic_prescreen_artifact():
@@ -18,4 +19,52 @@ def test_clean_replay_pool_can_render_deterministic_prescreen_artifact():
     assert len(artifact["priority_top3"]) <= 3
     assert artifact["alpha_radar_top5"]
     assert artifact["pullback_scout_top10"]
+    assert len(artifact["signal_shadow_top3"]) <= 3
     assert "Do not reorder these rows" in markdown
+    assert "Signal Shadow Top 3" in markdown
+
+
+def test_signal_shadow_top3_can_select_any_signal_status_without_expanding_priority():
+    pool = pd.DataFrame(
+        [
+            _signal_row("EXT1", "EXTENDED", 6.0, 2.2, 1.8, -1.0, "ceiling"),
+            _signal_row("UNC1", "UNCONFIRMED", 1.2, 1.8, 1.6, -2.0, "ceiling_pullback"),
+            _signal_row("ACT1", "ACTIONABLE", 1.5, 1.7, 1.5, -3.0, "ceiling"),
+            _signal_row("BAD1", "UNCONFIRMED", -1.0, 2.0, 1.7, -1.0, "ceiling"),
+        ]
+    )
+
+    shadow = rank_signal_shadow_top3(pool, version="v3")
+
+    assert len(shadow) <= 3
+    assert {item.code for item in shadow} >= {"EXT1", "UNC1"}
+    assert all(item.final_group == "SIGNAL_SHADOW" for item in shadow)
+    assert all(item.entry_status in {"ACTIONABLE", "EXTENDED", "UNCONFIRMED"} for item in shadow)
+    assert "BAD1" not in {item.code for item in shadow}
+
+
+def _signal_row(
+    code: str,
+    status: str,
+    current_vs_buy: float,
+    entry_volume: float,
+    weekly_volume: float,
+    dist_to_high: float,
+    rule: str,
+) -> dict[str, object]:
+    return {
+        "snapshot_date": "2026-07-24",
+        "code": code,
+        "signal": True,
+        "ibd_candidate_rule": rule,
+        "ibd_entry_status": status,
+        "current_vs_ibd_candidate_pct": current_vs_buy,
+        "ibd_entry_volume_ratio": entry_volume,
+        "ibd_entry_close_position": 0.9,
+        "ibd_entry_breakout_range_ratio": 0.7,
+        "dist_to_52w_high_pct": dist_to_high,
+        "volume_ratio": weekly_volume,
+        "eps_yoy_growth": 30.0,
+        "pullback_v_is_dry": True,
+        "industry": f"{code} Industry",
+    }

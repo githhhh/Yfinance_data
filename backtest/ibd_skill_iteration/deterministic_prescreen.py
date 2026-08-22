@@ -14,6 +14,7 @@ from backtest.ibd_skill_iteration.core import (
     rank_non_actionable_alpha_radar,
     rank_non_actionable_pullback_scout,
     rank_reasoning_candidates,
+    rank_signal_shadow_top3,
 )
 
 
@@ -91,6 +92,7 @@ def build_prescreen_artifact(
     actionable_raw = rank_reasoning_candidates(pool, universe="actionable", version=version)
     non_actionable = rank_non_actionable_alpha_radar(pool, version=version)
     pullback_scout = rank_non_actionable_pullback_scout(pool, version=version) if version == "v3" else []
+    signal_shadow = rank_signal_shadow_top3(pool, version=version)
     labels = SORT_KEY_LABELS.get(version, SORT_KEY_LABELS["v1"])
 
     return {
@@ -105,6 +107,7 @@ def build_prescreen_artifact(
         "priority_top3": _rows([item for item in picks if item.final_group == "PRIORITY"][:3], labels),
         "actionable_raw_top5": _rows(actionable_raw[:5], labels),
         "alpha_radar_top5": _rows([item for item in picks if item.final_group == "ALPHA_RADAR"][:5], labels),
+        "signal_shadow_top3": _rows(signal_shadow, labels),
         "non_actionable_alpha_radar_top10": _rows(non_actionable[:10], labels),
         "pullback_scout_top10": _rows(pullback_scout[:10], labels),
     }
@@ -142,6 +145,7 @@ def render_prescreen_artifact_markdown(artifact: dict[str, Any]) -> str:
         ("priority_top3", "Priority Top 3"),
         ("actionable_raw_top5", "Actionable Raw Top 5"),
         ("alpha_radar_top5", "Alpha Radar Top 5"),
+        ("signal_shadow_top3", "Signal Shadow Top 3"),
         ("non_actionable_alpha_radar_top10", "Non-ACTIONABLE Alpha Radar Top 10"),
         ("pullback_scout_top10", "Pullback Scout Top 10"),
     ]:

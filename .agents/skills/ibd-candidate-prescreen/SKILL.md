@@ -1,13 +1,13 @@
 ---
 name: ibd-candidate-prescreen
-description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IBD-aligned 人工预筛；项目模式强制先执行一次 market_analysis 子模块更新，但 Market Report 只独立展示、绝不阻断或影响候选预筛；随后生成不受 Industry 覆盖影响的完整原始质量排序、可审计决策轨迹及最多 3 只优先人工复核标的，并对每个 ticker 的来源字段与格式化数字执行交付硬核查。用户请求“预筛标的”“IBD 分析”“突破池分析”“review 候选池”或周中/完整周候选复盘时使用。本 Skill 不是未来表现预测、完整 CAN SLIM Review、行业领导者认证或投资建议。
+description: 从 Dashboard 的 signal 突破候选池中执行标准化、IBD-aligned 人工预筛；正式推荐仍只从 ACTIONABLE 中选最多 3 只优先人工复核，同时生成所有 signal 的 Signal Shadow Top3 审计层；Market Report 独立展示、绝不阻断候选预筛，并对每个 ticker 的来源字段与格式化数字执行交付硬核查。用户请求“预筛标的”“IBD 分析”“突破池分析”“review 候选池”或周中/完整周候选复盘时使用。本 Skill 不是未来表现预测、完整 CAN SLIM Review、行业领导者认证或投资建议。
 ---
 
 # IBD Candidate Pre-screen
 
 ## 任务定位
 
-- 目标固定为：**从当前 ACTIONABLE Pool 中，选出量价结构、买点新鲜度和阶段质量证据最强的最多 3 只，供人工优先复核。**
+- 目标固定为：**从当前 ACTIONABLE Pool 中，选出量价结构、买点新鲜度和阶段质量证据最强的最多 3 只，供人工优先复核；同时从所有 signal 行生成独立可审计的 Signal Shadow Top3。**
 - 先产生完整、确定性的原始质量排序，再应用 Industry 覆盖规则；不得把最终展示顺序冒充原始质量顺序。
 - 输出 0～3 只“优先复核”、0～2 只“值得留意”、独立“Alpha Radar（非 ACTIONABLE，仅观察）”、代表性“暂不优先”和完整候选决策轨迹；宁缺毋滥，不为凑满名额放宽规则。
 - 只评估当前正式导出字段，不预测未来收益、走势或目标价，不给仓位与买卖指令，不完成完整 CAN SLIM 认证，不替代图表人工判断。
@@ -66,6 +66,7 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 - 优化 skill 时只能把对照结果沉淀为证据簇推理顺序、风险提示、报告审计和缺失信息路由；不得把 32 周样本中的 ticker、日期、收益率、中位数、命中率或个别数值范围写成新门槛。
 - EPS 数值大小不得作为连续排序键，不得按 EPS 高低重新排序；只允许使用“达标 / 未达标但已知 / 缺失”的离散状态参与辅助证据和人工核验路由。
 - 当前历史迭代结论只允许沉淀为以下通用规则：EPS 已知优先于 EPS 缺失，但 `EPS >=25` 不得升级为优先复核硬门槛；`pullback_not_dry` 与 `geometry_caution_not_failure` 默认作为风险披露或同分压制，不得仅因二者存在就把 Critical 通过的候选硬排除。
+- Qlib / walk-forward 结果只能沉淀为独立 **Signal Shadow Top3** 审计层：该层从每周所有 `signal == True` 行中选择，不要求 `ibd_entry_status == ACTIONABLE`，但必须保留 `ACTIONABLE / EXTENDED / UNCONFIRMED` 状态；不得扩大 0～3 只优先复核和 0～2 只值得留意的正式容量，也不得写成当前买点确认或正式推荐。
 
 ## 状态语义
 
@@ -95,9 +96,11 @@ else:
 ## 候选范围与双层结果
 
 - Review Universe 仅包含 `signal == True` 且 `ibd_candidate_rule` 非空的行。
+- Signal Shadow Top3 也仅来自 Review Universe，按所有 signal 行排序；不要求 `ibd_entry_status == ACTIONABLE`，但必须过滤明确结构失败和当前低于候选买点的行。
 - “完整原始质量排序”只对其中 `ibd_entry_status == ACTIONABLE` 的候选编号；非 ACTIONABLE 不与 ACTIONABLE 混排。
 - 非 ACTIONABLE Review Universe 行可进入单独的 **Alpha Radar**：只用于发现值得后续人工观察的强量价或高质量 pullback 线索，不编号为 ACTIONABLE 原始顺位，不进入优先复核/值得留意，不给买卖结论。
 - Alpha Radar 拥有独立容量，必须从非 ACTIONABLE Review Universe 独立排序生成；不得用 ACTIONABLE 原始排序的剩余候选或最终分组 leftovers 占用、替代或遮蔽非 ACTIONABLE 发现名单。
+- Signal Shadow Top3 拥有独立审计容量，最多 3 只，默认每个已知 Industry 最多 1 只；它不替代 ACTIONABLE 原始排序、优先复核、值得留意、Alpha Radar 或 Pullback Scout。
 - 评估非 ACTIONABLE Alpha Radar 时，突破日字段缺失是人工看图/补数提示，不是自动压制理由；若周线量能、EPS 辅助、接近 52 周高点、回踩/巩固结构等证据形成一致链路，可进入 radar，但必须标注缺失项和状态限制。
 - 第一层是**个股原始质量排序**：只使用当前 ticker 的技术、量价、新鲜度、阶段证据和辅助确认簇；不使用 `industry`、`sector`、行业候选数量或最终展示名额。
 - 第二层是**人工复核覆盖选择**：从原始排序顺次处理，最终最多 3 只“优先复核”，每个已知 Industry 最多 1 只。
@@ -364,7 +367,7 @@ watch = take_first_two_by_raw_rank(
 6. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、证据簇、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、Alpha Radar 资格、非 ACTIONABLE radar 顺位、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配 ACTIONABLE 原始顺位。
 7. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
 8. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
-9. 由 artifact 中同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字，不得重排 `priority_top3`、`actionable_raw_top5`、`alpha_radar_top5`、`non_actionable_alpha_radar_top10` 或 `pullback_scout_top10`。
+9. 由 artifact 中同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字，不得重排 `priority_top3`、`actionable_raw_top5`、`alpha_radar_top5`、`signal_shadow_top3`、`non_actionable_alpha_radar_top10` 或 `pullback_scout_top10`。
 10. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
 11. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
 
@@ -418,6 +421,7 @@ watch = take_first_two_by_raw_rank(
 - “值得留意”完整展示 0～2 只详细卡片；每只必须已经处在人工关注前沿，并明确写原因：结构信息缺口、EPS 人工核验、Industry 信息缺口或同业补强，同时列出当前行其他适用 Checklist 与覆盖字段缺口。
 - “暂不优先”正文最多展示 3 只，固定取该最终分组中原始顺位最靠前的 3 只；每只只写一个或两个决定性原因。全部候选仍保留在完整决策轨迹中。
 - 非停止路径最后始终输出“完整候选排序与决策轨迹”表，覆盖所有 ACTIONABLE 候选；不可只输出最终 3 只。
+- 若 Signal Shadow Top3 非空，必须输出独立“Signal Shadow Top3（所有 signal，可审计对照）”小节；该小节可包含非 ACTIONABLE，但每只必须显示 `entry_status`，并写明“不进入正式优先复核，需按状态人工确认”。若为空，写“本轮无 signal shadow 候选通过基础过滤”。
 - 若 Review Universe 中存在非 ACTIONABLE radar 候选，必须输出独立“Alpha Radar（非 ACTIONABLE，仅观察）”小节；若没有候选，也写明“本轮无非 ACTIONABLE radar 候选通过证据链”。该小节不受 ACTIONABLE 优先复核/值得留意名额影响。
 - Review Universe 中的非 ACTIONABLE 候选如需展示，放入不编号的“Alpha Radar”或“排除记录”，不得混入 ACTIONABLE 原始质量排序；Alpha Radar 必须明确写“非 ACTIONABLE，仅供后续观察/人工看图”，不得写成优先复核。
 - 入选详情不外显 Critical / Major / Minor、PASS / FAIL / UNKNOWN / INFO_MISSING 等内部状态；决策轨迹改用人类可读原因。
@@ -456,6 +460,12 @@ watch = take_first_two_by_raw_rank(
 - **状态：** [EXTENDED / UNCONFIRMED]｜[rule]｜非 ACTIONABLE，不进入优先复核
 - **证据链：** [周线量能/EPS/接近高点/pullback 结构等当前字段事实]
 - **需人工确认：** [突破日字段缺失、延伸、未确认、非缩量等风险提示]
+
+## Signal Shadow Top3（所有 signal，可审计对照）
+### [TICKER]
+- **状态：** [ACTIONABLE / EXTENDED / UNCONFIRMED]｜所有 signal 审计层，不进入正式优先复核
+- **证据链：** [买点新鲜度/突破日量能/周线量能/接近高点/EPS 状态等当前字段事实]
+- **需人工确认：** [若非 ACTIONABLE，写明不得视为当前买点确认]
 
 ## 暂不优先
 - **[TICKER]：** [亮点可选]，但 [决定性原因 + 规范化数字]
