@@ -23,6 +23,14 @@
 | with_eps   | research_fresh_demand_proximity_first |      40 |            34 |     101 |                             16.3934 |                          8.49629 |                          28.7265 |                        -12.4111  |                          108.102 |                       11.5765  |                    -40.0915 |              0.09901  |                     0.158416 |         0.138614 |        0.039683 |        0.04878  |         0.053659 |                    0.095238 |                    0.078049 |                     0.024348 |                           15.1972  |                        -7.14242 |                         125.187 |
 | with_eps   | research_pullback_vcp_lane_interleave |      40 |            35 |     101 |                             14.4703 |                          4.42416 |                          30.8489 |                         -9.48272 |                          145.913 |                        8.81894 |                    -30.0794 |              0.128713 |                     0.178218 |         0.188119 |        0.055556 |        0.063415 |         0.073171 |                    0.111111 |                    0.087805 |                     0.033043 |                            9.25482 |                       -10.1257  |                         172.326 |
 
+## Skill Absorption Reading
+
+- `signal_shadow_top3` is audit-only: it captures more big winners, but also carries materially higher Bottom5 and stop exposure.
+- `skill_industry_eps_known` remains the formal with-EPS baseline because its risk profile is more balanced than the research variants.
+- `research_fresh_demand_proximity_first` is candidate-only: it improves median week return and pick stop rate, and ranks IMAX first in the EPS run, but the worse weekly floor blocks direct absorption.
+- `research_pullback_vcp_lane_interleave` is not ready for official ranking: it raises Top5 precision, but the current pullback/VCP proxy also raises Bottom5 and stop exposure.
+- IMAX audit: the fresh-demand proximity candidate selects IMAX at rank 1 in the with-EPS run; this supports studying buy-point proximity as a tie-break after evidence sufficiency.
+
 ## IMAX Rank Audit
 
 | eps_mode   | variant                               | snapshot_date   | code   | oracle_found   |   latest_rank |   gain_rank |   loss_rank |   latest_return_pct |   max_gain_pct | selected   |   pick_order |

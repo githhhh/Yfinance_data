@@ -147,6 +147,8 @@ def render_markdown_report(
         "",
     ]
     lines.extend(_markdown_table(_round_frame(quality)).splitlines())
+    lines.extend(["", "## Skill Absorption Reading", ""])
+    lines.extend(_skill_absorption_reading(quality, imax))
     lines.extend(["", "## IMAX Rank Audit", ""])
     lines.extend(_markdown_table(_round_frame(imax)).splitlines())
     lines.extend(["", "## Rule / Status Coverage", ""])
@@ -187,3 +189,54 @@ def _markdown_table(frame: pd.DataFrame) -> str:
     if frame.empty:
         return "_empty_"
     return frame.to_markdown(index=False)
+
+
+def _skill_absorption_reading(quality: pd.DataFrame, imax: pd.DataFrame) -> list[str]:
+    lines = [
+        "- `signal_shadow_top3` is audit-only: it captures more big winners, but also carries materially higher Bottom5 and stop exposure.",
+        "- `skill_industry_eps_known` remains the formal with-EPS baseline because its risk profile is more balanced than the research variants.",
+    ]
+    skill = _quality_row(quality, "with_eps", "skill_industry_eps_known")
+    fresh = _quality_row(quality, "with_eps", "research_fresh_demand_proximity_first")
+    pullback = _quality_row(quality, "with_eps", "research_pullback_vcp_lane_interleave")
+    if skill is not None and fresh is not None:
+        better_median = fresh["median_week_avg_latest_return_pct"] > skill["median_week_avg_latest_return_pct"]
+        lower_stop = fresh["pick_stop_rate"] < skill["pick_stop_rate"]
+        worse_floor = fresh["min_week_avg_latest_return_pct"] < skill["min_week_avg_latest_return_pct"]
+        if better_median and lower_stop and worse_floor:
+            lines.append(
+                "- `research_fresh_demand_proximity_first` is candidate-only: it improves median week return and pick stop rate, and ranks IMAX first in the EPS run, but the worse weekly floor blocks direct absorption."
+            )
+        else:
+            lines.append(
+                "- `research_fresh_demand_proximity_first` is candidate-only until it improves the official baseline across median return, stop rate, and weekly floor at the same time."
+            )
+    if pullback is not None:
+        lines.append(
+            "- `research_pullback_vcp_lane_interleave` is not ready for official ranking: it raises Top5 precision, but the current pullback/VCP proxy also raises Bottom5 and stop exposure."
+        )
+    imax_selected = _imax_selected_row(imax, "with_eps", "research_fresh_demand_proximity_first")
+    if imax_selected is not None:
+        order = imax_selected["pick_order"]
+        lines.append(f"- IMAX audit: the fresh-demand proximity candidate selects IMAX at rank {int(order)} in the with-EPS run; this supports studying buy-point proximity as a tie-break after evidence sufficiency.")
+    return lines
+
+
+def _imax_selected_row(imax: pd.DataFrame, eps_mode: str, variant: str) -> pd.Series | None:
+    required = {"variant", "selected", "pick_order"}
+    if imax.empty or not required.issubset(imax.columns):
+        return None
+    mask = imax["variant"].astype(str).eq(variant) & imax["selected"].astype(bool)
+    if "eps_mode" in imax.columns:
+        mask &= imax["eps_mode"].astype(str).eq(eps_mode)
+    selected = imax[mask]
+    if selected.empty:
+        return None
+    return selected.iloc[0]
+
+
+def _quality_row(quality: pd.DataFrame, eps_mode: str, variant: str) -> pd.Series | None:
+    rows = quality[quality["eps_mode"].astype(str).eq(eps_mode) & quality["variant"].astype(str).eq(variant)]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
