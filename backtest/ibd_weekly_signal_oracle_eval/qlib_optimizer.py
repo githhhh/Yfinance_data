@@ -577,9 +577,11 @@ def render_comparison(results: list[dict[str, object]], backend: dict[str, objec
             for rule in candidate_rules()
         ]
     )
+    total_pool_weeks = coverage_rows["pool_file_weeks"].max() if not coverage_rows.empty else 0
     lines = [
-        "# Qlib-Compatible 32-Week Pool Optimization",
+        "# Qlib-Compatible Replay Pool Optimization",
         "",
+        f"- Replay pool files: `{int(total_pool_weeks)}`",
         f"- Qlib backend available: `{backend.get('available')}`",
         f"- Qlib version: `{backend.get('version', 'unknown')}`",
     ]
@@ -593,7 +595,7 @@ def render_comparison(results: list[dict[str, object]], backend: dict[str, objec
             "## Execution Steps",
             "",
             "1. Load every weekly `breakout_follow_pool.csv` under `backtest/ibd_skill_replay_pools/`.",
-            "2. Build two datasets from the same 32-week pool history: `no_eps` disables EPS lookup, `with_eps` uses the supplemental point-in-time EPS lookup and assumes it is correct.",
+            "2. Build two datasets from the same replay pool history: `no_eps` disables EPS lookup, `with_eps` uses the supplemental point-in-time EPS lookup and assumes it is correct.",
             "3. Convert each dataset into a Qlib-style `datetime` / `instrument` panel with signal-time feature columns and future outcome label columns.",
             "4. For each evaluation week after the minimum training window, score every candidate rule on prior weeks only, then apply the best historical rule to that week.",
             "5. Evaluate that week's selected portfolio by realized return, top5 return hit, top5 gain hit, bottom5 loss hit, and 8% stop hit.",
@@ -622,7 +624,7 @@ def render_comparison(results: list[dict[str, object]], backend: dict[str, objec
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Qlib-compatible optimizer for 32-week IBD signal pools.")
+    parser = argparse.ArgumentParser(description="Qlib-compatible optimizer for replay IBD signal pools.")
     parser.add_argument("--eps-mode", choices=["no_eps", "with_eps", "both"], default="both")
     parser.add_argument("--output-dir", default="backtest/ibd_weekly_signal_oracle_eval/qlib_optimizer")
     parser.add_argument("--top-k", type=int, default=3)

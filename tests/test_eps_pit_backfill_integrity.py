@@ -7,12 +7,17 @@ from eps_pit.lookup import SignalEPSLookup, get_signal_eps, enrich_pool_with_sig
 
 
 def test_signal_eps_pit_csv_integrity():
-    """Verify 32-week signal PIT EPS dataset exists, covers signals, and has correct schema."""
+    """Verify replay signal PIT EPS dataset exists, covers signals, and has correct schema."""
     csv_path = "backtest/ibd_skill_replay_pools/signal_eps_pit.csv"
     assert os.path.exists(csv_path), f"Signal PIT EPS CSV missing at {csv_path}"
 
     df = pd.read_csv(csv_path)
-    assert len(df) == 2500, f"Expected 2500 signal rows, got {len(df)}"
+    expected_signal_rows = 0
+    for pool_file in sorted(glob.glob("backtest/ibd_skill_replay_pools/*/breakout_follow_pool.csv")):
+        pool = pd.read_csv(pool_file, encoding="utf-8-sig")
+        signal = pool["signal"].astype(str).str.strip().str.lower().isin({"true", "1"})
+        expected_signal_rows += int(signal.sum())
+    assert len(df) == expected_signal_rows
 
     required_cols = [
         "snapshot_date", "code", "eps_yoy_growth", "eps_current",
@@ -93,6 +98,10 @@ def test_signal_eps_dynamic_lookup_and_enrich():
 
 
 def test_raw_replay_pools_remain_untampered():
-    """Verify all 32 weekly replay pool CSVs exist and have original row counts."""
+    """Verify replay weekly pool CSVs match successful manifest weeks."""
     orig_files = sorted(glob.glob("backtest/ibd_skill_replay_pools/*/breakout_follow_pool.csv"))
-    assert len(orig_files) == 32
+    with open("backtest/ibd_skill_replay_pools/manifest.json", "r") as f:
+        manifest = json.load(f)
+    rows = manifest["weeks"] if isinstance(manifest, dict) else manifest
+    success_weeks = [row for row in rows if row.get("status") == "success"]
+    assert len(orig_files) == len(success_weeks)

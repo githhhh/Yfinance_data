@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest.latest_quant_trade_replay.runner import normalize_pickle_data, write_data_source_audit_report
+from backtest.latest_quant_trade_replay.runner import (
+    clean_replay_output_root,
+    load_replay_old_pool_from_metadata,
+    normalize_pickle_data,
+    write_data_source_audit_report,
+    write_report,
+)
 from backtest.latest_quant_trade_replay import (
     HistoricalPklCandidate,
     ReplayPoolSink,
@@ -154,6 +160,41 @@ def test_replay_pool_sink_writes_only_to_replay_directory(tmp_path):
     assert sink.path == str(tmp_path / "2026-08-07" / "breakout_follow_pool.csv")
     assert Path(sink.path).exists()
     assert pd.read_csv(sink.path)["code"].tolist() == ["IMAX"]
+
+
+def test_clean_replay_output_root_removes_stale_artifacts_and_logs_scope(tmp_path):
+    root = tmp_path / "ibd_skill_replay_pools"
+    stale_week = root / "2026-01-02"
+    stale_week.mkdir(parents=True)
+    (stale_week / "breakout_follow_pool.csv").write_text("code\nSTALE\n", encoding="utf-8")
+    (root / "manifest.csv").write_text("stale\n", encoding="utf-8")
+
+    log = clean_replay_output_root(root, reason="unit-test rebuild")
+
+    assert root.exists()
+    assert not stale_week.exists()
+    assert log["reason"] == "unit-test rebuild"
+    assert "2026-01-02/breakout_follow_pool.csv" in log["removed_paths"]
+    clean_log = root / "clean_rebuild_log.md"
+    assert clean_log.exists()
+    assert "unit-test rebuild" in clean_log.read_text(encoding="utf-8")
+
+
+def test_load_replay_old_pool_from_metadata_reads_previous_success_pool_codes(tmp_path):
+    root = tmp_path / "ibd_skill_replay_pools"
+    week = root / "2026-01-02"
+    week.mkdir(parents=True)
+    pool_path = week / "breakout_follow_pool.csv"
+    pd.DataFrame({"code": ["AAA", "BBB", "AAA"]}).to_csv(pool_path, index=False)
+    metadata = {
+        "status": "success",
+        "snapshot_date": "2026-01-02",
+        "output_pool_path": str(pool_path),
+    }
+
+    old_pool = load_replay_old_pool_from_metadata(metadata)
+
+    assert old_pool == {"AAA", "BBB"}
 
 
 def test_normalize_empty_pool_schema_keeps_zero_row_weeks_auditable():
@@ -511,3 +552,64 @@ def test_data_source_audit_report_lists_each_week_and_null_classification(tmp_pa
     assert "| 2026-07-24 | passed | 2 | 21 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |" in report
     assert "正常空值" in report
     assert "需要补充/修复" in report
+
+
+def test_replay_audit_report_schema_status_ignores_missing_pkl_gap_weeks(tmp_path):
+    rows = [
+        {
+            "snapshot_date": "2026-01-02",
+            "expected_last_trading_day": "2026-01-02",
+            "status": "failed_missing_historical_pkl",
+            "replay_used_clipped_data": False,
+            "data_source_mode": "historical_git",
+            "historical_pkl_found": False,
+            "historical_pkl_commit": "",
+            "historical_daily_pkl": "",
+            "historical_weekly_pkl": "",
+            "daily_pkl_file": "",
+            "weekly_pkl_file": "",
+            "daily_max_date": "",
+            "weekly_max_date": "",
+            "daily_max_date_before_clip": "",
+            "weekly_max_date_before_clip": "",
+            "daily_max_date_after_clip": "",
+            "weekly_max_date_after_clip": "",
+            "output_pool_path": str(tmp_path / "2026-01-02" / "breakout_follow_pool.csv"),
+            "schema_audit": {"schema_validation_status": "failed_missing_historical_pkl"},
+            "failure_reason": "no historical pkl pair found",
+            "replay_old_pool_count": 0,
+            "replay_new_pool_count": 0,
+            "replay_old_pool_source": "cold_start",
+        },
+        {
+            "snapshot_date": "2026-01-09",
+            "expected_last_trading_day": "2026-01-09",
+            "status": "success",
+            "replay_used_clipped_data": False,
+            "data_source_mode": "historical_git",
+            "historical_pkl_found": True,
+            "historical_pkl_commit": "abc123",
+            "historical_daily_pkl": "results_pkl/stock_data_090126_1d.pkl",
+            "historical_weekly_pkl": "results_pkl/stock_data_090126_1wk.pkl",
+            "daily_pkl_file": "results_pkl/stock_data_090126_1d.pkl",
+            "weekly_pkl_file": "results_pkl/stock_data_090126_1wk.pkl",
+            "daily_max_date": "2026-01-09",
+            "weekly_max_date": "2026-01-09",
+            "daily_max_date_before_clip": "2026-01-09",
+            "weekly_max_date_before_clip": "2026-01-09",
+            "daily_max_date_after_clip": "2026-01-09",
+            "weekly_max_date_after_clip": "2026-01-09",
+            "output_pool_path": str(tmp_path / "2026-01-09" / "breakout_follow_pool.csv"),
+            "schema_audit": {"schema_validation_status": "passed"},
+            "failure_reason": "",
+            "replay_old_pool_count": 0,
+            "replay_new_pool_count": 2,
+            "replay_old_pool_source": "reset_after_missing_pkl:2026-01-02",
+        },
+    ]
+
+    write_report(tmp_path, rows)
+
+    report = (tmp_path / "audit_report.md").read_text(encoding="utf-8")
+    assert "- Schema check on successful pool weeks: passed" in report
+    assert "- Missing historical pkl weeks recorded as data gaps: 1" in report

@@ -15,6 +15,7 @@ import os
 import sys
 import argparse
 import json
+import shutil
 import time
 from typing import List, Tuple, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -29,6 +30,71 @@ from eps_pit.mapping import TickerMapper
 from eps_pit.providers.factory import ProviderFactory
 from eps_pit.pit import PITTimelineEngine
 from eps_pit.backfill import ReplayPoolBackfiller
+
+
+def clean_output_dir(output_dir: str, reason: str) -> Dict[str, Any]:
+    target = os.path.abspath(output_dir)
+    cwd = os.path.abspath(os.getcwd())
+    if target in {cwd, os.path.dirname(cwd), os.path.abspath(os.sep)}:
+        raise ValueError(f"Refusing to clean unsafe EPS output directory: {target}")
+
+    removed_paths: List[str] = []
+    if os.path.exists(target):
+        for root, dirs, files in os.walk(target):
+            for name in files:
+                removed_paths.append(os.path.relpath(os.path.join(root, name), target))
+            for name in dirs:
+                removed_paths.append(os.path.relpath(os.path.join(root, name), target) + os.sep)
+        shutil.rmtree(target)
+    os.makedirs(os.path.join(target, "audit"), exist_ok=True)
+
+    log = {
+        "reason": reason,
+        "output_dir": target,
+        "cleaned_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "removed_path_count": len(removed_paths),
+        "removed_paths": sorted(removed_paths),
+    }
+    with open(os.path.join(target, "audit", "clean_rebuild_log.json"), "w") as f:
+        json.dump(log, f, indent=2)
+    with open(os.path.join(target, "audit", "clean_rebuild_log.md"), "w") as f:
+        f.write("# EPS PIT Clean Rebuild Log\n\n")
+        f.write(f"- reason: {reason}\n")
+        f.write(f"- output_dir: `{target}`\n")
+        f.write(f"- cleaned_at: {log['cleaned_at']}\n")
+        f.write(f"- removed_path_count: {len(removed_paths)}\n")
+    return log
+
+
+def write_execution_log(args, summary: Optional[Dict[str, Any]] = None) -> None:
+    audit_dir = os.path.join(args.output_dir, "audit")
+    os.makedirs(audit_dir, exist_ok=True)
+    lines = [
+        "# EPS PIT Backfill Execution Log",
+        "",
+        "## Scope",
+        "",
+        f"- pool_dir: `{args.pool_dir}`",
+        f"- output_dir: `{args.output_dir}`",
+        f"- pit_mode: `{args.pit_mode}`",
+        f"- workers: `{args.workers}`",
+        f"- generated_at: {time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+        "",
+        "## Procedure",
+        "",
+        "1. Scan replay pool CSV inventory and ticker universe from successful weekly pool files only.",
+        "2. Fetch or read cached quarterly fundamentals through the composite provider.",
+        "3. Build point-in-time EPS growth events with conservative filing-date availability.",
+        "4. Backfill into an isolated patched output tree for audit; do not overwrite weekly replay pool CSVs.",
+        "5. Export only signal-row PIT EPS records to `signal_eps_pit.csv` under the replay pool root.",
+        "6. Generate coverage, unresolved ticker, source error, and special-case audit artifacts.",
+    ]
+    if summary:
+        lines.extend(["", "## Summary", ""])
+        for key, value in summary.items():
+            lines.append(f"- {key}: {value}")
+    with open(os.path.join(audit_dir, "execution_log.md"), "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def run_audit(args):
@@ -347,7 +413,7 @@ def run_build_events(args):
 
 
 def run_backfill(args):
-    print(f"=== [Phase 2] Safe Backfill 32 Weekly CSVs (Mode: {args.pit_mode}) ===")
+    print(f"=== [Phase 2] Safe Backfill Replay Weekly CSVs (Mode: {args.pit_mode}) ===")
     cache_dir = os.path.join(args.output_dir, "cache")
     events_path = os.path.join(cache_dir, "eps_growth_events.parquet")
 
@@ -439,7 +505,7 @@ def run_report(args):
 
 
 def run_export_signal_eps(args):
-    print("=== Exporting 32-Week Signal PIT EPS Dataset ===")
+    print("=== Exporting Replay Signal PIT EPS Dataset ===")
     import glob
     prov_path = os.path.join(args.output_dir, "audit", "weekly_eps_provenance.parquet")
     if not os.path.exists(prov_path):
@@ -471,6 +537,15 @@ def run_export_signal_eps(args):
 
     target_csv = os.path.join(args.pool_dir, "signal_eps_pit.csv")
     merged.to_csv(target_csv, index=False)
+    summary = {
+        "signal_rows": int(len(df_sig)),
+        "exported_rows": int(len(merged)),
+        "filled_rows": int(merged["eps_yoy_growth"].notna().sum()) if "eps_yoy_growth" in merged.columns else 0,
+        "unique_signal_weeks": int(df_sig["snapshot_date"].nunique()) if not df_sig.empty else 0,
+        "unique_export_weeks": int(merged["snapshot_date"].nunique()) if not merged.empty else 0,
+    }
+    with open(os.path.join(args.output_dir, "audit", "signal_eps_export_summary.json"), "w") as f:
+        json.dump(summary, f, indent=2)
     print(f"Exported {len(merged)} signal PIT EPS records -> {target_csv}")
     return merged
 
@@ -482,6 +557,7 @@ def main():
     parent_parser.add_argument("--workers", type=int, default=8, help="Number of concurrent download threads")
     parent_parser.add_argument("--sample-size", type=int, default=100, help="Validation sample size")
     parent_parser.add_argument("--pit-mode", default="conservative", choices=["conservative", "release"], help="PIT date mode")
+    parent_parser.add_argument("--clean-output-dir", action="store_true", help="Remove the EPS PIT output directory before running")
 
     parser = argparse.ArgumentParser(description="Point-in-Time EPS YoY Growth Backfill & Audit Tool", parents=[parent_parser])
     subparsers = parser.add_subparsers(dest="command", help="Subcommand to execute")
@@ -490,12 +566,15 @@ def main():
     subparsers.add_parser("validate", parents=[parent_parser], help="Phase 1: Run 100-ticker validation")
     subparsers.add_parser("fetch", parents=[parent_parser], help="Phase 2: Fetch fundamentals data")
     subparsers.add_parser("build-events", parents=[parent_parser], help="Build PIT growth events")
-    subparsers.add_parser("backfill", parents=[parent_parser], help="Backfill 32 weekly CSVs")
-    subparsers.add_parser("export-signal-eps", parents=[parent_parser], help="Export 32-week signal PIT EPS dataset")
+    subparsers.add_parser("backfill", parents=[parent_parser], help="Backfill replay weekly CSVs")
+    subparsers.add_parser("export-signal-eps", parents=[parent_parser], help="Export replay signal PIT EPS dataset")
     subparsers.add_parser("report", parents=[parent_parser], help="Print audit reports")
     subparsers.add_parser("all", parents=[parent_parser], help="Run full pipeline end-to-end")
 
     args = parser.parse_args()
+
+    if args.clean_output_dir:
+        clean_output_dir(args.output_dir, "clean EPS PIT rebuild before regenerating signal_eps_pit.csv")
 
     if args.command == "audit":
         run_audit(args)
@@ -507,8 +586,10 @@ def main():
     elif args.command == "build-events":
         run_build_events(args)
     elif args.command == "backfill":
-        run_backfill(args)
+        summary = run_backfill(args)
         run_export_signal_eps(args)
+        run_report(args)
+        write_execution_log(args, summary)
     elif args.command == "export-signal-eps":
         run_export_signal_eps(args)
     elif args.command == "report":
@@ -527,6 +608,7 @@ def main():
         run_backfill(args)
         run_export_signal_eps(args)
         run_report(args)
+        write_execution_log(args)
 
 
 if __name__ == "__main__":

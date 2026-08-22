@@ -1,30 +1,39 @@
 # 按周 Signal Oracle 推荐质量评估 - 含 EPS
 
-- 周范围: 2026-01-02 至 2026-08-07；路径收益截至 2026-08-14
+- Pool 周范围: 2025-10-10 至 2026-08-07；pool files: 43；路径收益截至 2026-08-14
 - Oracle universe: 每周所有 `signal == True` 且路径收益可计算的标的；winner/loser 在每周内排序，不跨周合并。
 - Big winner: 当周 latest_return Top5；Opportunity winner: 当周 max_gain Top5；Big loser: 当周 latest_return Bottom5 或命中 -8% stop。
 
 ## Universe 覆盖
 
-- Signal rows: 2500；valid path rows: 1967；weeks: 31
+- Signal rows: 2738；valid path rows: 2074；weeks: 42
 
 ## Variant 总结
 
 | eps_mode   | variant                               |   weeks |   picks | median_week_avg_latest_return_pct   | avg_week_avg_latest_return_pct   | median_week_worst_pick_return_pct   | week_latest_top5_hit_rate   | week_gain_top5_hit_rate   | pick_latest_top5_rate   | week_bottom5_hit_rate   | pick_bottom5_rate   | week_stop_rate   | pick_stop_rate   |   score |
 |:-----------|:--------------------------------------|--------:|--------:|:------------------------------------|:---------------------------------|:------------------------------------|:----------------------------|:--------------------------|:------------------------|:------------------------|:--------------------|:-----------------|:-----------------|--------:|
-| with_eps   | skill_industry_eps_known              |      31 |      83 | 13.57%                              | 23.80%                           | 9.72%                               | 25.8%                       | 29.0%                     | 10.8%                   | 22.6%                   | 10.8%               | 29.0%            | 13.3%            |   0.418 |
-| with_eps   | skill_industry_eps_known_no_dry_fail  |      31 |      83 | 13.57%                              | 23.68%                           | 9.72%                               | 25.8%                       | 29.0%                     | 10.8%                   | 22.6%                   | 10.8%               | 29.0%            | 13.3%            |   0.418 |
-| with_eps   | clean_eps_pass_no_dry_no_geom_caution |      29 |      73 | 14.64%                              | 22.72%                           | 8.82%                               | 24.1%                       | 24.1%                     | 11.0%                   | 24.1%                   | 11.0%               | 27.6%            | 12.3%            |   0.325 |
-| with_eps   | risk_clean_eps_known                  |      31 |      83 | 13.57%                              | 23.45%                           | 9.72%                               | 25.8%                       | 29.0%                     | 10.8%                   | 25.8%                   | 12.0%               | 32.3%            | 14.5%            |   0.322 |
-| with_eps   | fresh_demand_eps_pass_clean           |      29 |      73 | 14.64%                              | 22.11%                           | 9.48%                               | 20.7%                       | 20.7%                     | 9.6%                    | 20.7%                   | 9.6%                | 24.1%            | 11.0%            |   0.291 |
-| with_eps   | v3_core_top3                          |      31 |      86 | 13.50%                              | 23.10%                           | 9.15%                               | 25.8%                       | 29.0%                     | 10.5%                   | 25.8%                   | 11.6%               | 35.5%            | 15.1%            |   0.289 |
-| with_eps   | eps_pass_only                         |      29 |      73 | 12.67%                              | 21.96%                           | 9.48%                               | 20.7%                       | 20.7%                     | 9.6%                    | 20.7%                   | 9.6%                | 24.1%            | 11.0%            |   0.271 |
-| with_eps   | fresh_or_constructive_eps_pass_clean  |      29 |      73 | 12.67%                              | 21.96%                           | 9.48%                               | 20.7%                       | 20.7%                     | 9.6%                    | 20.7%                   | 9.6%                | 24.1%            | 11.0%            |   0.271 |
+| with_eps   | skill_industry_eps_known              |      40 |     101 | 14.95%                              | 24.96%                           | 10.01%                              | 25.0%                       | 25.0%                     | 10.9%                   | 32.5%                   | 16.8%               | 32.5%            | 15.8%            |   0.123 |
+| with_eps   | skill_industry_eps_known_no_dry_fail  |      40 |     101 | 14.95%                              | 24.86%                           | 10.01%                              | 25.0%                       | 25.0%                     | 10.9%                   | 32.5%                   | 16.8%               | 32.5%            | 15.8%            |   0.123 |
+| with_eps   | clean_eps_pass_no_dry_no_geom_caution |      38 |      88 | 14.95%                              | 23.14%                           | 9.15%                               | 23.7%                       | 21.1%                     | 11.4%                   | 31.6%                   | 17.0%               | 31.6%            | 15.9%            |   0.065 |
+| with_eps   | risk_clean_eps_known                  |      40 |     101 | 14.66%                              | 24.67%                           | 10.01%                              | 25.0%                       | 25.0%                     | 10.9%                   | 35.0%                   | 17.8%               | 35.0%            | 16.8%            |   0.045 |
+| with_eps   | eps_pass_only                         |      38 |      88 | 14.95%                              | 22.51%                           | 9.72%                               | 21.1%                       | 18.4%                     | 10.2%                   | 28.9%                   | 15.9%               | 28.9%            | 14.8%            |   0.04  |
+| with_eps   | fresh_demand_eps_pass_clean           |      38 |      88 | 14.95%                              | 22.63%                           | 9.72%                               | 21.1%                       | 18.4%                     | 10.2%                   | 28.9%                   | 15.9%               | 28.9%            | 14.8%            |   0.04  |
+| with_eps   | fresh_or_constructive_eps_pass_clean  |      38 |      88 | 14.95%                              | 22.51%                           | 9.72%                               | 21.1%                       | 18.4%                     | 10.2%                   | 28.9%                   | 15.9%               | 28.9%            | 14.8%            |   0.04  |
+| with_eps   | v3_core_top3                          |      40 |     106 | 15.13%                              | 24.38%                           | 9.72%                               | 25.0%                       | 25.0%                     | 10.4%                   | 35.0%                   | 17.0%               | 37.5%            | 17.0%            |   0.031 |
 
 ## Best Variant: `skill_industry_eps_known`
 
 | snapshot_date   |   picks | codes          | avg_latest_return_pct   | worst_latest_return_pct   |   hit_latest_top5_count |   hit_gain_top5_count |   hit_loss_bottom5_count |   stop_8pct_count |
 |:----------------|--------:|:---------------|:------------------------|:--------------------------|------------------------:|----------------------:|-------------------------:|------------------:|
+| 2025-10-24      |       2 | IBM,AAPL       | 18.04%                  | 18.04%                    |                       0 |                     0 |                        1 |                 0 |
+| 2025-10-31      |       2 | VTR,SOFI       | 29.19%                  | 29.19%                    |                       0 |                     0 |                        1 |                 0 |
+| 2025-11-07      |       1 | COLL           | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-11-14      |       3 | ALL,LH,LYFT    | 22.94%                  | 21.89%                    |                       1 |                     0 |                        2 |                 1 |
+| 2025-11-21      |       1 | WMT            | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-11-28      |       3 | MNST,ROST,WFC  | 2.40%                   | -35.53%                   |                       0 |                     0 |                        1 |                 1 |
+| 2025-12-05      |       1 | DASH           | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-12-19      |       3 | SCHW,PLTR,MU   | 94.92%                  | -7.42%                    |                       1 |                     1 |                        2 |                 2 |
+| 2025-12-26      |       2 | HEI,HUT        | 14.69%                  | 14.69%                    |                       0 |                     0 |                        1 |                 1 |
 | 2026-01-02      |       2 | TSM,FTAI       | 38.82%                  | 38.82%                    |                       1 |                     1 |                        1 |                 0 |
 | 2026-01-09      |       2 | VALE,GH        | 49.71%                  | 49.71%                    |                       0 |                     0 |                        0 |                 1 |
 | 2026-01-16      |       3 | BKR,SHEL,FE    | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |

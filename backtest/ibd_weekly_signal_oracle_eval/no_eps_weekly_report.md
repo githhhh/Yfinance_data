@@ -1,23 +1,32 @@
 # 按周 Signal Oracle 推荐质量评估 - 无 EPS
 
-- 周范围: 2026-01-02 至 2026-08-07；路径收益截至 2026-08-14
+- Pool 周范围: 2025-10-10 至 2026-08-07；pool files: 43；路径收益截至 2026-08-14
 - Oracle universe: 每周所有 `signal == True` 且路径收益可计算的标的；winner/loser 在每周内排序，不跨周合并。
 - Big winner: 当周 latest_return Top5；Opportunity winner: 当周 max_gain Top5；Big loser: 当周 latest_return Bottom5 或命中 -8% stop。
 
 ## Universe 覆盖
 
-- Signal rows: 2500；valid path rows: 1967；weeks: 31
+- Signal rows: 2738；valid path rows: 2074；weeks: 42
 
 ## Variant 总结
 
 | eps_mode   | variant      |   weeks |   picks | median_week_avg_latest_return_pct   | avg_week_avg_latest_return_pct   | median_week_worst_pick_return_pct   | week_latest_top5_hit_rate   | week_gain_top5_hit_rate   | pick_latest_top5_rate   | week_bottom5_hit_rate   | pick_bottom5_rate   | week_stop_rate   | pick_stop_rate   |   score |
 |:-----------|:-------------|--------:|--------:|:------------------------------------|:---------------------------------|:------------------------------------|:----------------------------|:--------------------------|:------------------------|:------------------------|:--------------------|:-----------------|:-----------------|--------:|
-| no_eps     | v3_core_top3 |      31 |      86 | 12.62%                              | 21.65%                           | 9.48%                               | 25.8%                       | 32.3%                     | 11.6%                   | 32.3%                   | 14.0%               | 38.7%            | 17.4%            |   0.153 |
+| no_eps     | v3_core_top3 |      40 |     106 | 14.69%                              | 24.60%                           | 10.20%                              | 25.0%                       | 27.5%                     | 11.3%                   | 40.0%                   | 17.9%               | 40.0%            | 17.9%            |  -0.061 |
 
 ## Best Variant: `v3_core_top3`
 
 | snapshot_date   |   picks | codes          | avg_latest_return_pct   | worst_latest_return_pct   |   hit_latest_top5_count |   hit_gain_top5_count |   hit_loss_bottom5_count |   stop_8pct_count |
 |:----------------|--------:|:---------------|:------------------------|:--------------------------|------------------------:|----------------------:|-------------------------:|------------------:|
+| 2025-10-24      |       2 | IBM,AAPL       | 18.04%                  | 18.04%                    |                       0 |                     0 |                        1 |                 0 |
+| 2025-10-31      |       3 | VTR,SOFI,LKNCY | 29.19%                  | 29.19%                    |                       0 |                     0 |                        1 |                 0 |
+| 2025-11-07      |       2 | COLL,SEDG      | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-11-14      |       3 | ALL,LH,LYFT    | 22.94%                  | 21.89%                    |                       1 |                     0 |                        2 |                 1 |
+| 2025-11-21      |       1 | WMT            | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-11-28      |       3 | ROST,WFC,MNST  | 2.40%                   | -35.53%                   |                       0 |                     0 |                        1 |                 1 |
+| 2025-12-05      |       1 | DASH           | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |
+| 2025-12-19      |       3 | SCHW,MU,PAC    | 146.09%                 | 14.21%                    |                       1 |                     1 |                        1 |                 1 |
+| 2025-12-26      |       2 | HEI,HUT        | 14.69%                  | 14.69%                    |                       0 |                     0 |                        1 |                 1 |
 | 2026-01-02      |       3 | TSM,BIDU,ASML  | 50.70%                  | 38.82%                    |                       2 |                     2 |                        1 |                 0 |
 | 2026-01-09      |       3 | VALE,NU,GH     | 49.71%                  | 49.71%                    |                       0 |                     0 |                        0 |                 1 |
 | 2026-01-16      |       3 | BKR,SHEL,FE    | n/a                     | n/a                       |                       0 |                     0 |                        0 |                 0 |

@@ -12,19 +12,45 @@
 
 ## 总览
 
-- Weeks audited: 32
-- Passed weeks including EPS-isolated weeks: 32
-- Weeks requiring supplement/repair: 0
+- Weeks audited: 58
+- Passed weeks including EPS-isolated weeks: 43
+- Weeks requiring supplement/repair: 15
 - Non-EPS abnormal empty values needing supplement/repair: 0
-- Signal EPS gaps isolated pending point-in-time supplement: 2500
-- Signal EPS gaps with current snapshot-only source: 2028
-- Signal EPS gaps unresolved: 472
+- Signal EPS gaps isolated pending point-in-time supplement: 2738
+- Signal EPS gaps with current snapshot-only source: 2174
+- Signal EPS gaps unresolved: 564
 - Current snapshot EPS supplement sources are reported separately and are not point-in-time safe.
 
 ## 每周审计
 
 | snapshot_date | status | rows | cols | signal | missing_fields | non_eps_abnormal | signal_eps_missing | eps_supp_available | eps_unresolved | repairable_fallback | optional_gap |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2025-07-04 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-07-11 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-07-18 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-07-25 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-08-01 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-08-08 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-08-15 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-08-22 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-08-29 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-09-05 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-09-12 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-09-19 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-09-26 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-10-03 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-10-10 | passed_except_eps | 112 | 47 | 12 | 0 | 0 | 12 | 7 | 5 | 104 | 160 |
+| 2025-10-17 | failed | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2025-10-24 | passed_except_eps | 120 | 47 | 29 | 0 | 0 | 29 | 17 | 12 | 110 | 197 |
+| 2025-10-31 | passed_except_eps | 124 | 47 | 28 | 0 | 0 | 28 | 18 | 10 | 112 | 209 |
+| 2025-11-07 | passed_except_eps | 113 | 47 | 15 | 0 | 0 | 15 | 7 | 8 | 102 | 164 |
+| 2025-11-14 | passed_except_eps | 103 | 47 | 18 | 0 | 0 | 18 | 10 | 8 | 92 | 136 |
+| 2025-11-21 | passed_except_eps | 94 | 47 | 8 | 0 | 0 | 8 | 5 | 3 | 78 | 125 |
+| 2025-11-28 | passed_except_eps | 100 | 47 | 36 | 0 | 0 | 36 | 20 | 16 | 82 | 161 |
+| 2025-12-05 | passed_except_eps | 101 | 47 | 30 | 0 | 0 | 30 | 18 | 12 | 82 | 174 |
+| 2025-12-12 | passed_except_eps | 99 | 47 | 26 | 0 | 0 | 26 | 17 | 9 | 74 | 173 |
+| 2025-12-19 | passed_except_eps | 100 | 47 | 19 | 0 | 0 | 19 | 13 | 6 | 74 | 162 |
+| 2025-12-26 | passed_except_eps | 94 | 47 | 17 | 0 | 0 | 17 | 14 | 3 | 64 | 135 |
 | 2026-01-02 | passed_except_eps | 83 | 47 | 15 | 0 | 0 | 15 | 12 | 3 | 48 | 115 |
 | 2026-01-09 | passed_except_eps | 91 | 47 | 40 | 0 | 0 | 40 | 26 | 14 | 60 | 131 |
 | 2026-01-16 | passed_except_eps | 94 | 47 | 21 | 0 | 0 | 21 | 13 | 8 | 66 | 147 |
@@ -59,6 +85,266 @@
 | 2026-08-07 | passed_except_eps | 776 | 47 | 167 | 0 | 0 | 167 | 149 | 18 | 52 | 1030 |
 
 ## 每周明细
+
+### 2025-07-04
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-07-11
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-07-18
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-07-25
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-08-01
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-08-08
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-08-15
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-08-22
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-08-29
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-09-05
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-09-12
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-09-19
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-09-26
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-10-03
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-10-10
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=12
+- 正常空值: ibd_entry_reject_reason_valid_or_non_signal=107; ibd_entry_breakout_range_ratio_invalid_or_non_signal=105; ibd_entry_close_position_invalid_or_non_signal=105; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=105; ibd_entry_date_invalid_or_non_signal=105; ibd_entry_price_invalid_or_non_signal=105; ibd_entry_rule_invalid_or_non_signal=105; ibd_entry_volume_ratio_invalid_or_non_signal=105; ...+12
+- repairable fallback: industry=52; sector=52
+- optional gap: ibd_candidate_extra=104; pullback_v_is_dry=20; pullback_duration_weeks=12; pullback_pct=12; pullback_pct_off_peak=12
+- signal EPS 缺失代码: ALM;ANET;ASTS;CORZ;GH;GSK;MP;OKLO;RIOT;SANM;TEM;VRT
+- signal EPS 本地补源覆盖: 7; unresolved: 5
+
+### 2025-10-17
+
+- 状态: `failed`
+- 需要补充/修复: -
+- 正常空值: -
+- repairable fallback: -
+- optional gap: -
+- signal EPS 缺失代码: -
+- signal EPS 本地补源覆盖: 0; unresolved: 0
+
+### 2025-10-24
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=29
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=114; ibd_entry_close_position_invalid_or_non_signal=114; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=114; ibd_entry_date_invalid_or_non_signal=114; ibd_entry_price_invalid_or_non_signal=114; ibd_entry_rule_invalid_or_non_signal=114; ibd_entry_volume_ratio_invalid_or_non_signal=114; ibd_trigger_price_invalid_or_non_signal=114; ...+12
+- repairable fallback: industry=55; sector=55
+- optional gap: ibd_candidate_extra=104; pullback_v_is_dry=27; pullback_duration_weeks=22; pullback_pct=22; pullback_pct_off_peak=22
+- signal EPS 缺失代码: AAPL;AVGO;BKR;CDNS;COF;CRWD;FTAI;GH;GOOG;HWM;IBM;KLAC;MMM;NRG;NTRA;NU;NVDA;OPEN;PANW;RIOT;ROST;RTX;SEDG;SHEL;SHOP;VEEV;WELL;WFC;ZS
+- signal EPS 本地补源覆盖: 17; unresolved: 12
+
+### 2025-10-31
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=28
+- 正常空值: ibd_entry_reject_reason_valid_or_non_signal=112; ibd_entry_breakout_range_ratio_invalid_or_non_signal=108; ibd_entry_close_position_invalid_or_non_signal=108; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=108; ibd_entry_date_invalid_or_non_signal=108; ibd_entry_price_invalid_or_non_signal=108; ibd_entry_rule_invalid_or_non_signal=108; ibd_entry_volume_ratio_invalid_or_non_signal=108; ...+12
+- repairable fallback: industry=56; sector=56
+- optional gap: ibd_candidate_extra=105; pullback_v_is_dry=32; pullback_duration_weeks=24; pullback_pct=24; pullback_pct_off_peak=24
+- signal EPS 缺失代码: AMZN;C;CAH;CHRW;COE;CORZ;CPNG;CRDO;FUTU;GSK;HOOD;LKNCY;LSCC;MS;MTSR;NBIS;NET;NVDA;PLTR;ROKU;SOFI;STX;TSLA;VTR;W;WDC;WFC;WULF
+- signal EPS 本地补源覆盖: 18; unresolved: 10
+
+### 2025-11-07
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=15
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=106; ibd_entry_close_position_invalid_or_non_signal=106; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=106; ibd_entry_date_invalid_or_non_signal=106; ibd_entry_price_invalid_or_non_signal=106; ibd_entry_rule_invalid_or_non_signal=106; ibd_entry_volume_ratio_invalid_or_non_signal=106; ibd_trigger_price_invalid_or_non_signal=106; ...+12
+- repairable fallback: industry=51; sector=51
+- optional gap: ibd_candidate_extra=102; pullback_v_is_dry=23; pullback_duration_weeks=13; pullback_pct=13; pullback_pct_off_peak=13
+- signal EPS 缺失代码: ARGX;CASY;COLL;EXPE;FIGS;GH;JPM;LYFT;NRG;SANM;SEDG;STX;VEEV;VTR;XYL
+- signal EPS 本地补源覆盖: 7; unresolved: 8
+
+### 2025-11-14
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=18
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=98; ibd_entry_close_position_invalid_or_non_signal=98; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=98; ibd_entry_date_invalid_or_non_signal=98; ibd_entry_price_invalid_or_non_signal=98; ibd_entry_rule_invalid_or_non_signal=98; ibd_entry_volume_ratio_invalid_or_non_signal=98; ibd_trigger_price_invalid_or_non_signal=98; ...+12
+- repairable fallback: industry=46; sector=46
+- optional gap: ibd_candidate_extra=90; pullback_v_is_dry=16; pullback_duration_weeks=10; pullback_pct=10; pullback_pct_off_peak=10
+- signal EPS 缺失代码: ABBV;ALL;AU;AZN;CASY;COLL;EA;FE;GSK;JNJ;LH;LLY;LYFT;MDT;MNST;MS;NTRA;SHEL
+- signal EPS 本地补源覆盖: 10; unresolved: 8
+
+### 2025-11-21
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=8
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=90; ibd_entry_close_position_invalid_or_non_signal=90; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=90; ibd_entry_date_invalid_or_non_signal=90; ibd_entry_price_invalid_or_non_signal=90; ibd_entry_reject_reason_valid_or_non_signal=90; ibd_entry_rule_invalid_or_non_signal=90; ibd_entry_volume_ratio_invalid_or_non_signal=90; ...+12
+- repairable fallback: industry=39; sector=39
+- optional gap: ibd_candidate_extra=87; pullback_v_is_dry=11; pullback_duration_weeks=9; pullback_pct=9; pullback_pct_off_peak=9
+- signal EPS 缺失代码: ABBV;BTSG;FE;GOOG;MDT;MNPR;ROST;WMT
+- signal EPS 本地补源覆盖: 5; unresolved: 3
+
+### 2025-11-28
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=36
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=94; ibd_entry_close_position_invalid_or_non_signal=94; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=94; ibd_entry_date_invalid_or_non_signal=94; ibd_entry_price_invalid_or_non_signal=94; ibd_entry_rule_invalid_or_non_signal=94; ibd_entry_volume_ratio_invalid_or_non_signal=94; ibd_trigger_price_invalid_or_non_signal=94; ...+12
+- repairable fallback: industry=41; sector=41
+- optional gap: ibd_candidate_extra=76; pullback_v_is_dry=22; pullback_duration_weeks=21; pullback_pct=21; pullback_pct_off_peak=21
+- signal EPS 缺失代码: AAPL;APP;AU;AVGO;BIDU;BKR;BTSG;C;CASY;CEG;CHRW;CIEN;COHR;CRDO;EA;FE;HLT;IONQ;LYFT;MNST;MS;NRG;NU;OUST;ROST;SHOP;SOFI;STX;TTWO;UHS;VCYT;W;WES;WFC;WMT;WWD
+- signal EPS 本地补源覆盖: 20; unresolved: 16
+
+### 2025-12-05
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=30
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=97; ibd_entry_close_position_invalid_or_non_signal=97; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=97; ibd_entry_date_invalid_or_non_signal=97; ibd_entry_price_invalid_or_non_signal=97; ibd_entry_rule_invalid_or_non_signal=97; ibd_entry_volume_ratio_invalid_or_non_signal=97; ibd_trigger_price_invalid_or_non_signal=97; ...+12
+- repairable fallback: industry=41; sector=41
+- optional gap: ibd_candidate_extra=83; pullback_v_is_dry=28; pullback_duration_weeks=21; pullback_pct=21; pullback_pct_off_peak=21
+- signal EPS 缺失代码: AMAT;APP;ASML;ASTS;BIDU;BLK;C;CAT;COF;CVNA;DASH;EA;EWBC;FN;JOBY;JPM;LSCC;LYFT;MS;PATH;SHOP;SMTC;TSLA;TSM;TTWO;VRT;WDC;WES;WFC;WWD
+- signal EPS 本地补源覆盖: 18; unresolved: 12
+
+### 2025-12-12
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=26
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=96; ibd_entry_close_position_invalid_or_non_signal=96; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=96; ibd_entry_date_invalid_or_non_signal=96; ibd_entry_price_invalid_or_non_signal=96; ibd_entry_rule_invalid_or_non_signal=96; ibd_entry_volume_ratio_invalid_or_non_signal=96; ibd_trigger_price_invalid_or_non_signal=96; ...+12
+- repairable fallback: industry=37; sector=37
+- optional gap: ibd_candidate_extra=86; pullback_v_is_dry=27; pullback_duration_weeks=20; pullback_pct=20; pullback_pct_off_peak=20
+- signal EPS 缺失代码: AEO;ASTS;BLK;CIEN;COF;EXPE;FEIM;HLT;HWM;IBM;JPM;LH;NUTX;PAC;PFG;ROKU;ROST;RTX;STX;TKO;TPR;TSLA;UBS;URBN;ZION;ZM
+- signal EPS 本地补源覆盖: 17; unresolved: 9
+
+### 2025-12-19
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=19
+- 正常空值: ibd_entry_reject_reason_valid_or_non_signal=97; ibd_entry_breakout_range_ratio_invalid_or_non_signal=84; ibd_entry_close_position_invalid_or_non_signal=84; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=84; ibd_entry_date_invalid_or_non_signal=84; ibd_entry_price_invalid_or_non_signal=84; ibd_entry_rule_invalid_or_non_signal=84; ibd_entry_volume_ratio_invalid_or_non_signal=84; ...+12
+- repairable fallback: industry=37; sector=37
+- optional gap: ibd_candidate_extra=87; pullback_v_is_dry=24; pullback_duration_weeks=17; pullback_pct=17; pullback_pct_off_peak=17
+- signal EPS 缺失代码: ALM;CEG;CHRW;EXPE;HLT;HWM;LLY;MNST;MU;PAC;PLTR;RKLB;RTX;SCHW;SHOP;TKO;TSLA;TTWO;UAL
+- signal EPS 本地补源覆盖: 13; unresolved: 6
+
+### 2025-12-26
+
+- 状态: `passed_except_eps`
+- 需要补充/修复: eps_yoy_growth_signal=17
+- 正常空值: ibd_entry_breakout_range_ratio_invalid_or_non_signal=91; ibd_entry_close_position_invalid_or_non_signal=91; ibd_entry_close_vs_trigger_pct_invalid_or_non_signal=91; ibd_entry_date_invalid_or_non_signal=91; ibd_entry_price_invalid_or_non_signal=91; ibd_entry_rule_invalid_or_non_signal=91; ibd_entry_volume_ratio_invalid_or_non_signal=91; ibd_trigger_price_invalid_or_non_signal=91; ...+12
+- repairable fallback: industry=32; sector=32
+- optional gap: ibd_candidate_extra=79; pullback_v_is_dry=17; pullback_duration_weeks=13; pullback_pct=13; pullback_pct_off_peak=13
+- signal EPS 缺失代码: ALM;AU;CAH;CASY;CIEN;FEIM;HEI;HUT;HWM;IBKR;JPM;NU;NVDA;SCHW;SMTC;SNDK;TSM
+- signal EPS 本地补源覆盖: 14; unresolved: 3
 
 ### 2026-01-02
 

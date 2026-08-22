@@ -1,0 +1,12 @@
+{
+  "weekly_files": 43,
+  "total_rows": 13055,
+  "rows_need_eps": 13055,
+  "rows_filled": 12358,
+  "rows_unresolved": 697,
+  "coverage_pct": 94.66,
+  "pit_mode": "conservative",
+  "unresolved_count": 0,
+  "special_cases_count": 11639,
+  "source_errors_count": 0
+}

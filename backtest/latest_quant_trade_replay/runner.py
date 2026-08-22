@@ -7,6 +7,7 @@ import json
 import os
 import pickle
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -95,6 +96,61 @@ def _daily_map_from_price_data(
 
 def git_commit(path: Path) -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
+
+
+def _relative_removed_paths(root: Path) -> list[str]:
+    if not root.exists():
+        return []
+    paths: list[str] = []
+    for path in sorted(root.rglob("*")):
+        paths.append(path.relative_to(root).as_posix())
+    return paths
+
+
+def clean_replay_output_root(output_root: Path, *, reason: str) -> dict[str, Any]:
+    resolved = output_root.resolve()
+    cwd = Path.cwd().resolve()
+    if resolved in {cwd, cwd.parent, Path("/").resolve()}:
+        raise ValueError(f"Refusing to clean unsafe replay output root: {output_root}")
+    removed_paths = _relative_removed_paths(output_root)
+    if output_root.exists():
+        shutil.rmtree(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+    log = {
+        "reason": reason,
+        "output_root": str(output_root),
+        "removed_path_count": len(removed_paths),
+        "removed_paths": removed_paths,
+    }
+    (output_root / "clean_rebuild_log.json").write_text(
+        json.dumps(log, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    lines = [
+        "# Replay Pool Clean Rebuild Log",
+        "",
+        f"- Reason: {reason}",
+        f"- Output root: `{output_root}`",
+        f"- Removed path count: {len(removed_paths)}",
+        "",
+        "## Removed Paths",
+        "",
+    ]
+    lines.extend(f"- `{path}`" for path in removed_paths)
+    (output_root / "clean_rebuild_log.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return log
+
+
+def load_replay_old_pool_from_metadata(metadata: dict[str, Any]) -> set[str]:
+    if metadata.get("status") != "success":
+        return set()
+    pool_path = Path(str(metadata.get("output_pool_path") or ""))
+    if not pool_path.exists():
+        return set()
+    pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
+    if "code" not in pool.columns:
+        return set()
+    return set(pool["code"].dropna().astype(str).str.strip())
 
 
 PKL_NAME_RE = re.compile(r"stock_data_(\d{6})_(1d|1wk)\.pkl$")
@@ -245,6 +301,8 @@ def run_one_week(
     weekly_pkl_file: str | None = None,
     daily_pkl_sha256: str | None = None,
     weekly_pkl_sha256: str | None = None,
+    replay_old_pool: set[str] | None = None,
+    replay_old_pool_source: str = "cold_start",
 ) -> dict[str, Any]:
     if daily_data is None:
         if daily_pkl is None:
@@ -299,7 +357,7 @@ def run_one_week(
         from strategy.run_context import RunContext
         from strategy_analysis.breakout_follow import weekly_job
 
-        ctx = RunContext.replay(snapshot_date, old_pool=set())
+        ctx = RunContext.replay(snapshot_date, old_pool=set(replay_old_pool or set()))
         ctx.output_dir = str(run_output_dir)
         ctx.enable_futu = False
         ctx.enable_telegram = False
@@ -359,6 +417,10 @@ def run_one_week(
         "historical_pkl_commit": historical_pkl_commit,
         "historical_pkl_commit_date": historical_pkl_commit_date,
         "historical_pkl_candidate_count": historical_pkl_candidate_count,
+        "replay_old_pool_source": replay_old_pool_source,
+        "replay_old_pool_count": len(replay_old_pool or set()),
+        "replay_old_pool_codes_sample": sorted(replay_old_pool or set())[:25],
+        "replay_new_pool_count": output_row_count if status == "success" else 0,
         "daily_pkl_file": daily_pkl_file or str(daily_pkl),
         "weekly_pkl_file": weekly_pkl_file or str(weekly_pkl),
         "daily_pkl_sha256": daily_pkl_sha256 or (sha256_file(daily_pkl) if daily_pkl is not None else ""),
@@ -410,6 +472,8 @@ def metadata_for_missing_historical_pkl(
     yfinance_data_path: Path,
     quant_trade_commit: str,
     candidate_count: int,
+    replay_old_pool: set[str] | None = None,
+    replay_old_pool_source: str = "cold_start",
 ) -> dict[str, Any]:
     week_dir = output_root / snapshot_date
     week_dir.mkdir(parents=True, exist_ok=True)
@@ -423,6 +487,10 @@ def metadata_for_missing_historical_pkl(
         "historical_pkl_commit": None,
         "historical_pkl_commit_date": None,
         "historical_pkl_candidate_count": candidate_count,
+        "replay_old_pool_source": replay_old_pool_source,
+        "replay_old_pool_count": len(replay_old_pool or set()),
+        "replay_old_pool_codes_sample": sorted(replay_old_pool or set())[:25],
+        "replay_new_pool_count": 0,
         "daily_pkl_file": "",
         "weekly_pkl_file": "",
         "daily_pkl_sha256": "",
@@ -480,6 +548,9 @@ def write_manifest(output_root: Path, rows: list[dict[str, Any]]) -> None:
                 "data_source_mode": row.get("data_source_mode"),
                 "historical_pkl_commit": row.get("historical_pkl_commit"),
                 "historical_pkl_commit_date": row.get("historical_pkl_commit_date"),
+                "replay_old_pool_source": row.get("replay_old_pool_source"),
+                "replay_old_pool_count": row.get("replay_old_pool_count"),
+                "replay_new_pool_count": row.get("replay_new_pool_count"),
                 "daily_pkl_file": row.get("daily_pkl_file"),
                 "weekly_pkl_file": row.get("weekly_pkl_file"),
                 "daily_max_date_before_clip": row.get("daily_max_date_before_clip"),
@@ -716,11 +787,25 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     success = [r for r in rows if r["status"] == "success"]
     failed = [r for r in rows if r["status"] != "success"]
     clipped = [r for r in rows if r["replay_used_clipped_data"]]
-    boundary_ok = bool(rows) and rows[0]["snapshot_date"] == "2026-01-02" and rows[-1]["snapshot_date"] == "2026-08-07"
+    snapshot_dates = [str(row["snapshot_date"]) for row in rows]
+    chronological_ok = snapshot_dates == sorted(snapshot_dates)
     excluded_ok = "2026-08-14" not in {r["snapshot_date"] for r in rows}
-    schema_ok = all(r.get("schema_audit", {}).get("schema_validation_status") == "passed" for r in rows)
+    successful_rows = [r for r in rows if r.get("status") == "success"]
+    missing_pkl_rows = [r for r in rows if r.get("status") == "failed_missing_historical_pkl"]
+    schema_ok = all(
+        r.get("schema_audit", {}).get("schema_validation_status") in {"passed", "passed_with_repairs_or_optional_gaps"}
+        for r in successful_rows
+    )
     side_effects_ok = all(all(r.get("side_effects_disabled", {}).values()) for r in rows)
     historical_git_ok = all(r.get("data_source_mode") == "historical_git" for r in rows)
+    carry_forward_ok = bool(rows) and rows[0].get("replay_old_pool_source") == "cold_start"
+    for prev, cur in zip(rows, rows[1:]):
+        expected_source = f"previous_replay_week:{prev['snapshot_date']}"
+        if cur.get("replay_old_pool_source") not in {
+            expected_source,
+            f"reset_after_missing_pkl:{prev['snapshot_date']}",
+        }:
+            carry_forward_ok = False
     future_leak_ok = True
     historical_source_ok = True
     ibd_totals = {
@@ -786,16 +871,18 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
     lines = [
         "# Latest Quant Trade Replay Pool Audit",
         "",
-        f"- Quant trade commit: `{rows[0]['quant_trade_commit'] if rows else ''}`",
+        f"- Quant trade commit: `{rows[0].get('quant_trade_commit', '') if rows else ''}`",
         f"- Weeks processed: {len(rows)}",
         f"- Success weeks: {len(success)}",
         f"- Failed weeks: {len(failed)}",
         f"- Weeks using clipped data: {len(clipped)}",
-        f"- Boundary check: {'passed' if boundary_ok and excluded_ok else 'failed'} "
+        f"- Chronological boundary check: {'passed' if chronological_ok and excluded_ok else 'failed'} "
         f"(first={rows[0]['snapshot_date'] if rows else ''}, last={rows[-1]['snapshot_date'] if rows else ''}, "
         f"excluded_2026_08_14={excluded_ok})",
+        f"- Replay old_pool carry-forward check: {'passed' if carry_forward_ok else 'failed'}",
         f"- Future-date leak check after clip: {'passed' if future_leak_ok else 'failed'}",
-        f"- Schema check: {'passed' if schema_ok else 'failed'}",
+        f"- Schema check on successful pool weeks: {'passed' if schema_ok else 'failed'}",
+        f"- Missing historical pkl weeks recorded as data gaps: {len(missing_pkl_rows)}",
         f"- Historical git pkl source check: {'passed' if historical_git_ok and historical_source_ok else 'failed'}",
         f"- IBD resolver field check: {'passed' if ibd_resolver_ok else 'failed'} "
         f"(signal_candidates={ibd_totals['signal_candidates']}, "
@@ -810,18 +897,20 @@ def write_report(output_root: Path, rows: list[dict[str, Any]]) -> None:
         "",
         "## Week Status",
         "",
-        "| snapshot_date | status | rows | data_source | pkl_commit | daily_pkl | weekly_pkl | daily_max | weekly_max | clipped | schema | failure_reason |",
-        "|---|---:|---:|---|---|---|---|---|---|---:|---|---|",
+        "| snapshot_date | status | old_pool | new_pool | old_pool_source | rows | data_source | pkl_commit | daily_pkl | weekly_pkl | daily_max | weekly_max | clipped | schema | failure_reason |",
+        "|---|---:|---:|---:|---|---:|---|---|---|---|---|---|---:|---|---|",
     ]
     for row in rows:
         schema_status = row.get("schema_audit", {}).get("schema_validation_status", "")
         commit = str(row.get("historical_pkl_commit") or "")
         lines.append(
-            f"| {row['snapshot_date']} | {row['status']} | {row['output_row_count']} | "
+            f"| {row['snapshot_date']} | {row['status']} | {row.get('replay_old_pool_count')} | "
+            f"{row.get('replay_new_pool_count')} | {row.get('replay_old_pool_source')} | "
+            f"{row.get('output_row_count', 0)} | "
             f"{row.get('data_source_mode', '')} | {commit[:8]} | "
             f"{Path(str(row.get('daily_pkl_file') or '')).name} | {Path(str(row.get('weekly_pkl_file') or '')).name} | "
             f"{row.get('daily_max_date_before_clip')} | {row.get('weekly_max_date_before_clip')} | "
-            f"{row['replay_used_clipped_data']} | {schema_status} | {row['failure_reason']} |"
+            f"{row.get('replay_used_clipped_data', False)} | {schema_status} | {row.get('failure_reason', '')} |"
         )
     (output_root / "audit_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -832,19 +921,20 @@ def write_execution_log(output_root: Path, rows: list[dict[str, Any]], *, quant_
         "",
         "## Scope",
         "",
-        "- Rebuild 2026 year-to-date complete-week breakout/follow pools before the production week ending 2026-08-14.",
+        f"- Rebuild complete-week breakout/follow pools from {rows[0]['snapshot_date'] if rows else ''} to {rows[-1]['snapshot_date'] if rows else ''}.",
         "- Use the latest checked-out quant_trade dev logic for pool generation.",
         "- Use git-history pkl blobs from this Yfinance_data repository as point-in-time market data.",
         "- Do not use existing historical pool CSV files as inputs.",
         "- Do not write production `us/` pool files, publish, commit from the strategy pipeline, send Telegram, connect Futu, or update databases.",
+        "- Carry `old_pool` chronologically: first replay week cold-starts with an empty set; each successful week provides the next week's old_pool codes.",
         "",
         "## Procedure",
         "",
-        "1. Enumerate complete NYSE weeks from 2026-01-01 up to but excluding 2026-08-14.",
+        "1. Enumerate complete NYSE weeks from the requested start date up to but excluding the configured production week.",
         "2. For each snapshot week, scan git history commits touching `results_pkl` from the expected close date through the configured search window.",
         "3. In each candidate commit tree, inspect available `stock_data_*_1d.pkl` and `stock_data_*_1wk.pkl` blobs by reading their internal price dates.",
         "4. Select the earliest commit whose daily pkl max date equals the snapshot close and whose weekly pkl max date stays inside the snapshot week without exceeding the close.",
-        "5. Load selected pkl blobs directly with `git show <commit>:<path>`, run quant_trade `core_run`, then run the IBD entry enrichment helper against the replay output only.",
+        "5. Load selected pkl blobs directly with `git show <commit>:<path>`, run quant_trade `core_run` in replay mode with the carried old_pool set, then run the IBD entry enrichment helper against the replay output only.",
         "6. Clear current-snapshot EPS values, recompute 52-week-high fields from the selected as-of daily pkl, validate schema/null semantics, and write per-week metadata.",
         "",
         "## Commits",
@@ -855,13 +945,15 @@ def write_execution_log(output_root: Path, rows: list[dict[str, Any]], *, quant_
         "",
         "## Weekly Pkl Mapping",
         "",
-        "| snapshot_date | status | pkl_commit | commit_date | daily_pkl | daily_max | weekly_pkl | weekly_max | future_before_clip | clipped | rows |",
-        "|---|---|---|---|---|---|---|---|---:|---:|---:|",
+        "| snapshot_date | status | old_pool | new_pool | old_pool_source | pkl_commit | commit_date | daily_pkl | daily_max | weekly_pkl | weekly_max | future_before_clip | clipped | rows |",
+        "|---|---|---:|---:|---|---|---|---|---|---|---|---:|---:|---:|",
     ]
     for row in rows:
         commit = str(row.get("historical_pkl_commit") or "")
         lines.append(
-            f"| {row['snapshot_date']} | {row['status']} | {commit[:12]} | "
+            f"| {row['snapshot_date']} | {row['status']} | "
+            f"{row.get('replay_old_pool_count')} | {row.get('replay_new_pool_count')} | "
+            f"{row.get('replay_old_pool_source')} | {commit[:12]} | "
             f"{row.get('historical_pkl_commit_date') or ''} | "
             f"{row.get('daily_pkl_file') or ''} | {row.get('daily_max_date_before_clip')} | "
             f"{row.get('weekly_pkl_file') or ''} | {row.get('weekly_max_date_before_clip')} | "
@@ -883,6 +975,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quant-trade-path", default="/Users/tbin/Documents/quant_trade")
     parser.add_argument("--quant-trade-env", default="/Users/tbin/Documents/quant_trade/.env")
     parser.add_argument("--max-weeks", type=int, default=None)
+    parser.add_argument("--clean-output-root", action="store_true")
     args = parser.parse_args(argv)
 
     yfinance_data_path = Path.cwd()
@@ -893,6 +986,13 @@ def main(argv: list[str] | None = None) -> int:
     quant_trade_env = Path(args.quant_trade_env) if args.quant_trade_env else None
     quant_trade_commit = git_commit(quant_trade_path)
 
+    clean_log = None
+    if args.clean_output_root:
+        clean_log = clean_replay_output_root(
+            output_root,
+            reason="clean historical replay rebuild before regenerating pool/EPS audit data",
+        )
+
     weeks = enumerate_complete_snapshot_weeks(
         start_date=args.start_date,
         exclude_week_ending=args.exclude_week_ending,
@@ -901,6 +1001,8 @@ def main(argv: list[str] | None = None) -> int:
         weeks = weeks[: args.max_weeks]
 
     rows = []
+    replay_old_pool: set[str] = set()
+    replay_old_pool_source = "cold_start"
     for week in weeks:
         if args.pkl_source == "historical-git":
             chosen, candidates = discover_historical_pkl_pair(
@@ -918,53 +1020,68 @@ def main(argv: list[str] | None = None) -> int:
                         yfinance_data_path=yfinance_data_path,
                         quant_trade_commit=quant_trade_commit,
                         candidate_count=len(candidates),
+                        replay_old_pool=replay_old_pool,
+                        replay_old_pool_source=replay_old_pool_source,
                     )
                 )
+                replay_old_pool = set()
+                replay_old_pool_source = f"reset_after_missing_pkl:{week.snapshot_date}"
                 continue
             daily_blob = git_blob_bytes(yfinance_data_path, chosen.commit, chosen.daily_path)
             weekly_blob = git_blob_bytes(yfinance_data_path, chosen.commit, chosen.weekly_path)
-            rows.append(
-                run_one_week(
-                    snapshot_date=week.snapshot_date,
-                    expected_last_trading_day=week.expected_last_trading_day,
-                    daily_pkl=None,
-                    weekly_pkl=None,
-                    daily_data=normalize_pickle_data(pickle.loads(daily_blob)),
-                    weekly_data=normalize_pickle_data(pickle.loads(weekly_blob)),
-                    data_source_mode="historical_git",
-                    historical_pkl_commit=chosen.commit,
-                    historical_pkl_commit_date=chosen.commit_date,
-                    historical_pkl_candidate_count=len(candidates),
-                    daily_pkl_file=chosen.daily_path,
-                    weekly_pkl_file=chosen.weekly_path,
-                    daily_pkl_sha256=hashlib.sha256(daily_blob).hexdigest(),
-                    weekly_pkl_sha256=hashlib.sha256(weekly_blob).hexdigest(),
-                    output_root=output_root,
-                    quant_trade_path=quant_trade_path,
-                    quant_trade_env=quant_trade_env,
-                    yfinance_data_path=yfinance_data_path,
-                    quant_trade_commit=quant_trade_commit,
-                )
-            )
-            continue
-        rows.append(
-            run_one_week(
+            row = run_one_week(
                 snapshot_date=week.snapshot_date,
                 expected_last_trading_day=week.expected_last_trading_day,
-                daily_pkl=daily_pkl,
-                weekly_pkl=weekly_pkl,
+                daily_pkl=None,
+                weekly_pkl=None,
+                daily_data=normalize_pickle_data(pickle.loads(daily_blob)),
+                weekly_data=normalize_pickle_data(pickle.loads(weekly_blob)),
+                data_source_mode="historical_git",
+                historical_pkl_commit=chosen.commit,
+                historical_pkl_commit_date=chosen.commit_date,
+                historical_pkl_candidate_count=len(candidates),
+                daily_pkl_file=chosen.daily_path,
+                weekly_pkl_file=chosen.weekly_path,
+                daily_pkl_sha256=hashlib.sha256(daily_blob).hexdigest(),
+                weekly_pkl_sha256=hashlib.sha256(weekly_blob).hexdigest(),
                 output_root=output_root,
                 quant_trade_path=quant_trade_path,
                 quant_trade_env=quant_trade_env,
                 yfinance_data_path=yfinance_data_path,
                 quant_trade_commit=quant_trade_commit,
-                data_source_mode="current_files",
+                replay_old_pool=replay_old_pool,
+                replay_old_pool_source=replay_old_pool_source,
             )
+            rows.append(row)
+            replay_old_pool = load_replay_old_pool_from_metadata(row)
+            replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
+            continue
+        row = run_one_week(
+            snapshot_date=week.snapshot_date,
+            expected_last_trading_day=week.expected_last_trading_day,
+            daily_pkl=daily_pkl,
+            weekly_pkl=weekly_pkl,
+            output_root=output_root,
+            quant_trade_path=quant_trade_path,
+            quant_trade_env=quant_trade_env,
+            yfinance_data_path=yfinance_data_path,
+            quant_trade_commit=quant_trade_commit,
+            data_source_mode="current_files",
+            replay_old_pool=replay_old_pool,
+            replay_old_pool_source=replay_old_pool_source,
         )
+        rows.append(row)
+        replay_old_pool = load_replay_old_pool_from_metadata(row)
+        replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
     write_manifest(output_root, rows)
     write_report(output_root, rows)
     write_data_source_audit_report(output_root, rows)
     write_execution_log(output_root, rows, quant_trade_path=quant_trade_path)
+    if clean_log is not None:
+        (output_root / "clean_rebuild_log.json").write_text(
+            json.dumps({**clean_log, "weeks_rebuilt": len(rows)}, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     return 0
 
 

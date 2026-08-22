@@ -1,4 +1,23 @@
 snapshot_date,selected_rule,pick_order,code,industry,score,latest_return_pct,max_gain_pct,top5_return,top5_gain,bottom5,hit_stop_8pct
+2025-12-12,technical_balanced,1,ROKU,Packaged Software,2.522970984289945,50.228659,50.400152,True,True,False,True
+2025-12-19,technical_balanced,1,MNST,Beverages: Non-Alcoholic,5.293373878526642,-37.797263,33.306762,False,True,True,True
+2025-12-19,technical_balanced,2,SCHW,Investment Banks/Brokers,4.996557443607782,14.207875,14.300401,False,False,True,True
+2025-12-19,technical_balanced,3,MU,Semiconductors,4.904454163402672,277.974871,388.119967,True,True,False,False
+2025-12-26,technical_balanced,1,HEI,Aerospace & Defense,3.4679588129720695,14.690217,15.360598,False,False,True,True
+2026-01-02,technical_balanced,1,ASML,Semiconductors,3.791348381012482,62.591476,76.107849,True,True,False,False
+2026-01-09,technical_balanced,1,GH,Medical Specialties,4.378944079196329,49.709551,65.774688,False,False,False,True
+2026-01-09,technical_balanced,2,TROW,Investment Managers,3.469974325961747,4.027098,14.791118,False,False,True,True
+2026-01-16,technical_balanced,1,IBKR,Investment Banks/Brokers,4.1678115737423065,25.799399,33.697732,True,False,False,True
+2026-01-23,technical_balanced,1,MTB,Regional Banks,4.340011089554371,18.911456,19.65556,True,True,True,True
+2026-01-30,technical_balanced,1,KO,Beverages: Non-Alcoholic,4.219392781839649,20.052012,24.445661,True,True,False,False
+2026-01-30,technical_balanced,2,PFG,Investment Managers,4.121266965313905,23.850918,26.708682,True,True,False,True
+2026-01-30,technical_balanced,3,AAPL,Telecommunications Equipment,3.924804558044606,18.151624,32.958715,True,True,True,False
+2026-02-13,technical_balanced,1,WULF,Unknown,4.169227553521333,7.749535,84.9969,False,True,True,True
+2026-02-20,technical_balanced,1,FANG,Oil & Gas Production,4.376651638523769,19.458375,25.181427,True,True,True,False
+2026-02-20,technical_balanced,2,RTX,Aerospace & Defense,4.308492234479536,10.655087,12.595533,False,False,True,True
+2026-02-27,technical_balanced,1,CASY,Specialty Stores,8.789319080963613,24.721883,36.612787,True,True,False,False
+2026-02-27,technical_balanced,2,VVX,Miscellaneous Commercial Services,5.222781588169474,19.82099,35.672008,True,False,False,True
+2026-02-27,technical_balanced,3,BTSG,Medical/Nursing Services,5.083327166099241,49.057971,78.140097,True,True,False,True
 2026-03-06,technical_balanced,1,RTX,Aerospace & Defense,4.632944645667412,8.818936,10.727184,True,True,True,True
 2026-03-06,technical_balanced,2,MPC,Oil Refining/Marketing,3.9464134369948787,67.682582,69.890545,True,True,True,False
 2026-03-13,technical_balanced,1,DOCN,Packaged Software,3.620529713054585,96.076064,182.976155,True,True,True,False

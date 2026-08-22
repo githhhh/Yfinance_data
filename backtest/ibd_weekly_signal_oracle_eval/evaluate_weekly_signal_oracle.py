@@ -16,7 +16,7 @@ import eps_pit.lookup as eps_lookup
 
 
 ROOT = Path("backtest/ibd_skill_replay_pools")
-OUT = Path("/private/tmp/ibd_weekly_signal_oracle_eval")
+OUT = Path("backtest/ibd_weekly_signal_oracle_eval")
 END_DATE = "2026-08-14"
 PRICE_CACHE = Path("results_pkl/stock_data_150826_1d.pkl")
 VERSION = "v3"
@@ -62,6 +62,15 @@ VARIANTS = {
         "fill_relaxed": True,
     },
 }
+
+
+def pool_scope() -> dict[str, object]:
+    dates = sorted(p.parent.name for p in ROOT.glob("*/breakout_follow_pool.csv"))
+    return {
+        "pool_weeks": len(dates),
+        "first_week": dates[0] if dates else "n/a",
+        "last_week": dates[-1] if dates else "n/a",
+    }
 
 
 @contextmanager
@@ -374,10 +383,11 @@ def markdown_table(frame: pd.DataFrame) -> list[str]:
 
 def render_mode_report(suffix: str, universe: pd.DataFrame, weekly: pd.DataFrame, summary: pd.DataFrame) -> str:
     label = "含 EPS" if suffix == "with_eps" else "无 EPS"
+    scope = pool_scope()
     lines = [
         f"# 按周 Signal Oracle 推荐质量评估 - {label}",
         "",
-        f"- 周范围: 2026-01-02 至 2026-08-07；路径收益截至 {END_DATE}",
+        f"- Pool 周范围: {scope['first_week']} 至 {scope['last_week']}；pool files: {scope['pool_weeks']}；路径收益截至 {END_DATE}",
         "- Oracle universe: 每周所有 `signal == True` 且路径收益可计算的标的；winner/loser 在每周内排序，不跨周合并。",
         "- Big winner: 当周 latest_return Top5；Opportunity winner: 当周 max_gain Top5；Big loser: 当周 latest_return Bottom5 或命中 -8% stop。",
         "",
@@ -429,6 +439,7 @@ def render_mode_report(suffix: str, universe: pd.DataFrame, weekly: pd.DataFrame
 
 
 def render_run_log(combined: pd.DataFrame) -> str:
+    scope = pool_scope()
     return "\n".join(
         [
             "# Weekly Signal Oracle Evaluation Run Log",
@@ -439,7 +450,7 @@ def render_run_log(combined: pd.DataFrame) -> str:
             "",
             "## Step Logic",
             "",
-            "1. 固定输入：`backtest/ibd_skill_replay_pools/*/breakout_follow_pool.csv` 的 32 个历史 pool；不修改 pool。",
+            f"1. 固定输入：`backtest/ibd_skill_replay_pools/*/breakout_follow_pool.csv` 的 {scope['pool_weeks']} 个成功 replay pool，范围 {scope['first_week']} 至 {scope['last_week']}；不修改 pool。",
             f"2. 固定收益窗口：从每个 `snapshot_date` 的 `ibd_candidate_price` 到 `{END_DATE}`，使用 `results_pkl/stock_data_150826_1d.pkl` 计算 latest return、max gain、max drawdown、-8% stop。",
             "3. 每周 universe：该周所有 `signal == True` 行；ACTIONABLE 与非 ACTIONABLE 都进入 winner/loser oracle。",
             "4. 每周 winner/loser：latest return Top3/Top5、max gain Top5、latest return Bottom3/Bottom5、以及是否触发 -8% stop。所有排名只在同一周内比较。",
