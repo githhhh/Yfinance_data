@@ -7,7 +7,7 @@ import pandas as pd
 class SignalEPSLookup:
     """Point-in-time EPS lookup and signal-only pool enrichment."""
 
-    DEFAULT_CSV_PATH = "backtest/ibd_skill_replay_pools/signal_eps_pit.csv"
+    DEFAULT_CSV_PATH = "us/signal_eps_pit.csv"
     DEFAULT_STAGE2_PATH = "us/stage2/stage2_whitelist.csv"
     _eps_cache: Optional[Dict[Tuple[str, str], float]] = None
     _record_cache: Optional[Dict[Tuple[str, str], Dict[str, Any]]] = None
