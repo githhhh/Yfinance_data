@@ -1,6 +1,9 @@
 {
   "oracle_dir": "backtest/ibd_weekly_signal_oracle_eval",
   "output_dir": "backtest/rd_agent_research_bench/output",
+  "price_cache": "results_pkl/stock_data_220826_1d.pkl",
+  "initial_capital": 10000.0,
+  "stop_loss_pct": 8.0,
   "variants": [
     "v3_core_top3",
     "skill_industry_eps_known",
@@ -19,6 +22,10 @@
     "pair_audit": "backtest/rd_agent_research_bench/output/pair_outcome_audit.csv",
     "intuitive": "backtest/rd_agent_research_bench/output/intuitive_variant_summary.csv",
     "stop_loss": "backtest/rd_agent_research_bench/output/stop_loss_capital_replay.csv",
+    "backtrader_summary": "backtest/rd_agent_research_bench/output/backtrader_summary.csv",
+    "backtrader_trades": "backtest/rd_agent_research_bench/output/backtrader_trades.csv",
+    "backtrader_equity": "backtest/rd_agent_research_bench/output/backtrader_equity_curve.csv",
+    "backtrader_decisions": "backtest/rd_agent_research_bench/output/backtrader_decision_matrix.csv",
     "absorption": "backtest/rd_agent_research_bench/output/candidate_absorption_matrix.csv",
     "hypotheses_csv": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.csv",
     "hypotheses_json": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.json",

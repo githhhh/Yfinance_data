@@ -340,6 +340,55 @@ def stop_loss_capital_backtest(
     }
 
 
+def backtrader_decision_matrix(
+    summary: pd.DataFrame,
+    *,
+    eps_mode: str,
+    baseline_variant: str,
+    min_rebalance_coverage_ratio: float = 0.95,
+    min_pick_coverage_ratio: float = 0.90,
+) -> pd.DataFrame:
+    baseline = _summary_row(summary, eps_mode, baseline_variant)
+    if baseline is None:
+        return pd.DataFrame()
+    frame = summary[summary["eps_mode"].astype(str).eq(eps_mode)].copy()
+    rows = []
+    for _, row in frame.iterrows():
+        variant = str(row.get("variant"))
+        if variant == baseline_variant:
+            continue
+        rebalance_ratio = _safe_ratio(row.get("rebalance_events"), baseline.get("rebalance_events"))
+        pick_ratio = _safe_ratio(row.get("input_picks"), baseline.get("input_picks"))
+        return_ok = _leq_or_equal(baseline.get("final_value"), row.get("final_value"))
+        drawdown_ok = _leq_or_equal(baseline.get("max_drawdown_pct"), row.get("max_drawdown_pct"))
+        stop_ok = _leq_or_equal(row.get("stop_events"), baseline.get("stop_events"))
+        coverage_ok = rebalance_ratio >= min_rebalance_coverage_ratio and pick_ratio >= min_pick_coverage_ratio
+        if return_ok and drawdown_ok and stop_ok and coverage_ok:
+            status = "direct_replacement_candidate"
+        elif return_ok and drawdown_ok and stop_ok:
+            status = "high_confidence_candidate"
+        elif return_ok:
+            status = "audit_only"
+        else:
+            status = "reject_backtrader"
+        rows.append(
+            {
+                "eps_mode": eps_mode,
+                "baseline_variant": baseline_variant,
+                "variant": variant,
+                "backtrader_status": status,
+                "rebalance_coverage_ratio": rebalance_ratio,
+                "pick_coverage_ratio": pick_ratio,
+                "final_value_delta": _delta(row.get("final_value"), baseline.get("final_value")),
+                "total_return_delta": _delta(row.get("total_return_pct"), baseline.get("total_return_pct")),
+                "max_drawdown_delta": _delta(row.get("max_drawdown_pct"), baseline.get("max_drawdown_pct")),
+                "stop_events_delta": _delta(row.get("stop_events"), baseline.get("stop_events")),
+                "decision_reason": _backtrader_decision_reason(status, coverage_ok, return_ok, drawdown_ok, stop_ok),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["backtrader_status", "variant"]).reset_index(drop=True)
+
+
 def render_markdown_report(
     quality: pd.DataFrame,
     imax: pd.DataFrame,
@@ -349,6 +398,8 @@ def render_markdown_report(
     intuitive_summary: pd.DataFrame | None = None,
     absorption_matrix: pd.DataFrame | None = None,
     stop_loss_backtest: pd.DataFrame | None = None,
+    backtrader_summary: pd.DataFrame | None = None,
+    backtrader_decisions: pd.DataFrame | None = None,
     title: str = "RD-Agent Research Bench Audit",
 ) -> str:
     lines = [
@@ -372,6 +423,14 @@ def render_markdown_report(
         lines.append("- Replay lens: each snapshot allocates equal capital across selected picks; stopped picks realize the configured stop-loss return, then weekly returns compound from the initial capital.")
         lines.append("- This is not a live portfolio simulation: replay paths overlap and all path returns use the fixed oracle end date.")
         lines.extend(_markdown_table(_round_frame(stop_loss_backtest)).splitlines())
+    if backtrader_summary is not None:
+        lines.extend(["", "## Backtrader Weekly Rebalance Backtest", ""])
+        lines.append("- Primary return evidence: Backtrader event-driven broker simulation with weekly rebalance, actual OHLC feeds, next tradable open execution, and per-position stop orders.")
+        lines.extend(_markdown_table(_round_frame(backtrader_summary)).splitlines())
+    if backtrader_decisions is not None:
+        lines.extend(["", "## Backtrader Replacement Decision", ""])
+        lines.append("- Direct replacement requires better/equal final value, drawdown, stop events, and similar rebalance/pick coverage versus the baseline.")
+        lines.extend(_markdown_table(_round_frame(backtrader_decisions)).splitlines())
     if pair_audit is not None:
         lines.extend(["", "## BLFS / IMAX Pair Audit", ""])
         lines.extend(_markdown_table(_round_frame(pair_audit)).splitlines())
@@ -536,3 +595,25 @@ def _quality_row(quality: pd.DataFrame, eps_mode: str, variant: str) -> pd.Serie
     if rows.empty:
         return None
     return rows.iloc[0]
+
+
+def _summary_row(summary: pd.DataFrame, eps_mode: str, variant: str) -> pd.Series | None:
+    rows = summary[summary["eps_mode"].astype(str).eq(eps_mode) & summary["variant"].astype(str).eq(variant)]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
+def _backtrader_decision_reason(status: str, coverage_ok: bool, return_ok: bool, drawdown_ok: bool, stop_ok: bool) -> str:
+    failed = []
+    if not coverage_ok:
+        failed.append("coverage")
+    if not return_ok:
+        failed.append("final_value")
+    if not drawdown_ok:
+        failed.append("drawdown")
+    if not stop_ok:
+        failed.append("stop_events")
+    if not failed:
+        return f"{status}: Backtrader return/risk/coverage gates pass"
+    return f"{status}: failed " + ",".join(failed)
