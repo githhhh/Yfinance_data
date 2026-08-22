@@ -61,6 +61,14 @@ VARIANTS = {
         "exclude_geometry_caution": True,
         "fill_relaxed": True,
     },
+    "research_fresh_demand_proximity_first": {
+        "industry_cover": True,
+        "research_order": "fresh_proximity",
+    },
+    "research_pullback_vcp_lane_interleave": {
+        "industry_cover": True,
+        "research_order": "pullback_interleave",
+    },
     "signal_shadow_top3": {
         "industry_cover": True,
         "allow_non_actionable": True,
@@ -148,6 +156,7 @@ def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *,
 
 def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, object]) -> list:
     by_code = {str(row.get("code")): row for _, row in pool.iterrows()}
+    items = _research_ordered_items(items, cfg)
     out = []
     covered = set()
     for item in items:
@@ -181,6 +190,80 @@ def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, objec
             if len(out) == 3:
                 return out
     return out
+
+
+def _research_ordered_items(items: list, cfg: dict[str, object]) -> list:
+    order = cfg.get("research_order")
+    if order == "fresh_proximity":
+        return sorted(items, key=_fresh_proximity_key)
+    if order == "pullback_interleave":
+        return sorted(items, key=_pullback_interleave_key)
+    return items
+
+
+def _fresh_proximity_key(item) -> tuple:
+    cur = to_float(item.feature_values.get("current_vs_ibd_candidate_pct"))
+    entry_vol = to_float(item.feature_values.get("ibd_entry_volume_ratio"))
+    reasons = set(item.reason_codes)
+    risks = set(item.risk_codes)
+    evidence_balance = _evidence_balance(item)
+    return (
+        item.sort_key[0],
+        0 if item.entry_status == "ACTIONABLE" else 1,
+        0 if item.lane == "fresh_demand_alpha" else 1,
+        -evidence_balance,
+        _positive_buy_point_distance(cur),
+        0 if "geometry_caution_not_failure" not in reasons else 1,
+        0 if entry_vol is not None and entry_vol >= 1.5 else 1,
+        len(risks),
+        item.code,
+    )
+
+
+def _pullback_interleave_key(item) -> tuple:
+    cur = to_float(item.feature_values.get("current_vs_ibd_candidate_pct"))
+    rule = str(item.feature_values.get("ibd_candidate_rule") or "").strip()
+    reasons = set(item.reason_codes)
+    risks = set(item.risk_codes)
+    is_pullback = rule in {"ceiling_pullback", "pivot", "ma10_touch_confirm", "three_weeks_tight"}
+    evidence_balance = _evidence_balance(item)
+    return (
+        item.sort_key[0],
+        0 if item.entry_status == "ACTIONABLE" else 1,
+        -evidence_balance,
+        0 if is_pullback and "dry_pullback" in reasons else 1,
+        0 if item.lane in {"fresh_demand_alpha", "constructive_pullback"} else 1,
+        _positive_buy_point_distance(cur),
+        len(risks),
+        item.code,
+    )
+
+
+def _evidence_balance(item) -> int:
+    positive_codes = {
+        "near_buy_point",
+        "volume_confirms_breakout",
+        "eps_acceleration_support",
+        "weekly_volume_follow_through",
+        "near_52w_high",
+        "pullback_structure",
+        "dry_pullback",
+    }
+    negative_codes = {
+        "freshness_missing",
+        "below_candidate_buy_point",
+        "extended_from_buy_point",
+        "entry_volume_missing",
+        "entry_volume_below_standard",
+        "pullback_not_dry",
+    }
+    return sum(code in item.reason_codes for code in positive_codes) - sum(code in item.risk_codes for code in negative_codes)
+
+
+def _positive_buy_point_distance(value: float | None) -> float:
+    if value is None or value < 0:
+        return 999.0
+    return float(value)
 
 
 def fmt_pct(value: object) -> str:
@@ -461,7 +544,7 @@ def render_run_log(combined: pd.DataFrame, *, price_cache: Path) -> str:
             "5. 推荐生成：对同一 pool 调用 `rank_reasoning_candidates(..., universe='review', version='v3')`，比较现有 ACTIONABLE variants 与 `signal_shadow_top3`（所有 signal，保留 entry_status，最多 3 只的审计层；非正式推荐）。",
             "6. EPS-blind 模式：在内存中关闭 `eps_pit.lookup.get_signal_eps`，所有 CSV 空 EPS 保持 missing。",
             "7. EPS-enriched 模式：允许 `eps_pit.lookup.get_signal_eps(snapshot, code)` 作为 point-in-time 补源，按用户要求先假设其正确。",
-            "8. Variant 比较：测试行业覆盖、EPS 已知、EPS>=25、排除 `pullback_not_dry`、排除 `geometry_caution_not_failure`、Fresh Demand/Constructive Pullback 限定等组合。",
+            "8. Variant 比较：测试行业覆盖、EPS 已知、EPS>=25、排除 `pullback_not_dry`、排除 `geometry_caution_not_failure`、Fresh Demand/Constructive Pullback 限定，以及 RD candidate 排序假设。",
             "9. 评分函数：`3*周Top5命中率 + 周max-gain Top5命中率 + 周中位平均收益/100 - 1.5*周Bottom5暴露率 - 周stop暴露率 - 0.8*pick Bottom5率 - 0.5*pick stop率`。",
             "10. 规则沉淀：只采用跨周稳定的证据顺序和风险约束；禁止把具体 ticker、日期、收益率、中位数或命中率写成新门槛。",
             "",

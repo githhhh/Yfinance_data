@@ -1,2 +1,0 @@
-eps_mode,strategy,weeks,picks,avg_return_pct,median_week_return_pct,median_worst_pick_return_pct,top5_return_week_rate,top5_gain_week_rate,bottom5_week_rate,stop_week_rate,unique_rules
-with_eps,walk_forward_best_rule,33,79,29.643924762626266,18.911456,8.818936,0.36363636363636365,0.3333333333333333,0.3939393939393939,0.6666666666666666,3

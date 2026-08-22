@@ -1,0 +1,20 @@
+{
+  "oracle_dir": "backtest/ibd_weekly_signal_oracle_eval",
+  "output_dir": "backtest/rd_agent_research_bench/output",
+  "variants": [
+    "v3_core_top3",
+    "skill_industry_eps_known",
+    "clean_eps_pass_no_dry_no_geom_caution",
+    "signal_shadow_top3",
+    "research_fresh_demand_proximity_first",
+    "research_pullback_vcp_lane_interleave"
+  ],
+  "outputs": {
+    "quality": "backtest/rd_agent_research_bench/output/variant_quality_summary.csv",
+    "coverage": "backtest/rd_agent_research_bench/output/rule_status_coverage.csv",
+    "imax": "backtest/rd_agent_research_bench/output/imax_rank_audit.csv",
+    "hypotheses_csv": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.csv",
+    "hypotheses_json": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.json",
+    "report": "backtest/rd_agent_research_bench/output/research_bench_report.md"
+  }
+}
