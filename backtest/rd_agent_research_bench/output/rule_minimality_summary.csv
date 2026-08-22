@@ -1,0 +1,6 @@
+variant,rule_count,signal_wide,eps_gate,industry_cover,core_quality_gate,pullback_dry_hard_filter,geometry_caution_hard_filter,proximity_reorder,picks,median_week_return_pct,min_week_return_pct,pick_bottom5_rate,pick_stop_rate,final_value,total_return_pct,max_drawdown_pct,stop_events,imax_selected,imax_pick_order
+signal_core_quality_eps_pass,3,True,pass_25,True,True,False,False,False,88,15.52704475,-4.2633275,0.14772727272727273,0.13636363636363635,16364.43,63.64430000000001,-11.268163007446198,3,True,2.0
+skill_industry_eps_known,3,False,known,True,True,False,False,False,101,16.0251145,-4.2633275,0.1485148514851485,0.1485148514851485,15470.502799999998,54.70502799999999,-16.901371762076632,5,True,2.0
+signal_core_quality_eps_known,3,True,known,True,True,False,False,False,101,16.0251145,-4.2633275,0.1485148514851485,0.1485148514851485,15470.502799999998,54.70502799999999,-16.901371762076632,5,True,2.0
+signal_core_quality_proximity_eps_known,4,True,known,True,True,False,False,True,101,16.39334975,-6.076832,0.1485148514851485,0.13861386138613863,15309.675599999999,53.09675599999999,-16.901371762076632,5,True,1.0
+clean_eps_pass_no_dry_no_geom_caution,5,False,pass_25,True,True,True,True,False,88,15.2132215,-4.2633275,0.14772727272727273,0.14772727272727273,18198.789999999997,81.98789999999998,-6.608368436601408,2,False,

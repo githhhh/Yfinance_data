@@ -19,7 +19,9 @@ from backtest.rd_agent_research_bench.research import (
     load_oracle_tables,
     pair_outcome_audit,
     render_markdown_report,
+    rule_minimality_summary,
     rule_status_coverage,
+    semiconductor_capture_audit,
     summarize_variant_quality,
     stop_loss_capital_backtest,
 )
@@ -36,6 +38,11 @@ DEFAULT_VARIANTS = [
     "research_proximity_structural_floor_guard",
     "research_proximity_eps_known_floor_guard",
     "research_proximity_eps_pass_floor_guard",
+    "signal_core_quality_top3",
+    "signal_core_quality_no_industry",
+    "signal_core_quality_eps_known",
+    "signal_core_quality_eps_pass",
+    "signal_core_quality_proximity_eps_known",
 ]
 
 
@@ -130,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
         if backtrader_decision_parts
         else pd.DataFrame()
     )
+    minimality = rule_minimality_summary(quality, backtrader_summary, imax)
+    semiconductor_capture = semiconductor_capture_audit(backtrader_trades)
     absorption_parts = []
     with_eps_absorption = absorption_candidate_matrix(
         quality,
@@ -158,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
     backtrader_trades.to_csv(output_dir / "backtrader_trades.csv", index=False)
     backtrader_equity.to_csv(output_dir / "backtrader_equity_curve.csv", index=False)
     backtrader_decisions.to_csv(output_dir / "backtrader_decision_matrix.csv", index=False)
+    minimality.to_csv(output_dir / "rule_minimality_summary.csv", index=False)
+    semiconductor_capture.to_csv(output_dir / "semiconductor_capture_audit.csv", index=False)
     absorption.to_csv(output_dir / "candidate_absorption_matrix.csv", index=False)
     hypotheses.to_csv(output_dir / "rd_agent_hypothesis_space.csv", index=False)
     (output_dir / "rd_agent_hypothesis_space.json").write_text(
@@ -174,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
         stop_loss_backtest=stop_loss,
         backtrader_summary=backtrader_summary,
         backtrader_decisions=backtrader_decisions,
+        minimality_summary=minimality,
+        semiconductor_capture=semiconductor_capture,
     )
     (output_dir / "research_bench_report.md").write_text(report, encoding="utf-8")
     manifest = {
@@ -194,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
             "backtrader_trades": str(output_dir / "backtrader_trades.csv"),
             "backtrader_equity": str(output_dir / "backtrader_equity_curve.csv"),
             "backtrader_decisions": str(output_dir / "backtrader_decision_matrix.csv"),
+            "minimality": str(output_dir / "rule_minimality_summary.csv"),
+            "semiconductor_capture": str(output_dir / "semiconductor_capture_audit.csv"),
             "absorption": str(output_dir / "candidate_absorption_matrix.csv"),
             "hypotheses_csv": str(output_dir / "rd_agent_hypothesis_space.csv"),
             "hypotheses_json": str(output_dir / "rd_agent_hypothesis_space.json"),

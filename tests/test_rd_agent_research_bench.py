@@ -11,7 +11,9 @@ from backtest.rd_agent_research_bench.research import (
     imax_rank_audit,
     pair_outcome_audit,
     render_markdown_report,
+    rule_minimality_summary,
     rule_status_coverage,
+    semiconductor_capture_audit,
     summarize_variant_quality,
     stop_loss_capital_backtest,
 )
@@ -214,6 +216,67 @@ def test_absorption_candidate_matrix_separates_candidate_audit_and_reject():
     assert statuses["shadow"] == "audit_only"
     assert statuses["thin"] == "reject_low_coverage"
     assert "ticker" not in " ".join(matrix["decision_reason"].str.lower())
+
+
+def test_rule_minimality_summary_compares_core_rules_and_imax_selection():
+    quality = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "picks": 100, "median_week_avg_latest_return_pct": 16.0, "min_week_avg_latest_return_pct": -4.0, "pick_bottom5_precision_bad": 0.15, "pick_stop_rate": 0.15},
+            {"eps_mode": "with_eps", "variant": "signal_core_quality_eps_pass", "picks": 88, "median_week_avg_latest_return_pct": 15.5, "min_week_avg_latest_return_pct": -4.0, "pick_bottom5_precision_bad": 0.14, "pick_stop_rate": 0.13},
+            {"eps_mode": "with_eps", "variant": "clean_eps_pass_no_dry_no_geom_caution", "picks": 88, "median_week_avg_latest_return_pct": 15.2, "min_week_avg_latest_return_pct": -4.0, "pick_bottom5_precision_bad": 0.14, "pick_stop_rate": 0.14},
+        ]
+    )
+    backtrader = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "skill_industry_eps_known", "final_value": 15000.0, "total_return_pct": 50.0, "max_drawdown_pct": -16.0, "stop_events": 5},
+            {"eps_mode": "with_eps", "variant": "signal_core_quality_eps_pass", "final_value": 16000.0, "total_return_pct": 60.0, "max_drawdown_pct": -11.0, "stop_events": 3},
+            {"eps_mode": "with_eps", "variant": "clean_eps_pass_no_dry_no_geom_caution", "final_value": 18000.0, "total_return_pct": 80.0, "max_drawdown_pct": -6.0, "stop_events": 2},
+        ]
+    )
+    imax = pd.DataFrame(
+        [
+            {"eps_mode": "with_eps", "variant": "signal_core_quality_eps_pass", "selected": True, "pick_order": 2},
+            {"eps_mode": "with_eps", "variant": "clean_eps_pass_no_dry_no_geom_caution", "selected": False, "pick_order": pd.NA},
+        ]
+    )
+
+    summary = rule_minimality_summary(quality, backtrader, imax)
+    by_variant = summary.set_index("variant")
+
+    assert by_variant.loc["signal_core_quality_eps_pass", "rule_count"] < by_variant.loc["clean_eps_pass_no_dry_no_geom_caution", "rule_count"]
+    assert by_variant.loc["signal_core_quality_eps_pass", "final_value"] > by_variant.loc["skill_industry_eps_known", "final_value"]
+    assert bool(by_variant.loc["signal_core_quality_eps_pass", "imax_selected"])
+    assert not bool(by_variant.loc["clean_eps_pass_no_dry_no_geom_caution", "imax_selected"])
+
+
+def test_semiconductor_capture_audit_uses_pool_industry_labels(tmp_path):
+    pool_dir = tmp_path / "2026-01-02"
+    pool_dir.mkdir()
+    pd.DataFrame(
+        [
+            {"code": "TSM", "signal": True, "sector": "Electronic Technology", "industry": "Semiconductors"},
+            {"code": "SOFT", "signal": True, "sector": "Technology Services", "industry": "Packaged Software"},
+        ]
+    ).to_csv(pool_dir / "breakout_follow_pool.csv", index=False)
+    trades = pd.DataFrame(
+        [
+            {
+                "eps_mode": "with_eps",
+                "variant": "sample",
+                "event": "rebalance",
+                "snapshot_date": "2026-01-02",
+                "target_codes": "TSM,SOFT",
+            }
+        ]
+    )
+
+    audit = semiconductor_capture_audit(trades, pool_root=tmp_path)
+
+    row = audit.iloc[0]
+    assert row["semi_signal_weeks"] == 1
+    assert row["semi_hit_weeks"] == 1
+    assert row["semi_pick_slots"] == 1
+    assert row["unique_semis"] == "TSM"
 
 
 def test_stop_loss_capital_backtest_caps_stopped_picks_and_compounds_weekly():

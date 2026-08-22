@@ -13,6 +13,7 @@ from backtest.rd_agent_research_bench.hypotheses import hypothesis_space
 
 
 DEFAULT_ORACLE_DIR = Path("backtest/ibd_weekly_signal_oracle_eval")
+DEFAULT_POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
 
 
 def summarize_variant_quality(
@@ -389,6 +390,136 @@ def backtrader_decision_matrix(
     return pd.DataFrame(rows).sort_values(["backtrader_status", "variant"]).reset_index(drop=True)
 
 
+def rule_minimality_summary(
+    quality: pd.DataFrame,
+    backtrader_summary: pd.DataFrame,
+    imax: pd.DataFrame,
+) -> pd.DataFrame:
+    profiles = {
+        "skill_industry_eps_known": {
+            "signal_wide": False,
+            "eps_gate": "known",
+            "industry_cover": True,
+            "core_quality_gate": True,
+            "pullback_dry_hard_filter": False,
+            "geometry_caution_hard_filter": False,
+            "proximity_reorder": False,
+        },
+        "clean_eps_pass_no_dry_no_geom_caution": {
+            "signal_wide": False,
+            "eps_gate": "pass_25",
+            "industry_cover": True,
+            "core_quality_gate": True,
+            "pullback_dry_hard_filter": True,
+            "geometry_caution_hard_filter": True,
+            "proximity_reorder": False,
+        },
+        "signal_core_quality_eps_known": {
+            "signal_wide": True,
+            "eps_gate": "known",
+            "industry_cover": True,
+            "core_quality_gate": True,
+            "pullback_dry_hard_filter": False,
+            "geometry_caution_hard_filter": False,
+            "proximity_reorder": False,
+        },
+        "signal_core_quality_eps_pass": {
+            "signal_wide": True,
+            "eps_gate": "pass_25",
+            "industry_cover": True,
+            "core_quality_gate": True,
+            "pullback_dry_hard_filter": False,
+            "geometry_caution_hard_filter": False,
+            "proximity_reorder": False,
+        },
+        "signal_core_quality_proximity_eps_known": {
+            "signal_wide": True,
+            "eps_gate": "known",
+            "industry_cover": True,
+            "core_quality_gate": True,
+            "pullback_dry_hard_filter": False,
+            "geometry_caution_hard_filter": False,
+            "proximity_reorder": True,
+        },
+    }
+    rows = []
+    for variant, profile in profiles.items():
+        quality_row = _quality_row(quality, "with_eps", variant)
+        bt_row = _summary_row(backtrader_summary, "with_eps", variant)
+        imax_row = _imax_row(imax, "with_eps", variant)
+        if quality_row is None or bt_row is None:
+            continue
+        rule_count = int(profile["core_quality_gate"]) + int(profile["industry_cover"]) + int(profile["eps_gate"] != "none")
+        rule_count += int(profile["pullback_dry_hard_filter"]) + int(profile["geometry_caution_hard_filter"]) + int(profile["proximity_reorder"])
+        rows.append(
+            {
+                "variant": variant,
+                "rule_count": rule_count,
+                **profile,
+                "picks": quality_row.get("picks"),
+                "median_week_return_pct": quality_row.get("median_week_avg_latest_return_pct"),
+                "min_week_return_pct": quality_row.get("min_week_avg_latest_return_pct"),
+                "pick_bottom5_rate": quality_row.get("pick_bottom5_precision_bad"),
+                "pick_stop_rate": quality_row.get("pick_stop_rate"),
+                "final_value": bt_row.get("final_value"),
+                "total_return_pct": bt_row.get("total_return_pct"),
+                "max_drawdown_pct": bt_row.get("max_drawdown_pct"),
+                "stop_events": bt_row.get("stop_events"),
+                "imax_selected": bool(imax_row is not None and imax_row.get("selected")),
+                "imax_pick_order": imax_row.get("pick_order") if imax_row is not None else pd.NA,
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["rule_count", "final_value"], ascending=[True, False]).reset_index(drop=True)
+
+
+def semiconductor_capture_audit(
+    backtrader_trades: pd.DataFrame,
+    *,
+    pool_root: Path = DEFAULT_POOL_ROOT,
+) -> pd.DataFrame:
+    theme_by_week = _theme_signal_codes_by_week(pool_root)
+    if backtrader_trades.empty or not theme_by_week:
+        return pd.DataFrame()
+    rebalance = backtrader_trades[backtrader_trades["event"].astype(str).eq("rebalance")].copy()
+    rows = []
+    for (eps_mode, variant), group in rebalance.groupby(["eps_mode", "variant"], sort=True):
+        weeks = 0
+        hit_weeks = 0
+        pick_slots = 0
+        hit_slots = 0
+        unique_hits: set[str] = set()
+        examples: list[str] = []
+        for _, row in group.iterrows():
+            snapshot = str(row.get("snapshot_date", ""))[:10]
+            if snapshot not in theme_by_week:
+                continue
+            weeks += 1
+            targets = _split_codes(row.get("target_codes"))
+            hits = [code for code in targets if code in theme_by_week[snapshot]]
+            pick_slots += len(targets)
+            hit_slots += len(hits)
+            if hits:
+                hit_weeks += 1
+                unique_hits.update(hits)
+                if len(examples) < 8:
+                    examples.append(f"{snapshot}:{'/'.join(hits)}")
+        rows.append(
+            {
+                "eps_mode": eps_mode,
+                "variant": variant,
+                "semi_signal_weeks": weeks,
+                "semi_hit_weeks": hit_weeks,
+                "semi_week_rate": hit_weeks / weeks if weeks else 0.0,
+                "semi_pick_slots": hit_slots,
+                "pick_slots": pick_slots,
+                "semi_pick_rate": hit_slots / pick_slots if pick_slots else 0.0,
+                "unique_semis": ";".join(sorted(unique_hits)),
+                "examples": "; ".join(examples),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["eps_mode", "semi_hit_weeks", "semi_pick_slots"], ascending=[True, False, False]).reset_index(drop=True)
+
+
 def render_markdown_report(
     quality: pd.DataFrame,
     imax: pd.DataFrame,
@@ -400,6 +531,8 @@ def render_markdown_report(
     stop_loss_backtest: pd.DataFrame | None = None,
     backtrader_summary: pd.DataFrame | None = None,
     backtrader_decisions: pd.DataFrame | None = None,
+    minimality_summary: pd.DataFrame | None = None,
+    semiconductor_capture: pd.DataFrame | None = None,
     title: str = "RD-Agent Research Bench Audit",
 ) -> str:
     lines = [
@@ -431,6 +564,14 @@ def render_markdown_report(
         lines.extend(["", "## Backtrader Replacement Decision", ""])
         lines.append("- Direct replacement requires better/equal final value, drawdown, stop events, and similar rebalance/pick coverage versus the baseline.")
         lines.extend(_markdown_table(_round_frame(backtrader_decisions)).splitlines())
+    if minimality_summary is not None:
+        lines.extend(["", "## Minimal Signal-Core Rule Audit", ""])
+        lines.append("- Rule count is a coarse audit count of active hard gates/reorder layers, not a model score.")
+        lines.extend(_markdown_table(_round_frame(minimality_summary)).splitlines())
+    if semiconductor_capture is not None:
+        lines.extend(["", "## Semiconductor Capture Audit", ""])
+        lines.append("- Theme is identified from replay pool `sector` / `industry` text containing semiconductor-related labels; no ticker list is hard-coded.")
+        lines.extend(_markdown_table(_round_frame(semiconductor_capture)).splitlines())
     if pair_audit is not None:
         lines.extend(["", "## BLFS / IMAX Pair Audit", ""])
         lines.extend(_markdown_table(_round_frame(pair_audit)).splitlines())
@@ -588,6 +729,43 @@ def _imax_selected_row(imax: pd.DataFrame, eps_mode: str, variant: str) -> pd.Se
     if selected.empty:
         return None
     return selected.iloc[0]
+
+
+def _imax_row(imax: pd.DataFrame, eps_mode: str, variant: str) -> pd.Series | None:
+    required = {"variant"}
+    if imax.empty or not required.issubset(imax.columns):
+        return None
+    mask = imax["variant"].astype(str).eq(variant)
+    if "eps_mode" in imax.columns:
+        mask &= imax["eps_mode"].astype(str).eq(eps_mode)
+    rows = imax[mask]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
+def _theme_signal_codes_by_week(pool_root: Path) -> dict[str, set[str]]:
+    theme_by_week: dict[str, set[str]] = {}
+    for pool_path in sorted(pool_root.glob("*/breakout_follow_pool.csv")):
+        pool = pd.read_csv(pool_path, encoding="utf-8-sig")
+        if pool.empty or "code" not in pool.columns or "signal" not in pool.columns:
+            continue
+        text_cols = [col for col in ["sector", "industry"] if col in pool.columns]
+        if not text_cols:
+            continue
+        text = pool[text_cols].fillna("").astype(str).agg(" ".join, axis=1).str.lower()
+        semiconductor = text.str.contains("semiconductor|semiconductors|integrated circuit", regex=True, na=False)
+        signal = pool["signal"].astype(str).str.strip().str.lower().isin({"true", "1", "1.0"})
+        codes = set(pool.loc[semiconductor & signal, "code"].astype(str).str.strip().str.upper())
+        if codes:
+            theme_by_week[pool_path.parent.name] = codes
+    return theme_by_week
+
+
+def _split_codes(value: object) -> list[str]:
+    if pd.isna(value) or not str(value).strip():
+        return []
+    return [code.strip().upper() for code in str(value).split(",") if code.strip()]
 
 
 def _quality_row(quality: pd.DataFrame, eps_mode: str, variant: str) -> pd.Series | None:

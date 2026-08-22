@@ -2,6 +2,8 @@ eps_mode,variant,snapshot_date,code,oracle_found,latest_rank,gain_rank,loss_rank
 no_eps,research_fresh_demand_proximity_first,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,3.0
 no_eps,research_proximity_structural_floor_guard,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 no_eps,research_pullback_vcp_lane_interleave,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
+no_eps,signal_core_quality_no_industry,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
+no_eps,signal_core_quality_top3,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 no_eps,signal_shadow_top3,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 no_eps,v3_core_top3,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 with_eps,clean_eps_pass_no_dry_no_geom_caution,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
@@ -14,6 +16,11 @@ with_eps,research_proximity_eps_pass_floor_guard,2026-07-24,IMAX,True,6.0,8.0,95
 with_eps,research_proximity_structural_floor_guard,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 with_eps,research_pullback_vcp_lane_interleave,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
 with_eps,risk_clean_eps_known,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,False,
+with_eps,signal_core_quality_eps_known,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
+with_eps,signal_core_quality_eps_pass,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
+with_eps,signal_core_quality_no_industry,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
+with_eps,signal_core_quality_proximity_eps_known,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,1.0
+with_eps,signal_core_quality_top3,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
 with_eps,signal_shadow_top3,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
 with_eps,skill_industry_eps_known,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0
 with_eps,skill_industry_eps_known_no_dry_fail,2026-07-24,IMAX,True,6.0,8.0,95.0,22.520853,25.741427,True,2.0

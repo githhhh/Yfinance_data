@@ -94,6 +94,35 @@ VARIANTS = {
         "allow_non_actionable": True,
         "allow_extended_from_buy_point": True,
     },
+    "signal_core_quality_top3": {
+        "industry_cover": True,
+        "allow_non_actionable": True,
+        "require_core_quality": True,
+    },
+    "signal_core_quality_no_industry": {
+        "industry_cover": False,
+        "allow_non_actionable": True,
+        "require_core_quality": True,
+    },
+    "signal_core_quality_eps_known": {
+        "industry_cover": True,
+        "allow_non_actionable": True,
+        "require_core_quality": True,
+        "require_eps_known": True,
+    },
+    "signal_core_quality_eps_pass": {
+        "industry_cover": True,
+        "allow_non_actionable": True,
+        "require_core_quality": True,
+        "require_eps_pass": True,
+    },
+    "signal_core_quality_proximity_eps_known": {
+        "industry_cover": True,
+        "allow_non_actionable": True,
+        "require_core_quality": True,
+        "require_eps_known": True,
+        "research_order": "fresh_proximity",
+    },
 }
 
 
@@ -159,6 +188,13 @@ def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *,
     if cfg.get("require_eps_known") and eps_state == "missing":
         return False
     if cfg.get("require_eps_pass") and eps_state != "pass_25":
+        return False
+    if cfg.get("require_core_quality") and (
+        "freshness_missing" in risks
+        or "entry_volume_missing" in risks
+        or "entry_volume_below_standard" in risks
+        or "volume_confirms_breakout" not in reasons
+    ):
         return False
     if relaxed:
         return True

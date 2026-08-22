@@ -13,7 +13,12 @@
     "research_pullback_vcp_lane_interleave",
     "research_proximity_structural_floor_guard",
     "research_proximity_eps_known_floor_guard",
-    "research_proximity_eps_pass_floor_guard"
+    "research_proximity_eps_pass_floor_guard",
+    "signal_core_quality_top3",
+    "signal_core_quality_no_industry",
+    "signal_core_quality_eps_known",
+    "signal_core_quality_eps_pass",
+    "signal_core_quality_proximity_eps_known"
   ],
   "outputs": {
     "quality": "backtest/rd_agent_research_bench/output/variant_quality_summary.csv",
@@ -26,6 +31,8 @@
     "backtrader_trades": "backtest/rd_agent_research_bench/output/backtrader_trades.csv",
     "backtrader_equity": "backtest/rd_agent_research_bench/output/backtrader_equity_curve.csv",
     "backtrader_decisions": "backtest/rd_agent_research_bench/output/backtrader_decision_matrix.csv",
+    "minimality": "backtest/rd_agent_research_bench/output/rule_minimality_summary.csv",
+    "semiconductor_capture": "backtest/rd_agent_research_bench/output/semiconductor_capture_audit.csv",
     "absorption": "backtest/rd_agent_research_bench/output/candidate_absorption_matrix.csv",
     "hypotheses_csv": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.csv",
     "hypotheses_json": "backtest/rd_agent_research_bench/output/rd_agent_hypothesis_space.json",
