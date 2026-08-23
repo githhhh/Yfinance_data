@@ -40,10 +40,11 @@ def test_main_skill_declares_skill_industry_eps_known_as_formal_baseline():
 def test_research_variants_cannot_replace_or_pollute_main_baseline():
     skill = _skill_text()
 
-    assert "`clean_eps_pass_no_dry_no_geom_caution` 只允许作为研究或风险审计候选" in skill
-    assert "不得在生产预筛中替代 `skill_industry_eps_known`" in skill
+    assert "clean_eps_pass_no_dry_no_geom_caution" not in skill
+    assert "signal_shadow_top3" not in skill
+    assert "任何研究变体、审计层" in skill
     assert "RD/qlib 研究结果" in skill
-    assert "都不得进入生产推荐顺序" in skill
+    assert "不得进入生产推荐顺序；生产推荐只按 `skill_industry_eps_known` 的确定性规则执行" in skill
 
 
 def test_cross_model_determinism_contract_has_fixed_tie_breakers():
