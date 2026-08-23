@@ -20,6 +20,7 @@ description: 从 Dashboard 的 ACTIONABLE 突破候选池中执行标准化、IB
 
 只要输入 CSV、Market Report 文件和 skill 文本相同，不同模型必须输出相同的“优先复核”代码集合和顺序。为达成这一点，执行时必须遵守：
 
+- 生产验证以 deterministic artifact 为准；项目内固定入口为 `conda run --no-capture-output -n quant_env python -m dashboard.skill_industry_eps_known --pool [pool.csv]`。模型只能解释该 artifact，不得手工替换或重排。
 - 所有资格、状态、分组和排序只来自当前行正式字段与本文固定阈值；不得使用模型偏好、图表观感、历史收益、候选名称熟悉度、行业热度或外部记忆作为隐含排序键。
 - 原始质量排序必须严格使用“原始质量分层与排序”中的键序；完全并列时只用 `code` 大写字典序，再用 CSV 原始行序打破平局。
 - Industry 覆盖选择必须在原始排序冻结后顺序扫描；不得为了补齐 3 只、追热点、避开同业或迎合结论而重排。
@@ -197,6 +198,19 @@ trigger_pos = pos - rr
 - Minor 不作淘汰条件。#10 只比较“有加分 / 无加分”；所有 `volume_ratio >= 1.3` 的候选在该层完全并列，不得按 1.70、1.50、1.30 的实际大小继续排序。
 - `ibd_entry_close_vs_trigger_pct` 只作可读上下文，不参与 Geometry，也不得替代当前买点新鲜度。
 
+## 证据簇推理顺序
+
+完成 Critical、阶段路由和 Geometry 分类后，先判断候选属于哪类证据簇，再排序；不得把“图形更漂亮”单独置于“需求、跟进、基本面辅助和阶段证据更完整”之前。
+
+| 证据簇 | 触发含义 | 排序含义 |
+|---|---|---|
+| Fresh Demand Alpha | 近买点、突破日放量明确，且 EPS 辅助、周线量能或接近 52 周高点中有多项确认 | 优先寻找需求扩张；Geometry 不完美只作人工看图提示 |
+| Constructive Pullback | `ceiling_pullback`、`pivot`、`ma10_touch_confirm`、`three_weeks_tight` 等延续/回踩规则，近买点且量价证据明确 | 优先判断是突破后正常消化还是失败；dry pullback 是支持证据，非 dry 是风险提示 |
+| Standard Breakout | Critical 通过但辅助确认较少 | 可进入排序，但不得因单一完美 Geometry 压过证据簇更完整的候选 |
+| Incomplete Evidence | 关键字段通过但辅助证据不足或多项缺失 | 保留轨迹，通常不应进入优先复核前沿 |
+
+证据完整度只使用二元/三态事实，不使用数值大小作过度拟合排序：买点新鲜、突破日放量达标、EPS 是否达到辅助门槛、周线量能是否跟进、是否接近 52 周高点、适用时回踩是否缩量。EPS 仍然是辅助信息：不得作为淘汰条件，不得按 EPS 数值高低排序；但在其他关键证据已经通过时，`EPS >= 25` 可作为 Fresh Demand 证据簇的一项辅助确认。
+
 ## 原始质量分层与排序
 
 先为每个 ACTIONABLE 候选建立技术分层：
@@ -211,15 +225,18 @@ trigger_pos = pos - rr
 1. 技术分层 A > B > C > D；
 2. 更少 Major FAIL；
 3. 更少 Major UNKNOWN；
-4. Geometry 层级；Geometry UNKNOWN 排在已知 PASS 分类之后；
-5. 新鲜区 `0 <= current_vs_ibd_candidate_pct <= 2%`；
-6. Minor #7：PASS > UNKNOWN > FAIL；
-7. Minor #10：有二元加分 > 无加分；
-8. `code` 字典序，再按 CSV 原始行序。
+4. 证据簇：Fresh Demand Alpha > Constructive Pullback > Standard Breakout > Incomplete Evidence；
+5. 更完整的证据确认项数量：买点新鲜、突破日放量达标、EPS 辅助达标、周线量能跟进、接近 52 周高点、适用时回踩缩量；
+6. 更少非淘汰风险提示：例如当前巩固段未确认缩量、EPS 缺失、Industry 缺失、仅小幅越过触发位等；
+7. 新鲜区 `0 <= current_vs_ibd_candidate_pct <= 2%`；
+8. Geometry tie-breaker；Geometry UNKNOWN 排在已知 PASS 分类之后；
+9. Minor #7：PASS > UNKNOWN > FAIL；
+10. Minor #10：有二元加分 > 无加分；
+11. `code` 字典序，再按 CSV 原始行序。
 
 硬性约束：
 
-- `industry`、`sector`、行业候选数量、EPS 数值、EPS 缺失状态和最终展示名额均不得进入上述排序键。
+- `industry`、`sector`、行业候选数量、EPS 数值大小和最终展示名额均不得进入上述排序键。EPS 只能以“辅助门槛是否达标/是否缺失”的状态参与证据完整度或风险提示，不能按实际同比数值排序。
 - 原始顺位一经产生不得因 Industry 覆盖、EPS 人工核验或 Top 3 名额重排。
 - 不得把原始质量顺位命名为预测排名、收益排名、行业排名或领导者排名。
 
@@ -326,12 +343,13 @@ watch = take_first_two_by_raw_rank(
 2. 更新尝试后，项目模式读取可用的 `market_report.json` 并将其作为独立背景；报告旧、缺失、无效或日期无法确定时如实披露并继续。独立 CSV 模式只在用户提供报告时读取，否则记录“大盘背景未提供，本次未纳入”。
 3. 合规加载目标 CSV，确认唯一 `snapshot_date`，并按前置规则确定“周中分析”“完整周分析”或“指定快照分析”。
 4. 建立来源记录：`market_analysis_update_result + market_analysis_commit（若可得）+ market_snapshot_date（若可得）+ pool_snapshot_date + pool_path`。该记录只用于披露来源，任何字段都不得传入候选评分、排序或分组函数。
-5. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配原始顺位。
-6. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
-7. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
-8. 由同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字。
-9. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
-10. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
+5. 生成 deterministic artifact，作为所有模型的唯一排序与报告骨架来源。项目内固定入口为：`conda run --no-capture-output -n quant_env python -m dashboard.skill_industry_eps_known --pool [pool.csv]`。
+6. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、证据簇、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配原始顺位。
+7. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
+8. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
+9. 由同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字。
+10. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
+11. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
 
 决策轨迹使用可读链路，例如：
 
@@ -365,7 +383,7 @@ watch = take_first_two_by_raw_rank(
 3. 每个候选数字来自当前标题 ticker 的同一原始行，尤其逐一复核 `ibd_entry_volume_ratio`、`current_vs_ibd_candidate_pct` 与 `dist_to_52w_high_pct`，不得跨 ticker 复制或错位小数点。
 4. 完成双向数字审计：从最终文本的每个候选数字反查 `ticker + source_field + raw_value + formatted_value` 四元组，同时从四元组检查最终文本中的格式化值。必须逐字符核对数字串与小数位；例如 MTUS 原值 `dist_to_52w_high_pct=-4.0301...` 只能渲染为“低于52周高点4.03%”，不得漂移为 0.43%。
 5. 突破日量能与周线量能未混用；`ibd_entry_breakout_range_ratio` 未被写成百分比。
-6. 原始顺位不含 Industry、Sector 或 EPS 缺失因素；最终分组与覆盖决策没有反向污染原始顺位。
+6. 原始顺位不含 Industry、Sector、行业候选数量或 EPS 数值大小；EPS 缺失只作为非淘汰风险提示，最终分组与覆盖决策没有反向污染原始顺位。
 7. 优先复核不超过 3 只，且每个已知 Industry 最多 1 只；未凑满时没有降低门槛。
 8. 因同 Industry 未入选的候选确实排在已入选同业候选之后，或更高顺位候选存在 EPS / Industry 信息缺口；决策轨迹必须能解释例外。
 9. EPS 缺失没有被记失败或降低原始顺位；只有人工关注前沿内且最终进入“值得留意”的候选写出“EPS 数据缺失，需人工复核”。若该候选还有其他字段缺口，已全部列出。

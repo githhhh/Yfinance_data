@@ -52,6 +52,8 @@ def test_cross_model_determinism_contract_has_fixed_tie_breakers():
 
     expected_rules = (
         "不同模型必须输出相同的“优先复核”代码集合和顺序",
+        "deterministic artifact",
+        "dashboard.skill_industry_eps_known",
         "不得使用模型偏好、图表观感、历史收益、候选名称熟悉度、行业热度或外部记忆作为隐含排序键",
         "完全并列时只用 `code` 大写字典序，再用 CSV 原始行序打破平局",
         "Industry 覆盖选择必须在原始排序冻结后顺序扫描",
@@ -68,6 +70,8 @@ def test_existing_core_baseline_rules_remain_present():
     expected_rules = (
         "Review Universe 仅包含 `signal == True` 且 `ibd_candidate_rule` 非空的行",
         "完整原始质量排序”只对其中 `ibd_entry_status == ACTIONABLE` 的候选编号",
+        "Fresh Demand Alpha > Constructive Pullback > Standard Breakout > Incomplete Evidence",
+        "更完整的证据确认项数量",
         "优先复核不超过 3 只，且每个已知 Industry 最多 1 只",
         "只用 `current_vs_ibd_candidate_pct`；缺失 UNKNOWN；`0%～5%` PASS",
         "只用 `ibd_entry_volume_ratio`；缺失 UNKNOWN；有效值 `>=1.5` PASS",
