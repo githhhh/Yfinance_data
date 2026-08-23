@@ -1,0 +1,42 @@
+{
+  "backend": "skeptical_condition_generator_plus_weekly_proxy_plus_backtrader_all",
+  "eps_mode": "with_eps",
+  "oracle_end_date": "2026-08-14",
+  "initial_capital": 10000.0,
+  "stop_loss_pct": 8.0,
+  "config_count": 2592,
+  "variant_count": 2595,
+  "backtrader_finalist_count": 2595,
+  "axes": [
+    "scope/actionability",
+    "extended",
+    "eps_gate",
+    "core_entry_volume_and_volume_confirm",
+    "freshness_missing",
+    "below_candidate_buy_point",
+    "clear_geometry_failure",
+    "geometry_caution",
+    "industry_cover",
+    "order",
+    "max_picks"
+  ],
+  "non_coupling_boundary": [
+    "no ticker-specific rule",
+    "no date-specific rule",
+    "no realized-return threshold inside selector",
+    "realized returns only rank completed experiments"
+  ],
+  "outputs": {
+    "profiles": "backtest/rd_agent_research_bench/output/skeptical_condition_profiles.csv",
+    "quality": "backtest/rd_agent_research_bench/output/skeptical_condition_quality.csv",
+    "abstain": "backtest/rd_agent_research_bench/output/skeptical_condition_abstain_quality.csv",
+    "picks": "backtest/rd_agent_research_bench/output/skeptical_condition_picks.csv",
+    "weekly": "backtest/rd_agent_research_bench/output/skeptical_condition_weekly.csv",
+    "summary": "backtest/rd_agent_research_bench/output/skeptical_condition_summary.csv",
+    "decisions": "backtest/rd_agent_research_bench/output/skeptical_condition_decisions.csv",
+    "backtrader": "backtest/rd_agent_research_bench/output/skeptical_condition_backtrader_summary.csv",
+    "trades": "backtest/rd_agent_research_bench/output/skeptical_condition_backtrader_trades.csv",
+    "semiconductor": "backtest/rd_agent_research_bench/output/skeptical_condition_semiconductor_capture.csv",
+    "report": "backtest/rd_agent_research_bench/output/skeptical_condition_report.md"
+  }
+}

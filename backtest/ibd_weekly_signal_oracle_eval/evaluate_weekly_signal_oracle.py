@@ -175,7 +175,9 @@ def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *,
     if item.entry_status != "ACTIONABLE" and not cfg.get("allow_non_actionable"):
         return False
     risks = set(item.risk_codes)
-    if "clear_geometry_failure" in risks or "below_candidate_buy_point" in risks:
+    if "clear_geometry_failure" in risks and not cfg.get("allow_clear_geometry_failure"):
+        return False
+    if "below_candidate_buy_point" in risks and not cfg.get("allow_below_candidate_buy_point"):
         return False
     if "extended_from_buy_point" in risks and not cfg.get("allow_extended_from_buy_point"):
         return False
@@ -190,10 +192,10 @@ def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *,
     if cfg.get("require_eps_pass") and eps_state != "pass_25":
         return False
     if cfg.get("require_core_quality") and (
-        "freshness_missing" in risks
-        or "entry_volume_missing" in risks
-        or "entry_volume_below_standard" in risks
-        or "volume_confirms_breakout" not in reasons
+        ("freshness_missing" in risks and not cfg.get("allow_freshness_missing"))
+        or ("entry_volume_missing" in risks and not cfg.get("allow_entry_volume_missing"))
+        or ("entry_volume_below_standard" in risks and not cfg.get("allow_entry_volume_below_standard"))
+        or ("volume_confirms_breakout" not in reasons and not cfg.get("allow_without_volume_confirm"))
     ):
         return False
     if relaxed:
@@ -213,6 +215,7 @@ def item_allowed(item, row: pd.Series, enabled: bool, cfg: dict[str, object], *,
 def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, object]) -> list:
     by_code = {str(row.get("code")): row for _, row in pool.iterrows()}
     items = _research_ordered_items(items, cfg)
+    max_picks = int(cfg.get("max_picks", 3))
     out = []
     covered = set()
     for item in items:
@@ -225,10 +228,10 @@ def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, objec
         out.append(item)
         if cfg.get("industry_cover") and industry_key:
             covered.add(industry_key)
-        if len(out) == 3:
+        if len(out) == max_picks:
             return out
 
-    if len(out) < 3 and cfg.get("fill_relaxed"):
+    if len(out) < max_picks and cfg.get("fill_relaxed"):
         chosen = {item.code for item in out}
         for item in items:
             if item.code in chosen:
@@ -243,7 +246,7 @@ def variant_items(items, pool: pd.DataFrame, enabled: bool, cfg: dict[str, objec
             chosen.add(item.code)
             if cfg.get("industry_cover") and industry_key:
                 covered.add(industry_key)
-            if len(out) == 3:
+            if len(out) == max_picks:
                 return out
     return out
 
