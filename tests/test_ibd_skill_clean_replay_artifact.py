@@ -24,6 +24,27 @@ def test_clean_replay_pool_can_render_deterministic_prescreen_artifact():
     assert "Signal Shadow Top 3" in markdown
 
 
+def test_shadow_portfolio_top3_is_a_separate_audit_layer():
+    pool = pd.DataFrame(
+        [
+            _signal_row("NEAR", "ACTIONABLE", 0.5, 2.0, 1.7, -1.0, "ceiling"),
+            _signal_row("FAR", "ACTIONABLE", 4.0, 2.0, 1.7, -1.0, "ceiling"),
+            _signal_row("LOWEPS", "ACTIONABLE", 0.4, 2.0, 1.7, -1.0, "ceiling") | {"eps_yoy_growth": 12.0},
+            _signal_row("UNC", "UNCONFIRMED", 0.3, 2.0, 1.7, -1.0, "ceiling"),
+        ]
+    )
+
+    artifact = build_prescreen_artifact(pool, snapshot_date="2026-07-24", version="v3")
+    markdown = render_prescreen_artifact_markdown(artifact)
+
+    shadow = artifact["shadow_portfolio_top3"]
+    assert [row["code"] for row in shadow] == ["NEAR", "FAR"]
+    assert all(row["entry_status"] == "ACTIONABLE" for row in shadow)
+    assert all(row["final_group"] == "SHADOW_PORTFOLIO" for row in shadow)
+    assert "Shadow Portfolio Top 3" in markdown
+    assert "Formal Baseline" in markdown
+
+
 def test_signal_shadow_top3_can_select_any_signal_status_without_expanding_priority():
     pool = pd.DataFrame(
         [

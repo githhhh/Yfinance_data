@@ -14,6 +14,7 @@ from backtest.ibd_skill_iteration.core import (
     rank_non_actionable_alpha_radar,
     rank_non_actionable_pullback_scout,
     rank_reasoning_candidates,
+    rank_shadow_portfolio_top3,
     rank_signal_shadow_top3,
 )
 
@@ -93,6 +94,7 @@ def build_prescreen_artifact(
     non_actionable = rank_non_actionable_alpha_radar(pool, version=version)
     pullback_scout = rank_non_actionable_pullback_scout(pool, version=version) if version == "v3" else []
     signal_shadow = rank_signal_shadow_top3(pool, version=version)
+    shadow_portfolio = rank_shadow_portfolio_top3(pool, version=version)
     labels = SORT_KEY_LABELS.get(version, SORT_KEY_LABELS["v1"])
 
     return {
@@ -108,6 +110,7 @@ def build_prescreen_artifact(
         "actionable_raw_top5": _rows(actionable_raw[:5], labels),
         "alpha_radar_top5": _rows([item for item in picks if item.final_group == "ALPHA_RADAR"][:5], labels),
         "signal_shadow_top3": _rows(signal_shadow, labels),
+        "shadow_portfolio_top3": _rows(shadow_portfolio, labels),
         "non_actionable_alpha_radar_top10": _rows(non_actionable[:10], labels),
         "pullback_scout_top10": _rows(pullback_scout[:10], labels),
     }
@@ -146,6 +149,7 @@ def render_prescreen_artifact_markdown(artifact: dict[str, Any]) -> str:
         ("actionable_raw_top5", "Actionable Raw Top 5"),
         ("alpha_radar_top5", "Alpha Radar Top 5"),
         ("signal_shadow_top3", "Signal Shadow Top 3"),
+        ("shadow_portfolio_top3", "Shadow Portfolio Top 3"),
         ("non_actionable_alpha_radar_top10", "Non-ACTIONABLE Alpha Radar Top 10"),
         ("pullback_scout_top10", "Pullback Scout Top 10"),
     ]:
@@ -153,6 +157,10 @@ def render_prescreen_artifact_markdown(artifact: dict[str, Any]) -> str:
         lines.extend([f"## {title}", "", "| Rank | Code | Status | Lane | Reasons | Risks |", "|---:|---|---|---|---|---|"])
         if not rows:
             lines.append("|  |  |  |  |  |  |")
+        if key == "shadow_portfolio_top3":
+            lines.append(
+                "|  |  |  |  | Portfolio audit only; does not replace Formal Baseline or official priority picks. |  |"
+            )
         for row in rows:
             lines.append(
                 "| {rank} | {code} | {entry_status} | {lane} | {reasons} | {risks} |".format(

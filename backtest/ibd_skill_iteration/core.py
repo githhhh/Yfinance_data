@@ -108,6 +108,26 @@ def rank_signal_shadow_top3(
     return selected
 
 
+def rank_shadow_portfolio_top3(
+    pool: pd.DataFrame,
+    *,
+    version: str = "v3",
+    limit: int = 3,
+) -> list[ReasonedCandidate]:
+    """Portfolio audit layer for the current best ACTIONABLE shadow rule."""
+    selected = [
+        item
+        for item in rank_reasoning_candidates(pool, universe="actionable", version=version)
+        if _is_shadow_portfolio_candidate(item)
+    ]
+    selected.sort(key=_shadow_portfolio_key)
+    selected = selected[:limit]
+    for rank, item in enumerate(selected, 1):
+        item.raw_rank = rank
+        item.final_group = "SHADOW_PORTFOLIO"
+    return selected
+
+
 def build_reasoning_skill_picks(
     pool: pd.DataFrame,
     *,
@@ -312,6 +332,39 @@ def _entry_status(row: pd.Series) -> str:
 
 def _has_clear_failure(item: ReasonedCandidate) -> bool:
     return "clear_geometry_failure" in item.risk_codes or "below_candidate_buy_point" in item.risk_codes
+
+
+def _is_shadow_portfolio_candidate(item: ReasonedCandidate) -> bool:
+    if item.entry_status != "ACTIONABLE" or _has_clear_failure(item):
+        return False
+    return (
+        "eps_acceleration_support" in item.reason_codes
+        and "volume_confirms_breakout" in item.reason_codes
+        and "weekly_volume_follow_through" in item.reason_codes
+        and "near_buy_point" in item.reason_codes
+        and "extended_from_buy_point" not in item.risk_codes
+        and "entry_volume_below_standard" not in item.risk_codes
+        and "entry_volume_missing" not in item.risk_codes
+        and "freshness_missing" not in item.risk_codes
+        and "geometry_caution_not_failure" not in item.reason_codes
+    )
+
+
+def _shadow_portfolio_key(item: ReasonedCandidate) -> tuple:
+    cur = to_float(item.feature_values.get("current_vs_ibd_candidate_pct"))
+    entry_vol = to_float(item.feature_values.get("ibd_entry_volume_ratio")) or 0.0
+    weekly_vol = to_float(item.feature_values.get("volume_ratio")) or 0.0
+    dist = to_float(item.feature_values.get("dist_to_52w_high_pct"))
+    distance_from_high = abs(dist) if dist is not None else 999.0
+    return (
+        _fresh_bucket(cur),
+        cur if cur is not None else 999.0,
+        0 if "near_52w_high" in item.reason_codes else 1,
+        -entry_vol,
+        -weekly_vol,
+        distance_from_high,
+        item.code,
+    )
 
 
 def _is_radar_worthy(item: ReasonedCandidate) -> bool:

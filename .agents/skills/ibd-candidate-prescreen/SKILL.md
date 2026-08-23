@@ -68,6 +68,28 @@ description: 从 Dashboard 的 signal 突破候选池中执行标准化、IBD-al
 - 当前历史迭代结论只允许沉淀为以下通用规则：EPS 已知优先于 EPS 缺失，但 `EPS >=25` 不得升级为优先复核硬门槛；`pullback_not_dry` 与 `geometry_caution_not_failure` 默认作为风险披露或同分压制，不得仅因二者存在就把 Critical 通过的候选硬排除。
 - Qlib / walk-forward 结果只能沉淀为独立 **Signal Shadow Top3** 审计层：该层从每周所有 `signal == True` 行中选择，不要求 `ibd_entry_status == ACTIONABLE`，但必须保留 `ACTIONABLE / EXTENDED / UNCONFIRMED` 状态；不得扩大 0～3 只优先复核和 0～2 只值得留意的正式容量，也不得写成当前买点确认或正式推荐。
 
+### 基线替换与 Shadow Portfolio 审计
+
+历史组合回测只能决定审计层与对照层，不得单独覆盖正式 ACTIONABLE 预筛容量。区分三层：
+
+- **Formal Baseline**：`skill_industry_eps_known` 仍是正式历史对照锚点。除非候选规则通过下方全部 Replacement Gates，不得写成“已替换正式基线”。
+- **Current Best Baseline**：`clean_eps_pass_no_dry_no_geom_caution` 可作为当前回测表现最强的基线对照，用于报告比较与后续候选挑战；它不是新的硬性正式推荐规则。
+- **Shadow Portfolio Top3**：`sk_act_epspass_corestrict_freshstrict_bpstrict_geomclean_noind_prox_top3` 只作为独立组合审计层并行输出。其规则画像是 ACTIONABLE、EPS 达标辅助、核心量价严格、新鲜度严格、买点严格、Geometry clean、无 Industry 覆盖上限、proximity 排序、最多 3 只。该层**不能替换正式基线**，也不能扩大优先复核或值得留意容量。
+
+**Replacement Gates**：候选规则只有同时满足以下全部门槛，才能被描述为“可替换正式基线”。任一门槛不满足时，只能写成候选、影子组合或 portfolio tradeoff。
+
+1. Backtrader final value 不低于 Formal Baseline，且若存在 Current Best Baseline，也不得低于 Current Best Baseline。
+2. Backtrader 最大回撤不差于对照基线；负值越接近 0 越好。
+3. Backtrader stop events 不多于对照基线。
+4. Rebalance 覆盖率至少达到对照基线的 95%。
+5. Pick 覆盖率至少达到对照基线的 90%。
+6. 周度 median average return 不低于对照基线。
+7. 周度 worst/floor return 不差于对照基线。
+8. Pick Bottom5 暴露率不高于对照基线。
+9. Pick stop rate 不高于对照基线。
+
+不得把某次历史搜索中的收益率、净值、日期、ticker 或单周事件写进本 Skill 作为阈值或理由。允许在一次具体复盘报告中引用这些数字作为审计证据，但必须标注其只来自该次历史实验。
+
 ## 状态语义
 
 | 状态 | 含义 |
@@ -422,6 +444,7 @@ watch = take_first_two_by_raw_rank(
 - “暂不优先”正文最多展示 3 只，固定取该最终分组中原始顺位最靠前的 3 只；每只只写一个或两个决定性原因。全部候选仍保留在完整决策轨迹中。
 - 非停止路径最后始终输出“完整候选排序与决策轨迹”表，覆盖所有 ACTIONABLE 候选；不可只输出最终 3 只。
 - 若 Signal Shadow Top3 非空，必须输出独立“Signal Shadow Top3（所有 signal，可审计对照）”小节；该小节可包含非 ACTIONABLE，但每只必须显示 `entry_status`，并写明“不进入正式优先复核，需按状态人工确认”。若为空，写“本轮无 signal shadow 候选通过基础过滤”。
+- 若 Shadow Portfolio Top3 非空，必须输出独立“Shadow Portfolio Top3（组合审计层）”小节；该小节只用于组合规则并行审计，必须写明“不进入正式优先复核，不替换 Formal Baseline，需继续按 Replacement Gates 追踪”。若为空，写“本轮无 Shadow Portfolio 候选通过组合审计过滤”。
 - 若 Review Universe 中存在非 ACTIONABLE radar 候选，必须输出独立“Alpha Radar（非 ACTIONABLE，仅观察）”小节；若没有候选，也写明“本轮无非 ACTIONABLE radar 候选通过证据链”。该小节不受 ACTIONABLE 优先复核/值得留意名额影响。
 - Review Universe 中的非 ACTIONABLE 候选如需展示，放入不编号的“Alpha Radar”或“排除记录”，不得混入 ACTIONABLE 原始质量排序；Alpha Radar 必须明确写“非 ACTIONABLE，仅供后续观察/人工看图”，不得写成优先复核。
 - 入选详情不外显 Critical / Major / Minor、PASS / FAIL / UNKNOWN / INFO_MISSING 等内部状态；决策轨迹改用人类可读原因。
@@ -466,6 +489,12 @@ watch = take_first_two_by_raw_rank(
 - **状态：** [ACTIONABLE / EXTENDED / UNCONFIRMED]｜所有 signal 审计层，不进入正式优先复核
 - **证据链：** [买点新鲜度/突破日量能/周线量能/接近高点/EPS 状态等当前字段事实]
 - **需人工确认：** [若非 ACTIONABLE，写明不得视为当前买点确认]
+
+## Shadow Portfolio Top3（组合审计层）
+### [TICKER]
+- **状态：** [ACTIONABLE]｜组合审计层，不进入正式优先复核，不替换 Formal Baseline
+- **证据链：** [EPS 达标辅助/核心量价严格/买点新鲜/Geometry clean/proximity 排序等当前字段事实]
+- **需继续验证：** [按 Replacement Gates 追踪覆盖率、周度 floor、Bottom5 暴露与 pick stop rate]
 
 ## 暂不优先
 - **[TICKER]：** [亮点可选]，但 [决定性原因 + 规范化数字]
