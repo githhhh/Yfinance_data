@@ -1,10 +1,10 @@
 rule_family,machine_role,evidence_status,complete_outcomes,independent_weeks,blocker,production_change
-Status,Hard Eligibility,Promising / prospective confirmation required,1111,42,,False
-Close > Trigger,Risk Flag,Promising / prospective confirmation required,1111,42,,False
-Fresh Zone,Major Score,Promising / prospective confirmation required,1111,42,,False
-Entry Volume,Major Score,Promising / prospective confirmation required,1111,42,,False
-Geometry,Risk Flag,Promising / prospective confirmation required,1111,42,,False
-Pullback,Route-specific,Promising / prospective confirmation required,1111,42,,False
-EPS,Minor Bonus,Promising / prospective confirmation required,1111,42,PIT blocker for unverified Yahoo current-period records; verified subset only.,False
-Industry,Context Only,Promising / prospective confirmation required,1111,42,Coverage rule changes opportunity set and risk concentration; not a standalone alpha claim.,False
+Status,UNKNOWN,Insufficient Evidence,665,34,,False
+Close > Trigger,UNKNOWN,RULE_NOT_IDENTIFIABLE,665,35,negative group not observed,False
+Fresh Zone,Context Only,Insufficient Evidence,496,35,,False
+Entry Volume,UNKNOWN,RULE_NOT_IDENTIFIABLE,665,34,below 1.5 group not observed,False
+Geometry,Risk Flag,Promising / prospective confirmation required,665,34,,False
+Pullback,Context Only,Insufficient Evidence,456,35,,False
+EPS,Context Only,Insufficient Evidence,564,34,PIT blocker for unverified Yahoo current-period records; verified subset only.,False
+Industry,UNKNOWN,No Treatment Contrast,1111,35,Coverage rule changes opportunity set and risk concentration; not a standalone alpha claim.,False
 TopK,UNKNOWN,Insufficient Evidence,0,0,Capacity experiment only; cannot replace Top3 from in-sample return.,False

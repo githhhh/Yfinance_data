@@ -1,12 +1,12 @@
 base_commit: "3e73d887872a0f668b66cefe7811d09c7ae90b2b"
-head_commit_at_run: "3e73d887872a0f668b66cefe7811d09c7ae90b2b"
+head_commit_at_run: "da5f45876d3ef4fc74549a95ef9cbe30a0b2113b"
 branch: "research/candidate-event-rule-audit"
 period_name: "retrospective_final_test"
 prospective_holdout:
   enabled: true
   unlock_rule: "future replay pool snapshots unlock only after complete 40 trading-day observation window"
   embargo_weeks: 8
-source_code_hash: "f5760ee690cb67dd893cb502672eab41796ba44b9a2056f9b4125d967b24b4e4"
+source_code_hash: "0474a74821f72296a38fd0bf59a3418be619b3e4b45160d738b8681ee484f9a6"
 pool_file_content_hash:
   backtest/ibd_skill_replay_pools/2025-10-10/breakout_follow_pool.csv: "80c613310b4429352d6fdf77b609afb6c9aa9155fbff821049b898365455afac"
   backtest/ibd_skill_replay_pools/2025-10-24/breakout_follow_pool.csv: "73dae2a0ee12ee9053a7159e7263da4c89e4f22497e8804a92b76c2d6f466b76"
@@ -57,11 +57,11 @@ selector_configs:
   B0_REPO_EXACT:
     name: "B0_REPO_EXACT"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
     eps_mode: "repo_soft"
     industry_cover: true
@@ -70,39 +70,39 @@ selector_configs:
   B0_PIT_VERIFIED:
     name: "B0_PIT_VERIFIED"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: []
   B0 status soft:
     name: "B0 status soft"
     status_mode: "soft"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["status"]
   B0 status supplemental UNCONFIRMED:
     name: "B0 status supplemental UNCONFIRMED"
     status_mode: "supplemental_unconfirmed"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["status"]
@@ -110,140 +110,140 @@ selector_configs:
     name: "B0 no entry_valid"
     status_mode: "hard"
     valid_mode: "drop"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["entry_valid"]
   B0 close trigger soft:
     name: "B0 close trigger soft"
     status_mode: "hard"
-    valid_mode: "hard"
+    valid_mode: "drop"
     close_mode: "soft"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["close_trigger"]
   B0 fresh continuous:
     name: "B0 fresh continuous"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
     fresh_mode: "continuous"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["fresh"]
   B0 volume soft:
     name: "B0 volume soft"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
     volume_mode: "soft"
-    geometry_mode: "hard"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["volume"]
   B0 volume route-specific:
     name: "B0 volume route-specific"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
     volume_mode: "route_specific"
-    geometry_mode: "hard"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["volume"]
   B0 geometry soft:
     name: "B0 geometry soft"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
     geometry_mode: "soft"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["geometry"]
   B0 geometry failure only:
     name: "B0 geometry failure only"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
     geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["geometry"]
   B0 pullback dry hard:
     name: "B0 pullback dry hard"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "hard"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
   B0 pullback dry bonus:
     name: "B0 pullback dry bonus"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "bonus"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
   B0 pullback dry drop:
     name: "B0 pullback dry drop"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "drop"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
   B0 EPS >=25 hard/bonus/drop:
     name: "B0 EPS >=25 hard/bonus/drop"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
     eps_mode: "hard_25"
     industry_cover: true
@@ -252,11 +252,11 @@ selector_configs:
   B0 EPS unknown manual-review:
     name: "B0 EPS unknown manual-review"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
     eps_mode: "unknown_manual_review"
     industry_cover: true
@@ -265,62 +265,62 @@ selector_configs:
   B0 no industry cover:
     name: "B0 no industry cover"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: false
     top_n: 3
     changed_rules: ["industry_cover"]
   B0 top1:
     name: "B0 top1"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
-    fresh_mode: "hard"
-    volume_mode: "hard"
-    geometry_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 1
     changed_rules: ["topk"]
   R1_ATOMIC_IMPROVEMENTS:
     name: "R1_ATOMIC_IMPROVEMENTS"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
     fresh_mode: "continuous"
     volume_mode: "soft"
     geometry_mode: "failure_only"
     pullback_dry_mode: "bonus"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["fresh", "volume", "geometry", "pullback_dry"]
   R2_BALANCED_SOFT:
     name: "R2_BALANCED_SOFT"
     status_mode: "soft"
-    valid_mode: "hard"
-    close_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
     fresh_mode: "continuous"
     volume_mode: "soft"
     geometry_mode: "soft"
     pullback_dry_mode: "bonus"
-    eps_mode: "known_bonus"
+    eps_mode: "known_hard"
     industry_cover: true
     top_n: 3
     changed_rules: ["status", "fresh", "volume", "geometry", "pullback_dry"]
   R3_MINIMAL_TECHNICAL:
     name: "R3_MINIMAL_TECHNICAL"
     status_mode: "hard"
-    valid_mode: "hard"
-    close_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "soft"
     fresh_mode: "continuous"
-    volume_mode: "hard"
+    volume_mode: "soft"
     geometry_mode: "failure_only"
     pullback_dry_mode: "soft"
     eps_mode: "drop"
@@ -382,5 +382,5 @@ portfolio:
   initial_capital: 100000
   no_leverage: true
 censoring_policy: "insufficient horizon stays censored; as_of_return_pct separate from complete forward returns"
-hypothesis_hash: "b4767fccd269fa6b1518651d4dcc3e53c977b0df383064a1015610eceb2b0b01"
+hypothesis_hash: "73f53dc7ade175a46a11d1a9ea552782fddbca7f8b1fab4686aa9be99f98fb56"
 output_dir: "backtest/rd_agent_candidate_rule_audit/output"
