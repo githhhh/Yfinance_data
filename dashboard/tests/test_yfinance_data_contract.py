@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 import yfinance_data
+from eps_pit.lookup import SignalEPSLookup
 
 
 def _valid_complete_signal(code: str, *, rank: int) -> dict[str, object]:
@@ -54,6 +55,185 @@ def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, mo
     pool_run.save_snapshot(snapshot)
 
     assert pool_run.load_actionable_codes() == ["SECOND", "FIRST"]
+
+
+def test_pool_run_supplements_signal_eps_before_publishing(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pit_path = tmp_path / "signal_eps_pit.csv"
+
+    pd.DataFrame(
+        [{"snapshot_date": "2026-08-14", "code": "PIT", "eps_yoy_growth": 31.5}]
+    ).to_csv(pit_path, index=False)
+
+    SignalEPSLookup.clear_cache()
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(pit_path))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                "SECY": {
+                    "eps_yoy_growth": 42.0,
+                    "source": "SEC",
+                    "effective_date": "2026-08-01",
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    pool_run.save_snapshot(
+        pd.DataFrame(
+            [
+                {"code": "PIT", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                {"code": "SECY", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                {"code": "QUIET", "snapshot_date": "2026-08-14", "signal": False, "eps_yoy_growth": pd.NA},
+            ]
+        )
+    )
+
+    saved = pd.read_csv(pool_path)
+    assert saved.loc[saved["code"].eq("PIT"), "eps_yoy_growth"].item() == 31.5
+    assert saved.loc[saved["code"].eq("PIT"), "eps_yoy_growth_source"].item() == "PIT"
+    assert saved.loc[saved["code"].eq("SECY"), "eps_yoy_growth"].item() == 42.0
+    assert saved.loc[saved["code"].eq("SECY"), "eps_yoy_growth_source"].item() == "SEC"
+    assert pd.isna(saved.loc[saved["code"].eq("QUIET"), "eps_yoy_growth"].item())
+    assert "eps_yoy_growth_repair_method" not in saved.columns
+    assert "eps_yoy_growth_effective_date" not in saved.columns
+    assert "eps_yoy_growth_current_eps" not in saved.columns
+    assert "eps_yoy_growth_prior_year_eps" not in saved.columns
+
+
+def test_pool_run_logs_unresolved_signal_eps_codes(tmp_path, monkeypatch, caplog):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+
+    SignalEPSLookup.clear_cache()
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(tmp_path / "missing_pit.csv"))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                "FILLED": {
+                    "eps_yoy_growth": 42.0,
+                    "source": "Yahoo",
+                    "effective_date": "2026-08-01",
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    with caplog.at_level("WARNING"):
+        pool_run.save_snapshot(
+            pd.DataFrame(
+                [
+                    {"code": "FILLED", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                    {"code": "MISS", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                    {"code": "QUIET", "snapshot_date": "2026-08-14", "signal": False, "eps_yoy_growth": pd.NA},
+                ]
+            )
+        )
+
+    saved = pd.read_csv(pool_path)
+    assert saved.loc[saved["code"].eq("FILLED"), "eps_yoy_growth"].item() == 42.0
+    assert pd.isna(saved.loc[saved["code"].eq("MISS"), "eps_yoy_growth"].item())
+    assert "BF Pool signal EPS unresolved codes: MISS" in caplog.text
+    assert "QUIET" not in caplog.text
+
+
+def test_supplement_latest_pool_eps_updates_only_latest_snapshot_pool(tmp_path, monkeypatch):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    complete = pd.DataFrame(
+        [
+            {"code": "COMPLETE", "snapshot_date": "2026-08-21", "signal": True, "eps_yoy_growth": pd.NA},
+        ]
+    )
+    midweek = pd.DataFrame(
+        [
+            {"code": "MIDWEEK", "snapshot_date": "2026-08-19", "signal": True, "eps_yoy_growth": pd.NA},
+        ]
+    )
+    complete.to_csv(complete_path, index=False)
+    midweek.to_csv(midweek_path, index=False)
+
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(tmp_path / "missing_pit.csv"))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                "COMPLETE": {
+                    "eps_yoy_growth": 31.0,
+                    "source": "SEC",
+                    "effective_date": snapshot,
+                },
+                "MIDWEEK": {
+                    "eps_yoy_growth": 99.0,
+                    "source": "Yahoo",
+                    "effective_date": snapshot,
+                },
+            }
+        ),
+    )
+
+    result = yfinance_data.supplement_latest_pool_signal_eps()
+
+    saved_complete = pd.read_csv(complete_path)
+    saved_midweek = pd.read_csv(midweek_path)
+    assert result["path"] == str(complete_path)
+    assert result["snapshot_date"] == "2026-08-21"
+    assert result["repaired"] == 1
+    assert saved_complete.loc[0, "eps_yoy_growth"] == 31.0
+    assert pd.isna(saved_midweek.loc[0, "eps_yoy_growth"])
+
+
+def test_supplement_latest_pool_eps_uses_midweek_when_it_has_newer_snapshot(tmp_path, monkeypatch):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    pd.DataFrame(
+        [{"code": "COMPLETE", "snapshot_date": "2026-08-21", "signal": True, "eps_yoy_growth": pd.NA}]
+    ).to_csv(complete_path, index=False)
+    pd.DataFrame(
+        [{"code": "MIDWEEK", "snapshot_date": "2026-08-24", "signal": True, "eps_yoy_growth": pd.NA}]
+    ).to_csv(midweek_path, index=False)
+
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(tmp_path / "missing_pit.csv"))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                "COMPLETE": {
+                    "eps_yoy_growth": 31.0,
+                    "source": "SEC",
+                    "effective_date": snapshot,
+                },
+                "MIDWEEK": {
+                    "eps_yoy_growth": 99.0,
+                    "source": "Yahoo",
+                    "effective_date": snapshot,
+                },
+            }
+        ),
+    )
+
+    result = yfinance_data.supplement_latest_pool_signal_eps()
+
+    saved_complete = pd.read_csv(complete_path)
+    saved_midweek = pd.read_csv(midweek_path)
+    assert result["path"] == str(midweek_path)
+    assert result["snapshot_date"] == "2026-08-24"
+    assert result["repaired"] == 1
+    assert pd.isna(saved_complete.loc[0, "eps_yoy_growth"])
+    assert saved_midweek.loc[0, "eps_yoy_growth"] == 99.0
 
 
 def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_path, monkeypatch):

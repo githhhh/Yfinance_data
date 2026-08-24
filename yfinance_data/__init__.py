@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
+from eps_pit.lookup import enrich_pool_with_signal_eps
 
 
 DATA_ROOT = str(Path(__file__).resolve().parents[1])
@@ -60,6 +61,32 @@ def _snapshot_digest(path: str) -> str:
     return sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _pool_snapshot_date(path: str) -> str:
+    if not os.path.exists(path):
+        return ""
+    try:
+        pool = pd.read_csv(path, usecols=["snapshot_date"], encoding="utf-8-sig")
+    except Exception:
+        return ""
+    if "snapshot_date" not in pool.columns:
+        return ""
+    dates = pool["snapshot_date"].dropna().astype(str).str.strip().str[:10]
+    dates = dates[dates.ne("")]
+    return str(dates.max()) if not dates.empty else ""
+
+
+def _latest_pool_path_by_snapshot_date() -> tuple[str, str]:
+    candidates = [
+        (_pool_snapshot_date(BREAKOUT_FOLLOW_POOL_PATH), BREAKOUT_FOLLOW_POOL_PATH),
+        (_pool_snapshot_date(BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH), BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH),
+    ]
+    candidates = [(snapshot_date, path) for snapshot_date, path in candidates if snapshot_date]
+    if not candidates:
+        raise FileNotFoundError("没有可用的 BF Pool snapshot_date")
+    snapshot_date, path = max(candidates, key=lambda item: item[0])
+    return path, snapshot_date
+
+
 def _load_complete_actionable_codes(pool: pd.DataFrame) -> list[str]:
     required = {"code", "signal", "ibd_entry_valid", "ibd_entry_status"}
     missing = required.difference(pool.columns)
@@ -91,6 +118,61 @@ def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
     return codes
 
 
+def _signal_eps_missing_count(pool: pd.DataFrame) -> int:
+    if "signal" not in pool.columns or "eps_yoy_growth" not in pool.columns:
+        return 0
+    signal_mask = pool["signal"].map(_is_truthy)
+    return int(pool.loc[signal_mask, "eps_yoy_growth"].isna().sum())
+
+
+def _signal_eps_missing_codes(pool: pd.DataFrame) -> list[str]:
+    if "signal" not in pool.columns or "eps_yoy_growth" not in pool.columns or "code" not in pool.columns:
+        return []
+    signal_mask = pool["signal"].map(_is_truthy)
+    missing = pool.loc[signal_mask & pool["eps_yoy_growth"].isna(), "code"]
+    codes = {
+        str(value).strip()
+        for value in missing.dropna()
+        if str(value).strip() and str(value).strip().lower() != "nan"
+    }
+    return sorted(codes)
+
+
+def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
+    before = _signal_eps_missing_count(pool)
+    enriched = enrich_pool_with_signal_eps(pool, refresh_missing=before > 0)
+    after = _signal_eps_missing_count(enriched)
+    repaired = before - after
+    if repaired:
+        logging.info("BF Pool signal EPS supplemented: %s repaired, %s unresolved", repaired, after)
+    elif before:
+        logging.warning("BF Pool signal EPS still missing after supplement: %s unresolved", after)
+    unresolved_codes = _signal_eps_missing_codes(enriched)
+    if unresolved_codes:
+        logging.warning("BF Pool signal EPS unresolved codes: %s", ", ".join(unresolved_codes))
+    return enriched
+
+
+def supplement_latest_pool_signal_eps() -> dict[str, object]:
+    """Refresh missing signal EPS in the latest pool selected by snapshot_date."""
+    path, snapshot_date = _latest_pool_path_by_snapshot_date()
+    pool = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
+    before = _signal_eps_missing_count(pool)
+    enriched = _enrich_signal_eps(pool)
+    after = _signal_eps_missing_count(enriched)
+    repaired = before - after
+    if repaired:
+        enriched.to_csv(path, index=False, encoding="utf-8-sig")
+    return {
+        "path": path,
+        "snapshot_date": snapshot_date,
+        "before_missing": before,
+        "after_missing": after,
+        "repaired": repaired,
+        "unresolved_codes": _signal_eps_missing_codes(enriched),
+    }
+
+
 class BreakoutFollowPoolRun:
     """Run-scoped access to the weekend or midweek BreakoutFollow Pool."""
 
@@ -115,6 +197,7 @@ class BreakoutFollowPoolRun:
         return BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH if self._midweek else BREAKOUT_FOLLOW_POOL_PATH
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
+        pool = _enrich_signal_eps(pool)
         _pool_codes(pool)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         pool.to_csv(self.path, index=False, encoding="utf-8-sig")
@@ -181,4 +264,5 @@ __all__ = [
     "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH",
     "BREAKOUT_FOLLOW_POOL_PATH",
     "BreakoutFollowPoolRun",
+    "supplement_latest_pool_signal_eps",
 ]

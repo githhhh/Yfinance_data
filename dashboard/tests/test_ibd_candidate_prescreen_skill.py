@@ -15,10 +15,6 @@ def _skill_text() -> str:
     return SKILL_PATH.read_text(encoding="utf-8")
 
 
-def _output_contract() -> str:
-    return _skill_text().split("## 输出格式 (Output Format)", maxsplit=1)[1]
-
-
 def test_skill_frontmatter_has_valid_required_fields():
     text = _skill_text()
     match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
@@ -33,89 +29,55 @@ def test_skill_frontmatter_has_valid_required_fields():
     assert ">" not in fields["description"]
 
 
-def test_prescreen_output_is_chinese_and_decision_first():
-    output = _output_contract()
-
-    assert "正文最多 20 行" in output
-    assert "Breakout Quality 使用 Dashboard 原始名称" in output
-    assert "判断只写自然语言结论" in output
-    assert output.count("**突破日：** [Breakout Quality]") == 2
-    assert "日线突破突出但结构、基本面或关键数据证据不完整" in output
-    assert "只保留原始业务数据，不输出检查项数量或通过/失败统计" in output
-    assert "原著上下文" not in output
-
-    headings = ("## 结论", "## 优先复核", "## 值得留意", "## 暂不优先")
-    for heading in headings:
-        assert heading in output
-    assert [output.index(heading) for heading in headings] == sorted(
-        output.index(heading) for heading in headings
-    )
-    assert output.index("**背景**") < output.index("**优先复核**")
-
-    for label in ("突破日", "优势", "顾虑", "判断"):
-        assert label in output
-
-    for internal_term in (
-        "Critical",
-        "Major",
-        "Minor",
-        "PASS",
-        "FAIL",
-        "UNKNOWN",
-        "Checklist",
-        "Top Picks",
-        "Rejected Candidates",
-        "Manual Review Queue",
-    ):
-        assert internal_term not in output
-    assert "3/3" not in output
-
-
-def test_weekly_volume_is_only_a_positive_bonus_in_user_output():
+def test_main_skill_declares_skill_industry_eps_known_as_formal_baseline():
     skill = _skill_text()
 
-    assert "Minor 中 #10 仅执行下述正向加分语义" in skill
-    assert "周线量能达到 `1.3x` 时，作为“优势”中的加分项展示" in skill
-    assert "低于 `1.3x` 或缺失时直接省略" in skill
-    assert "不得作为拒绝、降级或风险理由" in skill
-    assert "原著上下文" not in skill
+    assert "正式生产基线固定为：**`skill_industry_eps_known`**" in skill
+    assert "含 EPS 补源后的 ACTIONABLE 原始质量排序 + EPS 已知准入 + Industry 覆盖 Top3" in skill
+    assert "它是当前 `main` 的主 skill 基线" in skill
 
 
-def test_internal_screening_rules_remain_unchanged():
+def test_research_variants_cannot_replace_or_pollute_main_baseline():
     skill = _skill_text()
 
-    unchanged_rules = (
-        "`ibd_entry_status == 'ACTIONABLE'`",
-        "单一板块不超过 2 只",
-        "某板块占比 > 50%",
-        "距 Candidate Price ≤ 5.0%",
-        "Entry Volume Ratio ≥ 1.5x",
-        "Close Position ≥ 0.65",
-        "`pullback_v_is_dry == True`",
-        "距 52 周高点 > -5.0%",
-        "EPS YoY 增长 ≥ 25%",
-        "近 10 周上涨周成交量 > 下跌周成交量",
-        "当周 Volume Ratio ≥ 1.3x",
-        "`trigger_pos <= 0`（即 `range_ratio >= pos`），且 `pos >= 0.80`",
-        "`pos >= 0.80` 且 `range_ratio >= 0.50`，但 `trigger_pos > 0`",
-        "`pos < 0.65`（上影线 $> 35\\%$）",
-        "若 $range\\_ratio \\le 0$ ($Close \\le Trigger$)",
-        "初始 Base 突破 (`ibd_candidate_rule == 'ceiling'`) → 强制使用 `base_depth_pct` / `base_duration_weeks`",
-        "回踩确认 (`ceiling_pullback`, `ma10_touch_confirm`) → 强制使用 `pullback_pct` / `pullback_duration_weeks`",
-        "Pivot / Three-Weeks-Tight → 仅当 `pullback_count > 0` 时评估 `pullback_pct` / `pullback_duration_weeks`",
+    assert "clean_eps_pass_no_dry_no_geom_caution" not in skill
+    assert "signal_shadow_top3" not in skill
+    assert "任何研究变体、审计层" in skill
+    assert "RD/qlib 研究结果" in skill
+    assert "不得进入生产推荐顺序；生产推荐只按 `skill_industry_eps_known` 的确定性规则执行" in skill
+
+
+def test_cross_model_determinism_contract_has_fixed_tie_breakers():
+    skill = _skill_text()
+
+    expected_rules = (
+        "不同模型必须输出相同的“优先复核”代码集合和顺序",
+        "deterministic artifact",
+        "dashboard.skill_industry_eps_known",
+        "不得使用模型偏好、图表观感、历史收益、候选名称熟悉度、行业热度或外部记忆作为隐含排序键",
+        "完全并列时只用 `code` 大写字典序，再用 CSV 原始行序打破平局",
+        "Industry 覆盖选择必须在原始排序冻结后顺序扫描",
+        "EPS 数值大小、EPS 是否高于 25%、EPS 缺失状态均不得进入原始排序",
+        "若两个模型输出不同，必须按上述排序键逐项回放，差异方视为执行错误",
     )
-    for rule in unchanged_rules:
+    for rule in expected_rules:
         assert rule in skill
 
 
-def test_signal_field_applicability_prevents_false_missing_data_risks():
+def test_existing_core_baseline_rules_remain_present():
     skill = _skill_text()
 
-    expected_guidance = (
-        "`ceiling` 首次突破只评估 `base_depth_pct` / `base_duration_weeks`",
-        "不得读取或报告 `pullback_v_is_dry`、`pullback_pct`、`pullback_duration_weeks` 缺失",
-        "仅当信号存在实际回撤阶段时才评估",
-        "`pullback_duration_weeks` 必须来自上游正式导出",
+    expected_rules = (
+        "Review Universe 仅包含 `signal == True` 且 `ibd_candidate_rule` 非空的行",
+        "完整原始质量排序”只对其中 `ibd_entry_status == ACTIONABLE` 的候选编号",
+        "Fresh Demand Alpha > Constructive Pullback > Standard Breakout > Incomplete Evidence",
+        "更完整的证据确认项数量",
+        "优先复核不超过 3 只，且每个已知 Industry 最多 1 只",
+        "只用 `current_vs_ibd_candidate_pct`；缺失 UNKNOWN；`0%～5%` PASS",
+        "只用 `ibd_entry_volume_ratio`；缺失 UNKNOWN；有效值 `>=1.5` PASS",
+        "`pullback_v_is_dry == True` PASS，`False` FAIL",
+        "`dist_to_52w_high_pct > -5.0` 为 PASS",
+        "`volume_ratio >= 1.3` 时记一个二元正向加分",
     )
-    for guidance in expected_guidance:
-        assert guidance in skill
+    for rule in expected_rules:
+        assert rule in skill

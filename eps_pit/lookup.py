@@ -1,17 +1,16 @@
+import logging
 import os
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 import pandas as pd
+
+from eps_pit.providers.sec_yahoo_provider import SECYahooEPSProvider
 
 
 class SignalEPSLookup:
-    """Point-in-Time Signal EPS Lookup & Enrichment Service.
-    
-    Provides O(1) in-memory lookup and dynamic dataframe enrichment for
-    signal candidates across weekly replay snapshots when the base pool
-    does not contain pre-filled eps_yoy_growth.
-    """
+    """Point-in-time EPS lookup and signal-only pool enrichment."""
 
-    DEFAULT_CSV_PATH = "backtest/ibd_skill_replay_pools/signal_eps_pit.csv"
+    DEFAULT_CSV_PATH = "us/signal_eps_pit.csv"
     _eps_cache: Optional[Dict[Tuple[str, str], float]] = None
     _record_cache: Optional[Dict[Tuple[str, str], Dict[str, Any]]] = None
     _loaded_fingerprint: Optional[Tuple[str, float, int]] = None
@@ -27,6 +26,19 @@ class SignalEPSLookup:
         if date_val is None:
             return ""
         return str(date_val).strip()[:10]
+
+    @classmethod
+    def _is_truthy(cls, value: object) -> bool:
+        if value is None:
+            return False
+        try:
+            if pd.isna(value):
+                return False
+        except Exception:
+            pass
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {"true", "1", "1.0", "yes", "y"}
 
     @classmethod
     def _compute_fingerprint(cls, path: str) -> Optional[Tuple[str, float, int]]:
@@ -46,7 +58,7 @@ class SignalEPSLookup:
         if cls._eps_cache is not None and cls._loaded_fingerprint == fp:
             return
 
-        if fp is None or not os.path.exists(path):
+        if fp is None:
             cls._eps_cache = {}
             cls._record_cache = {}
             cls._loaded_fingerprint = fp
@@ -65,9 +77,8 @@ class SignalEPSLookup:
             raw_eps = row.get("eps_yoy_growth")
             if pd.notna(raw_eps):
                 try:
-                    val = float(raw_eps)
-                    eps_map[(snap, sym)] = val
-                except (ValueError, TypeError):
+                    eps_map[(snap, sym)] = float(raw_eps)
+                except (TypeError, ValueError):
                     pass
 
             rec_map[(snap, sym)] = row.to_dict()
@@ -87,9 +98,8 @@ class SignalEPSLookup:
         cls,
         snapshot_date: object,
         code: object,
-        csv_path: Optional[str] = None
+        csv_path: Optional[str] = None,
     ) -> Optional[float]:
-        """Look up point-in-time EPS YoY growth for a specific snapshot and ticker."""
         cls.load(csv_path)
         snap = cls._normalize_date(snapshot_date)
         sym = cls._normalize_ticker(code)
@@ -102,9 +112,8 @@ class SignalEPSLookup:
         cls,
         snapshot_date: object,
         code: object,
-        csv_path: Optional[str] = None
+        csv_path: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Look up complete point-in-time provenance record."""
         cls.load(csv_path)
         snap = cls._normalize_date(snapshot_date)
         sym = cls._normalize_ticker(code)
@@ -113,13 +122,46 @@ class SignalEPSLookup:
         return cls._record_cache.get((snap, sym))
 
     @classmethod
+    def fetch_sec_yahoo_eps(
+        cls,
+        snapshot_date: object,
+        codes: list[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        snap = cls._normalize_date(snapshot_date)
+        symbols = sorted({cls._normalize_ticker(code) for code in codes if cls._normalize_ticker(code)})
+        if not snap or not symbols:
+            return {}
+
+        provider = SECYahooEPSProvider()
+        results: Dict[str, Dict[str, Any]] = {}
+        for symbol in symbols:
+            try:
+                record = provider.fetch_eps_yoy(symbol, snap)
+            except Exception as exc:
+                logging.warning("Signal EPS SEC/Yahoo refresh failed for %s: %s", symbol, exc)
+                continue
+            if record is not None:
+                results[symbol] = record
+        return results
+
+    @classmethod
+    def _apply_eps_record(cls, df: pd.DataFrame, idx: Any, record: Dict[str, Any]) -> None:
+        try:
+            eps_val = float(record["eps_yoy_growth"])
+        except (KeyError, TypeError, ValueError):
+            return
+        df.at[idx, "eps_yoy_growth"] = eps_val
+        df.at[idx, "eps_yoy_growth_source"] = record.get("source")
+
+    @classmethod
     def enrich_pool(
         cls,
         pool_df: pd.DataFrame,
         snapshot_date: Optional[object] = None,
-        csv_path: Optional[str] = None
+        csv_path: Optional[str] = None,
+        stage2_path: Optional[str] = None,
+        refresh_missing: bool = False,
     ) -> pd.DataFrame:
-        """Enriches pool DataFrame by filling missing eps_yoy_growth for signal rows."""
         if pool_df.empty:
             return pool_df.copy()
 
@@ -127,37 +169,81 @@ class SignalEPSLookup:
         df = pool_df.copy()
 
         if "eps_yoy_growth" not in df.columns:
-            df["eps_yoy_growth"] = None
+            df["eps_yoy_growth"] = pd.NA
+        if "eps_yoy_growth_source" not in df.columns:
+            df["eps_yoy_growth_source"] = pd.NA
 
         default_snap = cls._normalize_date(snapshot_date) if snapshot_date else ""
+        has_signal = "signal" in df.columns
 
-        # Identify rows needing EPS lookup
         for idx, row in df.iterrows():
+            if has_signal and not cls._is_truthy(row.get("signal")):
+                continue
             curr_eps = row.get("eps_yoy_growth")
             if pd.notna(curr_eps):
                 continue
 
             snap = cls._normalize_date(row.get("snapshot_date")) or default_snap
             sym = cls._normalize_ticker(row.get("code"))
-            if not snap or not sym:
+            if not sym:
                 continue
 
-            eps_val = cls._eps_cache.get((snap, sym)) if cls._eps_cache else None
+            eps_val = None
+            if snap and cls._eps_cache:
+                eps_val = cls._eps_cache.get((snap, sym))
             if eps_val is not None:
                 df.at[idx, "eps_yoy_growth"] = eps_val
+                df.at[idx, "eps_yoy_growth_source"] = "PIT"
+
+        if refresh_missing and has_signal and "code" in df.columns:
+            signal_mask = df["signal"].map(cls._is_truthy)
+            missing_mask = signal_mask & df["eps_yoy_growth"].isna()
+            missing_rows = df.loc[missing_mask]
+            for snap, group in missing_rows.groupby(
+                missing_rows["snapshot_date"].map(cls._normalize_date)
+                if "snapshot_date" in missing_rows.columns
+                else pd.Series([""] * len(missing_rows), index=missing_rows.index)
+            ):
+                snap = snap or default_snap
+                missing_codes = sorted(
+                    {
+                        cls._normalize_ticker(code)
+                        for code in group["code"].dropna().tolist()
+                        if cls._normalize_ticker(code)
+                    }
+                )
+                refreshed = cls.fetch_sec_yahoo_eps(snap, missing_codes)
+                if not refreshed:
+                    continue
+                for idx, row in group.iterrows():
+                    sym = cls._normalize_ticker(row.get("code"))
+                    record = refreshed.get(sym)
+                    if record is None:
+                        continue
+                    cls._apply_eps_record(df, idx, record)
 
         return df
 
 
-def get_signal_eps(snapshot_date: object, code: object, csv_path: Optional[str] = None) -> Optional[float]:
-    """Convenience functional wrapper for SignalEPSLookup.get_eps."""
+def get_signal_eps(
+    snapshot_date: object,
+    code: object,
+    csv_path: Optional[str] = None,
+) -> Optional[float]:
     return SignalEPSLookup.get_eps(snapshot_date, code, csv_path=csv_path)
 
 
 def enrich_pool_with_signal_eps(
     pool_df: pd.DataFrame,
     snapshot_date: Optional[object] = None,
-    csv_path: Optional[str] = None
+    csv_path: Optional[str] = None,
+    stage2_path: Optional[str] = None,
+    refresh_missing: bool = False,
 ) -> pd.DataFrame:
-    """Convenience functional wrapper for SignalEPSLookup.enrich_pool."""
-    return SignalEPSLookup.enrich_pool(pool_df, snapshot_date=snapshot_date, csv_path=csv_path)
+    return SignalEPSLookup.enrich_pool(
+        pool_df,
+        snapshot_date=snapshot_date,
+        csv_path=csv_path,
+        stage2_path=stage2_path,
+        refresh_missing=refresh_missing,
+    )

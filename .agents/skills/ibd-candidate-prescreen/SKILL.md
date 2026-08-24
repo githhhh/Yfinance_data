@@ -7,6 +7,7 @@ description: 从 Dashboard 的 signal 突破候选池中执行标准化、IBD-al
 
 ## 任务定位
 
+- 正式生产基线固定为：**`skill_industry_eps_known`**。该名称表示“含 EPS 补源后的 ACTIONABLE 原始质量排序 + EPS 已知准入 + Industry 覆盖 Top3”口径；它是当前 `main` 的主 skill 基线。
 - 目标固定为：**从当前 ACTIONABLE Pool 中，选出量价结构、买点新鲜度和阶段质量证据最强的最多 3 只，供人工优先复核；同时从所有 signal 行生成独立可审计的 Signal Shadow Top3。**
 - 先产生完整、确定性的原始质量排序，再应用 Industry 覆盖规则；不得把最终展示顺序冒充原始质量顺序。
 - 输出 0～3 只“优先复核”、0～2 只“值得留意”、独立“Alpha Radar（非 ACTIONABLE，仅观察）”、代表性“暂不优先”和完整候选决策轨迹；宁缺毋滥，不为凑满名额放宽规则。
@@ -15,6 +16,20 @@ description: 从 Dashboard 的 signal 突破候选池中执行标准化、IBD-al
 - 跨模型一致性优先：候选名单、原始顺位、最终分组、理由码和数字必须来自确定性 artifact；模型只能解释 artifact，不得凭自然语言权衡重新排序或替换名单。
 - 不修改原始数据，不用未提供字段推导新指标。所有计算在内存中完成，不在项目目录遗留临时脚本、中间文件或数据副本。
 - 单次预筛不能证明所选三只未来表现最好。始终保留 `snapshot_date`、原始质量顺位、最终分组与决策原因，使后续历史回测可以检验规则；实时预筛中严禁读取未来价格或事后收益。
+
+## 跨模型稳定性契约
+
+只要输入 CSV、Market Report 文件和 skill 文本相同，不同模型必须输出相同的“优先复核”代码集合和顺序。为达成这一点，执行时必须遵守：
+
+- 生产验证以 deterministic artifact 为准；项目内固定入口为 `conda run --no-capture-output -n quant_env python -m dashboard.skill_industry_eps_known --pool [pool.csv]`。模型只能解释该 artifact，不得手工替换或重排。
+- 所有资格、状态、分组和排序只来自当前行正式字段与本文固定阈值；不得使用模型偏好、图表观感、历史收益、候选名称熟悉度、行业热度或外部记忆作为隐含排序键。
+- 原始质量排序必须严格使用“原始质量分层与排序”中的键序；完全并列时只用 `code` 大写字典序，再用 CSV 原始行序打破平局。
+- Industry 覆盖选择必须在原始排序冻结后顺序扫描；不得为了补齐 3 只、追热点、避开同业或迎合结论而重排。
+- EPS 在正式基线中的作用只有两处：优先复核要求 EPS 已知；EPS 缺失在人工关注前沿内可触发“值得留意/需人工核验”。EPS 数值大小、EPS 是否高于 25%、EPS 缺失状态均不得进入原始排序。
+- 任何研究变体、审计层、RD/qlib 研究结果、历史回测收益和任何“本周看起来更好”的解释都不得进入生产推荐顺序；生产推荐只按 `skill_industry_eps_known` 的确定性规则执行。
+- 若任一字段缺失或无法解析，按本文 UNKNOWN / INFO_MISSING / N/A 规则处理；不得把缺失折叠为失败，也不得自行补造。
+
+跨模型稳定性的边界：本文能把推荐规则收敛为确定性算法，但不能保证任意模型在不校验的情况下都不会执行错误。对生产输出的确认口径是：同一 CSV 进入同一规则，保留完整候选排序与决策轨迹；若两个模型输出不同，必须按上述排序键逐项回放，差异方视为执行错误。
 
 ## 禁止推断边界
 
@@ -68,27 +83,11 @@ description: 从 Dashboard 的 signal 突破候选池中执行标准化、IBD-al
 - 当前历史迭代结论只允许沉淀为以下通用规则：EPS 已知优先于 EPS 缺失，但 `EPS >=25` 不得升级为优先复核硬门槛；`pullback_not_dry` 与 `geometry_caution_not_failure` 默认作为风险披露或同分压制，不得仅因二者存在就把 Critical 通过的候选硬排除。
 - Qlib / walk-forward 结果只能沉淀为独立 **Signal Shadow Top3** 审计层：该层从每周所有 `signal == True` 行中选择，不要求 `ibd_entry_status == ACTIONABLE`，但必须保留 `ACTIONABLE / EXTENDED / UNCONFIRMED` 状态；不得扩大 0～3 只优先复核和 0～2 只值得留意的正式容量，也不得写成当前买点确认或正式推荐。
 
-### 基线替换与 Shadow Portfolio 审计
+### 研究审计边界
 
-历史组合回测只能决定审计层与对照层，不得单独覆盖正式 ACTIONABLE 预筛容量。区分三层：
+历史组合回测只能决定审计层与对照层，不得单独覆盖正式 ACTIONABLE 预筛容量。`skill_industry_eps_known` 仍是正式历史对照锚点；任何候选研究规则都不能写成“已替换正式基线”，也不能扩大优先复核或值得留意容量。
 
-- **Formal Baseline**：`skill_industry_eps_known` 仍是正式历史对照锚点。除非候选规则通过下方全部 Replacement Gates，不得写成“已替换正式基线”。
-- **Current Best Baseline**：`clean_eps_pass_no_dry_no_geom_caution` 可作为当前回测表现最强的基线对照，用于报告比较与后续候选挑战；它不是新的硬性正式推荐规则。
-- **Shadow Portfolio Top3**：`sk_act_epspass_corestrict_freshstrict_bpstrict_geomclean_noind_prox_top3` 只作为独立组合审计层并行输出。其规则画像是 ACTIONABLE、EPS 达标辅助、核心量价严格、新鲜度严格、买点严格、Geometry clean、无 Industry 覆盖上限、proximity 排序、最多 3 只。该层**不能替换正式基线**，也不能扩大优先复核或值得留意容量。
-
-**Replacement Gates**：候选规则只有同时满足以下全部门槛，才能被描述为“可替换正式基线”。任一门槛不满足时，只能写成候选、影子组合或 portfolio tradeoff。
-
-1. Backtrader final value 不低于 Formal Baseline，且若存在 Current Best Baseline，也不得低于 Current Best Baseline。
-2. Backtrader 最大回撤不差于对照基线；负值越接近 0 越好。
-3. Backtrader stop events 不多于对照基线。
-4. Rebalance 覆盖率至少达到对照基线的 95%。
-5. Pick 覆盖率至少达到对照基线的 90%。
-6. 周度 median average return 不低于对照基线。
-7. 周度 worst/floor return 不差于对照基线。
-8. Pick Bottom5 暴露率不高于对照基线。
-9. Pick stop rate 不高于对照基线。
-
-不得把某次历史搜索中的收益率、净值、日期、ticker 或单周事件写进本 Skill 作为阈值或理由。允许在一次具体复盘报告中引用这些数字作为审计证据，但必须标注其只来自该次历史实验。
+研究审计层如需并行输出，必须满足：不进入正式优先复核、不替换正式生产基线、不改变 ACTIONABLE 原始排序、不把历史收益或单周事件写成阈值。允许在一次具体复盘报告中引用审计数字作为背景证据，但必须标注其只来自该次历史实验。
 
 ## 状态语义
 
@@ -383,13 +382,11 @@ watch = take_first_two_by_raw_rank(
 2. 更新尝试后，项目模式读取可用的 `market_report.json` 并将其作为独立背景；报告旧、缺失、无效或日期无法确定时如实披露并继续。独立 CSV 模式只在用户提供报告时读取，否则记录“大盘背景未提供，本次未纳入”。
 3. 合规加载目标 CSV，确认唯一 `snapshot_date`，并按前置规则确定“周中分析”“完整周分析”或“指定快照分析”。
 4. 建立来源记录：`market_analysis_update_result + market_analysis_commit（若可得）+ market_snapshot_date（若可得）+ pool_snapshot_date + pool_path`。该记录只用于披露来源，任何字段都不得传入候选评分、排序或分组函数。
-5. 生成确定性预筛 artifact，作为所有模型的唯一排序与报告骨架来源。项目内可运行：
-   `conda run --no-capture-output -n quant_env python -m backtest.ibd_skill_iteration.deterministic_prescreen --pool [pool.csv] --snapshot-date [YYYY-MM-DD] --version v3 --json-out [artifact.json] --markdown-out [artifact.md]`
-   若该脚本不可用，必须用同一套代码路径或停止说明，不能退回模型手工排序。
+5. 生成 deterministic artifact，作为所有模型的唯一排序与报告骨架来源。项目内固定入口为：`conda run --no-capture-output -n quant_env python -m dashboard.skill_industry_eps_known --pool [pool.csv]`。若需要输出试验审计层，仍必须基于同一评估记录派生，不能退回模型手工排序。
 6. 为每行建立评估记录，至少保存：`snapshot_date`、`code`、原始行序、原始字段、解析值、阶段路由、所有检查状态、Geometry、证据簇、技术分层、原始质量顺位、EPS 状态、Industry 覆盖键、覆盖决策、Alpha Radar 资格、非 ACTIONABLE radar 顺位、最终分组、全部缺失项、决定性原因和格式化值。非 ACTIONABLE 记录不分配 ACTIONABLE 原始顺位。
 7. 先执行 Critical 与 Geometry，再执行阶段路由后的 Major、Minor 与 EPS 辅助信息。
 8. 生成完整 ACTIONABLE 原始质量排序；冻结顺位后再应用 EPS 人工核验与 Industry 覆盖选择。
-9. 由 artifact 中同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字，不得重排 `priority_top3`、`actionable_raw_top5`、`alpha_radar_top5`、`signal_shadow_top3`、`non_actionable_alpha_radar_top10` 或 `pullback_scout_top10`。
+9. 由 artifact 中同一评估记录模板化渲染报告；不得凭记忆、旧报告或其他 ticker 的句子手工补写数字，不得重排正式优先复核、ACTIONABLE 原始排序、Alpha Radar、Signal Shadow 或 Pullback Scout 输出。
 10. 输出完整候选排序与决策轨迹。每个 ACTIONABLE 候选至少显示：原始顺位、Code、Industry、技术分层的人类可读说明、最终分组和决策原因；无论最终分组为何，都在内部记录并在轨迹需要时逐项列出全部适用 Checklist 与覆盖字段缺口，不能只保留首次命中的缺口。
 11. 执行交付前双向一致性校验。数字正确是交付硬门槛：任一候选数字无法追溯、取错 ticker、取错字段或格式化不一致时，必须从当前原始行重新渲染并重跑校验；仍无法确认时省略该数字事实，不得估算或带错发送。
 
