@@ -1,10 +1,15 @@
-rule_family,contrast,applicable_events,treated_complete,control_complete,treated_weeks,control_weeks,paired_week_routes,mean_return_diff_pct,stop_rate_diff,profit_24_rate_diff,power_rate_diff,ci_low,ci_high,status,blocker
-Status,Status_ACTIONABLE_vs_other,2738,270,841,32,35,62,-2.5477676252746537,-0.09792574976879376,-0.0981239265424759,-0.022376359712863864,-6.001147590823956,1.4471957287790844,OK,
-Close > Trigger,Close_nonnegative_vs_negative,1209,446,0,35,0,0,,,,,,,RULE_NOT_IDENTIFIABLE,negative group not observed
-Fresh Zone,Fresh_0_5_vs_other,2738,834,277,35,31,62,-8.399721084430123,-0.18413716680085535,-0.22321204408314502,-0.25880667307309385,-15.702564100694241,-1.7241909340361188,OK,
-Entry Volume,Volume_1_5_vs_other,1209,446,0,35,0,0,,,,,,,RULE_NOT_IDENTIFIABLE,below 1.5 group not observed
-Geometry,Geometry_nonfailure_vs_failure,1208,292,154,33,27,41,4.906332639606531,0.011074541896459678,0.13796477495107634,0.13382850026685644,-0.12211973825521492,12.091081165595561,OK,
-Pullback,Pullback_dry_PASS_vs_FAIL,1581,190,456,30,35,49,1.7796431487390982,-0.0421052631578947,-0.01842105263157895,-0.021929824561403508,-5.066522828386631,7.557882883434068,OK,
-Pullback,Pullback_dry_PASS_vs_UNKNOWN,805,190,175,30,22,28,-1.725652271118598,0.1344360902255639,0.016691729323308258,-0.02165413533834587,-6.770543184408704,4.804441164903822,OK,
-Pullback,Pullback_dry_FAIL_vs_UNKNOWN,1528,456,175,35,22,33,0.8860159821256381,0.1765413533834586,0.03511278195488721,0.00027568922305763743,-4.0276520727545835,7.714291416704787,OK,
-EPS,EPS_verified_25_vs_verified_below,2368,564,413,34,32,60,3.7053596435992255,0.09190665086806449,0.06083320454038088,0.02198066388473889,0.6969198460816711,8.307500728002266,OK,
+rule_family,contrast,applicable_events,treated_complete,control_complete,treated_weeks,control_weeks,paired_week_routes,mean_return_diff_pct,stop_rate_diff,profit_24_rate_diff,power_rate_diff,ci_low,ci_high,status,blocker,pairing_keys
+Status,Status_ACTIONABLE_vs_other,2738,270,841,32,35,66,-2.7359151400610577,-0.0922263549111601,-0.11097844258617072,-0.4270875180968764,-7.906008809841073,0.46015102228320426,OK,,snapshot_date;ibd_candidate_rule
+Status,Status_ACTIONABLE_increment_controlled,2738,270,841,32,35,0,,,,,,,RULE_NOT_IDENTIFIABLE,no same-week same-route Fresh/Volume/Geometry controlled overlap,snapshot_date;ibd_candidate_rule;_control_fresh;_control_volume;_control_geometry
+Close > Trigger,Close_nonnegative_vs_negative,1209,446,0,35,0,0,,,,,,,RULE_NOT_IDENTIFIABLE,negative group not observed,snapshot_date;ibd_candidate_rule
+Fresh Zone,Fresh_0_5_vs_other,2738,834,277,35,31,68,-7.6070571728145016,-0.13838990087378647,-0.2319678177114086,-0.4270875180968764,-18.611672026959347,-1.2427195010064602,OK,,snapshot_date;ibd_candidate_rule
+Entry Volume,Volume_1_5_vs_other,1209,446,0,35,0,0,,,,,,,RULE_NOT_IDENTIFIABLE,below 1.5 group not observed,snapshot_date;ibd_candidate_rule
+Geometry,Geometry_nonfailure_vs_failure,1208,292,154,33,27,45,3.6597952459076106,0.21596163096163098,0.09975357975357974,0.12190605690605688,-0.5206619789707464,11.066716456948031,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_dry_PASS_vs_FAIL,1581,190,456,30,35,49,1.7796431487390965,-0.039188233090622054,-0.03483888206543122,0.08860028860028861,-2.3734587110249006,7.650821087622736,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_dry_PASS_vs_UNKNOWN,805,190,175,30,22,28,-1.725652271118599,0.1851060121018104,-0.06819095062267332,-0.00775401069518716,-6.936280747663347,6.160418272662319,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_dry_FAIL_vs_UNKNOWN,1528,456,175,35,22,33,0.8860159821256375,0.20170807162017504,0.029898408868489868,0.06086678473042109,-5.3278393456346524,8.249035386146593,OK,,snapshot_date;ibd_candidate_rule
+EPS,EPS_verified_25_vs_verified_below,2368,564,413,34,32,63,3.7036887190861,0.03692986347535533,0.09304500783900907,0.007967557967557968,-0.7191677808618138,9.946127777548512,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_ceiling_pullback_PASS_vs_FAIL,160,19,41,7,18,7,,,,,,,INSUFFICIENT_EVIDENCE,insufficient treated/control count or independent weeks,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_ma10_touch_confirm_PASS_vs_FAIL,440,42,138,16,25,14,0.29363049874414987,-0.003178505192129711,-0.12343916852532359,0.08333333333333333,-5.185402435868867,5.539847847840858,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_pivot_PASS_vs_FAIL,907,125,254,27,33,26,1.305517487785423,-0.08993378697326067,-0.018279892621997883,0.054662004662004667,-7.216027438025284,9.385652055737204,OK,,snapshot_date;ibd_candidate_rule
+Pullback,Pullback_three_weeks_tight_PASS_vs_FAIL,74,4,23,2,14,2,,,,,,,INSUFFICIENT_EVIDENCE,insufficient treated/control count or independent weeks,snapshot_date;ibd_candidate_rule

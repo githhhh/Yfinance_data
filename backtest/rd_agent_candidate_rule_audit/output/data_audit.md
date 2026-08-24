@@ -12,4 +12,4 @@
 
 The local schema document is a migration pointer to the quant_trade SSOT. Field meanings not inferable from repository consumers remain schema blockers for production hard gates.
 
-Coverage regimes are assigned from observed pool row count: weeks with at least 500 raw rows are `late_high_coverage`; earlier weeks are `early_low_coverage`.
+Coverage regimes are descriptive minimum-SSE level-shift segments on log pool-row count. They are not evidence of a causal selector/config change; schema hashes and week-over-week coverage changes are reported separately.

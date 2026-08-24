@@ -1,0 +1,19 @@
+variant,target_rule,audited_weeks,actual_target_trace_changes,non_target_trace_violations,selection_contrast_weeks,baseline_selected_count,variant_selected_count,treatment_contrast,atomicity_status
+B0 status soft,status,42,2738,0,19,97,126,OK,PASS
+B0 status supplemental UNCONFIRMED,status,42,2738,0,19,97,126,OK,PASS
+B0 no entry_valid,entry_valid,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 close trigger soft,close_trigger,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 fresh continuous,fresh,42,2738,0,7,97,97,OK,PASS
+B0 volume soft,volume,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 volume route-specific,volume,42,2738,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 geometry soft,geometry,42,2738,0,12,97,113,OK,PASS
+B0 geometry failure only,geometry,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 pullback dry hard,pullback_dry,42,2738,0,14,97,76,OK,PASS
+B0 pullback dry bonus,pullback_dry,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 pullback dry drop,pullback_dry,42,2738,0,5,97,97,OK,PASS
+B0 EPS >=25 hard,eps,42,2738,0,16,97,84,OK,PASS
+B0 EPS >=25 bonus,eps,42,0,0,0,97,97,NO_TREATMENT_CONTRAST,PASS
+B0 EPS >=25 drop,eps,42,2738,0,21,97,97,OK,PASS
+B0 EPS unknown manual-review,eps,42,2738,0,5,97,101,OK,PASS
+B0 no industry cover,industry_cover,42,2738,0,6,97,99,OK,PASS
+B0 top1,topk,42,2738,0,32,97,40,OK,PASS

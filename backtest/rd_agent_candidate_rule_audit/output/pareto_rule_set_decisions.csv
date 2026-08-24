@@ -1,0 +1,2 @@
+variant,pareto_pass,passed_criteria,total_criteria,failed_criteria,decision,required_rule_families,source_atomic_variants
+R1_ATOMIC_IMPROVEMENTS,False,3,11,return_effect;return_confidence_interval;fold_direction_stability;stop_8_within_40d;profit_24_within_40d;cvar_20;coverage;trade_count,REJECTED,Status,B0 status supplemental UNCONFIRMED

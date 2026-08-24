@@ -1,12 +1,14 @@
 base_commit: "3e73d887872a0f668b66cefe7811d09c7ae90b2b"
-head_commit_at_run: "da5f45876d3ef4fc74549a95ef9cbe30a0b2113b"
+repair_baseline_commit: "199a0d892dc1aa7973bcad93a4180e9b3875e512"
+head_commit_at_run: "cbd0d35a4fbead255e27ad5181412b88bfc47410"
 branch: "research/candidate-event-rule-audit"
 period_name: "retrospective_final_test"
+data_status: "retrospective_inspected_data"
 prospective_holdout:
   enabled: true
   unlock_rule: "future replay pool snapshots unlock only after complete 40 trading-day observation window"
   embargo_weeks: 8
-source_code_hash: "0474a74821f72296a38fd0bf59a3418be619b3e4b45160d738b8681ee484f9a6"
+source_code_hash: "fa9613467ba8c9cd51b7ed7e64f1f7c9e8d2b3bd848967603fb0f745ad0f38ff"
 pool_file_content_hash:
   backtest/ibd_skill_replay_pools/2025-10-10/breakout_follow_pool.csv: "80c613310b4429352d6fdf77b609afb6c9aa9155fbff821049b898365455afac"
   backtest/ibd_skill_replay_pools/2025-10-24/breakout_follow_pool.csv: "73dae2a0ee12ee9053a7159e7263da4c89e4f22497e8804a92b76c2d6f466b76"
@@ -56,277 +58,326 @@ price_cache_content_hash: "a2668bd212322ed9fd7065a261a34d1bbfbf158b40a0e34f8df9b
 selector_configs:
   B0_REPO_EXACT:
     name: "B0_REPO_EXACT"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "repo_soft"
+    eps_source: "repo"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: []
+    source_atomic_variants: []
   B0_PIT_VERIFIED:
     name: "B0_PIT_VERIFIED"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: []
+    source_atomic_variants: []
   B0 status soft:
     name: "B0 status soft"
-    status_mode: "soft"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "all"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["status"]
+    source_atomic_variants: []
   B0 status supplemental UNCONFIRMED:
     name: "B0 status supplemental UNCONFIRMED"
-    status_mode: "supplemental_unconfirmed"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable_unconfirmed"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["status"]
+    source_atomic_variants: []
   B0 no entry_valid:
     name: "B0 no entry_valid"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["entry_valid"]
+    source_atomic_variants: []
   B0 close trigger soft:
     name: "B0 close trigger soft"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["close_trigger"]
+    source_atomic_variants: []
   B0 fresh continuous:
     name: "B0 fresh continuous"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "continuous"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["fresh"]
+    source_atomic_variants: []
   B0 volume soft:
     name: "B0 volume soft"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["volume"]
+    source_atomic_variants: []
   B0 volume route-specific:
     name: "B0 volume route-specific"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "route_specific"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "route_specific"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["volume"]
+    source_atomic_variants: []
   B0 geometry soft:
     name: "B0 geometry soft"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "soft"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "allow_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["geometry"]
+    source_atomic_variants: []
   B0 geometry failure only:
     name: "B0 geometry failure only"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["geometry"]
+    source_atomic_variants: []
   B0 pullback dry hard:
     name: "B0 pullback dry hard"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "hard"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "hard"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
+    source_atomic_variants: []
   B0 pullback dry bonus:
     name: "B0 pullback dry bonus"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "bonus"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
+    source_atomic_variants: []
   B0 pullback dry drop:
     name: "B0 pullback dry drop"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "drop"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "drop"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["pullback_dry"]
-  B0 EPS >=25 hard/bonus/drop:
-    name: "B0 EPS >=25 hard/bonus/drop"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "hard_25"
+    source_atomic_variants: []
+  B0 EPS >=25 hard:
+    name: "B0 EPS >=25 hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "at_least_25"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["eps"]
+    source_atomic_variants: []
+  B0 EPS >=25 bonus:
+    name: "B0 EPS >=25 bonus"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["eps"]
+    source_atomic_variants: []
+  B0 EPS >=25 drop:
+    name: "B0 EPS >=25 drop"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "drop"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["eps"]
+    source_atomic_variants: []
   B0 EPS unknown manual-review:
     name: "B0 EPS unknown manual-review"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "unknown_manual_review"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "allow_unknown"
+    eps_rank: "production"
     industry_cover: true
     top_n: 3
     changed_rules: ["eps"]
+    source_atomic_variants: []
   B0 no industry cover:
     name: "B0 no industry cover"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: false
     top_n: 3
     changed_rules: ["industry_cover"]
+    source_atomic_variants: []
   B0 top1:
     name: "B0 top1"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "known_hard"
+    eps_source: "pit_verified"
+    status_eligibility: "actionable"
+    entry_valid_gate: false
+    close_trigger_gate: false
+    fresh_rank: "production"
+    volume_policy: "production"
+    geometry_eligibility: "exclude_failure"
+    pullback_dry_policy: "production"
+    eps_eligibility: "known"
+    eps_rank: "production"
     industry_cover: true
     top_n: 1
     changed_rules: ["topk"]
-  R1_ATOMIC_IMPROVEMENTS:
-    name: "R1_ATOMIC_IMPROVEMENTS"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "bonus"
-    eps_mode: "known_hard"
-    industry_cover: true
-    top_n: 3
-    changed_rules: ["fresh", "volume", "geometry", "pullback_dry"]
-  R2_BALANCED_SOFT:
-    name: "R2_BALANCED_SOFT"
-    status_mode: "soft"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "soft"
-    pullback_dry_mode: "bonus"
-    eps_mode: "known_hard"
-    industry_cover: true
-    top_n: 3
-    changed_rules: ["status", "fresh", "volume", "geometry", "pullback_dry"]
-  R3_MINIMAL_TECHNICAL:
-    name: "R3_MINIMAL_TECHNICAL"
-    status_mode: "hard"
-    valid_mode: "drop"
-    close_mode: "soft"
-    fresh_mode: "continuous"
-    volume_mode: "soft"
-    geometry_mode: "failure_only"
-    pullback_dry_mode: "soft"
-    eps_mode: "drop"
-    industry_cover: true
-    top_n: 3
-    changed_rules: ["eps", "fresh", "geometry"]
+    source_atomic_variants: []
+B0_REPO_EXACT_invariant: "weekly code, pick order, reason_codes, and risk_codes must exactly match dashboard.skill_industry_eps_known"
+B0_PIT_VERIFIED_eps_policy: "only pit_eps_state=VERIFIED and pit_eps_yoy_growth; production fallback disabled"
 B0_ablation_configs:
   - "B0 status soft"
   - "B0 status supplemental UNCONFIRMED"
@@ -340,7 +391,9 @@ B0_ablation_configs:
   - "B0 pullback dry hard"
   - "B0 pullback dry bonus"
   - "B0 pullback dry drop"
-  - "B0 EPS >=25 hard/bonus/drop"
+  - "B0 EPS >=25 hard"
+  - "B0 EPS >=25 bonus"
+  - "B0 EPS >=25 drop"
   - "B0 EPS unknown manual-review"
   - "B0 no industry cover"
   - "B0 top1"
@@ -352,6 +405,10 @@ label_windows_trading_days:
 stop_profit_parameters:
   main_stop_pct: 8
   main_profit_pct: 24
+  main_power_lock_enabled: true
+  ordinary_comparator_power_lock_enabled: false
+  same_day_main_order: "stop_first"
+  same_day_sensitivity_order: "profit_first"
   sensitivity_stop_pct:
     - 7
     - 7.5
@@ -366,9 +423,52 @@ walk_forward:
   test_weeks: 4
   embargo_weeks: 8
   min_train_weeks: 8
+blocked_retrospective_evaluation:
+  train_select_freeze_test: true
+  overlapping_outcome_window_weeks: 8
+  oos_ci_moving_block_folds: 2
+  candidate_generation_thresholds:
+    min_mature_weeks: 8
+    min_independent_8w_time_blocks: 3
+    min_paired_weeks: 6
+    min_mean_return_diff_pct: 0.5
+    validated_ci_low_pct: 0.0
+    max_stop_40d_diff_pp: 2.0
+    min_profit_24_40d_diff_pp: -2.0
+    min_coverage_ratio: 0.75
+    max_industry_top_share_diff: 0.1
+  fold_rule_hashes:
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+    - "185eb1983756279ad4edf53048c925639650f6115cc553e2eb25065519166797"
+    - "958c60e69424a6fc970ee707cf928a40d6df60514b56fc66f4003a39f597c289"
+  fold_registry_hash: "13ef6aa5a2b5809e4e753ab8e403f1693fb94710c23d7483735ab8b53d64dccb"
+pareto_thresholds:
+  min_return_effect_pct: 0.5
+  min_return_ci_low_pct: 0.0
+  min_better_fold_ratio: 0.6
+  min_non_worse_fold_ratio: 0.75
+  min_evaluated_folds: 3
+  min_fold_coverage_ratio: 0.6
+  max_drawdown_worsening_pp: 2.0
+  max_stop_40d_diff_pp: 2.0
+  min_profit_24_40d_diff_pp: -2.0
+  min_cvar_20_diff_pct: -2.0
+  min_coverage_ratio: 0.75
+  min_trade_ratio: 0.75
+  min_trades: 10
+  max_industry_top_share_diff: 0.1
+  min_capacity_cost_nonnegative_ratio: 0.67
+  required_capacity_cost_scenarios: 9
+coverage_regime:
+  method: "three-segment log-row-count minimum-SSE change points"
+  causal_interpretation: false
 bootstrap:
   seed: 20260824
-  iterations_recorded_by_run_argument: true
+  iterations: 400
   block: "snapshot week"
 portfolio:
   capacities:
@@ -381,6 +481,8 @@ portfolio:
     - 25
   initial_capital: 100000
   no_leverage: true
+  uniform_valuation_start: "2025-10-27"
+  uniform_valuation_as_of: "2026-08-21"
 censoring_policy: "insufficient horizon stays censored; as_of_return_pct separate from complete forward returns"
-hypothesis_hash: "73f53dc7ade175a46a11d1a9ea552782fddbca7f8b1fab4686aa9be99f98fb56"
+hypothesis_hash: "cf5b3eddfbd0624812b93c5ab6a204a4214e784a8e1faa62fd8e10f1b56eca91"
 output_dir: "backtest/rd_agent_candidate_rule_audit/output"

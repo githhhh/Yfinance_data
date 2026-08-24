@@ -1,10 +1,11 @@
-rule_family,machine_role,evidence_status,complete_outcomes,independent_weeks,blocker,production_change
-Status,UNKNOWN,Insufficient Evidence,665,34,,False
-Close > Trigger,UNKNOWN,RULE_NOT_IDENTIFIABLE,665,35,negative group not observed,False
-Fresh Zone,Context Only,Insufficient Evidence,496,35,,False
-Entry Volume,UNKNOWN,RULE_NOT_IDENTIFIABLE,665,34,below 1.5 group not observed,False
-Geometry,Risk Flag,Promising / prospective confirmation required,665,34,,False
-Pullback,Context Only,Insufficient Evidence,456,35,,False
-EPS,Context Only,Insufficient Evidence,564,34,PIT blocker for unverified Yahoo current-period records; verified subset only.,False
-Industry,UNKNOWN,No Treatment Contrast,1111,35,Coverage rule changes opportunity set and risk concentration; not a standalone alpha claim.,False
-TopK,UNKNOWN,Insufficient Evidence,0,0,Capacity experiment only; cannot replace Top3 from in-sample return.,False
+rule_family,machine_role,evidence_status,complete_outcomes,independent_weeks,paired_week_routes,mean_effect_pct,ci_low_pct,ci_high_pct,stop_rate_diff,profit_24_rate_diff,evaluated_folds,better_folds,prospective_confirmed,decision_contrast,atomic_variant,fold_polarity,blocker,production_change
+Status,UNKNOWN,NOT_IDENTIFIABLE,665,34,0,,,,,,0,0,False,Status_ACTIONABLE_increment_controlled,B0 status soft,-1,no same-week same-route Fresh/Volume/Geometry controlled overlap,False
+Entry Valid,UNKNOWN,NOT_IDENTIFIABLE,0,0,0,,,,,,0,0,False,,B0 no entry_valid,1,registered atomic selector produced no treatment contrast,False
+Close > Trigger,UNKNOWN,NOT_IDENTIFIABLE,665,35,0,,,,,,0,0,False,Close_nonnegative_vs_negative,B0 close trigger soft,1,negative group not observed,False
+Fresh Zone,UNKNOWN,REJECTED,496,35,68,-7.6070571728145016,-18.611672026959347,-1.2427195010064602,-0.13838990087378647,-0.2319678177114086,5,0,False,Fresh_0_5_vs_other,B0 fresh continuous,1,registered 40-day stop/profit risk bar failed,False
+Entry Volume,UNKNOWN,NOT_IDENTIFIABLE,665,34,0,,,,,,0,0,False,Volume_1_5_vs_other,B0 volume route-specific,1,below 1.5 group not observed,False
+Geometry,UNKNOWN,REJECTED,665,34,45,3.6597952459076106,-0.5206619789707464,11.066716456948031,0.21596163096163098,0.09975357975357974,5,1,False,Geometry_nonfailure_vs_failure,B0 geometry soft,-1,registered 40-day stop/profit risk bar failed,False
+Pullback,UNKNOWN,REJECTED,456,35,49,1.7796431487390965,-2.3734587110249006,7.650821087622736,-0.039188233090622054,-0.03483888206543122,5,2,False,Pullback_dry_PASS_vs_FAIL,B0 pullback dry hard,1,registered 40-day stop/profit risk bar failed,False
+EPS,UNKNOWN,REJECTED,564,34,63,3.7036887190861,-0.7191677808618138,9.946127777548512,0.03692986347535533,0.09304500783900907,5,1,False,EPS_verified_25_vs_verified_below,B0 EPS >=25 hard,1,registered 40-day stop/profit risk bar failed,False
+Industry,UNKNOWN,INSUFFICIENT_EVIDENCE,8,3,3,0.7176116111111112,,,-0.07142857142857145,-0.0,5,1,False,,B0 no industry cover,-1,"insufficient independent weeks, paired week-route contrasts, or retrospective folds",False
+TopK,UNKNOWN,INSUFFICIENT_EVIDENCE,12,12,12,5.653669541666667,,,-0.04404761904761905,0.025,5,4,False,,B0 top1,1,"insufficient independent weeks, paired week-route contrasts, or retrospective folds",False

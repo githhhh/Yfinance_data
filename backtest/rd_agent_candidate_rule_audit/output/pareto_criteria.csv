@@ -1,0 +1,12 @@
+variant,criterion,observed_value,threshold,passed,reason
+R1_ATOMIC_IMPROVEMENTS,return_effect,,>=0.5,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,return_confidence_interval,,>0.0,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,fold_direction_stability,"{'folds': 1, 'better_ratio': 0.0, 'non_worse_ratio': 0.0, 'fold_coverage_ratio': 0.14285714285714285}",folds>=3;better>=0.6;non_worse>=0.75;coverage>=0.6,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,max_drawdown,0.0,<=2.0,True,PASS
+R1_ATOMIC_IMPROVEMENTS,stop_8_within_40d,,<=2.0,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,profit_24_within_40d,,>=-2.0,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,cvar_20,,>=-2.0,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,coverage,,>=0.75,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,trade_count,"{'trade_ratio': 1.0, 'trades': 3.0}",ratio>=0.75;trades>=10,False,FAIL_OR_MISSING
+R1_ATOMIC_IMPROVEMENTS,industry_concentration,0.0,<=0.1,True,PASS
+R1_ATOMIC_IMPROVEMENTS,capacity_cost_robustness,"{'paired_scenarios': 9, 'nonnegative_return_ratio': 1.0}",paired_scenarios>=9;nonnegative_return_ratio>=0.67,True,PASS

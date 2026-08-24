@@ -1,6 +1,2 @@
-variant,folds,paired_weeks,mean_oos_diff_pct,median_oos_diff_pct,worst_fold_diff_pct,better_folds
-B0_PIT_VERIFIED,5,17,0.0,0.0,0.0,0
-B0_REPO_EXACT,5,17,0.0,0.0,0.0,0
-R1_ATOMIC_IMPROVEMENTS,5,17,-2.900770780555555,-1.0910551666666666,-4.739251833333332,0
-R2_BALANCED_SOFT,5,17,-4.331767347222224,-2.7924883333333312,-12.373910500000008,1
-R3_MINIMAL_TECHNICAL,5,17,-4.6507723,-1.8312616666666663,-9.182196333333332,0
+variant,folds,paired_weeks,mean_oos_diff_pct,median_oos_diff_pct,return_ci_low_pct,return_ci_high_pct,worst_fold_diff_pct,better_folds,non_worse_folds,stop_40d_diff_pp,profit_24_40d_diff_pp,CVaR_20_diff_pct,coverage_ratio,industry_top_share_diff,frozen_rule_hashes,ci_time_block_weeks,ci_block_folds,required_rule_families,source_atomic_variants,portfolio_baseline_variant,evaluation_type,available_folds,fold_coverage_ratio
+R1_ATOMIC_IMPROVEMENTS,1,0,,,,,,0,0,,,,,0.0,1,8,2,Status,B0 status supplemental UNCONFIRMED,B0_FOR_R1_ATOMIC_IMPROVEMENTS_BLOCKED,blocked_retrospective_evaluation,7,0.14285714285714285
