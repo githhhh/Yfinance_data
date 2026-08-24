@@ -1,0 +1,16 @@
+run_date: 2026-08-24
+random_seed: 20260824
+base_commit: 7925b2209adfa810213623de34c1dae6402638aa
+head_commit: 9e8e8bb412c217b339751276fe2ac1e84584013d
+skill_path: .agents/skills/ibd-candidate-prescreen/SKILL.md
+pool_root: backtest/ibd_skill_replay_pools
+price_cache: results_pkl/stock_data_230826_1d.pkl
+pool_weeks: 42
+first_week: 2025-10-10
+last_week: 2026-08-07
+sealed_holdout_weeks: 2026-07-02,2026-07-10,2026-07-17,2026-07-24,2026-07-31,2026-08-07
+config_hash: eb3416d36e1902c6f679b55961df1765be282f4f13acd6190cf1b1f47a24baa2
+data_hash: 4d0e3e2d0232236552b0739668daa94e7d6ba2137464e89e639e879ce63d27bf
+market_report_policy: independent_display_only_not_used_for_scoring
+selector_exit_policy_decoupling: selector variants use same IBD state machine; exit sensitivity reported separately
+submodule_update_attempt: attempted git submodule update --init --remote market_analysis; interrupted by user in Codex turn and not retried

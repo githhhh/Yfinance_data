@@ -1,0 +1,8 @@
+metric,value,detail
+replay_pool_weeks_loaded,42,
+signal_rows_loaded,2738,
+selection_events,2289,
+missing_forward_paths,926,not dropped; retained as UNKNOWN
+censored_trades,516,open at price-cache end; mark-to-market
+pit_eps_rows,2738,PIT EPS effective_date audited
+pit_eps_future_violations,0,effective_date > snapshot_date
