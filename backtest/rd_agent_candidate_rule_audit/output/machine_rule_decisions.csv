@@ -1,0 +1,10 @@
+rule_family,machine_role,evidence_status,complete_outcomes,independent_weeks,blocker,production_change
+Status,Hard Eligibility,Promising / prospective confirmation required,1111,42,,False
+Close > Trigger,Risk Flag,Promising / prospective confirmation required,1111,42,,False
+Fresh Zone,Major Score,Promising / prospective confirmation required,1111,42,,False
+Entry Volume,Major Score,Promising / prospective confirmation required,1111,42,,False
+Geometry,Risk Flag,Promising / prospective confirmation required,1111,42,,False
+Pullback,Route-specific,Promising / prospective confirmation required,1111,42,,False
+EPS,Minor Bonus,Promising / prospective confirmation required,1111,42,PIT blocker for unverified Yahoo current-period records; verified subset only.,False
+Industry,Context Only,Promising / prospective confirmation required,1111,42,Coverage rule changes opportunity set and risk concentration; not a standalone alpha claim.,False
+TopK,UNKNOWN,Insufficient Evidence,0,0,Capacity experiment only; cannot replace Top3 from in-sample return.,False

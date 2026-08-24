@@ -1,0 +1,386 @@
+base_commit: "3e73d887872a0f668b66cefe7811d09c7ae90b2b"
+head_commit_at_run: "3e73d887872a0f668b66cefe7811d09c7ae90b2b"
+branch: "research/candidate-event-rule-audit"
+period_name: "retrospective_final_test"
+prospective_holdout:
+  enabled: true
+  unlock_rule: "future replay pool snapshots unlock only after complete 40 trading-day observation window"
+  embargo_weeks: 8
+source_code_hash: "f5760ee690cb67dd893cb502672eab41796ba44b9a2056f9b4125d967b24b4e4"
+pool_file_content_hash:
+  backtest/ibd_skill_replay_pools/2025-10-10/breakout_follow_pool.csv: "80c613310b4429352d6fdf77b609afb6c9aa9155fbff821049b898365455afac"
+  backtest/ibd_skill_replay_pools/2025-10-24/breakout_follow_pool.csv: "73dae2a0ee12ee9053a7159e7263da4c89e4f22497e8804a92b76c2d6f466b76"
+  backtest/ibd_skill_replay_pools/2025-10-31/breakout_follow_pool.csv: "2eb5edf2d70fd6463b8e6d58dd440a87508e04cf831973e5748740873b2d13da"
+  backtest/ibd_skill_replay_pools/2025-11-07/breakout_follow_pool.csv: "8d91aa9088057a132c5d6ae4d16cd351b8cd21ff8ee7be78195c8ccf9daeee7a"
+  backtest/ibd_skill_replay_pools/2025-11-14/breakout_follow_pool.csv: "2d9321775645d14cf64452b8207d1f61cff5169c6c9f6d76b900d9bfed7637bf"
+  backtest/ibd_skill_replay_pools/2025-11-21/breakout_follow_pool.csv: "7f8105d3767117d1573941bd0a9860a74c0f888232bcab27c594a26f62d539a7"
+  backtest/ibd_skill_replay_pools/2025-11-28/breakout_follow_pool.csv: "5b80df5b04961ea44890a0ade24ea26f1a6b92d5f7abdd96e8265c858f227f7e"
+  backtest/ibd_skill_replay_pools/2025-12-05/breakout_follow_pool.csv: "ce892242bce3560e20792ada2d0356321d0c70c92d7abbdaca6212e4efb5f753"
+  backtest/ibd_skill_replay_pools/2025-12-12/breakout_follow_pool.csv: "81a35f5c65e0d9f0da3bed58fadb711eacf1080016617b00a3ddd7af9db717df"
+  backtest/ibd_skill_replay_pools/2025-12-19/breakout_follow_pool.csv: "fcd13b2d3b5b33ea0e3b3ee4ec4002acd7495773fecd6b1e6716cba23bdac345"
+  backtest/ibd_skill_replay_pools/2025-12-26/breakout_follow_pool.csv: "a411b248b6a5f23c9861a715c277d9cd7cff00ec9f1322ea2b1a1b4e25e2e55f"
+  backtest/ibd_skill_replay_pools/2026-01-02/breakout_follow_pool.csv: "8ba6d6e322e3593db43ce82339b57078354425b470a9c87664182316f41cef3b"
+  backtest/ibd_skill_replay_pools/2026-01-09/breakout_follow_pool.csv: "7b8b2ceb6032c3090ce064fb4d18a19db6e422eb2fd61ebc1e35b483a11dc1b1"
+  backtest/ibd_skill_replay_pools/2026-01-16/breakout_follow_pool.csv: "0957ff517c21c7114836ac6a1140904d7ba905cfb37ab1a7336df55c543bbac8"
+  backtest/ibd_skill_replay_pools/2026-01-23/breakout_follow_pool.csv: "bfc5c6a1b377df7dcbbc8825f880295e5bfce75443aa0fda6172884d49daae85"
+  backtest/ibd_skill_replay_pools/2026-01-30/breakout_follow_pool.csv: "f03027ec33a44daff9ddbcbedff52657b30a5913928690649ac99eb7dcc819f5"
+  backtest/ibd_skill_replay_pools/2026-02-06/breakout_follow_pool.csv: "cdfdaf5c4f935f613e8fa12cff3f809368a0ca6969fd51cb9d49d2edebae3e17"
+  backtest/ibd_skill_replay_pools/2026-02-13/breakout_follow_pool.csv: "104f9373886106706efd12fc20805fa80c4377cb7cd6f8a384d5cda315494727"
+  backtest/ibd_skill_replay_pools/2026-02-20/breakout_follow_pool.csv: "ab54882e791c9e0b34cf18e3dfe9bd0aa1e42b6608e8ce800e011702d6f78c83"
+  backtest/ibd_skill_replay_pools/2026-02-27/breakout_follow_pool.csv: "06d48b4dde52a6552c1f6dd0d63e5e1fc5a32daa5f4948170d4f6ee90449c5f7"
+  backtest/ibd_skill_replay_pools/2026-03-06/breakout_follow_pool.csv: "3d2debdff6063d1ac49fdf6c82ef90cb03190726fb371efbb466eca10aa0556c"
+  backtest/ibd_skill_replay_pools/2026-03-13/breakout_follow_pool.csv: "ac3a1d6fb1589f17f0fc8eb6dbedbb948a03aef73caa455571f7e7c7391ad7d9"
+  backtest/ibd_skill_replay_pools/2026-03-20/breakout_follow_pool.csv: "f3c6561dcca75086a749a479e188c77cb330ee0fb98fee9da14acd81c1764bed"
+  backtest/ibd_skill_replay_pools/2026-03-27/breakout_follow_pool.csv: "5483b4df6b21a2cdb5ed8abebd5c708f196fa45d522bed57a0f8da2ca5a01c68"
+  backtest/ibd_skill_replay_pools/2026-04-02/breakout_follow_pool.csv: "8d2acf9572fbed94ef4a12f6f93f6217b63903db2542d3d4eb58d32dd8e785aa"
+  backtest/ibd_skill_replay_pools/2026-04-10/breakout_follow_pool.csv: "0e8a4a8fa763cf08ac1c0d5b99f60c8050a65ea5b6c83f5bb0c288f24a8ab5da"
+  backtest/ibd_skill_replay_pools/2026-04-17/breakout_follow_pool.csv: "75bbc4a874b2e84b59975c4836873c9687a1ca3d34f81a7f9404784c314fc267"
+  backtest/ibd_skill_replay_pools/2026-04-24/breakout_follow_pool.csv: "af2bf26c6a613e8cccea47c8df35bdd16ad139af7679546aa5707af08a2a7055"
+  backtest/ibd_skill_replay_pools/2026-05-01/breakout_follow_pool.csv: "4bcb5810e67af204e1377c85b77e2f0ef3a36db6cfff64ec839897796a6cffea"
+  backtest/ibd_skill_replay_pools/2026-05-08/breakout_follow_pool.csv: "b79fb3f5f29c199d7368e2da39ef8bf484d60a155e4686394d824c68af986bc8"
+  backtest/ibd_skill_replay_pools/2026-05-15/breakout_follow_pool.csv: "29c701230167fcd6b67f42a89d8c56c04b210816fec2570ab03bbb0d59308a33"
+  backtest/ibd_skill_replay_pools/2026-05-22/breakout_follow_pool.csv: "0bbe143c229fb08e497c2726f9280c19b6ad6ba025aaed9721810537f435ce93"
+  backtest/ibd_skill_replay_pools/2026-05-29/breakout_follow_pool.csv: "d71ddbcc4ea7649d856934606f780393e901dc77f2bce055063ca188d27f24eb"
+  backtest/ibd_skill_replay_pools/2026-06-05/breakout_follow_pool.csv: "a47548a2a719a1bb95daf33fdc65301de2d40cd79e3a74ebcf53f51bc3eb01bf"
+  backtest/ibd_skill_replay_pools/2026-06-12/breakout_follow_pool.csv: "2bd29d35c4856135e538b26e21295d2391dd87d6d45a6ef34d3e90b2394df0c5"
+  backtest/ibd_skill_replay_pools/2026-06-18/breakout_follow_pool.csv: "61753a16177817a6ac2fb98750e2f893f0e4073ac46dea45dae728e882c154e4"
+  backtest/ibd_skill_replay_pools/2026-06-26/breakout_follow_pool.csv: "2c5e4f19e2a0fa952aaf5e9e28c4b946b712b068d7c3a688f194f846832e7e27"
+  backtest/ibd_skill_replay_pools/2026-07-02/breakout_follow_pool.csv: "abc58adbc3b52744439bbc73ee36c14798309f04cacbba418a425a20ddc863a4"
+  backtest/ibd_skill_replay_pools/2026-07-10/breakout_follow_pool.csv: "6dfc1b6042ad9e8016036425965423573191b384c1012b0ba78a8093386c7520"
+  backtest/ibd_skill_replay_pools/2026-07-17/breakout_follow_pool.csv: "3271b081bb0ed93b5429fd8081f419301438cf2be56ac77ec1c46039d983ec60"
+  backtest/ibd_skill_replay_pools/2026-07-24/breakout_follow_pool.csv: "cdbc470ff1fc2482193b6223089b9dc89aa840748c4677ac6b177bed960ffbb6"
+  backtest/ibd_skill_replay_pools/2026-07-31/breakout_follow_pool.csv: "ca2b58ebfa8ce8f8abae13cb71edbdb8612cd09973bcade8dce6b69a4548e14e"
+  backtest/ibd_skill_replay_pools/2026-08-07/breakout_follow_pool.csv: "b54765fb4a28d423490639d2d883f447b43bd5e980ba12f43e2d3d27d876d29f"
+eps_file_content_hash: "c22eabba68f57cbb02a2c63b33a719b5532e14c1456b14ec65b0aa675ee0c38b"
+price_cache_content_hash: "a2668bd212322ed9fd7065a261a34d1bbfbf158b40a0e34f8df9bfe664721377"
+selector_configs:
+  B0_REPO_EXACT:
+    name: "B0_REPO_EXACT"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "repo_soft"
+    industry_cover: true
+    top_n: 3
+    changed_rules: []
+  B0_PIT_VERIFIED:
+    name: "B0_PIT_VERIFIED"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: []
+  B0 status soft:
+    name: "B0 status soft"
+    status_mode: "soft"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["status"]
+  B0 status supplemental UNCONFIRMED:
+    name: "B0 status supplemental UNCONFIRMED"
+    status_mode: "supplemental_unconfirmed"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["status"]
+  B0 no entry_valid:
+    name: "B0 no entry_valid"
+    status_mode: "hard"
+    valid_mode: "drop"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["entry_valid"]
+  B0 close trigger soft:
+    name: "B0 close trigger soft"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "soft"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["close_trigger"]
+  B0 fresh continuous:
+    name: "B0 fresh continuous"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "continuous"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["fresh"]
+  B0 volume soft:
+    name: "B0 volume soft"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "soft"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["volume"]
+  B0 volume route-specific:
+    name: "B0 volume route-specific"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "route_specific"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["volume"]
+  B0 geometry soft:
+    name: "B0 geometry soft"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "soft"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["geometry"]
+  B0 geometry failure only:
+    name: "B0 geometry failure only"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "failure_only"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["geometry"]
+  B0 pullback dry hard:
+    name: "B0 pullback dry hard"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "hard"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["pullback_dry"]
+  B0 pullback dry bonus:
+    name: "B0 pullback dry bonus"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "bonus"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["pullback_dry"]
+  B0 pullback dry drop:
+    name: "B0 pullback dry drop"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "drop"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["pullback_dry"]
+  B0 EPS >=25 hard/bonus/drop:
+    name: "B0 EPS >=25 hard/bonus/drop"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "hard_25"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["eps"]
+  B0 EPS unknown manual-review:
+    name: "B0 EPS unknown manual-review"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "unknown_manual_review"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["eps"]
+  B0 no industry cover:
+    name: "B0 no industry cover"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: false
+    top_n: 3
+    changed_rules: ["industry_cover"]
+  B0 top1:
+    name: "B0 top1"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "hard"
+    volume_mode: "hard"
+    geometry_mode: "hard"
+    pullback_dry_mode: "soft"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 1
+    changed_rules: ["topk"]
+  R1_ATOMIC_IMPROVEMENTS:
+    name: "R1_ATOMIC_IMPROVEMENTS"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "failure_only"
+    pullback_dry_mode: "bonus"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["fresh", "volume", "geometry", "pullback_dry"]
+  R2_BALANCED_SOFT:
+    name: "R2_BALANCED_SOFT"
+    status_mode: "soft"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "continuous"
+    volume_mode: "soft"
+    geometry_mode: "soft"
+    pullback_dry_mode: "bonus"
+    eps_mode: "known_bonus"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["status", "fresh", "volume", "geometry", "pullback_dry"]
+  R3_MINIMAL_TECHNICAL:
+    name: "R3_MINIMAL_TECHNICAL"
+    status_mode: "hard"
+    valid_mode: "hard"
+    close_mode: "hard"
+    fresh_mode: "continuous"
+    volume_mode: "hard"
+    geometry_mode: "failure_only"
+    pullback_dry_mode: "soft"
+    eps_mode: "drop"
+    industry_cover: true
+    top_n: 3
+    changed_rules: ["eps", "fresh", "geometry"]
+B0_ablation_configs:
+  - "B0 status soft"
+  - "B0 status supplemental UNCONFIRMED"
+  - "B0 no entry_valid"
+  - "B0 close trigger soft"
+  - "B0 fresh continuous"
+  - "B0 volume soft"
+  - "B0 volume route-specific"
+  - "B0 geometry soft"
+  - "B0 geometry failure only"
+  - "B0 pullback dry hard"
+  - "B0 pullback dry bonus"
+  - "B0 pullback dry drop"
+  - "B0 EPS >=25 hard/bonus/drop"
+  - "B0 EPS unknown manual-review"
+  - "B0 no industry cover"
+  - "B0 top1"
+label_windows_trading_days:
+  1w: 5
+  3w: 15
+  5w: 25
+  8w: 40
+stop_profit_parameters:
+  main_stop_pct: 8
+  main_profit_pct: 24
+  sensitivity_stop_pct:
+    - 7
+    - 7.5
+    - 8
+  sensitivity_profit_pct:
+    - 20
+    - 22.5
+    - 24
+    - 25
+power_trigger_definition: "daily High >= ibd_candidate_price * 1.20 through third breakout-week Friday from valid ibd_entry_date"
+walk_forward:
+  test_weeks: 4
+  embargo_weeks: 8
+  min_train_weeks: 8
+bootstrap:
+  seed: 20260824
+  iterations_recorded_by_run_argument: true
+  block: "snapshot week"
+portfolio:
+  capacities:
+    - 3
+    - 6
+    - 10
+  cost_bps_per_side:
+    - 0
+    - 10
+    - 25
+  initial_capital: 100000
+  no_leverage: true
+censoring_policy: "insufficient horizon stays censored; as_of_return_pct separate from complete forward returns"
+hypothesis_hash: "b4767fccd269fa6b1518651d4dcc3e53c977b0df383064a1015610eceb2b0b01"
+output_dir: "backtest/rd_agent_candidate_rule_audit/output"
