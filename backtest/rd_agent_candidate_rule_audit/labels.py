@@ -17,6 +17,7 @@ class ExitPolicy:
     min_hold_weeks: int = 8
     same_day_order: str = "stop_first"
     post_lock: str = "resume_profit"
+    enable_power_lock: bool = True
 
 
 @dataclass(frozen=True)

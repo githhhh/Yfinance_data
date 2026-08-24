@@ -16,6 +16,8 @@ class PortfolioConfig:
     initial_capital: float = 100_000.0
     cost_bps_per_side: float = 0.0
     exit_policy: ExitPolicy = ExitPolicy()
+    valuation_start: str | pd.Timestamp | None = None
+    valuation_as_of: str | pd.Timestamp | None = None
 
 
 def run_portfolio_backtest(
@@ -26,6 +28,8 @@ def run_portfolio_backtest(
     if picks.empty:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     normalized = {code: normalize_bars(frame) for code, frame in prices.items()}
+    valuation_start = parse_date(config.valuation_start)
+    valuation_as_of = parse_date(config.valuation_as_of) or _latest_price_date(normalized)
     ordered = picks.copy()
     ordered["snapshot_date"] = pd.to_datetime(ordered["snapshot_date"])
     if "pick_order" not in ordered.columns:
@@ -54,6 +58,9 @@ def run_portfolio_backtest(
         if entry_bar is None or entry_open is None:
             events.append(_event(signal_date, code, "entry_unavailable"))
             continue
+        if valuation_as_of is not None and entry_bar[0] > valuation_as_of:
+            events.append(_event(signal_date, code, "entry_after_valuation_as_of"))
+            continue
         entry_date = entry_bar[0]
         gross_budget = min(slot_capital, cash)
         shares = gross_budget / (entry_open * (1.0 + config.cost_bps_per_side / 10_000.0))
@@ -63,7 +70,15 @@ def run_portfolio_backtest(
         entry_cost = shares * entry_open
         entry_fee = entry_cost * config.cost_bps_per_side / 10_000.0
         cash -= entry_cost + entry_fee
-        trade = _simulate_trade(pick, bars, entry_date, entry_open, shares, config.exit_policy)
+        trade = _simulate_trade(
+            pick,
+            bars,
+            entry_date,
+            entry_open,
+            shares,
+            config.exit_policy,
+            valuation_as_of=valuation_as_of,
+        )
         trade["entry_fee"] = round(entry_fee, 6)
         if trade["exit_fill_price"] is not None:
             exit_value = shares * trade["exit_fill_price"]
@@ -79,7 +94,12 @@ def run_portfolio_backtest(
         if trade["exit_date"]:
             events.append(_event(pd.Timestamp(trade["exit_date"]), code, trade["exit_reason"], price=trade["exit_fill_price"]))
 
-    all_dates = _portfolio_dates(trades, normalized)
+    all_dates = _portfolio_dates(
+        trades,
+        normalized,
+        valuation_start=valuation_start,
+        valuation_as_of=valuation_as_of,
+    )
     equity = _equity_curve(trades, normalized, config.initial_capital, config.cost_bps_per_side, all_dates)
     return pd.DataFrame(trades), equity, pd.DataFrame(events)
 
@@ -95,6 +115,18 @@ def portfolio_metrics(equity: pd.DataFrame, trades: pd.DataFrame, *, initial_cap
     years = max((pd.Timestamp(equity["date"].iloc[-1]) - pd.Timestamp(equity["date"].iloc[0])).days / 365.25, 1 / 365.25)
     cagr = ((curve.iloc[-1] / initial_capital) ** (1 / years) - 1.0) * 100.0
     downside = daily_ret[daily_ret < 0]
+    closed = trades[~trades.get("censored", pd.Series(False, index=trades.index)).map(bool)].copy() if not trades.empty else trades.copy()
+    closed_returns = pd.to_numeric(closed.get("return_pct", pd.Series(dtype=float)), errors="coerce").dropna()
+    wins = closed_returns[closed_returns > 0]
+    losses = closed_returns[closed_returns <= 0]
+    win_rate = float((closed_returns > 0).mean()) if len(closed_returns) else 0.0
+    average_win = float(wins.mean()) if len(wins) else np.nan
+    average_loss = float(losses.mean()) if len(losses) else np.nan
+    payoff = average_win / abs(average_loss) if np.isfinite(average_win) and np.isfinite(average_loss) and average_loss != 0 else np.nan
+    expectancy = win_rate * average_win + (1.0 - win_rate) * average_loss if np.isfinite(average_win) and np.isfinite(average_loss) else np.nan
+    utilization = (
+        pd.to_numeric(equity.get("market_value", pd.Series(dtype=float)), errors="coerce") / curve.replace(0, np.nan)
+    ).mean()
     return {
         "total_return_pct": round(float(total_return), 6),
         "CAGR_pct": round(float(cagr), 6),
@@ -102,9 +134,13 @@ def portfolio_metrics(equity: pd.DataFrame, trades: pd.DataFrame, *, initial_cap
         "Calmar": round(float((cagr / abs(drawdown.min() * 100.0)) if drawdown.min() < 0 else np.nan), 6),
         "Sharpe": round(float((daily_ret.mean() / daily_ret.std()) * np.sqrt(252)) if daily_ret.std() else np.nan, 6),
         "Sortino": round(float((daily_ret.mean() / downside.std()) * np.sqrt(252)) if downside.std() else np.nan, 6),
-        "win_rate": round(float((pd.to_numeric(trades.get("return_pct", pd.Series(dtype=float)), errors="coerce") > 0).mean()), 6)
-        if not trades.empty
-        else 0.0,
+        "closed_trades": len(closed_returns),
+        "win_rate": round(win_rate, 6),
+        "average_win_pct": round(average_win, 6) if np.isfinite(average_win) else np.nan,
+        "average_loss_pct": round(average_loss, 6) if np.isfinite(average_loss) else np.nan,
+        "payoff_ratio": round(float(payoff), 6) if np.isfinite(payoff) else np.nan,
+        "expectancy_pct": round(float(expectancy), 6) if np.isfinite(expectancy) else np.nan,
+        "cash_utilization": round(float(utilization), 6) if np.isfinite(utilization) else 0.0,
         "average_holding_days": round(float(pd.to_numeric(trades.get("holding_days", pd.Series(dtype=float)), errors="coerce").mean()), 6)
         if not trades.empty
         else 0.0,
@@ -119,6 +155,8 @@ def _simulate_trade(
     entry_price: float,
     shares: float,
     policy: ExitPolicy,
+    *,
+    valuation_as_of: pd.Timestamp | None = None,
 ) -> dict[str, Any]:
     code = str(pick.get("code", "") or "").strip()
     pivot = to_float(pick.get("ibd_candidate_price"))
@@ -134,6 +172,8 @@ def _simulate_trade(
     exit_reason = ""
     high_water = entry_price
     window = bars[bars.index >= entry_date]
+    if valuation_as_of is not None:
+        window = window[window.index <= valuation_as_of]
     last_close = entry_price
     for date, row in window.iterrows():
         date = pd.Timestamp(date)
@@ -150,13 +190,19 @@ def _simulate_trade(
             break
         stop_hit = low is not None and low <= stop
         power_hit = (
-            power_price is not None
+            policy.enable_power_lock
+            and power_price is not None
             and power_deadline is not None
             and date <= power_deadline
             and date >= entry_date
             and high is not None
             and high >= power_price
         )
+        locked_before_bar = min_hold_until is not None and date <= min_hold_until
+        profit_hit = not locked_before_bar and high is not None and high >= profit
+        if stop_hit and profit_hit and policy.same_day_order == "profit_first":
+            exit_date, exit_price, exit_reason = date, profit, "profit_target"
+            break
         if stop_hit and policy.same_day_order == "stop_first":
             exit_date, exit_price, exit_reason = date, stop, "stop_loss"
             break
@@ -257,18 +303,25 @@ def _close_asof(bars: pd.DataFrame, date: pd.Timestamp) -> float | None:
     return to_float(window.iloc[-1].get("Close"))
 
 
-def _portfolio_dates(trades: list[dict[str, Any]], prices: dict[str, pd.DataFrame]) -> list[pd.Timestamp]:
+def _portfolio_dates(
+    trades: list[dict[str, Any]],
+    prices: dict[str, pd.DataFrame],
+    *,
+    valuation_start: pd.Timestamp | None = None,
+    valuation_as_of: pd.Timestamp | None = None,
+) -> list[pd.Timestamp]:
     entry_dates = [parse_date(trade.get("entry_date")) for trade in trades]
     entry_dates = [date for date in entry_dates if date is not None]
     if not entry_dates:
         return []
-    start = min(entry_dates)
-    exit_dates = [parse_date(trade.get("exit_date")) for trade in trades if trade.get("exit_date")]
-    if exit_dates:
-        end = max(exit_dates)
-    else:
-        end = max(pd.Timestamp(idx) for frame in prices.values() for idx in frame.index) if prices else start
+    start = valuation_start or min(entry_dates)
+    end = valuation_as_of or _latest_price_date(prices) or start
     return sorted({pd.Timestamp(idx) for frame in prices.values() for idx in frame.index if start <= pd.Timestamp(idx) <= end})
+
+
+def _latest_price_date(prices: dict[str, pd.DataFrame]) -> pd.Timestamp | None:
+    dates = [pd.Timestamp(idx) for frame in prices.values() for idx in frame.index]
+    return max(dates) if dates else None
 
 
 def _release_closed(active: list[dict[str, Any]], signal_date: pd.Timestamp) -> float:

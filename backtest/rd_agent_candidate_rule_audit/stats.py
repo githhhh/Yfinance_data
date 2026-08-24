@@ -46,20 +46,27 @@ def week_block_bootstrap(
     value_col: str,
     seed: int,
     iterations: int = 1000,
+    time_block_weeks: int = 1,
 ) -> list[float]:
     if frame.empty or value_col not in frame.columns:
         return []
     rng = np.random.default_rng(seed)
     groups = [(week, group[value_col].dropna().to_numpy(dtype=float)) for week, group in frame.groupby("snapshot_date")]
     groups = [(week, values) for week, values in groups if len(values)]
-    if not groups:
+    width = max(1, int(time_block_weeks))
+    if not groups or len(groups) < width:
         return []
     samples: list[float] = []
     for _ in range(iterations):
         values = []
-        picks = rng.integers(0, len(groups), size=len(groups))
-        for idx in picks:
-            values.extend(groups[int(idx)][1])
+        sampled_weeks = 0
+        while sampled_weeks < len(groups):
+            start = int(rng.integers(0, len(groups)))
+            for offset in range(width):
+                if sampled_weeks >= len(groups):
+                    break
+                values.extend(groups[(start + offset) % len(groups)][1])
+                sampled_weeks += 1
         samples.append(float(np.mean(values)) if values else float("nan"))
     return samples
 
@@ -71,6 +78,7 @@ def paired_week_route_bootstrap(
     control_col: str,
     seed: int,
     iterations: int = 1000,
+    time_block_weeks: int = 8,
 ) -> list[float]:
     if frame.empty or treated_col not in frame.columns or control_col not in frame.columns:
         return []
@@ -85,15 +93,49 @@ def paired_week_route_bootstrap(
         for _, group in work.groupby("snapshot_date", sort=True)
         if not group["_diff"].dropna().empty
     ]
-    if not week_groups:
+    width = max(1, int(time_block_weeks))
+    if not week_groups or len(week_groups) < width:
         return []
     samples: list[float] = []
     for _ in range(iterations):
         values = []
-        picks = rng.integers(0, len(week_groups), size=len(week_groups))
-        for idx in picks:
-            values.extend(week_groups[int(idx)])
+        sampled_weeks = 0
+        while sampled_weeks < len(week_groups):
+            start = int(rng.integers(0, len(week_groups)))
+            for offset in range(width):
+                if sampled_weeks >= len(week_groups):
+                    break
+                values.extend(week_groups[(start + offset) % len(week_groups)])
+                sampled_weeks += 1
         samples.append(float(np.mean(values)) if values else float("nan"))
+    return samples
+
+
+def moving_time_block_bootstrap(
+    frame: pd.DataFrame,
+    *,
+    value_col: str,
+    order_col: str,
+    block_size: int,
+    seed: int,
+    iterations: int = 1000,
+) -> list[float]:
+    if frame.empty or value_col not in frame.columns or order_col not in frame.columns:
+        return []
+    work = frame[[order_col, value_col]].copy()
+    work[value_col] = pd.to_numeric(work[value_col], errors="coerce")
+    values = work.dropna(subset=[value_col]).sort_values(order_col)[value_col].to_numpy(dtype=float)
+    if not len(values):
+        return []
+    width = max(1, min(int(block_size), len(values)))
+    rng = np.random.default_rng(seed)
+    samples: list[float] = []
+    for _ in range(iterations):
+        sampled: list[float] = []
+        while len(sampled) < len(values):
+            start = int(rng.integers(0, len(values)))
+            sampled.extend(values[(start + offset) % len(values)] for offset in range(width))
+        samples.append(float(np.mean(sampled[: len(values)])))
     return samples
 
 
