@@ -1,0 +1,9 @@
+{
+  "pool_dir": "backtest/ibd_skill_replay_pools",
+  "pool_files": 43,
+  "signal_rows": 2738,
+  "filled_rows": 2380,
+  "unresolved_rows": 358,
+  "signal_eps_pit_path": "backtest/ibd_skill_replay_pools/signal_eps_pit.csv",
+  "audit_summary_path": "backtest/ibd_skill_replay_pools/eps_signal_refresh_audit/summary.csv"
+}
