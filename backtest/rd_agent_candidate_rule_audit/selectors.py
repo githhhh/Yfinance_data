@@ -7,6 +7,7 @@ import pandas as pd
 
 from .labels import classify_geometry
 from .utils import to_bool, to_float
+from dashboard.skill_industry_eps_known import rank_skill_industry_eps_known, select_skill_industry_eps_known
 
 
 PULLBACK_RULES = {"pivot", "ceiling_pullback", "ma10_touch_confirm", "three_weeks_tight"}
@@ -17,13 +18,13 @@ BASE_RULES = {"ceiling", "ceiling_breakout"}
 class SelectorConfig:
     name: str
     status_mode: str = "hard"
-    valid_mode: str = "hard"
-    close_mode: str = "hard"
-    fresh_mode: str = "hard"
-    volume_mode: str = "hard"
-    geometry_mode: str = "hard"
+    valid_mode: str = "drop"
+    close_mode: str = "soft"
+    fresh_mode: str = "continuous"
+    volume_mode: str = "soft"
+    geometry_mode: str = "failure_only"
     pullback_dry_mode: str = "soft"
-    eps_mode: str = "known_bonus"
+    eps_mode: str = "known_hard"
     industry_cover: bool = True
     top_n: int = 3
     changed_rules: tuple[str, ...] = ()
@@ -69,7 +70,7 @@ def selector_configs() -> dict[str, SelectorConfig]:
             volume_mode="soft",
             geometry_mode="soft",
             pullback_dry_mode="bonus",
-            eps_mode="known_bonus",
+            eps_mode="known_hard",
             changed_rules=("status", "fresh", "volume", "geometry", "pullback_dry"),
         ),
         "R3_MINIMAL_TECHNICAL": SelectorConfig(
@@ -108,6 +109,8 @@ def enrich_features(frame: pd.DataFrame) -> pd.DataFrame:
 
 def select_weekly(pool: pd.DataFrame, config: SelectorConfig) -> pd.DataFrame:
     frame = enrich_features(pool)
+    if config.name in {"B0_REPO_EXACT", "B0_PIT_VERIFIED"}:
+        return _select_production_b0(frame, config)
     rows: list[dict[str, Any]] = []
     for idx, row in frame.iterrows():
         allowed, score, reasons, risks = score_row(row, config)
@@ -118,6 +121,8 @@ def select_weekly(pool: pd.DataFrame, config: SelectorConfig) -> pd.DataFrame:
         out["reason_codes"] = ";".join(reasons)
         out["risk_codes"] = ";".join(risks)
         out["selected_by"] = config.name
+        out["production_raw_rank"] = pd.NA
+        out["production_sort_key"] = ""
         out["_row_index"] = idx
         rows.append(out)
     if not rows:
@@ -138,6 +143,37 @@ def select_weekly(pool: pd.DataFrame, config: SelectorConfig) -> pd.DataFrame:
     if not out.empty:
         out.insert(2, "pick_order", range(1, len(out) + 1))
     return out
+
+
+def _select_production_b0(frame: pd.DataFrame, config: SelectorConfig) -> pd.DataFrame:
+    pool = frame.copy()
+    if config.name == "B0_PIT_VERIFIED":
+        pool["eps_yoy_growth"] = pool["pit_eps_yoy_growth"]
+    selected = select_skill_industry_eps_known(pool, limit=config.top_n)
+    by_code = {str(row.get("code", "")).strip(): row for _, row in frame.iterrows()}
+    rows: list[dict[str, Any]] = []
+    for pick_order, item in enumerate(selected, 1):
+        source = by_code.get(item.code)
+        out = source.to_dict() if source is not None else {}
+        out["code"] = item.code
+        out["pick_order"] = pick_order
+        out["score"] = None
+        out["reason_codes"] = ";".join(item.reason_codes)
+        out["risk_codes"] = ";".join(item.risk_codes)
+        out["selected_by"] = config.name
+        out["production_raw_rank"] = item.raw_rank
+        out["production_sort_key"] = repr(item.sort_key)
+        rows.append(out)
+    if not rows:
+        return pd.DataFrame(columns=list(frame.columns) + ["pick_order", "score", "reason_codes", "risk_codes", "selected_by"])
+    return pd.DataFrame(rows)
+
+
+def production_selected_codes(pool: pd.DataFrame) -> list[tuple[str, int, str, str]]:
+    return [
+        (item.code, order, ";".join(item.reason_codes), ";".join(item.risk_codes))
+        for order, item in enumerate(select_skill_industry_eps_known(pool), 1)
+    ]
 
 
 def select_all_weeks(panel: pd.DataFrame, config: SelectorConfig) -> pd.DataFrame:
@@ -248,6 +284,8 @@ def score_row(row: pd.Series, config: SelectorConfig) -> tuple[bool, float, list
     if eps is None:
         if config.eps_mode == "unknown_manual_review":
             risks.append("eps_unknown_manual_review")
+        elif config.eps_mode == "known_hard":
+            return False, score, reasons, ["eps_unknown"]
         elif config.eps_mode == "hard_25":
             return False, score, reasons, ["eps_unknown_or_below_25"]
         else:

@@ -9,7 +9,9 @@ from backtest.rd_agent_candidate_rule_audit.labels import (
 )
 from backtest.rd_agent_candidate_rule_audit.portfolio import PortfolioConfig, run_portfolio_backtest
 from backtest.rd_agent_candidate_rule_audit.selectors import selector_configs, select_weekly
-from backtest.rd_agent_candidate_rule_audit.stats import make_rolling_splits, week_block_bootstrap
+from backtest.rd_agent_candidate_rule_audit.stats import make_rolling_splits, paired_week_route_bootstrap, week_block_bootstrap
+from backtest.rd_agent_candidate_rule_audit.run import machine_rule_decisions, rule_treatment_contrast
+from dashboard.skill_industry_eps_known import select_skill_industry_eps_known
 
 
 def test_forward_return_is_censored_when_full_horizon_missing_and_asof_is_separate():
@@ -61,8 +63,28 @@ def test_stop_profit_boundaries_gap_and_same_day_stop_first():
     assert bool(by_code.loc["GAP", "gap_stop_8"]) is True
     assert by_code.loc["GAP", "realized_stop_loss_pct"] == -9.0
     assert bool(by_code.loc["PROFIT", "profit_24_touched"]) is True
+    assert bool(by_code.loc["PROFIT", "profit_24_within_40d"]) is True
     assert by_code.loc["BOTH", "first_touch_8_24"] == "stop"
+    assert by_code.loc["BOTH", "first_touch_40d_8_24"] == "stop"
     assert bool(by_code.loc["BOTH", "same_day_path_ambiguous"]) is True
+
+
+def test_candidate_touch_labels_are_limited_to_40_trading_days():
+    event = _event("2026-01-02", "AAA", 100)
+    rows = [("2026-01-02", 99, 100, 99, 100)]
+    for idx in range(1, 42):
+        date = pd.Timestamp("2026-01-02") + pd.offsets.BDay(idx)
+        high = 124 if idx == 41 else 101
+        rows.append((str(date.date()), 100, high, 99, 100))
+    prices = {"AAA": _bars(rows)}
+
+    labels = build_event_labels(pd.DataFrame([event]), prices, TradeLabelConfig())
+
+    row = labels.iloc[0]
+    assert bool(row["profit_24_touched"]) is True
+    assert bool(row["profit_24_within_40d"]) is False
+    assert row["profit_24_within_40d_date"] == ""
+    assert row["first_touch_40d_8_24"] == ""
 
 
 def test_power_trigger_uses_third_breakout_week_friday_not_fourth_week():
@@ -101,6 +123,24 @@ def test_pivot_power_and_entry_gain_are_separate_and_pre_entry_power_is_not_trad
     assert bool(row["pattern_power_trigger"]) is True
     assert bool(row["trade_power_trigger"]) is False
     assert bool(row["gain_20_3w_from_entry"]) is False
+
+
+def test_entry_gain_20_first_15_trading_days_is_not_truncated_by_pivot_power_window():
+    event = _event("2026-01-09", "AAA", 100, ibd_entry_date="2026-01-05")
+    rows = [
+        ("2026-01-09", 100, 101, 99, 100),
+        ("2026-01-12", 100, 101, 99, 100),
+    ]
+    for idx in range(2, 16):
+        date = pd.Timestamp("2026-01-09") + pd.offsets.BDay(idx)
+        rows.append((str(date.date()), 100, 120 if idx == 14 else 101, 99, 100))
+    prices = {"AAA": _bars(rows)}
+
+    labels = build_event_labels(pd.DataFrame([event]), prices, TradeLabelConfig())
+
+    row = labels.iloc[0]
+    assert bool(row["power_trigger_3w_from_pivot"]) is False
+    assert bool(row["gain_20_within_first_15_trading_days"]) is True
 
 
 def test_eight_week_lock_suspends_profit_but_keeps_stop_and_post_lock_resumes_profit():
@@ -196,7 +236,12 @@ def test_b0_reproduction_and_atomic_ablation_only_changes_target_rule():
     b0 = select_weekly(events, selector_configs()["B0_PIT_VERIFIED"])
     volume_soft = select_weekly(events, selector_configs()["B0 volume soft"])
 
-    assert list(b0["code"]) == ["AAA", "CCC"]
+    production_codes = [item.code for item in select_skill_industry_eps_known(events)]
+    assert list(b0["code"]) == production_codes
+    assert list(b0["pick_order"]) == list(range(1, len(production_codes) + 1))
+    assert list(b0["reason_codes"]) == [";".join(item.reason_codes) for item in select_skill_industry_eps_known(events)]
+    assert list(b0["risk_codes"]) == [";".join(item.risk_codes) for item in select_skill_industry_eps_known(events)]
+    assert set(b0["code"]) == {"AAA", "BBB", "CCC"}
     assert "BBB" in set(volume_soft["code"])
     assert set(b0.columns).issubset(set(volume_soft.columns))
     assert selector_configs()["B0 volume soft"].changed_rules == ("volume",)
@@ -220,6 +265,18 @@ def test_rolling_split_has_embargo_and_week_block_bootstrap_keeps_week_records()
     samples = week_block_bootstrap(frame.assign(effect=1.0), value_col="effect", seed=7, iterations=5)
     assert len(samples) == 5
     assert all(sample == 1.0 for sample in samples)
+
+    paired = pd.DataFrame(
+        {
+            "snapshot_date": ["2026-01-02", "2026-01-02", "2026-01-09", "2026-01-09"],
+            "signal_source": ["pivot", "ceiling", "pivot", "ceiling"],
+            "treated": [2.0, 4.0, 6.0, 8.0],
+            "control": [1.0, 1.0, 1.0, 1.0],
+        }
+    )
+    pair_samples = paired_week_route_bootstrap(paired, treated_col="treated", control_col="control", seed=7, iterations=5)
+    assert len(pair_samples) == 5
+    assert all(sample > 0 for sample in pair_samples)
 
 
 def test_portfolio_prevents_leverage_negative_cash_capacity_and_active_duplicates():
@@ -246,6 +303,93 @@ def test_portfolio_prevents_leverage_negative_cash_capacity_and_active_duplicate
     assert "repeat_signal_ignored" in set(events["event"])
     assert equity["cash"].min() >= 0
     assert equity["equity"].min() <= 1000
+
+
+def test_portfolio_recycles_cash_after_closed_trade_and_equity_starts_at_first_entry():
+    picks = pd.DataFrame(
+        [
+            _event("2026-01-02", "AAA", 100, ibd_entry_date=""),
+            _event("2026-01-09", "BBB", 100, ibd_entry_date=""),
+        ]
+    )
+    prices = {
+        "AAA": _bars(
+            [
+                ("2025-01-02", 10, 10, 10, 10),
+                ("2026-01-05", 100, 124, 99, 124),
+                ("2026-01-06", 124, 124, 124, 124),
+            ]
+        ),
+        "BBB": _bars(
+            [
+                ("2025-01-02", 10, 10, 10, 10),
+                ("2026-01-12", 100, 124, 99, 124),
+                ("2026-01-13", 124, 124, 124, 124),
+            ]
+        ),
+    }
+
+    trades, equity, events = run_portfolio_backtest(
+        picks,
+        prices,
+        PortfolioConfig(capacity=1, initial_capital=1000),
+    )
+
+    assert len(trades) == 2
+    assert "cash_skip" not in set(events["event"])
+    assert equity.iloc[0]["date"] == "2026-01-05"
+    assert equity["cash"].min() >= 0
+
+
+def test_rule_not_identifiable_when_observed_groups_missing_and_pullback_excludes_base():
+    panel = pd.DataFrame(
+        [
+            _labeled_event("2026-01-02", "BASE", "ceiling_breakout", "NOT_APPLICABLE", 1.0, 1.6, 2.0),
+            _labeled_event("2026-01-02", "P1", "pivot", "PASS", 1.0, 1.6, 4.0),
+            _labeled_event("2026-01-02", "P2", "pivot", "FAIL", 1.0, 1.6, -2.0),
+            _labeled_event("2026-01-09", "P3", "pivot", "UNKNOWN", 1.0, 1.6, 1.0),
+        ]
+    )
+
+    contrasts = rule_treatment_contrast(panel, bootstrap_iterations=5, min_group_size=1, min_weeks=1)
+
+    close = contrasts[contrasts["contrast"].eq("Close_nonnegative_vs_negative")].iloc[0]
+    assert close["status"] == "RULE_NOT_IDENTIFIABLE"
+    assert "negative group not observed" in close["blocker"]
+    dry = contrasts[contrasts["contrast"].eq("Pullback_dry_PASS_vs_FAIL")].iloc[0]
+    assert dry["treated_complete"] == 1
+    assert dry["control_complete"] == 1
+    assert dry["applicable_events"] == 2
+
+
+def test_machine_decision_uses_contrast_status_not_hardcoded_mapping():
+    evidence = pd.DataFrame(
+        [{"rule_family": "Entry Volume", "complete_8w": 100, "weeks": 10}]
+    )
+    contrasts = pd.DataFrame(
+        [
+            {
+                "rule_family": "Entry Volume",
+                "contrast": "Volume_1_5_vs_other",
+                "status": "RULE_NOT_IDENTIFIABLE",
+                "treated_complete": 100,
+                "control_complete": 0,
+                "mean_return_diff_pct": pd.NA,
+                "stop_rate_diff": pd.NA,
+                "profit_24_rate_diff": pd.NA,
+                "power_rate_diff": pd.NA,
+                "ci_low": pd.NA,
+                "ci_high": pd.NA,
+                "blocker": "below 1.5 group not observed",
+            }
+        ]
+    )
+
+    decisions = machine_rule_decisions(evidence, contrasts)
+
+    row = decisions[decisions["rule_family"].eq("Entry Volume")].iloc[0]
+    assert row["machine_role"] == "UNKNOWN"
+    assert row["evidence_status"] == "RULE_NOT_IDENTIFIABLE"
 
 
 def _event(snapshot, code, pivot, **overrides):
@@ -277,6 +421,29 @@ def _event(snapshot, code, pivot, **overrides):
     if "rule" in overrides:
         row["ibd_candidate_rule"] = overrides.pop("rule")
     row.update(overrides)
+    return row
+
+
+def _labeled_event(snapshot, code, rule, dry_state, close_vs_trigger, volume, return_8w):
+    row = _event(snapshot, code, 100, rule=rule)
+    row.update(
+        {
+            "signal_source": rule,
+            "pullback_dry_state": dry_state,
+            "ibd_entry_close_vs_trigger_pct": close_vs_trigger,
+            "ibd_entry_volume_ratio": volume,
+            "geometry": "Strong Finish",
+            "forward_8w_return_pct": return_8w,
+            "forward_8w_censored": False,
+            "stop_8_within_40d": False,
+            "profit_24_within_40d": return_8w > 0,
+            "pattern_power_trigger": False,
+            "mfe_8w_pct": return_8w,
+            "mae_8w_pct": min(return_8w, 0),
+            "relative_8w_return_pct": return_8w,
+            "industry": "Software",
+        }
+    )
     return row
 
 

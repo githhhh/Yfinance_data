@@ -64,6 +64,39 @@ def week_block_bootstrap(
     return samples
 
 
+def paired_week_route_bootstrap(
+    frame: pd.DataFrame,
+    *,
+    treated_col: str,
+    control_col: str,
+    seed: int,
+    iterations: int = 1000,
+) -> list[float]:
+    if frame.empty or treated_col not in frame.columns or control_col not in frame.columns:
+        return []
+    work = frame.copy()
+    work["_diff"] = pd.to_numeric(work[treated_col], errors="coerce") - pd.to_numeric(work[control_col], errors="coerce")
+    work = work.dropna(subset=["_diff"])
+    if work.empty:
+        return []
+    rng = np.random.default_rng(seed)
+    week_groups = [
+        group["_diff"].to_numpy(dtype=float)
+        for _, group in work.groupby("snapshot_date", sort=True)
+        if not group["_diff"].dropna().empty
+    ]
+    if not week_groups:
+        return []
+    samples: list[float] = []
+    for _ in range(iterations):
+        values = []
+        picks = rng.integers(0, len(week_groups), size=len(week_groups))
+        for idx in picks:
+            values.extend(week_groups[int(idx)])
+        samples.append(float(np.mean(values)) if values else float("nan"))
+    return samples
+
+
 def ci_from_samples(samples: list[float]) -> tuple[float | None, float | None]:
     clean = [value for value in samples if np.isfinite(value)]
     if not clean:

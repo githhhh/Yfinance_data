@@ -130,7 +130,12 @@ def _empty_labels() -> dict[str, Any]:
         "realized_stop_loss_pct": pd.NA,
         "first_touch_8_20": "",
         "first_touch_8_24": "",
+        "first_touch_40d_8_24": "",
         "same_day_path_ambiguous": False,
+        "stop_8_within_15d": False,
+        "stop_8_within_15d_date": "",
+        "stop_8_within_40d": False,
+        "stop_8_within_40d_date": "",
         "power_trigger_3w_from_pivot": pd.NA,
         "power_trigger_3w_from_pivot_date": "",
         "power_trigger_3w_max_gain_pct": pd.NA,
@@ -148,6 +153,10 @@ def _empty_labels() -> dict[str, Any]:
     for target in ("20", "22_5", "24", "25"):
         labels[f"profit_{target}_touched"] = False
         labels[f"profit_{target}_touched_date"] = ""
+        labels[f"profit_{target}_within_15d"] = False
+        labels[f"profit_{target}_within_15d_date"] = ""
+        labels[f"profit_{target}_within_40d"] = False
+        labels[f"profit_{target}_within_40d_date"] = ""
     return labels
 
 
@@ -173,7 +182,8 @@ def _add_touch_labels(labels: dict[str, Any], forward: pd.DataFrame, entry_price
     targets = {20.0: "20", 22.5: "22_5", 24.0: "24", 25.0: "25"}
     first_20 = ""
     first_24 = ""
-    for date, bar in forward.iterrows():
+    first_40d_24 = ""
+    for day_number, (date, bar) in enumerate(forward.iterrows(), 1):
         open_ = to_float(bar.get("Open"))
         high = to_float(bar.get("High"))
         low = to_float(bar.get("Low"))
@@ -186,10 +196,22 @@ def _add_touch_labels(labels: dict[str, Any], forward: pd.DataFrame, entry_price
             labels["gap_stop_8"] = bool(stop_gap)
             fill = open_ if stop_gap else stop_price
             labels["realized_stop_loss_pct"] = pct(fill, entry_price)
+        if stop_hit and day_number <= 15 and not labels["stop_8_within_15d"]:
+            labels["stop_8_within_15d"] = True
+            labels["stop_8_within_15d_date"] = fmt_date(pd.Timestamp(date))
+        if stop_hit and day_number <= 40 and not labels["stop_8_within_40d"]:
+            labels["stop_8_within_40d"] = True
+            labels["stop_8_within_40d_date"] = fmt_date(pd.Timestamp(date))
         for target, key in targets.items():
             if hit_targets[target] and not labels[f"profit_{key}_touched"]:
                 labels[f"profit_{key}_touched"] = True
                 labels[f"profit_{key}_touched_date"] = fmt_date(pd.Timestamp(date))
+            if hit_targets[target] and day_number <= 15 and not labels[f"profit_{key}_within_15d"]:
+                labels[f"profit_{key}_within_15d"] = True
+                labels[f"profit_{key}_within_15d_date"] = fmt_date(pd.Timestamp(date))
+            if hit_targets[target] and day_number <= 40 and not labels[f"profit_{key}_within_40d"]:
+                labels[f"profit_{key}_within_40d"] = True
+                labels[f"profit_{key}_within_40d_date"] = fmt_date(pd.Timestamp(date))
         if stop_hit and hit_targets[20.0]:
             labels["same_day_path_ambiguous"] = True
         if stop_hit and hit_targets[24.0]:
@@ -198,8 +220,11 @@ def _add_touch_labels(labels: dict[str, Any], forward: pd.DataFrame, entry_price
             first_20 = "stop" if stop_hit and policy.same_day_order == "stop_first" else "profit"
         if not first_24 and (stop_hit or hit_targets[24.0]):
             first_24 = "stop" if stop_hit and policy.same_day_order == "stop_first" else "profit"
+        if day_number <= 40 and not first_40d_24 and (stop_hit or hit_targets[24.0]):
+            first_40d_24 = "stop" if stop_hit and policy.same_day_order == "stop_first" else "profit"
     labels["first_touch_8_20"] = first_20
     labels["first_touch_8_24"] = first_24
+    labels["first_touch_40d_8_24"] = first_40d_24
 
 
 def _add_power_labels(
@@ -234,7 +259,9 @@ def _add_power_labels(
     entry_20_window = bars[(bars.index >= entry_date) & (bars.index <= deadline)]
     entry_touch = _first_high_touch(entry_20_window, entry_price * 1.20)
     labels["gain_20_3w_from_entry"] = entry_touch is not None
-    labels["gain_20_within_first_15_trading_days"] = entry_touch is not None and entry_touch in set(entry_20_window.head(15).index)
+    first_15_entry_window = bars[bars.index >= entry_date].head(15)
+    entry_15_touch = _first_high_touch(first_15_entry_window, entry_price * 1.20)
+    labels["gain_20_within_first_15_trading_days"] = entry_15_touch is not None
     if entry_touch is not None:
         labels["gain_20_3w_from_entry_date"] = fmt_date(entry_touch)
 

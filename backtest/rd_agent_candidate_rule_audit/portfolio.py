@@ -37,12 +37,11 @@ def run_portfolio_backtest(
     trades: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
     active: list[dict[str, Any]] = []
-    all_dates = _all_price_dates(normalized)
 
     for _, pick in ordered.iterrows():
         signal_date = pd.Timestamp(pick["snapshot_date"]).tz_localize(None)
         code = str(pick.get("code", "") or "").strip()
-        _release_closed(active, signal_date)
+        cash += _release_closed(active, signal_date)
         if _has_active(active, code, signal_date):
             events.append(_event(signal_date, code, "repeat_signal_ignored"))
             continue
@@ -80,6 +79,7 @@ def run_portfolio_backtest(
         if trade["exit_date"]:
             events.append(_event(pd.Timestamp(trade["exit_date"]), code, trade["exit_reason"], price=trade["exit_fill_price"]))
 
+    all_dates = _portfolio_dates(trades, normalized)
     equity = _equity_curve(trades, normalized, config.initial_capital, config.cost_bps_per_side, all_dates)
     return pd.DataFrame(trades), equity, pd.DataFrame(events)
 
@@ -257,15 +257,31 @@ def _close_asof(bars: pd.DataFrame, date: pd.Timestamp) -> float | None:
     return to_float(window.iloc[-1].get("Close"))
 
 
-def _all_price_dates(prices: dict[str, pd.DataFrame]) -> list[pd.Timestamp]:
-    dates = sorted({pd.Timestamp(idx) for frame in prices.values() for idx in frame.index})
-    return dates
+def _portfolio_dates(trades: list[dict[str, Any]], prices: dict[str, pd.DataFrame]) -> list[pd.Timestamp]:
+    entry_dates = [parse_date(trade.get("entry_date")) for trade in trades]
+    entry_dates = [date for date in entry_dates if date is not None]
+    if not entry_dates:
+        return []
+    start = min(entry_dates)
+    exit_dates = [parse_date(trade.get("exit_date")) for trade in trades if trade.get("exit_date")]
+    if exit_dates:
+        end = max(exit_dates)
+    else:
+        end = max(pd.Timestamp(idx) for frame in prices.values() for idx in frame.index) if prices else start
+    return sorted({pd.Timestamp(idx) for frame in prices.values() for idx in frame.index if start <= pd.Timestamp(idx) <= end})
 
 
-def _release_closed(active: list[dict[str, Any]], signal_date: pd.Timestamp) -> None:
-    active[:] = [
-        trade for trade in active if not trade["exit_date"] or pd.Timestamp(trade["exit_date"]) > signal_date
-    ]
+def _release_closed(active: list[dict[str, Any]], signal_date: pd.Timestamp) -> float:
+    released = 0.0
+    still_active = []
+    for trade in active:
+        exit_date = parse_date(trade.get("exit_date"))
+        if exit_date is not None and exit_date <= signal_date and trade.get("exit_fill_price") is not None:
+            released += float(trade["shares"]) * float(trade["exit_fill_price"]) - float(trade["exit_fee"])
+        else:
+            still_active.append(trade)
+    active[:] = still_active
+    return released
 
 
 def _has_active(active: list[dict[str, Any]], code: str, signal_date: pd.Timestamp) -> bool:

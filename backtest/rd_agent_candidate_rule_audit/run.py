@@ -13,8 +13,8 @@ import pandas as pd
 
 from .labels import ExitPolicy, TradeLabelConfig, build_event_labels, normalize_eps_pit
 from .portfolio import PortfolioConfig, portfolio_metrics, run_portfolio_backtest
-from .selectors import enrich_features, select_all_weeks, selector_configs
-from .stats import ci_from_samples, make_rolling_splits, week_block_bootstrap
+from .selectors import PULLBACK_RULES, enrich_features, select_all_weeks, selector_configs
+from .stats import ci_from_samples, make_rolling_splits, paired_week_route_bootstrap, week_block_bootstrap
 from .utils import content_hash, normalize_bars, object_hash, to_bool, to_float
 
 
@@ -246,8 +246,9 @@ def candidate_rule_evidence(panel: pd.DataFrame, *, bootstrap_iterations: int) -
                     "weeks": group["snapshot_date"].nunique(),
                     "mean_8w_return_pct": complete["forward_8w_return_pct"].mean(),
                     "median_relative_8w_return_pct": complete["relative_8w_return_pct"].median(),
-                    "stop_8_rate": complete["stop_8_touched"].mean() if len(complete) else np.nan,
-                    "profit_24_rate": complete["profit_24_touched"].mean() if len(complete) else np.nan,
+                    "mature_weeks": complete["snapshot_date"].nunique(),
+                    "stop_8_40d_rate": complete["stop_8_within_40d"].mean() if len(complete) else np.nan,
+                    "profit_24_40d_rate": complete["profit_24_within_40d"].mean() if len(complete) else np.nan,
                     "pattern_power_rate": complete["pattern_power_trigger"].eq(True).mean() if len(complete) else np.nan,
                     "bootstrap_ci_low": lo,
                     "bootstrap_ci_high": hi,
@@ -256,47 +257,140 @@ def candidate_rule_evidence(panel: pd.DataFrame, *, bootstrap_iterations: int) -
     return pd.DataFrame(rows)
 
 
-def rule_treatment_contrast(panel: pd.DataFrame, *, bootstrap_iterations: int) -> pd.DataFrame:
-    treatments = {
-        "Status_ACTIONABLE_vs_other": panel["ibd_entry_status"].astype(str).str.upper().eq("ACTIONABLE"),
-        "Close_nonnegative_vs_negative": panel["ibd_entry_close_vs_trigger_pct"].map(to_float).ge(0),
-        "Fresh_0_5_vs_other": panel["current_vs_ibd_candidate_pct"].map(to_float).between(0, 5, inclusive="both"),
-        "Volume_1_5_vs_other": panel["ibd_entry_volume_ratio"].map(to_float).ge(1.5),
-        "Geometry_nonfailure_vs_failure": ~panel["geometry"].isin(["Defensive Failure", "Squat / Upper Shadow"]),
-        "Pullback_dry_true_vs_false": panel["pullback_dry_state"].eq("PASS"),
-        "EPS_verified_25_vs_other": panel["pit_eps_yoy_growth"].map(to_float).ge(25),
-    }
+def rule_treatment_contrast(
+    panel: pd.DataFrame,
+    *,
+    bootstrap_iterations: int,
+    min_group_size: int = 20,
+    min_weeks: int = 5,
+) -> pd.DataFrame:
+    treatments = [
+        (
+            "Status",
+            "Status_ACTIONABLE_vs_other",
+            panel,
+            panel["ibd_entry_status"].astype(str).str.upper().eq("ACTIONABLE"),
+            "",
+        ),
+        (
+            "Close > Trigger",
+            "Close_nonnegative_vs_negative",
+            panel[panel["ibd_entry_close_vs_trigger_pct"].map(to_float).notna()],
+            panel["ibd_entry_close_vs_trigger_pct"].map(to_float).ge(0),
+            "negative group not observed",
+        ),
+        (
+            "Fresh Zone",
+            "Fresh_0_5_vs_other",
+            panel[panel["current_vs_ibd_candidate_pct"].map(to_float).notna()],
+            panel["current_vs_ibd_candidate_pct"].map(to_float).between(0, 5, inclusive="both"),
+            "",
+        ),
+        (
+            "Entry Volume",
+            "Volume_1_5_vs_other",
+            panel[panel["ibd_entry_volume_ratio"].map(to_float).notna()],
+            panel["ibd_entry_volume_ratio"].map(to_float).ge(1.5),
+            "below 1.5 group not observed",
+        ),
+        (
+            "Geometry",
+            "Geometry_nonfailure_vs_failure",
+            panel[panel["geometry"].ne("UNKNOWN")],
+            ~panel["geometry"].isin(["Defensive Failure", "Squat / Upper Shadow"]),
+            "",
+        ),
+        (
+            "Pullback",
+            "Pullback_dry_PASS_vs_FAIL",
+            panel[panel["ibd_candidate_rule"].isin(PULLBACK_RULES) & panel["pullback_dry_state"].isin(["PASS", "FAIL"])],
+            panel["pullback_dry_state"].eq("PASS"),
+            "",
+        ),
+        (
+            "Pullback",
+            "Pullback_dry_PASS_vs_UNKNOWN",
+            panel[panel["ibd_candidate_rule"].isin(PULLBACK_RULES) & panel["pullback_dry_state"].isin(["PASS", "UNKNOWN"])],
+            panel["pullback_dry_state"].eq("PASS"),
+            "",
+        ),
+        (
+            "Pullback",
+            "Pullback_dry_FAIL_vs_UNKNOWN",
+            panel[panel["ibd_candidate_rule"].isin(PULLBACK_RULES) & panel["pullback_dry_state"].isin(["FAIL", "UNKNOWN"])],
+            panel["pullback_dry_state"].eq("FAIL"),
+            "",
+        ),
+        (
+            "EPS",
+            "EPS_verified_25_vs_verified_below",
+            panel[panel["pit_eps_state"].eq("VERIFIED")],
+            panel["pit_eps_yoy_growth"].map(to_float).ge(25),
+            "",
+        ),
+    ]
     rows = []
-    for name, mask in treatments.items():
-        complete = panel[panel["forward_8w_censored"].eq(False)].copy()
-        a = complete[mask.reindex(complete.index).fillna(False)]
-        b = complete[~mask.reindex(complete.index).fillna(False)]
-        status = "OK" if len(a) >= 20 and len(b) >= 20 and a["snapshot_date"].nunique() >= 5 and b["snapshot_date"].nunique() >= 5 else "NO_TREATMENT_CONTRAST"
-        effect = a["forward_8w_return_pct"].mean() - b["forward_8w_return_pct"].mean() if status == "OK" else np.nan
-        boot_frame = pd.concat(
-            [
-                a.assign(effect=a["forward_8w_return_pct"] - b["forward_8w_return_pct"].mean()),
-            ],
-            ignore_index=True,
+    for family, name, applicable, mask, not_identifiable_reason in treatments:
+        complete = applicable[applicable["forward_8w_censored"].eq(False)].copy()
+        aligned_mask = mask.reindex(complete.index).fillna(False)
+        a = complete[aligned_mask]
+        b = complete[~aligned_mask]
+        paired = _paired_week_route_diffs(a, b)
+        if len(a) == 0 or len(b) == 0:
+            status = "RULE_NOT_IDENTIFIABLE" if not_identifiable_reason else "NO_TREATMENT_CONTRAST"
+            blocker = not_identifiable_reason or "one comparison side is empty"
+        elif len(a) < min_group_size or len(b) < min_group_size or a["snapshot_date"].nunique() < min_weeks or b["snapshot_date"].nunique() < min_weeks:
+            status = "NO_TREATMENT_CONTRAST"
+            blocker = "insufficient treated/control count or independent weeks"
+        elif paired.empty:
+            status = "NO_TREATMENT_CONTRAST"
+            blocker = "no same-week same-route paired contrast"
+        else:
+            status = "OK"
+            blocker = ""
+        effect = paired["diff"].mean() if status == "OK" else np.nan
+        lo, hi = ci_from_samples(
+            paired_week_route_bootstrap(
+                paired.rename(columns={"treated_mean": "treated", "control_mean": "control"}),
+                treated_col="treated",
+                control_col="control",
+                seed=SEED,
+                iterations=bootstrap_iterations,
+            )
         )
-        lo, hi = ci_from_samples(week_block_bootstrap(boot_frame, value_col="effect", seed=SEED, iterations=bootstrap_iterations))
         rows.append(
             {
+                "rule_family": family,
                 "contrast": name,
+                "applicable_events": len(applicable),
                 "treated_complete": len(a),
                 "control_complete": len(b),
                 "treated_weeks": a["snapshot_date"].nunique(),
                 "control_weeks": b["snapshot_date"].nunique(),
+                "paired_week_routes": len(paired),
                 "mean_return_diff_pct": effect,
-                "stop_rate_diff": a["stop_8_touched"].mean() - b["stop_8_touched"].mean() if status == "OK" else np.nan,
-                "profit_24_rate_diff": a["profit_24_touched"].mean() - b["profit_24_touched"].mean() if status == "OK" else np.nan,
+                "stop_rate_diff": a["stop_8_within_40d"].mean() - b["stop_8_within_40d"].mean() if status == "OK" else np.nan,
+                "profit_24_rate_diff": a["profit_24_within_40d"].mean() - b["profit_24_within_40d"].mean() if status == "OK" else np.nan,
                 "power_rate_diff": a["pattern_power_trigger"].eq(True).mean() - b["pattern_power_trigger"].eq(True).mean() if status == "OK" else np.nan,
                 "ci_low": lo if status == "OK" else np.nan,
                 "ci_high": hi if status == "OK" else np.nan,
                 "status": status,
+                "blocker": blocker,
             }
         )
     return pd.DataFrame(rows)
+
+
+def _paired_week_route_diffs(treated: pd.DataFrame, control: pd.DataFrame) -> pd.DataFrame:
+    keys = ["snapshot_date", "signal_source"]
+    t = treated.groupby(keys)["forward_8w_return_pct"].mean().rename("treated_mean")
+    c = control.groupby(keys)["forward_8w_return_pct"].mean().rename("control_mean")
+    paired = pd.concat([t, c], axis=1).dropna().reset_index()
+    if paired.empty:
+        paired["diff"] = pd.Series(dtype=float)
+        return paired
+    paired["diff"] = paired["treated_mean"] - paired["control_mean"]
+    return paired
 
 
 def build_all_selections(panel: pd.DataFrame) -> pd.DataFrame:
@@ -372,7 +466,7 @@ def b0_atomic_ablation(selections: pd.DataFrame, panel: pd.DataFrame) -> pd.Data
 
 
 def oos_results(selections: pd.DataFrame, panel: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    panel_labels = panel[["snapshot_date", "code", "forward_8w_return_pct", "forward_8w_censored", "stop_8_touched", "profit_24_touched", "pattern_power_trigger", "mfe_8w_pct", "mae_8w_pct"]]
+    panel_labels = panel[["snapshot_date", "code", "forward_8w_return_pct", "forward_8w_censored", "stop_8_within_40d", "profit_24_within_40d", "pattern_power_trigger", "mfe_8w_pct", "mae_8w_pct"]]
     selected = selections.merge(panel_labels, on=["snapshot_date", "code"], how="left", suffixes=("", "_label"))
     splits = make_rolling_splits(panel, test_weeks=4, embargo_weeks=8, min_train_weeks=8)
     rows = []
@@ -399,8 +493,9 @@ def oos_results(selections: pd.DataFrame, panel: pd.DataFrame) -> tuple[pd.DataF
                     "top3_equal_weight_8w_diff_pct": diff.mean() if len(diff) else np.nan,
                     "median_diff_pct": diff.median() if len(diff) else np.nan,
                     "trimmed_mean_diff_pct": _trimmed_mean(diff),
-                    "stop_first_rate": group["stop_8_touched_label"].mean(),
-                    "profit_24_rate": group["profit_24_touched_label"].mean(),
+                    "evaluation_type": "blocked_retrospective_evaluation",
+                    "stop_first_40d_rate": group["stop_8_within_40d_label"].mean(),
+                    "profit_24_40d_rate": group["profit_24_within_40d_label"].mean(),
                     "power_rate": group["pattern_power_trigger_label"].eq(True).mean(),
                     "mfe_8w_pct": group["mfe_8w_pct_label"].mean(),
                     "mae_8w_pct": group["mae_8w_pct_label"].mean(),
@@ -514,17 +609,36 @@ def machine_rule_decisions(evidence: pd.DataFrame, contrasts: pd.DataFrame) -> p
     }
     for family, role in mapping.items():
         family_evidence = evidence[evidence["rule_family"].eq(family)]
-        complete = int(family_evidence["complete_8w"].sum()) if not family_evidence.empty else 0
-        weeks = int(family_evidence["weeks"].max()) if not family_evidence.empty else 0
-        if complete < 60 or weeks < 8:
+        family_contrasts = contrasts[contrasts["rule_family"].eq(family)] if "rule_family" in contrasts.columns else pd.DataFrame()
+        complete = int(family_evidence["complete_8w"].max()) if not family_evidence.empty else 0
+        weeks = int(family_evidence["mature_weeks"].max()) if "mature_weeks" in family_evidence.columns and not family_evidence.empty else 0
+        if family_contrasts.empty:
+            decision = "UNKNOWN"
+            status = "Insufficient Evidence" if complete < 60 or weeks < 8 else "No Treatment Contrast"
+            blocker = blockers.get(family, "")
+        elif family_contrasts["status"].eq("RULE_NOT_IDENTIFIABLE").any():
+            decision = "UNKNOWN"
+            status = "RULE_NOT_IDENTIFIABLE"
+            blocker = "; ".join(sorted(set(family_contrasts.loc[family_contrasts["status"].eq("RULE_NOT_IDENTIFIABLE"), "blocker"].dropna().astype(str))))
+        elif not family_contrasts["status"].eq("OK").any():
+            decision = "UNKNOWN"
+            status = "No Treatment Contrast"
+            blocker = "; ".join(sorted(set(family_contrasts["blocker"].dropna().astype(str)))) if "blocker" in family_contrasts else ""
+        elif complete < 60 or weeks < 8:
             decision = "UNKNOWN"
             status = "Insufficient Evidence"
-        elif role == "Hard Eligibility":
-            decision = role
-            status = "Promising / prospective confirmation required"
+            blocker = "insufficient complete outcomes or mature weeks"
         else:
-            decision = role
-            status = "Promising / prospective confirmation required"
+            ok = family_contrasts[family_contrasts["status"].eq("OK")]
+            mean_effect = pd.to_numeric(ok["mean_return_diff_pct"], errors="coerce").mean()
+            stop_worse = pd.to_numeric(ok["stop_rate_diff"], errors="coerce").mean() > 0.02
+            if pd.notna(mean_effect) and mean_effect > 0 and not stop_worse:
+                decision = role
+                status = "Promising / prospective confirmation required"
+            else:
+                decision = "Context Only" if role != "Hard Eligibility" else "UNKNOWN"
+                status = "Insufficient Evidence"
+            blocker = blockers.get(family, "")
         rows.append(
             {
                 "rule_family": family,
@@ -532,7 +646,7 @@ def machine_rule_decisions(evidence: pd.DataFrame, contrasts: pd.DataFrame) -> p
                 "evidence_status": status,
                 "complete_outcomes": complete,
                 "independent_weeks": weeks,
-                "blocker": blockers.get(family, ""),
+                "blocker": blocker,
                 "production_change": False,
             }
         )
@@ -620,10 +734,10 @@ def render_data_audit(
 
 
 def render_b0_diff(ablations: pd.DataFrame, oos: pd.DataFrame, metrics: pd.DataFrame) -> str:
-    balanced = "R1_ATOMIC_IMPROVEMENTS"
-    candidate_oos = oos[oos["variant"].eq(balanced)] if "variant" in oos.columns else pd.DataFrame()
+    balanced = _best_balanced(oos, metrics)
+    candidate_oos = oos[oos["variant"].eq(balanced)] if "variant" in oos.columns and balanced != "NO_STABLE_REPLACEMENT" else pd.DataFrame()
     b0m = metrics[(metrics["variant"].eq("B0_PIT_VERIFIED")) & (metrics["capacity"].eq(3)) & (metrics["cost_bps_per_side"].eq(10))]
-    cm = metrics[(metrics["variant"].eq(balanced)) & (metrics["capacity"].eq(3)) & (metrics["cost_bps_per_side"].eq(10))]
+    cm = metrics[(metrics["variant"].eq(balanced)) & (metrics["capacity"].eq(3)) & (metrics["cost_bps_per_side"].eq(10))] if balanced != "NO_STABLE_REPLACEMENT" else pd.DataFrame()
     return "\n".join(
         [
             "# B0 vs Balanced Rule Diff",
@@ -636,7 +750,7 @@ def render_b0_diff(ablations: pd.DataFrame, oos: pd.DataFrame, metrics: pd.DataF
             f"B0 portfolio metric: {b0m.to_dict('records')[:1]}",
             f"Candidate portfolio metric: {cm.to_dict('records')[:1]}",
             "",
-            "NO PRODUCTION SKILL CHANGE unless prospective confirmation clears the registered Pareto bar.",
+            "Current sample does not support replacing B0. NO PRODUCTION SKILL CHANGE unless prospective confirmation clears the registered Pareto bar.",
         ]
     ) + "\n"
 
@@ -668,9 +782,9 @@ def render_report(
         "## Rule Answers",
         "1. Current pool is adequate for broad event-level diagnostics, but late/early coverage drift and censored recent weeks limit production claims.",
         "2. ACTIONABLE keeps support as a hard eligibility boundary in current B0, but independent increment still needs prospective confirmation because status is partly derived.",
-        "3. Close > Trigger is better treated as a risk flag/score input than promoted solely from this retrospective sample.",
+        "3. Close > Trigger is RULE_NOT_IDENTIFIABLE in current pools: the negative observed group is absent after upstream entry logic.",
         "4. Fresh Zone is more naturally continuous: near pivot is favorable, extension is risk, and below pivot is not proven as a universal hard gate.",
-        "5. Volume 1.5 shows useful signal but no registered evidence for decimal-precise optimization; soft or route-specific treatment is more defensible.",
+        "5. Volume 1.5 is RULE_NOT_IDENTIFIABLE in current pools: known entry-volume observations do not include the below-1.5 comparison group.",
         "6. Defensive Failure and Squat / Upper Shadow carry the clearest tail-risk concern; other geometry buckets should stay score/context.",
         "7. `pullback_v_is_dry` is route-specific; base breakouts are NOT_APPLICABLE, and dry pullback is not established as a universal hard gate.",
         "8. EPS evidence is PIT-limited: verified EPS >=25 can be a minor bonus, while unverified current-period Yahoo records are UNKNOWN before scoring.",
@@ -680,8 +794,8 @@ def render_report(
         "12. Eight-week hold can preserve power-trigger winners but increases capital occupancy; portfolio evidence is separated from selector evidence.",
         "13. Eight-week hold can enlarge drawdown and idle capacity cost depending on capacity/cost settings.",
         f"14. B0 portfolio metrics are computed from an explicit equity curve: {b0_port.to_dict('records')[:1]}",
-        f"15. Most balanced candidate in this run: `{best}` with metrics {best_port.to_dict('records')[:1]}",
-        "16. Improvements, where present, come from selector softening plus exit-policy interaction; this harness reports them separately.",
+        f"15. Most balanced candidate in this run: `{best}` with metrics {best_port.to_dict('records')[:1] if best != 'NO_STABLE_REPLACEMENT' else []}",
+        "16. No candidate rule set clears the pre-registered Pareto bar; current sample does not support replacing B0.",
         "17. NO PRODUCTION SKILL CHANGE.",
         "18. Prospective holdout must confirm any re-role from hard gate to score/risk/context.",
         "",
@@ -728,11 +842,16 @@ def _trimmed_mean(series: pd.Series) -> float:
 def _best_balanced(oos: pd.DataFrame, metrics: pd.DataFrame) -> str:
     candidates = ["R1_ATOMIC_IMPROVEMENTS", "R2_BALANCED_SOFT", "R3_MINIMAL_TECHNICAL"]
     if oos.empty or "variant" not in oos.columns:
-        return "R1_ATOMIC_IMPROVEMENTS"
+        return "NO_STABLE_REPLACEMENT"
     ranked = oos[oos["variant"].isin(candidates)].copy()
     ranked["nonnegative_mean"] = ranked["mean_oos_diff_pct"].ge(0)
     ranked = ranked.sort_values(["nonnegative_mean", "mean_oos_diff_pct", "worst_fold_diff_pct"], ascending=[False, False, False])
-    return str(ranked.iloc[0]["variant"]) if not ranked.empty else "R2_BALANCED_SOFT"
+    if ranked.empty:
+        return "NO_STABLE_REPLACEMENT"
+    best = ranked.iloc[0]
+    if not bool(best["nonnegative_mean"]) or int(best.get("better_folds", 0)) <= 0:
+        return "NO_STABLE_REPLACEMENT"
+    return str(best["variant"])
 
 
 def _skill_change_supported(decisions: pd.DataFrame, oos: pd.DataFrame, metrics: pd.DataFrame) -> bool:
