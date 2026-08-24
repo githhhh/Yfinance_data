@@ -1,47 +1,6 @@
-segment,variant,weeks,picks,median_forward_8w_return_pct,mean_forward_8w_return_pct,worst_forward_8w_return_pct,paired_week_note
-train_walk_forward_proxy,actionable_only_pool_order,36,97,4.253182,10.020754016949152,-23.303387,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,allow_zero_strict,34,82,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,b0_repository_skill,34,79,6.4330225,12.20490890909091,-30.839828,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,base_pullback_context,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,c_continuous_context,34,83,5.658022,11.403701959183673,-22.62826,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,close_trigger_soft,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,eps_drop,34,83,5.399501,9.667910102040816,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,eps_known_hard,34,79,5.0481435,9.85036348,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,eps_pass_hard,30,67,6.4330225,15.379861315789473,-18.350937,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,fresh_continuous,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,geometry_drop,36,97,3.578154,10.338040905660376,-23.303387,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,geometry_soft,36,97,4.577049000000001,11.610948259259258,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,ignore_entry_valid,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,pullback_dry_drop,34,83,4.399715,8.866302511111112,-22.62826,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,pullback_dry_hard,31,70,6.4136215,11.457848805555555,-22.62826,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,pullback_dry_minor,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,raw_pool_c_continuous,36,108,11.085276499999999,16.384385032258066,-25.610983,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,status_actionable_soft,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,status_actionable_unconfirmed,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,status_all_signal,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,top1_diagnostic,34,34,6.250717,19.7374676,-8.481532,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,volume_signal_specific,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-train_walk_forward_proxy,volume_soft,34,83,4.696786,12.4692112,-19.920354,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,actionable_only_pool_order,6,18,-1.072281,0.9484565333333334,-6.203474,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,allow_zero_strict,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,b0_repository_skill,6,18,-0.637629,3.5014227499999997,-6.203474,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,base_pullback_context,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,c_continuous_context,6,18,-0.666632,2.7560485624999997,-32.129212,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,close_trigger_soft,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,eps_drop,6,18,2.4949295,9.535583857142855,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,eps_known_hard,6,18,0.461255,1.8460826428571429,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,eps_pass_hard,6,17,0.821004,2.309176071428571,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,fresh_continuous,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,geometry_drop,6,18,-3.5253224999999997,6.769817166666667,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,geometry_soft,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,ignore_entry_valid,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,pullback_dry_drop,6,18,3.9349955,5.068881142857143,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,pullback_dry_hard,6,17,-0.448011,8.385356214285713,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,pullback_dry_minor,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,raw_pool_c_continuous,6,18,-1.543107,-1.8005368125000003,-32.129212,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,status_actionable_soft,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,status_actionable_unconfirmed,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,status_all_signal,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,top1_diagnostic,6,6,-2.496826,-0.8271968,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,volume_signal_specific,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
-sealed_holdout_frozen_read_once,volume_soft,6,18,2.103797,10.143065499999997,-14.518674,paired by snapshot_date against B0 in report; no LLM judgment used
+fold_id,segment,train_start,train_end,test_start,test_end,embargo_weeks,selected_variant,baseline_variant,train_complete_weeks,train_score,test_complete_weeks,paired_weeks,test_mean_delta_vs_b0,test_median_delta_vs_b0,block_bootstrap_ci_low,block_bootstrap_ci_high,status
+1,rolling_oos,2025-10-10,2026-01-02,2026-03-13,2026-04-02,8,top1_diagnostic,b0_repository_skill,12,9.618689833333333,4,3,-15.460708666666669,0.0,-46.38212600000001,0.0,ok
+2,rolling_oos,2025-10-10,2026-01-30,2026-04-10,2026-05-01,8,raw_pool_c_continuous,b0_repository_skill,16,7.674547391304348,4,4,26.182876625000002,17.3474575,16.627106,44.796039125,ok
+3,rolling_oos,2025-10-10,2026-03-06,2026-05-08,2026-05-29,8,raw_pool_c_continuous,b0_repository_skill,20,7.197128212962964,4,4,-7.833816083333334,-5.469605416666669,-13.697858125,-3.3157373333333338,ok
+4,rolling_oos,2025-10-10,2026-04-02,2026-06-05,2026-06-26,8,top1_diagnostic,b0_repository_skill,24,14.63479628125,3,3,-2.688448944444445,-5.10495,-6.957440333333335,3.9970435,ok
+5,sealed_holdout,2025-10-10,2026-05-01,2026-07-02,2026-08-07,8,raw_pool_c_continuous,b0_repository_skill,28,17.118947156249998,0,0,,,,,no_complete_8w_labels

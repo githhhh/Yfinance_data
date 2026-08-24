@@ -27,6 +27,7 @@ class Position:
     breakout_week: str
     signal_source: str
     pivot: float
+    breakout_anchor_date: pd.Timestamp
     entry_date: pd.Timestamp
     entry_fill_price: float
     initial_stop: float
@@ -49,6 +50,7 @@ class Position:
             "breakout_week": self.breakout_week,
             "signal_source": self.signal_source,
             "pivot": self.pivot,
+            "breakout_anchor_date": _fmt_date(self.breakout_anchor_date),
             "entry_date": _fmt_date(self.entry_date),
             "entry_fill_price": self.entry_fill_price,
             "initial_stop": self.initial_stop,
@@ -84,6 +86,7 @@ def run_ibd_position_state_machine(
     for _, pick in pick_frame.iterrows():
         code = str(pick.get("code", "")).strip()
         signal_date = pd.Timestamp(pick["snapshot_date"]).tz_localize(None)
+        breakout_anchor = _parse_date_or_default(pick.get("ibd_entry_date"), signal_date)
         if _has_active_position(positions, code, signal_date):
             events.append(_event(signal_date, code, "repeat_signal_ignored", signal_date=signal_date))
             continue
@@ -103,9 +106,10 @@ def run_ibd_position_state_machine(
         position = Position(
             ticker=code,
             signal_date=signal_date,
-            breakout_week=_fmt_date(_week_start(signal_date)),
+            breakout_week=_fmt_date(_week_start(breakout_anchor)),
             signal_source=str(pick.get("signal_source", pick.get("ibd_candidate_signal_source", "")) or ""),
             pivot=float(pivot),
+            breakout_anchor_date=breakout_anchor,
             entry_date=entry_date,
             entry_fill_price=float(entry_open),
             initial_stop=float(entry_open) * (1.0 - float(cfg.stop_loss_pct) / 100.0),
@@ -135,13 +139,13 @@ def _advance_position(position: Position, bars: pd.DataFrame, cfg: IBDTradeConfi
             _close(position, current, open_, "gap_stop", events)
             return
         stop_hit = low is not None and low <= stop
-        power_hit = high is not None and high >= power_target and _breakout_week_age(position.signal_date, current) <= cfg.power_trigger_weeks
+        power_hit = high is not None and high >= power_target and _breakout_week_age(position.breakout_anchor_date, current) <= cfg.power_trigger_weeks
         if stop_hit and cfg.same_day_priority == "conservative":
             _close(position, current, stop, "stop_loss", events)
             return
         if power_hit and position.power_trigger_date is None:
             position.power_trigger_date = current
-            position.minimum_hold_until = _minimum_hold_until(position.signal_date, cfg.minimum_hold_weeks)
+            position.minimum_hold_until = _minimum_hold_until(position.breakout_anchor_date, cfg.minimum_hold_weeks)
             events.append(_event(current, position.ticker, "power_trigger", price=power_target, signal_date=position.signal_date))
         if stop_hit:
             _close(position, current, stop, "stop_loss", events)
@@ -213,6 +217,16 @@ def _minimum_hold_until(signal_date: pd.Timestamp, weeks: int) -> pd.Timestamp:
 def _week_start(value: pd.Timestamp) -> pd.Timestamp:
     value = pd.Timestamp(value).tz_localize(None)
     return value.normalize() - timedelta(days=value.weekday())
+
+
+def _parse_date_or_default(value: object, default: pd.Timestamp) -> pd.Timestamp:
+    try:
+        parsed = pd.Timestamp(value)
+        if pd.isna(parsed):
+            return default
+        return parsed.tz_localize(None) if parsed.tzinfo is not None else parsed
+    except Exception:
+        return default
 
 
 def _event(date: pd.Timestamp, code: str, event: str, **extra: Any) -> dict[str, Any]:

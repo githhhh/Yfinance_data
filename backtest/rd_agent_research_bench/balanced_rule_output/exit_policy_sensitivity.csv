@@ -1,5 +1,5 @@
 selector,exit_policy,trade_count,expectancy_pct,median_return_pct,win_rate,censored_trades,power_trigger_count,note
-b0_repository_skill,fixed_forward_8w_mark,97,10.339876160714283,6.236883499999999,0.38144329896907214,41,0,"fixed label only, no intra-path exits"
+b0_repository_skill,fixed_forward_8w_mark,42,12.169660333333335,6.4330225,0.7142857142857143,0,0,"fixed label only, no intra-path exits"
 b0_repository_skill,ibd_8w_default_7p5_22p5,55,13.774498775245744,6.223049784398271,0.5454545454545454,23,4,selector frozen; only exit policy changes
 b0_repository_skill,no_8week_rule_7p5_22p5,55,6.543807172615845,6.223049784398271,0.5454545454545454,19,0,selector frozen; only exit policy changes
 b0_repository_skill,stop7_profit20,55,13.018356457317127,5.6752106324908125,0.5272727272727272,21,4,selector frozen; only exit policy changes

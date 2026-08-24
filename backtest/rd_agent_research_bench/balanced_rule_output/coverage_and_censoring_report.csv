@@ -1,8 +1,11 @@
 metric,value,detail
 replay_pool_weeks_loaded,42,
 signal_rows_loaded,2738,
-selection_events,2289,
-missing_forward_paths,926,not dropped; retained as UNKNOWN
-censored_trades,516,open at price-cache end; mark-to-market
-pit_eps_rows,2738,PIT EPS effective_date audited
+selection_events,2526,
+missing_forward_paths,1031,not dropped; retained as UNKNOWN
+censored_forward_8w_labels,1438,forward_8w_return_pct is UNKNOWN unless 40 trading days are available
+censored_trades,571,open at price-cache end; mark-to-market
+pit_eps_rows,2738,PIT EPS effective_date audited; Yahoo period-date fallback excluded from formal EPS evaluation
 pit_eps_future_violations,0,effective_date > snapshot_date
+pit_eps_unverified_availability,12,Yahoo rows where effective_date equals fiscal period end
+pit_eps_usable_rows_for_formal_eps_eval,2368,future-safe and not Yahoo period-date fallback

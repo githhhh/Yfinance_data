@@ -2,10 +2,8 @@
 
 No production Skill edit is recommended from this run.
 
-Reason: evidence is exploratory, replay history is short, sealed holdout is small, and no candidate rule clears the full Pareto bar of stable OOS increment, downside control, coverage, concentration control, parameter-neighborhood stability, and simplicity.
+Reason: the evaluator now marks incomplete 8-week labels as censored, and the sealed holdout has no complete paired 8-week labels with the current price cache. In addition, 12 Yahoo PIT EPS rows have unverified availability because their `effective_date` equals the fiscal period end.
 
-Recommended future low-risk edits only:
+Current machine decision: `Insufficient evidence` for every tested rule family. Keep B0 unchanged.
 
-- Clarify that `pullback_v_is_dry` should be tested as Minor Bonus/Risk Flag before any future hard gate.
-- Clarify that `EPS >=25` is auxiliary unless future PIT OOS evidence confirms a hard gate.
-- Add a schema pointer fix because `doc/BREAKOUT_FOLLOW_POOL_SCHEMA.md` is only a migration notice.
+Future research may continue testing soft handling for `pullback_v_is_dry`, EPS, fresh distance, volume saturation and Geometry, but none should enter production Skill from this run.

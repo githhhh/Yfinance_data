@@ -18,7 +18,7 @@ from backtest.rd_agent_research_bench.ibd_position_state_machine import (
     IBDTradeConfig,
     run_ibd_position_state_machine,
 )
-from dashboard.skill_industry_eps_known import select_skill_industry_eps_known
+from dashboard.skill_industry_eps_known import effective_eps, rank_skill_industry_eps_known, select_skill_industry_eps_known
 
 
 DEFAULT_POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
@@ -117,6 +117,7 @@ def evaluate_candidate(row: pd.Series, *, row_index: int) -> dict[str, Any]:
         "signal_source": source,
         "ibd_candidate_rule": rule,
         "ibd_candidate_price": to_float(row.get("ibd_candidate_price")),
+        "ibd_entry_date": str(row.get("ibd_entry_date", "") or "").strip(),
         "latest_close": to_float(row.get("latest_close")),
         "industry": str(row.get("industry", "") or "").strip(),
         "sector": str(row.get("sector", "") or "").strip(),
@@ -165,6 +166,7 @@ def select_by_config(pool: pd.DataFrame, cfg: SelectorConfig) -> pd.DataFrame:
                 "industry": evaluated["industry"],
                 "sector": evaluated["sector"],
                 "ibd_candidate_price": evaluated["ibd_candidate_price"],
+                "ibd_entry_date": evaluated["ibd_entry_date"],
                 "latest_close": evaluated["latest_close"],
                 "score": score,
                 "reason_codes": ";".join(reasons),
@@ -215,6 +217,11 @@ def run_balanced_rule_evaluation(
         for row in b0.to_dict("records"):
             selection_rows.append(row)
             forward_rows.append(_forward_row(row, prices))
+        for name in ["b0_no_eps_known_gate", "b0_no_industry_cover", "b0_top1_diagnostic"]:
+            b0_variant = _select_b0_ablation(pool, snapshot, name)
+            for row in b0_variant.to_dict("records"):
+                selection_rows.append(row)
+                forward_rows.append(_forward_row(row, prices))
         for cfg in configs:
             selected = select_by_config(pool, cfg)
             for row in selected.to_dict("records"):
@@ -226,7 +233,22 @@ def run_balanced_rule_evaluation(
     forwards = pd.DataFrame(forward_rows)
     if not forwards.empty and not selections.empty:
         selections = selections.merge(
-            forwards[["variant", "snapshot_date", "code", "forward_8w_return_pct", "mfe_pct", "mae_pct", "path_source"]],
+            forwards[
+                [
+                    "variant",
+                    "snapshot_date",
+                    "code",
+                    "forward_1w_censored",
+                    "forward_3w_censored",
+                    "forward_5w_censored",
+                    "forward_8w_censored",
+                    "observation_trading_days",
+                    "forward_8w_return_pct",
+                    "mfe_pct",
+                    "mae_pct",
+                    "path_source",
+                ]
+            ],
             on=["variant", "snapshot_date", "code"],
             how="left",
         )
@@ -238,9 +260,10 @@ def run_balanced_rule_evaluation(
     sealed_holdout = set(weeks[-holdout_weeks:]) if len(weeks) > holdout_weeks else set()
     walk_forward = _walk_forward(rule_ablation, forwards, sealed_holdout)
     benchmark = _benchmark_comparison(rule_ablation, baseline="b0_repository_skill")
+    decision_table = _machine_decision_table(rule_ablation, walk_forward, coverage)
     hypotheses = hypothesis_registry(configs)
     manifest = _manifest(configs, pool_root, resolved_price_cache, weeks, sealed_holdout)
-    report = _render_report(rule_ablation, walk_forward, benchmark, coverage, exit_sensitivity, hypotheses, weeks, sealed_holdout)
+    report = _render_report(rule_ablation, walk_forward, benchmark, coverage, exit_sensitivity, decision_table, hypotheses, weeks, sealed_holdout)
     schema_review = _render_schema_review()
     derived = _render_derived_dimensions()
     b0_diff = _render_b0_diff(rule_ablation)
@@ -257,6 +280,7 @@ def run_balanced_rule_evaluation(
         "trade_ledger": output_dir / "trade_ledger.csv",
         "trade_events": output_dir / "trade_events.csv",
         "exit_policy_sensitivity": output_dir / "exit_policy_sensitivity.csv",
+        "machine_decision_table": output_dir / "machine_decision_table.csv",
         "coverage_and_censoring_report": output_dir / "coverage_and_censoring_report.csv",
         "benchmark_comparison": output_dir / "benchmark_comparison.csv",
         "rd_agent_research_report": output_dir / "rd_agent_research_report.md",
@@ -273,6 +297,7 @@ def run_balanced_rule_evaluation(
     trade_ledger.to_csv(outputs["trade_ledger"], index=False)
     trade_events.to_csv(outputs["trade_events"], index=False)
     exit_sensitivity.to_csv(outputs["exit_policy_sensitivity"], index=False)
+    decision_table.to_csv(outputs["machine_decision_table"], index=False)
     coverage.to_csv(outputs["coverage_and_censoring_report"], index=False)
     benchmark.to_csv(outputs["benchmark_comparison"], index=False)
     outputs["rd_agent_research_report"].write_text(report, encoding="utf-8")
@@ -381,7 +406,7 @@ def _score_candidate(evaluated: dict[str, Any], cfg: SelectorConfig) -> tuple[bo
         score += 1.0 if checks["ibd_entry_valid"]["state"] == "PASS" else -0.5
 
     cur = features["current_vs_ibd_candidate_pct"]
-    if cfg.close_gate and (cur is None or cur < 0):
+    if cfg.close_gate and checks["close_above_trigger"]["state"] != "PASS":
         return False, score, reasons, risks
     if cfg.fresh_mode == "hard" and checks["fresh_zone_0_5"]["state"] != "PASS":
         return False, score, reasons, risks
@@ -439,8 +464,10 @@ def _score_candidate(evaluated: dict[str, Any], cfg: SelectorConfig) -> tuple[bo
 
 def _select_b0(pool: pd.DataFrame, snapshot: str) -> pd.DataFrame:
     selected = []
+    by_code = {str(row.get("code", "")).strip(): row for _, row in pool.iterrows()}
     for order, item in enumerate(select_skill_industry_eps_known(pool), 1):
         fields = item.feature_values
+        source_row = by_code.get(item.code, pd.Series(dtype=object))
         selected.append(
             {
                 "snapshot_date": snapshot,
@@ -453,6 +480,7 @@ def _select_b0(pool: pd.DataFrame, snapshot: str) -> pd.DataFrame:
                 "industry": item.industry,
                 "sector": fields.get("sector"),
                 "ibd_candidate_price": fields.get("ibd_candidate_price"),
+                "ibd_entry_date": source_row.get("ibd_entry_date"),
                 "latest_close": fields.get("latest_close"),
                 "score": None,
                 "reason_codes": ";".join(item.reason_codes),
@@ -464,6 +492,57 @@ def _select_b0(pool: pd.DataFrame, snapshot: str) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(selected)
+
+
+def _select_b0_ablation(pool: pd.DataFrame, snapshot: str, name: str) -> pd.DataFrame:
+    ranked = rank_skill_industry_eps_known(pool)
+    rows = []
+    covered: set[str] = set()
+    limit = 1 if name == "b0_top1_diagnostic" else 3
+    by_code = {str(row.get("code", "")).strip(): row for _, row in pool.iterrows()}
+    for item in ranked:
+        if item.entry_status != "ACTIONABLE":
+            continue
+        if "clear_geometry_failure" in item.risk_codes or "below_candidate_buy_point" in item.risk_codes:
+            continue
+        if name != "b0_no_eps_known_gate" and effective_eps(item) is None:
+            continue
+        industry_key = item.industry.strip().lower()
+        if name != "b0_no_industry_cover":
+            if not industry_key:
+                continue
+            if industry_key in covered:
+                continue
+        fields = item.feature_values
+        source_row = by_code.get(item.code, pd.Series(dtype=object))
+        rows.append(
+            {
+                "snapshot_date": snapshot,
+                "variant": name,
+                "pick_order": len(rows) + 1,
+                "code": item.code,
+                "entry_status": item.entry_status,
+                "signal_source": "",
+                "ibd_candidate_rule": fields.get("ibd_candidate_rule"),
+                "industry": item.industry,
+                "sector": fields.get("sector"),
+                "ibd_candidate_price": fields.get("ibd_candidate_price"),
+                "ibd_entry_date": source_row.get("ibd_entry_date"),
+                "latest_close": fields.get("latest_close"),
+                "score": None,
+                "reason_codes": ";".join(item.reason_codes),
+                "risk_flags": ";".join(item.risk_codes + [f"b0_ablation:{name}"]),
+                "checks_json": "",
+                "geometry": "",
+                "trigger_pos": None,
+                "row_index": None,
+            }
+        )
+        if industry_key and name != "b0_no_industry_cover":
+            covered.add(industry_key)
+        if len(rows) >= limit:
+            break
+    return pd.DataFrame(rows)
 
 
 def _forward_row(row: dict[str, Any], prices: dict[str, pd.DataFrame]) -> dict[str, Any]:
@@ -482,6 +561,11 @@ def _forward_row(row: dict[str, Any], prices: dict[str, pd.DataFrame]) -> dict[s
         "forward_3w_return_pct": None,
         "forward_5w_return_pct": None,
         "forward_8w_return_pct": None,
+        "forward_1w_censored": True,
+        "forward_3w_censored": True,
+        "forward_5w_censored": True,
+        "forward_8w_censored": True,
+        "observation_trading_days": 0,
         "mfe_pct": None,
         "mae_pct": None,
         "first_touch": "UNKNOWN",
@@ -493,15 +577,21 @@ def _forward_row(row: dict[str, Any], prices: dict[str, pd.DataFrame]) -> dict[s
     if entry_open is None:
         return base
     window = bars[bars.index >= entry_date]
-    base.update({"path_source": str(prices.get(code).attrs.get("source", "daily_cache")) if prices.get(code) is not None else "daily_cache", "entry_date": entry_date.date().isoformat(), "entry_open": entry_open})
+    base.update({"path_source": str(prices.get(code).attrs.get("source", "daily_cache")) if prices.get(code) is not None else "daily_cache", "entry_date": entry_date.date().isoformat(), "entry_open": entry_open, "observation_trading_days": int(len(window))})
     for label, offset in [("1w", 5), ("3w", 15), ("5w", 25), ("8w", 40)]:
-        close = _nth_close(window, offset)
-        base[f"forward_{label}_return_pct"] = _pct(close, entry_open)
-    highs = pd.to_numeric(window["High"], errors="coerce")
-    lows = pd.to_numeric(window["Low"], errors="coerce")
+        if len(window) >= offset:
+            close = _nth_close(window, offset)
+            base[f"forward_{label}_return_pct"] = _pct(close, entry_open)
+            base[f"forward_{label}_censored"] = False
+    if len(window) < 40:
+        base["first_touch"] = "CENSORED"
+        return base
+    fixed_window = window.iloc[:40]
+    highs = pd.to_numeric(fixed_window["High"], errors="coerce")
+    lows = pd.to_numeric(fixed_window["Low"], errors="coerce")
     base["mfe_pct"] = _pct(to_float(highs.max()), entry_open)
     base["mae_pct"] = _pct(to_float(lows.min()), entry_open)
-    base["first_touch"] = _first_touch(window, entry_open)
+    base["first_touch"] = _first_touch(fixed_window, entry_open)
     return base
 
 
@@ -527,12 +617,13 @@ def _exit_policy_sensitivity(selections: pd.DataFrame, prices: dict[str, pd.Data
     b0 = selections[selections["variant"].eq("b0_repository_skill")].copy()
     rows = []
     fwd = forwards[forwards["variant"].eq("b0_repository_skill")] if not forwards.empty else pd.DataFrame()
-    ret8 = pd.to_numeric(fwd.get("forward_8w_return_pct"), errors="coerce")
+    fwd_complete = _complete_forward_rows(fwd)
+    ret8 = pd.to_numeric(fwd_complete.get("forward_8w_return_pct"), errors="coerce")
     rows.append(
         {
             "selector": "b0_repository_skill",
             "exit_policy": "fixed_forward_8w_mark",
-            "trade_count": len(fwd),
+            "trade_count": len(fwd_complete),
             "expectancy_pct": _safe_float(ret8.mean()),
             "median_return_pct": _safe_float(ret8.median()),
             "win_rate": _safe_float(ret8.gt(0).mean()),
@@ -573,22 +664,25 @@ def _variant_summary(selections: pd.DataFrame, forwards: pd.DataFrame, ledger: p
     for variant in variants:
         sel = selections[selections["variant"].eq(variant)] if not selections.empty else pd.DataFrame()
         fwd = forwards[forwards["variant"].eq(variant)] if not forwards.empty else pd.DataFrame()
+        fwd_complete = _complete_forward_rows(fwd)
         trades = ledger[ledger["variant"].eq(variant)] if not ledger.empty else pd.DataFrame()
-        returns = pd.to_numeric(fwd.get("forward_8w_return_pct"), errors="coerce")
+        returns = pd.to_numeric(fwd_complete.get("forward_8w_return_pct"), errors="coerce")
         trade_returns = pd.to_numeric(trades.get("return_pct"), errors="coerce")
         rows.append(
             {
                 "variant": variant,
                 "weeks_with_picks": sel["snapshot_date"].nunique() if not sel.empty else 0,
                 "selection_count": len(sel),
+                "complete_8w_label_count": len(fwd_complete),
+                "censored_8w_label_count": int(fwd.get("forward_8w_censored", pd.Series(dtype=bool)).fillna(True).sum()) if not fwd.empty else 0,
                 "avg_picks_per_week": len(sel) / sel["snapshot_date"].nunique() if not sel.empty and sel["snapshot_date"].nunique() else 0.0,
                 "median_forward_8w_return_pct": _safe_float(returns.median()),
                 "mean_forward_8w_return_pct": _safe_float(returns.mean()),
                 "worst_forward_8w_return_pct": _safe_float(returns.min()),
-                "mfe_median_pct": _safe_float(pd.to_numeric(fwd.get("mfe_pct"), errors="coerce").median()),
-                "mae_median_pct": _safe_float(pd.to_numeric(fwd.get("mae_pct"), errors="coerce").median()),
-                "profit_zone_rate": _rate(fwd.get("first_touch"), "+20"),
-                "stop_first_rate": _rate(fwd.get("first_touch"), "-7.5"),
+                "mfe_median_pct": _safe_float(pd.to_numeric(fwd_complete.get("mfe_pct"), errors="coerce").median()),
+                "mae_median_pct": _safe_float(pd.to_numeric(fwd_complete.get("mae_pct"), errors="coerce").median()),
+                "profit_zone_rate": _rate(fwd_complete.get("first_touch"), "+20"),
+                "stop_first_rate": _rate(fwd_complete.get("first_touch"), "-7.5"),
                 "trade_count": len(trades),
                 "trade_expectancy_pct": _safe_float(trade_returns.mean()),
                 "trade_win_rate": _safe_float(trade_returns.gt(0).mean()),
@@ -597,34 +691,152 @@ def _variant_summary(selections: pd.DataFrame, forwards: pd.DataFrame, ledger: p
                 "power_trigger_count": int(trades.get("power_trigger_date", pd.Series(dtype=object)).notna().sum()) if not trades.empty else 0,
                 "max_single_ticker_pick_share": _max_share(sel, "code"),
                 "max_single_week_pick_share": _max_share(sel, "snapshot_date"),
-                "top1_mode": variant == "top1_diagnostic",
+                "top1_mode": "top1" in variant,
             }
         )
     return pd.DataFrame(rows).sort_values(["variant"]).reset_index(drop=True)
 
 
-def _walk_forward(summary: pd.DataFrame, forwards: pd.DataFrame, sealed_holdout: set[str]) -> pd.DataFrame:
-    rows = []
+def _walk_forward(
+    summary: pd.DataFrame,
+    forwards: pd.DataFrame,
+    sealed_holdout: set[str],
+    *,
+    min_train_weeks: int = 12,
+    embargo_weeks: int = 8,
+    test_window_weeks: int = 4,
+) -> pd.DataFrame:
     if forwards.empty:
         return pd.DataFrame()
-    pre = forwards[~forwards["snapshot_date"].astype(str).isin(sealed_holdout)]
-    hold = forwards[forwards["snapshot_date"].astype(str).isin(sealed_holdout)]
-    for segment, frame in [("train_walk_forward_proxy", pre), ("sealed_holdout_frozen_read_once", hold)]:
-        for variant, group in frame.groupby("variant", sort=True):
-            returns = pd.to_numeric(group["forward_8w_return_pct"], errors="coerce")
-            rows.append(
-                {
-                    "segment": segment,
-                    "variant": variant,
-                    "weeks": group["snapshot_date"].nunique(),
-                    "picks": len(group),
-                    "median_forward_8w_return_pct": _safe_float(returns.median()),
-                    "mean_forward_8w_return_pct": _safe_float(returns.mean()),
-                    "worst_forward_8w_return_pct": _safe_float(returns.min()),
-                    "paired_week_note": "paired by snapshot_date against B0 in report; no LLM judgment used",
-                }
-            )
+    frame = forwards.copy()
+    frame["snapshot_date"] = frame["snapshot_date"].astype(str)
+    weeks = sorted(frame["snapshot_date"].dropna().unique())
+    if not weeks:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    non_holdout_weeks = [week for week in weeks if week not in sealed_holdout]
+    fold_id = 1
+    for test_start_idx in range(min_train_weeks + embargo_weeks, len(non_holdout_weeks), test_window_weeks):
+        test_weeks = non_holdout_weeks[test_start_idx : test_start_idx + test_window_weeks]
+        if not test_weeks:
+            continue
+        train_weeks = non_holdout_weeks[: max(0, test_start_idx - embargo_weeks)]
+        if len(train_weeks) < min_train_weeks:
+            continue
+        rows.append(_walk_forward_row(frame, train_weeks, test_weeks, fold_id=fold_id, segment="rolling_oos", embargo_weeks=embargo_weeks))
+        fold_id += 1
+
+    if sealed_holdout:
+        holdout_weeks = sorted(sealed_holdout)
+        first_holdout = holdout_weeks[0]
+        pre_holdout = [week for week in weeks if week < first_holdout]
+        train_weeks = pre_holdout[: max(0, len(pre_holdout) - embargo_weeks)]
+        rows.append(_walk_forward_row(frame, train_weeks, holdout_weeks, fold_id=fold_id, segment="sealed_holdout", embargo_weeks=embargo_weeks))
     return pd.DataFrame(rows)
+
+
+def _walk_forward_row(frame: pd.DataFrame, train_weeks: list[str], test_weeks: list[str], *, fold_id: int, segment: str, embargo_weeks: int) -> dict[str, Any]:
+    train = _complete_forward_rows(frame[frame["snapshot_date"].isin(train_weeks)])
+    selected, train_score = _choose_champion(train)
+    test = _complete_forward_rows(frame[frame["snapshot_date"].isin(test_weeks)])
+    paired = _paired_week_delta(test, selected)
+    status = "ok"
+    if selected is None:
+        status = "no_train_champion"
+    elif paired["paired_weeks"] == 0:
+        status = "no_complete_8w_labels"
+    ci_low, ci_high = _bootstrap_ci(paired["weekly_deltas"])
+    return {
+        "fold_id": fold_id,
+        "segment": segment,
+        "train_start": train_weeks[0] if train_weeks else "",
+        "train_end": train_weeks[-1] if train_weeks else "",
+        "test_start": test_weeks[0] if test_weeks else "",
+        "test_end": test_weeks[-1] if test_weeks else "",
+        "embargo_weeks": embargo_weeks,
+        "selected_variant": selected,
+        "baseline_variant": "b0_repository_skill",
+        "train_complete_weeks": train["snapshot_date"].nunique() if not train.empty else 0,
+        "train_score": train_score,
+        "test_complete_weeks": test["snapshot_date"].nunique() if not test.empty else 0,
+        "paired_weeks": paired["paired_weeks"],
+        "test_mean_delta_vs_b0": paired["mean_delta"],
+        "test_median_delta_vs_b0": paired["median_delta"],
+        "block_bootstrap_ci_low": ci_low,
+        "block_bootstrap_ci_high": ci_high,
+        "status": status,
+    }
+
+
+def _complete_forward_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    complete = frame.copy()
+    if "forward_8w_censored" in complete.columns:
+        complete = complete[~complete["forward_8w_censored"].fillna(True).astype(bool)]
+    complete["forward_8w_return_pct"] = pd.to_numeric(complete["forward_8w_return_pct"], errors="coerce")
+    return complete[complete["forward_8w_return_pct"].notna()]
+
+
+def _choose_champion(train: pd.DataFrame) -> tuple[str | None, float | None]:
+    if train.empty:
+        return None, None
+    rows = []
+    for variant, group in train.groupby("variant", sort=True):
+        if variant == "b0_repository_skill":
+            continue
+        returns = pd.to_numeric(group["forward_8w_return_pct"], errors="coerce")
+        if returns.notna().sum() < 3:
+            continue
+        stop_rate = _rate(group.get("first_touch"), "-7.5") or 0.0
+        score = float(returns.median()) + 0.25 * float(returns.mean()) - 2.0 * stop_rate
+        rows.append((score, float(returns.min()), variant))
+    if not rows:
+        return None, None
+    rows.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    score, _, variant = rows[0]
+    return variant, score
+
+
+def _paired_week_delta(test: pd.DataFrame, variant: str | None) -> dict[str, Any]:
+    if test.empty or variant is None:
+        return {"paired_weeks": 0, "mean_delta": None, "median_delta": None, "weekly_deltas": []}
+    variant_week = (
+        test[test["variant"].eq(variant)]
+        .groupby("snapshot_date")["forward_8w_return_pct"]
+        .mean()
+        .rename("variant_return")
+    )
+    b0_week = (
+        test[test["variant"].eq("b0_repository_skill")]
+        .groupby("snapshot_date")["forward_8w_return_pct"]
+        .mean()
+        .rename("b0_return")
+    )
+    paired = pd.concat([variant_week, b0_week], axis=1).dropna()
+    if paired.empty:
+        return {"paired_weeks": 0, "mean_delta": None, "median_delta": None, "weekly_deltas": []}
+    deltas = (paired["variant_return"] - paired["b0_return"]).tolist()
+    return {
+        "paired_weeks": int(len(deltas)),
+        "mean_delta": float(pd.Series(deltas).mean()),
+        "median_delta": float(pd.Series(deltas).median()),
+        "weekly_deltas": deltas,
+    }
+
+
+def _bootstrap_ci(values: list[float], *, iterations: int = 500) -> tuple[float | None, float | None]:
+    if len(values) < 3:
+        return None, None
+    import random
+
+    rng = random.Random(RANDOM_SEED)
+    means = []
+    for _ in range(iterations):
+        sample = [values[rng.randrange(len(values))] for _ in values]
+        means.append(sum(sample) / len(sample))
+    means.sort()
+    return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
 
 
 def _benchmark_comparison(summary: pd.DataFrame, *, baseline: str) -> pd.DataFrame:
@@ -639,6 +851,61 @@ def _benchmark_comparison(summary: pd.DataFrame, *, baseline: str) -> pd.DataFra
     return out
 
 
+def _machine_decision_table(summary: pd.DataFrame, walk: pd.DataFrame, coverage: pd.DataFrame) -> pd.DataFrame:
+    holdout = walk[walk["segment"].eq("sealed_holdout")] if not walk.empty and "segment" in walk.columns else pd.DataFrame()
+    holdout_paired = int(pd.to_numeric(holdout.get("paired_weeks"), errors="coerce").fillna(0).sum()) if not holdout.empty else 0
+    holdout_status = ";".join(sorted(set(holdout.get("status", pd.Series(dtype=str)).astype(str)))) if not holdout.empty else "missing"
+    censored_8w = _coverage_value(coverage, "censored_forward_8w_labels")
+    unverified_eps = _coverage_value(coverage, "pit_eps_unverified_availability")
+    global_blocker = holdout_paired < 3 or unverified_eps > 0
+    rows = []
+    specs = [
+        ("ACTIONABLE hard boundary", "ibd_entry_status", "b0_repository_skill", "status_actionable_soft;status_all_signal", "Hard Eligibility"),
+        ("ibd_entry_valid", "ibd_entry_valid", "b0_repository_skill", "ignore_entry_valid", "Context Only"),
+        ("Close > Trigger", "ibd_entry_close_vs_trigger_pct", "b0_repository_skill", "close_trigger_soft", "Continuous/Major Score"),
+        ("Fresh Zone", "current_vs_ibd_candidate_pct", "b0_repository_skill", "fresh_continuous", "Continuous/Major Score"),
+        ("Entry volume", "ibd_entry_volume_ratio", "b0_repository_skill", "volume_soft;volume_signal_specific", "Continuous/Major Score"),
+        ("Breakout Geometry", "pos/range_ratio/trigger_pos", "b0_repository_skill", "geometry_soft;geometry_drop", "Hard Eligibility for clear FAIL"),
+        ("Base context", "base_depth/base_duration/base_mbox", "b0_repository_skill", "base_pullback_context", "Context Only"),
+        ("Pullback context", "pullback_pct/pullback_duration", "b0_repository_skill", "base_pullback_context", "Context Only"),
+        ("pullback_v_is_dry", "pullback_v_is_dry", "b0_repository_skill", "pullback_dry_hard;pullback_dry_minor;pullback_dry_drop", "Risk Flag / Minor Bonus candidate"),
+        ("EPS >= 25", "eps_yoy_growth", "b0_repository_skill", "eps_pass_hard;eps_known_hard;eps_drop", "Risk Flag / Minor Bonus candidate"),
+        ("EPS UNKNOWN", "eps_yoy_growth missingness", "b0_repository_skill", "b0_no_eps_known_gate", "Manual Review candidate"),
+        ("Industry coverage", "industry", "b0_repository_skill", "b0_no_industry_cover", "Context/Coverage Only"),
+        ("Top1 capacity", "top_n", "b0_repository_skill", "b0_top1_diagnostic;top1_diagnostic", "Context Only"),
+    ]
+    for rule, field, baseline, variants, proposed in specs:
+        rows.append(
+            {
+                "rule": rule,
+                "field_or_logic": field,
+                "baseline": baseline,
+                "tested_variants": variants,
+                "holdout_paired_weeks": holdout_paired,
+                "holdout_status": holdout_status,
+                "censored_forward_8w_labels": censored_8w,
+                "unverified_eps_availability_rows": unverified_eps,
+                "decision": "Insufficient evidence" if global_blocker else "Promising but not confirmed",
+                "recommended_production_handling": "Keep B0 unchanged",
+                "candidate_future_handling": proposed,
+                "machine_reason": "sealed holdout has too few complete 8w paired labels or EPS availability is unverified; no production rule can be confirmed",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _coverage_value(coverage: pd.DataFrame, metric: str) -> int:
+    if coverage.empty:
+        return 0
+    rows = coverage[coverage["metric"].astype(str).eq(metric)]
+    if rows.empty:
+        return 0
+    try:
+        return int(rows.iloc[0]["value"])
+    except Exception:
+        return 0
+
+
 def _coverage_report(selections: pd.DataFrame, forwards: pd.DataFrame, ledger: pd.DataFrame, pools: list[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
     signal_rows = sum(int(pool["signal"].astype(str).str.lower().isin({"true", "1"}).sum()) for _, pool in pools if "signal" in pool)
     eps_pit = _eps_pit_audit()
@@ -648,9 +915,12 @@ def _coverage_report(selections: pd.DataFrame, forwards: pd.DataFrame, ledger: p
             {"metric": "signal_rows_loaded", "value": signal_rows, "detail": ""},
             {"metric": "selection_events", "value": len(selections), "detail": ""},
             {"metric": "missing_forward_paths", "value": int(forwards["entry_open"].isna().sum()) if not forwards.empty else 0, "detail": "not dropped; retained as UNKNOWN"},
+            {"metric": "censored_forward_8w_labels", "value": int(forwards.get("forward_8w_censored", pd.Series(dtype=bool)).fillna(True).sum()) if not forwards.empty else 0, "detail": "forward_8w_return_pct is UNKNOWN unless 40 trading days are available"},
             {"metric": "censored_trades", "value": int(ledger.get("censored", pd.Series(dtype=bool)).fillna(False).sum()) if not ledger.empty else 0, "detail": "open at price-cache end; mark-to-market"},
             {"metric": "pit_eps_rows", "value": eps_pit["rows"], "detail": eps_pit["detail"]},
             {"metric": "pit_eps_future_violations", "value": eps_pit["future_violations"], "detail": "effective_date > snapshot_date"},
+            {"metric": "pit_eps_unverified_availability", "value": eps_pit["unverified_availability"], "detail": "Yahoo rows where effective_date equals fiscal period end"},
+            {"metric": "pit_eps_usable_rows_for_formal_eps_eval", "value": eps_pit["usable_rows_for_formal_eps_eval"], "detail": "future-safe and not Yahoo period-date fallback"},
         ]
     )
 
@@ -689,10 +959,9 @@ def _next_bar(bars: pd.DataFrame, snapshot: pd.Timestamp) -> tuple[pd.Timestamp,
 
 
 def _nth_close(window: pd.DataFrame, offset: int) -> float | None:
-    if window.empty:
+    if window.empty or len(window) < offset:
         return None
-    idx = min(offset - 1, len(window) - 1)
-    return to_float(window.iloc[idx].get("Close"))
+    return to_float(window.iloc[offset - 1].get("Close"))
 
 
 def _first_touch(window: pd.DataFrame, entry_open: float) -> str:
@@ -803,17 +1072,27 @@ def _max_share(frame: pd.DataFrame, column: str) -> float:
     return float(counts.iloc[0] / len(frame)) if len(frame) else 0.0
 
 
-def _eps_pit_audit() -> dict[str, Any]:
-    path = DEFAULT_POOL_ROOT / "signal_eps_pit.csv"
+def _eps_pit_audit(path: Path | None = None) -> dict[str, Any]:
+    path = path or (DEFAULT_POOL_ROOT / "signal_eps_pit.csv")
     if not path.exists():
-        return {"rows": 0, "future_violations": 0, "detail": "signal_eps_pit.csv missing"}
+        return {"rows": 0, "future_violations": 0, "unverified_availability": 0, "usable_rows_for_formal_eps_eval": 0, "detail": "signal_eps_pit.csv missing"}
     df = pd.read_csv(path)
     if df.empty or "effective_date" not in df.columns:
-        return {"rows": len(df), "future_violations": 0, "detail": "no effective_date column"}
+        return {"rows": len(df), "future_violations": 0, "unverified_availability": 0, "usable_rows_for_formal_eps_eval": 0, "detail": "no effective_date column"}
     eff = pd.to_datetime(df["effective_date"], errors="coerce")
     snap = pd.to_datetime(df["snapshot_date"], errors="coerce")
+    period = pd.to_datetime(df.get("current_period"), errors="coerce") if "current_period" in df.columns else pd.Series(pd.NaT, index=df.index)
+    source = df.get("source", pd.Series("", index=df.index)).astype(str).str.upper()
     violations = int((eff.notna() & snap.notna() & (eff > snap)).sum())
-    return {"rows": len(df), "future_violations": violations, "detail": "PIT EPS effective_date audited"}
+    unverified = source.eq("YAHOO") & eff.notna() & period.notna() & eff.eq(period)
+    usable = eff.notna() & snap.notna() & eff.le(snap) & ~unverified
+    return {
+        "rows": len(df),
+        "future_violations": violations,
+        "unverified_availability": int(unverified.sum()),
+        "usable_rows_for_formal_eps_eval": int(usable.sum()),
+        "detail": "PIT EPS effective_date audited; Yahoo period-date fallback excluded from formal EPS evaluation",
+    }
 
 
 def _manifest(configs: list[SelectorConfig], pool_root: Path, price_cache: Path, weeks: list[str], sealed_holdout: set[str]) -> str:
@@ -834,7 +1113,10 @@ def _manifest(configs: list[SelectorConfig], pool_root: Path, price_cache: Path,
             f"config_hash: {config_hash}",
             f"data_hash: {_data_hash(pool_root, price_cache)}",
             "market_report_policy: independent_display_only_not_used_for_scoring",
-            "selector_exit_policy_decoupling: selector variants use same IBD state machine; exit sensitivity reported separately",
+            "forward_label_policy: forward_8w_return_pct requires 40 trading days after next-open entry; otherwise UNKNOWN/censored",
+            "path_metric_policy: MFE/MAE/first-touch capped to the same 40-trading-day window",
+            "eps_availability_policy: Yahoo rows with effective_date equal to current_period are UNVERIFIED_AVAILABILITY and excluded from formal EPS evidence",
+            "selector_exit_policy_decoupling: selector variants use same IBD trade-path state machine; exit sensitivity reported separately; no portfolio capital simulation",
             "submodule_update_attempt: attempted git submodule update --init --remote market_analysis; interrupted by user in Codex turn and not retried",
         ]
     ) + "\n"
@@ -860,7 +1142,7 @@ def _render_schema_review() -> str:
 - Primary field semantics used for this run: repository consumer code plus the pointed SSOT at `/Users/tbin/Documents/quant_trade/strategy/doc/BREAKOUT_FOLLOW_POOL_SCHEMA.md`.
 - Ambiguity/inconsistency: yfinance_data no longer carries the full schema, so field semantics cannot be verified from this repository alone. Recommended fix: replace the migration notice with a pinned commit/path reference or vendor a read-only schema snapshot.
 - Isolated fields before use: no field with unclear formula was converted into a hard gate. Base/pullback fields are context only unless the existing rule route makes them applicable.
-- PIT EPS check: `signal_eps_pit.csv` was audited for `effective_date <= snapshot_date`; future-dated rows are reported in coverage.
+- PIT EPS check: `signal_eps_pit.csv` was audited for `effective_date <= snapshot_date` and Yahoo rows where `effective_date == current_period`. Those Yahoo rows are marked `UNVERIFIED_AVAILABILITY` and excluded from formal EPS evidence.
 """
 
 
@@ -878,7 +1160,7 @@ Only deterministic, PIT-safe dimensions were used:
 """
 
 
-def _render_report(summary: pd.DataFrame, walk: pd.DataFrame, benchmark: pd.DataFrame, coverage: pd.DataFrame, exit_sensitivity: pd.DataFrame, hypotheses: list[dict[str, Any]], weeks: list[str], sealed_holdout: set[str]) -> str:
+def _render_report(summary: pd.DataFrame, walk: pd.DataFrame, benchmark: pd.DataFrame, coverage: pd.DataFrame, exit_sensitivity: pd.DataFrame, decision_table: pd.DataFrame, hypotheses: list[dict[str, Any]], weeks: list[str], sealed_holdout: set[str]) -> str:
     b0 = summary[summary["variant"].eq("b0_repository_skill")]
     top = summary.sort_values(["median_forward_8w_return_pct", "worst_forward_8w_return_pct"], ascending=[False, False]).head(8)
     lines = [
@@ -893,21 +1175,23 @@ def _render_report(summary: pd.DataFrame, walk: pd.DataFrame, benchmark: pd.Data
         "## Why Current Backtests Are Not Full Quant Backtests",
         "",
         "- Existing Backtrader integration is a weekly rebalance model: positions are sold when not re-selected. That violates the requested IBD lifecycle and can confound selector quality with forced turnover.",
-        "- This run adds a daily OHLC path state machine with next-open entry, protective stop, ordinary profit zone, 8-week lock, repeated-signal ignore, and censored mark-to-market. It is still not a broker-grade simulator because daily OHLC cannot know intraday path; conservative priority is pre-registered.",
-        "- Benchmarks are fair only inside this evaluator because they share replay pools, next-open entry, costs/slippage assumptions, missing-path handling, and the same state machine.",
+        "- This run is now explicitly a trade-path evaluation, not a portfolio backtest: it has no capital ledger, position sizing, capacity, portfolio drawdown, fees, or slippage model.",
+        "- The daily OHLC path state machine covers next-open entry, protective stop, ordinary profit zone, 8-week lock, repeated-signal ignore, and censored mark-to-market. Daily OHLC still cannot know intraday path; conservative priority is pre-registered.",
+        "- Benchmarks are comparable only as selector trade-path labels under the same path assumptions. They do not prove portfolio-level Skill performance.",
         "",
         "## Data Sufficiency",
         "",
-        "- The replay sample is short and ticker exposures repeat. Results are exploratory unless a rule improves OOS, does not worsen downside, and is not concentrated in one ticker/week/source.",
-        "- Current data is not enough to claim a confirmed structural replacement for B0. More complete weekly PIT snapshots are needed, especially beyond one market regime and with uncensored 8-week outcomes.",
+        "- 8-week labels are now UNKNOWN unless 40 trading days are available after next-open entry; MFE/MAE/first-touch are capped to the same 40-trading-day window.",
+        "- The latest sealed holdout does not have enough complete 8-week labels with the current cache. Current data is not enough to claim any rule-level OOS confirmation.",
+        "- Yahoo EPS rows where `effective_date == current_period` are marked `UNVERIFIED_AVAILABILITY` and excluded from formal EPS evidence.",
         "",
         "## Top Observed Variants",
         "",
         top.to_markdown(index=False),
         "",
-        "## B0 Rule Verdicts",
+        "## Machine Decision Table",
         "",
-        _verdict_table(),
+        decision_table.to_markdown(index=False) if not decision_table.empty else "No rows.",
         "",
         "## Exit Policy Sensitivity",
         "",
@@ -915,19 +1199,14 @@ def _render_report(summary: pd.DataFrame, walk: pd.DataFrame, benchmark: pd.Data
         "",
         "## Required Answers",
         "",
-        "- ACTIONABLE as hard boundary: Promising to test as soft/status-wide, but not confirmed as a replacement. Keep formal Top Review ACTIONABLE-only for now; keep all-signal shadow as audit.",
-        "- Volume and Geometry: both show useful diagnostic value, but evidence does not support stronger global hardening. Volume is better studied as saturated/route-specific evidence; Geometry failures remain risk flags/hard exclusions only when clearly failed.",
-        "- `pullback_v_is_dry`: do not use as global hard gate. The balanced recommendation is Minor Bonus/Risk Flag for pullback-applicable routes; NOT_APPLICABLE for base breakout.",
-        "- EPS: keep PIT-known status for formal information completeness; `EPS >= 25` is a soft auxiliary score/risk context, not a hard gate. EPS UNKNOWN remains UNKNOWN/Manual Review, not FAIL.",
-        "- Unused schema fields: `base_mbox_count`, `base_duration_weeks`, `base_depth_abs`, `pullback_duration_weeks`, `pullback_pct_off_peak`, `C_continuous`, `rank_C_continuous`, and source labels deserve continued context-only or audit-layer tests.",
-        "- New derived dimensions: `trigger_pos`, fresh distance decay, saturated volume score, base/pullback context score. None has enough OOS evidence to enter production hard rules.",
-        "- Best observed vs most balanced: the highest observed return variant is not automatically recommended. The most balanced conclusion is to keep B0 and move only low-risk clarifications into future research.",
-        "- Top1: useful diagnostic, not a Skill replacement due concentration and rank-error sensitivity.",
-        "- Improvement source: current evidence primarily tests selector changes; exit policy is held constant in the main comparison. IBD 8-week rule improves rule fidelity but not yet proven to improve results robustly.",
+        "- ACTIONABLE, volume, Geometry, EPS, and `pullback_v_is_dry`: no trustworthy rule-level OOS verdict is available from this run.",
+        "- The only production-safe conclusion is that B0 should remain unchanged and all candidate changes should stay in future research.",
+        "- Top1 remains diagnostic only; this run does not establish it as a replacement for Top3.",
+        "- Improvements cannot be attributed to selector rules yet. Exit policy sensitivity is selector-frozen, but still trade-path level rather than portfolio level.",
         "",
         "## Conclusion",
         "",
-        "Verdict: Promising but not confirmed. Keep B0 production rules unchanged except for future low-risk documentation/schema fixes. Do not update the repository Skill from these exploratory results.",
+        "Verdict: Insufficient evidence. Keep B0 production Skill unchanged. This commit should be treated as an improved research framework and audit artifact, not a credible RD-Agent/OOS rule conclusion.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -956,13 +1235,11 @@ def _render_b0_diff(summary: pd.DataFrame) -> str:
 
 No production Skill edit is recommended from this run.
 
-Reason: evidence is exploratory, replay history is short, sealed holdout is small, and no candidate rule clears the full Pareto bar of stable OOS increment, downside control, coverage, concentration control, parameter-neighborhood stability, and simplicity.
+Reason: the evaluator now marks incomplete 8-week labels as censored, and the sealed holdout has no complete paired 8-week labels with the current price cache. In addition, 12 Yahoo PIT EPS rows have unverified availability because their `effective_date` equals the fiscal period end.
 
-Recommended future low-risk edits only:
+Current machine decision: `Insufficient evidence` for every tested rule family. Keep B0 unchanged.
 
-- Clarify that `pullback_v_is_dry` should be tested as Minor Bonus/Risk Flag before any future hard gate.
-- Clarify that `EPS >=25` is auxiliary unless future PIT OOS evidence confirms a hard gate.
-- Add a schema pointer fix because `doc/BREAKOUT_FOLLOW_POOL_SCHEMA.md` is only a migration notice.
+Future research may continue testing soft handling for `pullback_v_is_dry`, EPS, fresh distance, volume saturation and Geometry, but none should enter production Skill from this run.
 """
 
 

@@ -1,7 +1,7 @@
 run_date: 2026-08-24
 random_seed: 20260824
 base_commit: 7925b2209adfa810213623de34c1dae6402638aa
-head_commit: 9e8e8bb412c217b339751276fe2ac1e84584013d
+head_commit: d4d1c1a1ff9040be0df9770d9e002c45d75b7a77
 skill_path: .agents/skills/ibd-candidate-prescreen/SKILL.md
 pool_root: backtest/ibd_skill_replay_pools
 price_cache: results_pkl/stock_data_230826_1d.pkl
@@ -12,5 +12,8 @@ sealed_holdout_weeks: 2026-07-02,2026-07-10,2026-07-17,2026-07-24,2026-07-31,202
 config_hash: eb3416d36e1902c6f679b55961df1765be282f4f13acd6190cf1b1f47a24baa2
 data_hash: 4d0e3e2d0232236552b0739668daa94e7d6ba2137464e89e639e879ce63d27bf
 market_report_policy: independent_display_only_not_used_for_scoring
-selector_exit_policy_decoupling: selector variants use same IBD state machine; exit sensitivity reported separately
+forward_label_policy: forward_8w_return_pct requires 40 trading days after next-open entry; otherwise UNKNOWN/censored
+path_metric_policy: MFE/MAE/first-touch capped to the same 40-trading-day window
+eps_availability_policy: Yahoo rows with effective_date equal to current_period are UNVERIFIED_AVAILABILITY and excluded from formal EPS evidence
+selector_exit_policy_decoupling: selector variants use same IBD trade-path state machine; exit sensitivity reported separately; no portfolio capital simulation
 submodule_update_attempt: attempted git submodule update --init --remote market_analysis; interrupted by user in Codex turn and not retried

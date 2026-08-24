@@ -128,6 +128,26 @@ def test_same_day_stop_and_power_trigger_uses_conservative_stop_first():
     assert pd.isna(trade["power_trigger_date"])
 
 
+def test_power_trigger_uses_ibd_entry_date_as_breakout_week_anchor_when_available():
+    picks = _picks([("2026-01-09", "AAA", 100.0)])
+    picks.loc[0, "ibd_entry_date"] = "2025-12-26"
+    prices = {
+        "AAA": _bars(
+            [
+                ("2026-01-09", 100, 101, 99, 100),
+                ("2026-01-12", 100, 105, 99, 104),
+                ("2026-01-16", 104, 121, 103, 120),
+            ]
+        )
+    }
+
+    ledger, _ = run_ibd_position_state_machine(picks, prices, IBDTradeConfig(profit_take_pct=20.0))
+
+    trade = ledger.iloc[0]
+    assert trade["breakout_week"] == "2025-12-22"
+    assert pd.isna(trade["power_trigger_date"])
+
+
 def _picks(rows):
     return pd.DataFrame(
         [
