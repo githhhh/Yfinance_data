@@ -77,14 +77,24 @@ def run_b0_across_all_pools(
     pool_paths: Sequence[Path],
     output_events_csv: Path | str | None = "backtest/b0_top3_quality_audit/output/b0_selection_events.csv",
     output_invariant_csv: Path | str | None = "backtest/b0_top3_quality_audit/output/b0_production_invariant_audit.csv",
+    golden_csv_path: Path | str = "backtest/b0_top3_quality_audit/golden/b0_top3_golden_reference.csv",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Run B0 replay on all historical pools and record reproducible golden signatures with SHA256 drift checks.
+    """Run B0 replay on all historical pools and compare against frozen golden reference.
     
     Returns:
         (b0_events_df, invariant_audit_df)
     """
     all_b0_records: list[dict[str, Any]] = []
     invariant_records: list[dict[str, Any]] = []
+
+    # Load frozen golden reference if available
+    golden_df = pd.DataFrame()
+    golden_map: dict[str, list[dict[str, Any]]] = {}
+    g_path = Path(golden_csv_path)
+    if g_path.exists():
+        golden_df = pd.read_csv(g_path, encoding="utf-8-sig")
+        for snap_date, grp in golden_df.groupby("snapshot_date"):
+            golden_map[str(snap_date)] = grp.sort_values("pick_order").to_dict(orient="records")
 
     for path in pool_paths:
         snapshot_date = path.parent.name
@@ -103,16 +113,40 @@ def run_b0_across_all_pools(
         replay_sort_keys = [str(r["sort_key"]) for r in b0_records]
         replay_reasons = [str(r["reason_codes"]) for r in b0_records]
 
+        # Genuine Golden Comparison
+        golden_records = golden_map.get(str(snapshot_date), [])
+        golden_codes = [r["code"] for r in golden_records]
+        discrepancies: list[str] = []
+
+        if len(b0_records) == 0 and len(golden_records) == 0:
+            # Both have 0 recommendations -> exact match
+            pass
+        elif len(b0_records) != len(golden_records):
+            discrepancies.append(f"count_mismatch(replay={len(b0_records)},golden={len(golden_records)})")
+        elif replay_codes != golden_codes:
+            discrepancies.append(f"code_mismatch(replay={replay_codes},golden={golden_codes})")
+        else:
+            for idx, (rep, gol) in enumerate(zip(b0_records, golden_records), 1):
+                if rep["code"] != gol["code"]:
+                    discrepancies.append(f"pick_{idx}_code({rep['code']}!={gol['code']})")
+                if str(rep["sort_key"]) != str(gol.get("sort_key")):
+                    discrepancies.append(f"pick_{idx}_sort_key_drift")
+
+        discrepancy_count = len(discrepancies)
+        is_exact_match = bool(discrepancy_count == 0 and len(b0_records) == len(golden_records))
+
         invariant_records.append({
             "snapshot_date": snapshot_date,
             "pool_path": str(path),
             "pool_sha256": pool_sha256,
             "replay_top3_count": len(b0_records),
             "replay_codes": ",".join(replay_codes),
+            "golden_codes": ",".join(golden_codes),
             "replay_sort_keys": " | ".join(replay_sort_keys),
             "replay_reasons": " | ".join(replay_reasons),
-            "is_exact_match": True,
-            "discrepancy_count": 0,
+            "is_exact_match": is_exact_match,
+            "discrepancy_count": discrepancy_count,
+            "discrepancy_details": ";".join(discrepancies) if discrepancies else "NONE",
         })
 
     b0_events_df = pd.DataFrame(all_b0_records)
@@ -131,3 +165,10 @@ def run_b0_across_all_pools(
         logger.info(f"Saved B0 production invariant audit to {inv_p}")
 
     return b0_events_df, invariant_df
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    from backtest.b0_top3_quality_audit.universe import scan_replay_pools
+    pool_paths = scan_replay_pools()
+    run_b0_across_all_pools(pool_paths)

@@ -308,20 +308,28 @@ def run_three_tier_baseline(
         rec["screening_alpha_w4_w"] = rec["l1_w4_ret_med"] - rec["l0_w4_ret_med"]
         rec["ranking_alpha_w4_w"] = rec["l2_w4_ret"] - rec["l1_w4_ret_med"]
 
-        # Weekly Win Indicators (Binary)
-        rec["win_l2_gt_l0_exec"] = bool(rec["l2_executed_ret"] > rec["l0_executed_ret_med"])
-        rec["win_l2_gt_l1_exec"] = bool(rec["l2_executed_ret"] > rec["l1_executed_ret_med"])
-        rec["win_l1_gt_l0_exec"] = bool(rec["l1_executed_ret_med"] > rec["l0_executed_ret_med"])
+        # Weekly Win Indicators (Binary, NaN if immature/missing)
+        rec["win_l2_gt_l0_exec"] = bool(rec["l2_executed_ret"] > rec["l0_executed_ret_med"]) if not np.isnan(rec["l2_executed_ret"]) and not np.isnan(rec["l0_executed_ret_med"]) else np.nan
+        rec["win_l2_gt_l1_exec"] = bool(rec["l2_executed_ret"] > rec["l1_executed_ret_med"]) if not np.isnan(rec["l2_executed_ret"]) and not np.isnan(rec["l1_executed_ret_med"]) else np.nan
+        rec["win_l1_gt_l0_exec"] = bool(rec["l1_executed_ret_med"] > rec["l0_executed_ret_med"]) if not np.isnan(rec["l1_executed_ret_med"]) and not np.isnan(rec["l0_executed_ret_med"]) else np.nan
 
-        rec["win_l2_gt_l0_w1"] = bool(rec["l2_w1_ret"] > rec["l0_w1_ret_med"])
-        rec["win_l2_gt_l1_w1"] = bool(rec["l2_w1_ret"] > rec["l1_w1_ret_med"])
-        rec["win_l1_gt_l0_w1"] = bool(rec["l1_w1_ret_med"] > rec["l0_w1_ret_med"])
+        rec["win_l2_gt_l0_w1"] = bool(rec["l2_w1_ret"] > rec["l0_w1_ret_med"]) if not np.isnan(rec["l2_w1_ret"]) and not np.isnan(rec["l0_w1_ret_med"]) else np.nan
+        rec["win_l2_gt_l1_w1"] = bool(rec["l2_w1_ret"] > rec["l1_w1_ret_med"]) if not np.isnan(rec["l2_w1_ret"]) and not np.isnan(rec["l1_w1_ret_med"]) else np.nan
+        rec["win_l1_gt_l0_w1"] = bool(rec["l1_w1_ret_med"] > rec["l0_w1_ret_med"]) if not np.isnan(rec["l1_w1_ret_med"]) and not np.isnan(rec["l0_w1_ret_med"]) else np.nan
+
+        rec["win_l2_gt_l0_w2"] = bool(rec["l2_w2_ret"] > rec["l0_w2_ret_med"]) if not np.isnan(rec["l2_w2_ret"]) and not np.isnan(rec["l0_w2_ret_med"]) else np.nan
+        rec["win_l2_gt_l1_w2"] = bool(rec["l2_w2_ret"] > rec["l1_w2_ret_med"]) if not np.isnan(rec["l2_w2_ret"]) and not np.isnan(rec["l1_w2_ret_med"]) else np.nan
+        rec["win_l1_gt_l0_w2"] = bool(rec["l1_w2_ret_med"] > rec["l0_w2_ret_med"]) if not np.isnan(rec["l1_w2_ret_med"]) and not np.isnan(rec["l0_w2_ret_med"]) else np.nan
+
+        rec["win_l2_gt_l0_w4"] = bool(rec["l2_w4_ret"] > rec["l0_w4_ret_med"]) if not np.isnan(rec["l2_w4_ret"]) and not np.isnan(rec["l0_w4_ret_med"]) else np.nan
+        rec["win_l2_gt_l1_w4"] = bool(rec["l2_w4_ret"] > rec["l1_w4_ret_med"]) if not np.isnan(rec["l2_w4_ret"]) and not np.isnan(rec["l1_w4_ret_med"]) else np.nan
+        rec["win_l1_gt_l0_w4"] = bool(rec["l1_w4_ret_med"] > rec["l0_w4_ret_med"]) if not np.isnan(rec["l1_w4_ret_med"]) and not np.isnan(rec["l0_w4_ret_med"]) else np.nan
 
         weekly_records.append(rec)
 
     weekly_df = pd.DataFrame(weekly_records)
 
-    # 2. Overall Time-Series Alpha & Win Rate Summary (W1, W2, W4, As-Of)
+    # 2. Overall Time-Series Alpha & Win Rate Summary (W1, W2, W4, As-Of with Maturity Filtering)
     summary_rows: list[dict[str, Any]] = []
 
     for metric_name, l2_col, l1_col, l0_col, tot_col, scr_col, rnk_col, w_l2_l0, w_l2_l1, w_l1_l0 in [
@@ -345,9 +353,9 @@ def run_three_tier_baseline(
             "total_alpha_w2_w",
             "screening_alpha_w2_w",
             "ranking_alpha_w2_w",
-            "win_l2_gt_l0_exec",
-            "win_l2_gt_l1_exec",
-            "win_l1_gt_l0_exec",
+            "win_l2_gt_l0_w2",
+            "win_l2_gt_l1_w2",
+            "win_l1_gt_l0_w2",
         ),
         (
             "Week 4 Executed Return",
@@ -357,9 +365,9 @@ def run_three_tier_baseline(
             "total_alpha_w4_w",
             "screening_alpha_w4_w",
             "ranking_alpha_w4_w",
-            "win_l2_gt_l0_exec",
-            "win_l2_gt_l1_exec",
-            "win_l1_gt_l0_exec",
+            "win_l2_gt_l0_w4",
+            "win_l2_gt_l1_w4",
+            "win_l1_gt_l0_w4",
         ),
         (
             "Executed Return (to As-Of Secondary)",
@@ -374,10 +382,13 @@ def run_three_tier_baseline(
             "win_l1_gt_l0_exec",
         ),
     ]:
-        n_weeks = len(weekly_df)
-        l2_med = float(weekly_df[l2_col].median())
-        l1_med = float(weekly_df[l1_col].median())
-        l0_med = float(weekly_df[l0_col].median())
+        # Filter strictly to mature weeks where this horizon's outcome is known
+        mature_df = weekly_df[weekly_df[l2_col].notna()].copy()
+        n_mature_weeks = len(mature_df)
+
+        l2_med = float(mature_df[l2_col].median()) if not mature_df.empty else np.nan
+        l1_med = float(mature_df[l1_col].median()) if not mature_df.empty else np.nan
+        l0_med = float(mature_df[l0_col].median()) if not mature_df.empty else np.nan
 
         # Perspective A: Cross-Sectional Level Median Lift (median(L*) - median(L*))
         level_lift_total = l2_med - l0_med
@@ -385,25 +396,25 @@ def run_three_tier_baseline(
         level_lift_ranking = l2_med - l1_med
 
         # Perspective B: Weekly Spread Median (median_w(L*_w - L*_w))
-        spread_med_total = float(weekly_df[tot_col].median())
-        spread_med_screening = float(weekly_df[scr_col].median())
-        spread_med_ranking = float(weekly_df[rnk_col].median())
+        spread_med_total = float(mature_df[tot_col].median()) if not mature_df.empty else np.nan
+        spread_med_screening = float(mature_df[scr_col].median()) if not mature_df.empty else np.nan
+        spread_med_ranking = float(mature_df[rnk_col].median()) if not mature_df.empty else np.nan
 
-        # Weekly Win Rates
-        win_rate_l2_vs_l0 = float(weekly_df[w_l2_l0].mean() * 100.0)
-        win_rate_l2_vs_l1 = float(weekly_df[w_l2_l1].mean() * 100.0)
-        win_rate_l1_vs_l0 = float(weekly_df[w_l1_l0].mean() * 100.0)
+        # Weekly Win Rates (strictly on mature weeks)
+        win_rate_l2_vs_l0 = float(mature_df[w_l2_l0].mean() * 100.0) if not mature_df.empty else np.nan
+        win_rate_l2_vs_l1 = float(mature_df[w_l2_l1].mean() * 100.0) if not mature_df.empty else np.nan
+        win_rate_l1_vs_l0 = float(mature_df[w_l1_l0].mean() * 100.0) if not mature_df.empty else np.nan
 
-        # Active ranking weeks breakdown (l1_pool_size >= 4)
-        active_rank_df = weekly_df[weekly_df["l1_pool_size"] >= 4]
+        # Active ranking weeks breakdown (l1_pool_size >= 4 on mature weeks)
+        active_rank_df = mature_df[mature_df["l1_pool_size"] >= 4]
         active_spread_med_screening = float(active_rank_df[scr_col].median()) if not active_rank_df.empty else np.nan
         active_spread_med_ranking = float(active_rank_df[rnk_col].median()) if not active_rank_df.empty else np.nan
         active_win_l2_vs_l1 = float(active_rank_df[w_l2_l1].mean() * 100.0) if not active_rank_df.empty else np.nan
 
         # Statistical tests (Wilcoxon)
-        diff_tot = weekly_df[tot_col].dropna()
-        diff_scr = weekly_df[scr_col].dropna()
-        diff_rnk = weekly_df[rnk_col].dropna()
+        diff_tot = mature_df[tot_col].dropna()
+        diff_scr = mature_df[scr_col].dropna()
+        diff_rnk = mature_df[rnk_col].dropna()
 
         p_wilc_tot = stats.wilcoxon(diff_tot).pvalue if len(diff_tot) > 10 else np.nan
         p_wilc_scr = stats.wilcoxon(diff_scr).pvalue if len(diff_scr) > 10 else np.nan
@@ -411,7 +422,8 @@ def run_three_tier_baseline(
 
         summary_rows.append({
             "metric": metric_name,
-            "total_eval_weeks": n_weeks,
+            "mature_eval_weeks": n_mature_weeks,
+            "total_calendar_weeks": len(weekly_df),
             "l2_b0_median": l2_med,
             "l1_eligible_median": l1_med,
             "l0_signal_median": l0_med,
@@ -423,7 +435,7 @@ def run_three_tier_baseline(
             "weekly_spread_total_pct": spread_med_total,
             "weekly_spread_screening_pct": spread_med_screening,
             "weekly_spread_ranking_pct": spread_med_ranking,
-            # Active Ranking Subset (l1 >= 4, n=21)
+            # Active Ranking Subset (l1 >= 4)
             "active_rank_weeks_count": len(active_rank_df),
             "active_rank_spread_screening_pct": active_spread_med_screening,
             "active_rank_spread_ranking_pct": active_spread_med_ranking,

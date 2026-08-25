@@ -124,8 +124,10 @@ def test_04_three_tier_baseline_regression(sample_events_and_weekly):
     assert "Week 4 Executed Return" in summary_df["metric"].values
     assert "Executed Return (to As-Of Secondary)" in summary_df["metric"].values
     
-    # 3. Check Alpha math
+    # 3. Check Alpha math and maturity accounting
     for _, row in summary_df.iterrows():
+        assert "mature_eval_weeks" in row
+        assert row["mature_eval_weeks"] <= row["total_calendar_weeks"]
         assert row["win_rate_l2_vs_l0_pct"] >= 0.0
         assert row["win_rate_l2_vs_l1_pct"] >= 0.0
         assert row["win_rate_l1_vs_l0_pct"] >= 0.0

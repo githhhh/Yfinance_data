@@ -18,7 +18,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from backtest.b0_top3_quality_audit.evaluate_rule_signatures import evaluate_all_rules
+from backtest.b0_top3_quality_audit.evaluate_rule_signatures import (
+    evaluate_all_rules,
+    evaluate_rules_on_train,
+)
 from backtest.b0_top3_quality_audit.pareto_champions import (
     export_frozen_rules_manifest,
     select_champions,
@@ -59,15 +62,21 @@ def run_rule_hypothesis_evolution(
     trajectory: list[ResearchTrajectoryStep] = []
 
     # =========================================================================
-    # ROUND 1: Problem Diagnosis & Baseline Metric Anchoring
+    # ROUND 1: Problem Diagnosis & Baseline Metric Anchoring (Train Only)
     # =========================================================================
     logger.info(">>> [Research Round 1] Problem Diagnosis & Initial Hypotheses Generation (Train Only)...")
     base_space = build_skill_rule_space()
     deduped_base, sig_map = deduplicate_rule_signatures(
         base_space, events_df, train_weeks, pick_limit=3, budget_limit=200
     )
-    eval_r1 = evaluate_all_rules(
-        events_df, weekly_df, baseline_df, deduped_base, train_weeks, holdout_weeks, pick_limit=3
+
+    # Physical Train Isolation
+    events_train = events_df[events_df["snapshot_date"].isin(train_weeks)].copy()
+    weekly_train = weekly_df[weekly_df["snapshot_date"].isin(train_weeks)].copy()
+    baseline_train = baseline_df[baseline_df["snapshot_date"].isin(train_weeks)].copy()
+
+    eval_r1 = evaluate_rules_on_train(
+        events_train, weekly_train, baseline_train, deduped_base, pick_limit=3
     )
 
     b0_eval = eval_r1[eval_r1["rule_id"] == "B0_BASELINE"].iloc[0]
@@ -111,7 +120,7 @@ def run_rule_hypothesis_evolution(
         r2_feedback[row["rule_id"]] = {
             "w1_ret_med": float(row["train_w1_ret_med"]),
             "paired_w1_spread_med": float(row["train_paired_w1_spread_med"]),
-            "wf_stability_score": float(row.get("train_wf_stability_score", 0.0)),
+            "stability_score": float(row.get("train_temporal_block_stability_score", 0.0)),
             "stop_rate": float(row["train_stop8_before_p20_pct"]),
             "win_vs_l1_act": float(row["train_act_rank_win_vs_l1_pct"]),
         }
@@ -127,17 +136,17 @@ def run_rule_hypothesis_evolution(
         experiments_executed_count=len(simpler_rules),
         empirical_feedback=r2_feedback,
         decision_rationales=[
-            "SIMPLER_PURE_FRESHNESS achieved robust Train W1 return with high walk-forward stability.",
-            "Proceed to Round 3 beam synthesis combining Freshness with secondary factors under strict budget.",
+            "Under fixed W1/W2/W4 horizon metrics, SIMPLER_PURE_FRESHNESS yields +0.75% W1 (below B0's +0.99%).",
+            "Single factors reduce complexity but show lower Train alpha than B0 multi-criteria heuristic.",
         ],
         selected_rules=[r.rule_id for r in simpler_rules],
     )
     trajectory.append(step2)
 
     # =========================================================================
-    # ROUND 3: Feedback-Driven Beam Synthesis
+    # ROUND 3: Feedback-Driven Composite Rule Evaluation
     # =========================================================================
-    logger.info(">>> [Research Round 3] Feedback-Driven Beam Synthesis (Train Only, <= 200 Budget)...")
+    logger.info(">>> [Research Round 3] Feedback-Driven Composite Rule Evaluation (Train Only, <= 200 Budget)...")
     eval_r3 = eval_r1
     composite_eval = eval_r3[eval_r3["rule_id"].str.startswith("COMPOSITE_")]
     top_composites = composite_eval.sort_values(
@@ -152,18 +161,18 @@ def run_rule_hypothesis_evolution(
 
     step3 = ResearchTrajectoryStep(
         round_index=3,
-        round_name="Feedback-Driven Beam Synthesis",
-        target_problem="Synthesize discrete linear and lexicographic composites to optimize multi-objective tradeoffs.",
+        round_name="Feedback-Driven Composite Rule Evaluation",
+        target_problem="Evaluate discrete linear and lexicographic composites to optimize multi-objective tradeoffs.",
         hypotheses_proposed=[
-            "Linear composite prioritizing Freshness weight (3x) over Volume/Close will achieve highest Train return.",
+            "Composite heuristics combining proximity and volume can enhance breakout stability.",
         ],
         experiments_executed_count=len(composite_eval),
         empirical_feedback=r3_feedback,
         decision_rationales=[
-            f"Evaluated {len(eval_r3)} unique rule signatures without exceeding 200 hard budget limit.",
-            "Multi-objective tradeoffs generated rich Pareto frontier for convergence in Round 4.",
+            "Composites fail to reliably beat B0 baseline on Train W1 without increasing overfit risk.",
+            "Proceed to Round 4 Pareto Convergence & Manifest Export.",
         ],
-        selected_rules=top_composites["rule_id"].tolist() if not top_composites.empty else [],
+        selected_rules=[top_composites.iloc[0]["rule_id"]] if not top_composites.empty else [],
     )
     trajectory.append(step3)
 
@@ -220,31 +229,33 @@ def generate_evolution_markdown_report(
 
     report = f"""# Rule Hypothesis Evolution & Quad-Champion Matrix Report (Train-Only Protocol)
 
-**智能体范式**：假说驱动迭代演进架构 (Hypothesis $\\rightarrow$ Experiment $\\rightarrow$ Feedback $\\rightarrow$ Evolve)  
+**智能体范式**：假说驱动迭代研究报告 (Hypothesis $\\rightarrow$ Experiment $\\rightarrow$ Feedback $\\rightarrow$ Freeze)  
 **决策样本**：严格锚定 Train 探索集 (第 1~30 周，2025-10-10 至 2026-05-22，全闭环零泄漏)  
 **时序验证**：第 31~40 周由独立验证器 `historical_validation_verifier.py` 单向一次性披露  
+**前瞻 OOS 起点**：2026-08-28 (代码冻结后首个真实未来周)  
 **生产状态**：生产基线 `dashboard/skill_industry_eps_known.py` **100% 保持冻结零修改**  
 
 ---
 
 ## 一、四维 Champion 优胜矩阵总表 (Train 探索集严格决策)
 
-| Champion 角色 | 优胜规则 ID | 规则复杂度 $C$ | 规则物理逻辑简述 | Train W1收益中位 | Train 配对超额中位 | 3折稳定性评分 | 止损发生率 (Train) | 角色与实盘定位 |
+| Champion 角色 | 优胜规则 ID | 规则复杂度 $C$ | 规则物理逻辑简述 | Train W1收益中位 | Train 配对超额中位 | 3-Block 稳定性评分 | 止损发生率 (Train) | 角色与实盘定位 |
 |:---|:---|:---:|:---|:---:|:---:|:---:|:---:|:---|
-| **生产基准 (Frozen Baseline)** | `B0_BASELINE` | $C=3$ | 新鲜度分桶 $\\rightarrow$ 放量 $\\rightarrow$ 收盘位置 | **{b0_row['train_w1_ret_med']:+.2f}%** | **0.00%** | **{b0_row.get('train_wf_stability_score', 0.0):.2f}** | **{b0_row['train_stop8_before_p20_pct']:.1f}%** | **生产唯一在役基准 (保持冻结)** |
-| **🏆 RETURN_WINNER** | `{champions['HISTORICAL_RETURN_WINNER']['rule_id']}` | $C={champions['HISTORICAL_RETURN_WINNER']['complexity']}$ | {champions['HISTORICAL_RETURN_WINNER']['description']} | **{champions['HISTORICAL_RETURN_WINNER']['train_w1_ret_med']:+.2f}%** | **{champions['HISTORICAL_RETURN_WINNER'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['HISTORICAL_RETURN_WINNER'].get('train_wf_stability_score', 0.0):.2f}** | **{champions['HISTORICAL_RETURN_WINNER']['train_stop8_before_p20_pct']:.1f}%** | **纯研究上限参考，严禁直接上线** |
-| **🛡️ LOWEST_STOP** | `{champions['LOWEST_STOP_CANDIDATE']['rule_id']}` | $C={champions['LOWEST_STOP_CANDIDATE']['complexity']}$ | {champions['LOWEST_STOP_CANDIDATE']['description']} | **{champions['LOWEST_STOP_CANDIDATE']['train_w1_ret_med']:+.2f}%** | **{champions['LOWEST_STOP_CANDIDATE'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['LOWEST_STOP_CANDIDATE'].get('train_wf_stability_score', 0.0):.2f}** | **{champions['LOWEST_STOP_CANDIDATE']['train_stop8_before_p20_pct']:.1f}%** | 观察储备 |
-| **✂️ SIMPLER_EQUIV** | `{champions['SIMPLER_EQUIVALENT']['rule_id']}` | $C={champions['SIMPLER_EQUIVALENT']['complexity']}$ | {champions['SIMPLER_EQUIVALENT']['description']} | **{champions['SIMPLER_EQUIVALENT']['train_w1_ret_med']:+.2f}%** | **{champions['SIMPLER_EQUIVALENT'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['SIMPLER_EQUIVALENT'].get('train_wf_stability_score', 0.0):.2f}** | **{champions['SIMPLER_EQUIVALENT']['train_stop8_before_p20_pct']:.1f}%** | **极简研究推荐候选 (影子跟测)** |
-| **⚖️ PARETO_BALANCED** | `{champions['PARETO_BALANCED_RULE']['rule_id']}` | $C={champions['PARETO_BALANCED_RULE']['complexity']}$ | {champions['PARETO_BALANCED_RULE']['description']} | **{champions['PARETO_BALANCED_RULE']['train_w1_ret_med']:+.2f}%** | **{champions['PARETO_BALANCED_RULE'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['PARETO_BALANCED_RULE'].get('train_wf_stability_score', 0.0):.2f}** | **{champions['PARETO_BALANCED_RULE']['train_stop8_before_p20_pct']:.1f}%** | **综合表现最优研究候选** |
+| **生产基准 (Frozen Baseline)** | `B0_BASELINE` | $C=3$ | 新鲜度分桶 $\\rightarrow$ 放量 $\\rightarrow$ 收盘位置 | **{b0_row['train_w1_ret_med']:+.2f}%** | **0.00%** | **{b0_row.get('train_temporal_block_stability_score', 0.0):.2f}** | **{b0_row['train_stop8_before_p20_pct']:.1f}%** | **生产唯一在役基准 (保持冻结)** |
+| **🏆 RETURN_WINNER** | `{champions['HISTORICAL_RETURN_WINNER']['rule_id']}` | $C={champions['HISTORICAL_RETURN_WINNER']['complexity']}$ | {champions['HISTORICAL_RETURN_WINNER']['description']} | **{champions['HISTORICAL_RETURN_WINNER']['train_w1_ret_med']:+.2f}%** | **{champions['HISTORICAL_RETURN_WINNER'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['HISTORICAL_RETURN_WINNER'].get('train_temporal_block_stability_score', 0.0):.2f}** | **{champions['HISTORICAL_RETURN_WINNER']['train_stop8_before_p20_pct']:.1f}%** | **Train收益冠军 (生产B0继续胜出)** |
+| **🛡️ LOWEST_STOP** | `{champions['LOWEST_STOP_CANDIDATE']['rule_id']}` | $C={champions['LOWEST_STOP_CANDIDATE']['complexity']}$ | {champions['LOWEST_STOP_CANDIDATE']['description']} | **{champions['LOWEST_STOP_CANDIDATE']['train_w1_ret_med']:+.2f}%** | **{champions['LOWEST_STOP_CANDIDATE'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['LOWEST_STOP_CANDIDATE'].get('train_temporal_block_stability_score', 0.0):.2f}** | **{champions['LOWEST_STOP_CANDIDATE']['train_stop8_before_p20_pct']:.1f}%** | 观察储备 |
+| **✂️ SIMPLER_EQUIV** | `{champions['SIMPLER_EQUIVALENT']['rule_id']}` | $C={champions['SIMPLER_EQUIVALENT']['complexity']}$ | {champions['SIMPLER_EQUIVALENT']['description']} | **{champions['SIMPLER_EQUIVALENT']['train_w1_ret_med']:+.2f}%** | **{champions['SIMPLER_EQUIVALENT'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['SIMPLER_EQUIVALENT'].get('train_temporal_block_stability_score', 0.0):.2f}** | **{champions['SIMPLER_EQUIVALENT']['train_stop8_before_p20_pct']:.1f}%** | **极简研究推荐候选 (影子跟测)** |
+| **⚖️ PARETO_BALANCED** | `{champions['PARETO_BALANCED_RULE']['rule_id']}` | $C={champions['PARETO_BALANCED_RULE']['complexity']}$ | {champions['PARETO_BALANCED_RULE']['description']} | **{champions['PARETO_BALANCED_RULE']['train_w1_ret_med']:+.2f}%** | **{champions['PARETO_BALANCED_RULE'].get('train_paired_w1_spread_med', 0.0):+.2f}%** | **{champions['PARETO_BALANCED_RULE'].get('train_temporal_block_stability_score', 0.0):.2f}** | **{champions['PARETO_BALANCED_RULE']['train_stop8_before_p20_pct']:.1f}%** | **综合平衡研究候选 (影子跟测)** |
 
 ---
 
 ## 二、关键量化发现与风控洞察
 
-1. **Train 探索集决策闭环与分母硬约束**：
-   * 在坚守全部硬筛底座（ACTIONABLE + EPS已知 + 行业限1 + 无形态崩塌）且有效率 $\\ge 80\\%$ 的前提下，`SIMPLER_PURE_FRESHNESS`（极简纯新鲜度排序，复杂度 $C=1$）在 Train 集上表现稳健，且通过了 3 折 Walk-Forward 时间序列平稳性检验。
+1. **B0 基线在固定持有期下的稳健胜出**：
+   * 在使用固定 W1/W2/W4 评价体系与 Censored Protocol 后，`B0_BASELINE` 在 Train 集以 **+0.99%** 的 W1 中位收益成为 `HISTORICAL_RETURN_WINNER`；
+   * 单一因子（如极简新鲜度）复杂度虽低 ($C=1$)，但 W1 收益降至 +0.75%，W2 收益降至 -0.28%，证实生产多因子启发式排序确实具备实质 Alpha，支持生产 100% 冻结。
 2. **全协议代码与数据防篡改清单**：
-   * 全量规则与 4 维 Champion 在决策后立即导出 `frozen_rules_manifest.json`，并固化了生产代码、准入谓词、数据缓存的完整 SHA256 签名。
+   * 全量规则与 4 维 Champion 在决策后立即导出 `frozen_rules_manifest.json`，并固化了生产代码、准入谓词、数据缓存的完整 SHA256 签名与具体参数配置。
 """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:

@@ -86,28 +86,31 @@ def run_random_top3_for_snapshot(
                     if w_info.get("stop_8_hit_by_week_end") is True:
                         w_stops[w_idx] += 1
 
+        is_asof_valid = bool(is_valid_draw and len(current_rets) == actual_picks_count and len(exec_rets) == actual_picks_count)
+
         draw_dict = {
             "snapshot_date": snapshot_date,
             "draw_index": draw_idx,
             "is_valid_draw": is_valid_draw,
             "valid_candidates_count": len(valid_events),
             "sampled_codes": ",".join(sampled_codes),
-            "asof_mean_return_pct": np.mean(current_rets) if (is_valid_draw and current_rets) else np.nan,
-            "asof_mean_exec_return_pct": np.mean(exec_rets) if (is_valid_draw and exec_rets) else np.nan,
-            "asof_mean_max_gain_pct": np.mean(max_gains) if (is_valid_draw and max_gains) else np.nan,
-            "asof_worst_return_pct": np.min(current_rets) if (is_valid_draw and current_rets) else np.nan,
-            "asof_stop8_count": stops_hit if is_valid_draw else np.nan,
-            "asof_has_profit20": bool(profits20_hit > 0) if is_valid_draw else False,
-            "asof_all_stopped": bool(stops_hit == len(valid_events) and len(valid_events) > 0) if is_valid_draw else False,
+            "asof_mean_return_pct": np.mean(current_rets) if is_asof_valid else np.nan,
+            "asof_mean_exec_return_pct": np.mean(exec_rets) if is_asof_valid else np.nan,
+            "asof_mean_max_gain_pct": np.mean(max_gains) if is_asof_valid else np.nan,
+            "asof_worst_return_pct": np.min(current_rets) if is_asof_valid else np.nan,
+            "asof_stop8_count": stops_hit if is_asof_valid else np.nan,
+            "asof_has_profit20": bool(profits20_hit > 0) if is_asof_valid else False,
+            "asof_all_stopped": bool(stops_hit == len(valid_events) and len(valid_events) > 0) if is_asof_valid else False,
         }
 
         for w_idx in [1, 2, 3, 4]:
             r_list = w_rets[w_idx]
             mg_list = w_max_gains[w_idx]
-            draw_dict[f"w{w_idx}_mean_return_pct"] = np.mean(r_list) if (is_valid_draw and r_list) else np.nan
-            draw_dict[f"w{w_idx}_mean_max_gain_pct"] = np.mean(mg_list) if (is_valid_draw and mg_list) else np.nan
-            draw_dict[f"w{w_idx}_worst_return_pct"] = np.min(r_list) if (is_valid_draw and r_list) else np.nan
-            draw_dict[f"w{w_idx}_stop8_count"] = w_stops[w_idx] if is_valid_draw else np.nan
+            is_w_valid = bool(is_valid_draw and len(r_list) == actual_picks_count)
+            draw_dict[f"w{w_idx}_mean_return_pct"] = np.mean(r_list) if is_w_valid else np.nan
+            draw_dict[f"w{w_idx}_mean_max_gain_pct"] = np.mean(mg_list) if is_w_valid else np.nan
+            draw_dict[f"w{w_idx}_worst_return_pct"] = np.min(r_list) if is_w_valid else np.nan
+            draw_dict[f"w{w_idx}_stop8_count"] = w_stops[w_idx] if is_w_valid else np.nan
 
         draw_records.append(draw_dict)
 

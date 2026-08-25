@@ -10,6 +10,7 @@ True immutable virgin out-of-sample testing begins with the forward shadow ledge
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -18,6 +19,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from backtest.b0_top3_quality_audit.pareto_champions import compute_file_sha256
 from backtest.b0_top3_quality_audit.skill_rule_engine import (
     RuleSpec,
     build_skill_rule_space,
@@ -28,6 +30,59 @@ from backtest.b0_top3_quality_audit.three_tier_baseline import compute_portfolio
 logger = logging.getLogger(__name__)
 
 
+def verify_manifest_integrity(manifest: dict[str, Any], repo_root: Path) -> None:
+    """Fail-closed integrity gate: verify all cryptographic signatures before execution."""
+    stored_sha = manifest.get("manifest_sha256")
+    if not stored_sha:
+        raise RuntimeError("Integrity Error: manifest_sha256 is missing from manifest!")
+
+    manifest_copy = dict(manifest)
+    manifest_copy.pop("manifest_sha256", None)
+    canonical_json_str = json.dumps(manifest_copy, sort_keys=True, ensure_ascii=False)
+    computed_manifest_sha = hashlib.sha256(canonical_json_str.encode("utf-8")).hexdigest()
+
+    if computed_manifest_sha != stored_sha:
+        raise RuntimeError(
+            f"Integrity Error: Manifest SHA256 mismatch! "
+            f"Computed: {computed_manifest_sha} != Stored: {stored_sha}"
+        )
+
+    # Verify code fingerprints
+    code_fps = manifest.get("code_fingerprints", {})
+    code_paths = {
+        "production_selector_sha256": repo_root / "dashboard" / "skill_industry_eps_known.py",
+        "eligibility_predicate_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "eligibility.py",
+        "skill_rule_engine_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "skill_rule_engine.py",
+        "three_tier_baseline_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "three_tier_baseline.py",
+        "evaluate_rule_signatures_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "evaluate_rule_signatures.py",
+    }
+    for key, expected_hash in code_fps.items():
+        file_p = code_paths.get(key)
+        if file_p and file_p.exists():
+            actual_hash = compute_file_sha256(file_p)
+            if actual_hash != expected_hash:
+                raise RuntimeError(
+                    f"Integrity Error: Code file {file_p} has drifted! "
+                    f"Actual: {actual_hash} != Expected: {expected_hash}"
+                )
+
+    # Verify data fingerprints
+    data_fps = manifest.get("data_fingerprints", {})
+    data_paths = {
+        "candidate_events_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_event_outcomes.parquet",
+        "candidate_weekly_outcomes_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_weekly_outcomes.parquet",
+    }
+    for key, expected_hash in data_fps.items():
+        file_p = data_paths.get(key)
+        if file_p and file_p.exists():
+            actual_hash = compute_file_sha256(file_p)
+            if actual_hash != expected_hash:
+                raise RuntimeError(
+                    f"Integrity Error: Data file {file_p} has drifted! "
+                    f"Actual: {actual_hash} != Expected: {expected_hash}"
+                )
+
+
 def run_historical_validation_unblind(
     manifest_path: Path,
     events_df: pd.DataFrame,
@@ -35,23 +90,44 @@ def run_historical_validation_unblind(
     baseline_df: pd.DataFrame,
     out_dir: Path,
 ) -> tuple[pd.DataFrame, str]:
-    """Load frozen manifest and evaluate on Weeks 31~40 in one direction."""
+    """Load frozen manifest, execute fail-closed integrity gate, and evaluate on Weeks 31~40."""
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
+    repo_root = Path(__file__).resolve().parents[2]
+    # Execute Fail-Closed Integrity Gate
+    verify_manifest_integrity(manifest, repo_root)
+
     manifest_sha = manifest.get("manifest_sha256", "UNKNOWN")
     champions = manifest.get("champions", {})
-    logger.info(f"Loaded frozen manifest (SHA256: {manifest_sha}) with {len(champions)} champions.")
+    logger.info(f"Integrity check passed! Loaded frozen manifest (SHA256: {manifest_sha}) with {len(champions)} champions.")
 
     all_weeks = sorted(baseline_df["snapshot_date"].unique())
     validation_weeks = all_weeks[30:]  # Weeks 31~40 (10 weeks)
     logger.info(f"Evaluating {len(validation_weeks)} Historical Validation weeks ({validation_weeks[0]} to {validation_weeks[-1]})...")
 
     # Map of all rules to evaluate: B0 + Champions
-    rule_map: dict[str, RuleSpec] = {r.rule_id: r for r in build_skill_rule_space()}
-    rules_to_eval = [("PRODUCTION_BASELINE", "B0_BASELINE")]
+    base_rules: dict[str, RuleSpec] = {r.rule_id: r for r in build_skill_rule_space()}
+    rules_to_eval: list[tuple[str, RuleSpec]] = []
+    
+    b0_spec = base_rules.get("B0_BASELINE")
+    if b0_spec:
+        rules_to_eval.append(("PRODUCTION_BASELINE", b0_spec))
+
     for role, champ in champions.items():
-        rules_to_eval.append((role, champ["rule_id"]))
+        rid = champ["rule_id"]
+        frozen_params = champ.get("params", {})
+        # Find matching spec with exact params
+        matching_spec = None
+        for r in build_skill_rule_space():
+            if r.rule_id == rid and r.params == frozen_params:
+                matching_spec = r
+                break
+        if matching_spec is None:
+            matching_spec = base_rules.get(rid)
+        
+        if matching_spec:
+            rules_to_eval.append((role, matching_spec))
 
     # Precompute snapshots
     snapshot_data: dict[str, dict[str, Any]] = {}
@@ -61,7 +137,7 @@ def run_historical_validation_unblind(
         snap_event_dict = {str(r["code"]): r.to_dict() for _, r in snap_events.iterrows()}
         snap_weekly_dict = {
             (str(w["code"]), int(w["holding_week_index"])): w.to_dict()
-            for _, w in weekly_outcomes_df[weekly_outcomes_df["snapshot_date"] == snap_date].iterrows()
+            for _, w in weekly_df[weekly_df["snapshot_date"] == snap_date].iterrows()
         }
         snapshot_data[snap_date] = {
             "events_df": snap_events,
@@ -72,12 +148,7 @@ def run_historical_validation_unblind(
     b0_weekly_map = baseline_df.set_index("snapshot_date").to_dict(orient="index")
     val_records: list[dict[str, Any]] = []
 
-    for role_label, rule_id in rules_to_eval:
-        rule_spec = rule_map.get(rule_id)
-        if not rule_spec:
-            logger.warning(f"RuleSpec not found for {rule_id}")
-            continue
-
+    for role_label, rule_spec in rules_to_eval:
         weekly_res = []
         for snap_date in validation_weeks:
             s_data = snapshot_data[snap_date]
@@ -102,7 +173,7 @@ def run_historical_validation_unblind(
         wdf = pd.DataFrame(weekly_res)
         val_records.append({
             "role": role_label,
-            "rule_id": rule_id,
+            "rule_id": rule_spec.rule_id,
             "complexity": rule_spec.complexity,
             "val_w1_ret_med": float(wdf["w1_return"].median()),
             "val_w2_ret_med": float(wdf["w2_return"].median()),
@@ -128,7 +199,7 @@ def run_historical_validation_unblind(
 > [!WARNING]
 > **方法论定位说明（Methodology Caveat）**：
 > 鉴于前期研发探索已接触过第 31~40 周数据，本报告中的表现严格定性为 **“已被污染的历史验证集（Contaminated Historical Validation）”**，不能作为纯粹的盲测样本外证据。
-> 真正的无偏样本外验证严格建立在 **2026-08-14 之后的实时前瞻 Shadow 跟测账本**。
+> 真正的无偏样本外验证严格建立在 **2026-08-28 之后的实时前瞻 Shadow 跟测账本**。
 
 ---
 

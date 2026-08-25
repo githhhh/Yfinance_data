@@ -2,13 +2,13 @@
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
 **样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `f4b944629a44939123b946713beb3d766d785c823131addfb5ba7b2dcd62016c`)  
+**输入来源**：`frozen_rules_manifest.json` (SHA256: `40227837325e187db7cff5f2ba96d7816e69b6f49814f97306e834ea6f034f26`)  
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]
 > **方法论定位说明（Methodology Caveat）**：
 > 鉴于前期研发探索已接触过第 31~40 周数据，本报告中的表现严格定性为 **“已被污染的历史验证集（Contaminated Historical Validation）”**，不能作为纯粹的盲测样本外证据。
-> 真正的无偏样本外验证严格建立在 **2026-08-14 之后的实时前瞻 Shadow 跟测账本**。
+> 真正的无偏样本外验证严格建立在 **2026-08-28 之后的实时前瞻 Shadow 跟测账本**。
 
 ---
 

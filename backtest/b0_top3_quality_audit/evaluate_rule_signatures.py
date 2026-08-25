@@ -20,6 +20,135 @@ from backtest.b0_top3_quality_audit.three_tier_baseline import compute_portfolio
 logger = logging.getLogger(__name__)
 
 
+def evaluate_rules_on_train(
+    events_train_df: pd.DataFrame,
+    weekly_train_df: pd.DataFrame,
+    baseline_train_df: pd.DataFrame,
+    rules: list[RuleSpec],
+    pick_limit: int = 3,
+) -> pd.DataFrame:
+    """Evaluate rule specifications strictly on the Train Set (Weeks 1~30) with physical isolation.
+    
+    This function has ZERO access to Weeks 31~40 and produces ONLY Train-specific metrics.
+    """
+    train_weeks = sorted(baseline_train_df["snapshot_date"].unique())
+
+    snapshot_data: dict[str, dict[str, Any]] = {}
+    for snap_date in train_weeks:
+        snap_events = events_train_df[events_train_df["snapshot_date"] == snap_date].copy()
+        snap_events["snapshot_date"] = snap_date
+        snap_event_dict = {str(r["code"]): r.to_dict() for _, r in snap_events.iterrows()}
+        snap_weekly_dict = {
+            (str(w["code"]), int(w["holding_week_index"])): w.to_dict()
+            for _, w in weekly_train_df[weekly_train_df["snapshot_date"] == snap_date].iterrows()
+        }
+        snapshot_data[snap_date] = {
+            "events_df": snap_events,
+            "event_dict": snap_event_dict,
+            "weekly_dict": snap_weekly_dict,
+        }
+
+    b0_weekly_map = baseline_train_df.set_index("snapshot_date").to_dict(orient="index")
+    records: list[dict[str, Any]] = []
+
+    for rule in rules:
+        weekly_records: list[dict[str, Any]] = []
+        for snap_date in train_weeks:
+            s_data = snapshot_data[snap_date]
+            selected_codes = evaluate_rule_on_pool(s_data["events_df"], rule, pick_limit=pick_limit)
+            m = compute_portfolio_metrics(selected_codes, s_data["event_dict"], s_data["weekly_dict"], snap_date)
+
+            b0_info = b0_weekly_map.get(snap_date, {})
+            l0_exec_med = b0_info.get("l0_executed_ret_med", np.nan)
+            l1_exec_med = b0_info.get("l1_executed_ret_med", np.nan)
+            l1_pool_size = b0_info.get("l1_pool_size", 0)
+
+            weekly_records.append({
+                "snapshot_date": snap_date,
+                "is_active_ranking": l1_pool_size >= 4,
+                "picks_count": len(selected_codes),
+                "is_portfolio_valid": m["is_portfolio_valid"],
+                "invalid_reason": m["invalid_reason"],
+                "executed_return": m["executed_return"],
+                "w1_return": m["w1_return"],
+                "w2_return": m["w2_return"],
+                "w4_return": m["w4_return"],
+                "stop8_before_profit20": m["stop8_before_profit20"],
+                "b0_w1_ret": b0_info.get("l2_w1_ret", np.nan),
+                "b0_w2_ret": b0_info.get("l2_w2_ret", np.nan),
+                "b0_w4_ret": b0_info.get("l2_w4_ret", np.nan),
+                "b0_exec_ret": b0_info.get("l2_executed_ret", np.nan),
+                "win_vs_l1": bool(m["executed_return"] > l1_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l1_exec_med) else False,
+            })
+
+        wdf = pd.DataFrame(weekly_records)
+        train_total_weeks = len(wdf)
+        train_valid_weeks = int(wdf["is_portfolio_valid"].sum())
+        train_valid_rate = float(train_valid_weeks / train_total_weeks * 100.0) if train_total_weeks > 0 else 0.0
+
+        train_w1_med = float(wdf["w1_return"].median()) if not wdf.empty else np.nan
+        train_w2_med = float(wdf["w2_return"].median()) if not wdf.empty else np.nan
+        train_w4_med = float(wdf["w4_return"].median()) if not wdf.empty else np.nan
+        train_exec_med = float(wdf["executed_return"].median()) if not wdf.empty else np.nan
+        train_stop_rate = float(wdf["stop8_before_profit20"].mean() * 100.0) if not wdf.empty else np.nan
+        train_full3_weeks = int((wdf["picks_count"] == 3).sum())
+        train_win_vs_l1 = float(wdf["win_vs_l1"].mean() * 100.0) if not wdf.empty else np.nan
+
+        # Paired Deltas
+        paired_df = wdf[wdf["is_portfolio_valid"] & wdf["b0_w1_ret"].notna()].copy()
+        paired_w1 = paired_df["w1_return"] - paired_df["b0_w1_ret"]
+        paired_w2 = paired_df["w2_return"] - paired_df["b0_w2_ret"]
+        paired_w4 = paired_df["w4_return"] - paired_df["b0_w4_ret"]
+        paired_exec = paired_df["executed_return"] - paired_df["b0_exec_ret"]
+
+        # Active ranking opportunities
+        act_df = wdf[wdf["is_active_ranking"]]
+        act_paired = act_df[act_df["is_portfolio_valid"] & act_df["b0_w1_ret"].notna()]
+        act_w1_spread = act_paired["w1_return"] - act_paired["b0_w1_ret"]
+
+        # 3-block temporal stability
+        fold1 = wdf.iloc[:10]["w1_return"].dropna()
+        fold2 = wdf.iloc[10:20]["w1_return"].dropna()
+        fold3 = wdf.iloc[20:30]["w1_return"].dropna()
+        f_meds = [
+            float(fold1.median()) if not fold1.empty else 0.0,
+            float(fold2.median()) if not fold2.empty else 0.0,
+            float(fold3.median()) if not fold3.empty else 0.0,
+        ]
+        wf_mean = float(np.mean(f_meds))
+        wf_std = float(np.std(f_meds))
+        temporal_stability = round(wf_mean - 0.5 * wf_std, 4)
+
+        records.append({
+            "rule_id": rule.rule_id,
+            "description": rule.description,
+            "complexity": rule.complexity,
+            "train_w1_ret_med": train_w1_med,
+            "train_w2_ret_med": train_w2_med,
+            "train_w4_ret_med": train_w4_med,
+            "train_exec_ret_med": train_exec_med,
+            "train_paired_w1_spread_med": float(paired_w1.median()) if not paired_w1.empty else np.nan,
+            "train_paired_w2_spread_med": float(paired_w2.median()) if not paired_w2.empty else np.nan,
+            "train_paired_w4_spread_med": float(paired_w4.median()) if not paired_w4.empty else np.nan,
+            "train_paired_exec_spread_med": float(paired_exec.median()) if not paired_exec.empty else np.nan,
+            "train_paired_win_rate_vs_b0": float((paired_w1 > 0).mean() * 100.0) if not paired_w1.empty else np.nan,
+            "train_act_opp_w1_spread_med": float(act_w1_spread.median()) if not act_w1_spread.empty else np.nan,
+            "train_act_opp_w1_ret_med": float(act_df["w1_return"].median()) if not act_df.empty else np.nan,
+            "train_act_rank_win_vs_l1_pct": float(act_df["win_vs_l1"].mean() * 100.0) if not act_df.empty else np.nan,
+            "train_temporal_block_stability_score": temporal_stability,
+            "train_temporal_min_block_ret": float(np.min(f_meds)),
+            "train_valid_portfolio_rate": train_valid_rate,
+            "train_valid_weeks": train_valid_weeks,
+            "train_total_weeks": train_total_weeks,
+            "train_full3_weeks": train_full3_weeks,
+            "train_ranking_opportunity_weeks": len(act_df),
+            "train_stop8_before_p20_pct": train_stop_rate,
+            "train_win_vs_l1_pct": train_win_vs_l1,
+        })
+
+    return pd.DataFrame(records)
+
+
 def evaluate_all_rules(
     events_df: pd.DataFrame,
     weekly_outcomes_df: pd.DataFrame,
@@ -179,8 +308,8 @@ def evaluate_all_rules(
             "train_act_opp_w1_spread_med": train_act_opp_w1_spread_med,
             "train_act_opp_w1_ret_med": train_act_w1_med,
             "train_act_rank_win_vs_l1_pct": train_act_win_vs_l1,
-            "train_wf_stability_score": wf_stability_score,
-            "train_wf_min_fold_ret": wf_min_fold,
+            "train_temporal_block_stability_score": wf_stability_score,
+            "train_temporal_min_block_ret": wf_min_fold,
             "train_valid_portfolio_rate": train_valid_rate,
             "train_valid_weeks": train_valid_weeks,
             "train_total_weeks": train_total_weeks,
