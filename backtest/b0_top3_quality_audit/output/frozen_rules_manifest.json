@@ -1,0 +1,70 @@
+{
+  "manifest_version": "2.0",
+  "created_at": "2026-08-25T18:50:00Z",
+  "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
+  "train_period": "2025-10-10_to_2026-05-22 (Weeks 1~30)",
+  "historical_validation_period": "2026-05-29_to_2026-08-07 (Weeks 31~40, CONTAMINATED_HISTORICAL_VALIDATION)",
+  "forward_shadow_start_date": "2026-08-14 (IMMUTABLE_VIRGIN_OOS)",
+  "code_fingerprints": {
+    "production_selector_sha256": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477",
+    "eligibility_predicate_sha256": "14ff9659ad4229aaebc58e1d0a0501b6fe53ba789eb971e33ba78219373d8bf1",
+    "skill_rule_engine_sha256": "884112617484ec6f7d7f701c5e0ee8c0af8af09e9a74074312cfcc39a69dcfb9",
+    "three_tier_baseline_sha256": "cbde9b83f6014ee536626e234ddb86c4373de1e1b9e270e19d99c0fa375c0a29",
+    "evaluate_rule_signatures_sha256": "7f1430441a03faa5de8191b0e83cd15b8cd05faa281c6a53105f7e3f78a5a206"
+  },
+  "data_fingerprints": {
+    "candidate_events_parquet_sha256": "45b75c4491630e3ce1aac4f1bc10911e9c2699836970884965751de5633ada0c",
+    "candidate_weekly_outcomes_parquet_sha256": "0d417cc276edf35293f4e2ea8a1dd723839c141d03ca006c276076c1ff006f83"
+  },
+  "champions": {
+    "HISTORICAL_RETURN_WINNER": {
+      "role": "HISTORICAL_RETURN_WINNER",
+      "rule_id": "B0_BASELINE",
+      "description": "Production B0 Baseline (Exact 11-tuple sort_key)",
+      "complexity": 3,
+      "train_w1_ret_med": 0.9859333333333336,
+      "train_paired_w1_spread_med": 0.0,
+      "train_wf_stability_score": -1.1425,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.77777777777779
+    },
+    "LOWEST_STOP_CANDIDATE": {
+      "role": "LOWEST_STOP_CANDIDATE",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_wf_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    },
+    "SIMPLER_EQUIVALENT": {
+      "role": "SIMPLER_EQUIVALENT",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_wf_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    },
+    "PARETO_BALANCED_RULE": {
+      "role": "PARETO_BALANCED_RULE",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_wf_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    }
+  },
+  "manifest_sha256": "f4b944629a44939123b946713beb3d766d785c823131addfb5ba7b2dcd62016c"
+}

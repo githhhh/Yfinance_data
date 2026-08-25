@@ -1,4 +1,4 @@
 ﻿comparison_dimension,b0_mean,random_p50_mean,b0_spread,b0_win_rate_vs_random_median_pct,average_percentile_rank,paired_ttest_pvalue,wilcoxon_pvalue
-Week_1_Mean_Close_Return,1.3131,0.1873,1.1257,55.0,55.55,0.193,0.3269
-As_Of_Current_Return,11.9582,7.7742,4.184,47.5,51.93,0.2929,0.7648
-As_Of_Executed_Return_With_Stop8,5.2036,0.0966,5.107,50.0,51.93,0.1086,0.2547
+Week_1_Mean_Close_Return,1.3131,0.1865,1.1266,55.0,55.56,0.1926,0.3336
+As_Of_Current_Return,11.9582,7.7738,4.1845,47.5,51.95,0.2929,0.7852
+As_Of_Executed_Return_With_Stop8,5.2036,0.1127,5.091,50.0,59.61,0.1098,0.2807

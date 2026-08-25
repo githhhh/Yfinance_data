@@ -23,45 +23,77 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+import hashlib
+import json
+
+
+def compute_file_sha256(file_path: Path | str) -> str:
+    """Compute SHA256 hash of a local file."""
+    p = Path(file_path)
+    if not p.exists():
+        return ""
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def select_champions(evaluation_df: pd.DataFrame) -> dict[str, dict[str, Any]]:
-    """Select the 4 Champions based strictly on Train Set (Weeks 1~30) metrics."""
+    """Select the 4 Champions based strictly on Train Set (Weeks 1~30) metrics.
+    
+    Filters:
+      - Valid portfolio rate >= 80% on Train
+      - Valid portfolio weeks >= 15
+    """
     b0_row = evaluation_df[evaluation_df["rule_id"] == "B0_BASELINE"].iloc[0]
-    b0_train_exec_med = float(b0_row["train_exec_ret_med"])
+    b0_train_w1_med = float(b0_row.get("train_w1_ret_med", b0_row.get("train_exec_ret_med", 0.0)))
     b0_complexity = int(b0_row["complexity"])
 
-    # 1. Historical Return Winner (Highest Train Executed Return Median)
-    ret_winner_df = evaluation_df.sort_values(
-        by=["train_exec_ret_med", "train_act_rank_exec_med", "train_w1_ret_med"],
+    # Denominator-aware eligible rules pool
+    valid_candidates = evaluation_df[
+        (evaluation_df.get("train_valid_portfolio_rate", 100.0) >= 80.0)
+        & (evaluation_df.get("train_valid_weeks", 30) >= 15)
+    ].copy()
+    if valid_candidates.empty:
+        valid_candidates = evaluation_df.copy()
+
+    # 1. Historical Return Winner (Highest Train W1 Return Median & Ranking Opportunity Spread)
+    ret_winner_df = valid_candidates.sort_values(
+        by=["train_w1_ret_med", "train_act_opp_w1_spread_med", "train_exec_ret_med"],
         ascending=False,
     )
     ret_winner = ret_winner_df.iloc[0].to_dict()
 
-    # 2. Lowest Stop Candidate (Lowest stop8_before_profit20 rate with full coverage >= 30 weeks)
-    stop_cand_df = evaluation_df[
-        evaluation_df["full_active_weeks"] >= 30
-    ].sort_values(
-        by=["train_stop8_before_p20_pct", "train_exec_ret_med"],
+    # 2. Lowest Stop Candidate (Lowest stop8_before_profit20 rate with valid coverage)
+    stop_cand_df = valid_candidates.sort_values(
+        by=["train_stop8_before_p20_pct", "train_w1_ret_med"],
         ascending=[True, False],
     )
     lowest_stop = stop_cand_df.iloc[0].to_dict()
 
-    # 3. Simpler Equivalent (Complexity C < B0, non-inferiority: train_exec_med >= B0 - 0.5%)
-    simpler_df = evaluation_df[
-        (evaluation_df["complexity"] < b0_complexity)
-        & (evaluation_df["train_exec_ret_med"] >= b0_train_exec_med - 0.5)
+    # 3. Simpler Equivalent (Complexity C < B0, non-inferiority: train_w1_med >= B0 - 0.5%)
+    simpler_df = valid_candidates[
+        (valid_candidates["complexity"] < b0_complexity)
+        & (valid_candidates["train_w1_ret_med"] >= b0_train_w1_med - 0.5)
     ].sort_values(
-        by=["complexity", "train_exec_ret_med"],
-        ascending=[True, False],
+        by=["complexity", "train_wf_stability_score", "train_w1_ret_med"],
+        ascending=[True, False, False],
     )
+    if simpler_df.empty:
+        simpler_df = valid_candidates[valid_candidates["complexity"] < b0_complexity].sort_values(
+            by=["complexity", "train_w1_ret_med"], ascending=[True, False]
+        )
     simpler_equiv = simpler_df.iloc[0].to_dict()
 
-    # 4. Pareto Balanced Rule (Research Candidate: High Train return, high win rate vs L1, low complexity)
-    eval_df = evaluation_df.copy()
+    # 4. Pareto Balanced Rule (Research Candidate: High Train W1 return, walk-forward stability, win rate vs L1, low complexity)
+    eval_df = valid_candidates.copy()
     eval_df["pareto_score"] = (
-        (eval_df["train_exec_ret_med"] / 2.0)
+        (eval_df["train_w1_ret_med"] / 2.0)
+        + (eval_df.get("train_wf_stability_score", 0.0) / 2.0)
         + (eval_df["train_act_rank_win_vs_l1_pct"] / 100.0)
         - (eval_df["train_stop8_before_p20_pct"] / 100.0)
-        - (eval_df["complexity"] * 0.05)
+        - (eval_df["complexity"] * 0.08)
     )
     balanced_df = eval_df.sort_values(by="pareto_score", ascending=False)
     pareto_balanced = balanced_df.iloc[0].to_dict()
@@ -72,6 +104,68 @@ def select_champions(evaluation_df: pd.DataFrame) -> dict[str, dict[str, Any]]:
         "SIMPLER_EQUIVALENT": simpler_equiv,
         "PARETO_BALANCED_RULE": pareto_balanced,
     }
+
+
+def export_frozen_rules_manifest(
+    champions: dict[str, dict[str, Any]],
+    output_path: Path,
+    repo_root: Path | None = None,
+) -> dict[str, Any]:
+    """Export frozen rules manifest with code/data protocol SHA256 integrity signature."""
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parents[2]
+
+    # Gather Code & Protocol Fingerprints
+    code_fingerprints = {
+        "production_selector_sha256": compute_file_sha256(repo_root / "dashboard" / "skill_industry_eps_known.py"),
+        "eligibility_predicate_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "eligibility.py"),
+        "skill_rule_engine_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "skill_rule_engine.py"),
+        "three_tier_baseline_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "three_tier_baseline.py"),
+        "evaluate_rule_signatures_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "evaluate_rule_signatures.py"),
+    }
+
+    # Gather Data Fingerprints
+    data_fingerprints = {
+        "candidate_events_parquet_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_event_outcomes.parquet"),
+        "candidate_weekly_outcomes_parquet_sha256": compute_file_sha256(repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_weekly_outcomes.parquet"),
+    }
+
+    manifest_data: dict[str, Any] = {
+        "manifest_version": "2.0",
+        "created_at": "2026-08-25T18:50:00Z",
+        "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
+        "train_period": "2025-10-10_to_2026-05-22 (Weeks 1~30)",
+        "historical_validation_period": "2026-05-29_to_2026-08-07 (Weeks 31~40, CONTAMINATED_HISTORICAL_VALIDATION)",
+        "forward_shadow_start_date": "2026-08-14 (IMMUTABLE_VIRGIN_OOS)",
+        "code_fingerprints": code_fingerprints,
+        "data_fingerprints": data_fingerprints,
+        "champions": {},
+    }
+
+    for role, champ in champions.items():
+        role_entry = {
+            "role": role,
+            "rule_id": champ["rule_id"],
+            "description": champ.get("description", ""),
+            "complexity": int(champ.get("complexity", 0)),
+            "train_w1_ret_med": champ.get("train_w1_ret_med"),
+            "train_paired_w1_spread_med": champ.get("train_paired_w1_spread_med"),
+            "train_wf_stability_score": champ.get("train_wf_stability_score"),
+            "train_valid_portfolio_rate": champ.get("train_valid_portfolio_rate"),
+            "train_act_rank_win_vs_l1_pct": champ.get("train_act_rank_win_vs_l1_pct"),
+            "train_stop8_before_p20_pct": champ.get("train_stop8_before_p20_pct"),
+        }
+        manifest_data["champions"][role] = role_entry
+
+    # Canonical SHA256 of entire manifest structure
+    canonical_json_str = json.dumps(manifest_data, sort_keys=True, ensure_ascii=False)
+    manifest_data["manifest_sha256"] = hashlib.sha256(canonical_json_str.encode("utf-8")).hexdigest()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2, ensure_ascii=False)
+
+    return manifest_data
 
 
 def generate_champion_matrix_report(

@@ -21,10 +21,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from backtest.b0_top3_quality_audit.eligibility import is_production_eligible_pit
 from dashboard.skill_industry_eps_known import select_skill_industry_eps_known
 
 logger = logging.getLogger(__name__)
-
 
 
 def sample_l0_top3(
@@ -55,8 +55,7 @@ def sample_l1_top3_with_industry_dedup(
         code = str(row["code"]).strip()
         ind = str(row.get("industry", "") or "").strip().lower()
         if not ind:
-            # If industry is missing, treat each code as its own distinct singleton to avoid blocking
-            ind = f"__missing_{code}"
+            continue
         industry_groups.setdefault(ind, []).append(code)
 
     available_industries = list(industry_groups.keys())
@@ -80,8 +79,13 @@ def compute_portfolio_metrics(
     event_lookup: dict[str, dict[str, Any]],
     weekly_lookup: dict[tuple[str, int], dict[str, Any]],
     snapshot_date: str,
-) -> dict[str, float]:
-    """Compute equal-weighted portfolio metrics for a sampled list of tickers in a given week."""
+) -> dict[str, Any]:
+    """Compute equal-weighted portfolio metrics for a sampled list of tickers in a given week.
+    
+    Censored Portfolio Protocol:
+        If any sampled ticker is missing price data or valid outcome, the portfolio outcome is censored
+        (is_portfolio_valid=False, returns=NaN) to prevent silent survivor re-weighting.
+    """
     if not sampled_codes:
         return {
             "executed_return": np.nan,
@@ -92,11 +96,15 @@ def compute_portfolio_metrics(
             "stop8_before_profit20": np.nan,
             "stop_8_hit_ever": np.nan,
             "picks_count": 0,
+            "valid_picks_count": 0,
+            "is_portfolio_valid": False,
+            "invalid_reason": "EMPTY_PICKS",
         }
 
     exec_rets: list[float] = []
     stops_before_p20: list[float] = []
     stops_ever: list[float] = []
+    w_rets: dict[int, list[float]] = {1: [], 2: [], 3: [], 4: []}
 
     for code in sampled_codes:
         ev = event_lookup.get(code)
@@ -113,25 +121,33 @@ def compute_portfolio_metrics(
             if st_ev is not None and not pd.isna(st_ev):
                 stops_ever.append(1.0 if st_ev is True else 0.0)
 
-    # Weekly horizon returns (W1..W4)
-    w_rets: dict[int, list[float]] = {1: [], 2: [], 3: [], 4: []}
-    for code in sampled_codes:
-        for w_idx in [1, 2, 3, 4]:
-            w_info = weekly_lookup.get((code, w_idx))
-            if w_info:
-                ret = w_info.get("week_close_return_from_entry_pct")
-                if ret is not None and not pd.isna(ret):
-                    w_rets[w_idx].append(float(ret))
+            for w_idx in [1, 2, 3, 4]:
+                w_info = weekly_lookup.get((code, w_idx))
+                if w_info:
+                    stopped = w_info.get("stop_8_hit_by_week_end", False)
+                    if stopped:
+                        w_rets[w_idx].append(-8.0)
+                    else:
+                        ret = w_info.get("week_close_return_from_entry_pct")
+                        if ret is not None and not pd.isna(ret):
+                            w_rets[w_idx].append(float(ret))
+
+    # All sampled picks must have valid executed return for the portfolio to be valid
+    is_portfolio_valid = bool(len(sampled_codes) > 0 and len(exec_rets) == len(sampled_codes))
+    invalid_reason = "NONE" if is_portfolio_valid else "MISSING_PRICE_OUTCOME"
 
     return {
-        "executed_return": float(np.mean(exec_rets)) if exec_rets else np.nan,
-        "w1_return": float(np.mean(w_rets[1])) if w_rets[1] else np.nan,
-        "w2_return": float(np.mean(w_rets[2])) if w_rets[2] else np.nan,
-        "w3_return": float(np.mean(w_rets[3])) if w_rets[3] else np.nan,
-        "w4_return": float(np.mean(w_rets[4])) if w_rets[4] else np.nan,
-        "stop8_before_profit20": float(np.mean(stops_before_p20)) if stops_before_p20 else np.nan,
-        "stop_8_hit_ever": float(np.mean(stops_ever)) if stops_ever else np.nan,
+        "executed_return": float(np.mean(exec_rets)) if is_portfolio_valid else np.nan,
+        "w1_return": float(np.mean(w_rets[1])) if (is_portfolio_valid and len(w_rets[1]) == len(sampled_codes)) else np.nan,
+        "w2_return": float(np.mean(w_rets[2])) if (is_portfolio_valid and len(w_rets[2]) == len(sampled_codes)) else np.nan,
+        "w3_return": float(np.mean(w_rets[3])) if (is_portfolio_valid and len(w_rets[3]) == len(sampled_codes)) else np.nan,
+        "w4_return": float(np.mean(w_rets[4])) if (is_portfolio_valid and len(w_rets[4]) == len(sampled_codes)) else np.nan,
+        "stop8_before_profit20": float(np.mean(stops_before_p20)) if is_portfolio_valid else np.nan,
+        "stop_8_hit_ever": float(np.mean(stops_ever)) if is_portfolio_valid else np.nan,
         "picks_count": len(sampled_codes),
+        "valid_picks_count": len(exec_rets),
+        "is_portfolio_valid": is_portfolio_valid,
+        "invalid_reason": invalid_reason,
     }
 
 
@@ -160,7 +176,6 @@ def run_three_tier_baseline(
             
     valid_b0_weeks = sorted(b0_recs_by_snap.keys())
 
-
     # Build fast lookups
     event_lookup: dict[tuple[str, str], dict[str, Any]] = {}
     for _, row in events_df.iterrows():
@@ -175,36 +190,20 @@ def run_three_tier_baseline(
     weekly_records: list[dict[str, Any]] = []
 
     for snap_date in valid_b0_weeks:
-        snap_events = events_df[events_df["snapshot_date"] == snap_date]
+        snap_events = events_df[events_df["snapshot_date"] == snap_date].copy()
+        snap_events["snapshot_date"] = snap_date
         snap_event_dict = {str(r["code"]): r.to_dict() for _, r in snap_events.iterrows()}
         snap_weekly_dict = {
             (str(w["code"]), int(w["holding_week_index"])): w.to_dict()
             for _, w in weekly_outcomes_df[weekly_outcomes_df["snapshot_date"] == snap_date].iterrows()
         }
 
-        # Candidate pool for Level 0: signal == True and ENTRY_OK
-        l0_pool = snap_events[
-            (snap_events["signal"] == True)
-            & (snap_events["entry_status"] == "ENTRY_OK")
-            & (snap_events["entry_open"].notna())
-        ]
+        # Candidate pool for Level 0: Point-in-Time signal == True (NO future ENTRY_OK filter)
+        l0_pool = snap_events[snap_events["signal"] == True]
         l0_codes = l0_pool["code"].tolist()
 
-        # Candidate pool for Level 1: B0 Eligible + ENTRY_OK
-        # (ACTIONABLE, effective_eps notna, clear_geometry_failure not in risk, cur >= 0)
-        l1_pool = snap_events[
-            (snap_events["signal"] == True)
-            & (snap_events["entry_status"] == "ENTRY_OK")
-            & (snap_events["entry_open"].notna())
-            & (snap_events["ibd_entry_status"] == "ACTIONABLE")
-            & (snap_events["eps_yoy_growth"].notna())
-            & (snap_events["current_vs_ibd_candidate_pct"].notna())
-            & (snap_events["current_vs_ibd_candidate_pct"] >= 0)
-        ]
-        # Filter out clear geometry failure
-        l1_pool = l1_pool[
-            ~((l1_pool["ibd_entry_breakout_range_ratio"] <= 0) | (l1_pool["ibd_entry_close_position"] < 0.65))
-        ]
+        # Candidate pool for Level 1: Point-in-Time B0 Eligible using exact production mirror predicate
+        l1_pool = snap_events[snap_events.apply(is_production_eligible_pit, axis=1)]
 
         # Level 2 (B0 Deterministic Implementation)
         b0_codes = b0_recs_by_snap.get(snap_date, [])
@@ -229,28 +228,43 @@ def run_three_tier_baseline(
             "stop8_before_profit20": [],
             "stop_8_hit_ever": [],
         }
+        l0_valid_draws = 0
+        l1_valid_draws = 0
 
         for _ in range(n_draws):
             # L0 Draw
             sampled_l0 = sample_l0_top3(l0_codes, pick_limit, rng)
             m_l0 = compute_portfolio_metrics(sampled_l0, snap_event_dict, snap_weekly_dict, snap_date)
-            for k in l0_draws:
-                if not np.isnan(m_l0[k]):
-                    l0_draws[k].append(m_l0[k])
+            if m_l0["is_portfolio_valid"]:
+                l0_valid_draws += 1
+                for k in l0_draws:
+                    if not np.isnan(m_l0[k]):
+                        l0_draws[k].append(m_l0[k])
 
             # L1 Draw (with Industry Deduplication)
             sampled_l1 = sample_l1_top3_with_industry_dedup(l1_pool, pick_limit, rng)
             m_l1 = compute_portfolio_metrics(sampled_l1, snap_event_dict, snap_weekly_dict, snap_date)
-            for k in l1_draws:
-                if not np.isnan(m_l1[k]):
-                    l1_draws[k].append(m_l1[k])
+            if m_l1["is_portfolio_valid"]:
+                l1_valid_draws += 1
+                for k in l1_draws:
+                    if not np.isnan(m_l1[k]):
+                        l1_draws[k].append(m_l1[k])
 
         # Record Weekly Medians and Quartiles
+        l0_valid_pct = round(l0_valid_draws / n_draws * 100.0, 2)
+        l1_valid_pct = round(l1_valid_draws / n_draws * 100.0, 2)
+
         rec: dict[str, Any] = {
             "snapshot_date": snap_date,
             "b0_picks_count": len(b0_codes),
             "l0_pool_size": len(l0_codes),
             "l1_pool_size": len(l1_pool),
+            "l0_valid_draws_count": l0_valid_draws,
+            "l0_valid_draws_pct": l0_valid_pct,
+            "l0_is_low_confidence": bool(l0_valid_pct < 80.0),
+            "l1_valid_draws_count": l1_valid_draws,
+            "l1_valid_draws_pct": l1_valid_pct,
+            "l1_is_low_confidence": bool(l1_valid_pct < 80.0),
             # L2 Realized
             "l2_executed_ret": l2_metrics["executed_return"],
             "l2_w1_ret": l2_metrics["w1_return"],
@@ -264,12 +278,16 @@ def run_three_tier_baseline(
             "l0_executed_ret_p25": float(np.percentile(l0_draws["executed_return"], 25)) if l0_draws["executed_return"] else np.nan,
             "l0_executed_ret_p75": float(np.percentile(l0_draws["executed_return"], 75)) if l0_draws["executed_return"] else np.nan,
             "l0_w1_ret_med": float(np.median(l0_draws["w1_return"])) if l0_draws["w1_return"] else np.nan,
+            "l0_w2_ret_med": float(np.median(l0_draws["w2_return"])) if l0_draws["w2_return"] else np.nan,
+            "l0_w4_ret_med": float(np.median(l0_draws["w4_return"])) if l0_draws["w4_return"] else np.nan,
             "l0_stop8_before_p20_med": float(np.median(l0_draws["stop8_before_profit20"])) if l0_draws["stop8_before_profit20"] else np.nan,
             # L1 Median & Bounds
             "l1_executed_ret_med": float(np.median(l1_draws["executed_return"])) if l1_draws["executed_return"] else np.nan,
             "l1_executed_ret_p25": float(np.percentile(l1_draws["executed_return"], 25)) if l1_draws["executed_return"] else np.nan,
             "l1_executed_ret_p75": float(np.percentile(l1_draws["executed_return"], 75)) if l1_draws["executed_return"] else np.nan,
             "l1_w1_ret_med": float(np.median(l1_draws["w1_return"])) if l1_draws["w1_return"] else np.nan,
+            "l1_w2_ret_med": float(np.median(l1_draws["w2_return"])) if l1_draws["w2_return"] else np.nan,
+            "l1_w4_ret_med": float(np.median(l1_draws["w4_return"])) if l1_draws["w4_return"] else np.nan,
             "l1_stop8_before_p20_med": float(np.median(l1_draws["stop8_before_profit20"])) if l1_draws["stop8_before_profit20"] else np.nan,
         }
 
@@ -281,6 +299,14 @@ def run_three_tier_baseline(
         rec["total_alpha_w1_w"] = rec["l2_w1_ret"] - rec["l0_w1_ret_med"]
         rec["screening_alpha_w1_w"] = rec["l1_w1_ret_med"] - rec["l0_w1_ret_med"]
         rec["ranking_alpha_w1_w"] = rec["l2_w1_ret"] - rec["l1_w1_ret_med"]
+
+        rec["total_alpha_w2_w"] = rec["l2_w2_ret"] - rec["l0_w2_ret_med"]
+        rec["screening_alpha_w2_w"] = rec["l1_w2_ret_med"] - rec["l0_w2_ret_med"]
+        rec["ranking_alpha_w2_w"] = rec["l2_w2_ret"] - rec["l1_w2_ret_med"]
+
+        rec["total_alpha_w4_w"] = rec["l2_w4_ret"] - rec["l0_w4_ret_med"]
+        rec["screening_alpha_w4_w"] = rec["l1_w4_ret_med"] - rec["l0_w4_ret_med"]
+        rec["ranking_alpha_w4_w"] = rec["l2_w4_ret"] - rec["l1_w4_ret_med"]
 
         # Weekly Win Indicators (Binary)
         rec["win_l2_gt_l0_exec"] = bool(rec["l2_executed_ret"] > rec["l0_executed_ret_med"])
@@ -295,24 +321,12 @@ def run_three_tier_baseline(
 
     weekly_df = pd.DataFrame(weekly_records)
 
-    # 2. Overall Time-Series Alpha & Win Rate Summary
+    # 2. Overall Time-Series Alpha & Win Rate Summary (W1, W2, W4, As-Of)
     summary_rows: list[dict[str, Any]] = []
 
     for metric_name, l2_col, l1_col, l0_col, tot_col, scr_col, rnk_col, w_l2_l0, w_l2_l1, w_l1_l0 in [
         (
-            "Executed Return (to As-Of)",
-            "l2_executed_ret",
-            "l1_executed_ret_med",
-            "l0_executed_ret_med",
-            "total_alpha_exec_w",
-            "screening_alpha_exec_w",
-            "ranking_alpha_exec_w",
-            "win_l2_gt_l0_exec",
-            "win_l2_gt_l1_exec",
-            "win_l1_gt_l0_exec",
-        ),
-        (
-            "Week 1 Close Return",
+            "Week 1 Executed Return",
             "l2_w1_ret",
             "l1_w1_ret_med",
             "l0_w1_ret_med",
@@ -322,6 +336,42 @@ def run_three_tier_baseline(
             "win_l2_gt_l0_w1",
             "win_l2_gt_l1_w1",
             "win_l1_gt_l0_w1",
+        ),
+        (
+            "Week 2 Executed Return",
+            "l2_w2_ret",
+            "l1_w2_ret_med",
+            "l0_w2_ret_med",
+            "total_alpha_w2_w",
+            "screening_alpha_w2_w",
+            "ranking_alpha_w2_w",
+            "win_l2_gt_l0_exec",
+            "win_l2_gt_l1_exec",
+            "win_l1_gt_l0_exec",
+        ),
+        (
+            "Week 4 Executed Return",
+            "l2_w4_ret",
+            "l1_w4_ret_med",
+            "l0_w4_ret_med",
+            "total_alpha_w4_w",
+            "screening_alpha_w4_w",
+            "ranking_alpha_w4_w",
+            "win_l2_gt_l0_exec",
+            "win_l2_gt_l1_exec",
+            "win_l1_gt_l0_exec",
+        ),
+        (
+            "Executed Return (to As-Of Secondary)",
+            "l2_executed_ret",
+            "l1_executed_ret_med",
+            "l0_executed_ret_med",
+            "total_alpha_exec_w",
+            "screening_alpha_exec_w",
+            "ranking_alpha_exec_w",
+            "win_l2_gt_l0_exec",
+            "win_l2_gt_l1_exec",
+            "win_l1_gt_l0_exec",
         ),
     ]:
         n_weeks = len(weekly_df)
@@ -410,8 +460,8 @@ def generate_three_tier_report(
     output_path: Path,
 ) -> str:
     """Generate Markdown Report documenting the 3-Tier Baseline & Alpha Decoupling."""
-    exec_row = summary_df[summary_df["metric"] == "Executed Return (to As-Of)"].iloc[0]
-    w1_row = summary_df[summary_df["metric"] == "Week 1 Close Return"].iloc[0]
+    w1_row = summary_df[summary_df["metric"] == "Week 1 Executed Return"].iloc[0]
+    exec_row = summary_df[summary_df["metric"] == "Executed Return (to As-Of Secondary)"].iloc[0]
 
     report = f"""# Phase 2 Stage 1: 三层对照基准 (L0/L1/L2) 与 Alpha 解耦审计报告 (修订对齐版)
 

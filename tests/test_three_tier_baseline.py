@@ -89,11 +89,20 @@ def test_03_portfolio_metrics_equal_weighted():
     }
     
     m = compute_portfolio_metrics(["AAA", "BBB"], event_lookup, weekly_lookup, "2026-01-09")
+    assert m["is_portfolio_valid"] is True
     assert pytest.approx(m["executed_return"]) == 1.0  # (10 + -8)/2
     assert pytest.approx(m["w1_return"]) == 0.5        # (5 + -4)/2
     assert pytest.approx(m["stop8_before_profit20"]) == 0.5
     assert pytest.approx(m["stop_8_hit_ever"]) == 0.5
     assert m["picks_count"] == 2
+    assert m["valid_picks_count"] == 2
+
+    # Censored portfolio protocol: if any pick has missing outcome, portfolio is invalid
+    m_censored = compute_portfolio_metrics(["AAA", "MISSING_STOCK"], event_lookup, weekly_lookup, "2026-01-09")
+    assert m_censored["is_portfolio_valid"] is False
+    assert np.isnan(m_censored["executed_return"])
+    assert m_censored["picks_count"] == 2
+    assert m_censored["valid_picks_count"] == 1
 
 
 def test_04_three_tier_baseline_regression(sample_events_and_weekly):
@@ -108,10 +117,12 @@ def test_04_three_tier_baseline_regression(sample_events_and_weekly):
     assert stats_meta["full_top3_weeks"] == 25
     assert stats_meta["active_weeks"] == 40
     
-    # 2. Check summary DataFrame format
-    assert len(summary_df) == 2
-    assert "Executed Return (to As-Of)" in summary_df["metric"].values
-    assert "Week 1 Close Return" in summary_df["metric"].values
+    # 2. Check summary DataFrame format (W1, W2, W4, As-Of)
+    assert len(summary_df) == 4
+    assert "Week 1 Executed Return" in summary_df["metric"].values
+    assert "Week 2 Executed Return" in summary_df["metric"].values
+    assert "Week 4 Executed Return" in summary_df["metric"].values
+    assert "Executed Return (to As-Of Secondary)" in summary_df["metric"].values
     
     # 3. Check Alpha math
     for _, row in summary_df.iterrows():

@@ -92,34 +92,35 @@ def run_random_top3_for_snapshot(
             "is_valid_draw": is_valid_draw,
             "valid_candidates_count": len(valid_events),
             "sampled_codes": ",".join(sampled_codes),
-            "asof_mean_return_pct": np.mean(current_rets) if current_rets else np.nan,
-            "asof_mean_exec_return_pct": np.mean(exec_rets) if exec_rets else np.nan,
-            "asof_mean_max_gain_pct": np.mean(max_gains) if max_gains else np.nan,
-            "asof_worst_return_pct": np.min(current_rets) if current_rets else np.nan,
-            "asof_stop8_count": stops_hit,
-            "asof_has_profit20": bool(profits20_hit > 0),
-            "asof_all_stopped": bool(stops_hit == len(valid_events) and len(valid_events) > 0),
+            "asof_mean_return_pct": np.mean(current_rets) if (is_valid_draw and current_rets) else np.nan,
+            "asof_mean_exec_return_pct": np.mean(exec_rets) if (is_valid_draw and exec_rets) else np.nan,
+            "asof_mean_max_gain_pct": np.mean(max_gains) if (is_valid_draw and max_gains) else np.nan,
+            "asof_worst_return_pct": np.min(current_rets) if (is_valid_draw and current_rets) else np.nan,
+            "asof_stop8_count": stops_hit if is_valid_draw else np.nan,
+            "asof_has_profit20": bool(profits20_hit > 0) if is_valid_draw else False,
+            "asof_all_stopped": bool(stops_hit == len(valid_events) and len(valid_events) > 0) if is_valid_draw else False,
         }
 
         for w_idx in [1, 2, 3, 4]:
             r_list = w_rets[w_idx]
             mg_list = w_max_gains[w_idx]
-            draw_dict[f"w{w_idx}_mean_return_pct"] = np.mean(r_list) if r_list else np.nan
-            draw_dict[f"w{w_idx}_mean_max_gain_pct"] = np.mean(mg_list) if mg_list else np.nan
-            draw_dict[f"w{w_idx}_worst_return_pct"] = np.min(r_list) if r_list else np.nan
-            draw_dict[f"w{w_idx}_stop8_count"] = w_stops[w_idx]
+            draw_dict[f"w{w_idx}_mean_return_pct"] = np.mean(r_list) if (is_valid_draw and r_list) else np.nan
+            draw_dict[f"w{w_idx}_mean_max_gain_pct"] = np.mean(mg_list) if (is_valid_draw and mg_list) else np.nan
+            draw_dict[f"w{w_idx}_worst_return_pct"] = np.min(r_list) if (is_valid_draw and r_list) else np.nan
+            draw_dict[f"w{w_idx}_stop8_count"] = w_stops[w_idx] if is_valid_draw else np.nan
 
         draw_records.append(draw_dict)
 
     draws_df = pd.DataFrame(draw_records)
+    valid_draws_df = draws_df[draws_df["is_valid_draw"]]
 
-    # Compute Quantiles across the 1000 draws
+    # Compute Quantiles strictly across valid draws
     summary: dict[str, Any] = {
         "snapshot_date": snapshot_date,
         "total_candidates": n_candidates,
         "n_draws": n_draws,
         "seed": seed,
-        "valid_draw_pct": round(float((draws_df["is_valid_draw"].sum() / n_draws) * 100.0), 2),
+        "valid_draw_pct": round(float((len(valid_draws_df) / n_draws) * 100.0), 2),
     }
 
     metrics_to_quantiles = [
@@ -136,7 +137,7 @@ def run_random_top3_for_snapshot(
     ]
 
     for metric in metrics_to_quantiles:
-        s = draws_df[metric].dropna()
+        s = valid_draws_df[metric].dropna() if not valid_draws_df.empty else pd.Series(dtype=float)
         if not s.empty:
             summary[f"{metric}_p05"] = round(float(np.percentile(s, 5)), 4)
             summary[f"{metric}_p25"] = round(float(np.percentile(s, 25)), 4)
@@ -147,7 +148,7 @@ def run_random_top3_for_snapshot(
             for q in ["p05", "p25", "p50", "p75", "p95"]:
                 summary[f"{metric}_{q}"] = np.nan
 
-    # Calculate B0 Actual Performance & Percentile for this snapshot
+    # Calculate B0 Actual Performance & Percentile for this snapshot against valid draws
     if b0_snapshot_events is not None and not b0_snapshot_events.empty:
         b0_valid = b0_snapshot_events[b0_snapshot_events["entry_open"].notna()]
         b0_ret = b0_valid["current_return_to_asof_pct"].mean()
@@ -162,15 +163,21 @@ def run_random_top3_for_snapshot(
         summary["b0_actual_w1_mean_return_pct"] = round(float(b0_w1_ret), 4) if pd.notna(b0_w1_ret) else np.nan
         summary["b0_actual_stop8_count"] = int(b0_stops)
 
-        # Percentile Rank
-        if pd.notna(b0_ret) and not draws_df["asof_mean_return_pct"].dropna().empty:
-            dist = draws_df["asof_mean_return_pct"].dropna().values
+        # Percentile Rank against valid random draw distribution
+        if pd.notna(b0_ret) and not valid_draws_df.empty and not valid_draws_df["asof_mean_return_pct"].dropna().empty:
+            dist = valid_draws_df["asof_mean_return_pct"].dropna().values
             summary["b0_asof_return_percentile"] = round(float((np.sum(dist <= b0_ret) / len(dist)) * 100.0), 2)
         else:
             summary["b0_asof_return_percentile"] = np.nan
 
-        if pd.notna(b0_w1_ret) and not draws_df["w1_mean_return_pct"].dropna().empty:
-            dist_w1 = draws_df["w1_mean_return_pct"].dropna().values
+        if pd.notna(b0_exec_ret) and not valid_draws_df.empty and not valid_draws_df["asof_mean_exec_return_pct"].dropna().empty:
+            dist_exec = valid_draws_df["asof_mean_exec_return_pct"].dropna().values
+            summary["b0_asof_exec_return_percentile"] = round(float((np.sum(dist_exec <= b0_exec_ret) / len(dist_exec)) * 100.0), 2)
+        else:
+            summary["b0_asof_exec_return_percentile"] = np.nan
+
+        if pd.notna(b0_w1_ret) and not valid_draws_df.empty and not valid_draws_df["w1_mean_return_pct"].dropna().empty:
+            dist_w1 = valid_draws_df["w1_mean_return_pct"].dropna().values
             summary["b0_w1_return_percentile"] = round(float((np.sum(dist_w1 <= b0_w1_ret) / len(dist_w1)) * 100.0), 2)
         else:
             summary["b0_w1_return_percentile"] = np.nan

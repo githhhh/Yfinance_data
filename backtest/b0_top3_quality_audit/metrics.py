@@ -321,7 +321,7 @@ def compute_b0_vs_random_summary(
             "random_p50_mean": round(float(asof_exec_rnd_p50.mean()), 4),
             "b0_spread": round(float(asof_exec_spread.mean()), 4),
             "b0_win_rate_vs_random_median_pct": round(float((asof_exec_beat_count / n_weeks) * 100.0), 2),
-            "average_percentile_rank": round(float(merged["b0_asof_return_percentile"].dropna().mean()), 2),
+            "average_percentile_rank": round(float(merged["b0_asof_exec_return_percentile"].dropna().mean()), 2) if "b0_asof_exec_return_percentile" in merged.columns else round(float(merged["b0_asof_return_percentile"].dropna().mean()), 2),
             "paired_ttest_pvalue": round(float(asof_exec_p_val), 4) if pd.notna(asof_exec_p_val) else np.nan,
             "wilcoxon_pvalue": round(float(asof_exec_wilcoxon_p), 4) if pd.notna(asof_exec_wilcoxon_p) else np.nan,
         },

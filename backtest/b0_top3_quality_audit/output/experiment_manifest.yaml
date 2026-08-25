@@ -1,7 +1,7 @@
 as_of_date: '2026-08-25'
 base_commit: 3e73d887a070eb06bce8d48cebeae046c43343be
 calendar_week_definition: monday_to_friday_natural_week
-duration_seconds: 86.65
+duration_seconds: 101.23
 earliest_snapshot_date: '2025-10-10'
 entry_definition: next_trading_day_open_after_snapshot
 execution_date: '2026-08-25'
