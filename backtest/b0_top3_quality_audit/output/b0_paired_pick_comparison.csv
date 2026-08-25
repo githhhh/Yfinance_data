@@ -1,0 +1,4 @@
+﻿comparison_pair,common_weeks_count,w1_diff_mean_pct,w1_diff_median_pct,w1_win_rate_a_over_b_pct,w1_paired_ttest_pvalue,w1_wilcoxon_pvalue,asof_diff_mean_pct,asof_diff_median_pct,asof_win_rate_a_over_b_pct,asof_paired_ttest_pvalue,asof_wilcoxon_pvalue,exec_diff_mean_pct,exec_diff_median_pct,exec_win_rate_a_over_b_pct
+Pick_1_vs_Pick_2,25,2.098,-0.0861,48.0,0.1061,0.2411,4.9592,2.6118,64.0,0.6591,0.4578,3.3793,0.6976,56.0
+Pick_1_vs_Pick_3,25,-0.1452,1.7433,56.0,0.9367,0.8949,-3.5309,-1.2817,44.0,0.7735,0.9789,-9.9058,-1.2817,40.0
+Pick_2_vs_Pick_3,25,-2.2431,-2.7138,32.0,0.1124,0.0903,-8.4901,-1.6753,44.0,0.5233,0.4908,-13.2852,-0.2578,36.0
