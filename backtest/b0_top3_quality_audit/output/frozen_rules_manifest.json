@@ -1,10 +1,10 @@
 {
   "manifest_version": "2.1",
-  "created_at_utc": "2026-08-25T13:46:47.144866+00:00",
-  "source_git_commit": "93c8bd7ea4a526eb7a2e92637a6751de5a831471",
+  "created_at_utc": "2026-08-25T14:11:12.682471+00:00",
+  "source_base_commit": "a550f79c228b8d30e00e00f7c1988356effb859d",
   "freeze_id": "PHASE2_IMMUTABLE_FREEZE_20260828",
   "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
-  "protocol_sha256": "d4bd3470e5b1e5c63710c344dbcaedc2097bcd982fd1ad10ea6464f161cfb51a",
+  "protocol_sha256": "89f6a343c08eafacdc9d49e06057d2cf212f9ad7e10e748d012d3063fda5cf0c",
   "train_period": "2025-10-10_to_2026-05-22 (Weeks 1~30)",
   "historical_validation_period": "2026-05-29_to_2026-08-07 (Weeks 31~40, CONTAMINATED_HISTORICAL_VALIDATION)",
   "pre_freeze_replay_period": "2026-08-14_to_2026-08-21 (PRE_FREEZE_REPLAY)",
@@ -27,6 +27,9 @@
       "description": "Production multi-factor heuristic (freshness -> volume -> close position)",
       "complexity": 3,
       "params": {},
+      "semantic_config": {
+        "sort_mode": "b0_hierarchical"
+      },
       "start_date": "2026-08-28",
       "primary_metrics": [
         "w1_return",
@@ -41,7 +44,8 @@
       "role": "FORWARD_SHADOW_CANDIDATE",
       "description": "Single-factor freshness priority",
       "complexity": 1,
-      "params": {
+      "params": {},
+      "semantic_config": {
         "sort_mode": "freshness_only"
       },
       "start_date": "2026-08-28",
@@ -58,7 +62,8 @@
       "role": "RESEARCH_PARETO_CHAMPION",
       "description": "Single-factor close position priority",
       "complexity": 1,
-      "params": {
+      "params": {},
+      "semantic_config": {
         "sort_mode": "close_pos_only"
       },
       "start_date": "2026-08-28",
@@ -125,5 +130,5 @@
       "train_stop8_before_p20_pct": 52.222222222222236
     }
   },
-  "manifest_sha256": "9554c84d368b1c6b30366c794254eae62623986a3e826999a6c97a939bd2417f"
+  "manifest_sha256": "0190860ec3e15457f1c079dec3844e8994d29d1b85886aa177642ceafb898225"
 }

@@ -2,7 +2,7 @@
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
 **样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `9554c84d368b1c6b30366c794254eae62623986a3e826999a6c97a939bd2417f`)  
+**输入来源**：`frozen_rules_manifest.json` (SHA256: `0190860ec3e15457f1c079dec3844e8994d29d1b85886aa177642ceafb898225`)  
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]

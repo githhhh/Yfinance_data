@@ -135,7 +135,7 @@ def export_frozen_rules_manifest(
     output_path: Path,
     repo_root: Path | None = None,
     created_at_utc: str | None = None,
-    source_git_commit: str | None = None,
+    source_base_commit: str | None = None,
 ) -> dict[str, Any]:
     """Export frozen rules manifest with full RuleSpec params, train data snapshot hash, forward shadow registrations, and protocol SHA256 integrity signature."""
     from backtest.b0_top3_quality_audit.skill_rule_engine import build_skill_rule_space
@@ -145,8 +145,8 @@ def export_frozen_rules_manifest(
 
     if created_at_utc is None:
         created_at_utc = datetime.now(timezone.utc).isoformat()
-    if source_git_commit is None:
-        source_git_commit = get_git_commit_sha(repo_root)
+    if source_base_commit is None:
+        source_base_commit = get_git_commit_sha(repo_root)
 
     # Map rule specs to retrieve exact params
     rule_spec_map = {r.rule_id: r for r in build_skill_rule_space()}
@@ -174,6 +174,9 @@ def export_frozen_rules_manifest(
             "description": "Production multi-factor heuristic (freshness -> volume -> close position)",
             "complexity": 3,
             "params": {},
+            "semantic_config": {
+                "sort_mode": "b0_hierarchical",
+            },
             "start_date": "2026-08-28",
             "primary_metrics": ["w1_return", "w2_return", "w4_return"],
             "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
@@ -184,7 +187,10 @@ def export_frozen_rules_manifest(
             "role": "FORWARD_SHADOW_CANDIDATE",
             "description": "Single-factor freshness priority",
             "complexity": 1,
-            "params": {"sort_mode": "freshness_only"},
+            "params": {},
+            "semantic_config": {
+                "sort_mode": "freshness_only",
+            },
             "start_date": "2026-08-28",
             "primary_metrics": ["w1_return", "w2_return", "w4_return"],
             "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
@@ -195,7 +201,10 @@ def export_frozen_rules_manifest(
             "role": "RESEARCH_PARETO_CHAMPION",
             "description": "Single-factor close position priority",
             "complexity": 1,
-            "params": {"sort_mode": "close_pos_only"},
+            "params": {},
+            "semantic_config": {
+                "sort_mode": "close_pos_only",
+            },
             "start_date": "2026-08-28",
             "primary_metrics": ["w1_return", "w2_return", "w4_return"],
             "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
@@ -238,7 +247,7 @@ def export_frozen_rules_manifest(
     manifest_data: dict[str, Any] = {
         "manifest_version": "2.1",
         "created_at_utc": created_at_utc,
-        "source_git_commit": source_git_commit,
+        "source_base_commit": source_base_commit,
         "freeze_id": "PHASE2_IMMUTABLE_FREEZE_20260828",
         "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
         "protocol_sha256": protocol_sha256,

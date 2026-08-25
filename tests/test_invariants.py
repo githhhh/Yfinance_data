@@ -69,7 +69,7 @@ def test_01_holdout_isolation_invariant(test_datasets, tmp_path):
         clean_champs,
         tmp_path / "clean_manifest.json",
         created_at_utc=fixed_created_at,
-        source_git_commit=fixed_commit,
+        source_base_commit=fixed_commit,
     )
 
     # 2. Corrupted Holdout Run: Mutate all holdout price returns in the source dataframe
@@ -87,7 +87,7 @@ def test_01_holdout_isolation_invariant(test_datasets, tmp_path):
         corrupted_champs,
         tmp_path / "corrupted_manifest.json",
         created_at_utc=fixed_created_at,
-        source_git_commit=fixed_commit,
+        source_base_commit=fixed_commit,
     )
 
     # 3. Assert Byte-for-Byte and SHA256 equality
@@ -253,6 +253,7 @@ def test_07_forward_shadow_pre_registration():
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
+    assert "source_base_commit" in manifest, "Manifest must specify source_base_commit"
     shadow_rules = manifest.get("forward_shadow_rules", [])
     assert len(shadow_rules) >= 3, "Manifest must pre-register at least B0, Freshness, and Close Position"
 
@@ -265,25 +266,68 @@ def test_07_forward_shadow_pre_registration():
         assert r["start_date"] == "2026-08-28"
         assert set(r["primary_metrics"]) == {"w1_return", "w2_return", "w4_return"}
         assert r["stop_protocol"] == "STOP_8PCT_OR_PROFIT_20PCT"
+        assert r["params"] == {}, "Forward shadow RuleSpec params must be empty dict {} for exact matching"
+        assert "semantic_config" in r, "Descriptive config must be in semantic_config"
 
 
 def test_08_random_control_censoring_and_coverage(test_datasets):
-    """INVARIANT 8: Random control must enforce full pick count coverage for max-gain and output horizon rates."""
+    """INVARIANT 8: Random control must enforce Matched-N sampling and identical strict censoring on B0 side."""
     events_df, weekly_df, _ = test_datasets
     snap_date = "2026-01-09"
     snap_events = events_df[events_df["snapshot_date"] == snap_date]
 
-    summary, draws_df = run_random_top3_for_snapshot(
+    # 1. Baseline fixed 3-pick draw coverage
+    summary_fixed, draws_fixed = run_random_top3_for_snapshot(
         snapshot_date=snap_date,
         snapshot_events_df=snap_events,
         weekly_outcomes_df=weekly_df,
         n_draws=100,
         seed=42,
+        benchmark_mode="FIXED_TOP3",
     )
+    assert summary_fixed["benchmark_mode"] == "FIXED_TOP3"
+    assert summary_fixed["actual_picks_count"] == 3
+    assert summary_fixed["w1_valid_draw_pct"] == 100.0
+    assert summary_fixed["w4_valid_draw_pct"] == 100.0
 
-    assert "w1_valid_draw_pct" in summary
-    assert "w2_valid_draw_pct" in summary
-    assert "w3_valid_draw_pct" in summary
-    assert "w4_valid_draw_pct" in summary
-    assert summary["w1_valid_draw_pct"] == 100.0
-    assert summary["w4_valid_draw_pct"] == 100.0
+    # 2. Matched-N Sampling with 2-pick B0 snapshot
+    two_picks = snap_events.iloc[:2].copy()
+    summary_matched, draws_matched = run_random_top3_for_snapshot(
+        snapshot_date=snap_date,
+        snapshot_events_df=snap_events,
+        weekly_outcomes_df=weekly_df,
+        b0_snapshot_events=two_picks,
+        n_draws=100,
+        seed=42,
+        benchmark_mode="MATCHED_N",
+    )
+    assert summary_matched["benchmark_mode"] == "MATCHED_N"
+    assert summary_matched["actual_picks_count"] == 2
+    assert summary_matched["b0_selected_count"] == 2
+    assert summary_matched["b0_is_w1_valid"] is True
+    assert not np.isnan(summary_matched["b0_actual_w1_mean_return_pct"])
+    assert not np.isnan(summary_matched["b0_w1_return_percentile"])
+    # All draws must sample exactly 2 stocks
+    assert (draws_matched["valid_candidates_count"] == 2).all()
+
+    # 3. B0 Side Strict Common-Censoring (No Survivor Reweighting on B0)
+    # Corrupt weekly outcome of 1 B0 pick so it is missing W1 data
+    corrupted_weekly = weekly_df.copy()
+    code_to_corrupt = str(two_picks.iloc[0]["code"])
+    mask = (corrupted_weekly["snapshot_date"] == snap_date) & (corrupted_weekly["code"].astype(str) == code_to_corrupt) & (corrupted_weekly["holding_week_index"] == 1)
+    corrupted_weekly.loc[mask, "week_close_return_from_entry_pct"] = np.nan
+
+    summary_corrupted, _ = run_random_top3_for_snapshot(
+        snapshot_date=snap_date,
+        snapshot_events_df=snap_events,
+        weekly_outcomes_df=corrupted_weekly,
+        b0_snapshot_events=two_picks,
+        n_draws=100,
+        seed=42,
+        benchmark_mode="MATCHED_N",
+    )
+    # B0 should be censored on W1 because 1 pick is missing data (no survivor reweighting!)
+    assert summary_corrupted["b0_is_w1_valid"] is False
+    assert summary_corrupted["b0_w1_valid_count"] == 1
+    assert np.isnan(summary_corrupted["b0_actual_w1_mean_return_pct"])
+    assert np.isnan(summary_corrupted["b0_w1_return_percentile"])
