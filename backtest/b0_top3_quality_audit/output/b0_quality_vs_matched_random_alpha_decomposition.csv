@@ -1,0 +1,5 @@
+﻿horizon,mature_eval_weeks,l0_signal_median_pct,l1_screened_median_pct,b0_l2_median_pct,screening_alpha_weekly_spread_median_pct,ranking_alpha_weekly_spread_median_pct,total_alpha_weekly_spread_median_pct,active_rank_weeks_count,active_rank_spread_ranking_pct,active_rank_win_rate_b0_vs_l1_pct,win_rate_b0_vs_l0_pct,win_rate_b0_vs_l1_pct,win_rate_l1_vs_l0_pct,p_val_ranking_wilcoxon,interpretation
+W1,40,0.1385,0.233,0.6535,-0.0328,0.0,0.4771,21,0.0,47.619,57.5,25.0,47.5,0.433,W1 ranking alpha not proven; screening/total lift is visible but weak.
+W2,40,-0.2741,0.4064,0.5809,0.6646,0.0,2.0759,21,0.0,47.619,55.0,25.0,57.5,0.4445,Supportive context; not the primary ranking-alpha claim.
+W4,38,-0.8725,0.7277,1.2573,1.0081,0.0,2.3633,19,2.0774,52.6316,68.4211,26.3158,65.7895,0.0299,"W4 ranking alpha is a promising historical signal, pending forward shadow validation."
+AsOf executed,40,-0.8332,0.8019,2.0443,0.0,0.0,0.4907,21,0.8432,57.1429,50.0,30.0,47.5,0.1262,Supportive context; not the primary ranking-alpha claim.

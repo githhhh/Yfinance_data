@@ -1,0 +1,4 @@
+﻿horizon,valid_weeks,zero_pick_weeks_excluded,b0_median_return_pct,matched_random_p50_median_return_pct,paired_spread_median_pct,b0_mean_return_pct,matched_random_p50_mean_return_pct,paired_spread_mean_pct,beat_random_p50_rate_pct,mature_denominator_note
+W1,40,2,0.9859,0.3164,0.4513,1.3131,0.1817,1.1313,55.0,"actual_picks_count>0, B0 common-censored valid, Matched-N P50 available"
+W2,40,2,1.5747,0.1788,1.5435,2.3847,0.2606,2.124,57.5,"actual_picks_count>0, B0 common-censored valid, Matched-N P50 available"
+W4,38,2,4.603,0.4693,3.3309,3.9783,1.3458,2.6325,63.16,"actual_picks_count>0, B0 common-censored valid, Matched-N P50 available"

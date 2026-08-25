@@ -1,0 +1,16 @@
+﻿horizon,segment,valid_weeks,beat_random_p50_rate_pct,paired_spread_median_pct,paired_spread_mean_pct,median_percentile
+W1,All valid weeks,40,55.0,0.4513,1.1313,54.975
+W1,Early half,20,55.0,0.522,2.0077,58.835
+W1,Late half,20,55.0,0.4513,0.2549,54.975
+W1,Train-era weeks 1-30,30,56.67,0.5386,1.6382,57.575
+W1,Contaminated historical validation weeks 31-40,10,50.0,0.1783,-0.3891,51.55
+W2,All valid weeks,40,57.5,1.5435,2.124,64.09
+W2,Early half,20,75.0,3.1093,4.5417,79.05
+W2,Late half,20,40.0,-1.4371,-0.2936,36.185
+W2,Train-era weeks 1-30,30,63.33,1.682,2.9218,68.9
+W2,Contaminated historical validation weeks 31-40,10,40.0,-1.5336,-0.2692,36.035
+W4,All valid weeks,38,63.16,3.3309,2.6325,65.52
+W4,Early half,19,68.42,5.1554,4.9302,76.52
+W4,Late half,19,57.89,1.7413,0.3347,63.93
+W4,Train-era weeks 1-30,30,63.33,4.7377,3.2641,69.565
+W4,Contaminated historical validation weeks 31-40,8,62.5,1.7498,0.2637,64.27
