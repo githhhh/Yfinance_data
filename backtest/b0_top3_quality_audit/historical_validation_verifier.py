@@ -58,29 +58,31 @@ def verify_manifest_integrity(manifest: dict[str, Any], repo_root: Path) -> None
     }
     for key, expected_hash in code_fps.items():
         file_p = code_paths.get(key)
-        if file_p and file_p.exists():
-            actual_hash = compute_file_sha256(file_p)
-            if actual_hash != expected_hash:
-                raise RuntimeError(
-                    f"Integrity Error: Code file {file_p} has drifted! "
-                    f"Actual: {actual_hash} != Expected: {expected_hash}"
-                )
+        if file_p is None or not file_p.exists():
+            raise RuntimeError(f"Integrity Error: Required code file {file_p} is missing!")
+        actual_hash = compute_file_sha256(file_p)
+        if actual_hash != expected_hash:
+            raise RuntimeError(
+                f"Integrity Error: Code file {file_p} has drifted! "
+                f"Actual: {actual_hash} != Expected: {expected_hash}"
+            )
 
-    # Verify data fingerprints
+    # Verify immutable train data fingerprints (Weeks 1~30 only)
     data_fps = manifest.get("data_fingerprints", {})
     data_paths = {
-        "candidate_events_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_event_outcomes.parquet",
-        "candidate_weekly_outcomes_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "candidate_weekly_outcomes.parquet",
+        "train_candidate_events_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "frozen" / "train_candidate_event_outcomes.parquet",
+        "train_candidate_weekly_outcomes_parquet_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "data" / "frozen" / "train_candidate_weekly_outcomes.parquet",
     }
     for key, expected_hash in data_fps.items():
         file_p = data_paths.get(key)
-        if file_p and file_p.exists():
-            actual_hash = compute_file_sha256(file_p)
-            if actual_hash != expected_hash:
-                raise RuntimeError(
-                    f"Integrity Error: Data file {file_p} has drifted! "
-                    f"Actual: {actual_hash} != Expected: {expected_hash}"
-                )
+        if file_p is None or not file_p.exists():
+            raise RuntimeError(f"Integrity Error: Required frozen train data file {file_p} is missing!")
+        actual_hash = compute_file_sha256(file_p)
+        if actual_hash != expected_hash:
+            raise RuntimeError(
+                f"Integrity Error: Data file {file_p} has drifted! "
+                f"Actual: {actual_hash} != Expected: {expected_hash}"
+            )
 
 
 def run_historical_validation_unblind(
@@ -117,17 +119,17 @@ def run_historical_validation_unblind(
     for role, champ in champions.items():
         rid = champ["rule_id"]
         frozen_params = champ.get("params", {})
-        # Find matching spec with exact params
+        # Find matching spec with exact params (strictly fail-closed: NO fallback)
         matching_spec = None
         for r in build_skill_rule_space():
             if r.rule_id == rid and r.params == frozen_params:
                 matching_spec = r
                 break
         if matching_spec is None:
-            matching_spec = base_rules.get(rid)
-        
-        if matching_spec:
-            rules_to_eval.append((role, matching_spec))
+            raise RuntimeError(
+                f"Integrity Error: Frozen RuleSpec mismatch! Rule ID {rid} with params {frozen_params} does not exist in skill rule space."
+            )
+        rules_to_eval.append((role, matching_spec))
 
     # Precompute snapshots
     snapshot_data: dict[str, dict[str, Any]] = {}
@@ -222,8 +224,9 @@ def run_historical_validation_unblind(
 ## 二、审计结论与后续行动
 
 1. **生产基准零修改**：`dashboard/skill_industry_eps_known.py` 继续 100% 冻结不变。
-2. **启动实时前瞻跟测 (Forward Shadow Ledger)**：
-   * 从 2026-08-14 / 2026-08-21 周度复盘起，建立实时跟测账本，每周并行记录 `B0_BASELINE` 与 `SIMPLER_PURE_FRESHNESS` 的前瞻选股输出。
+2. **时序分期与影子跟测账本 (Forward Shadow Ledger)**：
+   * **Pre-Freeze Replay (2026-08-14 与 2026-08-21)**：作为规则冻结前的回放测试周；
+   * **Forward Shadow Kickoff (2026-08-28 起)**：正式启动纯净前瞻影子账本，并行跟踪冻结清单中预注册的 `B0_BASELINE`、`SIMPLER_PURE_FRESHNESS` 与 `SIMPLER_PURE_CLOSE_POS`。
 """
     out_md = out_dir / "CONTAMINATED_HISTORICAL_VALIDATION_REPORT.md"
     with open(out_md, "w", encoding="utf-8") as f:

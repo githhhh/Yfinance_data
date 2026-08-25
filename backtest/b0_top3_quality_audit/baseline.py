@@ -78,6 +78,7 @@ def run_b0_across_all_pools(
     output_events_csv: Path | str | None = "backtest/b0_top3_quality_audit/output/b0_selection_events.csv",
     output_invariant_csv: Path | str | None = "backtest/b0_top3_quality_audit/output/b0_production_invariant_audit.csv",
     golden_csv_path: Path | str = "backtest/b0_top3_quality_audit/golden/b0_top3_golden_reference.csv",
+    golden_weekly_csv_path: Path | str = "backtest/b0_top3_quality_audit/golden/b0_top3_golden_weekly_reference.csv",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Run B0 replay on all historical pools and compare against frozen golden reference.
     
@@ -87,14 +88,21 @@ def run_b0_across_all_pools(
     all_b0_records: list[dict[str, Any]] = []
     invariant_records: list[dict[str, Any]] = []
 
-    # Load frozen golden reference if available
-    golden_df = pd.DataFrame()
+    # Load frozen candidate-level golden reference if available
     golden_map: dict[str, list[dict[str, Any]]] = {}
     g_path = Path(golden_csv_path)
     if g_path.exists():
         golden_df = pd.read_csv(g_path, encoding="utf-8-sig")
         for snap_date, grp in golden_df.groupby("snapshot_date"):
             golden_map[str(snap_date)] = grp.sort_values("pick_order").to_dict(orient="records")
+
+    # Load frozen week-level golden reference if available
+    golden_weekly_map: dict[str, dict[str, Any]] = {}
+    gw_path = Path(golden_weekly_csv_path)
+    if gw_path.exists():
+        golden_weekly_df = pd.read_csv(gw_path, encoding="utf-8-sig")
+        for _, w_row in golden_weekly_df.iterrows():
+            golden_weekly_map[str(w_row["snapshot_date"])] = w_row.to_dict()
 
     for path in pool_paths:
         snapshot_date = path.parent.name
@@ -113,13 +121,39 @@ def run_b0_across_all_pools(
         replay_sort_keys = [str(r["sort_key"]) for r in b0_records]
         replay_reasons = [str(r["reason_codes"]) for r in b0_records]
 
-        # Genuine Golden Comparison
-        golden_records = golden_map.get(str(snapshot_date), [])
-        golden_codes = [r["code"] for r in golden_records]
+        sig_payload = {
+            "snapshot_date": snapshot_date,
+            "codes": replay_codes,
+            "sort_keys": replay_sort_keys,
+            "reasons": replay_reasons,
+        }
+        replay_sig_sha = hashlib.sha256(json.dumps(sig_payload, sort_keys=True).encode("utf-8")).hexdigest()
+
         discrepancies: list[str] = []
 
+        # 1. Week-Level Golden Audit (Verifies 0-pick weeks explicitly)
+        gw_info = golden_weekly_map.get(str(snapshot_date))
+        if gw_info is not None:
+            exp_count = int(gw_info.get("expected_pick_count", 0))
+            exp_codes_str = str(gw_info.get("expected_codes", "") or "")
+            if pd.isna(gw_info.get("expected_codes")):
+                exp_codes_str = ""
+            exp_codes = [c.strip() for c in exp_codes_str.split(",") if c.strip()]
+            exp_sig_sha = str(gw_info.get("selection_signature_sha256", ""))
+
+            if len(b0_records) != exp_count:
+                discrepancies.append(f"weekly_count_mismatch(replay={len(b0_records)},golden={exp_count})")
+            if replay_codes != exp_codes:
+                discrepancies.append(f"weekly_codes_mismatch(replay={replay_codes},golden={exp_codes})")
+            if exp_sig_sha and replay_sig_sha != exp_sig_sha:
+                discrepancies.append(f"weekly_signature_sha_mismatch")
+
+        # 2. Candidate-Level Golden Audit
+        golden_records = golden_map.get(str(snapshot_date), [])
+        golden_codes = [r["code"] for r in golden_records]
+
         if len(b0_records) == 0 and len(golden_records) == 0:
-            # Both have 0 recommendations -> exact match
+            # Both have 0 recommendations -> verified exact 0 match
             pass
         elif len(b0_records) != len(golden_records):
             discrepancies.append(f"count_mismatch(replay={len(b0_records)},golden={len(golden_records)})")
@@ -133,7 +167,7 @@ def run_b0_across_all_pools(
                     discrepancies.append(f"pick_{idx}_sort_key_drift")
 
         discrepancy_count = len(discrepancies)
-        is_exact_match = bool(discrepancy_count == 0 and len(b0_records) == len(golden_records))
+        is_exact_match = bool(discrepancy_count == 0 and (len(b0_records) == len(golden_records) or gw_info is not None))
 
         invariant_records.append({
             "snapshot_date": snapshot_date,
@@ -144,6 +178,7 @@ def run_b0_across_all_pools(
             "golden_codes": ",".join(golden_codes),
             "replay_sort_keys": " | ".join(replay_sort_keys),
             "replay_reasons": " | ".join(replay_reasons),
+            "selection_signature_sha256": replay_sig_sha,
             "is_exact_match": is_exact_match,
             "discrepancy_count": discrepancy_count,
             "discrepancy_details": ";".join(discrepancies) if discrepancies else "NONE",

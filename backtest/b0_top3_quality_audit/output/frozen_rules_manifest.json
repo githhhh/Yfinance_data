@@ -1,7 +1,10 @@
 {
-  "manifest_version": "2.0",
-  "created_at": "2026-08-25T19:00:00Z",
+  "manifest_version": "2.1",
+  "created_at_utc": "2026-08-25T13:46:47.144866+00:00",
+  "source_git_commit": "93c8bd7ea4a526eb7a2e92637a6751de5a831471",
+  "freeze_id": "PHASE2_IMMUTABLE_FREEZE_20260828",
   "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
+  "protocol_sha256": "d4bd3470e5b1e5c63710c344dbcaedc2097bcd982fd1ad10ea6464f161cfb51a",
   "train_period": "2025-10-10_to_2026-05-22 (Weeks 1~30)",
   "historical_validation_period": "2026-05-29_to_2026-08-07 (Weeks 31~40, CONTAMINATED_HISTORICAL_VALIDATION)",
   "pre_freeze_replay_period": "2026-08-14_to_2026-08-21 (PRE_FREEZE_REPLAY)",
@@ -11,12 +14,63 @@
     "eligibility_predicate_sha256": "14ff9659ad4229aaebc58e1d0a0501b6fe53ba789eb971e33ba78219373d8bf1",
     "skill_rule_engine_sha256": "884112617484ec6f7d7f701c5e0ee8c0af8af09e9a74074312cfcc39a69dcfb9",
     "three_tier_baseline_sha256": "8c64061d91a66c5f7b5d8d56a2e379c6f1a8b3b1613d430149458b1d753c1141",
-    "evaluate_rule_signatures_sha256": "f9460ee4d8a5f26724bd9e03674cf5cecb0ceb3c9864f07dafbff13aa824560a"
+    "evaluate_rule_signatures_sha256": "ccef7d3727144dfee0e1c04c41caa3e256c4aa9dbe05ae85d84f8fb8ad9274a0"
   },
   "data_fingerprints": {
-    "candidate_events_parquet_sha256": "45b75c4491630e3ce1aac4f1bc10911e9c2699836970884965751de5633ada0c",
-    "candidate_weekly_outcomes_parquet_sha256": "0d417cc276edf35293f4e2ea8a1dd723839c141d03ca006c276076c1ff006f83"
+    "train_candidate_events_parquet_sha256": "4e1015b72d28215c4b35311da82caa87cf9623aea2d4d10964834e840de3eea4",
+    "train_candidate_weekly_outcomes_parquet_sha256": "029f54e725d15046a5ab2902b2b009c6b6d43204823a35c32bcd2b03396dd35c"
   },
+  "forward_shadow_rules": [
+    {
+      "rule_id": "B0_BASELINE",
+      "role": "PRODUCTION_BENCHMARK",
+      "description": "Production multi-factor heuristic (freshness -> volume -> close position)",
+      "complexity": 3,
+      "params": {},
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "ACTIVE_PRODUCTION_BENCHMARK"
+    },
+    {
+      "rule_id": "SIMPLER_PURE_FRESHNESS",
+      "role": "FORWARD_SHADOW_CANDIDATE",
+      "description": "Single-factor freshness priority",
+      "complexity": 1,
+      "params": {
+        "sort_mode": "freshness_only"
+      },
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "REGISTERED_FORWARD_SHADOW"
+    },
+    {
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "role": "RESEARCH_PARETO_CHAMPION",
+      "description": "Single-factor close position priority",
+      "complexity": 1,
+      "params": {
+        "sort_mode": "close_pos_only"
+      },
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "REGISTERED_FORWARD_SHADOW"
+    }
+  ],
   "champions": {
     "HISTORICAL_RETURN_WINNER": {
       "role": "HISTORICAL_RETURN_WINNER",
@@ -28,7 +82,7 @@
       "train_paired_w1_spread_med": 0.0,
       "train_temporal_block_stability_score": -1.1425,
       "train_valid_portfolio_rate": 100.0,
-      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_act_w1_win_vs_l1_pct": 54.54545454545454,
       "train_stop8_before_p20_pct": 52.77777777777779
     },
     "LOWEST_STOP_CANDIDATE": {
@@ -41,7 +95,7 @@
       "train_paired_w1_spread_med": 0.0,
       "train_temporal_block_stability_score": -0.3241,
       "train_valid_portfolio_rate": 100.0,
-      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
       "train_stop8_before_p20_pct": 52.222222222222236
     },
     "SIMPLER_EQUIVALENT": {
@@ -54,7 +108,7 @@
       "train_paired_w1_spread_med": 0.0,
       "train_temporal_block_stability_score": -0.3241,
       "train_valid_portfolio_rate": 100.0,
-      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
       "train_stop8_before_p20_pct": 52.222222222222236
     },
     "PARETO_BALANCED_RULE": {
@@ -67,9 +121,9 @@
       "train_paired_w1_spread_med": 0.0,
       "train_temporal_block_stability_score": -0.3241,
       "train_valid_portfolio_rate": 100.0,
-      "train_act_rank_win_vs_l1_pct": 63.63636363636363,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
       "train_stop8_before_p20_pct": 52.222222222222236
     }
   },
-  "manifest_sha256": "40227837325e187db7cff5f2ba96d7816e69b6f49814f97306e834ea6f034f26"
+  "manifest_sha256": "9554c84d368b1c6b30366c794254eae62623986a3e826999a6c97a939bd2417f"
 }

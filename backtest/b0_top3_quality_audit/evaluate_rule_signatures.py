@@ -61,6 +61,9 @@ def evaluate_rules_on_train(
             b0_info = b0_weekly_map.get(snap_date, {})
             l0_exec_med = b0_info.get("l0_executed_ret_med", np.nan)
             l1_exec_med = b0_info.get("l1_executed_ret_med", np.nan)
+            l1_w1_med = b0_info.get("l1_w1_ret_med", np.nan)
+            l1_w2_med = b0_info.get("l1_w2_ret_med", np.nan)
+            l1_w4_med = b0_info.get("l1_w4_ret_med", np.nan)
             l1_pool_size = b0_info.get("l1_pool_size", 0)
 
             weekly_records.append({
@@ -78,7 +81,10 @@ def evaluate_rules_on_train(
                 "b0_w2_ret": b0_info.get("l2_w2_ret", np.nan),
                 "b0_w4_ret": b0_info.get("l2_w4_ret", np.nan),
                 "b0_exec_ret": b0_info.get("l2_executed_ret", np.nan),
-                "win_vs_l1": bool(m["executed_return"] > l1_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l1_exec_med) else False,
+                "win_vs_l1_w1": bool(m["w1_return"] > l1_w1_med) if not np.isnan(m["w1_return"]) and not np.isnan(l1_w1_med) else False,
+                "win_vs_l1_w2": bool(m["w2_return"] > l1_w2_med) if not np.isnan(m["w2_return"]) and not np.isnan(l1_w2_med) else False,
+                "win_vs_l1_w4": bool(m["w4_return"] > l1_w4_med) if not np.isnan(m["w4_return"]) and not np.isnan(l1_w4_med) else False,
+                "win_vs_l1_exec": bool(m["executed_return"] > l1_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l1_exec_med) else False,
             })
 
         wdf = pd.DataFrame(weekly_records)
@@ -92,7 +98,8 @@ def evaluate_rules_on_train(
         train_exec_med = float(wdf["executed_return"].median()) if not wdf.empty else np.nan
         train_stop_rate = float(wdf["stop8_before_profit20"].mean() * 100.0) if not wdf.empty else np.nan
         train_full3_weeks = int((wdf["picks_count"] == 3).sum())
-        train_win_vs_l1 = float(wdf["win_vs_l1"].mean() * 100.0) if not wdf.empty else np.nan
+        train_win_vs_l1_w1 = float(wdf["win_vs_l1_w1"].mean() * 100.0) if not wdf.empty else np.nan
+        train_win_vs_l1_exec = float(wdf["win_vs_l1_exec"].mean() * 100.0) if not wdf.empty else np.nan
 
         # Paired Deltas
         paired_df = wdf[wdf["is_portfolio_valid"] & wdf["b0_w1_ret"].notna()].copy()
@@ -101,10 +108,14 @@ def evaluate_rules_on_train(
         paired_w4 = paired_df["w4_return"] - paired_df["b0_w4_ret"]
         paired_exec = paired_df["executed_return"] - paired_df["b0_exec_ret"]
 
-        # Active ranking opportunities
+        # Active ranking opportunities (l1_pool >= 4)
         act_df = wdf[wdf["is_active_ranking"]]
         act_paired = act_df[act_df["is_portfolio_valid"] & act_df["b0_w1_ret"].notna()]
         act_w1_spread = act_paired["w1_return"] - act_paired["b0_w1_ret"]
+        train_act_w1_win = float(act_df["win_vs_l1_w1"].mean() * 100.0) if not act_df.empty else np.nan
+        train_act_w2_win = float(act_df["win_vs_l1_w2"].mean() * 100.0) if not act_df.empty else np.nan
+        train_act_w4_win = float(act_df["win_vs_l1_w4"].mean() * 100.0) if not act_df.empty else np.nan
+        train_act_exec_win = float(act_df["win_vs_l1_exec"].mean() * 100.0) if not act_df.empty else np.nan
 
         # 3-block temporal stability
         fold1 = wdf.iloc[:10]["w1_return"].dropna()
@@ -134,7 +145,11 @@ def evaluate_rules_on_train(
             "train_paired_win_rate_vs_b0": float((paired_w1 > 0).mean() * 100.0) if not paired_w1.empty else np.nan,
             "train_act_opp_w1_spread_med": float(act_w1_spread.median()) if not act_w1_spread.empty else np.nan,
             "train_act_opp_w1_ret_med": float(act_df["w1_return"].median()) if not act_df.empty else np.nan,
-            "train_act_rank_win_vs_l1_pct": float(act_df["win_vs_l1"].mean() * 100.0) if not act_df.empty else np.nan,
+            "train_act_w1_win_vs_l1_pct": train_act_w1_win,
+            "train_act_rank_win_vs_l1_pct": train_act_w1_win,
+            "train_act_w2_win_vs_l1_pct": train_act_w2_win,
+            "train_act_w4_win_vs_l1_pct": train_act_w4_win,
+            "train_act_exec_win_vs_l1_pct": train_act_exec_win,
             "train_temporal_block_stability_score": temporal_stability,
             "train_temporal_min_block_ret": float(np.min(f_meds)),
             "train_valid_portfolio_rate": train_valid_rate,
@@ -143,7 +158,8 @@ def evaluate_rules_on_train(
             "train_full3_weeks": train_full3_weeks,
             "train_ranking_opportunity_weeks": len(act_df),
             "train_stop8_before_p20_pct": train_stop_rate,
-            "train_win_vs_l1_pct": train_win_vs_l1,
+            "train_win_vs_l1_pct": train_win_vs_l1_w1,
+            "train_win_vs_l1_exec_pct": train_win_vs_l1_exec,
         })
 
     return pd.DataFrame(records)
@@ -191,6 +207,9 @@ def evaluate_all_rules(
             b0_info = b0_weekly_map.get(snap_date, {})
             l0_exec_med = b0_info.get("l0_executed_ret_med", np.nan)
             l1_exec_med = b0_info.get("l1_executed_ret_med", np.nan)
+            l1_w1_med = b0_info.get("l1_w1_ret_med", np.nan)
+            l1_w2_med = b0_info.get("l1_w2_ret_med", np.nan)
+            l1_w4_med = b0_info.get("l1_w4_ret_med", np.nan)
             l1_pool_size = b0_info.get("l1_pool_size", 0)
 
             rec = {
@@ -214,7 +233,10 @@ def evaluate_all_rules(
                 "b0_w4_ret": b0_info.get("l2_w4_ret", np.nan),
                 "b0_exec_ret": b0_info.get("l2_executed_ret", np.nan),
                 "win_vs_l0": bool(m["executed_return"] > l0_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l0_exec_med) else False,
-                "win_vs_l1": bool(m["executed_return"] > l1_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l1_exec_med) else False,
+                "win_vs_l1_w1": bool(m["w1_return"] > l1_w1_med) if not np.isnan(m["w1_return"]) and not np.isnan(l1_w1_med) else False,
+                "win_vs_l1_w2": bool(m["w2_return"] > l1_w2_med) if not np.isnan(m["w2_return"]) and not np.isnan(l1_w2_med) else False,
+                "win_vs_l1_w4": bool(m["w4_return"] > l1_w4_med) if not np.isnan(m["w4_return"]) and not np.isnan(l1_w4_med) else False,
+                "win_vs_l1_exec": bool(m["executed_return"] > l1_exec_med) if not np.isnan(m["executed_return"]) and not np.isnan(l1_exec_med) else False,
             }
             weekly_records.append(rec)
 
@@ -232,7 +254,8 @@ def evaluate_all_rules(
         train_exec_med = float(train_df["executed_return"].median()) if not train_df.empty else np.nan
         train_stop_rate = float(train_df["stop8_before_profit20"].mean() * 100.0) if not train_df.empty else np.nan
         train_full3_weeks = int((train_df["picks_count"] == 3).sum())
-        train_win_vs_l1 = float(train_df["win_vs_l1"].mean() * 100.0) if not train_df.empty else np.nan
+        train_win_vs_l1_w1 = float(train_df["win_vs_l1_w1"].mean() * 100.0) if not train_df.empty else np.nan
+        train_win_vs_l1_exec = float(train_df["win_vs_l1_exec"].mean() * 100.0) if not train_df.empty else np.nan
 
         # Paired Common-Support Deltas vs B0 on Train Set
         paired_train_df = train_df[train_df["is_portfolio_valid"] & train_df["b0_w1_ret"].notna()].copy()
@@ -253,7 +276,10 @@ def evaluate_all_rules(
         train_act_opp_weeks = len(train_act_df)
         train_act_w1_med = float(train_act_df["w1_return"].median()) if not train_act_df.empty else np.nan
         train_act_exec_med = float(train_act_df["executed_return"].median()) if not train_act_df.empty else np.nan
-        train_act_win_vs_l1 = float(train_act_df["win_vs_l1"].mean() * 100.0) if not train_act_df.empty else np.nan
+        train_act_w1_win = float(train_act_df["win_vs_l1_w1"].mean() * 100.0) if not train_act_df.empty else np.nan
+        train_act_w2_win = float(train_act_df["win_vs_l1_w2"].mean() * 100.0) if not train_act_df.empty else np.nan
+        train_act_w4_win = float(train_act_df["win_vs_l1_w4"].mean() * 100.0) if not train_act_df.empty else np.nan
+        train_act_exec_win = float(train_act_df["win_vs_l1_exec"].mean() * 100.0) if not train_act_df.empty else np.nan
 
         paired_act_df = train_act_df[train_act_df["is_portfolio_valid"] & train_act_df["b0_w1_ret"].notna()]
         paired_act_w1_spreads = paired_act_df["w1_return"] - paired_act_df["b0_w1_ret"]
@@ -284,14 +310,14 @@ def evaluate_all_rules(
         full_active_weeks = int((wdf["picks_count"] >= 1).sum())
         full_full3_weeks = int((wdf["picks_count"] == 3).sum())
         full_win_vs_l0 = float(wdf["win_vs_l0"].mean() * 100.0)
-        full_win_vs_l1 = float(wdf["win_vs_l1"].mean() * 100.0)
+        full_win_vs_l1 = float(wdf["win_vs_l1_w1"].mean() * 100.0)
 
         # 4. Historical Validation Set (Weeks 31~40, evaluated for disclosure)
         hold_df = wdf[wdf["is_holdout"]]
         hold_exec_med = float(hold_df["executed_return"].median()) if not hold_df.empty else np.nan
         hold_w1_med = float(hold_df["w1_return"].median()) if not hold_df.empty else np.nan
         hold_stop_rate = float(hold_df["stop8_before_profit20"].mean() * 100.0) if not hold_df.empty else np.nan
-        hold_win_vs_l1 = float(hold_df["win_vs_l1"].mean() * 100.0) if not hold_df.empty else np.nan
+        hold_win_vs_l1 = float(hold_df["win_vs_l1_w1"].mean() * 100.0) if not hold_df.empty else np.nan
 
         rule_summary_records.append({
             "rule_id": rule.rule_id,
@@ -307,7 +333,11 @@ def evaluate_all_rules(
             "train_paired_win_rate_vs_b0": train_paired_win_rate_vs_b0,
             "train_act_opp_w1_spread_med": train_act_opp_w1_spread_med,
             "train_act_opp_w1_ret_med": train_act_w1_med,
-            "train_act_rank_win_vs_l1_pct": train_act_win_vs_l1,
+            "train_act_w1_win_vs_l1_pct": train_act_w1_win,
+            "train_act_rank_win_vs_l1_pct": train_act_w1_win,
+            "train_act_w2_win_vs_l1_pct": train_act_w2_win,
+            "train_act_w4_win_vs_l1_pct": train_act_w4_win,
+            "train_act_exec_win_vs_l1_pct": train_act_exec_win,
             "train_temporal_block_stability_score": wf_stability_score,
             "train_temporal_min_block_ret": wf_min_fold,
             "train_valid_portfolio_rate": train_valid_rate,
@@ -320,7 +350,8 @@ def evaluate_all_rules(
             "train_exec_ret_med": train_exec_med,
             "train_paired_exec_spread_med": train_paired_exec_spread_med,
             "train_act_rank_exec_med": train_act_exec_med,
-            "train_win_vs_l1_pct": train_win_vs_l1,
+            "train_win_vs_l1_pct": train_win_vs_l1_w1,
+            "train_win_vs_l1_exec_pct": train_win_vs_l1_exec,
             # Full Sample (40 Weeks)
             "full_w1_ret_med": full_w1_med,
             "full_w2_ret_med": full_w2_med,

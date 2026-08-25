@@ -16,6 +16,7 @@ from backtest.b0_top3_quality_audit.evaluate_rule_signatures import (
     evaluate_rules_on_train,
 )
 from backtest.b0_top3_quality_audit.historical_validation_verifier import (
+    run_historical_validation_unblind,
     verify_manifest_integrity,
 )
 from backtest.b0_top3_quality_audit.pareto_champions import (
@@ -23,6 +24,7 @@ from backtest.b0_top3_quality_audit.pareto_champions import (
     export_frozen_rules_manifest,
     select_champions,
 )
+from backtest.b0_top3_quality_audit.random_control import run_random_top3_for_snapshot
 from backtest.b0_top3_quality_audit.skill_rule_engine import (
     build_skill_rule_space,
     deduplicate_rule_signatures,
@@ -51,6 +53,9 @@ def test_01_holdout_isolation_invariant(test_datasets, tmp_path):
         base_space, events_df, train_weeks, pick_limit=3, budget_limit=200
     )
 
+    fixed_created_at = "2026-08-25T19:00:00Z"
+    fixed_commit = "93c8bd7ea4a526eb7a2e92637a6751de5a831471"
+
     # 1. Clean Run
     clean_events_train = events_df[events_df["snapshot_date"].isin(train_weeks)]
     clean_weekly_train = weekly_df[weekly_df["snapshot_date"].isin(train_weeks)]
@@ -60,7 +65,12 @@ def test_01_holdout_isolation_invariant(test_datasets, tmp_path):
         clean_events_train, clean_weekly_train, clean_base_train, deduped_base, pick_limit=3
     )
     clean_champs = select_champions(clean_eval)
-    clean_manifest = export_frozen_rules_manifest(clean_champs, tmp_path / "clean_manifest.json")
+    clean_manifest = export_frozen_rules_manifest(
+        clean_champs,
+        tmp_path / "clean_manifest.json",
+        created_at_utc=fixed_created_at,
+        source_git_commit=fixed_commit,
+    )
 
     # 2. Corrupted Holdout Run: Mutate all holdout price returns in the source dataframe
     corrupted_events = events_df.copy()
@@ -73,9 +83,15 @@ def test_01_holdout_isolation_invariant(test_datasets, tmp_path):
         corrupted_events_train, clean_weekly_train, clean_base_train, deduped_base, pick_limit=3
     )
     corrupted_champs = select_champions(corrupted_eval)
-    corrupted_manifest = export_frozen_rules_manifest(corrupted_champs, tmp_path / "corrupted_manifest.json")
+    corrupted_manifest = export_frozen_rules_manifest(
+        corrupted_champs,
+        tmp_path / "corrupted_manifest.json",
+        created_at_utc=fixed_created_at,
+        source_git_commit=fixed_commit,
+    )
 
     # 3. Assert Byte-for-Byte and SHA256 equality
+    assert clean_manifest["protocol_sha256"] == corrupted_manifest["protocol_sha256"], "Protocol SHA drifted under Holdout corruption!"
     assert clean_manifest["manifest_sha256"] == corrupted_manifest["manifest_sha256"], "Manifest SHA drifted under Holdout corruption!"
     assert json.dumps(clean_manifest, sort_keys=True) == json.dumps(corrupted_manifest, sort_keys=True)
 
@@ -137,8 +153,8 @@ def test_04_production_selector_immutability_invariant():
     )
 
 
-def test_05_manifest_fail_closed_gate():
-    """INVARIANT 5: Manifest verifier must raise exception if manifest SHA or code fingerprint is tampered."""
+def test_05_manifest_fail_closed_gate(test_datasets, tmp_path):
+    """INVARIANT 5: Manifest verifier must fail-closed at each layer (missing file, code drift, params mismatch)."""
     repo_root = Path(__file__).resolve().parents[1]
     manifest_path = repo_root / "backtest" / "b0_top3_quality_audit" / "output" / "frozen_rules_manifest.json"
     if not manifest_path.exists():
@@ -150,40 +166,124 @@ def test_05_manifest_fail_closed_gate():
     # 1. Valid Manifest must pass
     verify_manifest_integrity(valid_manifest, repo_root)
 
-    # 2. Tampered code fingerprint must fail
+    # 2. Tampered outer manifest SHA256 must fail at manifest gate
+    tampered_outer = copy.deepcopy(valid_manifest)
+    tampered_outer["manifest_sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
+    with pytest.raises(RuntimeError, match="Manifest SHA256 mismatch"):
+        verify_manifest_integrity(tampered_outer, repo_root)
+
+    # 3. Genuine Internal Code Gate Test:
+    # Tamper code hash, but recompute top-level manifest_sha256 so manifest is structurally valid
     tampered_code = copy.deepcopy(valid_manifest)
     tampered_code["code_fingerprints"]["production_selector_sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
-    with pytest.raises(RuntimeError):
+    tampered_code.pop("manifest_sha256", None)
+    c_str = json.dumps(tampered_code, sort_keys=True, ensure_ascii=False)
+    tampered_code["manifest_sha256"] = hashlib.sha256(c_str.encode("utf-8")).hexdigest()
+    with pytest.raises(RuntimeError, match="Code file .* has drifted"):
         verify_manifest_integrity(tampered_code, repo_root)
 
-    # 3. Tampered champion param must fail
-    tampered_param = copy.deepcopy(valid_manifest)
-    tampered_param["champions"]["HISTORICAL_RETURN_WINNER"]["complexity"] = 999
-    with pytest.raises(RuntimeError):
-        verify_manifest_integrity(tampered_param, repo_root)
+    # 4. Missing Data File Gate:
+    tampered_data = copy.deepcopy(valid_manifest)
+    tampered_data["data_fingerprints"]["non_existent_data_file_sha256"] = "1111111111111111111111111111111111111111111111111111111111111111"
+    tampered_data.pop("manifest_sha256", None)
+    c_str = json.dumps(tampered_data, sort_keys=True, ensure_ascii=False)
+    tampered_data["manifest_sha256"] = hashlib.sha256(c_str.encode("utf-8")).hexdigest()
+    with pytest.raises(RuntimeError, match="Required frozen train data file None is missing"):
+        verify_manifest_integrity(tampered_data, repo_root)
+
+    # 5. Genuine RuleSpec Param Mismatch Gate in unblinding verifier (NO fallback):
+    events_df, weekly_df, baseline_df = test_datasets
+    tampered_rulespec = copy.deepcopy(valid_manifest)
+    tampered_rulespec["champions"]["HISTORICAL_RETURN_WINNER"]["params"] = {"invalid_param_key": 99999}
+    tampered_rulespec.pop("manifest_sha256", None)
+    c_str = json.dumps(tampered_rulespec, sort_keys=True, ensure_ascii=False)
+    tampered_rulespec["manifest_sha256"] = hashlib.sha256(c_str.encode("utf-8")).hexdigest()
+
+    bad_manifest_path = tmp_path / "bad_manifest.json"
+    with open(bad_manifest_path, "w", encoding="utf-8") as f:
+        json.dump(tampered_rulespec, f, indent=2)
+
+    with pytest.raises(RuntimeError, match="Frozen RuleSpec mismatch"):
+        run_historical_validation_unblind(
+            bad_manifest_path, events_df, weekly_df, baseline_df, tmp_path
+        )
 
 
 def test_06_golden_reference_audit():
-    """INVARIANT 6: B0 Production Replay must achieve 100% exact match against frozen Golden Reference."""
+    """INVARIANT 6: B0 Production Replay must achieve 100% exact match across all 43 pools against frozen Golden Reference."""
     from backtest.b0_top3_quality_audit.universe import scan_replay_pools
     repo_root = Path(__file__).resolve().parents[1]
     golden_path = repo_root / "backtest" / "b0_top3_quality_audit" / "golden" / "b0_top3_golden_reference.csv"
-    assert golden_path.exists(), "Missing golden reference file"
+    golden_weekly_path = repo_root / "backtest" / "b0_top3_quality_audit" / "golden" / "b0_top3_golden_weekly_reference.csv"
+    assert golden_path.exists(), "Missing golden candidate reference file"
+    assert golden_weekly_path.exists(), "Missing golden weekly reference file"
 
     golden_df = pd.read_csv(golden_path)
+    golden_weekly_df = pd.read_csv(golden_weekly_path)
     assert len(golden_df) == 97, f"Golden reference should have 97 events, got {len(golden_df)}"
+    assert len(golden_weekly_df) == 43, f"Golden weekly reference should have 43 weeks, got {len(golden_weekly_df)}"
 
     all_pools = scan_replay_pools(repo_root / "backtest" / "ibd_skill_replay_pools")
-    golden_weeks = set(golden_df["snapshot_date"].unique())
-    pool_paths = [p for p in all_pools if p.parent.name in golden_weeks]
-    assert len(pool_paths) == len(golden_weeks), f"Expected {len(golden_weeks)} golden replay pools, found {len(pool_paths)}"
+    assert len(all_pools) == 43, f"Expected 43 replay pools, found {len(all_pools)}"
 
     _, invariant_df = run_b0_across_all_pools(
-        pool_paths,
+        all_pools,
         output_events_csv=None,
         output_invariant_csv=None,
         golden_csv_path=golden_path,
+        golden_weekly_csv_path=golden_weekly_path,
     )
 
+    assert len(invariant_df) == 43, f"Audit returned {len(invariant_df)} weeks, expected 43"
     assert invariant_df["is_exact_match"].all(), "Discrepancy found against Golden Reference!"
     assert (invariant_df["discrepancy_count"] == 0).all()
+
+    # Explicitly check that zero-pick weeks are verified
+    zero_weeks = ["2025-10-10", "2025-12-12", "2026-02-06"]
+    zero_df = invariant_df[invariant_df["snapshot_date"].isin(zero_weeks)]
+    assert len(zero_df) == 3
+    assert (zero_df["replay_top3_count"] == 0).all()
+    assert (zero_df["is_exact_match"] == True).all()
+
+
+def test_07_forward_shadow_pre_registration():
+    """INVARIANT 7: Forward shadow hypotheses must be formally pre-registered in the manifest before 2026-08-28."""
+    repo_root = Path(__file__).resolve().parents[1]
+    manifest_path = repo_root / "backtest" / "b0_top3_quality_audit" / "output" / "frozen_rules_manifest.json"
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    shadow_rules = manifest.get("forward_shadow_rules", [])
+    assert len(shadow_rules) >= 3, "Manifest must pre-register at least B0, Freshness, and Close Position"
+
+    rule_ids = {r["rule_id"] for r in shadow_rules}
+    assert "B0_BASELINE" in rule_ids
+    assert "SIMPLER_PURE_FRESHNESS" in rule_ids
+    assert "SIMPLER_PURE_CLOSE_POS" in rule_ids
+
+    for r in shadow_rules:
+        assert r["start_date"] == "2026-08-28"
+        assert set(r["primary_metrics"]) == {"w1_return", "w2_return", "w4_return"}
+        assert r["stop_protocol"] == "STOP_8PCT_OR_PROFIT_20PCT"
+
+
+def test_08_random_control_censoring_and_coverage(test_datasets):
+    """INVARIANT 8: Random control must enforce full pick count coverage for max-gain and output horizon rates."""
+    events_df, weekly_df, _ = test_datasets
+    snap_date = "2026-01-09"
+    snap_events = events_df[events_df["snapshot_date"] == snap_date]
+
+    summary, draws_df = run_random_top3_for_snapshot(
+        snapshot_date=snap_date,
+        snapshot_events_df=snap_events,
+        weekly_outcomes_df=weekly_df,
+        n_draws=100,
+        seed=42,
+    )
+
+    assert "w1_valid_draw_pct" in summary
+    assert "w2_valid_draw_pct" in summary
+    assert "w3_valid_draw_pct" in summary
+    assert "w4_valid_draw_pct" in summary
+    assert summary["w1_valid_draw_pct"] == 100.0
+    assert summary["w4_valid_draw_pct"] == 100.0

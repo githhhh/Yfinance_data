@@ -86,7 +86,12 @@ def run_random_top3_for_snapshot(
                     if w_info.get("stop_8_hit_by_week_end") is True:
                         w_stops[w_idx] += 1
 
-        is_asof_valid = bool(is_valid_draw and len(current_rets) == actual_picks_count and len(exec_rets) == actual_picks_count)
+        is_asof_valid = bool(
+            is_valid_draw
+            and len(current_rets) == actual_picks_count
+            and len(exec_rets) == actual_picks_count
+            and len(max_gains) == actual_picks_count
+        )
 
         draw_dict = {
             "snapshot_date": snapshot_date,
@@ -106,7 +111,11 @@ def run_random_top3_for_snapshot(
         for w_idx in [1, 2, 3, 4]:
             r_list = w_rets[w_idx]
             mg_list = w_max_gains[w_idx]
-            is_w_valid = bool(is_valid_draw and len(r_list) == actual_picks_count)
+            is_w_valid = bool(
+                is_valid_draw
+                and len(r_list) == actual_picks_count
+                and len(mg_list) == actual_picks_count
+            )
             draw_dict[f"w{w_idx}_mean_return_pct"] = np.mean(r_list) if is_w_valid else np.nan
             draw_dict[f"w{w_idx}_mean_max_gain_pct"] = np.mean(mg_list) if is_w_valid else np.nan
             draw_dict[f"w{w_idx}_worst_return_pct"] = np.min(r_list) if is_w_valid else np.nan
@@ -125,6 +134,11 @@ def run_random_top3_for_snapshot(
         "seed": seed,
         "valid_draw_pct": round(float((len(valid_draws_df) / n_draws) * 100.0), 2),
     }
+
+    # Explicit Horizon-Specific Coverage
+    for w_idx in [1, 2, 3, 4]:
+        s_w = valid_draws_df[f"w{w_idx}_mean_return_pct"].dropna() if not valid_draws_df.empty else pd.Series(dtype=float)
+        summary[f"w{w_idx}_valid_draw_pct"] = round(float((len(s_w) / n_draws) * 100.0), 2)
 
     metrics_to_quantiles = [
         "w1_mean_return_pct",
@@ -153,12 +167,17 @@ def run_random_top3_for_snapshot(
 
     # Calculate B0 Actual Performance & Percentile for this snapshot against valid draws
     if b0_snapshot_events is not None and not b0_snapshot_events.empty:
-        b0_valid = b0_snapshot_events[b0_snapshot_events["entry_open"].notna()]
-        b0_ret = b0_valid["current_return_to_asof_pct"].mean()
-        b0_exec_ret = b0_valid["executed_return_to_asof_pct"].mean()
-        b0_mg = b0_valid["max_gain_to_asof_pct"].mean()
-        b0_w1_ret = b0_valid["week1_close_return_pct"].mean()
-        b0_stops = (b0_valid["stop_8_hit_ever"] == True).sum()
+        b0_codes = b0_snapshot_events["code"].tolist()
+        b0_events_subset = snapshot_events_df[snapshot_events_df["code"].isin(b0_codes)]
+        b0_valid = b0_events_subset[
+            (b0_events_subset.get("entry_status") == "ENTRY_OK")
+            & (b0_events_subset.get("entry_open").notna())
+        ]
+        b0_ret = b0_valid["current_return_to_asof_pct"].mean() if not b0_valid.empty and "current_return_to_asof_pct" in b0_valid else np.nan
+        b0_exec_ret = b0_valid["executed_return_to_asof_pct"].mean() if not b0_valid.empty and "executed_return_to_asof_pct" in b0_valid else np.nan
+        b0_mg = b0_valid["max_gain_to_asof_pct"].mean() if not b0_valid.empty and "max_gain_to_asof_pct" in b0_valid else np.nan
+        b0_w1_ret = b0_valid["week1_close_return_pct"].mean() if not b0_valid.empty and "week1_close_return_pct" in b0_valid else np.nan
+        b0_stops = (b0_valid.get("stop_8_hit_ever") == True).sum() if not b0_valid.empty else 0
 
         summary["b0_actual_asof_mean_return_pct"] = round(float(b0_ret), 4) if pd.notna(b0_ret) else np.nan
         summary["b0_actual_asof_mean_exec_return_pct"] = round(float(b0_exec_ret), 4) if pd.notna(b0_exec_ret) else np.nan

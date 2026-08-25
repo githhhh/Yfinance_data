@@ -2,7 +2,7 @@
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
 **样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `40227837325e187db7cff5f2ba96d7816e69b6f49814f97306e834ea6f034f26`)  
+**输入来源**：`frozen_rules_manifest.json` (SHA256: `9554c84d368b1c6b30366c794254eae62623986a3e826999a6c97a939bd2417f`)  
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]
@@ -27,5 +27,6 @@
 ## 二、审计结论与后续行动
 
 1. **生产基准零修改**：`dashboard/skill_industry_eps_known.py` 继续 100% 冻结不变。
-2. **启动实时前瞻跟测 (Forward Shadow Ledger)**：
-   * 从 2026-08-14 / 2026-08-21 周度复盘起，建立实时跟测账本，每周并行记录 `B0_BASELINE` 与 `SIMPLER_PURE_FRESHNESS` 的前瞻选股输出。
+2. **时序分期与影子跟测账本 (Forward Shadow Ledger)**：
+   * **Pre-Freeze Replay (2026-08-14 与 2026-08-21)**：作为规则冻结前的回放测试周；
+   * **Forward Shadow Kickoff (2026-08-28 起)**：正式启动纯净前瞻影子账本，并行跟踪冻结清单中预注册的 `B0_BASELINE`、`SIMPLER_PURE_FRESHNESS` 与 `SIMPLER_PURE_CLOSE_POS`。
