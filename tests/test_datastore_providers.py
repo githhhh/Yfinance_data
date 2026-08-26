@@ -42,6 +42,27 @@ class TestYahooDataProvider:
         assert "rounding" not in history_kwargs
 
     @patch("yfinance.Ticker")
+    def test_download_single_stock_rejects_missing_required_price_column(self, mock_ticker_cls):
+        sample_df = pd.DataFrame(
+            {
+                "Open": [100.123],
+                "High": [105.789],
+                "Low": [99.001],
+                "Volume": [10000],
+            },
+            index=pd.date_range("2026-01-01", periods=1),
+        )
+        mock_instance = MagicMock()
+        mock_instance.history.return_value = sample_df
+        mock_ticker_cls.return_value = mock_instance
+
+        provider = YahooDataProvider(max_retries=0)
+        symbol, df = provider.download_single_stock("AAPL", period="1y", interval="1d")
+
+        assert symbol == "AAPL"
+        assert df is None
+
+    @patch("yfinance.Ticker")
     def test_download_batch_stocks(self, mock_ticker_cls):
         sample_df = pd.DataFrame(
             {"Open": [10.0], "High": [11.0], "Low": [9.5], "Close": [10.5], "Volume": [1000]},
@@ -328,3 +349,25 @@ class TestLegacyBackwardCompatibility:
 
         all_data, failed = DataStore.download_batch_stocks(["AMD"])
         assert "AMD" in all_data
+
+    def test_results_pkl_round_trip_preserves_source_precision(self, tmp_path, monkeypatch):
+        pkl_path = tmp_path / "stock_data_test_1d.pkl"
+        monkeypatch.setattr(DataStore, "get_stock_pkl_path", lambda interval="1d": str(pkl_path))
+        source_df = pd.DataFrame(
+            {
+                "Open": [100.123456],
+                "High": [105.789123],
+                "Low": [99.001987],
+                "Close": [103.555123],
+                "Volume": [10000],
+            },
+            index=pd.date_range("2026-01-01", periods=1),
+        )
+
+        saved_path = DataStore.save_stock_data({"AAPL": source_df}, save_dir=str(tmp_path), interval="1d")
+        loaded = DataStore.load_stock_data(saved_path)
+
+        assert loaded["AAPL"].iloc[0]["Open"] == pytest.approx(100.123456)
+        assert loaded["AAPL"].iloc[0]["High"] == pytest.approx(105.789123)
+        assert loaded["AAPL"].iloc[0]["Low"] == pytest.approx(99.001987)
+        assert loaded["AAPL"].iloc[0]["Close"] == pytest.approx(103.555123)

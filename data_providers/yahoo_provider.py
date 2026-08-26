@@ -42,7 +42,9 @@ class YahooDataProvider(BaseDataProvider):
                 )
                 if not data.empty:
                     # 保留原始 Close，忽略 Adj Close，价格精度保持源数据原样。
-                    req_cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in data.columns]
+                    req_cols = ["Open", "High", "Low", "Close", "Volume"]
+                    if any(col not in data.columns for col in req_cols):
+                        return symbol, None
                     data = data[req_cols].copy()
                     return symbol, data
             except Exception as e:
