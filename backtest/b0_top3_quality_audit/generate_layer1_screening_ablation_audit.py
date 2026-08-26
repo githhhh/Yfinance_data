@@ -1164,8 +1164,8 @@ def render_layer1_ablation_report(
     md.append("## 二、Industry Diversity 深度诊断 (E1 vs E0)")
     md.append("")
     md.append("### 1. 行业重复客观画像")
-    md.append(f"- **E0 候选池中存在 >= 2 只同行业股票且 N > 1 的约束生效周数：** `{len(nz_w1)} / {total_snaps}` 周 ({len(nz_w1)/total_snaps*100:.1f}%)；")
-    md.append(f"- **行业去重活跃周 (Non-zero diffs, 严格动态计算):**")
+    md.append(f"- **E0 候选池中存在同行业重复且产生实际组合影响的周数：** W1 共有 {len(nz_w1)} 周 ({len(nz_w1)/total_snaps*100:.1f}%), W2 共有 {len(nz_w2)} 周 ({len(nz_w2)/total_snaps*100:.1f}%), W4 共有 {len(nz_w4)} 周 ({len(nz_w4)/38*100:.1f}%);")
+    md.append("- **行业去重活跃周 (Non-zero impact subset, 严格动态计算):**")
     if len(nz_w1) > 0:
         md.append(f"  - **W1 (n={len(nz_w1)}):** 利差中位数 `{nz_w1.median():+.2f}%` (均值 `{nz_w1.mean():+.2f}%`, 胜率 `{(nz_w1 > 0).mean()*100:.1f}%`)")
     if len(nz_w2) > 0:

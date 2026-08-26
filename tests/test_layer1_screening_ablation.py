@@ -97,35 +97,29 @@ def test_04_canonical_pool_seed_identity():
 
 
 def test_05_non_binding_industry_constraint_identity(audit_environment):
-    """INVARIANT 5 (Test A): When E1 industry constraint is non-binding, E1 must yield exact zero diff vs E0."""
-    paths, events_df, weekly_df, _ = audit_environment
-    event_lookup = {(str(r["snapshot_date"]), str(r["code"])): r.to_dict() for _, r in events_df.iterrows()}
-    weekly_lookup = {(str(r["snapshot_date"]), str(r["code"]), int(r["holding_week_index"])): r.to_dict() for _, r in weekly_df.iterrows()}
+    """INVARIANT 5 (Test A): When E1 industry constraint is non-binding, E1 and E0 must be bitwise identical."""
+    paths, events_df, weekly_df, b0_events_df = audit_environment
+    summary_path = paths.output_dir / "layer1_variant_weekly_summary.csv"
+    if summary_path.exists():
+        df = pd.read_csv(summary_path)
+        e0 = df[df["variant_name"] == "E0_BASE"].set_index("snapshot_date")
+        e1 = df[df["variant_name"] == "E1_INDUSTRY_DIVERSE"].set_index("snapshot_date")
 
-    # All unique industries -> non-binding
-    codes = ["A", "B", "C", "D"]
-    unique_inds = ["Tech", "Finance", "Healthcare", "Energy"]
+        # Find real non-binding snapshots (where target_n <= 1 or no duplicate industries in E0)
+        for snap, row_e0 in e0.iterrows():
+            target_n = row_e0["target_n"]
+            sub_events = events_df[events_df["snapshot_date"].astype(str) == str(snap)]
+            feats = [evaluate_candidate_features(r) for _, r in sub_events.iterrows()]
+            e0_cands = [f for f in feats if is_candidate_in_variant_pool(f, "E0_BASE")]
+            inds = [f["industry"] for f in e0_cands]
+            is_binding = (target_n > 1) and (len(inds) > len(set(inds)))
 
-    res_e0 = sample_portfolio_draws(
-        candidate_codes=codes,
-        candidate_industries=unique_inds,
-        target_n=3,
-        variant_name="E0_BASE",
-        snapshot_date="2025-11-14",
-        event_lookup=event_lookup,
-        weekly_lookup=weekly_lookup,
-        n_draws=100,
-    )
-
-    # In audit engine, non-binding E1 directly reuses E0
-    is_binding = (3 > 1) and (len(unique_inds) > len(set(unique_inds)))
-    assert is_binding is False
-    res_e1 = dict(res_e0)
-    res_e1["rejection_rate_pct"] = 0.0
-
-    assert res_e0["pool_size"] == res_e1["pool_size"]
-    assert res_e0["target_n"] == res_e1["target_n"]
-    assert (res_e0["w1_p50"] == res_e1["w1_p50"]) or (np.isnan(res_e0["w1_p50"]) and np.isnan(res_e1["w1_p50"]))
+            if not is_binding:
+                row_e1 = e1.loc[snap]
+                for col in ["w1_p50", "w2_p50", "w4_p50", "stop8_ever_rate_pct", "all_stopped_pct"]:
+                    v0 = row_e0[col]
+                    v1 = row_e1[col]
+                    assert (v0 == v1) or (pd.isna(v0) and pd.isna(v1)), f"Mismatch on {col} for non-binding snap {snap}"
 
 
 def test_06_entry_ok_gates_horizon_returns_and_path_risk():
@@ -134,7 +128,6 @@ def test_06_entry_ok_gates_horizon_returns_and_path_risk():
         ("2025-11-14", "A"): {"is_valid_entry": True, "entry_status": "ENTRY_OK", "entry_open": 100.0, "stop_8_hit_ever": True},
         ("2025-11-14", "B"): {"is_valid_entry": False, "entry_status": "ENTRY_STALE_EXPIRED", "entry_open": None, "stop_8_hit_ever": False},
     }
-    # Notice: weekly lookup has mature and non-null returns, but B lacks valid ENTRY_OK
     weekly_lookup = {
         ("2025-11-14", "A", 1): {"is_complete_week": True, "week_close_return_from_entry_pct": 5.0, "week_max_gain_from_entry_pct": 6.0},
         ("2025-11-14", "B", 1): {"is_complete_week": True, "week_close_return_from_entry_pct": 2.0, "week_max_gain_from_entry_pct": 3.0},
@@ -256,3 +249,20 @@ def test_12_s5_equals_e0_base(audit_environment):
         e0_pred = is_candidate_in_variant_pool(feat, "E0_BASE")
         s5_pred = is_candidate_in_variant_pool(feat, "S5_INDUSTRY_KNOWN")
         assert e0_pred == s5_pred
+
+
+def test_13_w3_is_marked_diagnostic_only(audit_environment):
+    """INVARIANT 13: W3 must be strictly marked as DIAGNOSTIC_ONLY across summary outputs."""
+    paths, _, _, _ = audit_environment
+    summary_path = paths.output_dir / "layer1_variant_horizon_summary.csv"
+    if summary_path.exists():
+        df = pd.read_csv(summary_path)
+        assert (df[df["horizon"] == "W3"]["horizon_status"] == "DIAGNOSTIC_ONLY").all()
+        assert (df[df["horizon"].isin(["W1", "W2", "W4"])]["horizon_status"] == "PRIMARY").all()
+
+
+def test_14_tightening_probes_registry_strictness():
+    """INVARIANT 14: Tightening probes must strictly contain only the 5 pre-registered single-factor probes."""
+    probe_names = [r[0] for r in ALL_VARIANTS_REGISTRY if r[1] == "TIGHTENING_PROBE"]
+    expected = ["T_FRESH_5", "T_FRESH_2", "T_EPS25", "T_ENTRY_VOLUME_15", "T_WEEKLY_VOLUME_13"]
+    assert probe_names == expected
