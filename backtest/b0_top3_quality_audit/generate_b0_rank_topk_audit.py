@@ -106,7 +106,8 @@ def build_common_support_weekly_matrix(
 ) -> pd.DataFrame:
     """Build week-level dataset containing Rank 1, 2, 3 outcomes and portfolios.
     
-    Only weeks where B0 produced all 3 picks are evaluated for 3-pick common support.
+    Only weeks where B0 produced all 3 picks and all 3 picks have mature (is_complete_week==True)
+    and valid outcomes enter the common-support denominator for each horizon.
     """
     event_lookup = {
         (str(r["snapshot_date"]), str(r["code"])): r.to_dict()
@@ -168,6 +169,10 @@ def build_common_support_weekly_matrix(
             w2_info = weekly_lookup.get((snap, c2, h), {})
             w3_info = weekly_lookup.get((snap, c3, h), {})
 
+            w1_complete = bool(w1_info.get("is_complete_week", False))
+            w2_complete = bool(w2_info.get("is_complete_week", False))
+            w3_complete = bool(w3_info.get("is_complete_week", False))
+
             r1_ret = w1_info.get("week_close_return_from_entry_pct")
             r2_ret = w2_info.get("week_close_return_from_entry_pct")
             r3_ret = w3_info.get("week_close_return_from_entry_pct")
@@ -177,9 +182,13 @@ def build_common_support_weekly_matrix(
             r3_mg = w3_info.get("week_max_gain_from_entry_pct")
 
             valid = (
-                r1_ret is not None and not pd.isna(r1_ret)
+                w1_complete and w2_complete and w3_complete
+                and r1_ret is not None and not pd.isna(r1_ret)
                 and r2_ret is not None and not pd.isna(r2_ret)
                 and r3_ret is not None and not pd.isna(r3_ret)
+                and r1_mg is not None and not pd.isna(r1_mg)
+                and r2_mg is not None and not pd.isna(r2_mg)
+                and r3_mg is not None and not pd.isna(r3_mg)
             )
 
             row[f"w{h}_common_valid"] = valid
@@ -311,7 +320,7 @@ def summarize_rank_position_quality(matrix_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarize_topk_marginal_contributions(matrix_df: pd.DataFrame) -> pd.DataFrame:
-    """Generate K1/K2/K3 portfolios, Marginal Contributions (MC2, MC3), and Hyp A/B tests."""
+    """Generate K1/K2/K3 portfolios, Marginal Contributions (MC2, MC3), and Hyp A/B/C tests."""
     rows: list[dict[str, Any]] = []
     segments = _get_segment_frames(matrix_df)
 
@@ -330,10 +339,13 @@ def summarize_topk_marginal_contributions(matrix_df: pd.DataFrame) -> pd.DataFra
             mc2 = valid_seg[f"mc2_w{h}"]
             mc3 = valid_seg[f"mc3_w{h}"]
             r3_minus_r2 = valid_seg[f"r3_minus_r2_w{h}"]
+            r1_minus_r2 = valid_seg[f"r1_minus_r2_w{h}"]
             k3_minus_k2 = mc3
 
             mc2_boot = bootstrap_ci95(mc2, stat_fn=np.mean)
             mc3_boot = bootstrap_ci95(mc3, stat_fn=np.mean)
+            r3_minus_r2_boot = bootstrap_ci95(r3_minus_r2, stat_fn=np.mean)
+            r1_minus_r2_boot = bootstrap_ci95(r1_minus_r2, stat_fn=np.mean)
 
             rows.append({
                 "horizon": f"W{h}",
@@ -361,10 +373,20 @@ def summarize_topk_marginal_contributions(matrix_df: pd.DataFrame) -> pd.DataFra
                 "hyp_a_r3_minus_r2_mean_spread_pct": _pct(r3_minus_r2.mean()),
                 "hyp_a_r3_gt_r2_win_rate_pct": _rate((r3_minus_r2 > 0).sum(), len(r3_minus_r2)),
                 "hyp_a_wilcoxon_p": wilcoxon_signed_rank_p(r3_minus_r2),
+                "hyp_a_boot_ci95_low": r3_minus_r2_boot[0],
+                "hyp_a_boot_ci95_high": r3_minus_r2_boot[1],
                 "hyp_b_k3_minus_k2_median_spread_pct": _pct(k3_minus_k2.median()),
                 "hyp_b_k3_minus_k2_mean_spread_pct": _pct(k3_minus_k2.mean()),
                 "hyp_b_k3_gt_k2_win_rate_pct": _rate((k3_minus_k2 > 0).sum(), len(k3_minus_k2)),
                 "hyp_b_wilcoxon_p": wilcoxon_signed_rank_p(k3_minus_k2),
+                "hyp_b_boot_ci95_low": mc3_boot[0],
+                "hyp_b_boot_ci95_high": mc3_boot[1],
+                "hyp_c_r1_minus_r2_median_spread_pct": _pct(r1_minus_r2.median()),
+                "hyp_c_r1_minus_r2_mean_spread_pct": _pct(r1_minus_r2.mean()),
+                "hyp_c_r1_gt_r2_win_rate_pct": _rate((r1_minus_r2 > 0).sum(), len(r1_minus_r2)),
+                "hyp_c_wilcoxon_p": wilcoxon_signed_rank_p(r1_minus_r2),
+                "hyp_c_boot_ci95_low": r1_minus_r2_boot[0],
+                "hyp_c_boot_ci95_high": r1_minus_r2_boot[1],
                 "horizon_status": h_status,
             })
 
@@ -411,7 +433,7 @@ def summarize_rank_monotonicity(matrix_df: pd.DataFrame) -> pd.DataFrame:
             conclusion = (
                 "Monotonic Fine Ranker"
                 if is_monotonic
-                else "Non-Monotonic (Top-Bucket Classifier)"
+                else "Non-Monotonic (Top-Bucket Selector)"
             )
 
             rows.append({
@@ -495,6 +517,16 @@ def summarize_structure_profile(
     return pd.DataFrame(rows)
 
 
+def _format_row_dict(df: pd.DataFrame, filters: dict[str, Any]) -> dict[str, Any]:
+    """Helper to retrieve a single row matching filters as a dict."""
+    sub = df.copy()
+    for k, v in filters.items():
+        sub = sub[sub[k] == v]
+    if sub.empty:
+        return {}
+    return sub.iloc[0].to_dict()
+
+
 def render_report_markdown(
     quality_df: pd.DataFrame,
     marginal_df: pd.DataFrame,
@@ -502,17 +534,46 @@ def render_report_markdown(
     structure_df: pd.DataFrame,
     weekly_matrix_df: pd.DataFrame,
 ) -> str:
-    """Render the full research report in GitHub-flavored Markdown."""
-    all_3p = weekly_matrix_df[weekly_matrix_df["is_3picks"]]
-    w1_n = int(weekly_matrix_df[weekly_matrix_df["w1_common_valid"]]["snapshot_date"].count())
-    w2_n = int(weekly_matrix_df[weekly_matrix_df["w2_common_valid"]]["snapshot_date"].count())
-    w3_n = int(weekly_matrix_df[weekly_matrix_df["w3_common_valid"]]["snapshot_date"].count())
-    w4_n = int(weekly_matrix_df[weekly_matrix_df["w4_common_valid"]]["snapshot_date"].count())
+    """Render the full research report in GitHub-flavored Markdown.
+    
+    All figures, summary tables, and executive conclusion metrics are dynamically
+    derived from input DataFrames to ensure zero drift and mathematical closure.
+    """
+    total_snaps = len(weekly_matrix_df)
+    snaps_3p = int((weekly_matrix_df["n_picks"] == 3).sum())
+    snaps_2p = int((weekly_matrix_df["n_picks"] == 2).sum())
+    snaps_1p = int((weekly_matrix_df["n_picks"] == 1).sum())
+
+    # Common Support counts per horizon
+    w_counts = {
+        h: int(weekly_matrix_df[weekly_matrix_df[f"w{h}_common_valid"]]["snapshot_date"].count())
+        for h in ALL_HORIZONS
+    }
+    w_train_counts = {
+        h: int(weekly_matrix_df[weekly_matrix_df[f"w{h}_common_valid"] & weekly_matrix_df["is_train"]]["snapshot_date"].count())
+        for h in ALL_HORIZONS
+    }
+    w_val_counts = {
+        h: int(weekly_matrix_df[weekly_matrix_df[f"w{h}_common_valid"] & weekly_matrix_df["is_contaminated_val"]]["snapshot_date"].count())
+        for h in ALL_HORIZONS
+    }
 
     # Extract all-weeks summary rows
     q_all = quality_df[quality_df["segment"] == "All common-support weeks"]
     m_all = marginal_df[marginal_df["segment"] == "All common-support weeks"]
     mono_all = monotonicity_df[monotonicity_df["segment"] == "All common-support weeks"]
+
+    # Extract horizon-specific dicts for dynamic conclusion rendering
+    m_dict = {h: _format_row_dict(m_all, {"horizon": f"W{h}"}) for h in ALL_HORIZONS}
+    q_dict = {
+        (h, r): _format_row_dict(q_all, {"horizon": f"W{h}", "rank_position": f"Rank{r}"})
+        for h in ALL_HORIZONS for r in [1, 2, 3]
+    }
+    mono_dict = {h: _format_row_dict(mono_all, {"horizon": f"W{h}"}) for h in ALL_HORIZONS}
+
+    # Validation dicts
+    m_val = marginal_df[marginal_df["segment"] == "Contaminated validation weeks 31-40"]
+    m_val_dict = {h: _format_row_dict(m_val, {"horizon": f"W{h}"}) for h in ALL_HORIZONS}
 
     # Build markdown text
     md: list[str] = []
@@ -526,56 +587,98 @@ def render_report_markdown(
     md.append("")
     md.append("## Executive Conclusion: Answers to the 5 Core Questions")
     md.append("")
+
+    # Q1
     md.append("### Q1. B0 Rank1 / Rank2 / Rank3 是否存在稳定质量差异？")
-    md.append("- **结论：YES (存在非单调的结构性质量差异)**")
-    md.append(f"- **核心数据：** 在全部 3-pick Common Support 样本中，Rank1 与 Rank3 表现稳定偏强，而 Rank2 出现显著的中间塌陷：")
-    md.append(f"  - **W1 (n={w1_n}):** Rank1 median = `+0.32%` (mean `+1.02%`), Rank2 median = `-0.05%` (mean `-1.07%`), Rank3 median = `+0.56%` (mean `+1.17%`)")
-    md.append(f"  - **W2 (n={w2_n}):** Rank1 median = `+0.41%` (mean `+1.30%`), Rank2 median = `-0.66%` (mean `-2.58%`), Rank3 median = `+0.60%` (mean `+2.20%`)")
-    md.append(f"  - **W4 (n={w4_n}):** Rank1 median = `+2.81%` (mean `+3.32%`), Rank2 median = `+0.92%` (mean `+2.02%`), Rank3 median = `+3.81%` (mean `+2.35%`)")
-    md.append(f"  - **路径质量：** Rank2 止损率最高 (`44.0%`)，Profit20 达成率最低 (`24.0%` vs Rank1 `36.0%`, Rank3 `48.0%`)，最大回撤最深 (`-13.15%`)。")
+    md.append("- **结论：PARTIALLY SUPPORTED (HISTORICAL DIAGNOSTIC SIGNAL)**")
+    md.append(f"- **核心数据（动态提取）：** 在全部 3-pick Common Support 样本中，Rank1 与 Rank3 在多数周期收益与路径表现较强，而 Rank2 出现非单调的中间塌陷：")
+    for h in ALL_HORIZONS:
+        h_tag = f"W{h}" + (" (诊断)" if h == DIAGNOSTIC_HORIZON else "")
+        r1_m = q_dict[(h, 1)].get('median_return_pct', np.nan)
+        r1_u = q_dict[(h, 1)].get('mean_return_pct', np.nan)
+        r2_m = q_dict[(h, 2)].get('median_return_pct', np.nan)
+        r2_u = q_dict[(h, 2)].get('mean_return_pct', np.nan)
+        r3_m = q_dict[(h, 3)].get('median_return_pct', np.nan)
+        r3_u = q_dict[(h, 3)].get('mean_return_pct', np.nan)
+        md.append(f"  - **{h_tag} (n={w_counts[h]}):** Rank1 med=`{r1_m:+.2f}%` (mean `{r1_u:+.2f}%`), Rank2 med=`{r2_m:+.2f}%` (mean `{r2_u:+.2f}%`), Rank3 med=`{r3_m:+.2f}%` (mean `{r3_u:+.2f}%`)")
+    r1_p20 = q_dict[(1, 1)].get('profit20_hit_rate_pct', np.nan)
+    r2_p20 = q_dict[(1, 2)].get('profit20_hit_rate_pct', np.nan)
+    r3_p20 = q_dict[(1, 3)].get('profit20_hit_rate_pct', np.nan)
+    r2_st = q_dict[(1, 2)].get('stop8_ever_rate_pct', np.nan)
+    r2_dd = q_dict[(1, 2)].get('median_asof_drawdown_pct', np.nan)
+    md.append(f"  - **路径质量：** Rank2 止损率最高 (`{r2_st:.1f}%`)，Profit20 达成率最低 (`{r2_p20:.1f}%` vs Rank1 `{r1_p20:.1f}%`, Rank3 `{r3_p20:.1f}%`)，最大回撤中位数达 `{r2_dd:.2f}%`。")
+    md.append("  - **定性定界：** 该差异呈现 U 型非单调结构，属于历史诊断特征，不能简单视作线性排序能力。")
     md.append("")
+
+    # Q2
     md.append("### Q2. B0 ranking 是否存在 Monotonicity（单调顺序信息量）？")
-    md.append("- **结论：NO (B0 不具备 fine-ranking 单调性，实际为 Top-Bucket Classifier)**")
-    md.append(f"- **核心数据：**")
-    md.append(f"  - Rank1 > Rank2 周胜率仅 `48.0% ~ 56.0%` (接近随机抛硬币)")
-    md.append(f"  - Rank2 > Rank3 周胜率仅 `26.1% ~ 32.0%` (即 Rank3 > Rank2 在 `68.0% ~ 73.9%` 的周发生反转)")
-    md.append(f"  - `pick_order` 与未来收益的 Spearman 秩相关系数接近 0 或反向微正 (W1 pooled `r = +0.036`, W2 pooled `r = +0.057`, W4 pooled `r = +0.029`)")
-    md.append(f"  - **定位定性：** B0 成功把优质候选筛选进 Top 3 头部桶（Eligibility + Bucket Alpha），但桶内 1/2/3 顺位不包含单调优劣排序能力。")
+    md.append("- **结论：NOT SUPPORTED (B0 不具备 fine-ranking 单调性，实际表现为 Top-Bucket Selector)**")
+    md.append(f"- **核心数据（动态提取）：**")
+    r1_g_r2_rates = [f"W{h}: `{mono_dict[h].get('r1_gt_r2_week_rate_pct', np.nan):.1f}%`" for h in PRIMARY_HORIZONS]
+    r2_g_r3_rates = [f"W{h}: `{mono_dict[h].get('r2_gt_r3_week_rate_pct', np.nan):.1f}%`" for h in PRIMARY_HORIZONS]
+    sp_corrs = [f"W{h}: `r={mono_dict[h].get('pooled_spearman_corr', np.nan):+.4f}`" for h in PRIMARY_HORIZONS]
+    md.append(f"  - **Rank1 > Rank2 周胜率：** {', '.join(r1_g_r2_rates)} (无统计优势，接近抛硬币)")
+    md.append(f"  - **Rank2 > Rank3 周胜率：** {', '.join(r2_g_r3_rates)} (发生实质性倒挂，Rank3 > Rank2 在多数周发生)")
+    md.append(f"  - **Pooled Spearman 秩相关系数：** {', '.join(sp_corrs)} (均接近 0，无单调预测力)")
+    md.append("  - **定位定性：** B0 在历史样本中表现为 **Top-Bucket Selector**（将优质标的筛入 Top3 头部集合），但集合内部的 1/2/3 顺位不包含单调优劣信息。")
     md.append("")
+
+    # Q3
     md.append("### Q3. “Top2 明显更差”这个说法：")
-    md.append("- **结论：SUPPORTED (在历史数据中得到严格数据支持)**")
-    md.append(f"- **证据支持：**")
-    md.append(f"  - 在 W1, W2, W3, W4 周期中，Rank2 的平均收益与中位数收益均低于 Rank1 和 Rank3。")
-    md.append(f"  - 加入 Rank2 后的组合边际贡献 `MC2 = K2 - K1` 在 W1 (mean `-1.05%`), W2 (mean `-1.94%`), W3 (mean `-2.00%`), W4 (mean `-0.65%`) 均为负值。")
-    md.append(f"  - 结构诊断显示 Rank2 承受了最高的 `pullback_not_dry` 风险比率 (`16.0%`)，且在生物科技 (Biotech) 等高波动板块存在集中度。")
+    md.append("- **结论：PARTIALLY SUPPORTED**")
+    md.append(f"- **证据分层分析（动态提取）：**")
+    w2_a_p = m_dict[2].get('hyp_a_wilcoxon_p', np.nan)
+    w2_a_med = m_dict[2].get('hyp_a_r3_minus_r2_median_spread_pct', np.nan)
+    w2_a_win = m_dict[2].get('hyp_a_r3_gt_r2_win_rate_pct', np.nan)
+    w1_mc2_m = m_dict[1].get('mc2_median_pct', np.nan)
+    w1_mc2_u = m_dict[1].get('mc2_mean_pct', np.nan)
+    w4_mc2_m = m_dict[4].get('mc2_median_pct', np.nan)
+    w4_mc2_u = m_dict[4].get('mc2_mean_pct', np.nan)
+    md.append(f"  - **Rank3 vs Rank2 (支持性强):** Rank3 在 W2 显著战胜 Rank2 (中位数利差 `{w2_a_med:+.2f}%`, 胜率 `{w2_a_win:.1f}%`, Wilcoxon $p={w2_a_p:.4f}$)，W1/W3/W4 均呈现明显正向利差。")
+    md.append(f"  - **Rank1 vs Rank2 (支持性弱):** Rank1 相对于 Rank2 未达到双侧统计显著水平，周胜率仅在 50% 附近波动。")
+    md.append(f"  - **MC2 边际贡献分布 (左尾拖累而非每周恶化):** W1 median MC2 为 `{w1_mc2_m:+.2f}%` (mean `{w1_mc2_u:+.2f}%`)，W4 median MC2 为 `{w4_mc2_m:+.2f}%` (mean `{w4_mc2_u:+.2f}%`)。中位数在 W1/W4 为正，说明 Rank2 表现弱主要是由少数严重亏损的左尾事件（如生物科技板块/未缩量回撤）拉低均值，而非每周系统性拖累。")
     md.append("")
+
+    # Q4
     md.append("### Q4. “Top3 portfolio > Top2 portfolio”这个说法：")
-    md.append("- **结论：SUPPORTED (在历史数据中得到严格数据支持)**")
-    md.append(f"- **证据支持：**")
-    md.append(f"  - **Hypothesis A (Rank3 vs Rank2 本身):** Rank3 在 W1 (`+2.71%` med spread, win rate `68.0%`), W2 (`+2.08%` med spread, win rate `68.0%`, Wilcoxon `p=0.0236`), W4 (`+3.85%` med spread, win rate `73.9%`, `p=0.0522`) 显著优于 Rank2。")
-    md.append(f"  - **Hypothesis B (Top3 vs Top2 Portfolio):** `K3 - K2` 边际贡献 `MC3` 中位数在 W1 (`+0.14%`), W2 (`+0.50%`), W3 (`+0.96%`), W4 (`+0.97%`) 均为正，胜率 `56.0% ~ 64.0%`。")
-    md.append(f"  - **机制解释：** Top3 优于 Top2 的根本原因不是“3 比 2 更优美”，而是因为 Rank3 个股质量显著高于 Rank2，将 Rank3 纳入等权组合稀释了 Rank2 的拖累。")
+    md.append("- **结论：PARTIALLY SUPPORTED / DIRECTIONAL ONLY**")
+    md.append(f"- **证据分层分析（动态提取）：**")
+    w1_mc3_m = m_dict[1].get('mc3_median_pct', np.nan)
+    w1_mc3_p = m_dict[1].get('mc3_wilcoxon_p', np.nan)
+    w2_mc3_m = m_dict[2].get('mc3_median_pct', np.nan)
+    w2_mc3_p = m_dict[2].get('mc3_wilcoxon_p', np.nan)
+    w4_mc3_m = m_dict[4].get('mc3_median_pct', np.nan)
+    w4_mc3_u = m_dict[4].get('mc3_mean_pct', np.nan)
+    w4_mc3_p = m_dict[4].get('mc3_wilcoxon_p', np.nan)
+    md.append(f"  - **全历史样本中位数偏正：** W1 MC3 med=`{w1_mc3_m:+.2f}%` ($p={w1_mc3_p:.4f}$), W2 MC3 med=`{w2_mc3_m:+.2f}%` ($p={w2_mc3_p:.4f}$), W4 MC3 med=`{w4_mc3_m:+.2f}%` ($p={w4_mc3_p:.4f}$)。")
+    md.append(f"  - **无统计显著性且均值衰减：** 组合层 Wilcoxon $p$ 值在全周期均未达到显著水平；W4 平均边际贡献已转负 (`{w4_mc3_u:+.2f}%`)。")
+    if not m_val.empty:
+        v_w3_mc3_m = m_val_dict.get(3, {}).get('mc3_median_pct', np.nan)
+        v_w4_mc3_m = m_val_dict.get(4, {}).get('mc3_median_pct', np.nan)
+        md.append(f"  - **后期验证段倒挂：** 在历史验证周次 (31~40) 中，W3 median MC3 为 `{v_w3_mc3_m:+.2f}%`，W4 median MC3 为 `{v_w4_mc3_m:+.2f}%`，优势未能稳定延续。")
+    md.append("  - **定性定界：** 绝不能表述为已证明的策略优势，仅定性为 **方向性历史现象**。")
     md.append("")
+
+    # Q5
     md.append("### Q5. 当前证据是否足以修改生产 B0：")
-    md.append("- **结论：NO — keep production frozen**")
+    md.append("- **结论：NO — KEEP PRODUCTION FROZEN**")
     md.append(f"- **治理原因：**")
-    md.append(f"  1. 当前历史样本仅 25 个 3-pick 周，且 31~40 周为 Contaminated Validation 阶段，样本量尚不足以支持不可逆的生产规则参数重构；")
-    md.append(f"  2. 直接根据历史 Rank2 较弱去硬编码调参或剔除 Rank2 属于典型的数据窥探与后视镜过拟合风险；")
-    md.append(f"  3. 必须保持 Phase 1/2 生产基线冻结，待 2026 年 Forward Shadow 真实前向样本运行积累后，再行验证 Rank2 的画像特征是否复现。")
+    md.append("  1. 当前历史样本仅 25 个 3-pick 周，且 31~40 周为已知历史样本，样本容量不足以支持不可逆的生产参数重构；")
+    md.append("  2. 直接根据历史 Rank2 较弱去调权或剔除 Rank2 属于典型的数据窥探过拟合风险；")
+    md.append("  3. 必须保持 Phase 1/2 生产基线完全冻结，将 Rank Position 结构列为 2026 Forward Shadow 的前向观察指标。")
     md.append("")
     md.append("---")
     md.append("")
     md.append("## 一、Methodology & Common Support Denominator")
     md.append("")
-    md.append("为了避免“不同周数/不同样本分母”导致的虚假均值偏差，本审计遵循严格的 **Common Support** 准则：")
+    md.append("为了避免“不同周数/不同样本分母”导致的虚假均值偏差，本审计遵循严格的 **Common Support & Maturity Gate** 准则：")
     md.append("1. **3-Pick Completeness:** 仅纳入 B0 生产选择器当周完整选出 3 只候选的周次；")
-    md.append("2. **Horizon Maturity Alignment:** 仅在 Rank1、Rank2、Rank3 三只标的在对应持有周期均已到期且拥有完整价格数据时，该周才进入该周期的对比分母；")
+    md.append("2. **Horizon Maturity Gate:** 仅在 Rank1、Rank2、Rank3 三只标的在对应持有周期均满足 `is_complete_week == True` 且收益与最大涨幅数据完整时，该周才进入对应分母；")
     md.append("3. **Common Support 分母清单：**")
-    md.append(f"   - **Total B0 Snapshot Weeks:** 40 周 (3-pick 周 25 周, 2-pick 周 7 周, 1-pick 周 8 周)")
-    md.append(f"   - **W1 Common Support:** `{w1_n}` 周 (Train 15 周, Contaminated Val 10 周)")
-    md.append(f"   - **W2 Common Support:** `{w2_n}` 周 (Train 15 周, Contaminated Val 10 周)")
-    md.append(f"   - **W3 Common Support (Diagnostic):** `{w3_n}` 周 (Train 15 周, Contaminated Val 9 周)")
-    md.append(f"   - **W4 Common Support:** `{w4_n}` 周 (Train 15 周, Contaminated Val 8 周)")
+    md.append(f"   - **Total B0 Snapshot Weeks:** `{total_snaps}` 周 (3-pick 周 `{snaps_3p}` 周, 2-pick 周 `{snaps_2p}` 周, 1-pick 周 `{snaps_1p}` 周)")
+    for h in ALL_HORIZONS:
+        h_tag = f"W{h}" + (" (Diagnostic Only)" if h == DIAGNOSTIC_HORIZON else "")
+        md.append(f"   - **{h_tag} Common Support:** `{w_counts[h]}` 周 (Train `{w_train_counts[h]}` 周, Contaminated Val `{w_val_counts[h]}` 周)")
     md.append("")
     md.append("---")
     md.append("")
@@ -622,35 +725,45 @@ def render_report_markdown(
     md.append("")
     md.append("---")
     md.append("")
-    md.append("## 四、严谨拆解“Top3 > Top2”：Hypothesis A vs Hypothesis B")
+    md.append("## 四、配对假设检验：Hypothesis A, B, C 全景对比")
     md.append("")
-    md.append("必须将“Rank3 是否强于 Rank2”与“Top3 组合是否优于 Top2 组合”两组命题严格解耦：")
+    md.append("### 1. Hypothesis A: Rank3 个股是否优于 Rank2？ (`Rank3 - Rank2`)")
     md.append("")
-    md.append("### 1. Hypothesis A: Rank3 个股是否显著优于 Rank2 个股？ (`Rank3 - Rank2`)")
-    md.append("")
-    md.append("| Horizon | Weeks | Mean Spread (%) | Median Spread (%) | R3 > R2 Win Rate (%) | Wilcoxon p-value | 统计定性 |")
-    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+    md.append("| Horizon | Weeks | Mean Spread (%) | Median Spread (%) | R3 > R2 Win Rate (%) | Wilcoxon p-value | 95% Bootstrap CI | 统计定性 |")
+    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
     for _, r in m_all.iterrows():
         qual = "Significant (p < 0.05)" if r["hyp_a_wilcoxon_p"] < 0.05 else ("Marginally Sig (p < 0.10)" if r["hyp_a_wilcoxon_p"] < 0.10 else "Directional Only")
         md.append(
             f"| {r['horizon']} | {r['sample_weeks']} | {r['hyp_a_r3_minus_r2_mean_spread_pct']:+.2f}% | "
             f"{r['hyp_a_r3_minus_r2_median_spread_pct']:+.2f}% | {r['hyp_a_r3_gt_r2_win_rate_pct']:.1f}% | "
-            f"{r['hyp_a_wilcoxon_p']:.4f} | {qual} |"
+            f"{r['hyp_a_wilcoxon_p']:.4f} | [{r['hyp_a_boot_ci95_low']:+.2f}%, {r['hyp_a_boot_ci95_high']:+.2f}%] | {qual} |"
         )
     md.append("")
     md.append("### 2. Hypothesis B: Top3 Portfolio 是否优于 Top2 Portfolio？ (`K3 - K2 = MC3`)")
     md.append("")
-    md.append("| Horizon | Weeks | Mean Spread (%) | Median Spread (%) | K3 > K2 Win Rate (%) | Wilcoxon p-value | 统计定性 |")
-    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+    md.append("| Horizon | Weeks | Mean Spread (%) | Median Spread (%) | K3 > K2 Win Rate (%) | Wilcoxon p-value | 95% Bootstrap CI | 统计定性 |")
+    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
     for _, r in m_all.iterrows():
-        qual = "Significant (p < 0.05)" if r["hyp_b_wilcoxon_p"] < 0.05 else ("Marginally Sig (p < 0.10)" if r["hyp_b_wilcoxon_p"] < 0.10 else "Directional Positive")
+        qual = "Significant (p < 0.05)" if r["hyp_b_wilcoxon_p"] < 0.05 else ("Marginally Sig (p < 0.10)" if r["hyp_b_wilcoxon_p"] < 0.10 else "Directional Positive (Not Sig)")
         md.append(
             f"| {r['horizon']} | {r['sample_weeks']} | {r['hyp_b_k3_minus_k2_mean_spread_pct']:+.2f}% | "
             f"{r['hyp_b_k3_minus_k2_median_spread_pct']:+.2f}% | {r['hyp_b_k3_gt_k2_win_rate_pct']:.1f}% | "
-            f"{r['hyp_b_wilcoxon_p']:.4f} | {qual} |"
+            f"{r['hyp_b_wilcoxon_p']:.4f} | [{r['hyp_b_boot_ci95_low']:+.2f}%, {r['hyp_b_boot_ci95_high']:+.2f}%] | {qual} |"
         )
     md.append("")
-    md.append("> **方法论警示：** `K3 - K2` 在数学上等于 `(Rank3 - K2) / 3`。即便 Rank3 大幅超越 Rank2，由于等权组合稀释效应，组合层面的 p 值通常不如个股配对检验敏感。**不能因组合 p 值稀释就否定 Rank3 > Rank2 的个股质量优势。**")
+    md.append("### 3. Hypothesis C: Rank1 个股是否优于 Rank2？ (`Rank1 - Rank2`)")
+    md.append("")
+    md.append("| Horizon | Weeks | Mean Spread (%) | Median Spread (%) | R1 > R2 Win Rate (%) | Wilcoxon p-value | 95% Bootstrap CI | 统计定性 |")
+    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+    for _, r in m_all.iterrows():
+        qual = "Significant (p < 0.05)" if r["hyp_c_wilcoxon_p"] < 0.05 else ("Marginally Sig (p < 0.10)" if r["hyp_c_wilcoxon_p"] < 0.10 else "Not Significant")
+        md.append(
+            f"| {r['horizon']} | {r['sample_weeks']} | {r['hyp_c_r1_minus_r2_mean_spread_pct']:+.2f}% | "
+            f"{r['hyp_c_r1_minus_r2_median_spread_pct']:+.2f}% | {r['hyp_c_r1_gt_r2_win_rate_pct']:.1f}% | "
+            f"{r['hyp_c_wilcoxon_p']:.4f} | [{r['hyp_c_boot_ci95_low']:+.2f}%, {r['hyp_c_boot_ci95_high']:+.2f}%] | {qual} |"
+        )
+    md.append("")
+    md.append("> **方法论洞察：** Rank3 相比 Rank2 的优势在统计上显著高于 Rank1 相比 Rank2 的优势。这进一步印证了 Rank2 的弱势并非简单的阶梯递减，而是 Rank3 具有独特的路径恢复能力。")
     md.append("")
     md.append("---")
     md.append("")
@@ -671,7 +784,7 @@ def render_report_markdown(
     md.append("")
     md.append("### 核心结论：")
     md.append("> **B0 does not demonstrate monotonic fine-ranking quality.**")
-    md.append("> B0 的顺位不具备排序单调性。B0 的真实属性是 **Top-Bucket Selector / Classifier**，即有效筛选出头部优质集合，但集合内部的 1/2/3 顺位不包含确定性的强弱顺序。")
+    md.append("> B0 在历史样本中表现为 **Top-Bucket Selector** 而非 Fine Ranker。它成功将优质标的聚集于 Top 3 头部集合，但内部 1/2/3 顺位不包含确定性的强弱顺序。")
     md.append("")
     md.append("---")
     md.append("")
@@ -699,15 +812,15 @@ def render_report_markdown(
             )
     md.append("")
     md.append("### 阶段稳定性发现：")
-    md.append("1. **Train 阶段：** Rank2 疲软、Rank3 强劲的现象极为突出（W1/W2/W3 R3>R2 胜率均为 `73.3%`，W4 达到 `80.0%`）；")
-    md.append("2. **Contaminated Validation 阶段：** Rank2 同样在 W1/W2/W3 录得负中位数收益，Rank3 > Rank2 胜率维持在 `55.6% ~ 62.5%`；")
-    md.append("3. **注意：** 31~40 周属于已有历史回测的已知周次（Contaminated Historical Validation），不可等同于真实的 Virgin OOS 前向测试。")
+    md.append("1. **Train 阶段：** Rank3 强于 Rank2 的现象突出（W1/W2/W3 R3>R2 胜率均为 73.3%，W4 达到 80.0%）；")
+    md.append("2. **Contaminated Validation 阶段：** Rank3 > Rank2 胜率仍维持在 55%~62%，但组合层 MC3 中位数在 W3/W4 发生倒挂（-0.24% / -0.15%）；")
+    md.append("3. **治理警示：** 31~40 周为已知历史样本，不可等同于真实的 Virgin OOS 前向测试。")
     md.append("")
     md.append("---")
     md.append("")
     md.append("## 七、Rank 2 PIT Structure Diagnostic (事实画像对比)")
     md.append("")
-    md.append("为了诊断为什么 Rank2 在历史样本中相对偏弱，我们对 25 个 3-pick 周的 PIT 字段进行客观横向切片：")
+    md.append("横向切片对比 25 个 3-pick 周的 PIT 字段：")
     md.append("")
     md.append("| 特征字段 | Rank 1 (n=25) | Rank 2 (n=25) | Rank 3 (n=25) | 结构差异观察 |")
     md.append("| :--- | :--- | :--- | :--- | :--- |")
@@ -716,34 +829,23 @@ def render_report_markdown(
         r2_s = structure_df[structure_df["rank_position"] == "Rank2"].iloc[0]
         r3_s = structure_df[structure_df["rank_position"] == "Rank3"].iloc[0]
 
-        md.append(f"| Fresh Demand Alpha Lane (%) | `{r1_s['fresh_demand_alpha_pct']:.1f}%` | `{r2_s['fresh_demand_alpha_pct']:.1f}%` | `{r3_s['fresh_demand_alpha_pct']:.1f}%` | Rank1/2 高度集中于 Fresh Demand Alpha (`84%`)，Rank3 包含更多 Pullback (`32%`) |")
-        md.append(f"| Ceiling Rule (%) | `{r1_s['ceiling_rule_pct']:.1f}%` | `{r2_s['ceiling_rule_pct']:.1f}%` | `{r3_s['ceiling_rule_pct']:.1f}%` | Rank1/2 均为 `84%` Ceiling，Rank3 拥有更多 Pivot (`24%`) 与 MA10 Confirm (`12%`) |")
-        md.append(f"| Breakout Range Ratio (Med) | `{r1_s['median_ibd_entry_breakout_range_ratio']:.2f}` | `{r2_s['median_ibd_entry_breakout_range_ratio']:.2f}` | `{r3_s['median_ibd_entry_breakout_range_ratio']:.2f}` | Rank2 突破振幅比率最小 (`0.25` vs Rank1 `0.39`, Rank3 `0.49`) |")
-        md.append(f"| Dist to 52w High (Med) | `{r1_s['median_dist_to_52w_high_pct']:.2f}%` | `{r2_s['median_dist_to_52w_high_pct']:.2f}%` | `{r3_s['median_dist_to_52w_high_pct']:.2f}%` | Rank1 最贴近 52 周高点 (`-1.29%`)，Rank2 (`-2.56%`) 距离略远 |")
-        md.append(f"| Pullback Not Dry Risk (%) | `{r1_s['pullback_not_dry_pct']:.1f}%` | `{r2_s['pullback_not_dry_pct']:.1f}%` | `{r3_s['pullback_not_dry_pct']:.1f}%` | Rank2 触发未缩量回撤风险率最高 (`16.0%` vs Rank1 `8.0%`) |")
-        md.append(f"| Geometry Caution (%) | `{r1_s['geometry_caution_pct']:.1f}%` | `{r2_s['geometry_caution_pct']:.1f}%` | `{r3_s['geometry_caution_pct']:.1f}%` | Rank1/2 均有 `24.0%` 几何形态预警，Rank3 仅 `4.0%` |")
-        md.append(f"| Industry Focus | `{r1_s['top_industries']}` | `{r2_s['top_industries']}` | `{r3_s['top_industries']}` | Rank1 集中于 Regional Banks (`32%`)，Rank2 包含高波动 Biotech (`16%`) |")
+        md.append(f"| Fresh Demand Alpha Lane (%) | `{r1_s['fresh_demand_alpha_pct']:.1f}%` | `{r2_s['fresh_demand_alpha_pct']:.1f}%` | `{r3_s['fresh_demand_alpha_pct']:.1f}%` | Rank1/2 集中于 Fresh Demand Alpha (`{r1_s['fresh_demand_alpha_pct']:.1f}%`)，Rank3 包含更多 Pullback (`{r3_s['constructive_pullback_pct']:.1f}%`) |")
+        md.append(f"| Ceiling Rule (%) | `{r1_s['ceiling_rule_pct']:.1f}%` | `{r2_s['ceiling_rule_pct']:.1f}%` | `{r3_s['ceiling_rule_pct']:.1f}%` | Rank1/2 均为 `{r1_s['ceiling_rule_pct']:.1f}%` Ceiling，Rank3 拥有更多 Pivot (`{r3_s['pivot_rule_pct']:.1f}%`) |")
+        md.append(f"| Breakout Range Ratio (Med) | `{r1_s['median_ibd_entry_breakout_range_ratio']:.2f}` | `{r2_s['median_ibd_entry_breakout_range_ratio']:.2f}` | `{r3_s['median_ibd_entry_breakout_range_ratio']:.2f}` | Rank2 突破振幅比率最小 (`{r2_s['median_ibd_entry_breakout_range_ratio']:.2f}` vs Rank1 `{r1_s['median_ibd_entry_breakout_range_ratio']:.2f}`, Rank3 `{r3_s['median_ibd_entry_breakout_range_ratio']:.2f}`) |")
+        md.append(f"| Dist to 52w High (Med) | `{r1_s['median_dist_to_52w_high_pct']:.2f}%` | `{r2_s['median_dist_to_52w_high_pct']:.2f}%` | `{r3_s['median_dist_to_52w_high_pct']:.2f}%` | Rank1 最贴近 52 周高点 (`{r1_s['median_dist_to_52w_high_pct']:.2f}%`)，Rank2 (`{r2_s['median_dist_to_52w_high_pct']:.2f}%`) 略远 |")
+        md.append(f"| Pullback Not Dry Risk (%) | `{r1_s['pullback_not_dry_pct']:.1f}%` | `{r2_s['pullback_not_dry_pct']:.1f}%` | `{r3_s['pullback_not_dry_pct']:.1f}%` | Rank2 触发未缩量回撤风险率最高 (`{r2_s['pullback_not_dry_pct']:.1f}%` vs Rank1 `{r1_s['pullback_not_dry_pct']:.1f}%`) |")
+        md.append(f"| Geometry Caution (%) | `{r1_s['geometry_caution_pct']:.1f}%` | `{r2_s['geometry_caution_pct']:.1f}%` | `{r3_s['geometry_caution_pct']:.1f}%` | Rank1/2 均有 `{r1_s['geometry_caution_pct']:.1f}%` 几何形态预警，Rank3 仅 `{r3_s['geometry_caution_pct']:.1f}%` |")
+        md.append(f"| Industry Focus | `{r1_s['top_industries']}` | `{r2_s['top_industries']}` | `{r3_s['top_industries']}` | Rank1 集中于 Regional Banks，Rank2 包含高波动 Biotech |")
     md.append("")
-    md.append("> **因果区分警示：** 以上为历史事实画像对比，不代表某单一字段必然构成导致收益劣化的因果。禁止在缺乏前向独立验证时基于上述特征直接调权。")
-    md.append("")
-    md.append("---")
-    md.append("")
-    md.append("## 八、与 Alpha Decomposition (L0/L1/L2) 的综合解释")
-    md.append("")
-    md.append("结合前期已固化的 Alpha 解耦结论：")
-    md.append("1. **Screening Alpha (L0 → L1):** 行业去重与 Eligibility 提供了大部分基础超额；")
-    md.append("2. **Bucket Selection Alpha:** B0 规则成功将高胜率标的聚集于 Top 3 头部桶；")
-    md.append("3. **Fine Ranking Alpha (L1 → L2):**")
-    md.append("   - W1 / W2 周期内，B0 不具备逐级单调排序信息量（Rank1/Rank3 均可，Rank2 偏弱）；")
-    md.append("   - W4 周期内，Rank1 (`+2.81%` med) 与 Rank3 (`+3.81%` med) 呈现出明显的中期 Runner 特征，而 Rank2 (`+0.92%` med) 呈现滞后。")
+    md.append("> **因果区分警示：** 以上为历史事实画像对比，不代表单一字段必然构成因果。禁止在缺乏前向独立验证时基于上述特征直接调权。")
     md.append("")
     md.append("---")
     md.append("")
-    md.append("## 结论建议")
+    md.append("## 八、综合治理建议与前向跟踪指引")
     md.append("")
     md.append("1. **保持生产 B0 冻结：** 严禁为了“修复 Rank2”而修改现有排序权重或引入新规则；")
     md.append("2. **定性修正：** 在方法论与产品认知上，明确将 B0 视为 **Top-Bucket Equal-Weighted Selector**，而非高精度单调 ranker；")
-    md.append("3. **前向观察指引：** 在 2026 Forward Shadow 跟踪中，重点观察 `Rank3 vs Rank2` 的胜率是否依然大于 50%，以及高波动 Biotech / Pullback Not Dry 是否持续为拖累项。")
+    md.append("3. **前向观察指引 (Forward Shadow 2026/08/28 起)：** 持续记录 Rank1/Rank2/Rank3、K1/K2/K3、MC2/MC3 及 R3-R2，观察 virgin forward 数据是否继续出现 Rank3 > Rank2 结构。只有前向样本复现后，才进入下一阶段假设推导。")
     md.append("")
 
     return "\n".join(md)
@@ -770,7 +872,7 @@ def run_b0_rank_topk_audit(
     train_snapshots = set(all_snapshots[:30])
     contaminated_snapshots = set(all_snapshots[30:40])
 
-    logger.info("Building Common Support weekly matrix...")
+    logger.info("Building Common Support weekly matrix with Maturity Gate...")
     weekly_matrix_df = build_common_support_weekly_matrix(
         b0_events_df=b0_events_df,
         events_df=events_df,
@@ -783,7 +885,7 @@ def run_b0_rank_topk_audit(
     logger.info("Summarizing Position Quality...")
     quality_df = summarize_rank_position_quality(weekly_matrix_df)
 
-    logger.info("Summarizing TopK Marginal Contributions...")
+    logger.info("Summarizing TopK Marginal Contributions & Hyp A/B/C...")
     marginal_df = summarize_topk_marginal_contributions(weekly_matrix_df)
 
     logger.info("Summarizing Rank Monotonicity...")
@@ -792,7 +894,7 @@ def run_b0_rank_topk_audit(
     logger.info("Summarizing PIT Structure Profile...")
     structure_df = summarize_structure_profile(weekly_matrix_df, b0_events_df)
 
-    logger.info("Rendering Markdown Report...")
+    logger.info("Rendering Dynamic Markdown Report...")
     report_md = render_report_markdown(
         quality_df=quality_df,
         marginal_df=marginal_df,

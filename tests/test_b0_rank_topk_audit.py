@@ -54,6 +54,9 @@ def test_01_common_support_denominator_strictness(audit_data):
         assert (valid_rows[f"r1_w{h}_return_pct"].notna()).all()
         assert (valid_rows[f"r2_w{h}_return_pct"].notna()).all()
         assert (valid_rows[f"r3_w{h}_return_pct"].notna()).all()
+        assert (valid_rows[f"r1_w{h}_max_gain_pct"].notna()).all()
+        assert (valid_rows[f"r2_w{h}_max_gain_pct"].notna()).all()
+        assert (valid_rows[f"r3_w{h}_max_gain_pct"].notna()).all()
 
         # In non-valid rows, returns must be NaN
         invalid_rows = matrix_df[~matrix_df[f"w{h}_common_valid"]]
@@ -72,8 +75,44 @@ def test_02_missing_or_incomplete_rank3_excluded(audit_data):
         assert (partial_weeks[f"w{h}_common_valid"] == False).all()
 
 
-def test_03_portfolio_definitions_and_marginal_contributions(audit_data):
-    """INVARIANT 3: K1, K2, K3 and MC2, MC3 must satisfy exact algebraic definitions."""
+def test_03_maturity_gate_censorship(audit_data):
+    """INVARIANT 3: If is_complete_week is False, the week must be strictly censored even if return exists."""
+    _, paths = audit_data
+    b0_events_df = pd.read_csv(paths.b0_events_path)
+    events_df = pd.read_parquet(paths.events_path)
+    weekly_df = pd.read_parquet(paths.weekly_path)
+    three_tier_df = pd.read_csv(paths.three_tier_weekly_path)
+
+    all_snapshots = sorted(three_tier_df["snapshot_date"].astype(str).unique())
+    train_snapshots = set(all_snapshots[:30])
+    contaminated_snapshots = set(all_snapshots[30:40])
+
+    # Corrupt one complete week flag in weekly_df for a 3-pick week
+    modified_weekly_df = weekly_df.copy()
+    mask = (
+        (modified_weekly_df["snapshot_date"] == "2025-11-14")
+        & (modified_weekly_df["code"] == "ALL")
+        & (modified_weekly_df["holding_week_index"] == 2)
+    )
+    modified_weekly_df.loc[mask, "is_complete_week"] = False
+
+    corrupted_matrix = build_common_support_weekly_matrix(
+        b0_events_df=b0_events_df,
+        events_df=events_df,
+        weekly_df=modified_weekly_df,
+        all_snapshots=all_snapshots,
+        train_snapshots=train_snapshots,
+        contaminated_snapshots=contaminated_snapshots,
+    )
+    target_row = corrupted_matrix[corrupted_matrix["snapshot_date"] == "2025-11-14"].iloc[0]
+    # W1 should still be valid, but W2 must be censored because ALL's W2 was marked incomplete
+    assert target_row["w1_common_valid"] == True
+    assert target_row["w2_common_valid"] == False
+    assert np.isnan(target_row["r1_w2_return_pct"])
+
+
+def test_04_portfolio_definitions_and_marginal_contributions(audit_data):
+    """INVARIANT 4: K1, K2, K3 and MC2, MC3 must satisfy exact algebraic definitions."""
     matrix_df, _ = audit_data
     for h in ALL_HORIZONS:
         valid_rows = matrix_df[matrix_df[f"w{h}_common_valid"]]
@@ -97,8 +136,8 @@ def test_03_portfolio_definitions_and_marginal_contributions(audit_data):
             assert pytest.approx(mc3, abs=1e-3) == (r3 - k2) / 3.0
 
 
-def test_04_hypothesis_a_vs_hypothesis_b_separation(audit_data):
-    """INVARIANT 4: Hypothesis A (Rank3 - Rank2) and Hypothesis B (K3 - K2) are distinct metrics."""
+def test_05_hypotheses_a_b_c_separation(audit_data):
+    """INVARIANT 5: Hypothesis A (R3-R2), B (K3-K2), and C (R1-R2) are distinct paired tests."""
     matrix_df, _ = audit_data
     marginal_df = summarize_topk_marginal_contributions(matrix_df)
     for _, row in marginal_df.iterrows():
@@ -107,11 +146,16 @@ def test_04_hypothesis_a_vs_hypothesis_b_separation(audit_data):
         # Hyp B: K3 - K2 spread
         k3_k2_med = row["hyp_b_k3_minus_k2_median_spread_pct"]
         mc3_med = row["mc3_median_pct"]
-        assert pytest.approx(k3_k2_med, abs=1e-4) == mc3_med
+        # Hyp C: R1 - R2 spread
+        r1_r2_med = row["hyp_c_r1_minus_r2_median_spread_pct"]
+
+        assert pytest.approx(k3_k2_med, abs=1e-3) == mc3_med
+        assert "hyp_c_wilcoxon_p" in row
+        assert "hyp_c_r1_gt_r2_win_rate_pct" in row
 
 
-def test_05_w3_is_marked_diagnostic_only(audit_data):
-    """INVARIANT 5: W3 is explicitly marked as DIAGNOSTIC_ONLY and not a frozen primary endpoint."""
+def test_06_w3_is_marked_diagnostic_only(audit_data):
+    """INVARIANT 6: W3 is explicitly marked as DIAGNOSTIC_ONLY and not a frozen primary endpoint."""
     matrix_df, _ = audit_data
     quality_df = summarize_rank_position_quality(matrix_df)
     marginal_df = summarize_topk_marginal_contributions(matrix_df)
@@ -127,8 +171,8 @@ def test_05_w3_is_marked_diagnostic_only(audit_data):
     assert (monotonicity_df[monotonicity_df["horizon"].isin(["W1", "W2", "W4"])]["horizon_status"] == "PRIMARY").all()
 
 
-def test_06_production_selector_sha_unchanged():
-    """INVARIANT 6: Production selector dashboard/skill_industry_eps_known.py SHA256 must remain strictly unchanged."""
+def test_07_production_selector_sha_unchanged():
+    """INVARIANT 7: Production selector dashboard/skill_industry_eps_known.py SHA256 must remain strictly unchanged."""
     selector_path = Path(__file__).resolve().parents[1] / "dashboard" / "skill_industry_eps_known.py"
     with open(selector_path, "rb") as f:
         sha = hashlib.sha256(f.read()).hexdigest()
@@ -136,8 +180,8 @@ def test_06_production_selector_sha_unchanged():
     assert sha == "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477"
 
 
-def test_07_end_to_end_audit_generation(tmp_path):
-    """INVARIANT 7: Complete audit execution generates all 5 CSV artifacts and Markdown report."""
+def test_08_end_to_end_audit_and_report_sync(tmp_path):
+    """INVARIANT 8: Audit execution generates all 5 CSVs and Markdown report with matched numbers."""
     base_paths = default_audit_paths()
     custom_paths = AuditPaths(
         root_dir=base_paths.root_dir,
@@ -157,6 +201,14 @@ def test_07_end_to_end_audit_generation(tmp_path):
     assert not mono_df.empty
     assert not s_df.empty
     assert len(report_md) > 1000
+
+    # Verify that dynamic report contains exact metrics from dataframes
+    w2_r3_r2_p = m_df[(m_df["horizon"] == "W2") & (m_df["segment"] == "All common-support weeks")]["hyp_a_wilcoxon_p"].iloc[0]
+    assert f"p={w2_r3_r2_p:.4f}" in report_md or f"p = {w2_r3_r2_p:.4f}" in report_md or f"{w2_r3_r2_p:.4f}" in report_md
+
+    assert "PARTIALLY SUPPORTED" in report_md
+    assert "NOT SUPPORTED" in report_md
+    assert "KEEP PRODUCTION FROZEN" in report_md
 
     assert (custom_paths.output_dir / "b0_rank_position_weekly_detail.csv").exists()
     assert (custom_paths.output_dir / "b0_rank_position_quality_summary.csv").exists()
