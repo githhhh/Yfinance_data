@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
-from eps_pit.lookup import enrich_pool_with_signal_eps
+from eps_pit import EPSResolveMode, EPSStatus, SignalEPSLookup, enrich_pool_with_signal_eps
 
 
 DATA_ROOT = str(Path(__file__).resolve().parents[1])
@@ -119,17 +119,21 @@ def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
 
 
 def _signal_eps_missing_count(pool: pd.DataFrame) -> int:
-    if "signal" not in pool.columns or "eps_yoy_growth" not in pool.columns:
+    if "signal" not in pool.columns:
         return 0
     signal_mask = pool["signal"].map(_is_truthy)
+    if "eps_yoy_growth" not in pool.columns:
+        return int(signal_mask.sum())
     return int(pool.loc[signal_mask, "eps_yoy_growth"].isna().sum())
 
 
 def _signal_eps_missing_codes(pool: pd.DataFrame) -> list[str]:
-    if "signal" not in pool.columns or "eps_yoy_growth" not in pool.columns or "code" not in pool.columns:
+    if "signal" not in pool.columns or "code" not in pool.columns:
         return []
     signal_mask = pool["signal"].map(_is_truthy)
-    missing = pool.loc[signal_mask & pool["eps_yoy_growth"].isna(), "code"]
+    if "eps_yoy_growth" in pool.columns:
+        signal_mask = signal_mask & pool["eps_yoy_growth"].isna()
+    missing = pool.loc[signal_mask, "code"]
     codes = {
         str(value).strip()
         for value in missing.dropna()
@@ -138,18 +142,43 @@ def _signal_eps_missing_codes(pool: pd.DataFrame) -> list[str]:
     return sorted(codes)
 
 
+def _signal_eps_provider_error_codes(pool: pd.DataFrame) -> list[str]:
+    required = {"signal", "code", "eps_yoy_growth", "eps_yoy_growth_status"}
+    if not required.issubset(pool.columns):
+        return []
+    signal_mask = pool["signal"].map(_is_truthy)
+    error_mask = pool["eps_yoy_growth_status"].astype(str).eq(EPSStatus.PROVIDER_ERROR.value)
+    missing_mask = pool["eps_yoy_growth"].isna()
+    values = pool.loc[signal_mask & error_mask & missing_mask, "code"]
+    return sorted({str(value).strip() for value in values.dropna() if str(value).strip()})
+
+
 def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
     before = _signal_eps_missing_count(pool)
-    enriched = enrich_pool_with_signal_eps(pool, refresh_missing=before > 0)
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        refresh_missing=before > 0,
+        mode=EPSResolveMode.LIVE,
+    )
     after = _signal_eps_missing_count(enriched)
     repaired = before - after
     if repaired:
         logging.info("BF Pool signal EPS supplemented: %s repaired, %s unresolved", repaired, after)
     elif before:
         logging.warning("BF Pool signal EPS still missing after supplement: %s unresolved", after)
+
     unresolved_codes = _signal_eps_missing_codes(enriched)
     if unresolved_codes:
         logging.warning("BF Pool signal EPS unresolved codes: %s", ", ".join(unresolved_codes))
+
+    provider_error_codes = _signal_eps_provider_error_codes(enriched)
+    if provider_error_codes:
+        # Technical provider failures are different from a legitimate lack of
+        # comparable EPS. Publishing here would silently make downstream Top3
+        # selection exclude otherwise-valid candidates, so fail this run.
+        codes = ", ".join(provider_error_codes)
+        logging.error("BF Pool signal EPS provider failure: %s", codes)
+        raise RuntimeError(f"BF Pool signal EPS provider failure: {codes}")
     return enriched
 
 
@@ -161,7 +190,7 @@ def supplement_latest_pool_signal_eps() -> dict[str, object]:
     enriched = _enrich_signal_eps(pool)
     after = _signal_eps_missing_count(enriched)
     repaired = before - after
-    if repaired:
+    if not enriched.equals(pool):
         enriched.to_csv(path, index=False, encoding="utf-8-sig")
     return {
         "path": path,
@@ -197,8 +226,10 @@ class BreakoutFollowPoolRun:
         return BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH if self._midweek else BREAKOUT_FOLLOW_POOL_PATH
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
-        pool = _enrich_signal_eps(pool)
+        # Validate the pool structure before EPS enrichment can call providers
+        # or mutate the durable PIT store.
         _pool_codes(pool)
+        pool = _enrich_signal_eps(pool)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         pool.to_csv(self.path, index=False, encoding="utf-8-sig")
         self._published_digest = _snapshot_digest(self.path)
@@ -212,8 +243,7 @@ class BreakoutFollowPoolRun:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致") from exc
         if current_digest != self._published_digest:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致")
-        pool = pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
-        return pool
+        return pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
 
     def load_actionable_codes(self) -> list[str]:
         pool = self.ensure_current_snapshot()
@@ -226,20 +256,29 @@ class BreakoutFollowPoolRun:
         _commit_pool(self.path)
 
 
+def _pit_store_path() -> str:
+    path = SignalEPSLookup.DEFAULT_CSV_PATH
+    return path if os.path.isabs(path) else os.path.join(DATA_ROOT, path)
+
+
 def _commit_pool(pool_path: str) -> None:
-    """Commit only the file managed by the current run, matching the caller contract."""
+    """Commit only the current pool plus its durable EPS PIT observations."""
     try:
-        if not os.path.exists(pool_path):
-            return
-        result = subprocess.run(["git", "diff", "--quiet", pool_path], cwd=DATA_ROOT)
-        is_untracked = subprocess.run(
-            ["git", "ls-files", "--error-unmatch", pool_path],
+        managed_paths = [pool_path]
+        pit_path = _pit_store_path()
+        if os.path.exists(pit_path):
+            managed_paths.append(pit_path)
+
+        subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
             cwd=DATA_ROOT,
-            capture_output=True,
-        ).returncode != 0
-        if result.returncode == 0 and not is_untracked:
+        )
+        if staged.returncode == 0:
             return
-        subprocess.run(["git", "add", pool_path], cwd=DATA_ROOT, check=True)
+        if staged.returncode != 1:
+            raise subprocess.CalledProcessError(staged.returncode, staged.args)
+
         subprocess.run(
             ["git", "commit", "-m", "Update breakout follow pool"],
             cwd=DATA_ROOT,
