@@ -8,7 +8,8 @@ This module is DIAGNOSTIC / AUDIT ONLY. It investigates:
 
 Strict Invariants & Scientific Governance:
 - Canonical Candidate Pool Seed: Identical candidate universe and constraint produce 100% identical random draws.
-- Event Execution Validity Gate: Valid entry (ENTRY_OK) is strictly verified for portfolio path metrics.
+- Non-Binding Industry Constraint Reuse: When E1 has no duplicate industries (or N<=1), it directly reuses E0 draws (exact zero difference).
+- Event Execution Validity Gate: Valid entry (ENTRY_OK) strictly gates both event path metrics AND horizon returns (W1/W2/W3/W4).
 - Matched-N per week: Strictly matches frozen B0 selected count; NO shrinking of N.
 - Maturity Gate: is_complete_week == True and non-null outcomes for all picks.
 - Zero modifications to production code, frozen selector, or frozen protocols.
@@ -304,15 +305,15 @@ def evaluate_portfolio_draw(
             "max_gain_asof_mean_pct": np.nan,
         }
 
-    # Horizon-specific holding metrics with strict maturity gate
+    # Horizon-specific holding metrics with strict maturity AND execution validity gates
     for h in ALL_HORIZONS:
         w_infos = [weekly_lookup.get((snapshot_date, code, h), {}) for code in sampled_codes]
         is_mature = all(bool(w.get("is_complete_week", False)) for w in w_infos)
         rets = [to_float(w.get("week_close_return_from_entry_pct")) for w in w_infos]
         mgs = [to_float(w.get("week_max_gain_from_entry_pct")) for w in w_infos]
 
-        all_rets_valid = is_mature and all(r is not None and not np.isnan(r) for r in rets)
-        all_mgs_valid = is_mature and all(m is not None and not np.isnan(m) for m in mgs)
+        all_rets_valid = event_valid and is_mature and all(r is not None and not np.isnan(r) for r in rets)
+        all_mgs_valid = event_valid and is_mature and all(m is not None and not np.isnan(m) for m in mgs)
 
         if all_rets_valid and all_mgs_valid:
             valid_rets = [float(r) for r in rets if r is not None]
@@ -538,12 +539,28 @@ def build_layer1_audit_data(
         snap_candidates[snap] = feats
 
     weekly_rows: list[dict[str, Any]] = []
+    e0_sim_res_by_snap: dict[str, dict[str, Any]] = {}
 
     for snap in all_snapshots:
         target_n = len(b0_recs_by_snap[snap])
         is_train = snap in train_snapshots
         is_contaminated_val = snap in contaminated_snapshots
         feats = snap_candidates[snap]
+
+        # First evaluate E0_BASE so its draws can be reused by non-binding E1
+        e0_cands = [f for f in feats if is_candidate_in_variant_pool(f, "E0_BASE")]
+        e0_sim_res = sample_portfolio_draws(
+            candidate_codes=[f["code"] for f in e0_cands],
+            candidate_industries=[f["industry"] for f in e0_cands],
+            target_n=target_n,
+            variant_name="E0_BASE",
+            snapshot_date=snap,
+            event_lookup=event_lookup,
+            weekly_lookup=weekly_lookup,
+            n_draws=n_draws,
+            base_seed=base_seed,
+        )
+        e0_sim_res_by_snap[snap] = e0_sim_res
 
         for reg in ALL_VARIANTS_REGISTRY:
             vname, vgroup, vdesc, vrules, vpolicy, is_ref = reg
@@ -598,17 +615,39 @@ def build_layer1_audit_data(
             c_codes = [f["code"] for f in var_candidates]
             c_inds = [f["industry"] for f in var_candidates]
 
-            sim_res = sample_portfolio_draws(
-                candidate_codes=c_codes,
-                candidate_industries=c_inds,
-                target_n=target_n,
-                variant_name=vname,
-                snapshot_date=snap,
-                event_lookup=event_lookup,
-                weekly_lookup=weekly_lookup,
-                n_draws=n_draws,
-                base_seed=base_seed,
-            )
+            if vname == "E0_BASE":
+                sim_res = e0_sim_res_by_snap[snap]
+            elif vname == "E1_INDUSTRY_DIVERSE":
+                # Check if industry constraint is actually binding
+                is_binding = (target_n > 1) and (len(c_inds) > len(set(c_inds)))
+                if not is_binding:
+                    # Non-binding: directly reuse E0 results (exact zero effect)
+                    sim_res = dict(e0_sim_res_by_snap[snap])
+                    sim_res["rejection_rate_pct"] = 0.0
+                else:
+                    sim_res = sample_portfolio_draws(
+                        candidate_codes=c_codes,
+                        candidate_industries=c_inds,
+                        target_n=target_n,
+                        variant_name=vname,
+                        snapshot_date=snap,
+                        event_lookup=event_lookup,
+                        weekly_lookup=weekly_lookup,
+                        n_draws=n_draws,
+                        base_seed=base_seed,
+                    )
+            else:
+                sim_res = sample_portfolio_draws(
+                    candidate_codes=c_codes,
+                    candidate_industries=c_inds,
+                    target_n=target_n,
+                    variant_name=vname,
+                    snapshot_date=snap,
+                    event_lookup=event_lookup,
+                    weekly_lookup=weekly_lookup,
+                    n_draws=n_draws,
+                    base_seed=base_seed,
+                )
 
             w_row = {
                 "snapshot_date": snap,
@@ -1013,6 +1052,18 @@ def render_layer1_ablation_report(
         sub = probe_all[(probe_all["probe_name"] == pname) & (probe_all["horizon"] == h_str)]
         return sub.iloc[0].to_dict() if not sub.empty else {}
 
+    # Dynamic active-diversity non-zero subset statistics
+    e0_weekly = weekly_matrix_df[weekly_matrix_df["variant_name"] == "E0_BASE"].set_index("snapshot_date")
+    e1_weekly = weekly_matrix_df[weekly_matrix_df["variant_name"] == "E1_INDUSTRY_DIVERSE"].set_index("snapshot_date")
+
+    diff_w1 = (e1_weekly["w1_p50"] - e0_weekly["w1_p50"]).dropna()
+    diff_w2 = (e1_weekly["w2_p50"] - e0_weekly["w2_p50"]).dropna()
+    diff_w4 = (e1_weekly["w4_p50"] - e0_weekly["w4_p50"]).dropna()
+
+    nz_w1 = diff_w1[diff_w1 != 0.0]
+    nz_w2 = diff_w2[diff_w2 != 0.0]
+    nz_w4 = diff_w4[diff_w4 != 0.0]
+
     md: list[str] = []
     md.append("# Layer-1 Eligibility Screening Decomposition & Ablation Audit Report")
     md.append("")
@@ -1032,7 +1083,7 @@ def render_layer1_ablation_report(
     md.append(f"  - **W1 (n={e0_l0_w1.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w1.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w1.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w1.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w1.get('wilcoxon_p', 1.0):.4f}$")
     md.append(f"  - **W2 (n={e0_l0_w2.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w2.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w2.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w2.get('wilcoxon_p', 1.0):.4f}$")
     md.append(f"  - **W4 (n={e0_l0_w4.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w4.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w4.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w4.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w4.get('wilcoxon_p', 1.0):.4f}$")
-    md.append("  - **定性定界：** 生产准入规则方向为正，且利差随持有期放大（W4 中位数 `+1.21%`）；但在统计检验上尚未达到独立 Alpha 显著性，且验证段存在阶段分化。")
+    md.append(f"  - **定性定界：** 生产准入规则方向为正，且利差随持有期放大（W4 中位数 `{e0_l0_w4.get('paired_median_spread_pct', 0.0):+.2f}%`）；但在统计检验上尚未达到独立 Alpha 显著性，且验证段存在阶段分化。")
     md.append("")
 
     # Q2
@@ -1049,11 +1100,12 @@ def render_layer1_ablation_report(
     md.append("| Gate 门槛 | 证据评级 | 历史消融表现与理由 |")
     md.append("| :--- | :---: | :--- |")
     act_w2 = get_abl("ACTIONABLE", "W2")
+    act_w4 = get_abl("ACTIONABLE", "W4")
     geom_w2 = get_abl("Geometry", "W2")
     eps_w2 = get_abl("EPS_Known", "W2")
     bp_w2 = get_abl("BuyPoint", "W2")
     ind_w2 = get_abl("Industry_Known", "W2")
-    md.append(f"| **1. ACTIONABLE Status** | **DIRECTIONALLY SUPPORTED & OPERATIONALLY CRITICAL** | 剔除后候选池急剧膨胀至 2011 个（膨胀 5.1x），W1/W2/W4 收益均呈现正向利差（W2 `{act_w2.get('paired_median_spread_pct', 0.0):+.2f}%`, W4 `+{get_abl('ACTIONABLE', 'W4').get('paired_median_spread_pct', 0.0):.2f}%`）。属于主力候选规模压缩与业务第一道防线。 |")
+    md.append(f"| **1. ACTIONABLE Status** | **DIRECTIONALLY SUPPORTED & OPERATIONALLY CRITICAL** | 剔除后候选池急剧膨胀至 2011 个（膨胀 5.1x），W1/W2/W4 收益均呈现正向利差（W2 `{act_w2.get('paired_median_spread_pct', 0.0):+.2f}%`, W4 `{act_w4.get('paired_median_spread_pct', 0.0):+.2f}%`）。属于主力候选规模压缩与业务第一道防线。 |")
     md.append(f"| **2. Geometry Failure Gate** | **NOT DEMONSTRATED (RETURN SPREAD NEUTRAL)** | 剔除后候选池膨胀至 648 个（+65%），过滤 256 只破位候选，但配对收益利差中位数在 W1/W2/W4 均为 `{geom_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (p >= 0.27)。 |")
     md.append(f"| **3. Effective EPS Known Gate** | **NOT DEMONSTRATED (DATA-QUALITY CONSTRAINT)** | 剔除后额外引入 50 个 EPS 缺失标的，配对收益利差中位数为 `{eps_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (p >= 0.62)，属于基本面数据完整性约束。 |")
     md.append(f"| **4. BuyPoint Proximity >= 0** | **NOT DEMONSTRATED (100% EMBEDDED IN ACTIONABLE)** | 在通过 ACTIONABLE 的标的中，100% 的标的均已满足 `0 <= current_vs <= 5%`，消融后新增 0 个候选。门槛在逻辑上必要但在 ACTIONABLE 后属于冗余防护。 |")
@@ -1112,8 +1164,14 @@ def render_layer1_ablation_report(
     md.append("## 二、Industry Diversity 深度诊断 (E1 vs E0)")
     md.append("")
     md.append("### 1. 行业重复客观画像")
-    md.append("- **E0 候选池中存在 >= 2 只同行业股票的周数：** `19 / 40` 周 (47.5%)；")
-    md.append("- **行业去重活跃周 (Non-zero diffs, n=20~21):** 在去重起作用的周次中，W1 利差中位数 `+0.12%` (均值 `-0.40%`), W2 利差中位数 `+0.05%` (均值 `-0.61%`), W4 利差中位数 `+0.17%` (均值 `-1.98%`)。")
+    md.append(f"- **E0 候选池中存在 >= 2 只同行业股票且 N > 1 的约束生效周数：** `{len(nz_w1)} / {total_snaps}` 周 ({len(nz_w1)/total_snaps*100:.1f}%)；")
+    md.append(f"- **行业去重活跃周 (Non-zero diffs, 严格动态计算):**")
+    if len(nz_w1) > 0:
+        md.append(f"  - **W1 (n={len(nz_w1)}):** 利差中位数 `{nz_w1.median():+.2f}%` (均值 `{nz_w1.mean():+.2f}%`, 胜率 `{(nz_w1 > 0).mean()*100:.1f}%`)")
+    if len(nz_w2) > 0:
+        md.append(f"  - **W2 (n={len(nz_w2)}):** 利差中位数 `{nz_w2.median():+.2f}%` (均值 `{nz_w2.mean():+.2f}%`, 胜率 `{(nz_w2 > 0).mean()*100:.1f}%`)")
+    if len(nz_w4) > 0:
+        md.append(f"  - **W4 (n={len(nz_w4)}):** 利差中位数 `{nz_w4.median():+.2f}%` (均值 `{nz_w4.mean():+.2f}%`, 胜率 `{(nz_w4 > 0).mean()*100:.1f}%`)")
     md.append("")
     md.append("### 2. 全样本收益与风险统计对比")
     md.append("")
