@@ -1,10 +1,22 @@
+import json
 import os
 import time
 import pandas as pd
+import requests
 from typing import Dict, List, Optional, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data_providers.base_provider import BaseDataProvider
+
+
+SCHWAB_API_BASE = "https://api.schwabapi.com"
+SCHWAB_TOKEN_URL = f"{SCHWAB_API_BASE}/v1/oauth/token"
+
+
+def _enum_value(value: Any) -> Any:
+    if hasattr(value, "value"):
+        return value.value
+    return value
 
 
 class SchwabCredentials:
@@ -34,6 +46,109 @@ class SchwabCredentials:
         )
 
 
+class SchwabRawTokenClient:
+    """Minimal Schwab REST client for OAuth token files created outside schwab-py."""
+
+    def __init__(self, creds: SchwabCredentials, timeout: int = 30):
+        self.creds = creds
+        self.timeout = timeout
+
+    def has_access_token(self) -> bool:
+        return bool(self._load_token().get("access_token"))
+
+    def get_quote(self, symbol: str) -> Dict:
+        response = self._get(
+            f"{SCHWAB_API_BASE}/marketdata/v1/{symbol}/quotes",
+            params=None,
+        )
+        return response.json()
+
+    def get_option_chain(self, symbol: str) -> Dict:
+        response = self._get(
+            f"{SCHWAB_API_BASE}/marketdata/v1/chains",
+            params={"symbol": symbol},
+        )
+        return response.json()
+
+    def get_price_history(
+        self,
+        symbol: str,
+        period_type: Any = "year",
+        period: int = 1,
+        frequency_type: Any = "daily",
+        frequency: Any = 1,
+        **_: Any,
+    ) -> requests.Response:
+        return self._get(
+            f"{SCHWAB_API_BASE}/marketdata/v1/pricehistory",
+            params={
+                "symbol": symbol,
+                "periodType": _enum_value(period_type),
+                "period": period,
+                "frequencyType": _enum_value(frequency_type),
+                "frequency": _enum_value(frequency),
+                "needExtendedHoursData": "false",
+            },
+        )
+
+    def _get(self, url: str, params: Optional[Dict[str, Any]]) -> requests.Response:
+        response = requests.get(
+            url,
+            headers=self._headers(),
+            params=params,
+            timeout=self.timeout,
+        )
+        if response.status_code == 401 and self._refresh_access_token():
+            response = requests.get(
+                url,
+                headers=self._headers(),
+                params=params,
+                timeout=self.timeout,
+            )
+        response.raise_for_status()
+        return response
+
+    def _headers(self) -> Dict[str, str]:
+        token = self._load_token().get("access_token", "")
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+    def _refresh_access_token(self) -> bool:
+        token = self._load_token()
+        refresh_token = token.get("refresh_token")
+        if not refresh_token or not self.creds.app_key or not self.creds.app_secret:
+            return False
+        response = requests.post(
+            SCHWAB_TOKEN_URL,
+            auth=(self.creds.app_key, self.creds.app_secret),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=self.timeout,
+        )
+        if not response.ok:
+            return False
+        updated = token.copy()
+        updated.update(response.json())
+        if "refresh_token" not in updated and refresh_token:
+            updated["refresh_token"] = refresh_token
+        self._save_token(updated)
+        return bool(updated.get("access_token"))
+
+    def _load_token(self) -> Dict[str, Any]:
+        try:
+            with open(self.creds.token_path, "r", encoding="utf-8") as f:
+                token = json.load(f)
+        except Exception:
+            return {}
+        return token if isinstance(token, dict) else {}
+
+    def _save_token(self, token: Dict[str, Any]) -> None:
+        with open(self.creds.token_path, "w", encoding="utf-8") as f:
+            json.dump(token, f, indent=2)
+
+
 class SchwabDataProvider(BaseDataProvider):
     """基于 schwab-py 库实现的嘉信理财 (Charles Schwab) 数据提供者。"""
 
@@ -43,10 +158,14 @@ class SchwabDataProvider(BaseDataProvider):
         client: Optional[Any] = None,
         batch_size: int = 50,
         max_workers: int = 4,
+        max_retries: int = 1,
+        rate_limit_sleep: float = 0.25,
     ):
         self.creds = creds or SchwabCredentials()
         self.batch_size = batch_size
         self.max_workers = max_workers
+        self.max_retries = max_retries
+        self.rate_limit_sleep = rate_limit_sleep
         self._client = client
 
     @property
@@ -79,28 +198,44 @@ class SchwabDataProvider(BaseDataProvider):
                 app_secret=self.creds.app_secret,
             )
         except Exception as e:
+            raw_client = SchwabRawTokenClient(self.creds)
+            if raw_client.has_access_token():
+                return raw_client
             raise RuntimeError(f"初始化 Schwab API 客户端失败: {e}")
 
     def download_single_stock(
         self, symbol: str, period: str = "1y", interval: str = "1d"
     ) -> Tuple[str, Optional[pd.DataFrame]]:
         """抓取单只标的 K 线历史数据并清洗对齐 Schema。"""
+        attempt = 0
+        while attempt <= self.max_retries:
+            data = self._download_single_stock_once(symbol, period=period, interval=interval)
+            if data is not None:
+                return symbol, data
+            attempt += 1
+            if attempt <= self.max_retries:
+                time.sleep(self.rate_limit_sleep * attempt)
+        return symbol, None
+
+    def _download_single_stock_once(
+        self, symbol: str, period: str = "1y", interval: str = "1d"
+    ) -> Optional[pd.DataFrame]:
         try:
             # 兼容标准 yfinance 的符号格式 (例如 BRK-B 替换为 BRK.B 适配 Schwab)
             schwab_symbol = symbol.replace("-", ".")
             resp = self._request_price_history(schwab_symbol, period=period, interval=interval)
             
             if resp is None:
-                return symbol, None
+                return None
                 
             data_json = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
             
             if not isinstance(data_json, dict) or data_json.get("empty", False):
-                return symbol, None
+                return None
 
             candles = data_json.get("candles", [])
             if not candles:
-                return symbol, None
+                return None
 
             df = pd.DataFrame(candles)
             
@@ -119,32 +254,35 @@ class SchwabDataProvider(BaseDataProvider):
                 df = df.set_index("Date")
             
             req_cols = ["Open", "High", "Low", "Close", "Volume"]
-            for col in req_cols:
-                if col not in df.columns:
-                    df[col] = 0.0
+            if any(col not in df.columns for col in req_cols):
+                return None
 
             df = df[req_cols].copy()
             
-            # 转换数值类型并强制 round(2)
+            # Schwab candles are already raw OHLCV. Normalize dtype only; do not round.
             for col in req_cols:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
-            
-            df = df.round(2)
+
             df = df.dropna(how="all")
 
             if df.empty:
-                return symbol, None
+                return None
 
-            return symbol, df
+            return df
 
         except Exception as e:
             print(f"[Schwab] Error downloading {symbol}: {e}")
-            return symbol, None
+            return None
 
     def _request_price_history(self, symbol: str, period: str, interval: str) -> Any:
         """调用 Schwab Client 获取价格历史 response。"""
         try:
             import schwab
+        except ImportError:
+            if hasattr(self.client, "get_price_history"):
+                return self.client.get_price_history(symbol)
+            return None
+        try:
             # 判断频次类型
             if interval == "1wk":
                 freq_type = schwab.client.Client.PriceHistory.FrequencyType.WEEKLY
@@ -191,19 +329,23 @@ class SchwabDataProvider(BaseDataProvider):
         )
         start_time = time.time()
 
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_ticker = {
-                executor.submit(
-                    self.download_single_stock, symbol, period, interval
-                ): symbol
-                for symbol in symbols
-            }
-            for future in as_completed(future_to_ticker):
-                stock_code, data = future.result()
-                if data is not None and not data.empty:
-                    all_data[stock_code] = data
-                else:
-                    failed.append(stock_code)
+        for batch_start in range(0, total, self.batch_size):
+            batch = symbols[batch_start : batch_start + self.batch_size]
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_ticker = {
+                    executor.submit(
+                        self.download_single_stock, symbol, period, interval
+                    ): symbol
+                    for symbol in batch
+                }
+                for future in as_completed(future_to_ticker):
+                    stock_code, data = future.result()
+                    if data is not None and not data.empty:
+                        all_data[stock_code] = data
+                    else:
+                        failed.append(stock_code)
+            if batch_start + self.batch_size < total and self.rate_limit_sleep > 0:
+                time.sleep(self.rate_limit_sleep)
 
         elapsed = time.time() - start_time
         print(

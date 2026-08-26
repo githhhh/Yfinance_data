@@ -35,14 +35,15 @@ class YahooDataProvider(BaseDataProvider):
                 data = ticker.history(
                     period=period,
                     interval=interval,
-                    auto_adjust=True,
-                    rounding=True,
+                    # Raw Yahoo OHLC: split-adjusted, not dividend-adjusted.
+                    # Keep yfinance source precision for downstream comparisons.
+                    auto_adjust=False,
                     timeout=5,
                 )
                 if not data.empty:
-                    # 确保关键列存在且精度为 round(2)
+                    # 保留原始 Close，忽略 Adj Close，价格精度保持源数据原样。
                     req_cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in data.columns]
-                    data = data[req_cols].round(2)
+                    data = data[req_cols].copy()
                     return symbol, data
             except Exception as e:
                 print(f"[Yahoo] Error downloading {symbol} (attempt {attempt+1}): {e}")
