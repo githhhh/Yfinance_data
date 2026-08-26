@@ -1,0 +1,21 @@
+﻿variant_name,variant_group,description,rules_summary,target_n_policy,is_reference
+L0_SIGNAL,PRIMARY_DECOMPOSITION,"Review Universe Random Baseline (signal=True, rule non-empty)",Review Universe,MATCHED_N,False
+E0_BASE,PRIMARY_DECOMPOSITION,"Pure Production Eligibility Random Baseline (ACTIONABLE, Geometry, BuyPoint, EPS, Industry; NO industry de-dup, NO ranking)",E0 Pure Eligibility,MATCHED_N,False
+E1_INDUSTRY_DIVERSE,PRIMARY_DECOMPOSITION,Production Eligibility + Unique Industry Portfolio Constraint (NO ranking),E0 + Industry Unique Portfolio,MATCHED_N,False
+B0_REFERENCE,PRIMARY_DECOMPOSITION,Frozen B0 Deterministic Production Selection Reference,Production B0 Selector,MATCHED_N,True
+E0_NO_ACTIONABLE,ABLATION,E0 without ACTIONABLE status requirement (all entry statuses allowed),E0 - ACTIONABLE,MATCHED_N,False
+E0_NO_GEOMETRY_GATE,ABLATION,E0 without geometry failure gate (allows breakout_range_ratio<=0 or close_pos<0.65),E0 - Geometry Gate,MATCHED_N,False
+E0_NO_BUYPOINT_GATE,ABLATION,E0 without buy point gate (allows current_vs < 0 and current_vs missing),E0 - BuyPoint Gate,MATCHED_N,False
+E0_NO_EPS_KNOWN,ABLATION,E0 without effective PIT EPS known requirement (allows missing EPS),E0 - EPS Known,MATCHED_N,False
+E0_NO_INDUSTRY_KNOWN,ABLATION,E0 without industry known requirement (allows missing/unknown industry),E0 - Industry Known,MATCHED_N,False
+S0_REVIEW_UNIVERSE,ADDBACK,Review Universe Baseline (Step 0),signal & rule,MATCHED_N,False
+S1_ACTIONABLE,ADDBACK,Review Universe + ACTIONABLE status (Step 1),S0 + ACTIONABLE,MATCHED_N,False
+S2_GEOMETRY,ADDBACK,Step 1 + Geometry Gate (Step 2),S1 + Geometry,MATCHED_N,False
+S3_BUYPOINT,ADDBACK,Step 2 + BuyPoint Proximity >= 0 (Step 3),S2 + BuyPoint,MATCHED_N,False
+S4_EPS_KNOWN,ADDBACK,Step 3 + Effective PIT EPS Known (Step 4),S3 + EPS Known,MATCHED_N,False
+S5_INDUSTRY_KNOWN,ADDBACK,Step 4 + Industry Known (Step 5 = E0_BASE),S4 + Industry Known,MATCHED_N,False
+T_FRESH_5,TIGHTENING_PROBE,"E0 + Buy-point proximity within [0, 5%]",E0 + (0 <= current_vs <= 5),MATCHED_N,False
+T_FRESH_2,TIGHTENING_PROBE,"E0 + Buy-point proximity within [0, 2%]",E0 + (0 <= current_vs <= 2),MATCHED_N,False
+T_EPS25,TIGHTENING_PROBE,E0 + Effective EPS YoY Growth >= 25%,E0 + (effective_eps >= 25),MATCHED_N,False
+T_ENTRY_VOLUME_15,TIGHTENING_PROBE,E0 + IBD Entry Volume Ratio >= 1.5x,E0 + (entry_vol >= 1.5),MATCHED_N,False
+T_WEEKLY_VOLUME_13,TIGHTENING_PROBE,E0 + Weekly Volume Ratio >= 1.3x,E0 + (volume_ratio >= 1.3),MATCHED_N,False
