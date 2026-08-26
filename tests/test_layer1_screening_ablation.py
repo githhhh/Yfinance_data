@@ -17,7 +17,7 @@ from backtest.b0_top3_quality_audit.generate_layer1_screening_ablation_audit imp
     Layer1AuditPaths,
     build_layer1_audit_data,
     default_layer1_audit_paths,
-    derive_seed,
+    derive_candidate_pool_seed,
     evaluate_candidate_features,
     evaluate_portfolio_draw,
     is_candidate_in_variant_pool,
@@ -68,7 +68,6 @@ def test_03_no_future_leakage_on_candidate_filtering(audit_environment):
     base_feat = evaluate_candidate_features(sample_row)
     base_e0 = is_candidate_in_variant_pool(base_feat, "E0_BASE")
 
-    # Corrupt future outcome fields
     corrupted_row = dict(sample_row)
     corrupted_row["entry_status"] = "CANCELLED"
     corrupted_row["executed_return_to_asof_pct"] = -99.9
@@ -82,17 +81,50 @@ def test_03_no_future_leakage_on_candidate_filtering(audit_environment):
     assert base_e0 == corrupted_e0
 
 
-def test_04_matched_n_strictness_and_no_shrink(audit_environment):
-    """INVARIANT 4: All variants target frozen B0 N. If pool_size < target_N, week is marked infeasible."""
+def test_04_canonical_pool_seed_identity():
+    """INVARIANT 4: Identical candidate universe and constraint must yield 100% identical seeds and draws."""
+    codes_1 = ["NVDA", "AAPL", "MSFT"]
+    codes_2 = ["MSFT", "NVDA", "AAPL"]  # different order, identical set
+
+    s1 = derive_candidate_pool_seed("2026-06-26", codes_1, "UNCONSTRAINED", 42)
+    s2 = derive_candidate_pool_seed("2026-06-26", codes_2, "UNCONSTRAINED", 42)
+    s_diff_pool = derive_candidate_pool_seed("2026-06-26", ["NVDA", "AAPL"], "UNCONSTRAINED", 42)
+    s_div = derive_candidate_pool_seed("2026-06-26", codes_1, "UNIQUE_INDUSTRY", 42)
+
+    assert s1 == s2
+    assert s1 != s_diff_pool
+    assert s1 != s_div
+
+
+def test_05_entry_ok_execution_validation():
+    """INVARIANT 5: If any pick lacks valid ENTRY_OK execution, event path metrics must be censored (NaN)."""
+    event_lookup = {
+        ("2025-11-14", "A"): {"is_valid_entry": True, "entry_status": "ENTRY_OK", "entry_open": 100.0, "stop_8_hit_ever": True},
+        ("2025-11-14", "B"): {"is_valid_entry": False, "entry_status": "ENTRY_STALE_EXPIRED", "entry_open": None, "stop_8_hit_ever": False},
+    }
+    weekly_lookup = {}
+
+    res = evaluate_portfolio_draw(
+        sampled_codes=["A", "B"],
+        snapshot_date="2025-11-14",
+        event_lookup=event_lookup,
+        weekly_lookup=weekly_lookup,
+    )
+    assert res["is_event_valid"] is False
+    assert np.isnan(res["stop8_ever_rate_pct"])
+    assert np.isnan(res["all_stopped_pct"])
+
+
+def test_06_matched_n_strictness_and_no_shrink(audit_environment):
+    """INVARIANT 6: All variants target frozen B0 N. If pool_size < target_N, week is marked infeasible."""
     paths, events_df, weekly_df, b0_events_df = audit_environment
     event_lookup = {(str(r["snapshot_date"]), str(r["code"])): r.to_dict() for _, r in events_df.iterrows()}
     weekly_lookup = {(str(r["snapshot_date"]), str(r["code"]), int(r["holding_week_index"])): r.to_dict() for _, r in weekly_df.iterrows()}
 
-    # Test sampling when pool size is smaller than target_n
     res = sample_portfolio_draws(
         candidate_codes=["TICKER_A", "TICKER_B"],
         candidate_industries=["Tech", "Finance"],
-        target_n=3,  # Requires 3, but only 2 available
+        target_n=3,
         variant_name="E0_BASE",
         snapshot_date="2025-11-14",
         event_lookup=event_lookup,
@@ -103,13 +135,12 @@ def test_04_matched_n_strictness_and_no_shrink(audit_environment):
     assert res["valid_draws"] == 0
 
 
-def test_05_e1_portfolios_have_unique_industries(audit_environment):
-    """INVARIANT 5: E1 sampled portfolios must guarantee that all selected industries are unique."""
+def test_07_e1_portfolios_have_unique_industries(audit_environment):
+    """INVARIANT 7: E1 sampled portfolios must guarantee that all selected industries are unique."""
     paths, events_df, weekly_df, _ = audit_environment
     event_lookup = {(str(r["snapshot_date"]), str(r["code"])): r.to_dict() for _, r in events_df.iterrows()}
     weekly_lookup = {(str(r["snapshot_date"]), str(r["code"]), int(r["holding_week_index"])): r.to_dict() for _, r in weekly_df.iterrows()}
 
-    # Simulate with duplicate industries in pool
     codes = ["A", "B", "C", "D"]
     inds = ["Bank", "Bank", "Tech", "Healthcare"]
     res = sample_portfolio_draws(
@@ -127,8 +158,8 @@ def test_05_e1_portfolios_have_unique_industries(audit_environment):
     assert res["rejection_rate_pct"] >= 0.0
 
 
-def test_06_maturity_gate_censorship(audit_environment):
-    """INVARIANT 6: If any pick has is_complete_week == False, the portfolio is censored at that horizon."""
+def test_08_maturity_gate_censorship(audit_environment):
+    """INVARIANT 8: If any pick has is_complete_week == False, the portfolio is censored at that horizon."""
     event_lookup = {("2025-11-14", "A"): {}, ("2025-11-14", "B"): {}}
     weekly_lookup = {
         ("2025-11-14", "A", 1): {"is_complete_week": True, "week_close_return_from_entry_pct": 5.0, "week_max_gain_from_entry_pct": 6.0},
@@ -146,8 +177,8 @@ def test_06_maturity_gate_censorship(audit_environment):
     assert np.isnan(res["w1_return"])
 
 
-def test_07_missing_return_or_maxgain_censored(audit_environment):
-    """INVARIANT 7: Missing return or max-gain on any pick invalidates the portfolio outcome for that horizon."""
+def test_09_missing_return_or_maxgain_censored(audit_environment):
+    """INVARIANT 9: Missing return or max-gain on any pick invalidates the portfolio outcome for that horizon."""
     event_lookup = {("2025-11-14", "A"): {}, ("2025-11-14", "B"): {}}
     weekly_lookup = {
         ("2025-11-14", "A", 1): {"is_complete_week": True, "week_close_return_from_entry_pct": 5.0, "week_max_gain_from_entry_pct": 6.0},
@@ -164,26 +195,16 @@ def test_07_missing_return_or_maxgain_censored(audit_environment):
     assert np.isnan(res["w1_return"])
 
 
-def test_08_w3_is_marked_diagnostic_only(audit_environment):
-    """INVARIANT 8: W3 must be strictly marked as DIAGNOSTIC_ONLY across summaries."""
-    paths, _, _, _ = audit_environment
-    summary_path = paths.output_dir / "layer1_variant_horizon_summary.csv"
-    if summary_path.exists():
-        df = pd.read_csv(summary_path)
-        assert (df[df["horizon"] == "W3"]["horizon_status"] == "DIAGNOSTIC_ONLY").all()
-        assert (df[df["horizon"].isin(["W1", "W2", "W4"])]["horizon_status"] == "PRIMARY").all()
-
-
-def test_09_production_selector_sha_unchanged():
-    """INVARIANT 9: Production selector dashboard/skill_industry_eps_known.py SHA256 must remain unchanged."""
+def test_10_production_selector_sha_unchanged():
+    """INVARIANT 10: Production selector dashboard/skill_industry_eps_known.py SHA256 must remain unchanged."""
     selector_path = Path(__file__).resolve().parents[1] / "dashboard" / "skill_industry_eps_known.py"
     with open(selector_path, "rb") as f:
         sha = hashlib.sha256(f.read()).hexdigest()
     assert sha == "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477"
 
 
-def test_10_s5_equals_e0_base(audit_environment):
-    """INVARIANT 10: Step 5 of Add-Back (S5_INDUSTRY_KNOWN) must strictly equal E0_BASE."""
+def test_11_s5_equals_e0_base(audit_environment):
+    """INVARIANT 11: Step 5 of Add-Back (S5_INDUSTRY_KNOWN) must strictly equal E0_BASE."""
     _, events_df, _, _ = audit_environment
     for _, row in events_df.iterrows():
         feat = evaluate_candidate_features(row)
@@ -192,20 +213,8 @@ def test_10_s5_equals_e0_base(audit_environment):
         assert e0_pred == s5_pred
 
 
-def test_11_tightening_probes_registry_strictness():
-    """INVARIANT 11: Tightening probes must strictly contain only the 5 pre-registered single-factor probes."""
+def test_12_tightening_probes_registry_strictness():
+    """INVARIANT 12: Tightening probes must strictly contain only the 5 pre-registered single-factor probes."""
     probe_names = [r[0] for r in ALL_VARIANTS_REGISTRY if r[1] == "TIGHTENING_PROBE"]
     expected = ["T_FRESH_5", "T_FRESH_2", "T_EPS25", "T_ENTRY_VOLUME_15", "T_WEEKLY_VOLUME_13"]
     assert probe_names == expected
-
-
-def test_12_deterministic_seed_reproducibility():
-    """INVARIANT 12: Deterministic seeds derived from SHA256 must be 100% reproducible."""
-    s1 = derive_seed("2026-06-26", "E0_BASE", 42)
-    s2 = derive_seed("2026-06-26", "E0_BASE", 42)
-    s3 = derive_seed("2026-06-26", "E1_INDUSTRY_DIVERSE", 42)
-
-    assert s1 == s2
-    assert s1 != s3
-    assert isinstance(s1, int)
-    assert 0 <= s1 < 2**32

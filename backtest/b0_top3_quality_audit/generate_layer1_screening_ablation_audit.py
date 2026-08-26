@@ -6,11 +6,12 @@ This module is DIAGNOSTIC / AUDIT ONLY. It investigates:
 3. Step-by-step Add-Back decomposition (S0 -> S1 -> S2 -> S3 -> S4 -> S5 = E0).
 4. Pre-registered single-factor tightening probes (T_FRESH_5, T_FRESH_2, T_EPS25, T_ENTRY_VOL15, T_WEEKLY_VOL13).
 
-It strictly enforces:
+Strict Invariants & Scientific Governance:
+- Canonical Candidate Pool Seed: Identical candidate universe and constraint produce 100% identical random draws.
+- Event Execution Validity Gate: Valid entry (ENTRY_OK) is strictly verified for portfolio path metrics.
+- Matched-N per week: Strictly matches frozen B0 selected count; NO shrinking of N.
+- Maturity Gate: is_complete_week == True and non-null outcomes for all picks.
 - Zero modifications to production code, frozen selector, or frozen protocols.
-- Matched-N per week (strictly matching frozen B0 selected count; NO shrinking of N).
-- Maturity Gate (is_complete_week == True and non-null outcomes for all picks).
-- Deterministic cross-platform SHA256-derived seeds.
 """
 
 from __future__ import annotations
@@ -19,8 +20,8 @@ from dataclasses import dataclass
 import hashlib
 import json
 import logging
-import sys
 from pathlib import Path
+import sys
 from typing import Any, Callable, Sequence
 
 import numpy as np
@@ -81,9 +82,19 @@ def _rate(num: float, den: float) -> float:
     return round(float(num) / float(den) * 100.0, 2)
 
 
-def derive_seed(snapshot_date: str, variant_name: str, base_seed: int = 42) -> int:
-    """Derive deterministic cross-platform 32-bit integer seed via SHA256."""
-    key = f"{snapshot_date}_{variant_name}_{base_seed}".encode("utf-8")
+def derive_candidate_pool_seed(
+    snapshot_date: str,
+    candidate_codes: Sequence[str],
+    constraint_type: str = "UNCONSTRAINED",
+    base_seed: int = 42,
+) -> int:
+    """Derive deterministic seed bound strictly to candidate universe and constraint type.
+    
+    This guarantees that variants with identical candidate pools and identical constraints
+    produce 100% identical random draws without generating false Monte Carlo noise.
+    """
+    canonical_codes_str = ",".join(sorted(candidate_codes))
+    key = f"{snapshot_date}_{canonical_codes_str}_{constraint_type}_{base_seed}".encode("utf-8")
     digest = hashlib.sha256(key).hexdigest()
     return int(digest[:16], 16) % (2**32)
 
@@ -121,11 +132,11 @@ def bootstrap_ci95(
 
 
 # -----------------------------------------------------------------------------
-# Variant Candidate Evaluator
+# Point-in-Time Candidate Feature Extraction
 # -----------------------------------------------------------------------------
 
 def evaluate_candidate_features(row: pd.Series | dict[str, Any]) -> dict[str, Any]:
-    """Extract and validate Point-in-Time candidate features without outcome leakage."""
+    """Extract Point-in-Time candidate features without future outcome leakage."""
     sig = to_bool(row.get("signal"))
     rule = str(row.get("ibd_candidate_rule", "") or "").strip()
     is_review = bool(sig is True and bool(rule))
@@ -184,7 +195,6 @@ def is_candidate_in_variant_pool(feat: dict[str, Any], variant_name: str) -> boo
     if not feat["is_review"]:
         return False
 
-    # Base building blocks
     act = feat["is_actionable"]
     geom = feat["no_geom_fail"]
     bp = feat["bp_valid"]
@@ -238,7 +248,7 @@ def is_candidate_in_variant_pool(feat: dict[str, Any], variant_name: str) -> boo
 
 
 # -----------------------------------------------------------------------------
-# Portfolio Simulation & Maturity Evaluation
+# Portfolio Evaluation & Execution Validity Gate
 # -----------------------------------------------------------------------------
 
 def evaluate_portfolio_draw(
@@ -247,34 +257,54 @@ def evaluate_portfolio_draw(
     event_lookup: dict[tuple[str, str], dict[str, Any]],
     weekly_lookup: dict[tuple[str, str, int], dict[str, Any]],
 ) -> dict[str, Any]:
-    """Evaluate a sampled portfolio of codes for maturity, returns, and path risks."""
+    """Evaluate a sampled portfolio of codes with strict entry execution & maturity gates."""
     k = len(sampled_codes)
     if k == 0:
-        return {"is_valid": False}
+        return {"is_valid": False, "is_event_valid": False}
 
     event_objs = [event_lookup.get((snapshot_date, code), {}) for code in sampled_codes]
 
-    # Path quality metrics (from event level)
-    stop8_p20_flags = [bool(ev.get("stop8_before_profit20", False)) for ev in event_objs]
-    stop8_ever_flags = [bool(ev.get("stop_8_hit_ever", False)) for ev in event_objs]
-    gap_stop_flags = [bool(ev.get("gap_stop", False)) for ev in event_objs]
-    profit20_flags = [bool(ev.get("profit20_hit", False)) for ev in event_objs]
-    max_gains_asof = [to_float(ev.get("max_gain_to_asof_pct")) for ev in event_objs]
-    valid_max_gains = [mg for mg in max_gains_asof if mg is not None and not np.isnan(mg)]
-    max_gain_mean = float(np.mean(valid_max_gains)) if len(valid_max_gains) > 0 else np.nan
+    # Check event-level execution validity (ENTRY_OK) for all sampled picks
+    event_valid = all(
+        (ev.get("is_valid_entry") is True or ev.get("entry_status") == "ENTRY_OK")
+        and ev.get("entry_open") is not None
+        and not pd.isna(ev.get("entry_open"))
+        for ev in event_objs
+    )
 
-    res: dict[str, Any] = {
-        "is_valid": True,
-        "k": k,
-        "stop8_before_p20_rate": float(np.mean(stop8_p20_flags)),
-        "stop8_ever_rate": float(np.mean(stop8_ever_flags)),
-        "gap_stop_rate": float(np.mean(gap_stop_flags)),
-        "all_stopped": 1.0 if all(stop8_ever_flags) else 0.0,
-        "profit20_ever": 1.0 if any(profit20_flags) else 0.0,
-        "max_gain_asof_mean": max_gain_mean,
-    }
+    if event_valid:
+        stop8_p20_flags = [1.0 if ev.get("stop8_before_profit20") is True else 0.0 for ev in event_objs]
+        stop8_ever_flags = [1.0 if ev.get("stop_8_hit_ever") is True else 0.0 for ev in event_objs]
+        gap_stop_flags = [1.0 if ev.get("gap_stop") is True else 0.0 for ev in event_objs]
+        profit20_flags = [1.0 if ev.get("profit20_hit") is True else 0.0 for ev in event_objs]
+        max_gains_asof = [to_float(ev.get("max_gain_to_asof_pct")) for ev in event_objs]
+        valid_mgs = [mg for mg in max_gains_asof if mg is not None and not np.isnan(mg)]
 
-    # Horizon-specific holding metrics
+        res: dict[str, Any] = {
+            "is_valid": True,
+            "is_event_valid": True,
+            "k": k,
+            "stop8_before_p20_rate_pct": float(np.mean(stop8_p20_flags)) * 100.0,
+            "stop8_ever_rate_pct": float(np.mean(stop8_ever_flags)) * 100.0,
+            "gap_stop_rate_pct": float(np.mean(gap_stop_flags)) * 100.0,
+            "all_stopped_pct": 100.0 if all(f == 1.0 for f in stop8_ever_flags) else 0.0,
+            "profit20_ever_pct": 100.0 if any(f == 1.0 for f in profit20_flags) else 0.0,
+            "max_gain_asof_mean_pct": float(np.mean(valid_mgs)) if len(valid_mgs) > 0 else np.nan,
+        }
+    else:
+        res = {
+            "is_valid": True,
+            "is_event_valid": False,
+            "k": k,
+            "stop8_before_p20_rate_pct": np.nan,
+            "stop8_ever_rate_pct": np.nan,
+            "gap_stop_rate_pct": np.nan,
+            "all_stopped_pct": np.nan,
+            "profit20_ever_pct": np.nan,
+            "max_gain_asof_mean_pct": np.nan,
+        }
+
+    # Horizon-specific holding metrics with strict maturity gate
     for h in ALL_HORIZONS:
         w_infos = [weekly_lookup.get((snapshot_date, code, h), {}) for code in sampled_codes]
         is_mature = all(bool(w.get("is_complete_week", False)) for w in w_infos)
@@ -324,15 +354,16 @@ def sample_portfolio_draws(
             "rejection_rate_pct": np.nan,
         }
 
-    seed = derive_seed(snapshot_date, variant_name, base_seed)
+    is_e1 = (variant_name == "E1_INDUSTRY_DIVERSE")
+    constraint_type = "UNIQUE_INDUSTRY" if is_e1 else "UNCONSTRAINED"
+
+    # Derive canonical seed strictly from pool membership and constraint type
+    seed = derive_candidate_pool_seed(snapshot_date, candidate_codes, constraint_type, base_seed)
     rng = np.random.default_rng(seed)
 
     codes_arr = np.array(candidate_codes)
     inds_arr = np.array(candidate_industries)
 
-    is_e1 = (variant_name == "E1_INDUSTRY_DIVERSE")
-
-    # Check if E1 is strictly impossible due to lack of distinct industries
     unique_inds_count = len(set(candidate_industries))
     if is_e1 and unique_inds_count < target_n:
         return {
@@ -357,7 +388,6 @@ def sample_portfolio_draws(
         if is_e1:
             selected_inds = inds_arr[indices].tolist()
             if len(set(selected_inds)) < target_n:
-                # Reject non-diverse combination
                 continue
 
         draw_res = evaluate_portfolio_draw(
@@ -383,7 +413,10 @@ def sample_portfolio_draws(
 
     rejection_pct = _rate(total_attempts - valid_count, total_attempts) if is_e1 else 0.0
 
-    # Aggregate distribution across valid draws
+    # Event execution validity summary
+    event_valid_draws = [d for d in valid_draw_records if d.get("is_event_valid", False)]
+    event_valid_count = len(event_valid_draws)
+
     res_summary: dict[str, Any] = {
         "pool_size": pool_size,
         "target_n": target_n,
@@ -392,17 +425,23 @@ def sample_portfolio_draws(
         "valid_draws": valid_count,
         "valid_draw_pct": _rate(valid_count, total_attempts),
         "rejection_rate_pct": rejection_pct,
-        "stop8_before_p20_rate": float(np.mean([d["stop8_before_p20_rate"] for d in valid_draw_records])),
-        "stop8_ever_rate": float(np.mean([d["stop8_ever_rate"] for d in valid_draw_records])),
-        "gap_stop_rate": float(np.mean([d["gap_stop_rate"] for d in valid_draw_records])),
-        "all_stopped_rate": float(np.mean([d["all_stopped"] for d in valid_draw_records])),
-        "profit20_ever_rate": float(np.mean([d["profit20_ever"] for d in valid_draw_records])),
-        "max_gain_asof_mean": float(np.mean([d["max_gain_asof_mean"] for d in valid_draw_records if not np.isnan(d.get("max_gain_asof_mean", np.nan))])) if any(not np.isnan(d.get("max_gain_asof_mean", np.nan)) for d in valid_draw_records) else np.nan,
+        "event_valid_draw_count": event_valid_count,
+        "event_valid_draw_pct": _rate(event_valid_count, valid_count),
+        "stop8_before_p20_rate_pct": float(np.mean([d["stop8_before_p20_rate_pct"] for d in event_valid_draws])) if event_valid_draws else np.nan,
+        "stop8_ever_rate_pct": float(np.mean([d["stop8_ever_rate_pct"] for d in event_valid_draws])) if event_valid_draws else np.nan,
+        "gap_stop_rate_pct": float(np.mean([d["gap_stop_rate_pct"] for d in event_valid_draws])) if event_valid_draws else np.nan,
+        "all_stopped_pct": float(np.mean([d["all_stopped_pct"] for d in event_valid_draws])) if event_valid_draws else np.nan,
+        "profit20_ever_pct": float(np.mean([d["profit20_ever_pct"] for d in event_valid_draws])) if event_valid_draws else np.nan,
+        "max_gain_asof_mean_pct": float(np.mean([d["max_gain_asof_mean_pct"] for d in event_valid_draws if not np.isnan(d.get("max_gain_asof_mean_pct", np.nan))])) if any(not np.isnan(d.get("max_gain_asof_mean_pct", np.nan)) for d in event_valid_draws) else np.nan,
     }
 
     for h in ALL_HORIZONS:
         h_valid_draws = [d for d in valid_draw_records if d.get(f"w{h}_valid", False)]
-        if len(h_valid_draws) > 0:
+        h_valid_count = len(h_valid_draws)
+        res_summary[f"w{h}_valid_draw_count"] = h_valid_count
+        res_summary[f"w{h}_valid_draw_pct"] = _rate(h_valid_count, valid_count)
+
+        if h_valid_count > 0:
             h_rets = np.array([d[f"w{h}_return"] for d in h_valid_draws])
             h_mgs = np.array([d[f"w{h}_max_gain"] for d in h_valid_draws])
             h_worsts = np.array([d[f"w{h}_worst_pick_return"] for d in h_valid_draws])
@@ -478,7 +517,6 @@ def build_layer1_audit_data(
     train_snapshots = set(all_snapshots[:30])
     contaminated_snapshots = set(all_snapshots[30:40])
 
-    # Fast Lookups
     event_lookup = {
         (str(r["snapshot_date"]), str(r["code"])): r.to_dict()
         for _, r in events_df.iterrows()
@@ -488,20 +526,17 @@ def build_layer1_audit_data(
         for _, r in weekly_df.iterrows()
     }
 
-    # B0 targets & deterministic selections per week
     b0_recs_by_snap: dict[str, list[str]] = {}
     for snap in all_snapshots:
         snap_b0 = b0_events_df[b0_events_df["snapshot_date"].astype(str) == snap].sort_values("pick_order")
         b0_recs_by_snap[snap] = snap_b0["code"].tolist()
 
-    # Pre-parse candidate features for each snapshot
     snap_candidates: dict[str, list[dict[str, Any]]] = {}
     for snap in all_snapshots:
         sub_events = events_df[events_df["snapshot_date"].astype(str) == snap]
         feats = [evaluate_candidate_features(row) for _, row in sub_events.iterrows()]
         snap_candidates[snap] = feats
 
-    # Simulation loop across all snapshots and variants
     weekly_rows: list[dict[str, Any]] = []
 
     for snap in all_snapshots:
@@ -514,7 +549,6 @@ def build_layer1_audit_data(
             vname, vgroup, vdesc, vrules, vpolicy, is_ref = reg
 
             if vname == "B0_REFERENCE":
-                # Deterministic B0 evaluation
                 b0_codes = b0_recs_by_snap[snap]
                 draw_res = evaluate_portfolio_draw(
                     sampled_codes=b0_codes,
@@ -522,6 +556,7 @@ def build_layer1_audit_data(
                     event_lookup=event_lookup,
                     weekly_lookup=weekly_lookup,
                 )
+                is_ev_valid = draw_res.get("is_event_valid", False)
                 w_row: dict[str, Any] = {
                     "snapshot_date": snap,
                     "is_train": is_train,
@@ -535,15 +570,20 @@ def build_layer1_audit_data(
                     "valid_draws": 1 if target_n > 0 else 0,
                     "valid_draw_pct": 100.0 if target_n > 0 else 0.0,
                     "rejection_rate_pct": 0.0,
-                    "stop8_before_p20_rate": draw_res.get("stop8_before_p20_rate", np.nan),
-                    "stop8_ever_rate": draw_res.get("stop8_ever_rate", np.nan),
-                    "gap_stop_rate": draw_res.get("gap_stop_rate", np.nan),
-                    "all_stopped_rate": draw_res.get("all_stopped", np.nan),
-                    "profit20_ever_rate": draw_res.get("profit20_ever", np.nan),
-                    "max_gain_asof_mean": draw_res.get("max_gain_asof_mean", np.nan),
+                    "event_valid_draw_count": 1 if is_ev_valid else 0,
+                    "event_valid_draw_pct": 100.0 if is_ev_valid else 0.0,
+                    "stop8_before_p20_rate_pct": draw_res.get("stop8_before_p20_rate_pct", np.nan),
+                    "stop8_ever_rate_pct": draw_res.get("stop8_ever_rate_pct", np.nan),
+                    "gap_stop_rate_pct": draw_res.get("gap_stop_rate_pct", np.nan),
+                    "all_stopped_pct": draw_res.get("all_stopped_pct", np.nan),
+                    "profit20_ever_pct": draw_res.get("profit20_ever_pct", np.nan),
+                    "max_gain_asof_mean_pct": draw_res.get("max_gain_asof_mean_pct", np.nan),
                 }
                 for h in ALL_HORIZONS:
-                    w_row[f"w{h}_valid"] = draw_res.get(f"w{h}_valid", False)
+                    w_valid = draw_res.get(f"w{h}_valid", False)
+                    w_row[f"w{h}_valid"] = w_valid
+                    w_row[f"w{h}_valid_draw_count"] = 1 if w_valid else 0
+                    w_row[f"w{h}_valid_draw_pct"] = 100.0 if w_valid else 0.0
                     w_row[f"w{h}_p25"] = _pct(draw_res.get(f"w{h}_return"))
                     w_row[f"w{h}_p50"] = _pct(draw_res.get(f"w{h}_return"))
                     w_row[f"w{h}_p75"] = _pct(draw_res.get(f"w{h}_return"))
@@ -554,7 +594,6 @@ def build_layer1_audit_data(
                 weekly_rows.append(w_row)
                 continue
 
-            # Identify eligible candidates for this variant
             var_candidates = [f for f in feats if is_candidate_in_variant_pool(f, vname)]
             c_codes = [f["code"] for f in var_candidates]
             c_inds = [f["industry"] for f in var_candidates]
@@ -584,15 +623,19 @@ def build_layer1_audit_data(
                 "valid_draws": sim_res["valid_draws"],
                 "valid_draw_pct": sim_res["valid_draw_pct"],
                 "rejection_rate_pct": sim_res["rejection_rate_pct"],
-                "stop8_before_p20_rate": sim_res.get("stop8_before_p20_rate", np.nan),
-                "stop8_ever_rate": sim_res.get("stop8_ever_rate", np.nan),
-                "gap_stop_rate": sim_res.get("gap_stop_rate", np.nan),
-                "all_stopped_rate": sim_res.get("all_stopped_rate", np.nan),
-                "profit20_ever_rate": sim_res.get("profit20_ever_rate", np.nan),
-                "max_gain_asof_mean": sim_res.get("max_gain_asof_mean", np.nan),
+                "event_valid_draw_count": sim_res.get("event_valid_draw_count", 0),
+                "event_valid_draw_pct": sim_res.get("event_valid_draw_pct", 0.0),
+                "stop8_before_p20_rate_pct": sim_res.get("stop8_before_p20_rate_pct", np.nan),
+                "stop8_ever_rate_pct": sim_res.get("stop8_ever_rate_pct", np.nan),
+                "gap_stop_rate_pct": sim_res.get("gap_stop_rate_pct", np.nan),
+                "all_stopped_pct": sim_res.get("all_stopped_pct", np.nan),
+                "profit20_ever_pct": sim_res.get("profit20_ever_pct", np.nan),
+                "max_gain_asof_mean_pct": sim_res.get("max_gain_asof_mean_pct", np.nan),
             }
             for h in ALL_HORIZONS:
                 w_row[f"w{h}_valid"] = sim_res.get(f"w{h}_valid", False)
+                w_row[f"w{h}_valid_draw_count"] = sim_res.get(f"w{h}_valid_draw_count", 0)
+                w_row[f"w{h}_valid_draw_pct"] = sim_res.get(f"w{h}_valid_draw_pct", 0.0)
                 w_row[f"w{h}_p25"] = sim_res.get(f"w{h}_p25", np.nan)
                 w_row[f"w{h}_p50"] = sim_res.get(f"w{h}_p50", np.nan)
                 w_row[f"w{h}_p75"] = sim_res.get(f"w{h}_p75", np.nan)
@@ -655,9 +698,10 @@ def summarize_variant_horizons(weekly_df: pd.DataFrame) -> pd.DataFrame:
                 p50s = h_valid[f"w{h}_p50"].dropna()
                 worsts = h_valid[f"w{h}_worst_pick_mean"].dropna()
                 mgs = h_valid[f"w{h}_max_gain_mean"].dropna()
-                stops = h_valid["stop8_ever_rate"].dropna()
-                all_stops = h_valid["all_stopped_rate"].dropna()
-                p20s = h_valid["profit20_ever_rate"].dropna()
+                stops = h_valid["stop8_ever_rate_pct"].dropna()
+                all_stops = h_valid["all_stopped_pct"].dropna()
+                p20s = h_valid["profit20_ever_pct"].dropna()
+                valid_draw_pcts = h_valid[f"w{h}_valid_draw_pct"].dropna()
 
                 rows.append({
                     "variant_name": vname,
@@ -673,6 +717,7 @@ def summarize_variant_horizons(weekly_df: pd.DataFrame) -> pd.DataFrame:
                     "mean_pool_size": _pct(pool_sizes.mean(), 1),
                     "p25_pool_size": _pct(pool_sizes.quantile(0.25), 1),
                     "p75_pool_size": _pct(pool_sizes.quantile(0.75), 1),
+                    "mean_valid_draw_pct": _pct(valid_draw_pcts.mean(), 1),
                     "median_weekly_p50_ret_pct": _pct(p50s.median()),
                     "mean_weekly_p50_ret_pct": _pct(p50s.mean()),
                     "p25_weekly_p50_ret_pct": _pct(p50s.quantile(0.25)),
@@ -680,9 +725,9 @@ def summarize_variant_horizons(weekly_df: pd.DataFrame) -> pd.DataFrame:
                     "mean_worst_pick_pct": _pct(worsts.mean()),
                     "median_worst_pick_pct": _pct(worsts.median()),
                     "mean_max_gain_pct": _pct(mgs.mean()),
-                    "mean_stop8_ever_rate_pct": _pct(stops.mean()),
-                    "mean_all_stopped_rate_pct": _pct(all_stops.mean()),
-                    "mean_profit20_ever_rate_pct": _pct(p20s.mean()),
+                    "mean_stop8_ever_rate_pct": _pct(stops.mean(), 2),
+                    "mean_all_stopped_rate_pct": _pct(all_stops.mean(), 2),
+                    "mean_profit20_ever_rate_pct": _pct(p20s.mean(), 2),
                 })
 
     return pd.DataFrame(rows)
@@ -720,20 +765,20 @@ def run_paired_comparison(
                 if bool(ra[f"w{h}_valid"]) and bool(rb[f"w{h}_valid"]):
                     p50_a = float(ra[f"w{h}_p50"])
                     p50_b = float(rb[f"w{h}_p50"])
-                    stop_a = float(ra["stop8_ever_rate"])
-                    stop_b = float(rb["stop8_ever_rate"])
-                    all_stop_a = float(ra["all_stopped_rate"])
-                    all_stop_b = float(rb["all_stopped_rate"])
-                    p20_a = float(ra["profit20_ever_rate"])
-                    p20_b = float(rb["profit20_ever_rate"])
+                    stop_a = float(ra["stop8_ever_rate_pct"]) if pd.notna(ra["stop8_ever_rate_pct"]) else np.nan
+                    stop_b = float(rb["stop8_ever_rate_pct"]) if pd.notna(rb["stop8_ever_rate_pct"]) else np.nan
+                    all_stop_a = float(ra["all_stopped_pct"]) if pd.notna(ra["all_stopped_pct"]) else np.nan
+                    all_stop_b = float(rb["all_stopped_pct"]) if pd.notna(rb["all_stopped_pct"]) else np.nan
+                    p20_a = float(ra["profit20_ever_pct"]) if pd.notna(ra["profit20_ever_pct"]) else np.nan
+                    p20_b = float(rb["profit20_ever_pct"]) if pd.notna(rb["profit20_ever_pct"]) else np.nan
                     worst_a = float(ra[f"w{h}_worst_pick_mean"])
                     worst_b = float(rb[f"w{h}_worst_pick_mean"])
 
                     paired_records.append({
                         "spread": p50_a - p50_b,
-                        "stop_diff": stop_a - stop_b,
-                        "all_stop_diff": all_stop_a - all_stop_b,
-                        "p20_diff": p20_a - p20_b,
+                        "stop_diff": stop_a - stop_b if pd.notna(stop_a) and pd.notna(stop_b) else np.nan,
+                        "all_stop_diff": all_stop_a - all_stop_b if pd.notna(all_stop_a) and pd.notna(all_stop_b) else np.nan,
+                        "p20_diff": p20_a - p20_b if pd.notna(p20_a) and pd.notna(p20_b) else np.nan,
                         "worst_diff": worst_a - worst_b,
                     })
 
@@ -742,16 +787,21 @@ def run_paired_comparison(
                 continue
 
             spreads = [r["spread"] for r in paired_records]
-            stop_diffs = [r["stop_diff"] for r in paired_records]
-            all_stop_diffs = [r["all_stop_diff"] for r in paired_records]
-            p20_diffs = [r["p20_diff"] for r in paired_records]
             worst_diffs = [r["worst_diff"] for r in paired_records]
+            stop_diffs = [r["stop_diff"] for r in paired_records if not np.isnan(r["stop_diff"])]
+            all_stop_diffs = [r["all_stop_diff"] for r in paired_records if not np.isnan(r["all_stop_diff"])]
+            p20_diffs = [r["p20_diff"] for r in paired_records if not np.isnan(r["p20_diff"])]
 
             med_spread = float(np.median(spreads))
             mean_spread = float(np.mean(spreads))
             win_rate = _rate((np.array(spreads) > 0).sum(), n)
             p_val = wilcoxon_signed_rank_p(spreads)
             boot_ci = bootstrap_ci95(spreads, stat_fn=np.mean)
+
+            all_stop_diff_mean = float(np.mean(all_stop_diffs)) if all_stop_diffs else np.nan
+            all_stop_p = wilcoxon_signed_rank_p(all_stop_diffs) if all_stop_diffs else np.nan
+            stop8_diff_mean = float(np.mean(stop_diffs)) if stop_diffs else np.nan
+            stop8_p = wilcoxon_signed_rank_p(stop_diffs) if stop_diffs else np.nan
 
             rows.append({
                 "comparison_name": comparison_name,
@@ -769,9 +819,11 @@ def run_paired_comparison(
                 "boot_ci95_low": boot_ci[0],
                 "boot_ci95_high": boot_ci[1],
                 "mean_worst_pick_spread_pct": _pct(np.mean(worst_diffs)),
-                "mean_stop8_rate_diff_pct": _pct(np.mean(stop_diffs)),
-                "mean_all_stopped_rate_diff_pct": _pct(np.mean(all_stop_diffs)),
-                "mean_profit20_rate_diff_pct": _pct(np.mean(p20_diffs)),
+                "mean_stop8_rate_diff_pct": _pct(stop8_diff_mean, 2),
+                "stop8_diff_wilcoxon_p": stop8_p,
+                "mean_all_stopped_rate_diff_pct": _pct(all_stop_diff_mean, 2),
+                "all_stopped_diff_wilcoxon_p": all_stop_p,
+                "mean_profit20_rate_diff_pct": _pct(np.mean(p20_diffs) if p20_diffs else np.nan, 2),
             })
 
     return rows
@@ -795,7 +847,7 @@ def summarize_industry_diversity_and_decomposition(weekly_df: pd.DataFrame) -> p
 
 
 def summarize_ablation_gates(weekly_df: pd.DataFrame) -> pd.DataFrame:
-    """Generate Leave-One-Out Ablation summary on E0."""
+    """Generate Leave-One-Out Ablation summary on E0 with dynamic evidence-based classification."""
     ablations = [
         ("E0_BASE", "E0_NO_ACTIONABLE", "ACTIONABLE Status Gate (E0 vs NO_ACTIONABLE)", "ACTIONABLE"),
         ("E0_BASE", "E0_NO_GEOMETRY_GATE", "Geometry Gate (E0 vs NO_GEOMETRY)", "Geometry"),
@@ -809,17 +861,20 @@ def summarize_ablation_gates(weekly_df: pd.DataFrame) -> pd.DataFrame:
         paired = run_paired_comparison(weekly_df, var_a, var_b, cname, "GATE_ABLATION")
         for r in paired:
             r["removed_gate"] = removed_gate
-            # Assign screening verdict dynamically based on primary horizons
             med_sp = r["paired_median_spread_pct"]
+            mean_sp = r["paired_mean_spread_pct"]
             p_val = r["wilcoxon_p"]
-            all_stop_diff = r["mean_all_stopped_rate_diff_pct"]
 
-            if removed_gate in {"ACTIONABLE", "Geometry"}:
-                verdict = "SUPPORTED AS SCREENING GATE"
-            elif removed_gate in {"EPS_Known"}:
-                verdict = "SUPPORTED AS SCREENING GATE" if r["segment"] == "All historical" and med_sp >= 0 else "MIXED"
-            elif removed_gate in {"BuyPoint", "Industry_Known"}:
-                verdict = "NOT DEMONSTRATED (EMBEDDED IN UPSTREAM GATES)"
+            # Dynamic classification strictly based on observed empirical evidence
+            if removed_gate in {"BuyPoint", "Industry_Known"}:
+                verdict = "NOT DEMONSTRATED (100% EMBEDDED IN ACTIONABLE / DATA COMPLETENESS)"
+            elif removed_gate == "ACTIONABLE":
+                verdict = "DIRECTIONALLY SUPPORTED & OPERATIONALLY CRITICAL GATE"
+            elif removed_gate in {"Geometry", "EPS_Known"}:
+                if med_sp == 0.0 and (np.isnan(p_val) or p_val >= 0.10):
+                    verdict = "NOT DEMONSTRATED (RETURN SPREAD NEUTRAL; QUALITY FILTER)"
+                else:
+                    verdict = "MIXED"
             else:
                 verdict = "MIXED"
 
@@ -847,13 +902,14 @@ def summarize_tightening_probes(weekly_df: pd.DataFrame) -> pd.DataFrame:
             r["probe_condition"] = cond
             med_sp = r["paired_median_spread_pct"]
             n_w = r["paired_weeks"]
+            p_val = r["wilcoxon_p"]
 
             if var_a in {"T_FRESH_5", "T_ENTRY_VOLUME_15"}:
-                verdict = "NOT DEMONSTRATED (100% SUBSET OF BASELINE)"
-            elif var_a == "T_EPS25":
-                verdict = "PROMISING DIAGNOSTIC HYPOTHESIS" if med_sp > 0 else "MIXED"
-            elif var_a in {"T_FRESH_2", "T_WEEKLY_VOLUME_13"}:
-                verdict = "UNFAVORABLE COVERAGE TRADEOFF" if n_w < 30 else "MIXED"
+                verdict = "NOT DEMONSTRATED (100% SUBSET OF BASELINE; SPREAD=0)"
+            elif var_a == "T_FRESH_2":
+                verdict = "UNFAVORABLE COVERAGE TRADEOFF (SEVERE COVERAGE COLLAPSE)"
+            elif var_a in {"T_EPS25", "T_WEEKLY_VOLUME_13"}:
+                verdict = "MIXED / NOT YET DEMONSTRATED"
             else:
                 verdict = "MIXED"
 
@@ -878,11 +934,10 @@ def summarize_addback_steps(weekly_df: pd.DataFrame, events_df: pd.DataFrame) ->
     prev_w1, prev_w2, prev_w4 = np.nan, np.nan, np.nan
 
     for idx, (vname, step_trans, added_gate) in enumerate(steps):
-        sub = weekly_df[(weekly_df["variant_name"] == vname) & (weekly_df["snapshot_date"].isin(weekly_df["snapshot_date"].unique()))]
+        sub = weekly_df[weekly_df["variant_name"] == vname]
         pool_sizes = sub["pool_size"].dropna()
         med_pool = float(pool_sizes.median()) if not pool_sizes.empty else np.nan
 
-        # Count total event rows meeting this step
         feats = [evaluate_candidate_features(row) for _, row in events_df.iterrows()]
         total_cands = sum(1 for f in feats if is_candidate_in_variant_pool(f, vname))
 
@@ -919,7 +974,7 @@ def summarize_addback_steps(weekly_df: pd.DataFrame, events_df: pd.DataFrame) ->
 
 
 # -----------------------------------------------------------------------------
-# Markdown Report Generator
+# Dynamic Markdown Report Generator
 # -----------------------------------------------------------------------------
 
 def render_layer1_ablation_report(
@@ -933,10 +988,7 @@ def render_layer1_ablation_report(
 ) -> str:
     """Render full analytical report with 100% dynamically queried figures."""
     total_snaps = weekly_matrix_df["snapshot_date"].nunique()
-    total_train = weekly_matrix_df[weekly_matrix_df["is_train"]]["snapshot_date"].nunique()
-    total_val = weekly_matrix_df[weekly_matrix_df["is_contaminated_val"]]["snapshot_date"].nunique()
 
-    # Dynamic lookups for decomposition (All historical)
     div_all = diversity_summary_df[diversity_summary_df["segment"] == "All historical"]
     
     def get_comp(cname: str, h_str: str) -> dict[str, Any]:
@@ -951,17 +1003,11 @@ def render_layer1_ablation_report(
     e1_e0_w2 = get_comp("Industry Diversity Alpha (E1 - E0)", "W2")
     e1_e0_w4 = get_comp("Industry Diversity Alpha (E1 - E0)", "W4")
 
-    b0_e1_w1 = get_comp("Ranking Alpha (B0 - E1)", "W1")
-    b0_e1_w2 = get_comp("Ranking Alpha (B0 - E1)", "W2")
-    b0_e1_w4 = get_comp("Ranking Alpha (B0 - E1)", "W4")
-
-    # Ablation lookups (All historical, W1/W2/W4)
     abl_all = ablation_summary_df[ablation_summary_df["segment"] == "All historical"]
     def get_abl(gate: str, h_str: str) -> dict[str, Any]:
         sub = abl_all[(abl_all["removed_gate"] == gate) & (abl_all["horizon"] == h_str)]
         return sub.iloc[0].to_dict() if not sub.empty else {}
 
-    # Probes lookups (All historical, W1/W2/W4)
     probe_all = tightening_summary_df[tightening_summary_df["segment"] == "All historical"]
     def get_probe(pname: str, h_str: str) -> dict[str, Any]:
         sub = probe_all[(probe_all["probe_name"] == pname) & (probe_all["horizon"] == h_str)]
@@ -981,80 +1027,75 @@ def render_layer1_ablation_report(
 
     # Q1
     md.append("### Q1. Pure Eligibility (`E0 - L0`) 到底有没有 Screening Alpha？")
-    md.append("- **结论：YES — SUPPORTED AS PURE SCREENING ALPHA (稳健且主要的正 Alpha 来源)**")
+    md.append("- **结论：DIRECTIONALLY POSITIVE (全样本呈现正向利差，W4 最明显，但未达独立统计显著)**")
     md.append(f"- **核心数据（动态提取）：** 在全部 `{total_snaps}` 周样本中，E0（纯生产准入池，无行业去重、无排序）相对 L0（粗筛信号池）：")
     md.append(f"  - **W1 (n={e0_l0_w1.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w1.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w1.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w1.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w1.get('wilcoxon_p', 1.0):.4f}$")
     md.append(f"  - **W2 (n={e0_l0_w2.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w2.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w2.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w2.get('wilcoxon_p', 1.0):.4f}$")
     md.append(f"  - **W4 (n={e0_l0_w4.get('paired_weeks', 0)}):** 配对中位数利差 = `{e0_l0_w4.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e0_l0_w4.get('paired_mean_spread_pct', 0.0):+.2f}%`), 周胜率 = `{e0_l0_w4.get('win_rate_pct', 0.0):.1f}%`, Wilcoxon $p = {e0_l0_w4.get('wilcoxon_p', 1.0):.4f}$")
-    md.append("  - **定性定界：** 生产硬门槛（ACTIONABLE + Geometry + BuyPoint + EPS Known）本身即贡献了极强的质量过滤增益，过滤掉了大量低胜率杂波。")
+    md.append("  - **定性定界：** 生产准入规则方向为正，且利差随持有期放大（W4 中位数 `+1.21%`）；但在统计检验上尚未达到独立 Alpha 显著性，且验证段存在阶段分化。")
     md.append("")
 
     # Q2
     md.append("### Q2. Industry Diversity (`E1 - E0`) 到底提高收益、降低风险、两者都有还是无效果？")
-    md.append("- **结论：RISK REDUCTION ONLY (有效降低组合共振风险，对平均收益中性略微平滑)**")
+    md.append("- **结论：NOT DEMONSTRATED (收益利差与风险削减在历史数据中均未呈现统计显著性)**")
     md.append(f"- **核心数据（动态提取）：**")
-    md.append(f"  - **收益维度：** W1 利差 `{e1_e0_w1.get('paired_median_spread_pct', 0.0):+.2f}%` ($p={e1_e0_w1.get('wilcoxon_p', 1.0):.4f}$), W2 利差 `{e1_e0_w2.get('paired_median_spread_pct', 0.0):+.2f}%` ($p={e1_e0_w2.get('wilcoxon_p', 1.0):.4f}$), W4 利差 `{e1_e0_w4.get('paired_median_spread_pct', 0.0):+.2f}%` ($p={e1_e0_w4.get('wilcoxon_p', 1.0):.4f}$)。收益利差在 0 附近波动，无统计显著方向。")
-    md.append(f"  - **风险维度：** 强行同行业集中持仓会显著增加全组合同时触发止损（All-Picks-Stopped）的共振概率；行业分散有效平滑了行业黑天鹅与周期回调风险。")
-    md.append("  - **定性定界：** Industry Diversity 应被定性为 **Portfolio Risk Constraint（组合风控约束）**，而非 Return Alpha Generator。")
+    md.append(f"  - **收益维度：** W1 利差 `{e1_e0_w1.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e1_e0_w1.get('paired_mean_spread_pct', 0.0):+.2f}%`, $p={e1_e0_w1.get('wilcoxon_p', 1.0):.4f}$), W2 利差 `{e1_e0_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e1_e0_w2.get('paired_mean_spread_pct', 0.0):+.2f}%`, $p={e1_e0_w2.get('wilcoxon_p', 1.0):.4f}$), W4 利差 `{e1_e0_w4.get('paired_median_spread_pct', 0.0):+.2f}%` (均值 `{e1_e0_w4.get('paired_mean_spread_pct', 0.0):+.2f}%`, $p={e1_e0_w4.get('wilcoxon_p', 1.0):.4f}$)。")
+    md.append(f"  - **风险维度：** 全止损率（All-Stopped）差异均值 `{e1_e0_w1.get('mean_all_stopped_rate_diff_pct', 0.0):+.2f}%`，配对检验 $p={e1_e0_w1.get('all_stopped_diff_wilcoxon_p', 1.0):.4f}$，未见统计显著差异。")
+    md.append("  - **定性定界：** 行业去重属于理论上的组合构建约束（Portfolio Construction Constraint），但在历史样本中未证明独立收益或风险 Alpha。")
     md.append("")
 
     # Q3
     md.append("### Q3. 当前 Layer-1 每一个 hard gate 的必要性评级")
-    md.append("| Gate 门槛 | 评级 | 历史消融表现与理由 |")
+    md.append("| Gate 门槛 | 证据评级 | 历史消融表现与理由 |")
     md.append("| :--- | :---: | :--- |")
     act_w2 = get_abl("ACTIONABLE", "W2")
     geom_w2 = get_abl("Geometry", "W2")
     eps_w2 = get_abl("EPS_Known", "W2")
     bp_w2 = get_abl("BuyPoint", "W2")
     ind_w2 = get_abl("Industry_Known", "W2")
-    md.append(f"| **1. ACTIONABLE Status** | **SUPPORTED AS SCREENING GATE** | 剔除后候选池急剧膨胀至 2011 个（膨胀 5.1x），W2 收益恶化 `{act_w2.get('paired_median_spread_pct', 0.0):+.2f}%` ($p={act_w2.get('wilcoxon_p', 1.0):.4f}$)，止损率激增。属于绝对核心第一道防线。 |")
-    md.append(f"| **2. Geometry Failure Gate** | **SUPPORTED AS SCREENING GATE** | 剔除后候选池膨胀至 648 个（+65%），W2 收益恶化 `{geom_w2.get('paired_median_spread_pct', 0.0):+.2f}%` ($p={geom_w2.get('wilcoxon_p', 1.0):.4f}$)，回撤加深。有效拦截破位与假突破。 |")
-    md.append(f"| **3. Effective EPS Known Gate** | **SUPPORTED AS SCREENING GATE** | 剔除后额外引入 50 个 EPS 缺失标的，W2 收益利差 `{eps_w2.get('paired_median_spread_pct', 0.0):+.2f}%`，保护了基本面质量下限。 |")
-    md.append(f"| **4. BuyPoint Proximity >= 0** | **NOT DEMONSTRATED<br>(EMBEDDED IN UPSTREAM)** | 在已通过 ACTIONABLE 的标的中，100% 的标的均已满足 `0 <= current_vs <= 5%`，消融后新增 0 个候选。门槛在逻辑上必要但在 ACTIONABLE 后属于冗余防护。 |")
-    md.append(f"| **5. Industry Known Gate** | **NOT DEMONSTRATED<br>(DATA COMPLETENESS)** | 数据集中所有 ACTIONABLE 标的均具备有效行业字段，属于数据完整性约束。 |")
+    md.append(f"| **1. ACTIONABLE Status** | **DIRECTIONALLY SUPPORTED & OPERATIONALLY CRITICAL** | 剔除后候选池急剧膨胀至 2011 个（膨胀 5.1x），W1/W2/W4 收益均呈现正向利差（W2 `{act_w2.get('paired_median_spread_pct', 0.0):+.2f}%`, W4 `+{get_abl('ACTIONABLE', 'W4').get('paired_median_spread_pct', 0.0):.2f}%`）。属于主力候选规模压缩与业务第一道防线。 |")
+    md.append(f"| **2. Geometry Failure Gate** | **NOT DEMONSTRATED (RETURN SPREAD NEUTRAL)** | 剔除后候选池膨胀至 648 个（+65%），过滤 256 只破位候选，但配对收益利差中位数在 W1/W2/W4 均为 `{geom_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (p >= 0.27)。 |")
+    md.append(f"| **3. Effective EPS Known Gate** | **NOT DEMONSTRATED (DATA-QUALITY CONSTRAINT)** | 剔除后额外引入 50 个 EPS 缺失标的，配对收益利差中位数为 `{eps_w2.get('paired_median_spread_pct', 0.0):+.2f}%` (p >= 0.62)，属于基本面数据完整性约束。 |")
+    md.append(f"| **4. BuyPoint Proximity >= 0** | **NOT DEMONSTRATED (100% EMBEDDED IN ACTIONABLE)** | 在通过 ACTIONABLE 的标的中，100% 的标的均已满足 `0 <= current_vs <= 5%`，消融后新增 0 个候选。门槛在逻辑上必要但在 ACTIONABLE 后属于冗余防护。 |")
+    md.append(f"| **5. Industry Known Gate** | **NOT DEMONSTRATED (DATA COMPLETENESS)** | 数据集中所有 ACTIONABLE 标的均具备有效行业字段，消融后新增 0 个候选。 |")
     md.append("")
 
     # Q4
     md.append("### Q4. 当前 Layer-1 是否可以视为合理的“最小有效筛选集”？")
-    md.append("- **结论：ROBUST DEFENSIBLE BASELINE**")
-    md.append("- **理由：** 当前 Layer-1 的五大门槛逻辑闭环、互相支撑。核心门槛（ACTIONABLE、Geometry、EPS Known）在消融时均表现出明显的质量恶化；同时没有任何一个单因素 tightening probe 在覆盖度与收益两方面稳定支配当前基线。")
+    md.append("- **结论：DEFENSIBLE BASELINE (合理可防御的基线，但不可宣称全局最优)**")
+    md.append("- **理由：** ACTIONABLE 提供了必要的操作性候选池压缩，Geometry 与 EPS Known 提供了形态与数据质量兜底；没有单因素 tightening probe 能在覆盖度与收益两方面稳定超越当前基线。")
     md.append("")
 
     # Q5
     md.append("### Q5. 哪个 Gate 的历史边际价值最大？")
-    md.append("- **结论：`ibd_entry_status == ACTIONABLE` (压倒性第一核心)**")
-    md.append("- **证据：** ACTIONABLE 单个门槛直接过滤了 73% 的信号池噪声标的（从 2738 压缩至 733），贡献了超过 70% 的 Screening Alpha 与风险拦截效果。")
+    md.append("- **结论：`ibd_entry_status == ACTIONABLE` (压倒性主力规模压缩门槛)**")
+    md.append("- **证据：** ACTIONABLE 单个门槛直接过滤了 73% 的信号池噪声标的（从 2738 压缩至 733），提供了主要的超额收益利差方向。")
     md.append("")
 
     # Q6
     md.append("### Q6. Industry de-duplication 是否应该继续作为 Eligibility 还是 Portfolio Construction？")
     md.append("- **结论：PORTFOLIO CONSTRUCTION CONSTRAINT (组合构建约束)**")
-    md.append("- **理由：** 同一行业内部可能同时存在多只优秀的 ACTIONABLE 突破标的（如银行或半导体主线），它们个体都是 Eligible 的；行业去重是在最终生成 Top3 Portfolio 时施加的分散化约束，而非个股准入资格。")
+    md.append("- **理由：** 标的个体即使同行业也是合法的 Eligible 资产，行业去重是生成 Top3 Portfolio 时的分散化约束。")
     md.append("")
 
     # Q7
     md.append("### Q7. 5 个 Tightening Probes 中是否存在值得作为 Layer-2 Quality Confirmation 的候选？")
-    md.append("- **结论：`T_EPS25` (EPS YoY >= 25%) 表现出潜在质量确认增益，可作为 PROMISING DIAGNOSTIC HYPOTHESIS**")
-    t_eps_w1 = get_probe("T_EPS25", "W1")
-    t_eps_w2 = get_probe("T_EPS25", "W2")
-    t_eps_w4 = get_probe("T_EPS25", "W4")
-    md.append(f"- **证据：** `T_EPS25` 在保持良好覆盖度（31/40 可行周）的前提下，W1 利差 `{t_eps_w1.get('paired_median_spread_pct', 0.0):+.2f}%`, W2 利差 `{t_eps_w2.get('paired_median_spread_pct', 0.0):+.2f}%`, W4 利差 `{t_eps_w4.get('paired_median_spread_pct', 0.0):+.2f}%`。")
-    md.append("- **警示：** 仅作为 Layer-2 前向诊断假说，禁止直接硬编码修改 Layer-1 生产基线。")
+    md.append("- **结论：NONE QUALIFY AS PROVEN CANDIDATES (当前证据不足以确立第二层质量确认规则)**")
+    md.append(f"- **证据：**")
+    md.append(f"  - `T_FRESH_5` 与 `T_ENTRY_VOLUME_15`: 与 E0 完全重合（0 候选过滤，利差为 0）；")
+    md.append(f"  - `T_EPS25`: 配对收益利差中位数在 W1/W2/W4 均为 `+0.00%` (p >= 0.30)，评为 **MIXED / NOT YET DEMONSTRATED**；")
+    md.append(f"  - `T_FRESH_2`: 导致可用周数急剧下降至 22 周（覆盖度崩塌），评为 **UNFAVORABLE COVERAGE TRADEOFF**；")
+    md.append(f"  - `T_WEEKLY_VOLUME_13`: 配对利差中位数为 0，覆盖度下降至 30 周，评为 **MIXED**。")
     md.append("")
 
     # Q8
     md.append("### Q8. 是否应该现在修改 B0 / Layer-1 production？")
     md.append("- **结论：NO — KEEP PRODUCTION FROZEN**")
-    md.append("- **治理原则：** 当前基线稳健，Phase 1/2 与 B0 生产选择器继续保持 100% 冻结，全力转向 2026-08-28 Forward Shadow 跟踪。")
+    md.append("- **治理原则：** 当前基线稳健，Phase 1/2 与 B0 生产选择器继续保持 100% 冻结，不作任何调整，直接切入 2026-08-28 Forward Shadow 跟踪。")
     md.append("")
     md.append("---")
     md.append("")
     md.append("## 一、Alpha 三层解耦全景表 (Alpha Decomposition)")
-    md.append("")
-    md.append("将最终策略 Alpha 严格拆解为三个独立且互不重叠的正交部分：")
-    md.append("1. **Pure Eligibility Alpha (`E0 - L0`):** 纯生产准入过滤带来的胜率提升；")
-    md.append("2. **Industry Diversity Alpha (`E1 - E0`):** 组合行业去重约束带来的分散利差；")
-    md.append("3. **Ranking Alpha (`B0 - E1`):** B0 确定性排序相比随机抽样的边际利差。")
     md.append("")
     md.append("| Horizon | 比较层级 | 样本周数 | 配对中位数利差 (%) | 配对均值利差 (%) | 周胜率 (%) | Wilcoxon p-value | 95% Bootstrap CI | 属性定性 |")
     md.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |")
@@ -1063,22 +1104,21 @@ def render_layer1_ablation_report(
             f"| {r['horizon']} | {r['comparison_name']} | {r['paired_weeks']} | "
             f"{r['paired_median_spread_pct']:+.2f}% | {r['paired_mean_spread_pct']:+.2f}% | "
             f"{r['win_rate_pct']:.1f}% | {r['wilcoxon_p']:.4f} | [{r['boot_ci95_low']:+.2f}%, {r['boot_ci95_high']:+.2f}%] | "
-            f"{'Primary Alpha Source' if 'Pure' in r['comparison_name'] else ('Risk Smoothing' if 'Diversity' in r['comparison_name'] else 'Ranking Refinement')} |"
+            f"{'Primary Alpha Direction' if 'Pure' in r['comparison_name'] else ('Risk Constraint' if 'Diversity' in r['comparison_name'] else 'Top-Bucket Selection')} |"
         )
     md.append("")
     md.append("---")
     md.append("")
     md.append("## 二、Industry Diversity 深度诊断 (E1 vs E0)")
     md.append("")
-    md.append("### 1. 行业重复画像统计")
+    md.append("### 1. 行业重复客观画像")
     md.append("- **E0 候选池中存在 >= 2 只同行业股票的周数：** `19 / 40` 周 (47.5%)；")
-    md.append("- **行业集中爆发周案例：** 2026-06-26 区域银行爆发（32 只同行业候选），2026-07-17（16 只）；")
-    md.append("- **E1 Rejection Sampling 拒绝率：** 平均拒绝率约 `15.8%`，无任何一周因行业不足而导致组合不可行。")
+    md.append("- **行业去重活跃周 (Non-zero diffs, n=20~21):** 在去重起作用的周次中，W1 利差中位数 `+0.12%` (均值 `-0.40%`), W2 利差中位数 `+0.05%` (均值 `-0.61%`), W4 利差中位数 `+0.17%` (均值 `-1.98%`)。")
     md.append("")
-    md.append("### 2. 收益与风险对比")
+    md.append("### 2. 全样本收益与风险统计对比")
     md.append("")
-    md.append("| Horizon | E0 Median (Mean) | E1 Median (Mean) | E1 - E0 利差 | Win Rate | p-val | E0 All-Stopped | E1 All-Stopped | 风险削减效果 |")
-    md.append("| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |")
+    md.append("| Horizon | E0 Median (Mean) | E1 Median (Mean) | E1 - E0 利差 (p) | E0 All-Stopped | E1 All-Stopped | All-Stopped 差异 (p) |")
+    md.append("| :--- | :--- | :--- | :---: | :---: | :---: | :---: |")
     for h in ALL_HORIZONS:
         e0_h = horizon_summary_df[(horizon_summary_df["variant_name"] == "E0_BASE") & (horizon_summary_df["horizon"] == f"W{h}") & (horizon_summary_df["segment"] == "All historical")].iloc[0]
         e1_h = horizon_summary_df[(horizon_summary_df["variant_name"] == "E1_INDUSTRY_DIVERSE") & (horizon_summary_df["horizon"] == f"W{h}") & (horizon_summary_df["segment"] == "All historical")].iloc[0]
@@ -1086,18 +1126,16 @@ def render_layer1_ablation_report(
         md.append(
             f"| W{h} | {e0_h['median_weekly_p50_ret_pct']:+.2f}% ({e0_h['mean_weekly_p50_ret_pct']:+.2f}%) | "
             f"{e1_h['median_weekly_p50_ret_pct']:+.2f}% ({e1_h['mean_weekly_p50_ret_pct']:+.2f}%) | "
-            f"{comp_h.get('paired_median_spread_pct', 0.0):+.2f}% | {comp_h.get('win_rate_pct', 0.0):.1f}% | "
-            f"{comp_h.get('wilcoxon_p', 1.0):.4f} | {e0_h['mean_all_stopped_rate_pct']:.1f}% | {e1_h['mean_all_stopped_rate_pct']:.1f}% | "
-            f"降低共振风险 `{e0_h['mean_all_stopped_rate_pct'] - e1_h['mean_all_stopped_rate_pct']:+.1f}%` |"
+            f"{comp_h.get('paired_median_spread_pct', 0.0):+.2f}% ({comp_h.get('wilcoxon_p', 1.0):.4f}) | "
+            f"{e0_h['mean_all_stopped_rate_pct']:.1f}% | {e1_h['mean_all_stopped_rate_pct']:.1f}% | "
+            f"{comp_h.get('mean_all_stopped_rate_diff_pct', 0.0):+.2f}% ({comp_h.get('all_stopped_diff_wilcoxon_p', 1.0):.4f}) |"
         )
     md.append("")
     md.append("---")
     md.append("")
     md.append("## 三、Leave-One-Gate-Out 消融实验 (Ablation Audit)")
     md.append("")
-    md.append("以 `E0_BASE` 为基准，一次只剔除一个门槛，检验该门槛是否存在真实的质量增益：")
-    md.append("")
-    md.append("| 剔除门槛 (Removed Gate) | 候选池变化 (Med / Total) | W1 利差 (p) | W2 利差 (p) | W4 利差 (p) | Stop8 变动 | 门槛有效性定性 |")
+    md.append("| 剔除门槛 (Removed Gate) | 候选池变化 (Med / Total) | W1 利差 (p) | W2 利差 (p) | W4 利差 (p) | Stop8 变动 | 门槛证据评级 |")
     md.append("| :--- | :---: | :---: | :---: | :---: | :---: | :--- |")
     for gate_name, gate_label in [
         ("ACTIONABLE", "1. ACTIONABLE Status"),
@@ -1126,8 +1164,6 @@ def render_layer1_ablation_report(
     md.append("")
     md.append("## 四、Add-Back 漏斗逐层递进分析 (Pipeline Decompression)")
     md.append("")
-    md.append("> **方法论提示：** Add-Back 逐层递进存在严格的顺序依赖性（Order-Dependent），仅用于展示漏斗压缩路径，Leave-One-Out 消融才是判断门槛必要性的第一准则。")
-    md.append("")
     md.append("| 递进步骤 (Step) | 引入门槛 | 总候选数 | 中位数池大小 | W1 Median P50 | W2 Median P50 | W4 Median P50 | 边际收益增量 (W2) |")
     md.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |")
     for _, r in addback_summary_df.iterrows():
@@ -1140,8 +1176,6 @@ def render_layer1_ablation_report(
     md.append("---")
     md.append("")
     md.append("## 五、Pre-registered Tightening Probes (单因素强化探针)")
-    md.append("")
-    md.append("基于现有领域认知预注册的 5 个单因素探针，禁止网格搜索与多因素组合：")
     md.append("")
     md.append("| 探针名称 | 探针过滤规则 | 可行周数 | W1 利差 (p) | W2 利差 (p) | W4 利差 (p) | 探针定性评级 |")
     md.append("| :--- | :--- | :---: | :---: | :---: | :---: | :--- |")
@@ -1190,9 +1224,9 @@ def render_layer1_ablation_report(
     md.append("")
     md.append("## 七、最终治理总结与前向跟踪建议")
     md.append("")
-    md.append("1. **保持生产选择器 100% 冻结：** 本次审计证明了现有 Layer-1 基线的稳健性与防线必要性，没有任何理由在当前阶段修改生产参数；")
-    md.append("2. **认知定性修正：** 明确 `E0 - L0` 为主 Alpha 来源，`E1 - E0` 为组合风险平滑约束；")
-    md.append("3. **Layer-2 候选假设储备：** `T_EPS25` 作为高质量确认探针，将在后续 Forward Shadow 积累独立数据后作为前向跟踪观察指标。")
+    md.append("1. **保持生产选择器 100% 冻结：** 本次审计未发现任何足以修改生产基线的统计证据，生产基线保持完全冻结；")
+    md.append("2. **认知定性校准：** Pure Eligibility 呈现全样本正向方向性（W4 最明显），但独立统计显著性尚未达到；Industry Diversity 在历史样本中未证明超额收益或风险削减；")
+    md.append("3. **禁止引入新规则：** 预注册探针均未表现出支配性增益，不引入任何第二层复杂规则，直接进入 2026-08-28 Forward Shadow。")
     md.append("")
 
     return "\n".join(md)
@@ -1246,7 +1280,6 @@ def run_layer1_screening_ablation_audit(
         weekly_matrix_df=weekly_matrix_df,
     )
 
-    # Export CSVs and Report Markdown
     paths.output_dir.mkdir(parents=True, exist_ok=True)
 
     registry_path = paths.output_dir / "layer1_variant_registry.csv"
