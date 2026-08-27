@@ -17,7 +17,7 @@ class BaseDataProvider(ABC):
         """抓取单只标的的 K 线行情数据。
         
         返回 (symbol, DataFrame)，DataFrame 必须遵循包含列:
-        ['Open', 'High', 'Low', 'Close', 'Volume']，且数值保留 2 位小数。
+        ['Open', 'High', 'Low', 'Close', 'Volume']，价格精度保持源数据原样。
         若抓取失败或无数据则 DataFrame 为 None。
         """
         pass

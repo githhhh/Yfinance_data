@@ -3,7 +3,7 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 from data_providers.base_provider import BaseDataProvider
 from data_providers.yahoo_provider import YahooDataProvider
-from data_providers.schwab_provider import SchwabDataProvider, SchwabCredentials
+from data_providers.schwab_provider import SchwabDataProvider, SchwabCredentials, SchwabRawTokenClient
 from data_providers.factory import DataProviderFactory
 import DataStore
 
@@ -19,6 +19,7 @@ class TestYahooDataProvider:
                 "High": [105.789, 106.111],
                 "Low": [99.001, 101.222],
                 "Close": [103.555, 104.999],
+                "Adj Close": [101.111, 102.222],
                 "Volume": [10000, 15000],
             },
             index=pd.date_range("2026-01-01", periods=2),
@@ -33,8 +34,33 @@ class TestYahooDataProvider:
         assert symbol == "AAPL"
         assert df is not None
         assert list(df.columns) == ["Open", "High", "Low", "Close", "Volume"]
-        assert df.loc[df.index[0], "Open"] == 100.12  # 验证 round(2)
-        assert df.loc[df.index[0], "Close"] == 103.56
+        assert df.loc[df.index[0], "Open"] == 100.123
+        assert df.loc[df.index[0], "Close"] == 103.555
+        assert "Adj Close" not in df.columns
+        history_kwargs = mock_instance.history.call_args.kwargs
+        assert history_kwargs["auto_adjust"] is False
+        assert "rounding" not in history_kwargs
+
+    @patch("yfinance.Ticker")
+    def test_download_single_stock_rejects_missing_required_price_column(self, mock_ticker_cls):
+        sample_df = pd.DataFrame(
+            {
+                "Open": [100.123],
+                "High": [105.789],
+                "Low": [99.001],
+                "Volume": [10000],
+            },
+            index=pd.date_range("2026-01-01", periods=1),
+        )
+        mock_instance = MagicMock()
+        mock_instance.history.return_value = sample_df
+        mock_ticker_cls.return_value = mock_instance
+
+        provider = YahooDataProvider(max_retries=0)
+        symbol, df = provider.download_single_stock("AAPL", period="1y", interval="1d")
+
+        assert symbol == "AAPL"
+        assert df is None
 
     @patch("yfinance.Ticker")
     def test_download_batch_stocks(self, mock_ticker_cls):
@@ -106,9 +132,32 @@ class TestSchwabDataProvider:
         assert symbol == "AAPL"
         assert df is not None
         assert list(df.columns) == ["Open", "High", "Low", "Close", "Volume"]
-        assert df.iloc[0]["Open"] == 150.13  # round(2)
-        assert df.iloc[0]["High"] == 155.89  # round(2)
+        assert df.iloc[0]["Open"] == 150.126
+        assert df.iloc[0]["High"] == 155.888
         assert df.iloc[0]["Volume"] == 5000000
+
+    def test_download_single_stock_rejects_missing_required_price_column(self):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {
+                    "open": 150.126,
+                    "high": 155.888,
+                    "low": 149.333,
+                    "volume": 5000000,
+                    "datetime": 1672531200000,
+                }
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = mock_resp
+
+        provider = SchwabDataProvider(client=mock_client, max_retries=0)
+        symbol, df = provider.download_single_stock("AAPL")
+
+        assert symbol == "AAPL"
+        assert df is None
 
     def test_download_batch_stocks(self):
         mock_client = MagicMock()
@@ -129,6 +178,48 @@ class TestSchwabDataProvider:
         assert "TSLA" in all_data
         assert len(failed) == 0
 
+    def test_download_single_stock_retries_transient_empty_response(self, monkeypatch):
+        mock_client = MagicMock()
+        empty_resp = MagicMock()
+        empty_resp.json.return_value = {"candles": [], "empty": True}
+        good_resp = MagicMock()
+        good_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5, "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.side_effect = [empty_resp, good_resp]
+        monkeypatch.setattr("data_providers.schwab_provider.time.sleep", lambda _: None)
+
+        provider = SchwabDataProvider(client=mock_client, max_retries=1, rate_limit_sleep=0)
+        symbol, df = provider.download_single_stock("AAPL")
+
+        assert symbol == "AAPL"
+        assert df is not None
+        assert len(df) == 1
+        assert mock_client.get_price_history.call_count == 2
+
+    def test_download_batch_stocks_paces_schwab_batches(self, monkeypatch):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5, "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = mock_resp
+        sleeps = []
+        monkeypatch.setattr("data_providers.schwab_provider.time.sleep", lambda value: sleeps.append(value))
+
+        provider = SchwabDataProvider(client=mock_client, batch_size=1, max_workers=1, rate_limit_sleep=0.25)
+        all_data, failed = provider.download_batch_stocks(["AAPL", "MSFT"])
+
+        assert set(all_data) == {"AAPL", "MSFT"}
+        assert failed == []
+        assert sleeps == [0.25]
+
     def test_fetch_quote_and_options(self):
         mock_client = MagicMock()
         mock_client.get_quote.return_value = {"AAPL": {"lastPrice": 180.5}}
@@ -146,6 +237,72 @@ class TestSchwabDataProvider:
         provider = SchwabDataProvider(creds=creds)
         with pytest.raises((FileNotFoundError, RuntimeError)):
             _ = provider.client
+
+    def test_raw_token_client_fetches_quote_with_bearer_token(self, tmp_path, monkeypatch):
+        token_path = tmp_path / "token.json"
+        token_path.write_text('{"access_token": "access-token"}', encoding="utf-8")
+        calls = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"AAPL": {"lastPrice": 180.5}}
+
+            def raise_for_status(self):
+                pass
+
+        def fake_get(url, headers, params=None, timeout=30):
+            calls.append({"url": url, "headers": headers, "params": params, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr("data_providers.schwab_provider.requests.get", fake_get)
+
+        client = SchwabRawTokenClient(SchwabCredentials(token_path=str(token_path)))
+
+        assert client.get_quote("AAPL") == {"AAPL": {"lastPrice": 180.5}}
+        assert calls[0]["headers"]["Authorization"] == "Bearer access-token"
+        assert calls[0]["url"].endswith("/marketdata/v1/AAPL/quotes")
+
+    def test_raw_token_client_fetches_price_history_with_download_params(self, tmp_path, monkeypatch):
+        token_path = tmp_path / "token.json"
+        token_path.write_text('{"access_token": "access-token"}', encoding="utf-8")
+        calls = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"candles": [{"close": 10.0}]}
+
+            def raise_for_status(self):
+                pass
+
+        def fake_get(url, headers, params=None, timeout=30):
+            calls.append({"url": url, "headers": headers, "params": params, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr("data_providers.schwab_provider.requests.get", fake_get)
+
+        client = SchwabRawTokenClient(SchwabCredentials(token_path=str(token_path)))
+        response = client.get_price_history(
+            "AAPL",
+            period_type="year",
+            period=1,
+            frequency_type="daily",
+            frequency=1,
+        )
+
+        assert response.json() == {"candles": [{"close": 10.0}]}
+        assert calls[0]["url"].endswith("/marketdata/v1/pricehistory")
+        assert calls[0]["params"] == {
+            "symbol": "AAPL",
+            "periodType": "year",
+            "period": 1,
+            "frequencyType": "daily",
+            "frequency": 1,
+            "needExtendedHoursData": "false",
+        }
 
 
 class TestDataProviderFactory:
@@ -192,3 +349,25 @@ class TestLegacyBackwardCompatibility:
 
         all_data, failed = DataStore.download_batch_stocks(["AMD"])
         assert "AMD" in all_data
+
+    def test_results_pkl_round_trip_preserves_source_precision(self, tmp_path, monkeypatch):
+        pkl_path = tmp_path / "stock_data_test_1d.pkl"
+        monkeypatch.setattr(DataStore, "get_stock_pkl_path", lambda interval="1d": str(pkl_path))
+        source_df = pd.DataFrame(
+            {
+                "Open": [100.123456],
+                "High": [105.789123],
+                "Low": [99.001987],
+                "Close": [103.555123],
+                "Volume": [10000],
+            },
+            index=pd.date_range("2026-01-01", periods=1),
+        )
+
+        saved_path = DataStore.save_stock_data({"AAPL": source_df}, save_dir=str(tmp_path), interval="1d")
+        loaded = DataStore.load_stock_data(saved_path)
+
+        assert loaded["AAPL"].iloc[0]["Open"] == pytest.approx(100.123456)
+        assert loaded["AAPL"].iloc[0]["High"] == pytest.approx(105.789123)
+        assert loaded["AAPL"].iloc[0]["Low"] == pytest.approx(99.001987)
+        assert loaded["AAPL"].iloc[0]["Close"] == pytest.approx(103.555123)
