@@ -203,24 +203,13 @@ def test_default_sec_user_agent_uses_contact_email_env(monkeypatch):
     assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT ops@example.com"
 
 
-def test_default_sec_user_agent_falls_back_to_git_email(monkeypatch):
-    _clear_sec_identity_env(monkeypatch)
-    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "git@example.com")
-
-    assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT git@example.com"
-
-
 def test_default_sec_user_agent_has_no_fake_contact_fallback(monkeypatch):
     _clear_sec_identity_env(monkeypatch)
-    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
-
     assert pit_provider.default_sec_user_agent() == ""
 
 
 def test_sec_provider_headers_require_real_contact_email(monkeypatch, tmp_path):
     _clear_sec_identity_env(monkeypatch)
-    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
-
     provider = SECProvider(tmp_path)
     with pytest.raises(
         pit_provider.SECUserAgentConfigurationError,
@@ -237,7 +226,6 @@ def test_sec_provider_headers_require_real_contact_email(monkeypatch, tmp_path):
 
 def test_sec_missing_identity_fails_before_http_request(monkeypatch, tmp_path):
     _clear_sec_identity_env(monkeypatch)
-    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
     calls = []
 
     def forbidden_get(*args, **kwargs):
