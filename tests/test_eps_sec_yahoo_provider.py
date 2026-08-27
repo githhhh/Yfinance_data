@@ -1,5 +1,6 @@
 import os
 import time
+import zipfile
 
 import pandas as pd
 import pytest
@@ -194,12 +195,21 @@ def test_sec_provider_uses_fixed_privacy_preserving_identity(tmp_path):
 
 
 class _FakeSECResponse:
-    def __init__(self, status_code, payload=None):
+    def __init__(self, status_code, payload=None, headers=None, body=b""):
         self.status_code = status_code
         self._payload = payload if payload is not None else {}
+        self.headers = headers or {}
+        self._body = body
 
     def json(self):
         return self._payload
+
+    def iter_content(self, chunk_size=1024 * 1024):
+        if self._body:
+            yield self._body
+
+    def close(self):
+        return None
 
 
 def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
@@ -210,18 +220,18 @@ def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
     ]
     calls = []
 
-    def fake_get(url, headers, timeout):
-        calls.append((url, headers, timeout))
+    def fake_get(url, timeout, **kwargs):
+        calls.append((url, timeout, kwargs))
         return responses.pop(0)
-
-    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
-    monkeypatch.setattr(pit_provider.time, "sleep", lambda seconds: None)
 
     provider = SECProvider(
         tmp_path,
         rate_limit_sleep=0,
         max_retries=2,
     )
+    monkeypatch.setattr(provider.session, "get", fake_get)
+    monkeypatch.setattr(pit_provider.time, "sleep", lambda seconds: None)
+
     assert provider._get_json("https://data.sec.gov/test", label="SEC test") == {"ok": True}
     assert len(calls) == 3
 
@@ -229,17 +239,16 @@ def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
 def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
     calls = []
 
-    def fake_get(url, headers, timeout):
-        calls.append((url, headers, timeout))
+    def fake_get(url, timeout, **kwargs):
+        calls.append((url, timeout, kwargs))
         return _FakeSECResponse(403)
-
-    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
 
     provider = SECProvider(
         tmp_path,
         rate_limit_sleep=0,
         max_retries=2,
     )
+    monkeypatch.setattr(provider.session, "get", fake_get)
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
 
@@ -249,13 +258,12 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
 def test_sec_403_opens_run_level_circuit_breaker(monkeypatch, tmp_path):
     calls = []
 
-    def fake_get(url, headers, timeout):
+    def fake_get(url, timeout, **kwargs):
         calls.append(url)
         return _FakeSECResponse(403)
 
-    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
-
     provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=2)
+    monkeypatch.setattr(provider.session, "get", fake_get)
 
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
@@ -378,3 +386,154 @@ def test_yahoo_historical_reconstruction_still_requires_release_dates(
 
     assert records == []
     assert provider.missing_release_periods == ["2026-04-30", "2025-04-30"]
+
+
+def test_sec_historical_prefers_existing_bulk_without_network(monkeypatch, tmp_path):
+    provider = SECProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        bulk_cache_ttl_seconds=3600,
+    )
+    ticker_map = {
+        "0": {"ticker": "ALOT", "cik_str": 8203},
+    }
+    TTLJSONCache.write(provider.cache_dir / "company_tickers.json", ticker_map)
+
+    facts = {
+        "facts": {
+            "us-gaap": {
+                "EarningsPerShareDiluted": {
+                    "units": {
+                        "USD/shares": [
+                            {
+                                "start": "2025-02-01",
+                                "end": "2025-04-30",
+                                "val": -0.05,
+                                "filed": "2025-06-09",
+                                "accepted": "2025-06-09T12:00:00",
+                                "form": "10-Q",
+                                "fp": "Q1",
+                                "fy": 2026,
+                                "accn": "prior",
+                            },
+                            {
+                                "start": "2026-02-01",
+                                "end": "2026-04-30",
+                                "val": 0.08,
+                                "filed": "2026-06-08",
+                                "accepted": "2026-06-08T12:00:00",
+                                "form": "10-Q",
+                                "fp": "Q1",
+                                "fy": 2027,
+                                "accn": "current",
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    with zipfile.ZipFile(provider.bulk_companyfacts_zip, "w") as archive:
+        archive.writestr("CIK0000008203.json", __import__("json").dumps(facts))
+
+    monkeypatch.setattr(
+        provider.session,
+        "get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("existing historical bulk should avoid SEC network")
+        ),
+    )
+
+    records = provider.fetch_quarterly_history("ALOT", prefer_bulk=True)
+    result = calculate_latest_eps_yoy(records, "2026-08-21")
+
+    assert result["eps_yoy_growth"] == 260.0
+    assert result["source"] == "SEC"
+
+
+def test_sec_bulk_prepare_downloads_at_most_once_per_provider(monkeypatch, tmp_path):
+    provider = SECProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        bulk_cache_ttl_seconds=0,
+    )
+    calls = []
+
+    def fake_download(url, destination, *, label):
+        calls.append((url, destination, label))
+        with zipfile.ZipFile(destination, "w") as archive:
+            archive.writestr("CIK0000008203.json", "{}")
+
+    monkeypatch.setattr(provider, "_download_file", fake_download)
+
+    first = provider.ensure_bulk_companyfacts()
+    second = provider.ensure_bulk_companyfacts()
+
+    assert first == second == provider.bulk_companyfacts_zip
+    assert len(calls) == 1
+
+
+def test_sec_bulk_refresh_failure_uses_stale_zip(monkeypatch, tmp_path):
+    provider = SECProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        bulk_cache_ttl_seconds=1,
+    )
+    with zipfile.ZipFile(provider.bulk_companyfacts_zip, "w") as archive:
+        archive.writestr("CIK0000008203.json", "{}")
+    stale_time = time.time() - 3600
+    os.utime(provider.bulk_companyfacts_zip, (stale_time, stale_time))
+
+    monkeypatch.setattr(
+        provider,
+        "_download_file",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("SEC companyfacts bulk HTTP 403")
+        ),
+    )
+
+    assert provider.ensure_bulk_companyfacts() == provider.bulk_companyfacts_zip
+
+
+def test_yahoo_rate_limit_error_uses_bounded_backoff(monkeypatch, tmp_path):
+    calls = {"ticker": 0}
+    sleeps = []
+
+    class YFRateLimitError(Exception):
+        pass
+
+    class RateLimitedTicker:
+        @property
+        def quarterly_income_stmt(self):
+            if calls["ticker"] < 3:
+                raise YFRateLimitError("Too Many Requests")
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-04-30"): [0.08],
+                    pd.Timestamp("2025-04-30"): [-0.05],
+                },
+                index=["Diluted EPS"],
+            )
+
+    def fake_ticker(symbol):
+        calls["ticker"] += 1
+        return RateLimitedTicker()
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", fake_ticker)
+    monkeypatch.setattr(pit_provider.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    provider = YahooFundamentalsProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        max_rate_limit_retries=3,
+    )
+    records = provider.fetch_quarterly_history(
+        "ALOT",
+        require_release_date=False,
+        observed_on="2026-08-27",
+        refresh=True,
+    )
+
+    assert len(records) == 2
+    assert calls["ticker"] == 3
+    assert sleeps == [5.0, 15.0]
