@@ -24,56 +24,100 @@ class SECYahooEPSProvider:
         self,
         symbol: str,
         snapshot_date: object,
+        *,
+        allow_current_yahoo: bool = False,
+        observation_date: object | None = None,
     ) -> tuple[dict[str, Any] | None, EPSMissingReason | None]:
+        """Resolve with a mode-specific source order.
+
+        Historical/replay snapshots prefer SEC's filed companyfacts (bulk/cache
+        first) and use Yahoo's release-dated reconstruction only as fallback.
+        True LIVE snapshots prefer Yahoo's current observation and use SEC as
+        fallback.
+        """
         self.yahoo.missing_release_periods = []
-        sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
         yahoo_reason = EPSMissingReason.NO_QUARTERLY_EPS
-        sec_error: Exception | None = None
+        sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
         yahoo_error: Exception | None = None
+        sec_error: Exception | None = None
 
-        try:
-            sec_result, sec_reason = calculate_latest_eps_yoy_diagnostic(
-                self.sec.fetch_quarterly_history(symbol), snapshot_date
-            )
-            if sec_result is not None:
-                return sec_result, None
-        except Exception as exc:
-            sec_error = exc
+        def fetch_yahoo() -> dict[str, Any] | None:
+            nonlocal yahoo_reason, yahoo_error
+            try:
+                yahoo_history = self.yahoo.fetch_quarterly_history(
+                    symbol,
+                    require_release_date=not allow_current_yahoo,
+                    observed_on=observation_date if allow_current_yahoo else None,
+                    refresh=allow_current_yahoo,
+                )
+                result, yahoo_reason = calculate_latest_eps_yoy_diagnostic(
+                    yahoo_history, snapshot_date
+                )
+                return result
+            except Exception as exc:
+                yahoo_error = exc
+                return None
 
-        try:
-            yahoo_result, yahoo_reason = calculate_latest_eps_yoy_diagnostic(
-                self.yahoo.fetch_quarterly_history(symbol), snapshot_date
-            )
+        def fetch_sec() -> dict[str, Any] | None:
+            nonlocal sec_reason, sec_error
+            try:
+                sec_history = self.sec.fetch_quarterly_history(
+                    symbol,
+                    prefer_bulk=not allow_current_yahoo,
+                )
+                result, sec_reason = calculate_latest_eps_yoy_diagnostic(
+                    sec_history, snapshot_date
+                )
+                return result
+            except Exception as exc:
+                sec_error = exc
+                return None
+
+        if allow_current_yahoo:
+            yahoo_result = fetch_yahoo()
             if yahoo_result is not None:
                 return yahoo_result, None
-        except Exception as exc:
-            yahoo_error = exc
+            if yahoo_error is None and yahoo_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+                return None, yahoo_reason
+
+            sec_result = fetch_sec()
+            if sec_result is not None:
+                return sec_result, None
+            if sec_error is None and sec_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+                return None, sec_reason
+        else:
+            sec_result = fetch_sec()
+            if sec_result is not None:
+                return sec_result, None
+            if sec_error is None and sec_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+                return None, sec_reason
+
+            yahoo_result = fetch_yahoo()
+            if yahoo_result is not None:
+                return yahoo_result, None
+            if yahoo_error is None and yahoo_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+                return None, yahoo_reason
 
         provider_errors = [
             f"{name}: {exc}"
-            for name, exc in (("SEC", sec_error), ("Yahoo", yahoo_error))
+            for name, exc in (("Yahoo", yahoo_error), ("SEC", sec_error))
             if exc is not None
         ]
-        if sec_error is not None and yahoo_error is not None:
+        if yahoo_error is not None and sec_error is not None:
             raise RuntimeError("; ".join(provider_errors))
-        if sec_error is not None:
-            logging.warning(
-                "Signal EPS PIT SEC provider error for %s ignored after Yahoo returned %s: %s",
-                symbol,
-                yahoo_reason.value,
-                sec_error,
-            )
-            return None, yahoo_reason
-        if yahoo_error is not None:
-            logging.warning(
-                "Signal EPS PIT Yahoo provider error for %s ignored after SEC returned %s: %s",
-                symbol,
-                sec_reason.value,
-                yahoo_error,
-            )
-            return None, sec_reason
 
-        reasons = {sec_reason, yahoo_reason}
+        # A technical failure matters whenever no source resolved a value or
+        # reached a terminal semantic outcome. Do not silently downgrade an
+        # incomplete run into EXPECTED_UNAVAILABLE.
+        if provider_errors:
+            logging.warning(
+                "Signal EPS PIT provider error for %s with no resolved fallback: %s",
+                symbol,
+                "; ".join(provider_errors),
+            )
+            return None, EPSMissingReason.PROVIDER_ERROR
+
+        reasons = {yahoo_reason, sec_reason}
         if EPSMissingReason.PRIOR_YEAR_EPS_ZERO in reasons:
             return None, EPSMissingReason.PRIOR_YEAR_EPS_ZERO
         if EPSMissingReason.NO_PRIOR_YEAR_QUARTER in reasons:
@@ -93,6 +137,14 @@ class SECYahooEPSProvider:
         self,
         symbol: str,
         snapshot_date: object,
+        *,
+        allow_current_yahoo: bool = False,
+        observation_date: object | None = None,
     ) -> dict[str, Any] | None:
-        result, _ = self.fetch_eps_yoy_detailed(symbol, snapshot_date)
+        result, _ = self.fetch_eps_yoy_detailed(
+            symbol,
+            snapshot_date,
+            allow_current_yahoo=allow_current_yahoo,
+            observation_date=observation_date,
+        )
         return result

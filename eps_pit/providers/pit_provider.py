@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import datetime as dt
+from email.utils import parsedate_to_datetime
 import json
 import logging
 import math
 import os
-import re
-import subprocess
 import tempfile
+import threading
 import time
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -21,57 +22,35 @@ from eps_pit.models import EPSMissingReason
 
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-SEC_USER_AGENT_PRODUCT = "Yfinance_data EPS PIT"
-SEC_USER_AGENT_EMAIL_RE = re.compile(r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b")
+# Fixed repository-level identity for SEC automated access. This intentionally
+# uses GitHub's privacy-preserving noreply address rather than any personal
+# email or runtime host configuration.
+SEC_USER_AGENT = "Yfinance_data EPS PIT githhhh@users.noreply.github.com"
+SEC_REQUESTS_PER_SECOND = 9.0
+SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 1.0 / SEC_REQUESTS_PER_SECOND
+SEC_COMPANYFACTS_CACHE_TTL_SECONDS = 30 * 60
+SEC_RETRYABLE_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
+SEC_BULK_COMPANYFACTS_FILENAME = "companyfacts.zip"
+SEC_BULK_COMPANYFACTS_URL = (
+    "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
+)
+SEC_BULK_CACHE_TTL_SECONDS = 24 * 60 * 60
+
+YAHOO_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.35
+YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
+
+_SEC_RATE_LOCK = threading.Lock()
+_SEC_LAST_REQUEST_AT: float | None = None
+_YAHOO_RATE_LOCK = threading.Lock()
+_YAHOO_LAST_REQUEST_AT: float | None = None
 
 
-def sec_user_agent_has_contact_email(user_agent: str) -> bool:
-    return bool(SEC_USER_AGENT_EMAIL_RE.search(str(user_agent or "")))
-
-
-def _env_contact_email() -> str:
-    for name in ("SEC_CONTACT_EMAIL", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL", "EMAIL"):
-        value = os.environ.get(name, "").strip()
-        if sec_user_agent_has_contact_email(value):
-            return value
-    return ""
-
-
-def _git_config_user_email() -> str:
-    try:
-        result = subprocess.run(
-            ["git", "config", "--get", "user.email"],
-            cwd=Path(__file__).resolve().parents[2],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except Exception:
-        return ""
-    email = result.stdout.strip()
-    return email if sec_user_agent_has_contact_email(email) else ""
-
-
-def default_sec_user_agent() -> str:
-    contact = _env_contact_email() or _git_config_user_email() or "AdminContact@example.com"
-    return f"{SEC_USER_AGENT_PRODUCT} {contact}"
-
-
-SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "").strip() or default_sec_user_agent()
-
-
-def build_sec_request_headers(user_agent: str | None = None) -> dict[str, str]:
-    declared_user_agent = str(user_agent or SEC_USER_AGENT).strip()
-    if not sec_user_agent_has_contact_email(declared_user_agent):
-        logging.warning(
-            "SEC_USER_AGENT should include a contact email; SEC may reject this "
-            "automated request"
-        )
+def build_sec_request_headers() -> dict[str, str]:
     return {
-        "User-Agent": declared_user_agent,
+        "User-Agent": SEC_USER_AGENT,
         "Accept-Encoding": "gzip, deflate",
     }
+
 
 # Compatibility aliases for older imports. Internal code uses EPSMissingReason.
 NO_QUARTERLY_EPS = EPSMissingReason.NO_QUARTERLY_EPS.value
@@ -127,7 +106,7 @@ def safe_float(value: object) -> float | None:
 
 
 def availability_date(record: dict[str, Any]) -> str:
-    if str(record.get("source") or "").lower() == "yahoo":
+    if str(record.get("source") or "").lower().startswith("yahoo"):
         return date10(record.get("earnings_release_at"))
     return date10(record.get("filing_date")) or date10(record.get("accepted_at"))
 
@@ -150,7 +129,7 @@ def is_standalone_quarter(record: dict[str, Any]) -> bool:
     # Yahoo rows are already quarterly-income-statement observations. SEC rows
     # without duration metadata are never assumed to be standalone quarters.
     return (
-        str(record.get("source") or "").lower() == "yahoo"
+        str(record.get("source") or "").lower().startswith("yahoo")
         and bool(date10(record.get("report_period")))
         and bool(date10(record.get("earnings_release_at")))
     )
@@ -560,6 +539,16 @@ class TTLJSONCache:
             return None
 
     @staticmethod
+    def load_any(path: Path) -> Any | None:
+        """Read a cache entry regardless of TTL for safe stale fallbacks."""
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            return None
+
+    @staticmethod
     def write(path: Path, data: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
@@ -579,33 +568,231 @@ class SECProvider:
     def __init__(
         self,
         cache_dir: Path | None = None,
-        rate_limit_sleep: float = 0.1,
+        rate_limit_sleep: float = SEC_DEFAULT_REQUEST_INTERVAL_SECONDS,
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
+        companyfacts_cache_ttl_seconds: int = SEC_COMPANYFACTS_CACHE_TTL_SECONDS,
+        bulk_cache_ttl_seconds: int = SEC_BULK_CACHE_TTL_SECONDS,
+        max_retries: int = 2,
+        bulk_companyfacts_zip: Path | None = None,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.rate_limit_sleep = rate_limit_sleep
-        self.cache = TTLJSONCache(cache_ttl_seconds)
-        self.headers = build_sec_request_headers()
+        self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
+        self.ticker_cache = TTLJSONCache(cache_ttl_seconds)
+        self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
+        self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
+        self.max_retries = max(int(max_retries), 0)
+        self._blocked_error: RuntimeError | None = None
         self._cik_map: dict[str, str] | None = None
+        self._cik_map_error: Exception | None = None
+        self._bulk_members: dict[str, str] | None = None
+        self._bulk_prepare_attempted = False
+        self._bulk_prepare_error: Exception | None = None
+        self.bulk_companyfacts_zip = Path(
+            bulk_companyfacts_zip
+            or (self.cache_dir / SEC_BULK_COMPANYFACTS_FILENAME)
+        )
+        self.session = requests.Session()
+        self.session.headers.update(build_sec_request_headers())
 
-    def fetch_quarterly_history(self, symbol: str) -> list[dict[str, Any]]:
+    @property
+    def headers(self) -> dict[str, str]:
+        return dict(self.session.headers)
+
+    def _throttle(self) -> None:
+        global _SEC_LAST_REQUEST_AT
+        if self.rate_limit_sleep <= 0:
+            return
+        with _SEC_RATE_LOCK:
+            now = time.monotonic()
+            if _SEC_LAST_REQUEST_AT is not None:
+                remaining = self.rate_limit_sleep - (now - _SEC_LAST_REQUEST_AT)
+                if remaining > 0:
+                    time.sleep(remaining)
+            _SEC_LAST_REQUEST_AT = time.monotonic()
+
+    @staticmethod
+    def _retry_delay(response: requests.Response, attempt: int) -> float:
+        retry_after = str(response.headers.get("Retry-After") or "").strip()
+        if retry_after:
+            try:
+                return max(float(retry_after), 0.0)
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=dt.timezone.utc)
+                    return max(
+                        (retry_at - dt.datetime.now(dt.timezone.utc)).total_seconds(),
+                        0.0,
+                    )
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        return 0.5 * (2 ** attempt)
+
+    def _get_json(self, url: str, *, label: str) -> Any:
+        if self._blocked_error is not None:
+            raise self._blocked_error
+
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            self._throttle()
+            response = self.session.get(url, timeout=15)
+
+            if response.status_code == 200:
+                try:
+                    return response.json()
+                except Exception as exc:
+                    raise RuntimeError(f"{label} returned invalid JSON") from exc
+
+            if (
+                response.status_code in SEC_RETRYABLE_STATUS_CODES
+                and attempt + 1 < attempts
+            ):
+                time.sleep(self._retry_delay(response, attempt))
+                continue
+
+            error = RuntimeError(f"{label} HTTP {response.status_code}")
+            if response.status_code == 403:
+                # Hosted/cloud egress can be blocked independently of request
+                # identity. Stop the entire SEC client for this run after the
+                # first access-denied response instead of hammering every CIK.
+                self._blocked_error = error
+            raise error
+
+        raise RuntimeError(f"{label} request failed")
+
+    def _download_file(self, url: str, destination: Path, *, label: str) -> None:
+        if self._blocked_error is not None:
+            raise self._blocked_error
+
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            self._throttle()
+            response = self.session.get(url, timeout=60, stream=True)
+
+            if response.status_code == 200:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=f".{destination.name}.",
+                    suffix=".tmp",
+                    dir=destination.parent,
+                )
+                try:
+                    with os.fdopen(fd, "wb") as handle:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                handle.write(chunk)
+                    os.replace(temp_name, destination)
+                    return
+                finally:
+                    response.close()
+                    if os.path.exists(temp_name):
+                        os.unlink(temp_name)
+
+            try:
+                if (
+                    response.status_code in SEC_RETRYABLE_STATUS_CODES
+                    and attempt + 1 < attempts
+                ):
+                    time.sleep(self._retry_delay(response, attempt))
+                    continue
+
+                error = RuntimeError(f"{label} HTTP {response.status_code}")
+                if response.status_code == 403:
+                    self._blocked_error = error
+                raise error
+            finally:
+                response.close()
+
+        raise RuntimeError(f"{label} download failed")
+
+    def ensure_bulk_companyfacts(self) -> Path:
+        """Refresh the nightly SEC bulk archive at most once per provider run."""
+        path = self.bulk_companyfacts_zip
+        if path.exists():
+            try:
+                age = time.time() - path.stat().st_mtime
+                if age <= self.bulk_cache_ttl_seconds:
+                    return path
+            except OSError:
+                pass
+
+        if self._bulk_prepare_attempted:
+            if path.exists():
+                return path
+            if self._bulk_prepare_error is not None:
+                raise self._bulk_prepare_error
+
+        self._bulk_prepare_attempted = True
+        try:
+            self._download_file(
+                SEC_BULK_COMPANYFACTS_URL,
+                path,
+                label="SEC companyfacts bulk",
+            )
+            self._bulk_members = None
+            return path
+        except Exception as exc:
+            self._bulk_prepare_error = exc
+            if path.exists():
+                logging.warning(
+                    "SEC bulk refresh failed; using stale local companyfacts.zip: %s",
+                    exc,
+                )
+                return path
+            raise
+
+    def _load_bulk_companyfacts(self, cik: str) -> dict[str, Any] | None:
+        path = self.bulk_companyfacts_zip
+        if not path.exists():
+            return None
+        try:
+            with zipfile.ZipFile(path) as archive:
+                if self._bulk_members is None:
+                    self._bulk_members = {
+                        Path(name).name: name
+                        for name in archive.namelist()
+                        if name.lower().endswith(".json")
+                    }
+                member = self._bulk_members.get(f"CIK{cik}.json")
+                if not member:
+                    return None
+                with archive.open(member) as handle:
+                    return json.load(handle)
+        except Exception as exc:
+            logging.warning("SEC bulk companyfacts cache unreadable: %s", exc)
+            return None
+
+    def fetch_quarterly_history(
+        self,
+        symbol: str,
+        *,
+        prefer_bulk: bool = False,
+    ) -> list[dict[str, Any]]:
         cik = self.get_cik(symbol)
         if not cik:
             return []
         cache_file = self.cache_dir / f"{normalize_symbol(symbol)}.json"
-        facts = self.cache.load(cache_file)
+        facts = self.companyfacts_cache.load(cache_file)
+
+        if facts is None and prefer_bulk:
+            try:
+                self.ensure_bulk_companyfacts()
+            except Exception:
+                # A direct companyfacts request may still work after a transient
+                # bulk-download failure. A 403 circuit breaker will prevent it
+                # automatically when the egress itself is blocked.
+                pass
+
         if facts is None:
-            time.sleep(self.rate_limit_sleep)
-            response = requests.get(
+            facts = self._load_bulk_companyfacts(cik)
+        if facts is None:
+            facts = self._get_json(
                 self.FACTS_URL.format(cik=cik),
-                headers=self.headers,
-                timeout=15,
+                label=f"SEC companyfacts for {normalize_symbol(symbol)}",
             )
-            if response.status_code != 200:
-                raise RuntimeError(f"SEC companyfacts HTTP {response.status_code} for {symbol}")
-            facts = response.json()
-            self.cache.write(cache_file, facts)
+        self.companyfacts_cache.write(cache_file, facts)
         return self._parse_company_facts(normalize_symbol(symbol), facts)
 
     def get_cik(self, symbol: str) -> str | None:
@@ -613,19 +800,32 @@ class SECProvider:
         if not sym:
             return None
         mapping = self._get_cik_map()
-        return mapping.get(sym) or mapping.get(sym.replace("-", "."))
+        cik = mapping.get(sym) or mapping.get(sym.replace("-", "."))
+        if cik is None and self._cik_map_error is not None:
+            raise RuntimeError(
+                f"SEC ticker map unavailable and stale cache has no mapping for {sym}"
+            ) from self._cik_map_error
+        return cik
 
     def _get_cik_map(self) -> dict[str, str]:
         if self._cik_map is not None:
             return self._cik_map
         cache_file = self.cache_dir / "company_tickers.json"
-        data = self.cache.load(cache_file)
+        data = self.ticker_cache.load(cache_file)
         if data is None:
-            response = requests.get(self.TICKERS_URL, headers=self.headers, timeout=15)
-            if response.status_code != 200:
-                raise RuntimeError(f"SEC ticker map HTTP {response.status_code}")
-            data = response.json()
-            self.cache.write(cache_file, data)
+            stale = TTLJSONCache.load_any(cache_file)
+            try:
+                data = self._get_json(self.TICKERS_URL, label="SEC ticker map")
+                self.ticker_cache.write(cache_file, data)
+            except Exception as exc:
+                if stale is None:
+                    raise
+                self._cik_map_error = exc
+                data = stale
+                logging.warning(
+                    "SEC ticker map network refresh failed; using stale local mapping: %s",
+                    exc,
+                )
 
         mapping: dict[str, str] = {}
         if isinstance(data, dict):
@@ -713,11 +913,54 @@ class YahooFundamentalsProvider:
         self,
         cache_dir: Path | None = None,
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
+        rate_limit_sleep: float = YAHOO_DEFAULT_REQUEST_INTERVAL_SECONDS,
+        max_rate_limit_retries: int = len(YAHOO_RATE_LIMIT_BACKOFF_SECONDS),
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "yahoo"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache = TTLJSONCache(cache_ttl_seconds)
+        self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
+        self.max_rate_limit_retries = max(int(max_rate_limit_retries), 0)
         self.missing_release_periods: list[str] = []
+
+    def _throttle(self) -> None:
+        global _YAHOO_LAST_REQUEST_AT
+        if self.rate_limit_sleep <= 0:
+            return
+        with _YAHOO_RATE_LOCK:
+            now = time.monotonic()
+            if _YAHOO_LAST_REQUEST_AT is not None:
+                remaining = self.rate_limit_sleep - (now - _YAHOO_LAST_REQUEST_AT)
+                if remaining > 0:
+                    time.sleep(remaining)
+            _YAHOO_LAST_REQUEST_AT = time.monotonic()
+
+    @staticmethod
+    def _is_rate_limit_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return (
+            exc.__class__.__name__ == "YFRateLimitError"
+            or "too many requests" in text
+            or "rate limit" in text
+            or "http 429" in text
+        )
+
+    def _fetch_payload(self, symbol: str, *, include_events: bool) -> dict[str, Any]:
+        attempts = self.max_rate_limit_retries + 1
+        for attempt in range(attempts):
+            self._throttle()
+            ticker = yf.Ticker(symbol)
+            try:
+                events = self._fetch_earnings_dates(ticker) if include_events else []
+                income = self._fetch_income_stmt_eps(ticker)
+                return {"events": events, "income": income}
+            except Exception as exc:
+                if not self._is_rate_limit_error(exc) or attempt + 1 >= attempts:
+                    raise
+                delay_index = min(attempt, len(YAHOO_RATE_LIMIT_BACKOFF_SECONDS) - 1)
+                time.sleep(YAHOO_RATE_LIMIT_BACKOFF_SECONDS[delay_index])
+
+        raise RuntimeError(f"Yahoo fundamentals request failed for {symbol}")
 
     @property
     def last_missing_release_date_count(self) -> int:
@@ -730,19 +973,40 @@ class YahooFundamentalsProvider:
         if value == 0:
             self.missing_release_periods = []
 
-    def fetch_quarterly_history(self, symbol: str) -> list[dict[str, Any]]:
+    def fetch_quarterly_history(
+        self,
+        symbol: str,
+        *,
+        require_release_date: bool = True,
+        observed_on: object | None = None,
+        refresh: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return Yahoo quarterly EPS facts under explicit availability semantics.
+
+        Historical/replay reconstruction requires a matched Yahoo earnings
+        release timestamp. A true current LIVE observation may instead use the
+        fact that the income statement is observable now; in that case every
+        returned row is effective no earlier than observed_on.
+        """
         sym = normalize_symbol(symbol)
         if not sym:
             return []
+
+        observation = date10(observed_on) if observed_on is not None else ""
+        if not require_release_date and not observation:
+            raise ValueError("Yahoo live observation requires observed_on")
+
         cache_file = self.cache_dir / f"{sym}.json"
-        data = self.cache.load(cache_file)
-        if data is None:
-            ticker = yf.Ticker(sym)
-            data = {
-                "events": self._fetch_earnings_dates(ticker),
-                "income": self._fetch_income_stmt_eps(ticker),
-            }
-            self.cache.write(cache_file, data)
+        if require_release_date:
+            data = None if refresh else self.cache.load(cache_file)
+            if data is None:
+                data = self._fetch_payload(sym, include_events=True)
+                self.cache.write(cache_file, data)
+        else:
+            # Current LIVE observation needs only what Yahoo exposes now.
+            # Do not make it depend on the often-incomplete earnings calendar,
+            # and do not overwrite the historical reconstruction cache.
+            data = self._fetch_payload(sym, include_events=False)
 
         events = sorted(
             data.get("events", []),
@@ -755,10 +1019,22 @@ class YahooFundamentalsProvider:
             period_end = date10(item.get("period_end"))
             if eps is None or not period_end:
                 continue
-            release_at = self._match_release_date(period_end, events)
-            if not release_at:
-                self.missing_release_periods.append(period_end)
-                continue
+
+            if require_release_date:
+                release_at = self._match_release_date(period_end, events)
+                if not release_at:
+                    self.missing_release_periods.append(period_end)
+                    continue
+                source = "Yahoo"
+                source_record_id = f"yahoo_income_{period_end}"
+            else:
+                # This does not claim to know the historical release timestamp.
+                # It records only that the current Yahoo statement was observed
+                # by this run on the stated date.
+                release_at = observation
+                source = "YahooLiveObserved"
+                source_record_id = f"yahoo_live_{observation}_{period_end}"
+
             records.append(
                 {
                     "code": sym,
@@ -766,15 +1042,15 @@ class YahooFundamentalsProvider:
                     "eps_diluted": eps,
                     "earnings_release_at": release_at,
                     "period_type": "quarter",
-                    "source": "Yahoo",
+                    "source": source,
                     "concept": "DilutedEPS",
                     "unit": "USD/shares",
-                    "source_record_id": f"yahoo_income_{period_end}",
+                    "source_record_id": source_record_id,
                 }
             )
-        # Do not discard valid historical rows merely because Yahoo's current
-        # income statement lags its latest earnings event. Snapshot filtering
-        # later decides which matched rows are usable for PIT replay.
+
+        # Historical mode keeps only release-dated rows. LIVE observation mode
+        # keeps current Yahoo rows but never backdates them before observed_on.
         return sorted(records, key=lambda record: record["report_period"])
 
     @staticmethod
