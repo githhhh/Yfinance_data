@@ -28,27 +28,12 @@ class SECYahooEPSProvider:
         allow_current_yahoo: bool = False,
         observation_date: object | None = None,
     ) -> tuple[dict[str, Any] | None, EPSMissingReason | None]:
+        """Resolve Yahoo first, using SEC only as a fallback source."""
         self.yahoo.missing_release_periods = []
-        sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
         yahoo_reason = EPSMissingReason.NO_QUARTERLY_EPS
-        sec_error: Exception | None = None
+        sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
         yahoo_error: Exception | None = None
-
-        try:
-            sec_result, sec_reason = calculate_latest_eps_yoy_diagnostic(
-                self.sec.fetch_quarterly_history(symbol), snapshot_date
-            )
-            if sec_result is not None:
-                return sec_result, None
-        except Exception as exc:
-            sec_error = exc
-
-        # PRIOR_YEAR_EPS_ZERO from SEC is a mathematical result from an
-        # authoritative filing, not a source-coverage miss. Do not let a
-        # secondary current-state provider manufacture a denominator that the
-        # filed diluted EPS does not contain.
-        if sec_error is None and sec_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
-            return None, sec_reason
+        sec_error: Exception | None = None
 
         try:
             yahoo_history = self.yahoo.fetch_quarterly_history(
@@ -65,24 +50,38 @@ class SECYahooEPSProvider:
         except Exception as exc:
             yahoo_error = exc
 
-        # A mathematically undefined denominator is a terminal semantic
-        # outcome, not a coverage miss. It is safe to publish even if another
-        # provider would only be used as a redundant fallback.
+        # Yahoo is the primary source. SEC is queried only when Yahoo could not
+        # produce a numeric result, keeping SEC traffic low and preserving an
+        # authoritative fallback for sparse or incomplete Yahoo fundamentals.
+        try:
+            sec_result, sec_reason = calculate_latest_eps_yoy_diagnostic(
+                self.sec.fetch_quarterly_history(symbol), snapshot_date
+            )
+            if sec_result is not None:
+                return sec_result, None
+        except Exception as exc:
+            sec_error = exc
+
+        # A zero prior-year denominator is a semantic outcome rather than a
+        # transport/coverage failure. If either provider reached it cleanly,
+        # publishing EXPECTED_UNAVAILABLE is safe even if the other provider is
+        # unavailable.
         if yahoo_error is None and yahoo_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
             return None, yahoo_reason
+        if sec_error is None and sec_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+            return None, sec_reason
 
         provider_errors = [
             f"{name}: {exc}"
-            for name, exc in (("SEC", sec_error), ("Yahoo", yahoo_error))
+            for name, exc in (("Yahoo", yahoo_error), ("SEC", sec_error))
             if exc is not None
         ]
-        if sec_error is not None and yahoo_error is not None:
+        if yahoo_error is not None and sec_error is not None:
             raise RuntimeError("; ".join(provider_errors))
 
-        # A technical provider failure matters whenever neither source resolved.
-        # The other provider returning a business-level miss does not prove
-        # completeness, so do not downgrade a transport/configuration failure
-        # into EXPECTED_UNAVAILABLE.
+        # A technical failure matters whenever no source resolved a value or
+        # reached a terminal semantic outcome. Do not silently downgrade an
+        # incomplete run into EXPECTED_UNAVAILABLE.
         if provider_errors:
             logging.warning(
                 "Signal EPS PIT provider error for %s with no resolved fallback: %s",
@@ -91,7 +90,7 @@ class SECYahooEPSProvider:
             )
             return None, EPSMissingReason.PROVIDER_ERROR
 
-        reasons = {sec_reason, yahoo_reason}
+        reasons = {yahoo_reason, sec_reason}
         if EPSMissingReason.PRIOR_YEAR_EPS_ZERO in reasons:
             return None, EPSMissingReason.PRIOR_YEAR_EPS_ZERO
         if EPSMissingReason.NO_PRIOR_YEAR_QUARTER in reasons:
