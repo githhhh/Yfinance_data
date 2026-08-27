@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from email.utils import parsedate_to_datetime
 import json
 import logging
 import math
@@ -30,6 +31,10 @@ SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 1.0 / SEC_REQUESTS_PER_SECOND
 SEC_COMPANYFACTS_CACHE_TTL_SECONDS = 30 * 60
 SEC_RETRYABLE_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
 SEC_BULK_COMPANYFACTS_FILENAME = "companyfacts.zip"
+SEC_BULK_COMPANYFACTS_URL = (
+    "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
+)
+SEC_BULK_CACHE_TTL_SECONDS = 24 * 60 * 60
 
 YAHOO_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.35
 YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
@@ -566,6 +571,7 @@ class SECProvider:
         rate_limit_sleep: float = SEC_DEFAULT_REQUEST_INTERVAL_SECONDS,
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
         companyfacts_cache_ttl_seconds: int = SEC_COMPANYFACTS_CACHE_TTL_SECONDS,
+        bulk_cache_ttl_seconds: int = SEC_BULK_CACHE_TTL_SECONDS,
         max_retries: int = 2,
         bulk_companyfacts_zip: Path | None = None,
     ):
@@ -574,11 +580,14 @@ class SECProvider:
         self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
         self.ticker_cache = TTLJSONCache(cache_ttl_seconds)
         self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
+        self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
         self.max_retries = max(int(max_retries), 0)
         self._blocked_error: RuntimeError | None = None
         self._cik_map: dict[str, str] | None = None
         self._cik_map_error: Exception | None = None
         self._bulk_members: dict[str, str] | None = None
+        self._bulk_prepare_attempted = False
+        self._bulk_prepare_error: Exception | None = None
         self.bulk_companyfacts_zip = Path(
             bulk_companyfacts_zip
             or (self.cache_dir / SEC_BULK_COMPANYFACTS_FILENAME)
@@ -609,7 +618,16 @@ class SECProvider:
             try:
                 return max(float(retry_after), 0.0)
             except ValueError:
-                pass
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=dt.timezone.utc)
+                    return max(
+                        (retry_at - dt.datetime.now(dt.timezone.utc)).total_seconds(),
+                        0.0,
+                    )
+                except (TypeError, ValueError, OverflowError):
+                    pass
         return 0.5 * (2 ** attempt)
 
     def _get_json(self, url: str, *, label: str) -> Any:
@@ -644,6 +662,87 @@ class SECProvider:
 
         raise RuntimeError(f"{label} request failed")
 
+    def _download_file(self, url: str, destination: Path, *, label: str) -> None:
+        if self._blocked_error is not None:
+            raise self._blocked_error
+
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            self._throttle()
+            response = self.session.get(url, timeout=60, stream=True)
+
+            if response.status_code == 200:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=f".{destination.name}.",
+                    suffix=".tmp",
+                    dir=destination.parent,
+                )
+                try:
+                    with os.fdopen(fd, "wb") as handle:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                handle.write(chunk)
+                    os.replace(temp_name, destination)
+                    return
+                finally:
+                    response.close()
+                    if os.path.exists(temp_name):
+                        os.unlink(temp_name)
+
+            try:
+                if (
+                    response.status_code in SEC_RETRYABLE_STATUS_CODES
+                    and attempt + 1 < attempts
+                ):
+                    time.sleep(self._retry_delay(response, attempt))
+                    continue
+
+                error = RuntimeError(f"{label} HTTP {response.status_code}")
+                if response.status_code == 403:
+                    self._blocked_error = error
+                raise error
+            finally:
+                response.close()
+
+        raise RuntimeError(f"{label} download failed")
+
+    def ensure_bulk_companyfacts(self) -> Path:
+        """Refresh the nightly SEC bulk archive at most once per provider run."""
+        path = self.bulk_companyfacts_zip
+        if path.exists():
+            try:
+                age = time.time() - path.stat().st_mtime
+                if age <= self.bulk_cache_ttl_seconds:
+                    return path
+            except OSError:
+                pass
+
+        if self._bulk_prepare_attempted:
+            if path.exists():
+                return path
+            if self._bulk_prepare_error is not None:
+                raise self._bulk_prepare_error
+
+        self._bulk_prepare_attempted = True
+        try:
+            self._download_file(
+                SEC_BULK_COMPANYFACTS_URL,
+                path,
+                label="SEC companyfacts bulk",
+            )
+            self._bulk_members = None
+            return path
+        except Exception as exc:
+            self._bulk_prepare_error = exc
+            if path.exists():
+                logging.warning(
+                    "SEC bulk refresh failed; using stale local companyfacts.zip: %s",
+                    exc,
+                )
+                return path
+            raise
+
     def _load_bulk_companyfacts(self, cik: str) -> dict[str, Any] | None:
         path = self.bulk_companyfacts_zip
         if not path.exists():
@@ -665,12 +764,27 @@ class SECProvider:
             logging.warning("SEC bulk companyfacts cache unreadable: %s", exc)
             return None
 
-    def fetch_quarterly_history(self, symbol: str) -> list[dict[str, Any]]:
+    def fetch_quarterly_history(
+        self,
+        symbol: str,
+        *,
+        prefer_bulk: bool = False,
+    ) -> list[dict[str, Any]]:
         cik = self.get_cik(symbol)
         if not cik:
             return []
         cache_file = self.cache_dir / f"{normalize_symbol(symbol)}.json"
         facts = self.companyfacts_cache.load(cache_file)
+
+        if facts is None and prefer_bulk:
+            try:
+                self.ensure_bulk_companyfacts()
+            except Exception:
+                # A direct companyfacts request may still work after a transient
+                # bulk-download failure. A 403 circuit breaker will prevent it
+                # automatically when the egress itself is blocked.
+                pass
+
         if facts is None:
             facts = self._load_bulk_companyfacts(cik)
         if facts is None:
