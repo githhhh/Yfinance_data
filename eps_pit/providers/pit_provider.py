@@ -853,7 +853,7 @@ class SECProvider:
 
                 error = RuntimeError(f"{label} HTTP {response.status_code}")
                 if response.status_code == 403:
-                    self._blocked_error = error
+                    self._block_host(url, error)
                 raise error
             finally:
                 response.close()
