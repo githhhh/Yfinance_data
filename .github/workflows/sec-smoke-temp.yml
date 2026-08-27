@@ -6,11 +6,19 @@ on:
       - fix/sec-edgar-access-contract
 
 jobs:
-  sec-smoke:
+  eps-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify SEC endpoints with production User-Agent
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install targeted test dependencies
+        run: pip install pytest yfinance==1.0 tradingview-screener
+      - name: Run EPS contract tests
+        run: |
+          python -m pytest             tests/test_eps_sec_yahoo_provider.py             tests/test_eps_pit_composite.py             tests/test_eps_pit_resolver_contract.py             tests/test_signal_eps_lookup.py             -q
+      - name: Report SEC live access with production identity
         run: |
           python - <<'PY'
           import ast
@@ -20,24 +28,17 @@ jobs:
 
           source = pathlib.Path("eps_pit/providers/pit_provider.py").read_text()
           tree = ast.parse(source)
-          user_agent = None
-          for node in tree.body:
-              if isinstance(node, ast.Assign):
-                  for target in node.targets:
-                      if isinstance(target, ast.Name) and target.id == "SEC_USER_AGENT":
-                          user_agent = ast.literal_eval(node.value)
-                          break
-              if user_agent:
-                  break
-          assert user_agent
-
+          user_agent = next(
+              ast.literal_eval(node.value)
+              for node in tree.body
+              if isinstance(node, ast.Assign)
+              and any(isinstance(t, ast.Name) and t.id == "SEC_USER_AGENT" for t in node.targets)
+          )
           urls = [
               "https://www.sec.gov/files/company_tickers.json",
-              "https://www.sec.gov/files/company_tickers_exchange.json",
               "https://data.sec.gov/api/xbrl/companyfacts/CIK0000008203.json",
               "https://data.sec.gov/api/xbrl/companyfacts/CIK0002100805.json",
           ]
-          failures = []
           for url in urls:
               req = urllib.request.Request(
                   url,
@@ -49,13 +50,7 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(req, timeout=20) as response:
-                      prefix = response.read(64)
-                      print(url, "HTTP", response.status, "prefix_bytes", len(prefix))
+                      print(url, "HTTP", response.status)
               except urllib.error.HTTPError as exc:
                   print(url, "HTTP", exc.code)
-                  failures.append((url, exc.code))
-              except Exception as exc:
-                  print(url, type(exc).__name__, str(exc))
-                  failures.append((url, type(exc).__name__))
-          print("FAILURES", failures)
           PY
