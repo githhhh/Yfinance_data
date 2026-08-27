@@ -31,7 +31,7 @@ def test_single_provider_failure_plus_nonterminal_missing_is_provider_error(monk
     monkeypatch.setattr(
         provider.sec,
         "fetch_quarterly_history",
-        lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC provider HTTP 500")),
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("SEC provider HTTP 500")),
     )
     monkeypatch.setattr(provider.yahoo, "fetch_quarterly_history", lambda symbol, **kwargs: [])
 
@@ -48,7 +48,7 @@ def test_single_provider_failure_plus_yahoo_prior_missing_is_provider_error(monk
     monkeypatch.setattr(
         provider.sec,
         "fetch_quarterly_history",
-        lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC ticker map HTTP 403")),
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("SEC ticker map HTTP 403")),
     )
     monkeypatch.setattr(
         provider.yahoo,
@@ -64,7 +64,7 @@ def test_single_provider_failure_plus_yahoo_prior_missing_is_provider_error(monk
 
 def test_single_yahoo_provider_failure_plus_sec_nonterminal_missing_is_provider_error(monkeypatch):
     provider = SECYahooEPSProvider()
-    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol: [])
+    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: [])
     monkeypatch.setattr(
         provider.yahoo,
         "fetch_quarterly_history",
@@ -82,7 +82,7 @@ def test_other_provider_can_resolve_when_one_provider_fails(monkeypatch):
     monkeypatch.setattr(
         provider.sec,
         "fetch_quarterly_history",
-        lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC outage")),
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("SEC outage")),
     )
     monkeypatch.setattr(
         provider.yahoo,
@@ -102,7 +102,7 @@ def test_dual_provider_failure_still_blocks_missing_result(monkeypatch):
     monkeypatch.setattr(
         provider.sec,
         "fetch_quarterly_history",
-        lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC outage")),
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("SEC outage")),
     )
     monkeypatch.setattr(
         provider.yahoo,
@@ -121,7 +121,7 @@ def test_dual_provider_failure_still_blocks_missing_result(monkeypatch):
 
 def test_missing_yahoo_release_date_is_snapshot_scoped(monkeypatch):
     provider = SECYahooEPSProvider()
-    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol: [])
+    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: [])
 
     def future_only(symbol, **kwargs):
         provider.yahoo.missing_release_periods = ["2027-06-30"]
@@ -135,7 +135,7 @@ def test_missing_yahoo_release_date_is_snapshot_scoped(monkeypatch):
 
 def test_relevant_missing_yahoo_release_date_is_explicit(monkeypatch):
     provider = SECYahooEPSProvider()
-    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol: [])
+    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: [])
 
     def current_period(symbol, **kwargs):
         provider.yahoo.missing_release_periods = ["2026-06-30"]
@@ -152,7 +152,7 @@ def test_yahoo_zero_denominator_is_terminal_even_if_sec_failed(monkeypatch):
     monkeypatch.setattr(
         provider.sec,
         "fetch_quarterly_history",
-        lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC outage")),
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("SEC outage")),
     )
     zero_records = [
         {
@@ -197,7 +197,7 @@ def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
             "unit": "USD/shares",
         },
     ]
-    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol: sec_records)
+    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: sec_records)
     monkeypatch.setattr(
         provider.yahoo,
         "fetch_quarterly_history",
@@ -210,3 +210,89 @@ def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
 
     assert result is None
     assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
+
+
+def test_historical_prefers_sec_and_never_calls_yahoo_when_sec_resolves(monkeypatch):
+    provider = SECYahooEPSProvider()
+    calls = []
+    sec_records = [
+        {
+            "report_period": "2025-06-30",
+            "start": "2025-04-01",
+            "eps_diluted": 1.0,
+            "filing_date": "2025-08-01",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+        },
+        {
+            "report_period": "2026-06-30",
+            "start": "2026-04-01",
+            "eps_diluted": 1.5,
+            "filing_date": "2026-08-01",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+        },
+    ]
+
+    def sec_fetch(symbol, **kwargs):
+        calls.append(("SEC", kwargs))
+        return sec_records
+
+    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", sec_fetch)
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            AssertionError("historical SEC success must not query Yahoo")
+        ),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-21")
+
+    assert reason is None
+    assert result["source"] == "SEC"
+    assert result["eps_yoy_growth"] == 50.0
+    assert calls == [("SEC", {"prefer_bulk": True})]
+
+
+def test_live_prefers_yahoo_and_never_calls_sec_when_yahoo_resolves(monkeypatch):
+    provider = SECYahooEPSProvider()
+    calls = []
+
+    def yahoo_fetch(symbol, **kwargs):
+        calls.append(("Yahoo", kwargs))
+        return [_prior_yahoo_record(), _resolved_yahoo_record()]
+
+    monkeypatch.setattr(provider.yahoo, "fetch_quarterly_history", yahoo_fetch)
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            AssertionError("LIVE Yahoo success must not query SEC")
+        ),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed(
+        "TEST",
+        "2026-08-21",
+        allow_current_yahoo=True,
+        observation_date="2026-08-21",
+    )
+
+    assert reason is None
+    assert result["source"] == "Yahoo"
+    assert result["eps_yoy_growth"] == 50.0
+    assert calls == [
+        (
+            "Yahoo",
+            {
+                "require_release_date": False,
+                "observed_on": "2026-08-21",
+                "refresh": True,
+            },
+        )
+    ]
