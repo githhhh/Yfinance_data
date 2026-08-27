@@ -214,3 +214,30 @@ def test_commit_rejects_legacy_pool_even_when_snapshot_digest_matches(
 
     with pytest.raises(ValueError, match="EPS PIT publication 字段不完整"):
         run.commit()
+
+
+def test_private_commit_helper_also_rejects_legacy_eps_pool_before_git(tmp_path, monkeypatch):
+    pool_path = tmp_path / "legacy.csv"
+    pd.DataFrame(
+        [
+            {
+                "code": "LEGACY",
+                "snapshot_date": "2026-08-26",
+                "signal": True,
+                "eps_yoy_growth": 12.0,
+            }
+        ]
+    ).to_csv(pool_path, index=False)
+
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        raise AssertionError("git must not be reached for an invalid pool")
+
+    monkeypatch.setattr(yfinance_data.subprocess, "run", fake_run)
+
+    with pytest.raises(ValueError, match="EPS PIT publication 字段不完整"):
+        yfinance_data._commit_pool(str(pool_path))
+
+    assert calls == []
