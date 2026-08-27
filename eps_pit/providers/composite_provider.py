@@ -24,6 +24,9 @@ class SECYahooEPSProvider:
         self,
         symbol: str,
         snapshot_date: object,
+        *,
+        allow_current_yahoo: bool = False,
+        observation_date: object | None = None,
     ) -> tuple[dict[str, Any] | None, EPSMissingReason | None]:
         self.yahoo.missing_release_periods = []
         sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
@@ -40,9 +43,22 @@ class SECYahooEPSProvider:
         except Exception as exc:
             sec_error = exc
 
+        # PRIOR_YEAR_EPS_ZERO from SEC is a mathematical result from an
+        # authoritative filing, not a source-coverage miss. Do not let a
+        # secondary current-state provider manufacture a denominator that the
+        # filed diluted EPS does not contain.
+        if sec_error is None and sec_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+            return None, sec_reason
+
         try:
+            yahoo_history = self.yahoo.fetch_quarterly_history(
+                symbol,
+                require_release_date=not allow_current_yahoo,
+                observed_on=observation_date if allow_current_yahoo else None,
+                refresh=allow_current_yahoo,
+            )
             yahoo_result, yahoo_reason = calculate_latest_eps_yoy_diagnostic(
-                self.yahoo.fetch_quarterly_history(symbol), snapshot_date
+                yahoo_history, snapshot_date
             )
             if yahoo_result is not None:
                 return yahoo_result, None
@@ -89,6 +105,14 @@ class SECYahooEPSProvider:
         self,
         symbol: str,
         snapshot_date: object,
+        *,
+        allow_current_yahoo: bool = False,
+        observation_date: object | None = None,
     ) -> dict[str, Any] | None:
-        result, _ = self.fetch_eps_yoy_detailed(symbol, snapshot_date)
+        result, _ = self.fetch_eps_yoy_detailed(
+            symbol,
+            snapshot_date,
+            allow_current_yahoo=allow_current_yahoo,
+            observation_date=observation_date,
+        )
         return result
