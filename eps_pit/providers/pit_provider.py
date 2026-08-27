@@ -23,6 +23,12 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_USER_AGENT_PRODUCT = "Yfinance_data EPS PIT"
 SEC_USER_AGENT_EMAIL_RE = re.compile(r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b")
+SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.12
+SEC_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+class SECUserAgentConfigurationError(RuntimeError):
+    """Raised before network access when SEC bot identity is not declared."""
 
 
 def sec_user_agent_has_contact_email(user_agent: str) -> bool:
@@ -54,20 +60,34 @@ def _git_config_user_email() -> str:
 
 
 def default_sec_user_agent() -> str:
-    contact = _env_contact_email() or _git_config_user_email() or "AdminContact@example.com"
-    return f"{SEC_USER_AGENT_PRODUCT} {contact}"
+    contact = _env_contact_email() or _git_config_user_email()
+    return f"{SEC_USER_AGENT_PRODUCT} {contact}" if contact else ""
 
 
-SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "").strip() or default_sec_user_agent()
+def resolve_sec_user_agent(user_agent: str | None = None) -> str:
+    declared = str(user_agent or "").strip()
+    if not declared:
+        declared = os.environ.get("SEC_USER_AGENT", "").strip()
+    if not declared:
+        declared = default_sec_user_agent()
+    if not sec_user_agent_has_contact_email(declared):
+        raise SECUserAgentConfigurationError(
+            "SEC automated access requires a declared User-Agent with a real "
+            "contact email. Set SEC_CONTACT_EMAIL or SEC_USER_AGENT."
+        )
+    return declared
+
+
+# Compatibility alias for external diagnostics. SECProvider resolves the value
+# again at construction time so environment changes made before a run are seen.
+SEC_USER_AGENT = (
+    os.environ.get("SEC_USER_AGENT", "").strip()
+    or default_sec_user_agent()
+)
 
 
 def build_sec_request_headers(user_agent: str | None = None) -> dict[str, str]:
-    declared_user_agent = str(user_agent or SEC_USER_AGENT).strip()
-    if not sec_user_agent_has_contact_email(declared_user_agent):
-        logging.warning(
-            "SEC_USER_AGENT should include a contact email; SEC may reject this "
-            "automated request"
-        )
+    declared_user_agent = resolve_sec_user_agent(user_agent)
     return {
         "User-Agent": declared_user_agent,
         "Accept-Encoding": "gzip, deflate",
@@ -579,15 +599,53 @@ class SECProvider:
     def __init__(
         self,
         cache_dir: Path | None = None,
-        rate_limit_sleep: float = 0.1,
+        rate_limit_sleep: float = SEC_DEFAULT_REQUEST_INTERVAL_SECONDS,
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
+        user_agent: str | None = None,
+        max_retries: int = 2,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.rate_limit_sleep = rate_limit_sleep
+        self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
         self.cache = TTLJSONCache(cache_ttl_seconds)
-        self.headers = build_sec_request_headers()
+        self.headers = build_sec_request_headers(user_agent)
+        self.max_retries = max(int(max_retries), 0)
+        self._last_request_at: float | None = None
         self._cik_map: dict[str, str] | None = None
+
+    def _throttle(self) -> None:
+        if self.rate_limit_sleep <= 0 or self._last_request_at is None:
+            return
+        elapsed = time.monotonic() - self._last_request_at
+        remaining = self.rate_limit_sleep - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+
+    def _get_json(self, url: str, *, label: str) -> Any:
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            self._throttle()
+            try:
+                response = requests.get(url, headers=self.headers, timeout=15)
+            finally:
+                self._last_request_at = time.monotonic()
+
+            if response.status_code == 200:
+                try:
+                    return response.json()
+                except Exception as exc:
+                    raise RuntimeError(f"{label} returned invalid JSON") from exc
+
+            if (
+                response.status_code in SEC_RETRYABLE_STATUS_CODES
+                and attempt + 1 < attempts
+            ):
+                time.sleep(0.5 * (2 ** attempt))
+                continue
+
+            raise RuntimeError(f"{label} HTTP {response.status_code}")
+
+        raise RuntimeError(f"{label} request failed")
 
     def fetch_quarterly_history(self, symbol: str) -> list[dict[str, Any]]:
         cik = self.get_cik(symbol)
@@ -596,15 +654,10 @@ class SECProvider:
         cache_file = self.cache_dir / f"{normalize_symbol(symbol)}.json"
         facts = self.cache.load(cache_file)
         if facts is None:
-            time.sleep(self.rate_limit_sleep)
-            response = requests.get(
+            facts = self._get_json(
                 self.FACTS_URL.format(cik=cik),
-                headers=self.headers,
-                timeout=15,
+                label=f"SEC companyfacts for {normalize_symbol(symbol)}",
             )
-            if response.status_code != 200:
-                raise RuntimeError(f"SEC companyfacts HTTP {response.status_code} for {symbol}")
-            facts = response.json()
             self.cache.write(cache_file, facts)
         return self._parse_company_facts(normalize_symbol(symbol), facts)
 
@@ -621,10 +674,7 @@ class SECProvider:
         cache_file = self.cache_dir / "company_tickers.json"
         data = self.cache.load(cache_file)
         if data is None:
-            response = requests.get(self.TICKERS_URL, headers=self.headers, timeout=15)
-            if response.status_code != 200:
-                raise RuntimeError(f"SEC ticker map HTTP {response.status_code}")
-            data = response.json()
+            data = self._get_json(self.TICKERS_URL, label="SEC ticker map")
             self.cache.write(cache_file, data)
 
         mapping: dict[str, str] = {}
