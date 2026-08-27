@@ -26,6 +26,13 @@ def _reset_sec_blocked_hosts():
     pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
 
 
+@pytest.fixture(autouse=True)
+def _reset_sec_circuit_breakers():
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+    yield
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+
+
 def _quarter(period, eps, filed, *, start=None, fiscal_quarter=None, concept="EarningsPerShareDiluted", source="SEC", record_id=None):
     period_ts = pd.Timestamp(period)
     if start is None:
@@ -264,26 +271,87 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
     assert len(calls) == 1
 
 
-def test_sec_403_opens_run_level_circuit_breaker(monkeypatch, tmp_path):
+def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path):
     calls = []
 
-    def fake_get(url, timeout, **kwargs):
-        calls.append(url)
-        return _FakeSECResponse(403)
-
-    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=2)
-    monkeypatch.setattr(provider.session, "get", fake_get)
-
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=2)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            calls.append(url) or _FakeSECResponse(403)
+        ),
+    )
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
-        provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
+        first._get_json(first.TICKERS_URL, label="SEC ticker map")
 
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=2)
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("same blocked host must not be retried")
+        ),
+    )
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
-        provider._get_json(
-            provider.FACTS_URL.format(cik="0000008203"),
-            label="SEC companyfacts for ALOT",
+        second._get_json(second.TICKERS_URL, label="SEC ticker map")
+
+    assert calls == [first.TICKERS_URL]
+
+
+def test_sec_403_does_not_block_other_sec_host(monkeypatch, tmp_path):
+    blocked = SECProvider(tmp_path / "blocked", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        blocked.session,
+        "get",
+        lambda url, timeout, **kwargs: _FakeSECResponse(403),
+    )
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        blocked._get_json(blocked.TICKERS_URL, label="SEC ticker map")
+
+    data_provider = SECProvider(tmp_path / "data", rate_limit_sleep=0, max_retries=0)
+    calls = []
+    monkeypatch.setattr(
+        data_provider.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            calls.append(url) or _FakeSECResponse(200, {"ok": True})
+        ),
+    )
+
+    url = data_provider.FACTS_URL.format(cik="0000008203")
+    assert data_provider._get_json(url, label="SEC companyfacts") == {"ok": True}
+    assert calls == [url]
+
+
+def test_sec_bulk_403_is_shared_for_www_host(monkeypatch, tmp_path):
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: _FakeSECResponse(403),
+    )
+    with pytest.raises(RuntimeError, match="SEC companyfacts bulk HTTP 403"):
+        first._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            first.bulk_companyfacts_zip,
+            label="SEC companyfacts bulk",
         )
 
-    assert calls == [provider.TICKERS_URL]
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("blocked www.sec.gov must not be retried")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="SEC companyfacts bulk HTTP 403"):
+        second._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            second.bulk_companyfacts_zip,
+            label="SEC companyfacts bulk",
+        )
 
 
 def test_sec_403_circuit_breaker_is_shared_across_provider_instances(
