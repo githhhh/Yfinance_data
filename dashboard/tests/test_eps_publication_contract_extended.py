@@ -62,3 +62,155 @@ def test_current_pool_rejects_invalid_signal_snapshot_before_writing_anything(
 
     assert not pool_path.exists()
     assert not pit_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("factory_name", "path_attr"),
+    [
+        ("weekend", "BREAKOUT_FOLLOW_POOL_PATH"),
+        ("midweek", "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH"),
+    ],
+)
+def test_weekend_and_midweek_publish_the_same_complete_eps_pit_contract(
+    tmp_path,
+    monkeypatch,
+    factory_name,
+    path_attr,
+):
+    pool_path = tmp_path / f"{factory_name}.csv"
+    pit_path = tmp_path / "signal_eps_pit.csv"
+    monkeypatch.setattr(yfinance_data, path_attr, str(pool_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(pit_path))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(lambda codes: {}),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                code: {"missing_reason": EPSMissingReason.NO_PRIOR_YEAR_QUARTER}
+                for code in codes
+            }
+        ),
+    )
+
+    run = getattr(yfinance_data.BreakoutFollowPoolRun, factory_name)()
+    run.save_snapshot(
+        pd.DataFrame(
+            [
+                {
+                    "code": "EXISTING",
+                    "snapshot_date": "2026-08-26",
+                    "signal": True,
+                    "eps_yoy_growth": 25.5,
+                },
+                {
+                    "code": "MISSING",
+                    "snapshot_date": "2026-08-26",
+                    "signal": True,
+                    "eps_yoy_growth": pd.NA,
+                },
+                {
+                    "code": "QUIET",
+                    "snapshot_date": "2026-08-26",
+                    "signal": False,
+                    "eps_yoy_growth": pd.NA,
+                },
+            ]
+        )
+    )
+
+    saved = pd.read_csv(pool_path)
+    assert set(yfinance_data.EPS_PUBLICATION_COLUMNS).issubset(saved.columns)
+
+    existing = saved.loc[saved["code"].eq("EXISTING")].iloc[0]
+    assert existing["eps_yoy_growth"] == 25.5
+    assert existing["eps_yoy_growth_source"] == "TV_STAGE2"
+    assert existing["eps_yoy_growth_status"] == "resolved"
+    assert pd.isna(existing["eps_yoy_growth_missing_reason"])
+
+    missing = saved.loc[saved["code"].eq("MISSING")].iloc[0]
+    assert pd.isna(missing["eps_yoy_growth"])
+    assert missing["eps_yoy_growth_status"] == "expected_unavailable"
+    assert missing["eps_yoy_growth_missing_reason"] == "NO_PRIOR_YEAR_QUARTER"
+
+    # The same validated snapshot must remain acceptable to downstream readers
+    # and commit(), regardless of weekend/midweek mode.
+    run.ensure_current_snapshot()
+
+
+@pytest.mark.parametrize(
+    ("factory_name", "path_attr"),
+    [
+        ("weekend", "BREAKOUT_FOLLOW_POOL_PATH"),
+        ("midweek", "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH"),
+    ],
+)
+def test_weekend_and_midweek_fail_closed_if_eps_enrichment_is_bypassed(
+    tmp_path,
+    monkeypatch,
+    factory_name,
+    path_attr,
+):
+    pool_path = tmp_path / f"{factory_name}.csv"
+    monkeypatch.setattr(yfinance_data, path_attr, str(pool_path))
+    monkeypatch.setattr(
+        yfinance_data,
+        "_enrich_signal_eps",
+        lambda pool: pool.copy(),
+    )
+
+    run = getattr(yfinance_data.BreakoutFollowPoolRun, factory_name)()
+    with pytest.raises(ValueError, match="EPS PIT publication 字段不完整"):
+        run.save_snapshot(
+            pd.DataFrame(
+                [
+                    {
+                        "code": "LEGACY",
+                        "snapshot_date": "2026-08-26",
+                        "signal": True,
+                        "eps_yoy_growth": 12.0,
+                    }
+                ]
+            )
+        )
+
+    assert not pool_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("factory_name", "path_attr"),
+    [
+        ("weekend", "BREAKOUT_FOLLOW_POOL_PATH"),
+        ("midweek", "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH"),
+    ],
+)
+def test_commit_rejects_legacy_pool_even_when_snapshot_digest_matches(
+    tmp_path,
+    monkeypatch,
+    factory_name,
+    path_attr,
+):
+    pool_path = tmp_path / f"{factory_name}.csv"
+    monkeypatch.setattr(yfinance_data, path_attr, str(pool_path))
+    pd.DataFrame(
+        [
+            {
+                "code": "LEGACY",
+                "snapshot_date": "2026-08-26",
+                "signal": True,
+                "eps_yoy_growth": 12.0,
+            }
+        ]
+    ).to_csv(pool_path, index=False)
+
+    run = getattr(yfinance_data.BreakoutFollowPoolRun, factory_name)()
+    # Simulate a caller from an older publication path that recorded the file
+    # as its current snapshot without applying the new EPS metadata contract.
+    run._published_digest = yfinance_data._snapshot_digest(str(pool_path))
+
+    with pytest.raises(ValueError, match="EPS PIT publication 字段不完整"):
+        run.commit()
