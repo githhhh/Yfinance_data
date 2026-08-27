@@ -239,12 +239,34 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
         tmp_path,
         rate_limit_sleep=0,
         max_retries=2,
-        user_agent="Yfinance_data EPS PIT ops@example.com",
     )
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
 
     assert len(calls) == 1
+
+
+def test_sec_403_opens_run_level_circuit_breaker(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append(url)
+        return _FakeSECResponse(403)
+
+    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
+
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=2)
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        provider._get_json(
+            provider.FACTS_URL.format(cik="0000008203"),
+            label="SEC companyfacts for ALOT",
+        )
+
+    assert calls == [provider.TICKERS_URL]
 
 
 def test_yahoo_requires_verified_release_but_keeps_verified_history(monkeypatch, tmp_path):
