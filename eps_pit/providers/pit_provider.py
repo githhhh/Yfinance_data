@@ -787,12 +787,31 @@ class YahooFundamentalsProvider:
         if value == 0:
             self.missing_release_periods = []
 
-    def fetch_quarterly_history(self, symbol: str) -> list[dict[str, Any]]:
+    def fetch_quarterly_history(
+        self,
+        symbol: str,
+        *,
+        require_release_date: bool = True,
+        observed_on: object | None = None,
+        refresh: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return Yahoo quarterly EPS facts under explicit availability semantics.
+
+        Historical/replay reconstruction requires a matched Yahoo earnings
+        release timestamp. A true current LIVE observation may instead use the
+        fact that the income statement is observable now; in that case every
+        returned row is effective no earlier than observed_on.
+        """
         sym = normalize_symbol(symbol)
         if not sym:
             return []
+
+        observation = date10(observed_on) if observed_on is not None else ""
+        if not require_release_date and not observation:
+            raise ValueError("Yahoo live observation requires observed_on")
+
         cache_file = self.cache_dir / f"{sym}.json"
-        data = self.cache.load(cache_file)
+        data = None if refresh else self.cache.load(cache_file)
         if data is None:
             ticker = yf.Ticker(sym)
             data = {
@@ -812,10 +831,22 @@ class YahooFundamentalsProvider:
             period_end = date10(item.get("period_end"))
             if eps is None or not period_end:
                 continue
-            release_at = self._match_release_date(period_end, events)
-            if not release_at:
-                self.missing_release_periods.append(period_end)
-                continue
+
+            if require_release_date:
+                release_at = self._match_release_date(period_end, events)
+                if not release_at:
+                    self.missing_release_periods.append(period_end)
+                    continue
+                source = "Yahoo"
+                source_record_id = f"yahoo_income_{period_end}"
+            else:
+                # This does not claim to know the historical release timestamp.
+                # It records only that the current Yahoo statement was observed
+                # by this run on the stated date.
+                release_at = observation
+                source = "YahooLiveObserved"
+                source_record_id = f"yahoo_live_{observation}_{period_end}"
+
             records.append(
                 {
                     "code": sym,
@@ -823,15 +854,15 @@ class YahooFundamentalsProvider:
                     "eps_diluted": eps,
                     "earnings_release_at": release_at,
                     "period_type": "quarter",
-                    "source": "Yahoo",
+                    "source": source,
                     "concept": "DilutedEPS",
                     "unit": "USD/shares",
-                    "source_record_id": f"yahoo_income_{period_end}",
+                    "source_record_id": source_record_id,
                 }
             )
-        # Do not discard valid historical rows merely because Yahoo's current
-        # income statement lags its latest earnings event. Snapshot filtering
-        # later decides which matched rows are usable for PIT replay.
+
+        # Historical mode keeps only release-dated rows. LIVE observation mode
+        # keeps current Yahoo rows but never backdates them before observed_on.
         return sorted(records, key=lambda record: record["report_period"])
 
     @staticmethod
