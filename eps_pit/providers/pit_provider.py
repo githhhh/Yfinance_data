@@ -5,7 +5,6 @@ import json
 import logging
 import math
 import os
-import re
 import tempfile
 import time
 from pathlib import Path
@@ -20,7 +19,6 @@ from eps_pit.models import EPSMissingReason
 
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-SEC_USER_AGENT_PRODUCT = "Yfinance_data EPS PIT"
 # Fixed repository-level identity for SEC automated access. This intentionally
 # uses GitHub's privacy-preserving noreply address rather than any personal
 # email or runtime host configuration.
@@ -29,10 +27,9 @@ SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.12
 SEC_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
-def build_sec_request_headers(user_agent: str | None = None) -> dict[str, str]:
-    declared_user_agent = str(user_agent or SEC_USER_AGENT).strip()
+def build_sec_request_headers() -> dict[str, str]:
     return {
-        "User-Agent": declared_user_agent,
+        "User-Agent": SEC_USER_AGENT,
         "Accept-Encoding": "gzip, deflate",
     }
 
@@ -545,14 +542,12 @@ class SECProvider:
         cache_dir: Path | None = None,
         rate_limit_sleep: float = SEC_DEFAULT_REQUEST_INTERVAL_SECONDS,
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
-        user_agent: str | None = None,
         max_retries: int = 2,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
         self.cache = TTLJSONCache(cache_ttl_seconds)
-        self._configured_user_agent = user_agent
         self._headers: dict[str, str] | None = None
         self.max_retries = max(int(max_retries), 0)
         self._last_request_at: float | None = None
@@ -562,7 +557,7 @@ class SECProvider:
     @property
     def headers(self) -> dict[str, str]:
         if self._headers is None:
-            self._headers = build_sec_request_headers(self._configured_user_agent)
+            self._headers = build_sec_request_headers()
         return self._headers
 
     def _throttle(self) -> None:
