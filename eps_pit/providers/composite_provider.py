@@ -65,6 +65,12 @@ class SECYahooEPSProvider:
         except Exception as exc:
             yahoo_error = exc
 
+        # A mathematically undefined denominator is a terminal semantic
+        # outcome, not a coverage miss. It is safe to publish even if another
+        # provider would only be used as a redundant fallback.
+        if yahoo_error is None and yahoo_reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO:
+            return None, yahoo_reason
+
         provider_errors = [
             f"{name}: {exc}"
             for name, exc in (("SEC", sec_error), ("Yahoo", yahoo_error))
