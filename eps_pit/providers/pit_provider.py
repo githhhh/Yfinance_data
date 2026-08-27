@@ -21,59 +21,21 @@ from eps_pit.models import EPSMissingReason
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_USER_AGENT_PRODUCT = "Yfinance_data EPS PIT"
-SEC_USER_AGENT_EMAIL_RE = re.compile(r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b")
+# Fixed repository-level identity for SEC automated access. This intentionally
+# uses GitHub's privacy-preserving noreply address rather than any personal
+# email or runtime host configuration.
+SEC_USER_AGENT = "Yfinance_data EPS PIT githhhh@users.noreply.github.com"
 SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.12
 SEC_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
-class SECUserAgentConfigurationError(RuntimeError):
-    """Raised before network access when SEC bot identity is not declared."""
-
-
-def sec_user_agent_has_contact_email(user_agent: str) -> bool:
-    return bool(SEC_USER_AGENT_EMAIL_RE.search(str(user_agent or "")))
-
-
-def _env_contact_email() -> str:
-    value = os.environ.get("SEC_CONTACT_EMAIL", "").strip()
-    return value if sec_user_agent_has_contact_email(value) else ""
-
-
-def default_sec_user_agent() -> str:
-    # SEC identity is supplied only through dedicated runtime configuration.
-    # Never infer a personal address from git, shell, or host account settings.
-    contact = _env_contact_email()
-    return f"{SEC_USER_AGENT_PRODUCT} {contact}" if contact else ""
-
-
-def resolve_sec_user_agent(user_agent: str | None = None) -> str:
-    declared = str(user_agent or "").strip()
-    if not declared:
-        declared = os.environ.get("SEC_USER_AGENT", "").strip()
-    if not declared:
-        declared = default_sec_user_agent()
-    if not sec_user_agent_has_contact_email(declared):
-        raise SECUserAgentConfigurationError(
-            "SEC automated access requires a declared User-Agent with a real "
-            "contact email. Set SEC_CONTACT_EMAIL or SEC_USER_AGENT."
-        )
-    return declared
-
-
-# Compatibility alias for external diagnostics. SECProvider resolves the value
-# again at construction time so environment changes made before a run are seen.
-SEC_USER_AGENT = (
-    os.environ.get("SEC_USER_AGENT", "").strip()
-    or default_sec_user_agent()
-)
-
-
 def build_sec_request_headers(user_agent: str | None = None) -> dict[str, str]:
-    declared_user_agent = resolve_sec_user_agent(user_agent)
+    declared_user_agent = str(user_agent or SEC_USER_AGENT).strip()
     return {
         "User-Agent": declared_user_agent,
         "Accept-Encoding": "gzip, deflate",
     }
+
 
 # Compatibility aliases for older imports. Internal code uses EPSMissingReason.
 NO_QUARTERLY_EPS = EPSMissingReason.NO_QUARTERLY_EPS.value
