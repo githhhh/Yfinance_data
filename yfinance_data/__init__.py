@@ -25,6 +25,13 @@ BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH = os.path.join(
     DATA_ROOT, "us", "breakout_follow_pool_midweek.csv"
 )
 
+EPS_PUBLICATION_COLUMNS = (
+    "eps_yoy_growth",
+    "eps_yoy_growth_source",
+    "eps_yoy_growth_status",
+    "eps_yoy_growth_missing_reason",
+)
+
 
 def _is_truthy(value) -> bool:
     if value is None:
@@ -153,6 +160,68 @@ def _signal_eps_provider_error_codes(pool: pd.DataFrame) -> list[str]:
     return sorted({str(value).strip() for value in values.dropna() if str(value).strip()})
 
 
+def _validate_eps_publication_contract(pool: pd.DataFrame) -> None:
+    """Require complete LIVE EPS metadata on every published signal row."""
+    if "signal" not in pool.columns:
+        return
+
+    missing_columns = [column for column in EPS_PUBLICATION_COLUMNS if column not in pool.columns]
+    if missing_columns:
+        raise ValueError(
+            f"BF Pool EPS PIT publication 字段不完整: {missing_columns}"
+        )
+
+    signal_mask = pool["signal"].map(_is_truthy)
+    if not signal_mask.any():
+        return
+
+    signal_rows = pool.loc[signal_mask]
+    raw_eps = signal_rows["eps_yoy_growth"]
+    numeric_eps = pd.to_numeric(raw_eps, errors="coerce")
+    invalid_eps = raw_eps.notna() & raw_eps.astype(str).str.strip().ne("") & numeric_eps.isna()
+    if invalid_eps.any():
+        codes = ", ".join(signal_rows.loc[invalid_eps, "code"].astype(str).tolist())
+        raise ValueError(f"BF Pool EPS PIT publication EPS 非数值: {codes}")
+
+    status = signal_rows["eps_yoy_growth_status"].astype("string").str.strip().str.lower()
+    source = signal_rows["eps_yoy_growth_source"].astype("string").str.strip()
+    reason = signal_rows["eps_yoy_growth_missing_reason"].astype("string").str.strip()
+
+    resolved_mask = numeric_eps.notna()
+    unresolved_mask = ~resolved_mask
+
+    bad_resolved = resolved_mask & (
+        status.ne(EPSStatus.RESOLVED.value)
+        | status.isna()
+        | source.isna()
+        | source.eq("")
+    )
+    if bad_resolved.any():
+        codes = ", ".join(signal_rows.loc[bad_resolved, "code"].astype(str).tolist())
+        raise ValueError(
+            f"BF Pool EPS PIT publication resolved 元数据不完整: {codes}"
+        )
+
+    bad_resolved_reason = resolved_mask & reason.notna() & reason.ne("")
+    if bad_resolved_reason.any():
+        codes = ", ".join(signal_rows.loc[bad_resolved_reason, "code"].astype(str).tolist())
+        raise ValueError(
+            f"BF Pool EPS PIT publication resolved 行不应有 missing_reason: {codes}"
+        )
+
+    bad_unresolved = unresolved_mask & (
+        status.ne(EPSStatus.EXPECTED_UNAVAILABLE.value)
+        | status.isna()
+        | reason.isna()
+        | reason.eq("")
+    )
+    if bad_unresolved.any():
+        codes = ", ".join(signal_rows.loc[bad_unresolved, "code"].astype(str).tolist())
+        raise ValueError(
+            f"BF Pool EPS PIT publication unresolved 元数据不完整: {codes}"
+        )
+
+
 def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
     before = _signal_eps_missing_count(pool)
     enriched = enrich_pool_with_signal_eps(
@@ -188,6 +257,7 @@ def supplement_latest_pool_signal_eps() -> dict[str, object]:
     pool = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
     before = _signal_eps_missing_count(pool)
     enriched = _enrich_signal_eps(pool)
+    _validate_eps_publication_contract(enriched)
     after = _signal_eps_missing_count(enriched)
     repaired = before - after
     if not enriched.equals(pool):
@@ -226,10 +296,11 @@ class BreakoutFollowPoolRun:
         return BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH if self._midweek else BREAKOUT_FOLLOW_POOL_PATH
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
-        # Validate the pool structure before EPS enrichment can call providers
-        # or mutate the durable PIT store.
+        # Weekend and midweek publication intentionally share this exact path:
+        # structural validation -> LIVE EPS PIT enrichment -> publication contract.
         _pool_codes(pool)
         pool = _enrich_signal_eps(pool)
+        _validate_eps_publication_contract(pool)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         pool.to_csv(self.path, index=False, encoding="utf-8-sig")
         self._published_digest = _snapshot_digest(self.path)
@@ -243,7 +314,9 @@ class BreakoutFollowPoolRun:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致") from exc
         if current_digest != self._published_digest:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致")
-        return pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
+        pool = pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
+        _validate_eps_publication_contract(pool)
+        return pool
 
     def load_actionable_codes(self) -> list[str]:
         pool = self.ensure_current_snapshot()
