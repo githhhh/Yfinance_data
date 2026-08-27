@@ -16,7 +16,7 @@ def test_replay_mode_never_calls_current_tradingview(monkeypatch, tmp_path):
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -41,7 +41,7 @@ def test_live_tv_error_plus_pit_missing_is_provider_error(monkeypatch, tmp_path)
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -51,6 +51,7 @@ def test_live_tv_error_plus_pit_missing_is_provider_error(monkeypatch, tmp_path)
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(tmp_path / "pit.csv"),
     )
     assert result.status is EPSStatus.PROVIDER_ERROR
@@ -68,7 +69,7 @@ def test_live_tv_error_can_be_overridden_by_strict_pit_success(monkeypatch, tmp_
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {
                     "eps_yoy_growth": 50.0,
                     "source": "SEC",
@@ -82,6 +83,7 @@ def test_live_tv_error_can_be_overridden_by_strict_pit_success(monkeypatch, tmp_
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(tmp_path / "pit.csv"),
     )
     assert result.status is EPSStatus.RESOLVED
@@ -102,7 +104,7 @@ def test_live_tv_field_null_preserves_pit_business_missing_reason(monkeypatch, t
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -112,6 +114,7 @@ def test_live_tv_field_null_preserves_pit_business_missing_reason(monkeypatch, t
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(tmp_path / "pit.csv"),
     )
 
@@ -165,6 +168,7 @@ def test_signal_rows_are_validated_before_any_partial_pit_write(monkeypatch, tmp
             csv_path=str(pit_path),
             refresh_missing=True,
             mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         )
     assert not pit_path.exists()
 
@@ -179,7 +183,7 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -196,5 +200,6 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
         csv_path=str(tmp_path / "pit.csv"),
         refresh_missing=True,
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
     )
     assert set(enriched["eps_yoy_growth_status"]) == {EPSStatus.PROVIDER_ERROR.value}
