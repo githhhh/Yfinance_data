@@ -662,35 +662,84 @@ class SECProvider:
 
         raise RuntimeError(f"{label} request failed")
 
+    @staticmethod
+    def _partial_download_path(destination: Path) -> Path:
+        return destination.with_name(f".{destination.name}.part")
+
+    @staticmethod
+    def _validate_downloaded_zip(path: Path, *, label: str) -> None:
+        if not zipfile.is_zipfile(path):
+            raise RuntimeError(f"{label} downloaded file is not a valid ZIP")
+
     def _download_file(self, url: str, destination: Path, *, label: str) -> None:
+        """Download a large SEC archive with resumable Range requests.
+
+        A stable .part file is preserved across retries and process restarts.
+        HTTP 206 appends to the partial file. If the server ignores Range and
+        returns HTTP 200, the partial file is safely restarted from byte zero.
+        """
         if self._blocked_error is not None:
             raise self._blocked_error
 
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        partial = self._partial_download_path(destination)
         attempts = self.max_retries + 1
-        for attempt in range(attempts):
-            self._throttle()
-            response = self.session.get(url, timeout=60, stream=True)
 
-            if response.status_code == 200:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                fd, temp_name = tempfile.mkstemp(
-                    prefix=f".{destination.name}.",
-                    suffix=".tmp",
-                    dir=destination.parent,
-                )
-                try:
-                    with os.fdopen(fd, "wb") as handle:
-                        for chunk in response.iter_content(chunk_size=1024 * 1024):
-                            if chunk:
-                                handle.write(chunk)
-                    os.replace(temp_name, destination)
-                    return
-                finally:
-                    response.close()
-                    if os.path.exists(temp_name):
-                        os.unlink(temp_name)
+        for attempt in range(attempts):
+            offset = partial.stat().st_size if partial.exists() else 0
+            request_headers = {"Range": f"bytes={offset}-"} if offset > 0 else None
+
+            self._throttle()
+            response = self.session.get(
+                url,
+                timeout=60,
+                stream=True,
+                headers=request_headers,
+            )
 
             try:
+                if response.status_code == 416 and offset > 0:
+                    content_range = str(response.headers.get("Content-Range") or "")
+                    total_text = content_range.rsplit("/", 1)[-1] if "/" in content_range else ""
+                    try:
+                        total_size = int(total_text)
+                    except ValueError:
+                        total_size = -1
+                    if total_size == offset:
+                        self._validate_downloaded_zip(partial, label=label)
+                        os.replace(partial, destination)
+                        return
+                    partial.unlink(missing_ok=True)
+                    if attempt + 1 < attempts:
+                        continue
+
+                if response.status_code in {200, 206}:
+                    append = response.status_code == 206 and offset > 0
+                    if append:
+                        content_range = str(response.headers.get("Content-Range") or "")
+                        expected_prefix = f"bytes {offset}-"
+                        if not content_range.startswith(expected_prefix):
+                            partial.unlink(missing_ok=True)
+                            raise RuntimeError(
+                                f"{label} invalid Content-Range for resume: {content_range!r}"
+                            )
+
+                    mode = "ab" if append else "wb"
+                    try:
+                        with partial.open(mode) as handle:
+                            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                                if chunk:
+                                    handle.write(chunk)
+                    except requests.RequestException:
+                        if attempt + 1 < attempts:
+                            time.sleep(0.5 * (2 ** attempt))
+                            continue
+                        raise
+
+                    self._validate_downloaded_zip(partial, label=label)
+                    os.replace(partial, destination)
+                    return
+
                 if (
                     response.status_code in SEC_RETRYABLE_STATUS_CODES
                     and attempt + 1 < attempts
