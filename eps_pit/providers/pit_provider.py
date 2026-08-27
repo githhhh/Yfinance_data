@@ -811,14 +811,24 @@ class YahooFundamentalsProvider:
             raise ValueError("Yahoo live observation requires observed_on")
 
         cache_file = self.cache_dir / f"{sym}.json"
-        data = None if refresh else self.cache.load(cache_file)
-        if data is None:
+        if require_release_date:
+            data = None if refresh else self.cache.load(cache_file)
+            if data is None:
+                ticker = yf.Ticker(sym)
+                data = {
+                    "events": self._fetch_earnings_dates(ticker),
+                    "income": self._fetch_income_stmt_eps(ticker),
+                }
+                self.cache.write(cache_file, data)
+        else:
+            # Current LIVE observation needs only what Yahoo exposes now.
+            # Do not make it depend on the often-incomplete earnings calendar,
+            # and do not overwrite the historical reconstruction cache.
             ticker = yf.Ticker(sym)
             data = {
-                "events": self._fetch_earnings_dates(ticker),
+                "events": [],
                 "income": self._fetch_income_stmt_eps(ticker),
             }
-            self.cache.write(cache_file, data)
 
         events = sorted(
             data.get("events", []),
