@@ -5,6 +5,7 @@ import zipfile
 
 import pandas as pd
 import pytest
+import requests
 
 from eps_pit import EPSMissingReason
 from eps_pit.providers import pit_provider
