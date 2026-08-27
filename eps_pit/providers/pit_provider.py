@@ -761,6 +761,7 @@ class SECProvider:
                         expected_prefix = f"bytes {offset}-"
                         if not content_range.startswith(expected_prefix):
                             partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
                             raise RuntimeError(
                                 f"{label} invalid Content-Range for resume: {content_range!r}"
                             )
