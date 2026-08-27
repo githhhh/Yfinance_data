@@ -31,6 +31,31 @@ def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@pytest.fixture(autouse=True)
+def _default_expected_unavailable_eps(tmp_path, monkeypatch):
+    SignalEPSLookup.clear_cache()
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "DEFAULT_CSV_PATH",
+        str(tmp_path / "default_signal_eps_pit.csv"),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(lambda codes: {}),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                code: {"missing_reason": "NO_PRIOR_YEAR_QUARTER"}
+                for code in codes
+            }
+        ),
+    )
+
+
 def _valid_complete_signal(code: str, *, rank: int) -> dict[str, object]:
     return {
         "code": code,
@@ -67,10 +92,10 @@ def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, mo
     monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
     snapshot = pd.DataFrame(
         [
-            {"code": "FIRST", "signal": True, "ibd_entry_valid": 1, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "WAIT", "signal": True, "ibd_entry_valid": 0, "ibd_entry_status": "UNCONFIRMED"},
-            {"code": "SECOND", "signal": True, "ibd_entry_valid": 1, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "POOL", "signal": False, "ibd_entry_valid": None, "ibd_entry_status": None},
+            {"code": "FIRST", "snapshot_date": "2026-08-21", "signal": True, "ibd_entry_valid": 1, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "WAIT", "snapshot_date": "2026-08-21", "signal": True, "ibd_entry_valid": 0, "ibd_entry_status": "UNCONFIRMED"},
+            {"code": "SECOND", "snapshot_date": "2026-08-21", "signal": True, "ibd_entry_valid": 1, "ibd_entry_status": "ACTIONABLE"},
+            {"code": "POOL", "snapshot_date": "2026-08-21", "signal": False, "ibd_entry_valid": None, "ibd_entry_status": None},
         ]
     )
     pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
@@ -357,6 +382,7 @@ def test_pool_run_rejects_same_codes_with_changed_snapshot_content(tmp_path, mon
             [
                 {
                     "code": "SAME",
+                    "snapshot_date": "2026-08-21",
                     "signal": True,
                     "ibd_entry_valid": 1,
                     "ibd_entry_status": "ACTIONABLE",
@@ -368,6 +394,7 @@ def test_pool_run_rejects_same_codes_with_changed_snapshot_content(tmp_path, mon
         [
             {
                 "code": "SAME",
+                "snapshot_date": "2026-08-21",
                 "signal": False,
                 "ibd_entry_valid": 1,
                 "ibd_entry_status": "ACTIONABLE",
@@ -501,7 +528,7 @@ def test_pool_run_fails_closed_when_ibd_enrichment_is_incomplete(tmp_path, monke
     pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
     pool_run.save_snapshot(
         pd.DataFrame(
-            [{"code": "CURRENT", "signal": True, "ibd_entry_valid": None, "ibd_entry_status": None}]
+            [{"code": "CURRENT", "snapshot_date": "2026-08-21", "signal": True, "ibd_entry_valid": None, "ibd_entry_status": None}]
         )
     )
 
