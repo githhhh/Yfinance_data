@@ -441,7 +441,7 @@ class SignalEPSLookup:
                 allow_network=refresh_missing,
                 _allow_live_current_provider=not tv_batch_attempted,
                 _live_current_outcome=live_outcome,
-                _live_current_error=tv_batch_error,
+                _live_current_error=tv_batch_error if current_state_allowed else None,
                 observation_date=observed_on,
             )
             df.at[idx, "eps_yoy_growth_status"] = result.status.value
