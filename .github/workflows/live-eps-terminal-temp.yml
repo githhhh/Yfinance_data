@@ -1,0 +1,40 @@
+name: LIVE EPS terminal temp
+
+on:
+  push:
+    branches:
+      - fix/live-eps-terminal-semantics
+
+jobs:
+  eps-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pytest yfinance tradingview-screener
+      - name: Run EPS contracts
+        run: |
+          python -m pytest             tests/test_eps_sec_yahoo_provider.py             tests/test_eps_pit_composite.py             tests/test_eps_pit_resolver_contract.py             tests/test_signal_eps_lookup.py             dashboard/tests/test_eps_publication_contract.py             dashboard/tests/test_eps_publication_contract_extended.py             dashboard/tests/test_yfinance_data_contract.py             -q
+      - name: Probe current Yahoo ALOT JAN
+        if: always()
+        run: |
+          python - <<'PY'
+          from eps_pit.providers.pit_provider import YahooFundamentalsProvider, calculate_latest_eps_yoy_diagnostic
+          for code in ("ALOT", "JAN"):
+              print("\n==", code, "==")
+              try:
+                  p = YahooFundamentalsProvider(rate_limit_sleep=0.5)
+                  rows = p.fetch_quarterly_history(
+                      code,
+                      require_release_date=False,
+                      observed_on="2026-08-27",
+                      refresh=True,
+                  )
+                  print("rows=", [(r["report_period"], r["eps_diluted"]) for r in rows])
+                  print("diagnostic=", calculate_latest_eps_yoy_diagnostic(rows, "2026-08-27"))
+              except Exception as exc:
+                  print("ERROR", type(exc).__name__, repr(exc))
+          PY
