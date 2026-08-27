@@ -667,6 +667,31 @@ class SECProvider:
         return destination.with_name(f".{destination.name}.part")
 
     @staticmethod
+    def _partial_metadata_path(destination: Path) -> Path:
+        return destination.with_name(f".{destination.name}.part.json")
+
+    @staticmethod
+    def _load_partial_metadata(path: Path) -> dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _write_partial_metadata(path: Path, response: requests.Response) -> None:
+        validator = (
+            str(response.headers.get("ETag") or "").strip()
+            or str(response.headers.get("Last-Modified") or "").strip()
+        )
+        if not validator:
+            path.unlink(missing_ok=True)
+            return
+        path.write_text(json.dumps({"if_range": validator}))
+
+    @staticmethod
     def _validate_downloaded_zip(path: Path, *, label: str) -> None:
         if not zipfile.is_zipfile(path):
             raise RuntimeError(f"{label} downloaded file is not a valid ZIP")
@@ -683,11 +708,18 @@ class SECProvider:
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = self._partial_download_path(destination)
+        metadata_path = self._partial_metadata_path(destination)
         attempts = self.max_retries + 1
 
         for attempt in range(attempts):
             offset = partial.stat().st_size if partial.exists() else 0
-            request_headers = {"Range": f"bytes={offset}-"} if offset > 0 else None
+            request_headers = None
+            if offset > 0:
+                request_headers = {"Range": f"bytes={offset}-"}
+                metadata = self._load_partial_metadata(metadata_path)
+                if_range = str(metadata.get("if_range") or "").strip()
+                if if_range:
+                    request_headers["If-Range"] = if_range
 
             self._throttle()
             response = self.session.get(
@@ -706,10 +738,17 @@ class SECProvider:
                     except ValueError:
                         total_size = -1
                     if total_size == offset:
-                        self._validate_downloaded_zip(partial, label=label)
+                        try:
+                            self._validate_downloaded_zip(partial, label=label)
+                        except Exception:
+                            partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
+                            raise
                         os.replace(partial, destination)
+                        metadata_path.unlink(missing_ok=True)
                         return
                     partial.unlink(missing_ok=True)
+                    metadata_path.unlink(missing_ok=True)
                     if attempt + 1 < attempts:
                         continue
 
@@ -742,6 +781,12 @@ class SECProvider:
                             expected_total = -1
 
                     mode = "ab" if append else "wb"
+                    if not append:
+                        # HTTP 200 after a Range/If-Range request means the
+                        # remote archive changed (or Range was ignored); restart
+                        # the local partial and bind it to the new validator.
+                        metadata_path.unlink(missing_ok=True)
+                    self._write_partial_metadata(metadata_path, response)
                     try:
                         with partial.open(mode) as handle:
                             for chunk in response.iter_content(chunk_size=1024 * 1024):
@@ -764,13 +809,24 @@ class SECProvider:
                         )
                     if expected_total >= 0 and downloaded_size > expected_total:
                         partial.unlink(missing_ok=True)
+                        metadata_path.unlink(missing_ok=True)
                         raise RuntimeError(
                             f"{label} download exceeded expected size: "
                             f"{downloaded_size}/{expected_total} bytes"
                         )
 
-                    self._validate_downloaded_zip(partial, label=label)
+                    try:
+                        self._validate_downloaded_zip(partial, label=label)
+                    except Exception:
+                        # If the server declared a complete body, a bad ZIP is
+                        # corruption/version mismatch rather than an incomplete
+                        # resumable transfer. Force the next run to start clean.
+                        if expected_total >= 0 and downloaded_size == expected_total:
+                            partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
+                        raise
                     os.replace(partial, destination)
+                    metadata_path.unlink(missing_ok=True)
                     return
 
                 if (
