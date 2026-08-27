@@ -296,3 +296,76 @@ def test_live_prefers_yahoo_and_never_calls_sec_when_yahoo_resolves(monkeypatch)
             },
         )
     ]
+
+
+def test_live_clean_yahoo_missing_is_not_upgraded_by_sec_technical_failure(monkeypatch):
+    provider = SECYahooEPSProvider()
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: [_resolved_yahoo_record()],
+    )
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("SEC ticker map HTTP 403")
+        ),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed(
+        "TEST",
+        "2026-08-21",
+        allow_current_yahoo=True,
+        observation_date="2026-08-21",
+    )
+
+    assert result is None
+    assert reason is EPSMissingReason.NO_PRIOR_YEAR_QUARTER
+
+
+def test_live_yahoo_technical_failure_still_fails_closed_when_sec_cannot_resolve(monkeypatch):
+    provider = SECYahooEPSProvider()
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("Yahoo service unavailable")
+        ),
+    )
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: [],
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed(
+        "TEST",
+        "2026-08-21",
+        allow_current_yahoo=True,
+        observation_date="2026-08-21",
+    )
+
+    assert result is None
+    assert reason is EPSMissingReason.PROVIDER_ERROR
+
+
+def test_historical_clean_sec_missing_is_not_upgraded_by_yahoo_failure(monkeypatch):
+    provider = SECYahooEPSProvider()
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("Yahoo service unavailable")
+        ),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-21")
+
+    assert result is None
+    assert reason is EPSMissingReason.NO_QUARTERLY_EPS
