@@ -71,6 +71,13 @@ def test_current_pool_rejects_invalid_signal_snapshot_before_writing_anything(
         ("midweek", "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH"),
     ],
 )
+def test_weekend_and_midweek_share_the_same_save_snapshot_implementation():
+    weekend = yfinance_data.BreakoutFollowPoolRun.weekend()
+    midweek = yfinance_data.BreakoutFollowPoolRun.midweek()
+
+    assert weekend.save_snapshot.__func__ is midweek.save_snapshot.__func__
+
+
 def test_weekend_and_midweek_publish_the_same_complete_eps_pit_contract(
     tmp_path,
     monkeypatch,
