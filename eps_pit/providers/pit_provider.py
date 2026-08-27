@@ -147,7 +147,7 @@ def safe_float(value: object) -> float | None:
 
 
 def availability_date(record: dict[str, Any]) -> str:
-    if str(record.get("source") or "").lower() == "yahoo":
+    if str(record.get("source") or "").lower().startswith("yahoo"):
         return date10(record.get("earnings_release_at"))
     return date10(record.get("filing_date")) or date10(record.get("accepted_at"))
 
@@ -170,7 +170,7 @@ def is_standalone_quarter(record: dict[str, Any]) -> bool:
     # Yahoo rows are already quarterly-income-statement observations. SEC rows
     # without duration metadata are never assumed to be standalone quarters.
     return (
-        str(record.get("source") or "").lower() == "yahoo"
+        str(record.get("source") or "").lower().startswith("yahoo")
         and bool(date10(record.get("report_period")))
         and bool(date10(record.get("earnings_release_at")))
     )
