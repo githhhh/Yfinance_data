@@ -342,3 +342,78 @@ def test_json_cache_ttl_invalidates_stale_file(tmp_path):
     os.utime(path, (stale_time, stale_time))
     assert TTLJSONCache(ttl_seconds=60).load(path) is None
     assert TTLJSONCache(ttl_seconds=3600).load(path) == {"value": 1}
+
+
+def test_yahoo_current_observation_does_not_require_historical_release_dates(
+    monkeypatch,
+    tmp_path,
+):
+    class CurrentOnlyTicker:
+        def get_earnings_dates(self, limit=32):
+            raise AssertionError("LIVE current observation must not depend on earnings_dates")
+
+        @property
+        def quarterly_income_stmt(self):
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-04-30"): [0.08],
+                    pd.Timestamp("2025-04-30"): [-0.05],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", lambda symbol: CurrentOnlyTicker())
+    provider = YahooFundamentalsProvider(tmp_path / "live")
+
+    records = provider.fetch_quarterly_history(
+        "ALOT",
+        require_release_date=False,
+        observed_on="2026-08-27",
+        refresh=True,
+    )
+
+    assert [record["report_period"] for record in records] == [
+        "2025-04-30",
+        "2026-04-30",
+    ]
+    assert all(record["source"] == "YahooLiveObserved" for record in records)
+    assert all(record["earnings_release_at"] == "2026-08-27" for record in records)
+
+    result, reason = calculate_latest_eps_yoy_diagnostic(records, "2026-08-27")
+    assert reason is None
+    assert result["eps_yoy_growth"] == 260.0
+    assert result["effective_date"] == "2026-08-27"
+
+
+def test_yahoo_historical_reconstruction_still_requires_release_dates(
+    monkeypatch,
+    tmp_path,
+):
+    class NoHistoricalReleaseTicker:
+        def get_earnings_dates(self, limit=32):
+            return pd.DataFrame()
+
+        @property
+        def quarterly_income_stmt(self):
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-04-30"): [0.08],
+                    pd.Timestamp("2025-04-30"): [-0.05],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(
+        pit_provider.yf,
+        "Ticker",
+        lambda symbol: NoHistoricalReleaseTicker(),
+    )
+    provider = YahooFundamentalsProvider(tmp_path / "historical")
+
+    records = provider.fetch_quarterly_history(
+        "ALOT",
+        require_release_date=True,
+    )
+
+    assert records == []
+    assert provider.missing_release_periods == ["2026-04-30", "2025-04-30"]
