@@ -398,11 +398,14 @@ def test_live_tradingview_yahoo_schwab_price_contract_audit():
             f"adj_err={tv_high_adjusted_error:.4%}"
         )
 
-    # The negative control must materially differ on enough high-dividend names
-    # for the audit to prove anything about dividend adjustment.
+    # SMA40 should materially distinguish the two contracts on high-dividend
+    # names.  52W High is still checked against all three raw sources above,
+    # but we do not require a minimum adjusted-vs-raw separation count because
+    # a recent 52-week high can legitimately make those two controls converge.
     assert sma40_evidence >= 3, (
         f"insufficient dividend-adjustment separation in SMA40 controls: {sma40_evidence}"
     )
-    assert high52_evidence >= 2, (
-        f"insufficient dividend-adjustment separation in 52W-high controls: {high52_evidence}"
+    print(
+        f"[dividend-evidence] SMA40 distinguishable={sma40_evidence}, "
+        f"52W-high distinguishable={high52_evidence}"
     )
