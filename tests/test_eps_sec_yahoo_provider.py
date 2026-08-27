@@ -19,6 +19,13 @@ from eps_pit.providers.sec_yahoo_provider import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _reset_sec_blocked_hosts():
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+    yield
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+
+
 def _quarter(period, eps, filed, *, start=None, fiscal_quarter=None, concept="EarningsPerShareDiluted", source="SEC", record_id=None):
     period_ts = pd.Timestamp(period)
     if start is None:
@@ -277,6 +284,41 @@ def test_sec_403_opens_run_level_circuit_breaker(monkeypatch, tmp_path):
         )
 
     assert calls == [provider.TICKERS_URL]
+
+
+def test_sec_403_circuit_breaker_is_shared_across_provider_instances(
+    monkeypatch,
+    tmp_path,
+):
+    first_calls = []
+    second_calls = []
+
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=0)
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=0)
+
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            first_calls.append(url) or _FakeSECResponse(403)
+        ),
+    )
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            second_calls.append(url) or _FakeSECResponse(200, {"unexpected": True})
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        first._get_json(first.TICKERS_URL, label="SEC ticker map")
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        second._get_json(second.TICKERS_URL, label="SEC ticker map")
+
+    assert first_calls == [first.TICKERS_URL]
+    assert second_calls == []
 
 
 def test_yahoo_requires_verified_release_but_keeps_verified_history(monkeypatch, tmp_path):
