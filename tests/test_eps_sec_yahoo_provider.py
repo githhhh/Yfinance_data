@@ -559,7 +559,10 @@ def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_
 
     def fake_get(url, timeout, stream, headers):
         calls.append(headers)
-        assert headers == {"Range": f"bytes={split}-"}
+        assert headers == {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
         return _FakeSECResponse(
             206,
             headers={
@@ -577,9 +580,15 @@ def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_
         label="SEC companyfacts bulk",
     )
 
-    assert calls == [{"Range": f"bytes={split}-"}]
+    assert calls == [
+        {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+    ]
     assert destination.read_bytes() == payload
     assert not partial.exists()
+    assert not second._partial_metadata_path(destination).exists()
 
 
 def test_sec_bulk_download_restarts_if_server_ignores_range(monkeypatch, tmp_path):
@@ -628,7 +637,10 @@ def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_
         "get",
         lambda url, timeout, stream, headers: InterruptedResponse(
             200,
-            headers={"Content-Length": str(len(payload))},
+            headers={
+                "Content-Length": str(len(payload)),
+                "ETag": '"archive-v1"',
+            },
         ),
     )
 
@@ -669,3 +681,45 @@ def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_
     assert calls == [{"Range": f"bytes={split}-"}]
     assert destination.read_bytes() == payload
     assert not partial.exists()
+
+
+def test_sec_bulk_resume_restarts_when_remote_archive_changed(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    metadata = provider._partial_metadata_path(destination)
+    old_payload = _valid_zip_bytes(payload=b'{"old": true}')
+    new_payload = _valid_zip_bytes(payload=b'{"new": true}')
+    split = max(1, len(old_payload) // 3)
+    partial.write_bytes(old_payload[:split])
+    metadata.write_text(__import__("json").dumps({"if_range": '"archive-v1"'}))
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+        # If-Range validator no longer matches, so the server returns the full
+        # new representation with HTTP 200.
+        return _FakeSECResponse(
+            200,
+            headers={
+                "Content-Length": str(len(new_payload)),
+                "ETag": '"archive-v2"',
+            },
+            body=new_payload,
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert destination.read_bytes() == new_payload
+    assert not partial.exists()
+    assert not metadata.exists()
