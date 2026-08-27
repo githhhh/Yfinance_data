@@ -203,3 +203,141 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
         observation_date="2026-08-21",
     )
     assert set(enriched["eps_yoy_growth_status"]) == {EPSStatus.PROVIDER_ERROR.value}
+
+
+def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("current TradingView forbidden for older snapshot")
+            )
+        ),
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 33.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-26",
+        "ABC",
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert result.eps_yoy_growth == 33.0
+    assert calls == [
+        (
+            "2026-08-26",
+            ["ABC"],
+            {"allow_current_yahoo": False, "observation_date": None},
+        )
+    ]
+
+
+def test_true_live_snapshot_allows_current_yahoo_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.TV_FIELD_NULL}
+            }
+        ),
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 260.0,
+                "source": "YahooLiveObserved",
+                "effective_date": "2026-08-27",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-27",
+        "ALOT",
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert result.source == "YahooLiveObserved"
+    assert calls == [
+        (
+            "2026-08-27",
+            ["ALOT"],
+            {
+                "allow_current_yahoo": True,
+                "observation_date": "2026-08-27",
+            },
+        )
+    ]
+
+
+def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("stale Stage2 must not trigger current TV")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                codes[0]: {
+                    "eps_yoy_growth": 42.0,
+                    "source": "SEC",
+                    "effective_date": "2026-08-20",
+                }
+            }
+        ),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-26",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": 999.0,
+            }
+        ]
+    )
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(tmp_path / "pit.csv"),
+        refresh_missing=True,
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
