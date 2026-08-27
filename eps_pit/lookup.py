@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -13,6 +15,12 @@ from eps_pit.store import EPSPITStore
 
 
 _UNSET = object()
+_CURRENT_EPS_TIMEZONE = ZoneInfo("America/New_York")
+
+
+def current_eps_observation_date() -> str:
+    """Calendar date on which current-state providers are being observed."""
+    return dt.datetime.now(_CURRENT_EPS_TIMEZONE).date().isoformat()
 
 
 class SignalEPSLookup:
@@ -72,18 +80,31 @@ class SignalEPSLookup:
         cls,
         snapshot_date: object,
         codes: list[str],
+        *,
+        allow_current_yahoo: bool = False,
+        observation_date: object | None = None,
     ) -> dict[str, dict[str, Any]]:
         snap = cls._normalize_date(snapshot_date)
+        observation = cls._normalize_date(observation_date) if observation_date else ""
         symbols = sorted(
             {cls._normalize_ticker(code) for code in codes if cls._normalize_ticker(code)}
         )
         if not snap or not symbols:
             return {}
+        if allow_current_yahoo and (not observation or observation != snap):
+            raise ValueError(
+                "Yahoo current observation may only be used for the observation snapshot"
+            )
 
         provider = SECYahooEPSProvider()
         results: dict[str, dict[str, Any]] = {}
         for symbol in symbols:
-            record, reason = provider.fetch_eps_yoy_detailed(symbol, snap)
+            record, reason = provider.fetch_eps_yoy_detailed(
+                symbol,
+                snap,
+                allow_current_yahoo=allow_current_yahoo,
+                observation_date=observation if allow_current_yahoo else None,
+            )
             if record is not None:
                 results[symbol] = record
             else:
@@ -154,6 +175,7 @@ class SignalEPSLookup:
         _allow_live_current_provider: bool = True,
         _live_current_outcome: object = _UNSET,
         _live_current_error: Exception | None = None,
+        observation_date: object | None = None,
     ) -> EPSResult:
         if not isinstance(mode, EPSResolveMode):
             raise TypeError("mode must be EPSResolveMode")
@@ -163,6 +185,15 @@ class SignalEPSLookup:
             raise ValueError(f"Invalid EPS snapshot_date: {snapshot_date!r}")
         if not sym:
             raise ValueError(f"Invalid EPS code: {code!r}")
+
+        observed_on = cls._normalize_date(observation_date) if observation_date else ""
+        if not observed_on:
+            observed_on = current_eps_observation_date()
+        if snap > observed_on:
+            raise ValueError(
+                f"EPS snapshot_date is in the future: {snap} > {observed_on}"
+            )
+        current_state_allowed = mode is EPSResolveMode.LIVE and snap == observed_on
 
         store = EPSPITStore(csv_path or cls.DEFAULT_CSV_PATH)
         cached = store.get(snap, sym)
@@ -179,7 +210,7 @@ class SignalEPSLookup:
 
         tv_reason: EPSMissingReason | None = None
         tv_error = _live_current_error
-        if mode is EPSResolveMode.LIVE:
+        if current_state_allowed:
             outcome = _live_current_outcome
             if outcome is _UNSET and _allow_live_current_provider and tv_error is None:
                 try:
@@ -206,7 +237,12 @@ class SignalEPSLookup:
         pit_error: Exception | None = None
         pit_entry: dict[str, Any] | None = None
         try:
-            pit_entry = cls.fetch_sec_yahoo_eps(snap, [sym]).get(sym)
+            pit_entry = cls.fetch_sec_yahoo_eps(
+                snap,
+                [sym],
+                allow_current_yahoo=current_state_allowed,
+                observation_date=observed_on if current_state_allowed else None,
+            ).get(sym)
         except Exception as exc:
             pit_error = exc
             logging.warning("Signal EPS PIT provider error for %s: %s", sym, exc)
@@ -263,6 +299,7 @@ class SignalEPSLookup:
         refresh_missing: bool = False,
         *,
         mode: EPSResolveMode = EPSResolveMode.LIVE,
+        observation_date: object | None = None,
     ) -> pd.DataFrame:
         del stage2_path  # retained only for compatibility with current callers
         if not isinstance(mode, EPSResolveMode):
@@ -281,6 +318,9 @@ class SignalEPSLookup:
                 df[column] = pd.NA
 
         default_snap = cls._normalize_date(snapshot_date) if snapshot_date else ""
+        observed_on = cls._normalize_date(observation_date) if observation_date else ""
+        if not observed_on:
+            observed_on = current_eps_observation_date()
         has_signal = "signal" in df.columns
         store = EPSPITStore(csv_path or cls.DEFAULT_CSV_PATH)
 
@@ -294,13 +334,26 @@ class SignalEPSLookup:
                     raise ValueError(f"Signal row has invalid snapshot_date: {row.get('code')!r}")
                 if not sym:
                     raise ValueError("Signal row has invalid code")
+                if snap > observed_on:
+                    raise ValueError(
+                        f"Signal row snapshot_date is in the future: {sym} {snap} > {observed_on}"
+                    )
 
         tv_batch_attempted = False
         tv_batch_error: Exception | None = None
         tv_results: dict[str, dict[str, Any]] = {}
         if mode is EPSResolveMode.LIVE and refresh_missing and has_signal and "code" in df.columns:
             signal_mask = df["signal"].map(cls._is_truthy)
-            missing_mask = signal_mask & df["eps_yoy_growth"].map(safe_float).isna()
+            row_snaps = df.apply(
+                lambda row: cls._normalize_date(row.get("snapshot_date")) or default_snap,
+                axis=1,
+            )
+            current_snapshot_mask = row_snaps.eq(observed_on)
+            missing_mask = (
+                signal_mask
+                & current_snapshot_mask
+                & df["eps_yoy_growth"].map(safe_float).isna()
+            )
             missing_codes = sorted(
                 {
                     cls._normalize_ticker(code)
@@ -333,6 +386,17 @@ class SignalEPSLookup:
             snap = cls._normalize_date(row.get("snapshot_date")) or default_snap
             sym = cls._normalize_ticker(row.get("code"))
             existing_eps = safe_float(row.get("eps_yoy_growth"))
+            current_state_allowed = mode is EPSResolveMode.LIVE and snap == observed_on
+            if existing_eps is not None and mode is EPSResolveMode.LIVE and not current_state_allowed:
+                # A current-state Stage2 value observed after this snapshot
+                # cannot be backdated. Re-resolve the old snapshot from strict
+                # PIT sources instead of silently stamping effective_date=snap.
+                existing_eps = None
+                df.at[idx, "eps_yoy_growth"] = pd.NA
+                df.at[idx, "eps_yoy_growth_source"] = pd.NA
+                df.at[idx, "eps_yoy_growth_status"] = pd.NA
+                df.at[idx, "eps_yoy_growth_missing_reason"] = pd.NA
+
             if existing_eps is not None:
                 source_raw = row.get("eps_yoy_growth_source")
                 try:
@@ -364,7 +428,7 @@ class SignalEPSLookup:
                 continue
 
             live_outcome: object = _UNSET
-            if mode is EPSResolveMode.LIVE and tv_batch_attempted and tv_batch_error is None:
+            if current_state_allowed and tv_batch_attempted and tv_batch_error is None:
                 live_outcome = tv_results.get(
                     sym, {"missing_reason": EPSMissingReason.TV_NOT_FOUND}
                 )
@@ -378,6 +442,7 @@ class SignalEPSLookup:
                 _allow_live_current_provider=not tv_batch_attempted,
                 _live_current_outcome=live_outcome,
                 _live_current_error=tv_batch_error,
+                observation_date=observed_on,
             )
             df.at[idx, "eps_yoy_growth_status"] = result.status.value
             df.at[idx, "eps_yoy_growth_missing_reason"] = (
@@ -405,6 +470,7 @@ def resolve_signal_eps(
     mode: EPSResolveMode,
     csv_path: Optional[str] = None,
     allow_network: bool = True,
+    observation_date: object | None = None,
 ) -> EPSResult:
     return SignalEPSLookup.resolve_eps(
         snapshot_date,
@@ -412,6 +478,7 @@ def resolve_signal_eps(
         mode=mode,
         csv_path=csv_path,
         allow_network=allow_network,
+        observation_date=observation_date,
     )
 
 
@@ -423,6 +490,7 @@ def enrich_pool_with_signal_eps(
     refresh_missing: bool = False,
     *,
     mode: EPSResolveMode = EPSResolveMode.LIVE,
+    observation_date: object | None = None,
 ) -> pd.DataFrame:
     return SignalEPSLookup.enrich_pool(
         pool_df,
@@ -431,4 +499,5 @@ def enrich_pool_with_signal_eps(
         stage2_path=stage2_path,
         refresh_missing=refresh_missing,
         mode=mode,
+        observation_date=observation_date,
     )
