@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 import yfinance_data
+import eps_pit.lookup as eps_lookup
 from eps_pit import EPSMissingReason
 from eps_pit.lookup import SignalEPSLookup
 
@@ -26,6 +27,7 @@ def test_current_pool_does_not_publish_when_live_tradingview_fails_and_pit_canno
     pool_path = tmp_path / "breakout_follow_pool.csv"
     monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
     monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(tmp_path / "pit.csv"))
+    monkeypatch.setattr(eps_lookup, "current_eps_observation_date", lambda: "2026-08-21")
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_tradingview_eps",
@@ -88,6 +90,7 @@ def test_weekend_and_midweek_publish_complete_eps_pit_metadata(
     pit_path = tmp_path / "signal_eps_pit.csv"
     monkeypatch.setattr(yfinance_data, path_attr, str(pool_path))
     monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(pit_path))
+    monkeypatch.setattr(eps_lookup, "current_eps_observation_date", lambda: "2026-08-27")
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_tradingview_eps",
