@@ -608,10 +608,17 @@ class SECProvider:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.rate_limit_sleep = max(float(rate_limit_sleep), 0.0)
         self.cache = TTLJSONCache(cache_ttl_seconds)
-        self.headers = build_sec_request_headers(user_agent)
+        self._configured_user_agent = user_agent
+        self._headers: dict[str, str] | None = None
         self.max_retries = max(int(max_retries), 0)
         self._last_request_at: float | None = None
         self._cik_map: dict[str, str] | None = None
+
+    @property
+    def headers(self) -> dict[str, str]:
+        if self._headers is None:
+            self._headers = build_sec_request_headers(self._configured_user_agent)
+        return self._headers
 
     def _throttle(self) -> None:
         if self.rate_limit_sleep <= 0 or self._last_request_at is None:
