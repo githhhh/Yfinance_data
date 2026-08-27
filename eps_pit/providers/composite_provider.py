@@ -56,22 +56,18 @@ class SECYahooEPSProvider:
         ]
         if sec_error is not None and yahoo_error is not None:
             raise RuntimeError("; ".join(provider_errors))
-        if sec_error is not None:
+
+        # A technical provider failure matters whenever neither source resolved.
+        # The other provider returning a business-level miss does not prove
+        # completeness, so do not downgrade a transport/configuration failure
+        # into EXPECTED_UNAVAILABLE.
+        if provider_errors:
             logging.warning(
-                "Signal EPS PIT SEC provider error for %s ignored after Yahoo returned %s: %s",
+                "Signal EPS PIT provider error for %s with no resolved fallback: %s",
                 symbol,
-                yahoo_reason.value,
-                sec_error,
+                "; ".join(provider_errors),
             )
-            return None, yahoo_reason
-        if yahoo_error is not None:
-            logging.warning(
-                "Signal EPS PIT Yahoo provider error for %s ignored after SEC returned %s: %s",
-                symbol,
-                sec_reason.value,
-                yahoo_error,
-            )
-            return None, sec_reason
+            return None, EPSMissingReason.PROVIDER_ERROR
 
         reasons = {sec_reason, yahoo_reason}
         if EPSMissingReason.PRIOR_YEAR_EPS_ZERO in reasons:
