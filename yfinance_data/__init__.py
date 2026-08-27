@@ -153,6 +153,58 @@ def _signal_eps_provider_error_codes(pool: pd.DataFrame) -> list[str]:
     return sorted({str(value).strip() for value in values.dropna() if str(value).strip()})
 
 
+def _clean_log_value(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    text = str(value).strip()
+    return "" if text.lower() == "nan" else text
+
+
+def _signal_eps_status_items(pool: pd.DataFrame, status: EPSStatus) -> list[str]:
+    required = {"signal", "code", "eps_yoy_growth_status"}
+    if not required.issubset(pool.columns):
+        return []
+    signal_mask = pool["signal"].map(_is_truthy)
+    status_mask = pool["eps_yoy_growth_status"].astype(str).eq(status.value)
+    rows = pool.loc[signal_mask & status_mask].copy()
+    items: list[str] = []
+    for _, row in rows.sort_values("code").iterrows():
+        code = _clean_log_value(row.get("code"))
+        if not code:
+            continue
+        reason = _clean_log_value(row.get("eps_yoy_growth_missing_reason"))
+        if reason:
+            items.append(f"{code}({reason})")
+        else:
+            items.append(code)
+    return items
+
+
+def _format_signal_eps_status_items(items: list[str]) -> str:
+    return ", ".join(items) if items else "none"
+
+
+def _log_signal_eps_pit_summary(pool: pd.DataFrame) -> None:
+    resolved = _signal_eps_status_items(pool, EPSStatus.RESOLVED)
+    expected_unavailable = _signal_eps_status_items(pool, EPSStatus.EXPECTED_UNAVAILABLE)
+    provider_error = _signal_eps_status_items(pool, EPSStatus.PROVIDER_ERROR)
+    logging.info(
+        "BF Pool signal EPS PIT summary: resolved=%s [%s]; "
+        "expected_unavailable=%s [%s]; provider_error=%s [%s]",
+        len(resolved),
+        _format_signal_eps_status_items(resolved),
+        len(expected_unavailable),
+        _format_signal_eps_status_items(expected_unavailable),
+        len(provider_error),
+        _format_signal_eps_status_items(provider_error),
+    )
+
+
 def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
     before = _signal_eps_missing_count(pool)
     enriched = enrich_pool_with_signal_eps(
@@ -170,6 +222,8 @@ def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
     unresolved_codes = _signal_eps_missing_codes(enriched)
     if unresolved_codes:
         logging.warning("BF Pool signal EPS unresolved codes: %s", ", ".join(unresolved_codes))
+
+    _log_signal_eps_pit_summary(enriched)
 
     provider_error_codes = _signal_eps_provider_error_codes(enriched)
     if provider_error_codes:

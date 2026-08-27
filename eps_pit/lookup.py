@@ -234,10 +234,11 @@ class SignalEPSLookup:
                 missing_reason=EPSMissingReason.PROVIDER_ERROR,
             )
 
-        if pit_reason in {
+        if pit_entry is not None and pit_reason in {
             EPSMissingReason.PRIOR_YEAR_EPS_ZERO,
             EPSMissingReason.NO_PRIOR_YEAR_QUARTER,
             EPSMissingReason.NO_VERIFIED_YAHOO_RELEASE_DATE,
+            EPSMissingReason.NO_QUARTERLY_EPS,
         }:
             reason = pit_reason
         elif tv_reason in {EPSMissingReason.TV_FIELD_NULL, EPSMissingReason.TV_NOT_FOUND}:

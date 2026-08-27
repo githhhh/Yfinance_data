@@ -88,6 +88,37 @@ def test_live_tv_error_can_be_overridden_by_strict_pit_success(monkeypatch, tmp_
     assert result.eps_yoy_growth == 50.0
 
 
+def test_live_tv_field_null_preserves_pit_business_missing_reason(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.TV_FIELD_NULL}
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
+            }
+        ),
+    )
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.LIVE,
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.EXPECTED_UNAVAILABLE
+    assert result.missing_reason is EPSMissingReason.NO_QUARTERLY_EPS
+
+
 def test_refresh_disabled_is_not_mislabeled_expected_unavailable(tmp_path):
     result = resolve_signal_eps(
         "2026-08-21",

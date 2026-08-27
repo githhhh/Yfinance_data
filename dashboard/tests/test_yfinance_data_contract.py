@@ -144,6 +144,48 @@ def test_pool_run_logs_unresolved_signal_eps_codes(tmp_path, monkeypatch, caplog
     assert "QUIET" not in caplog.text
 
 
+def test_pool_run_logs_signal_eps_pit_summary(tmp_path, monkeypatch, caplog):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+
+    SignalEPSLookup.clear_cache()
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(tmp_path / "missing_pit.csv"))
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes: {
+                "FILLED": {
+                    "eps_yoy_growth": 42.0,
+                    "source": "Yahoo",
+                    "effective_date": "2026-08-01",
+                },
+                "MISS": {
+                    "missing_reason": "NO_PRIOR_YEAR_QUARTER",
+                },
+            }
+        ),
+    )
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    with caplog.at_level("INFO"):
+        pool_run.save_snapshot(
+            pd.DataFrame(
+                [
+                    {"code": "FILLED", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                    {"code": "MISS", "snapshot_date": "2026-08-14", "signal": True, "eps_yoy_growth": pd.NA},
+                    {"code": "QUIET", "snapshot_date": "2026-08-14", "signal": False, "eps_yoy_growth": pd.NA},
+                ]
+            )
+        )
+
+    assert "BF Pool signal EPS PIT summary:" in caplog.text
+    assert "resolved=1 [FILLED]" in caplog.text
+    assert "expected_unavailable=1 [MISS(NO_PRIOR_YEAR_QUARTER)]" in caplog.text
+    assert "provider_error=0 [none]" in caplog.text
+    assert "QUIET" not in caplog.text
+
+
 def test_supplement_latest_pool_eps_updates_only_latest_snapshot_pool(tmp_path, monkeypatch):
     complete_path = tmp_path / "breakout_follow_pool.csv"
     midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"

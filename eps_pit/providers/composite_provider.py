@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +25,11 @@ class SECYahooEPSProvider:
         symbol: str,
         snapshot_date: object,
     ) -> tuple[dict[str, Any] | None, EPSMissingReason | None]:
-        provider_errors: list[str] = []
         self.yahoo.missing_release_periods = []
         sec_reason = EPSMissingReason.NO_QUARTERLY_EPS
         yahoo_reason = EPSMissingReason.NO_QUARTERLY_EPS
+        sec_error: Exception | None = None
+        yahoo_error: Exception | None = None
 
         try:
             sec_result, sec_reason = calculate_latest_eps_yoy_diagnostic(
@@ -36,7 +38,7 @@ class SECYahooEPSProvider:
             if sec_result is not None:
                 return sec_result, None
         except Exception as exc:
-            provider_errors.append(f"SEC: {exc}")
+            sec_error = exc
 
         try:
             yahoo_result, yahoo_reason = calculate_latest_eps_yoy_diagnostic(
@@ -45,14 +47,31 @@ class SECYahooEPSProvider:
             if yahoo_result is not None:
                 return yahoo_result, None
         except Exception as exc:
-            provider_errors.append(f"Yahoo: {exc}")
+            yahoo_error = exc
 
-        # If neither provider resolved, any technical failure means we did not
-        # establish completeness. Never downgrade it to a business-level miss.
-        if len(provider_errors) == 2:
+        provider_errors = [
+            f"{name}: {exc}"
+            for name, exc in (("SEC", sec_error), ("Yahoo", yahoo_error))
+            if exc is not None
+        ]
+        if sec_error is not None and yahoo_error is not None:
             raise RuntimeError("; ".join(provider_errors))
-        if provider_errors:
-            return None, EPSMissingReason.PROVIDER_ERROR
+        if sec_error is not None:
+            logging.warning(
+                "Signal EPS PIT SEC provider error for %s ignored after Yahoo returned %s: %s",
+                symbol,
+                yahoo_reason.value,
+                sec_error,
+            )
+            return None, yahoo_reason
+        if yahoo_error is not None:
+            logging.warning(
+                "Signal EPS PIT Yahoo provider error for %s ignored after SEC returned %s: %s",
+                symbol,
+                sec_reason.value,
+                yahoo_error,
+            )
+            return None, sec_reason
 
         reasons = {sec_reason, yahoo_reason}
         if EPSMissingReason.PRIOR_YEAR_EPS_ZERO in reasons:

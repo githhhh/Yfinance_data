@@ -184,6 +184,40 @@ def test_sec_parser_preserves_versions_and_duration_metadata(tmp_path):
     assert all(r["unit"] == "USD/shares" for r in records)
 
 
+def test_sec_default_user_agent_declares_contact_email():
+    assert "@" in pit_provider.SEC_USER_AGENT
+    assert pit_provider.sec_user_agent_has_contact_email(pit_provider.SEC_USER_AGENT)
+
+
+def test_default_sec_user_agent_uses_contact_email_env(monkeypatch):
+    monkeypatch.setenv("SEC_CONTACT_EMAIL", "ops@example.com")
+
+    assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT ops@example.com"
+
+
+def test_default_sec_user_agent_falls_back_to_git_email(monkeypatch):
+    monkeypatch.delenv("SEC_CONTACT_EMAIL", raising=False)
+    monkeypatch.delenv("GIT_AUTHOR_EMAIL", raising=False)
+    monkeypatch.delenv("GIT_COMMITTER_EMAIL", raising=False)
+    monkeypatch.delenv("EMAIL", raising=False)
+    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "git@example.com")
+
+    assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT git@example.com"
+
+
+def test_sec_provider_headers_are_declared_for_sec_requests(tmp_path, caplog):
+    provider = SECProvider(tmp_path)
+
+    assert provider.headers["User-Agent"] == pit_provider.SEC_USER_AGENT
+    assert provider.headers["Accept-Encoding"] == "gzip, deflate"
+
+    with caplog.at_level("WARNING"):
+        headers = pit_provider.build_sec_request_headers("Yfinance_data EPS PIT")
+
+    assert headers["User-Agent"] == "Yfinance_data EPS PIT"
+    assert "SEC_USER_AGENT should include a contact email" in caplog.text
+
+
 def test_yahoo_requires_verified_release_but_keeps_verified_history(monkeypatch, tmp_path):
     class NoReleaseTicker:
         def get_earnings_dates(self, limit=32):
