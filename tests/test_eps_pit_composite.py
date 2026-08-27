@@ -40,7 +40,7 @@ def test_single_provider_failure_plus_nonterminal_missing_is_provider_error(monk
 
     assert result is None
     assert reason is EPSMissingReason.PROVIDER_ERROR
-    assert "Signal EPS PIT provider error for TEST with no resolved fallback" in caplog.text
+    assert "Signal EPS PIT primary provider error for TEST with no resolved fallback" in caplog.text
 
 
 def test_single_provider_failure_plus_yahoo_prior_missing_is_provider_error(monkeypatch):
@@ -62,7 +62,7 @@ def test_single_provider_failure_plus_yahoo_prior_missing_is_provider_error(monk
     assert reason is EPSMissingReason.PROVIDER_ERROR
 
 
-def test_single_yahoo_provider_failure_plus_sec_nonterminal_missing_is_provider_error(monkeypatch):
+def test_historical_clean_sec_missing_survives_yahoo_fallback_failure(monkeypatch):
     provider = SECYahooEPSProvider()
     monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: [])
     monkeypatch.setattr(
@@ -74,7 +74,7 @@ def test_single_yahoo_provider_failure_plus_sec_nonterminal_missing_is_provider_
     result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-21")
 
     assert result is None
-    assert reason is EPSMissingReason.PROVIDER_ERROR
+    assert reason is EPSMissingReason.NO_QUARTERLY_EPS
 
 
 def test_other_provider_can_resolve_when_one_provider_fails(monkeypatch):
