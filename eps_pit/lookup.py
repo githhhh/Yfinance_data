@@ -387,7 +387,23 @@ class SignalEPSLookup:
             sym = cls._normalize_ticker(row.get("code"))
             existing_eps = safe_float(row.get("eps_yoy_growth"))
             current_state_allowed = mode is EPSResolveMode.LIVE and snap == observed_on
-            if existing_eps is not None and mode is EPSResolveMode.LIVE and not current_state_allowed:
+            source_raw = row.get("eps_yoy_growth_source")
+            try:
+                existing_source = None if pd.isna(source_raw) else str(source_raw).strip()
+            except Exception:
+                existing_source = str(source_raw).strip() if source_raw is not None else None
+
+            stale_current_replacement = (
+                existing_eps is not None
+                and mode is EPSResolveMode.LIVE
+                and not current_state_allowed
+                and (not existing_source or existing_source in {
+                    "TV_STAGE2",
+                    "TV_DIRECT",
+                    "POOL_EXISTING",
+                })
+            )
+            if stale_current_replacement:
                 # A current-state Stage2 value observed after this snapshot
                 # cannot be backdated. Re-resolve the old snapshot from strict
                 # PIT sources instead of silently stamping effective_date=snap.
@@ -398,11 +414,7 @@ class SignalEPSLookup:
                 df.at[idx, "eps_yoy_growth_missing_reason"] = pd.NA
 
             if existing_eps is not None:
-                source_raw = row.get("eps_yoy_growth_source")
-                try:
-                    source = None if pd.isna(source_raw) else str(source_raw).strip()
-                except Exception:
-                    source = str(source_raw).strip() if source_raw is not None else None
+                source = existing_source
                 if not source:
                     source = "TV_STAGE2" if mode is EPSResolveMode.LIVE else "POOL_EXISTING"
                 df.at[idx, "eps_yoy_growth_status"] = EPSStatus.RESOLVED.value
@@ -438,7 +450,7 @@ class SignalEPSLookup:
                 sym,
                 mode=mode,
                 csv_path=csv_path,
-                allow_network=refresh_missing,
+                allow_network=refresh_missing or stale_current_replacement,
                 _allow_live_current_provider=not tv_batch_attempted,
                 _live_current_outcome=live_outcome,
                 _live_current_error=tv_batch_error if current_state_allowed else None,
