@@ -556,6 +556,7 @@ class SECProvider:
         self._headers: dict[str, str] | None = None
         self.max_retries = max(int(max_retries), 0)
         self._last_request_at: float | None = None
+        self._blocked_error: RuntimeError | None = None
         self._cik_map: dict[str, str] | None = None
 
     @property
@@ -573,6 +574,9 @@ class SECProvider:
             time.sleep(remaining)
 
     def _get_json(self, url: str, *, label: str) -> Any:
+        if self._blocked_error is not None:
+            raise self._blocked_error
+
         attempts = self.max_retries + 1
         for attempt in range(attempts):
             self._throttle()
@@ -594,7 +598,13 @@ class SECProvider:
                 time.sleep(0.5 * (2 ** attempt))
                 continue
 
-            raise RuntimeError(f"{label} HTTP {response.status_code}")
+            error = RuntimeError(f"{label} HTTP {response.status_code}")
+            if response.status_code == 403:
+                # SEC may block an egress IP independently of request identity.
+                # Treat 403 as a run-level circuit breaker so one blocked
+                # network does not hammer every remaining symbol.
+                self._blocked_error = error
+            raise error
 
         raise RuntimeError(f"{label} request failed")
 
