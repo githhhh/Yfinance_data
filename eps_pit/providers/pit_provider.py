@@ -12,6 +12,7 @@ import time
 import zipfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
@@ -41,6 +42,7 @@ YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
 
 _SEC_RATE_LOCK = threading.Lock()
 _SEC_LAST_REQUEST_AT: float | None = None
+_SEC_BLOCKED_HOST_ERRORS: dict[str, RuntimeError] = {}
 _YAHOO_RATE_LOCK = threading.Lock()
 _YAHOO_LAST_REQUEST_AT: float | None = None
 
@@ -582,7 +584,6 @@ class SECProvider:
         self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
         self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
         self.max_retries = max(int(max_retries), 0)
-        self._blocked_error: RuntimeError | None = None
         self._cik_map: dict[str, str] | None = None
         self._cik_map_error: Exception | None = None
         self._bulk_members: dict[str, str] | None = None
@@ -630,9 +631,21 @@ class SECProvider:
                     pass
         return 0.5 * (2 ** attempt)
 
+    @staticmethod
+    def _blocked_host_error(url: str) -> RuntimeError | None:
+        host = (urlparse(url).hostname or "").lower()
+        return _SEC_BLOCKED_HOST_ERRORS.get(host)
+
+    @staticmethod
+    def _block_host(url: str, error: RuntimeError) -> None:
+        host = (urlparse(url).hostname or "").lower()
+        if host:
+            _SEC_BLOCKED_HOST_ERRORS[host] = error
+
     def _get_json(self, url: str, *, label: str) -> Any:
-        if self._blocked_error is not None:
-            raise self._blocked_error
+        blocked = self._blocked_host_error(url)
+        if blocked is not None:
+            raise blocked
 
         attempts = self.max_retries + 1
         for attempt in range(attempts):
@@ -657,40 +670,180 @@ class SECProvider:
                 # Hosted/cloud egress can be blocked independently of request
                 # identity. Stop the entire SEC client for this run after the
                 # first access-denied response instead of hammering every CIK.
-                self._blocked_error = error
+                self._block_host(url, error)
             raise error
 
         raise RuntimeError(f"{label} request failed")
 
+    @staticmethod
+    def _partial_download_path(destination: Path) -> Path:
+        return destination.with_name(f".{destination.name}.part")
+
+    @staticmethod
+    def _partial_metadata_path(destination: Path) -> Path:
+        return destination.with_name(f".{destination.name}.part.json")
+
+    @staticmethod
+    def _load_partial_metadata(path: Path) -> dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _write_partial_metadata(path: Path, response: requests.Response) -> None:
+        validator = (
+            str(response.headers.get("ETag") or "").strip()
+            or str(response.headers.get("Last-Modified") or "").strip()
+        )
+        if not validator:
+            path.unlink(missing_ok=True)
+            return
+        path.write_text(json.dumps({"if_range": validator}))
+
+    @staticmethod
+    def _validate_downloaded_zip(path: Path, *, label: str) -> None:
+        if not zipfile.is_zipfile(path):
+            raise RuntimeError(f"{label} downloaded file is not a valid ZIP")
+
     def _download_file(self, url: str, destination: Path, *, label: str) -> None:
-        if self._blocked_error is not None:
-            raise self._blocked_error
+        """Download a large SEC archive with resumable Range requests.
 
+        A stable .part file is preserved across retries and process restarts.
+        HTTP 206 appends to the partial file. If the server ignores Range and
+        returns HTTP 200, the partial file is safely restarted from byte zero.
+        """
+        blocked = self._blocked_host_error(url)
+        if blocked is not None:
+            raise blocked
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        partial = self._partial_download_path(destination)
+        metadata_path = self._partial_metadata_path(destination)
         attempts = self.max_retries + 1
-        for attempt in range(attempts):
-            self._throttle()
-            response = self.session.get(url, timeout=60, stream=True)
 
-            if response.status_code == 200:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                fd, temp_name = tempfile.mkstemp(
-                    prefix=f".{destination.name}.",
-                    suffix=".tmp",
-                    dir=destination.parent,
-                )
-                try:
-                    with os.fdopen(fd, "wb") as handle:
-                        for chunk in response.iter_content(chunk_size=1024 * 1024):
-                            if chunk:
-                                handle.write(chunk)
-                    os.replace(temp_name, destination)
-                    return
-                finally:
-                    response.close()
-                    if os.path.exists(temp_name):
-                        os.unlink(temp_name)
+        for attempt in range(attempts):
+            offset = partial.stat().st_size if partial.exists() else 0
+            request_headers = None
+            if offset > 0:
+                request_headers = {"Range": f"bytes={offset}-"}
+                metadata = self._load_partial_metadata(metadata_path)
+                if_range = str(metadata.get("if_range") or "").strip()
+                if if_range:
+                    request_headers["If-Range"] = if_range
+
+            self._throttle()
+            response = self.session.get(
+                url,
+                timeout=60,
+                stream=True,
+                headers=request_headers,
+            )
 
             try:
+                if response.status_code == 416 and offset > 0:
+                    content_range = str(response.headers.get("Content-Range") or "")
+                    total_text = content_range.rsplit("/", 1)[-1] if "/" in content_range else ""
+                    try:
+                        total_size = int(total_text)
+                    except ValueError:
+                        total_size = -1
+                    if total_size == offset:
+                        try:
+                            self._validate_downloaded_zip(partial, label=label)
+                        except Exception:
+                            partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
+                            raise
+                        os.replace(partial, destination)
+                        metadata_path.unlink(missing_ok=True)
+                        return
+                    partial.unlink(missing_ok=True)
+                    metadata_path.unlink(missing_ok=True)
+                    if attempt + 1 < attempts:
+                        continue
+
+                if response.status_code in {200, 206}:
+                    append = response.status_code == 206 and offset > 0
+                    expected_total = -1
+
+                    if append:
+                        content_range = str(response.headers.get("Content-Range") or "")
+                        expected_prefix = f"bytes {offset}-"
+                        if not content_range.startswith(expected_prefix):
+                            partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
+                            raise RuntimeError(
+                                f"{label} invalid Content-Range for resume: {content_range!r}"
+                            )
+                        total_text = (
+                            content_range.rsplit("/", 1)[-1]
+                            if "/" in content_range
+                            else ""
+                        )
+                        try:
+                            expected_total = int(total_text)
+                        except ValueError:
+                            expected_total = -1
+                    else:
+                        content_length = str(response.headers.get("Content-Length") or "")
+                        try:
+                            expected_total = int(content_length)
+                        except ValueError:
+                            expected_total = -1
+
+                    mode = "ab" if append else "wb"
+                    if not append:
+                        # HTTP 200 after a Range/If-Range request means the
+                        # remote archive changed (or Range was ignored); restart
+                        # the local partial and bind it to the new validator.
+                        metadata_path.unlink(missing_ok=True)
+                    self._write_partial_metadata(metadata_path, response)
+                    try:
+                        with partial.open(mode) as handle:
+                            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                                if chunk:
+                                    handle.write(chunk)
+                    except requests.RequestException:
+                        if attempt + 1 < attempts:
+                            time.sleep(0.5 * (2 ** attempt))
+                            continue
+                        raise
+
+                    downloaded_size = partial.stat().st_size
+                    if expected_total >= 0 and downloaded_size < expected_total:
+                        if attempt + 1 < attempts:
+                            time.sleep(0.5 * (2 ** attempt))
+                            continue
+                        raise RuntimeError(
+                            f"{label} incomplete download: "
+                            f"{downloaded_size}/{expected_total} bytes"
+                        )
+                    if expected_total >= 0 and downloaded_size > expected_total:
+                        partial.unlink(missing_ok=True)
+                        metadata_path.unlink(missing_ok=True)
+                        raise RuntimeError(
+                            f"{label} download exceeded expected size: "
+                            f"{downloaded_size}/{expected_total} bytes"
+                        )
+
+                    try:
+                        self._validate_downloaded_zip(partial, label=label)
+                    except Exception:
+                        # If the server declared a complete body, a bad ZIP is
+                        # corruption/version mismatch rather than an incomplete
+                        # resumable transfer. Force the next run to start clean.
+                        if expected_total >= 0 and downloaded_size == expected_total:
+                            partial.unlink(missing_ok=True)
+                            metadata_path.unlink(missing_ok=True)
+                        raise
+                    os.replace(partial, destination)
+                    metadata_path.unlink(missing_ok=True)
+                    return
+
                 if (
                     response.status_code in SEC_RETRYABLE_STATUS_CODES
                     and attempt + 1 < attempts
@@ -700,7 +853,7 @@ class SECProvider:
 
                 error = RuntimeError(f"{label} HTTP {response.status_code}")
                 if response.status_code == 403:
-                    self._blocked_error = error
+                    self._block_host(url, error)
                 raise error
             finally:
                 response.close()

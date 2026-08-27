@@ -1,9 +1,11 @@
+import io
 import os
 import time
 import zipfile
 
 import pandas as pd
 import pytest
+import requests
 
 from eps_pit import EPSMissingReason
 from eps_pit.providers import pit_provider
@@ -15,6 +17,20 @@ from eps_pit.providers.sec_yahoo_provider import (
     calculate_latest_eps_yoy_diagnostic,
     select_visible_quarters,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_sec_blocked_hosts():
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+    yield
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_sec_circuit_breakers():
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
+    yield
+    pit_provider._SEC_BLOCKED_HOST_ERRORS.clear()
 
 
 def _quarter(period, eps, filed, *, start=None, fiscal_quarter=None, concept="EarningsPerShareDiluted", source="SEC", record_id=None):
@@ -255,26 +271,122 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
     assert len(calls) == 1
 
 
-def test_sec_403_opens_run_level_circuit_breaker(monkeypatch, tmp_path):
+def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path):
     calls = []
 
-    def fake_get(url, timeout, **kwargs):
-        calls.append(url)
-        return _FakeSECResponse(403)
-
-    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=2)
-    monkeypatch.setattr(provider.session, "get", fake_get)
-
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=2)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            calls.append(url) or _FakeSECResponse(403)
+        ),
+    )
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
-        provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
+        first._get_json(first.TICKERS_URL, label="SEC ticker map")
 
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=2)
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("same blocked host must not be retried")
+        ),
+    )
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
-        provider._get_json(
-            provider.FACTS_URL.format(cik="0000008203"),
-            label="SEC companyfacts for ALOT",
+        second._get_json(second.TICKERS_URL, label="SEC ticker map")
+
+    assert calls == [first.TICKERS_URL]
+
+
+def test_sec_403_does_not_block_other_sec_host(monkeypatch, tmp_path):
+    blocked = SECProvider(tmp_path / "blocked", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        blocked.session,
+        "get",
+        lambda url, timeout, **kwargs: _FakeSECResponse(403),
+    )
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        blocked._get_json(blocked.TICKERS_URL, label="SEC ticker map")
+
+    data_provider = SECProvider(tmp_path / "data", rate_limit_sleep=0, max_retries=0)
+    calls = []
+    monkeypatch.setattr(
+        data_provider.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            calls.append(url) or _FakeSECResponse(200, {"ok": True})
+        ),
+    )
+
+    url = data_provider.FACTS_URL.format(cik="0000008203")
+    assert data_provider._get_json(url, label="SEC companyfacts") == {"ok": True}
+    assert calls == [url]
+
+
+def test_sec_bulk_403_is_shared_for_www_host(monkeypatch, tmp_path):
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: _FakeSECResponse(403),
+    )
+    with pytest.raises(RuntimeError, match="SEC companyfacts bulk HTTP 403"):
+        first._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            first.bulk_companyfacts_zip,
+            label="SEC companyfacts bulk",
         )
 
-    assert calls == [provider.TICKERS_URL]
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("blocked www.sec.gov must not be retried")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="SEC companyfacts bulk HTTP 403"):
+        second._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            second.bulk_companyfacts_zip,
+            label="SEC companyfacts bulk",
+        )
+
+
+def test_sec_403_circuit_breaker_is_shared_across_provider_instances(
+    monkeypatch,
+    tmp_path,
+):
+    first_calls = []
+    second_calls = []
+
+    first = SECProvider(tmp_path / "first", rate_limit_sleep=0, max_retries=0)
+    second = SECProvider(tmp_path / "second", rate_limit_sleep=0, max_retries=0)
+
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            first_calls.append(url) or _FakeSECResponse(403)
+        ),
+    )
+    monkeypatch.setattr(
+        second.session,
+        "get",
+        lambda url, timeout, **kwargs: (
+            second_calls.append(url) or _FakeSECResponse(200, {"unexpected": True})
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        first._get_json(first.TICKERS_URL, label="SEC ticker map")
+
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        second._get_json(second.TICKERS_URL, label="SEC ticker map")
+
+    assert first_calls == [first.TICKERS_URL]
+    assert second_calls == []
 
 
 def test_yahoo_requires_verified_release_but_keeps_verified_history(monkeypatch, tmp_path):
@@ -537,3 +649,187 @@ def test_yahoo_rate_limit_error_uses_bounded_backoff(monkeypatch, tmp_path):
     assert len(records) == 2
     assert calls["ticker"] == 3
     assert sleeps == [5.0, 15.0]
+
+
+def _valid_zip_bytes(name="CIK0000008203.json", payload=b"{}"):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(name, payload)
+    return buffer.getvalue()
+
+
+def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    payload = _valid_zip_bytes()
+    split = max(1, len(payload) // 3)
+    partial.write_bytes(payload[:split])
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {"Range": f"bytes={split}-"}
+        return _FakeSECResponse(
+            206,
+            headers={
+                "Content-Range": f"bytes {split}-{len(payload) - 1}/{len(payload)}",
+                "Content-Length": str(len(payload) - split),
+            },
+            body=payload[split:],
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert calls == [{"Range": f"bytes={split}-"}]
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
+
+
+def test_sec_bulk_download_restarts_if_server_ignores_range(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    payload = _valid_zip_bytes()
+    partial.write_bytes(b"stale-partial")
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {"Range": f"bytes={len(b'stale-partial')}-"}
+        return _FakeSECResponse(
+            200,
+            headers={"Content-Length": str(len(payload))},
+            body=payload,
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert len(calls) == 1
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
+
+
+def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_path):
+    payload = _valid_zip_bytes()
+    split = max(1, len(payload) // 2)
+    destination = tmp_path / "sec" / pit_provider.SEC_BULK_COMPANYFACTS_FILENAME
+
+    class InterruptedResponse(_FakeSECResponse):
+        def iter_content(self, chunk_size=1024 * 1024):
+            yield payload[:split]
+            raise requests.ConnectionError("connection dropped")
+
+    first = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, stream, headers: InterruptedResponse(
+            200,
+            headers={
+                "Content-Length": str(len(payload)),
+                "ETag": '"archive-v1"',
+            },
+        ),
+    )
+
+    with pytest.raises(requests.ConnectionError, match="connection dropped"):
+        first._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            destination,
+            label="SEC companyfacts bulk",
+        )
+
+    partial = first._partial_download_path(destination)
+    assert partial.exists()
+    assert partial.read_bytes() == payload[:split]
+
+    second = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    calls = []
+
+    def resumed_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+        return _FakeSECResponse(
+            206,
+            headers={
+                "Content-Range": f"bytes {split}-{len(payload) - 1}/{len(payload)}",
+                "Content-Length": str(len(payload) - split),
+            },
+            body=payload[split:],
+        )
+
+    monkeypatch.setattr(second.session, "get", resumed_get)
+
+    second._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert calls == [
+        {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+    ]
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
+    assert not second._partial_metadata_path(destination).exists()
+
+
+def test_sec_bulk_resume_restarts_when_remote_archive_changed(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    metadata = provider._partial_metadata_path(destination)
+    old_payload = _valid_zip_bytes(payload=b'{"old": true}')
+    new_payload = _valid_zip_bytes(payload=b'{"new": true}')
+    split = max(1, len(old_payload) // 3)
+    partial.write_bytes(old_payload[:split])
+    metadata.write_text(__import__("json").dumps({"if_range": '"archive-v1"'}))
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+        # If-Range validator no longer matches, so the server returns the full
+        # new representation with HTTP 200.
+        return _FakeSECResponse(
+            200,
+            headers={
+                "Content-Length": str(len(new_payload)),
+                "ETag": '"archive-v2"',
+            },
+            body=new_payload,
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert destination.read_bytes() == new_payload
+    assert not partial.exists()
+    assert not metadata.exists()
