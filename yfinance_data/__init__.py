@@ -335,7 +335,11 @@ def _pit_store_path() -> str:
 
 
 def _commit_pool(pool_path: str) -> None:
-    """Commit only the current pool plus its durable EPS PIT observations."""
+    """Commit only a pool that satisfies the current EPS publication contract."""
+    if os.path.exists(pool_path):
+        pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
+        _validate_eps_publication_contract(pool)
+
     try:
         managed_paths = [pool_path]
         pit_path = _pit_store_path()
