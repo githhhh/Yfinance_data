@@ -715,6 +715,8 @@ class SECProvider:
 
                 if response.status_code in {200, 206}:
                     append = response.status_code == 206 and offset > 0
+                    expected_total = -1
+
                     if append:
                         content_range = str(response.headers.get("Content-Range") or "")
                         expected_prefix = f"bytes {offset}-"
@@ -723,6 +725,21 @@ class SECProvider:
                             raise RuntimeError(
                                 f"{label} invalid Content-Range for resume: {content_range!r}"
                             )
+                        total_text = (
+                            content_range.rsplit("/", 1)[-1]
+                            if "/" in content_range
+                            else ""
+                        )
+                        try:
+                            expected_total = int(total_text)
+                        except ValueError:
+                            expected_total = -1
+                    else:
+                        content_length = str(response.headers.get("Content-Length") or "")
+                        try:
+                            expected_total = int(content_length)
+                        except ValueError:
+                            expected_total = -1
 
                     mode = "ab" if append else "wb"
                     try:
@@ -735,6 +752,22 @@ class SECProvider:
                             time.sleep(0.5 * (2 ** attempt))
                             continue
                         raise
+
+                    downloaded_size = partial.stat().st_size
+                    if expected_total >= 0 and downloaded_size < expected_total:
+                        if attempt + 1 < attempts:
+                            time.sleep(0.5 * (2 ** attempt))
+                            continue
+                        raise RuntimeError(
+                            f"{label} incomplete download: "
+                            f"{downloaded_size}/{expected_total} bytes"
+                        )
+                    if expected_total >= 0 and downloaded_size > expected_total:
+                        partial.unlink(missing_ok=True)
+                        raise RuntimeError(
+                            f"{label} download exceeded expected size: "
+                            f"{downloaded_size}/{expected_total} bytes"
+                        )
 
                     self._validate_downloaded_zip(partial, label=label)
                     os.replace(partial, destination)
