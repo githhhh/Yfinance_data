@@ -2,6 +2,7 @@ import os
 import time
 
 import pandas as pd
+import pytest
 
 from eps_pit import EPSMissingReason
 from eps_pit.providers import pit_provider
@@ -184,38 +185,127 @@ def test_sec_parser_preserves_versions_and_duration_metadata(tmp_path):
     assert all(r["unit"] == "USD/shares" for r in records)
 
 
-def test_sec_default_user_agent_declares_contact_email():
-    assert "@" in pit_provider.SEC_USER_AGENT
-    assert pit_provider.sec_user_agent_has_contact_email(pit_provider.SEC_USER_AGENT)
+def _clear_sec_identity_env(monkeypatch):
+    for name in (
+        "SEC_USER_AGENT",
+        "SEC_CONTACT_EMAIL",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_EMAIL",
+        "EMAIL",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_default_sec_user_agent_uses_contact_email_env(monkeypatch):
+    _clear_sec_identity_env(monkeypatch)
     monkeypatch.setenv("SEC_CONTACT_EMAIL", "ops@example.com")
 
     assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT ops@example.com"
 
 
 def test_default_sec_user_agent_falls_back_to_git_email(monkeypatch):
-    monkeypatch.delenv("SEC_CONTACT_EMAIL", raising=False)
-    monkeypatch.delenv("GIT_AUTHOR_EMAIL", raising=False)
-    monkeypatch.delenv("GIT_COMMITTER_EMAIL", raising=False)
-    monkeypatch.delenv("EMAIL", raising=False)
+    _clear_sec_identity_env(monkeypatch)
     monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "git@example.com")
 
     assert pit_provider.default_sec_user_agent() == "Yfinance_data EPS PIT git@example.com"
 
 
-def test_sec_provider_headers_are_declared_for_sec_requests(tmp_path, caplog):
+def test_default_sec_user_agent_has_no_fake_contact_fallback(monkeypatch):
+    _clear_sec_identity_env(monkeypatch)
+    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
+
+    assert pit_provider.default_sec_user_agent() == ""
+
+
+def test_sec_provider_headers_require_real_contact_email(monkeypatch, tmp_path):
+    _clear_sec_identity_env(monkeypatch)
+    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
+
     provider = SECProvider(tmp_path)
+    with pytest.raises(
+        pit_provider.SECUserAgentConfigurationError,
+        match="SEC_CONTACT_EMAIL or SEC_USER_AGENT",
+    ):
+        _ = provider.headers
 
-    assert provider.headers["User-Agent"] == pit_provider.SEC_USER_AGENT
-    assert provider.headers["Accept-Encoding"] == "gzip, deflate"
+    headers = pit_provider.build_sec_request_headers(
+        "Yfinance_data EPS PIT ops@example.com"
+    )
+    assert headers["User-Agent"] == "Yfinance_data EPS PIT ops@example.com"
+    assert headers["Accept-Encoding"] == "gzip, deflate"
 
-    with caplog.at_level("WARNING"):
-        headers = pit_provider.build_sec_request_headers("Yfinance_data EPS PIT")
 
-    assert headers["User-Agent"] == "Yfinance_data EPS PIT"
-    assert "SEC_USER_AGENT should include a contact email" in caplog.text
+def test_sec_missing_identity_fails_before_http_request(monkeypatch, tmp_path):
+    _clear_sec_identity_env(monkeypatch)
+    monkeypatch.setattr(pit_provider, "_git_config_user_email", lambda: "")
+    calls = []
+
+    def forbidden_get(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("HTTP must not be attempted without SEC identity")
+
+    monkeypatch.setattr(pit_provider.requests, "get", forbidden_get)
+
+    provider = SECProvider(tmp_path, rate_limit_sleep=0)
+    with pytest.raises(pit_provider.SECUserAgentConfigurationError):
+        provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
+
+    assert calls == []
+
+
+class _FakeSECResponse:
+    def __init__(self, status_code, payload=None):
+        self.status_code = status_code
+        self._payload = payload if payload is not None else {}
+
+    def json(self):
+        return self._payload
+
+
+def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
+    responses = [
+        _FakeSECResponse(429),
+        _FakeSECResponse(503),
+        _FakeSECResponse(200, {"ok": True}),
+    ]
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append((url, headers, timeout))
+        return responses.pop(0)
+
+    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
+    monkeypatch.setattr(pit_provider.time, "sleep", lambda seconds: None)
+
+    provider = SECProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        max_retries=2,
+        user_agent="Yfinance_data EPS PIT ops@example.com",
+    )
+    assert provider._get_json("https://data.sec.gov/test", label="SEC test") == {"ok": True}
+    assert len(calls) == 3
+
+
+def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append((url, headers, timeout))
+        return _FakeSECResponse(403)
+
+    monkeypatch.setattr(pit_provider.requests, "get", fake_get)
+
+    provider = SECProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        max_retries=2,
+        user_agent="Yfinance_data EPS PIT ops@example.com",
+    )
+    with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
+        provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
+
+    assert len(calls) == 1
 
 
 def test_yahoo_requires_verified_release_but_keeps_verified_history(monkeypatch, tmp_path):
