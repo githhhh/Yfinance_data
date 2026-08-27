@@ -12,6 +12,7 @@ import time
 import zipfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
@@ -41,6 +42,7 @@ YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
 
 _SEC_RATE_LOCK = threading.Lock()
 _SEC_LAST_REQUEST_AT: float | None = None
+_SEC_BLOCKED_HOST_ERRORS: dict[str, RuntimeError] = {}
 _YAHOO_RATE_LOCK = threading.Lock()
 _YAHOO_LAST_REQUEST_AT: float | None = None
 
@@ -582,7 +584,6 @@ class SECProvider:
         self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
         self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
         self.max_retries = max(int(max_retries), 0)
-        self._blocked_error: RuntimeError | None = None
         self._cik_map: dict[str, str] | None = None
         self._cik_map_error: Exception | None = None
         self._bulk_members: dict[str, str] | None = None
@@ -630,9 +631,21 @@ class SECProvider:
                     pass
         return 0.5 * (2 ** attempt)
 
+    @staticmethod
+    def _blocked_host_error(url: str) -> RuntimeError | None:
+        host = (urlparse(url).hostname or "").lower()
+        return _SEC_BLOCKED_HOST_ERRORS.get(host)
+
+    @staticmethod
+    def _block_host(url: str, error: RuntimeError) -> None:
+        host = (urlparse(url).hostname or "").lower()
+        if host:
+            _SEC_BLOCKED_HOST_ERRORS[host] = error
+
     def _get_json(self, url: str, *, label: str) -> Any:
-        if self._blocked_error is not None:
-            raise self._blocked_error
+        blocked = self._blocked_host_error(url)
+        if blocked is not None:
+            raise blocked
 
         attempts = self.max_retries + 1
         for attempt in range(attempts):
@@ -657,7 +670,7 @@ class SECProvider:
                 # Hosted/cloud egress can be blocked independently of request
                 # identity. Stop the entire SEC client for this run after the
                 # first access-denied response instead of hammering every CIK.
-                self._blocked_error = error
+                self._block_host(url, error)
             raise error
 
         raise RuntimeError(f"{label} request failed")
@@ -703,8 +716,9 @@ class SECProvider:
         HTTP 206 appends to the partial file. If the server ignores Range and
         returns HTTP 200, the partial file is safely restarted from byte zero.
         """
-        if self._blocked_error is not None:
-            raise self._blocked_error
+        blocked = self._blocked_host_error(url)
+        if blocked is not None:
+            raise blocked
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = self._partial_download_path(destination)
