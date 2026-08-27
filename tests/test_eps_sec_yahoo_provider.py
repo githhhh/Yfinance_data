@@ -559,10 +559,7 @@ def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_
 
     def fake_get(url, timeout, stream, headers):
         calls.append(headers)
-        assert headers == {
-            "Range": f"bytes={split}-",
-            "If-Range": '"archive-v1"',
-        }
+        assert headers == {"Range": f"bytes={split}-"}
         return _FakeSECResponse(
             206,
             headers={
@@ -580,15 +577,9 @@ def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_
         label="SEC companyfacts bulk",
     )
 
-    assert calls == [
-        {
-            "Range": f"bytes={split}-",
-            "If-Range": '"archive-v1"',
-        }
-    ]
+    assert calls == [{"Range": f"bytes={split}-"}]
     assert destination.read_bytes() == payload
     assert not partial.exists()
-    assert not second._partial_metadata_path(destination).exists()
 
 
 def test_sec_bulk_download_restarts_if_server_ignores_range(monkeypatch, tmp_path):
@@ -660,7 +651,10 @@ def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_
 
     def resumed_get(url, timeout, stream, headers):
         calls.append(headers)
-        assert headers == {"Range": f"bytes={split}-"}
+        assert headers == {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
         return _FakeSECResponse(
             206,
             headers={
@@ -678,9 +672,15 @@ def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_
         label="SEC companyfacts bulk",
     )
 
-    assert calls == [{"Range": f"bytes={split}-"}]
+    assert calls == [
+        {
+            "Range": f"bytes={split}-",
+            "If-Range": '"archive-v1"',
+        }
+    ]
     assert destination.read_bytes() == payload
     assert not partial.exists()
+    assert not second._partial_metadata_path(destination).exists()
 
 
 def test_sec_bulk_resume_restarts_when_remote_archive_changed(monkeypatch, tmp_path):
