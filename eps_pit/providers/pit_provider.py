@@ -6,7 +6,6 @@ import logging
 import math
 import os
 import re
-import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -36,31 +35,14 @@ def sec_user_agent_has_contact_email(user_agent: str) -> bool:
 
 
 def _env_contact_email() -> str:
-    for name in ("SEC_CONTACT_EMAIL", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL", "EMAIL"):
-        value = os.environ.get(name, "").strip()
-        if sec_user_agent_has_contact_email(value):
-            return value
-    return ""
-
-
-def _git_config_user_email() -> str:
-    try:
-        result = subprocess.run(
-            ["git", "config", "--get", "user.email"],
-            cwd=Path(__file__).resolve().parents[2],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except Exception:
-        return ""
-    email = result.stdout.strip()
-    return email if sec_user_agent_has_contact_email(email) else ""
+    value = os.environ.get("SEC_CONTACT_EMAIL", "").strip()
+    return value if sec_user_agent_has_contact_email(value) else ""
 
 
 def default_sec_user_agent() -> str:
-    contact = _env_contact_email() or _git_config_user_email()
+    # SEC identity is supplied only through dedicated runtime configuration.
+    # Never infer a personal address from git, shell, or host account settings.
+    contact = _env_contact_email()
     return f"{SEC_USER_AGENT_PRODUCT} {contact}" if contact else ""
 
 
