@@ -1,3 +1,4 @@
+import io
 import os
 import time
 import zipfile
@@ -537,3 +538,133 @@ def test_yahoo_rate_limit_error_uses_bounded_backoff(monkeypatch, tmp_path):
     assert len(records) == 2
     assert calls["ticker"] == 3
     assert sleeps == [5.0, 15.0]
+
+
+def _valid_zip_bytes(name="CIK0000008203.json", payload=b"{}"):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(name, payload)
+    return buffer.getvalue()
+
+
+def test_sec_bulk_download_resumes_existing_partial_with_range(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    payload = _valid_zip_bytes()
+    split = max(1, len(payload) // 3)
+    partial.write_bytes(payload[:split])
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {"Range": f"bytes={split}-"}
+        return _FakeSECResponse(
+            206,
+            headers={
+                "Content-Range": f"bytes {split}-{len(payload) - 1}/{len(payload)}",
+                "Content-Length": str(len(payload) - split),
+            },
+            body=payload[split:],
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert calls == [{"Range": f"bytes={split}-"}]
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
+
+
+def test_sec_bulk_download_restarts_if_server_ignores_range(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    destination = provider.bulk_companyfacts_zip
+    partial = provider._partial_download_path(destination)
+    payload = _valid_zip_bytes()
+    partial.write_bytes(b"stale-partial")
+    calls = []
+
+    def fake_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {"Range": f"bytes={len(b'stale-partial')}-"}
+        return _FakeSECResponse(
+            200,
+            headers={"Content-Length": str(len(payload))},
+            body=payload,
+        )
+
+    monkeypatch.setattr(provider.session, "get", fake_get)
+
+    provider._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert len(calls) == 1
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
+
+
+def test_sec_bulk_partial_survives_process_restart_and_resumes(monkeypatch, tmp_path):
+    payload = _valid_zip_bytes()
+    split = max(1, len(payload) // 2)
+    destination = tmp_path / "sec" / pit_provider.SEC_BULK_COMPANYFACTS_FILENAME
+
+    class InterruptedResponse(_FakeSECResponse):
+        def iter_content(self, chunk_size=1024 * 1024):
+            yield payload[:split]
+            raise requests.ConnectionError("connection dropped")
+
+    first = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    monkeypatch.setattr(
+        first.session,
+        "get",
+        lambda url, timeout, stream, headers: InterruptedResponse(
+            200,
+            headers={"Content-Length": str(len(payload))},
+        ),
+    )
+
+    with pytest.raises(requests.ConnectionError, match="connection dropped"):
+        first._download_file(
+            pit_provider.SEC_BULK_COMPANYFACTS_URL,
+            destination,
+            label="SEC companyfacts bulk",
+        )
+
+    partial = first._partial_download_path(destination)
+    assert partial.exists()
+    assert partial.read_bytes() == payload[:split]
+
+    second = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    calls = []
+
+    def resumed_get(url, timeout, stream, headers):
+        calls.append(headers)
+        assert headers == {"Range": f"bytes={split}-"}
+        return _FakeSECResponse(
+            206,
+            headers={
+                "Content-Range": f"bytes {split}-{len(payload) - 1}/{len(payload)}",
+                "Content-Length": str(len(payload) - split),
+            },
+            body=payload[split:],
+        )
+
+    monkeypatch.setattr(second.session, "get", resumed_get)
+
+    second._download_file(
+        pit_provider.SEC_BULK_COMPANYFACTS_URL,
+        destination,
+        label="SEC companyfacts bulk",
+    )
+
+    assert calls == [{"Range": f"bytes={split}-"}]
+    assert destination.read_bytes() == payload
+    assert not partial.exists()
