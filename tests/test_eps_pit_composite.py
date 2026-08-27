@@ -33,7 +33,7 @@ def test_single_provider_failure_plus_nonterminal_missing_is_provider_error(monk
         "fetch_quarterly_history",
         lambda symbol: (_ for _ in ()).throw(RuntimeError("SEC provider HTTP 500")),
     )
-    monkeypatch.setattr(provider.yahoo, "fetch_quarterly_history", lambda symbol: [])
+    monkeypatch.setattr(provider.yahoo, "fetch_quarterly_history", lambda symbol, **kwargs: [])
 
     with caplog.at_level("WARNING"):
         result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-21")
@@ -178,6 +178,7 @@ def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
     sec_records = [
         {
             "report_period": "2025-06-30",
+            "start": "2025-04-01",
             "eps_diluted": 0.0,
             "filing_date": "2025-08-01",
             "period_type": "quarter",
@@ -187,6 +188,7 @@ def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
         },
         {
             "report_period": "2026-06-30",
+            "start": "2026-04-01",
             "eps_diluted": 0.05,
             "filing_date": "2026-08-01",
             "period_type": "quarter",
