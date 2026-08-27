@@ -15,6 +15,6 @@ jobs:
           python-version: '3.12'
       - name: Install targeted test dependencies
         run: pip install pytest yfinance==1.0 tradingview-screener
-      - name: Run EPS contract tests
+      - name: Run EPS and publication contract tests
         run: |
-          python -m pytest             tests/test_eps_sec_yahoo_provider.py             tests/test_eps_pit_composite.py             tests/test_eps_pit_resolver_contract.py             tests/test_signal_eps_lookup.py             -q
+          python -m pytest             tests/test_eps_sec_yahoo_provider.py             tests/test_eps_pit_composite.py             tests/test_eps_pit_resolver_contract.py             tests/test_signal_eps_lookup.py             dashboard/tests/test_eps_publication_contract.py             dashboard/tests/test_eps_publication_contract_extended.py             dashboard/tests/test_yfinance_data_contract.py             -q
