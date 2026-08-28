@@ -1232,12 +1232,24 @@ class YahooFundamentalsProvider:
                 continue
 
             if require_release_date:
-                release_at = self._match_release_date(period_end, events)
-                if not release_at:
+                release_event = self._match_release_event(period_end, events)
+                if not release_event:
                     self.missing_release_periods.append(period_end)
                     continue
-                source = "Yahoo"
-                source_record_id = f"yahoo_income_{period_end}"
+                release_at = str(release_event["earnings_release_at"])
+                # Historical Yahoo PIT must use the EPS value Yahoo reported
+                # at that earnings event. Using today's quarterly income
+                # statement value with an old release date can leak later
+                # restatements into replay.
+                event_eps = safe_float(release_event.get("eps_diluted"))
+                if event_eps is None:
+                    self.missing_release_periods.append(period_end)
+                    continue
+                eps = event_eps
+                source = "YahooHistoricalEvent"
+                source_record_id = (
+                    f"yahoo_event_{period_end}_{release_at}"
+                )
             else:
                 # This does not claim to know the historical release timestamp.
                 # It records only that the current Yahoo statement was observed
@@ -1308,24 +1320,44 @@ class YahooFundamentalsProvider:
         return result
 
     @staticmethod
-    def _match_release_date(period_end: str, events: list[dict[str, Any]]) -> str | None:
+    def _match_release_event(
+        period_end: str,
+        events: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
         period = date10(period_end)
         if not period:
             return None
         period_date = dt.date.fromisoformat(period)
-        candidates: list[tuple[int, str]] = []
+        candidates: list[tuple[int, str, dict[str, Any]]] = []
         for event in events:
             release = date10(event.get("earnings_release_at"))
-            if not release:
+            event_eps = safe_float(event.get("eps_diluted"))
+            if not release or event_eps is None:
                 continue
             release_date = dt.date.fromisoformat(release)
             delta = (release_date - period_date).days
             if 0 <= delta <= 75:
-                candidates.append((delta, str(event.get("earnings_release_at") or release)))
+                candidates.append(
+                    (
+                        delta,
+                        str(event.get("earnings_release_at") or release),
+                        event,
+                    )
+                )
         if not candidates:
             return None
-        candidates.sort(key=lambda item: item[0])
-        return candidates[0][1]
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return dict(candidates[0][2])
+
+    @classmethod
+    def _match_release_date(
+        cls,
+        period_end: str,
+        events: list[dict[str, Any]],
+    ) -> str | None:
+        """Compatibility wrapper for callers that only need the timestamp."""
+        event = cls._match_release_event(period_end, events)
+        return str(event.get("earnings_release_at")) if event else None
 
     @staticmethod
     def _income_statement_is_stale(
