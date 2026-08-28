@@ -394,7 +394,7 @@ def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
     assert len(calls) == 3
 
 
-def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
+def test_sec_403_switches_same_project_user_agent_before_circuit_break(monkeypatch, tmp_path):
     calls = []
 
     def fake_get(url, timeout, **kwargs):
@@ -410,7 +410,7 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
 
-    assert len(calls) == 1
+    assert len(calls) == pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1
 
 
 def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path):
@@ -438,7 +438,9 @@ def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path)
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         second._get_json(second.TICKERS_URL, label="SEC ticker map")
 
-    assert calls == [first.TICKERS_URL]
+    assert calls == [
+        first.TICKERS_URL
+    ] * (pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1)
 
 
 def test_sec_403_does_not_block_other_sec_host(monkeypatch, tmp_path):
@@ -527,7 +529,9 @@ def test_sec_403_circuit_breaker_is_shared_across_provider_instances(
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         second._get_json(second.TICKERS_URL, label="SEC ticker map")
 
-    assert first_calls == [first.TICKERS_URL]
+    assert first_calls == [
+        first.TICKERS_URL
+    ] * (pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1)
     assert second_calls == []
 
 
