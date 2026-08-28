@@ -24,6 +24,7 @@ PIT_COLUMNS = [
     "calculation_method",
     "status",
     "missing_reason",
+    "sec_cik",
     "source_record_id",
     "resolver_version",
     "retrieved_at",
@@ -147,9 +148,39 @@ class EPSPITStore:
             current_period=date10(s("current_period")) or None,
             prior_year_period=date10(s("prior_year_period")) or None,
             calculation_method=s("calculation_method"),
+            sec_cik=s("sec_cik"),
             source_record_id=s("source_record_id"),
             resolver_version=resolver_version,
         )
+
+    def get_sec_cik(self, code: object) -> str | None:
+        """Return a stable SEC CIK previously bound under the active policy."""
+        sym = self._norm_code(code)
+        if not sym:
+            return None
+        df = self._read()
+        if df.empty or "sec_cik" not in df.columns:
+            return None
+        self._validate_unique(df)
+        codes = df["code"].map(normalize_symbol)
+        versions = (
+            df["resolver_version"].astype(str)
+            if "resolver_version" in df.columns
+            else pd.Series("", index=df.index)
+        )
+        rows = df.loc[codes.eq(sym) & versions.eq(EPS_RESOLVER_VERSION)]
+        if rows.empty:
+            return None
+        values = {
+            str(value).strip().zfill(10)
+            for value in rows["sec_cik"].dropna()
+            if str(value).strip() and str(value).strip().lower() != "nan"
+        }
+        if len(values) > 1:
+            raise EPSPITStoreError(
+                f"EPS PIT store has conflicting SEC CIK bindings for {sym}: {sorted(values)}"
+            )
+        return next(iter(values), None)
 
     def upsert(self, result: EPSResult) -> None:
         if not result.is_resolved:
