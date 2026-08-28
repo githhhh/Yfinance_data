@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from eps_pit.models import EPS_RESOLVER_VERSION, EPSResult, EPSStatus
+from eps_pit.models import (
+    EPS_RESOLVER_VERSION,
+    EPSGrowthType,
+    EPSMissingReason,
+    EPSResult,
+    EPSStatus,
+)
 from eps_pit.providers.pit_provider import date10, normalize_symbol, safe_float
 
 
@@ -22,9 +28,22 @@ PIT_COLUMNS = [
     "current_period",
     "prior_year_period",
     "calculation_method",
+    "growth_type",
     "status",
     "missing_reason",
     "sec_cik",
+    "sec_current_eps",
+    "sec_prior_year_eps",
+    "sec_current_period",
+    "sec_prior_year_period",
+    "sec_effective_date",
+    "sec_source_record_id",
+    "yahoo_current_eps",
+    "yahoo_prior_year_eps",
+    "yahoo_current_period",
+    "yahoo_prior_year_period",
+    "yahoo_effective_date",
+    "yahoo_source_record_id",
     "source_record_id",
     "resolver_version",
     "retrieved_at",
@@ -124,15 +143,19 @@ class EPSPITStore:
             # observation silently bypass the active policy.
             return None
         eps = safe_float(row.get("eps_yoy_growth"))
-        if eps is None:
-            # New stores persist resolved observations only. Ignore legacy
-            # unresolved rows rather than treating them as durable facts.
+        status_raw = self._norm_text(row.get("status")).lower()
+        if status_raw not in {
+            EPSStatus.RESOLVED.value,
+            EPSStatus.EXPECTED_UNAVAILABLE.value,
+        }:
             return None
-
-        status_raw = str(row.get("status") or "").strip().lower()
-        if status_raw and status_raw != "nan" and status_raw != EPSStatus.RESOLVED.value:
+        if status_raw == EPSStatus.RESOLVED.value and eps is None:
             raise EPSPITStoreError(
-                f"EPS PIT record has value with non-resolved status: {sym} {snap}"
+                f"EPS PIT resolved record has no numeric value: {sym} {snap}"
+            )
+        if status_raw == EPSStatus.EXPECTED_UNAVAILABLE.value and eps is not None:
+            raise EPSPITStoreError(
+                f"EPS PIT expected_unavailable record unexpectedly has value: {sym} {snap}"
             )
 
         def f(name: str) -> float | None:
@@ -161,10 +184,25 @@ class EPSPITStore:
                 )
             effective = normalized_effective
 
+        growth_type_raw = s("growth_type")
+        try:
+            growth_type = EPSGrowthType(growth_type_raw) if growth_type_raw else None
+        except ValueError:
+            growth_type = None
+        missing_reason_raw = s("missing_reason")
+        try:
+            missing_reason = (
+                EPSMissingReason(missing_reason_raw)
+                if missing_reason_raw
+                else None
+            )
+        except ValueError:
+            missing_reason = None
+
         return EPSResult(
             code=sym,
             snapshot_date=snap,
-            status=EPSStatus.RESOLVED,
+            status=EPSStatus(status_raw),
             eps_yoy_growth=eps,
             source=s("source"),
             effective_date=effective,
@@ -173,7 +211,21 @@ class EPSPITStore:
             current_period=date10(s("current_period")) or None,
             prior_year_period=date10(s("prior_year_period")) or None,
             calculation_method=s("calculation_method"),
-            sec_cik=s("sec_cik"),
+            growth_type=growth_type,
+            missing_reason=missing_reason,
+            sec_cik=self._norm_cik(row.get("sec_cik")),
+            sec_current_eps=f("sec_current_eps"),
+            sec_prior_year_eps=f("sec_prior_year_eps"),
+            sec_current_period=date10(s("sec_current_period")) or None,
+            sec_prior_year_period=date10(s("sec_prior_year_period")) or None,
+            sec_effective_date=date10(s("sec_effective_date")) or None,
+            sec_source_record_id=s("sec_source_record_id"),
+            yahoo_current_eps=f("yahoo_current_eps"),
+            yahoo_prior_year_eps=f("yahoo_prior_year_eps"),
+            yahoo_current_period=date10(s("yahoo_current_period")) or None,
+            yahoo_prior_year_period=date10(s("yahoo_prior_year_period")) or None,
+            yahoo_effective_date=date10(s("yahoo_effective_date")) or None,
+            yahoo_source_record_id=s("yahoo_source_record_id"),
             source_record_id=s("source_record_id"),
             resolver_version=resolver_version,
         )
@@ -208,13 +260,33 @@ class EPSPITStore:
         return next(iter(values), None)
 
     def upsert(self, result: EPSResult) -> None:
-        if not result.is_resolved:
+        has_evidence = any(
+            value is not None
+            for value in (
+                result.current_eps,
+                result.prior_year_eps,
+                result.sec_current_eps,
+                result.sec_prior_year_eps,
+                result.yahoo_current_eps,
+                result.yahoo_prior_year_eps,
+            )
+        )
+        persistable = result.is_resolved or (
+            result.status is EPSStatus.EXPECTED_UNAVAILABLE and has_evidence
+        )
+        if not persistable:
             return
         snap = self._norm_date(result.snapshot_date)
         sym = self._norm_code(result.code)
         eps = safe_float(result.eps_yoy_growth)
-        if not snap or not sym or eps is None or not math.isfinite(eps):
-            raise EPSPITStoreError("Resolved EPS result has invalid key/value")
+        if not snap or not sym:
+            raise EPSPITStoreError("EPS PIT result has invalid key")
+        if result.is_resolved and (eps is None or not math.isfinite(eps)):
+            raise EPSPITStoreError("Resolved EPS result has invalid value")
+        if result.status is EPSStatus.EXPECTED_UNAVAILABLE and eps is not None:
+            raise EPSPITStoreError(
+                "Expected-unavailable EPS result cannot have numeric growth"
+            )
         effective = self._norm_date(result.effective_date) if result.effective_date else None
         if result.effective_date and not effective:
             raise EPSPITStoreError("Resolved EPS result has invalid effective_date")
