@@ -1064,3 +1064,60 @@ def test_yahoo_live_zero_prior_is_terminal_after_current_observation(
 
     assert result is None
     assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
+
+
+def test_yahoo_historical_uses_event_reported_eps_not_current_statement_value(
+    monkeypatch,
+    tmp_path,
+):
+    class RestatedTicker:
+        def get_earnings_dates(self, limit=32):
+            index = pd.to_datetime(["2026-08-01", "2025-08-01"])
+            return pd.DataFrame(
+                {"Reported EPS": [1.5, 1.0]},
+                index=index,
+            )
+
+        @property
+        def quarterly_income_stmt(self):
+            # Today's statement has a restated prior-year value. Historical PIT
+            # must not backfill this revised value into the 2025 event.
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-06-30"): [1.5],
+                    pd.Timestamp("2025-06-30"): [0.8],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", lambda symbol: RestatedTicker())
+    provider = YahooFundamentalsProvider(tmp_path, rate_limit_sleep=0)
+
+    records = provider.fetch_quarterly_history(
+        "TEST",
+        require_release_date=True,
+        refresh=True,
+    )
+    result, reason = calculate_latest_eps_yoy_diagnostic(records, "2026-08-21")
+
+    assert reason is None
+    assert result["current_eps"] == 1.5
+    assert result["prior_year_eps"] == 1.0
+    assert result["eps_yoy_growth"] == 50.0
+    assert result["source"] == "YahooHistoricalEvent"
+
+
+def test_snapshot_cutoff_policy_is_explicit_end_of_et_calendar_day():
+    assert pit_provider.EPS_SNAPSHOT_CUTOFF_POLICY == "calendar_date_eod_et"
+
+    before_midnight = {
+        "source": "YahooHistoricalEvent",
+        "earnings_release_at": "2026-08-21T23:59:59-04:00",
+    }
+    next_day = {
+        "source": "YahooHistoricalEvent",
+        "earnings_release_at": "2026-08-22T00:00:00-04:00",
+    }
+
+    assert pit_provider.is_visible_by_snapshot(before_midnight, "2026-08-21")
+    assert not pit_provider.is_visible_by_snapshot(next_day, "2026-08-21")
