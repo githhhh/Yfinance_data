@@ -16,6 +16,10 @@ from backtest.b0_top3_quality_audit.skill_rule_engine import (
     evaluate_rule_on_pool,
 )
 from backtest.b0_top3_quality_audit.three_tier_baseline import compute_portfolio_metrics
+from backtest.b0_top3_quality_audit.research_windows import (
+    contaminated_validation_dates,
+    train_dates as frozen_train_dates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +389,8 @@ if __name__ == "__main__":
     baseline_df = pd.read_csv(baseline_path)
 
     all_weeks = sorted(baseline_df["snapshot_date"].unique())
-    train_weeks = all_weeks[:30]
-    holdout_weeks = all_weeks[30:]
+    train_weeks = sorted(frozen_train_dates(all_weeks))
+    holdout_weeks = sorted(contaminated_validation_dates(all_weeks))
 
     logger.info(f"Total Weeks: {len(all_weeks)} (Train: {len(train_weeks)} weeks, Holdout: {len(holdout_weeks)} weeks)")
 

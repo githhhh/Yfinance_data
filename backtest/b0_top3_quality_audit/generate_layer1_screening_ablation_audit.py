@@ -39,6 +39,10 @@ from backtest.b0_top3_quality_audit.eligibility import (
     to_bool,
     to_float,
 )
+from backtest.b0_top3_quality_audit.research_windows import (
+    contaminated_validation_dates,
+    train_dates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -515,8 +519,8 @@ def build_layer1_audit_data(
     three_tier_df = pd.read_csv(paths.three_tier_weekly_path)
 
     all_snapshots = sorted(three_tier_df["snapshot_date"].astype(str).unique())
-    train_snapshots = set(all_snapshots[:30])
-    contaminated_snapshots = set(all_snapshots[30:40])
+    train_snapshots = train_dates(all_snapshots)
+    contaminated_snapshots = contaminated_validation_dates(all_snapshots)
 
     event_lookup = {
         (str(r["snapshot_date"]), str(r["code"])): r.to_dict()

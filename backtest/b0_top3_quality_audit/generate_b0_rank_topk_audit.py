@@ -19,6 +19,11 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from backtest.b0_top3_quality_audit.research_windows import (
+    contaminated_validation_dates,
+    train_dates,
+)
+
 logger = logging.getLogger(__name__)
 
 PRIMARY_HORIZONS = (1, 2, 4)
@@ -869,8 +874,8 @@ def run_b0_rank_topk_audit(
     three_tier_df = pd.read_csv(paths.three_tier_weekly_path)
 
     all_snapshots = sorted(three_tier_df["snapshot_date"].astype(str).unique())
-    train_snapshots = set(all_snapshots[:30])
-    contaminated_snapshots = set(all_snapshots[30:40])
+    train_snapshots = train_dates(all_snapshots)
+    contaminated_snapshots = contaminated_validation_dates(all_snapshots)
 
     logger.info("Building Common Support weekly matrix with Maturity Gate...")
     weekly_matrix_df = build_common_support_weekly_matrix(

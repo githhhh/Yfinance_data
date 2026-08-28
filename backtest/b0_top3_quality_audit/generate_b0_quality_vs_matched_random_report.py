@@ -14,6 +14,10 @@ import numpy as np
 import pandas as pd
 
 from backtest.b0_top3_quality_audit.random_control import run_random_top3_for_snapshot
+from backtest.b0_top3_quality_audit.research_windows import (
+    contaminated_validation_dates,
+    train_dates,
+)
 
 
 HORIZONS = (1, 2, 4)
@@ -145,8 +149,8 @@ def summarize_stability(
     contaminated_dates: set[str] = set()
     if three_tier_weekly_df is not None and not three_tier_weekly_df.empty:
         all_eval_dates = sorted(three_tier_weekly_df["snapshot_date"].astype(str).unique())
-        train_dates = set(all_eval_dates[:30])
-        contaminated_dates = set(all_eval_dates[30:40])
+        train_dates_set = train_dates(all_eval_dates)
+        contaminated_dates = contaminated_validation_dates(all_eval_dates)
 
     for horizon in HORIZONS:
         df = _valid_horizon_frame(random_df, horizon).sort_values("snapshot_date").copy()
@@ -162,7 +166,7 @@ def summarize_stability(
             ("Late half", df.iloc[midpoint:]),
         ]
         if train_dates:
-            segments.append(("Train-era weeks 1-30", df[df["snapshot_date"].astype(str).isin(train_dates)]))
+            segments.append(("Train-era weeks 1-30", df[df["snapshot_date"].astype(str).isin(train_dates_set)]))
         if contaminated_dates:
             segments.append(
                 (

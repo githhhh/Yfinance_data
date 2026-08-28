@@ -5,7 +5,7 @@ This module performs one-way evaluation of frozen rules on Weeks 31~40.
 IMPORTANT:
 Weeks 31~40 have been exposed during prior research exploration and are formally designated
 as 'Contaminated Historical Validation'. They do NOT serve as virgin out-of-sample evidence.
-True immutable virgin out-of-sample testing begins with the forward shadow ledger on 2026-08-14+.
+True immutable virgin out-of-sample testing begins with the forward shadow ledger on 2026-08-28+.
 """
 
 from __future__ import annotations
@@ -26,6 +26,11 @@ from backtest.b0_top3_quality_audit.skill_rule_engine import (
     evaluate_rule_on_pool,
 )
 from backtest.b0_top3_quality_audit.three_tier_baseline import compute_portfolio_metrics
+from backtest.b0_top3_quality_audit.research_windows import (
+    CONTAMINATED_VALIDATION_END,
+    CONTAMINATED_VALIDATION_START,
+    contaminated_validation_dates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +110,18 @@ def run_historical_validation_unblind(
     logger.info(f"Integrity check passed! Loaded frozen manifest (SHA256: {manifest_sha}) with {len(champions)} champions.")
 
     all_weeks = sorted(baseline_df["snapshot_date"].unique())
-    validation_weeks = all_weeks[30:]  # Weeks 31~40 (10 weeks)
-    logger.info(f"Evaluating {len(validation_weeks)} Historical Validation weeks ({validation_weeks[0]} to {validation_weeks[-1]})...")
+    validation_weeks = sorted(contaminated_validation_dates(all_weeks))
+    if not validation_weeks:
+        raise RuntimeError(
+            "No contaminated historical validation weeks found in fixed date window "
+            f"{CONTAMINATED_VALIDATION_START}..{CONTAMINATED_VALIDATION_END}"
+        )
+    logger.info(
+        "Evaluating %s Historical Validation weeks (%s to %s)...",
+        len(validation_weeks),
+        validation_weeks[0],
+        validation_weeks[-1],
+    )
 
     # Map of all rules to evaluate: B0 + Champions
     base_rules: dict[str, RuleSpec] = {r.rule_id: r for r in build_skill_rule_space()}
