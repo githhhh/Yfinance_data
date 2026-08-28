@@ -19,7 +19,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from eps_pit.models import EPSMissingReason
+from eps_pit.models import EPSGrowthType, EPSMissingReason
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -141,6 +141,33 @@ def safe_float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return result if math.isfinite(result) else None
+
+
+def classify_eps_growth(
+    current_eps: object,
+    prior_year_eps: object,
+) -> EPSGrowthType | None:
+    current = safe_float(current_eps)
+    prior = safe_float(prior_year_eps)
+    if current is None or prior is None:
+        return None
+    if prior == 0:
+        return EPSGrowthType.ZERO_BASE
+    if prior < 0:
+        if current > 0:
+            return EPSGrowthType.TURNAROUND
+        if current > prior:
+            return EPSGrowthType.LOSS_NARROWING
+        if current < prior:
+            return EPSGrowthType.LOSS_WIDENING
+        return EPSGrowthType.FLAT
+    if current < 0:
+        return EPSGrowthType.PROFIT_TO_LOSS
+    if current > prior:
+        return EPSGrowthType.GROWTH
+    if current < prior:
+        return EPSGrowthType.DECLINE
+    return EPSGrowthType.FLAT
 
 
 def availability_date(record: dict[str, Any]) -> str:
@@ -507,6 +534,48 @@ def _find_prior_year_record(
     return max(nearest, key=lambda item: item[1])[2]
 
 
+def latest_eps_pair_evidence(
+    records: list[dict[str, Any]],
+    snapshot_date: object,
+) -> dict[str, Any] | None:
+    """Return the latest visible current/prior EPS pair even for a zero base."""
+    eligible = select_visible_quarters(records, snapshot_date)
+    if not eligible:
+        return None
+    latest_period = max(date10(record.get("report_period")) for record in eligible)
+    current_candidates = [
+        record
+        for record in eligible
+        if date10(record.get("report_period")) == latest_period
+    ]
+    current_candidates.sort(key=_concept_priority, reverse=True)
+
+    for current in current_candidates:
+        prior = _find_prior_year_record(current, eligible)
+        if prior is None:
+            continue
+        current_eps = safe_float(current.get("_eps", current.get("eps_diluted")))
+        prior_eps = safe_float(prior.get("_eps", prior.get("eps_diluted")))
+        if current_eps is None or prior_eps is None:
+            continue
+        return {
+            "source": current.get("source") or "SEC/Yahoo",
+            "effective_date": str(
+                current.get("_available_date") or availability_date(current)
+            ),
+            "current_eps": current_eps,
+            "prior_year_eps": prior_eps,
+            "current_period": latest_period,
+            "prior_year_period": date10(prior.get("report_period")),
+            "growth_type": classify_eps_growth(current_eps, prior_eps).value
+            if classify_eps_growth(current_eps, prior_eps)
+            else None,
+            "sec_cik": current.get("sec_cik"),
+            "source_record_id": current.get("source_record_id"),
+        }
+    return None
+
+
 def calculate_latest_eps_yoy_diagnostic(
     records: list[dict[str, Any]],
     snapshot_date: object,
@@ -546,6 +615,11 @@ def calculate_latest_eps_yoy_diagnostic(
             "current_period": latest_period,
             "prior_year_period": date10(prior.get("report_period")),
             "calculation_method": current.get("calculation_method") or "reported_quarter",
+            "growth_type": (
+                classify_eps_growth(current_eps, prior_eps).value
+                if classify_eps_growth(current_eps, prior_eps)
+                else None
+            ),
             "sec_cik": current.get("sec_cik"),
             "source_record_id": current.get("source_record_id"),
         }, None
