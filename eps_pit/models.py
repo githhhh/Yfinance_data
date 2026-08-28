@@ -45,6 +45,7 @@ class EPSResult:
     prior_year_period: str | None = None
     calculation_method: str | None = None
     missing_reason: EPSMissingReason | None = None
+    sec_cik: str | None = None
     source_record_id: str | None = None
     resolver_version: str = EPS_RESOLVER_VERSION
 
@@ -66,6 +67,7 @@ class EPSResult:
             "calculation_method": self.calculation_method,
             "status": self.status.value,
             "missing_reason": self.missing_reason.value if self.missing_reason else None,
+            "sec_cik": self.sec_cik,
             "source_record_id": self.source_record_id,
             "resolver_version": self.resolver_version,
         }
