@@ -13,5 +13,10 @@
   "source_changed_count": 138,
   "eps25_state_changed_count": 239,
   "new_provider_error_count": 0,
-  "future_leakage_violation_count": 0
+  "future_leakage_violation_count": 0,
+  "e0_membership_changed_count": 22,
+  "e0_affected_weeks": 10,
+  "b0_selected_count_changed_weeks": 0,
+  "b0_codes_changed_weeks": 6,
+  "b0_order_only_changed_weeks": 2
 }

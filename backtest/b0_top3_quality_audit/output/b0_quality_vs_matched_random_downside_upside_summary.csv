@@ -1,12 +1,12 @@
 ﻿category,metric,valid_weeks,b0_median,matched_random_p50_median,paired_spread_median,b0_mean,matched_random_p50_mean,paired_spread_mean,b0_better_than_random_p50_rate_pct,higher_is_better
-Downside,Stop8 before Profit20 rate,40,33.3333,66.6667,0.0,47.0833,58.75,-11.6667,32.5,False
-Downside,Stop8 ever rate,40,41.6667,66.6667,0.0,52.5,65.8333,-13.3333,37.5,False
+Downside,Stop8 before Profit20 rate,40,33.3333,66.6667,0.0,47.0833,58.75,-11.6667,35.0,False
+Downside,Stop8 ever rate,40,50.0,66.6667,0.0,52.5,65.8333,-13.3333,37.5,False
 Downside,Gap-stop rate,40,0.0,0.0,0.0,6.6667,0.8333,5.8333,0.0,False
 Downside,All picks stopped week rate,40,0.0,27.49,-8.75,30.0,35.3882,-5.3882,70.0,False
-Downside,Worst pick as-of return,40,-6.2961,-7.9197,0.5782,-6.8463,-6.9893,0.1429,50.0,True
-Upside,Profit20 pick rate,40,41.6667,50.0,0.0,46.25,50.0,-3.75,12.5,True
-Upside,Weeks with >=1 Profit20 winner,40,100.0,80.23,12.1,77.5,69.7348,7.7652,77.5,True
-Upside,As-of mean max gain,40,22.202,24.5836,-0.0613,38.2492,25.9343,12.3149,47.5,True
-Upside,W1 mean max gain,40,3.9491,3.9165,0.1889,5.4342,4.097,1.3372,52.5,True
-Upside,W2 mean max gain,40,6.3053,4.2882,2.146,7.1066,4.5119,2.5946,62.5,True
-Upside,W4 mean max gain,38,6.9859,4.2816,2.7622,8.9066,5.1918,3.7148,65.79,True
+Downside,Worst pick as-of return,40,-6.2961,-7.9197,0.5782,-7.099,-6.9893,-0.1097,50.0,True
+Upside,Profit20 pick rate,40,50.0,50.0,0.0,48.75,50.0,-1.25,17.5,True
+Upside,Weeks with >=1 Profit20 winner,40,100.0,80.23,12.75,80.0,69.7348,10.2652,80.0,True
+Upside,As-of mean max gain,40,23.1713,24.5836,0.6531,39.5221,25.9343,13.5879,52.5,True
+Upside,W1 mean max gain,40,3.873,3.9165,0.212,5.537,4.097,1.44,52.5,True
+Upside,W2 mean max gain,40,6.4742,4.2882,2.1625,7.2591,4.5119,2.7471,62.5,True
+Upside,W4 mean max gain,38,7.3814,4.2816,3.2187,9.8934,5.1918,4.7016,68.42,True

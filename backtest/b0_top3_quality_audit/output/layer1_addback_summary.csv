@@ -3,5 +3,5 @@ S0_REVIEW_UNIVERSE,Step 0: Review Universe,Signal & Rule,2738,38.0,0.3704,0.0857
 S1_ACTIONABLE,Step 1: + ACTIONABLE,+ ACTIONABLE Status,733,9.0,0.2634,0.046,1.3598,-0.107,-0.0396,0.8596,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
 S2_GEOMETRY,Step 2: + Geometry,+ No Clear Geometry Failure,442,5.0,0.2634,0.5461,2.0408,0.0,0.5,0.681,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
 S3_BUYPOINT,Step 3: + BuyPoint Proximity,+ BuyPoint >= 0,442,5.0,0.2634,0.5461,2.0408,0.0,0.0,0.0,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
-S4_EPS_KNOWN,Step 4: + EPS Known,+ Effective PIT EPS Known,392,4.5,0.1354,0.5927,2.2786,-0.128,0.0466,0.2378,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
-S5_INDUSTRY_KNOWN,Step 5: + Industry Known (= E0_BASE),+ Valid Industry String,392,4.5,0.1354,0.5927,2.2786,0.0,0.0,0.0,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
+S4_EPS_KNOWN,Step 4: + EPS Known,+ Effective PIT EPS Known,414,5.0,0.1495,0.6095,2.3361,-0.1139,0.0634,0.2953,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.
+S5_INDUSTRY_KNOWN,Step 5: + Industry Known (= E0_BASE),+ Valid Industry String,414,5.0,0.1495,0.6095,2.3361,0.0,0.0,0.0,Order-dependent illustrative decompression; Leave-One-Out remains primary necessity test.

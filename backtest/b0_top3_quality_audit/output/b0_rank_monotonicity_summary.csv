@@ -1,21 +1,21 @@
 ﻿horizon,segment,sample_weeks,rank1_median_return_pct,rank2_median_return_pct,rank3_median_return_pct,r1_gt_r2_week_rate_pct,r2_gt_r3_week_rate_pct,r3_gt_r2_week_rate_pct,r1_gt_r3_week_rate_pct,mean_per_week_spearman_corr,pooled_spearman_corr,pooled_spearman_p,monotonicity_conclusion,horizon_status
-W1,All common-support weeks,25,0.3201,-0.0472,0.5562,48.0,32.0,68.0,56.0,0.04,0.0362,0.7578,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W1,Train-era weeks 1-30,15,0.73,-0.0303,1.2346,40.0,26.67,73.33,53.33,0.1333,0.0733,0.6321,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W1,Contaminated validation weeks 31-40,10,0.1351,-0.4867,-0.2529,60.0,40.0,60.0,60.0,-0.1,-0.0189,0.9212,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W1,Early half,13,0.73,-0.6777,2.7557,46.15,23.08,76.92,53.85,0.1154,0.053,0.7486,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W1,Late half,12,0.1351,-0.0006,0.1156,50.0,41.67,58.33,58.33,-0.0417,0.0196,0.9094,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W2,All common-support weeks,25,0.4071,-0.6604,0.5976,56.0,32.0,68.0,52.0,0.04,0.0566,0.6297,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W2,Train-era weeks 1-30,15,0.4071,0.251,1.1541,53.33,26.67,73.33,53.33,0.0667,0.0943,0.5378,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W2,Contaminated validation weeks 31-40,10,0.851,-0.7616,-0.941,60.0,40.0,60.0,50.0,0.0,-0.0283,0.882,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W2,Early half,13,0.4071,-1.0793,2.8336,53.85,23.08,76.92,53.85,0.0769,0.0921,0.5772,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W2,Late half,12,0.851,-0.607,-0.4018,58.33,41.67,58.33,50.0,0.0,-0.0098,0.9546,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W3,All common-support weeks,24,1.2453,-0.0356,0.8816,54.17,33.33,66.67,45.83,0.1042,0.0581,0.6278,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
-W3,Train-era weeks 1-30,15,1.2291,0.2108,2.6689,46.67,26.67,73.33,46.67,0.1667,0.1153,0.4509,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
-W3,Contaminated validation weeks 31-40,9,1.4225,-0.3405,-0.9143,66.67,44.44,55.56,44.44,0.0,-0.0291,0.8854,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
-W3,Early half,13,1.2291,0.2108,3.6505,46.15,23.08,76.92,46.15,0.1923,0.106,0.5206,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
-W3,Late half,11,1.4225,-0.3405,-0.3221,63.64,45.45,54.55,45.45,0.0,0.0078,0.9657,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
-W4,All common-support weeks,23,2.8094,0.917,3.8111,47.83,26.09,73.91,47.83,0.1522,0.0294,0.8104,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W4,Train-era weeks 1-30,15,2.6557,0.917,4.2077,40.0,20.0,80.0,46.67,0.2333,0.1048,0.4933,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W4,Contaminated validation weeks 31-40,8,3.4986,0.5779,2.9802,62.5,37.5,62.5,50.0,0.0,-0.118,0.5831,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W4,Early half,13,3.6338,0.3483,4.2077,46.15,23.08,76.92,53.85,0.1154,0.0,1.0,Non-Monotonic (Top-Bucket Selector),PRIMARY
-W4,Late half,10,0.5209,2.497,3.7888,50.0,30.0,70.0,40.0,0.2,0.0472,0.8045,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W1,All common-support weeks,25,0.3201,0.0459,0.3369,48.0,44.0,56.0,56.0,-0.02,-0.0075,0.9488,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W1,Train-era weeks 1-30,14,-0.5972,0.1976,1.656,50.0,35.71,64.29,42.86,0.1429,0.0962,0.5444,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W1,Contaminated validation weeks 31-40,11,2.4218,0.0459,-0.4001,45.45,54.55,45.45,72.73,-0.2273,-0.1559,0.3863,Monotonic Fine Ranker,PRIMARY
+W1,Early half,13,-0.4057,-0.0303,2.7557,53.85,30.77,69.23,46.15,0.1154,0.0921,0.5772,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W1,Late half,12,1.371,0.2357,-0.8888,41.67,58.33,41.67,66.67,-0.1667,-0.1277,0.4579,Monotonic Fine Ranker,PRIMARY
+W2,All common-support weeks,25,1.9559,-0.6604,0.1996,56.0,48.0,52.0,52.0,-0.04,0.0053,0.9641,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W2,Train-era weeks 1-30,14,1.5433,-1.2076,1.9131,50.0,35.71,64.29,42.86,0.1429,0.0866,0.5855,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W2,Contaminated validation weeks 31-40,11,1.9559,-0.5537,-0.8782,63.64,63.64,36.36,63.64,-0.2727,-0.1325,0.4622,Monotonic Fine Ranker,PRIMARY
+W2,Early half,13,2.0187,-1.3359,2.8336,53.85,30.77,69.23,46.15,0.1154,0.0698,0.673,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W2,Late half,12,0.851,-0.1513,-0.8179,58.33,66.67,33.33,58.33,-0.2083,-0.0851,0.6215,Monotonic Fine Ranker,PRIMARY
+W3,All common-support weeks,24,1.342,0.7355,1.2494,45.83,41.67,58.33,41.67,0.1458,0.0532,0.6572,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
+W3,Train-era weeks 1-30,14,0.9402,0.7355,3.1597,42.86,42.86,57.14,35.71,0.2143,0.1323,0.4035,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
+W3,Contaminated validation weeks 31-40,10,1.4815,0.5551,0.2963,50.0,40.0,60.0,50.0,0.05,-0.0519,0.7854,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
+W3,Early half,13,1.2615,0.2418,3.6505,46.15,38.46,61.54,38.46,0.1923,0.0921,0.5772,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
+W3,Late half,11,1.4225,1.4507,0.6122,45.45,45.45,54.55,45.45,0.0909,0.0078,0.9657,Non-Monotonic (Top-Bucket Selector),DIAGNOSTIC_ONLY
+W4,All common-support weeks,23,1.5779,2.766,3.7664,43.48,39.13,60.87,43.48,0.1522,0.0428,0.7271,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W4,Train-era weeks 1-30,14,2.1168,1.0221,3.5406,42.86,42.86,57.14,42.86,0.1429,0.0361,0.8205,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W4,Contaminated validation weeks 31-40,9,-1.7677,4.1877,3.7664,44.44,33.33,66.67,44.44,0.1667,0.0175,0.9311,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W4,Early half,13,2.6557,0.917,4.2077,46.15,38.46,61.54,46.15,0.1154,0.0167,0.9194,Non-Monotonic (Top-Bucket Selector),PRIMARY
+W4,Late half,10,-1.7989,3.5026,2.9802,40.0,40.0,60.0,40.0,0.2,0.0519,0.7854,Non-Monotonic (Top-Bucket Selector),PRIMARY

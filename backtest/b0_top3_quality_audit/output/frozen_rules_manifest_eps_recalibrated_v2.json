@@ -1,0 +1,146 @@
+{
+  "manifest_version": "2.1-eps-recalibrated-v2",
+  "created_at_utc": "2026-08-25T14:11:12.682471+00:00",
+  "source_base_commit": "83ebce7de8caeaa2684ba3bc5a1b9e60c595b765",
+  "freeze_id": "PHASE2_IMMUTABLE_FREEZE_20260828",
+  "evaluation_protocol": "CENSORED_PORTFOLIO_PIT_W1_W4_PROTOCOL",
+  "protocol_sha256": "89f6a343c08eafacdc9d49e06057d2cf212f9ad7e10e748d012d3063fda5cf0c",
+  "train_period": "2025-10-10_to_2026-05-22 (Weeks 1~30)",
+  "historical_validation_period": "2026-05-29_to_2026-08-07 (Weeks 31~40, CONTAMINATED_HISTORICAL_VALIDATION)",
+  "pre_freeze_replay_period": "2026-08-14_to_2026-08-21 (PRE_FREEZE_REPLAY)",
+  "forward_shadow_start_date": "2026-08-28 (IMMUTABLE_VIRGIN_OOS)",
+  "code_fingerprints": {
+    "production_selector_sha256": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477",
+    "eligibility_predicate_sha256": "693d3d42233e183924999c514523b6dd16246855a4a35629eb37179b9daee4a4",
+    "skill_rule_engine_sha256": "4fb866559b456d705e3f053a8b44281d0413c1c9413772783a81dc1ddcfb9d95",
+    "three_tier_baseline_sha256": "90cfb3174bf1648af36256491f9e903bebf4e56359a4e89b79f93ca333abe0d1",
+    "evaluate_rule_signatures_sha256": "bf3ae75dad15c50337d2abb4a7e22f8f8fc555e863f053b8b9d3f0e968f2dffc",
+    "research_windows_sha256": "754dfece84abd73cd1739f7e9e852ea395c9a0d5223615d7962d30e504bc9bc8",
+    "replay_eps_sha256": "a0e4d70f8aca3b0382273f4489553c12e7a0cb19a127e2f05134fd0affca4643"
+  },
+  "data_fingerprints": {
+    "train_candidate_events_parquet_sha256": "b22e6ce12ae6c8eca8a62fe7233a203a1e76dabc5d715c13f12187524df2a7cd",
+    "train_candidate_weekly_outcomes_parquet_sha256": "029f54e725d15046a5ab2902b2b009c6b6d43204823a35c32bcd2b03396dd35c"
+  },
+  "forward_shadow_rules": [
+    {
+      "rule_id": "B0_BASELINE",
+      "role": "PRODUCTION_BENCHMARK",
+      "description": "Production multi-factor heuristic (freshness -> volume -> close position)",
+      "complexity": 3,
+      "params": {},
+      "semantic_config": {
+        "sort_mode": "b0_hierarchical"
+      },
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "ACTIVE_PRODUCTION_BENCHMARK"
+    },
+    {
+      "rule_id": "SIMPLER_PURE_FRESHNESS",
+      "role": "FORWARD_SHADOW_CANDIDATE",
+      "description": "Single-factor freshness priority",
+      "complexity": 1,
+      "params": {},
+      "semantic_config": {
+        "sort_mode": "freshness_only"
+      },
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "REGISTERED_FORWARD_SHADOW"
+    },
+    {
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "role": "RESEARCH_PARETO_CHAMPION",
+      "description": "Single-factor close position priority",
+      "complexity": 1,
+      "params": {},
+      "semantic_config": {
+        "sort_mode": "close_pos_only"
+      },
+      "start_date": "2026-08-28",
+      "primary_metrics": [
+        "w1_return",
+        "w2_return",
+        "w4_return"
+      ],
+      "stop_protocol": "STOP_8PCT_OR_PROFIT_20PCT",
+      "status": "REGISTERED_FORWARD_SHADOW"
+    }
+  ],
+  "champions": {
+    "HISTORICAL_RETURN_WINNER": {
+      "role": "HISTORICAL_RETURN_WINNER",
+      "rule_id": "B0_BASELINE",
+      "description": "Production B0 Baseline (Exact 11-tuple sort_key)",
+      "complexity": 3,
+      "params": {},
+      "train_w1_ret_med": 0.9859333333333336,
+      "train_paired_w1_spread_med": 0.0,
+      "train_temporal_block_stability_score": -1.1425,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_w1_win_vs_l1_pct": 54.54545454545454,
+      "train_stop8_before_p20_pct": 52.77777777777779
+    },
+    "LOWEST_STOP_CANDIDATE": {
+      "role": "LOWEST_STOP_CANDIDATE",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "params": {},
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_temporal_block_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    },
+    "SIMPLER_EQUIVALENT": {
+      "role": "SIMPLER_EQUIVALENT",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "params": {},
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_temporal_block_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    },
+    "PARETO_BALANCED_RULE": {
+      "role": "PARETO_BALANCED_RULE",
+      "rule_id": "SIMPLER_PURE_CLOSE_POS",
+      "description": "Pure Close Position Sort (Highest intraday close position)",
+      "complexity": 1,
+      "params": {},
+      "train_w1_ret_med": 0.5766000000000001,
+      "train_paired_w1_spread_med": 0.0,
+      "train_temporal_block_stability_score": -0.3241,
+      "train_valid_portfolio_rate": 100.0,
+      "train_act_w1_win_vs_l1_pct": 63.63636363636363,
+      "train_stop8_before_p20_pct": 52.222222222222236
+    }
+  },
+  "manifest_sha256": "c57078a044b43346367f06c50ece3195db1599028941aa51e5af7a9ea4741b97",
+  "freeze_type": "DATA_REVISION_ONLY",
+  "data_revision": "EPS_RECALIBRATED_V2",
+  "data_revision_reason": "EPS PIT recalibration after LIVE/REPLAY resolver separation",
+  "rule_change": false,
+  "selector_change": false,
+  "methodology_change": false,
+  "price_data_change": false,
+  "champions_reselected": false,
+  "champion_selection_baseline_ref": "593bd333181da4fe301b3f61397c7bc95ac86ced",
+  "historical_champion_metrics_semantics": "PRESERVED_FROM_OLD_EPS_BASELINE; rule identities/params frozen; not used to reselect champions"
+}

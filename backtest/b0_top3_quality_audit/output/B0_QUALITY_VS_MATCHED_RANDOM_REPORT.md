@@ -6,9 +6,9 @@
 
 ## Executive Conclusion
 
-B0 shows a positive but uneven selection-quality edge against equal-position Matched-N Random. The strongest direct evidence is W4: B0's median weekly portfolio return is +4.60% versus Matched-N Random P50 +0.47%, with a paired median spread of +3.33%. W4 percentile quality is also better than W1, with median weekly random percentile 65.52.
+B0 shows a positive but uneven selection-quality edge against equal-position Matched-N Random. The strongest direct evidence is W4: B0's median weekly portfolio return is +4.60% versus Matched-N Random P50 +0.47%, with a paired median spread of +3.68%. W4 percentile quality is also better than W1, with median weekly random percentile 72.57.
 
-W1 should remain conservatively worded. B0's W1 paired median spread is +0.45%, and the existing three-tier decomposition does **not** prove W1 ranking alpha. The cleaner interpretation is: screening alpha is visible, W1 ranking alpha is unconfirmed, and W4 ranking alpha is a promising historical signal that must be validated by the forward shadow ledger starting 2026-08-28.
+W1 should remain conservatively worded. B0's W1 paired median spread is +0.58%, and the existing three-tier decomposition does **not** prove W1 ranking alpha. The cleaner interpretation is: screening alpha is visible, W1 ranking alpha is unconfirmed, and W4 ranking alpha is a promising historical signal that must be validated by the forward shadow ledger starting 2026-08-28.
 
 ## 1. B0 vs Matched-N Random P50
 
@@ -16,17 +16,17 @@ Zero-pick weeks are excluded from return and percentile denominators. Each horiz
 
 | horizon   |   valid_weeks |   b0_median_return_pct |   matched_random_p50_median_return_pct |   paired_spread_median_pct |   b0_mean_return_pct |   matched_random_p50_mean_return_pct |   paired_spread_mean_pct |   beat_random_p50_rate_pct |
 |:----------|--------------:|-----------------------:|---------------------------------------:|---------------------------:|---------------------:|-------------------------------------:|-------------------------:|---------------------------:|
-| W1        |            40 |                 0.9859 |                                 0.3164 |                     0.4513 |               1.3131 |                               0.1817 |                   1.1313 |                      55    |
-| W2        |            40 |                 1.5747 |                                 0.1788 |                     1.5435 |               2.3847 |                               0.2606 |                   2.124  |                      57.5  |
-| W4        |            38 |                 4.603  |                                 0.4693 |                     3.3309 |               3.9783 |                               1.3458 |                   2.6325 |                      63.16 |
+| W1        |            40 |                 1.1325 |                                 0.3164 |                     0.5798 |               1.4208 |                               0.1817 |                   1.2391 |                      57.5  |
+| W2        |            40 |                 1.7404 |                                 0.1788 |                     1.682  |               2.6748 |                               0.2606 |                   2.4141 |                      60    |
+| W4        |            38 |                 4.603  |                                 0.4693 |                     3.6791 |               4.9089 |                               1.3458 |                   3.563  |                      65.79 |
 
 ## 2. Weekly Random Percentile Quality
 
 | horizon   |   valid_percentile_weeks |   median_percentile |   mean_percentile |   weeks_gt_p50_pct |   weeks_gt_p75_pct |   weeks_gt_p90_pct |
 |:----------|-------------------------:|--------------------:|------------------:|-------------------:|-------------------:|-------------------:|
-| W1        |                       40 |              54.975 |           56.4872 |              55    |              30    |              17.5  |
-| W2        |                       40 |              64.09  |           57.4362 |              57.5  |              45    |              12.5  |
-| W4        |                       38 |              65.52  |           59.8313 |              63.16 |              39.47 |              13.16 |
+| W1        |                       40 |              57.575 |           57.8377 |              57.5  |              35    |              17.5  |
+| W2        |                       40 |              68.9   |           58.822  |              60    |              47.5  |              15    |
+| W4        |                       38 |              72.57  |           62.0203 |              65.79 |              44.74 |              18.42 |
 
 ## 3. Downside Quality and Upside Capture
 
@@ -34,37 +34,37 @@ Downside rows are better when lower, except worst-pick return where less negativ
 
 | category   | metric                         |   valid_weeks |   b0_median |   matched_random_p50_median |   paired_spread_median |   b0_mean |   matched_random_p50_mean |   b0_better_than_random_p50_rate_pct |
 |:-----------|:-------------------------------|--------------:|------------:|----------------------------:|-----------------------:|----------:|--------------------------:|-------------------------------------:|
-| Downside   | Stop8 before Profit20 rate     |            40 |     33.3333 |                     66.6667 |                 0      |   47.0833 |                   58.75   |                                32.5  |
-| Downside   | Stop8 ever rate                |            40 |     41.6667 |                     66.6667 |                 0      |   52.5    |                   65.8333 |                                37.5  |
+| Downside   | Stop8 before Profit20 rate     |            40 |     33.3333 |                     66.6667 |                 0      |   47.0833 |                   58.75   |                                35    |
+| Downside   | Stop8 ever rate                |            40 |     50      |                     66.6667 |                 0      |   52.5    |                   65.8333 |                                37.5  |
 | Downside   | Gap-stop rate                  |            40 |      0      |                      0      |                 0      |    6.6667 |                    0.8333 |                                 0    |
 | Downside   | All picks stopped week rate    |            40 |      0      |                     27.49   |                -8.75   |   30      |                   35.3882 |                                70    |
-| Downside   | Worst pick as-of return        |            40 |     -6.2961 |                     -7.9197 |                 0.5782 |   -6.8463 |                   -6.9893 |                                50    |
-| Upside     | Profit20 pick rate             |            40 |     41.6667 |                     50      |                 0      |   46.25   |                   50      |                                12.5  |
-| Upside     | Weeks with >=1 Profit20 winner |            40 |    100      |                     80.23   |                12.1    |   77.5    |                   69.7348 |                                77.5  |
-| Upside     | As-of mean max gain            |            40 |     22.202  |                     24.5836 |                -0.0613 |   38.2492 |                   25.9343 |                                47.5  |
-| Upside     | W1 mean max gain               |            40 |      3.9491 |                      3.9165 |                 0.1889 |    5.4342 |                    4.097  |                                52.5  |
-| Upside     | W2 mean max gain               |            40 |      6.3053 |                      4.2882 |                 2.146  |    7.1066 |                    4.5119 |                                62.5  |
-| Upside     | W4 mean max gain               |            38 |      6.9859 |                      4.2816 |                 2.7622 |    8.9066 |                    5.1918 |                                65.79 |
+| Downside   | Worst pick as-of return        |            40 |     -6.2961 |                     -7.9197 |                 0.5782 |   -7.099  |                   -6.9893 |                                50    |
+| Upside     | Profit20 pick rate             |            40 |     50      |                     50      |                 0      |   48.75   |                   50      |                                17.5  |
+| Upside     | Weeks with >=1 Profit20 winner |            40 |    100      |                     80.23   |                12.75   |   80      |                   69.7348 |                                80    |
+| Upside     | As-of mean max gain            |            40 |     23.1713 |                     24.5836 |                 0.6531 |   39.5221 |                   25.9343 |                                52.5  |
+| Upside     | W1 mean max gain               |            40 |      3.873  |                      3.9165 |                 0.212  |    5.537  |                    4.097  |                                52.5  |
+| Upside     | W2 mean max gain               |            40 |      6.4742 |                      4.2882 |                 2.1625 |    7.2591 |                    4.5119 |                                62.5  |
+| Upside     | W4 mean max gain               |            38 |      7.3814 |                      4.2816 |                 3.2187 |    9.8934 |                    5.1918 |                                68.42 |
 
 ## 4. Stability
 
 | horizon   | segment                                        |   valid_weeks |   beat_random_p50_rate_pct |   paired_spread_median_pct |   paired_spread_mean_pct |   median_percentile |
 |:----------|:-----------------------------------------------|--------------:|---------------------------:|---------------------------:|-------------------------:|--------------------:|
-| W1        | All valid weeks                                |            40 |                      55    |                     0.4513 |                   1.1313 |              54.975 |
+| W1        | All valid weeks                                |            40 |                      57.5  |                     0.5798 |                   1.2391 |              57.575 |
 | W1        | Early half                                     |            20 |                      55    |                     0.522  |                   2.0077 |              58.835 |
-| W1        | Late half                                      |            20 |                      55    |                     0.4513 |                   0.2549 |              54.975 |
-| W1        | Train-era weeks 1-30                           |            30 |                      56.67 |                     0.5386 |                   1.6382 |              57.575 |
-| W1        | Contaminated historical validation weeks 31-40 |            10 |                      50    |                     0.1783 |                  -0.3891 |              51.55  |
-| W2        | All valid weeks                                |            40 |                      57.5  |                     1.5435 |                   2.124  |              64.09  |
+| W1        | Late half                                      |            20 |                      60    |                     0.5798 |                   0.4704 |              57.575 |
+| W1        | Train-era weeks 1-30                           |            29 |                      55.17 |                     0.4101 |                   1.5434 |              55.15  |
+| W1        | Contaminated historical validation weeks 31-40 |            11 |                      63.64 |                     0.8626 |                   0.4367 |              67.09  |
+| W2        | All valid weeks                                |            40 |                      60    |                     1.682  |                   2.4141 |              68.9   |
 | W2        | Early half                                     |            20 |                      75    |                     3.1093 |                   4.5417 |              79.05  |
-| W2        | Late half                                      |            20 |                      40    |                    -1.4371 |                  -0.2936 |              36.185 |
-| W2        | Train-era weeks 1-30                           |            30 |                      63.33 |                     1.682  |                   2.9218 |              68.9   |
-| W2        | Contaminated historical validation weeks 31-40 |            10 |                      40    |                    -1.5336 |                  -0.2692 |              36.035 |
-| W4        | All valid weeks                                |            38 |                      63.16 |                     3.3309 |                   2.6325 |              65.52  |
+| W2        | Late half                                      |            20 |                      45    |                    -1.0134 |                   0.2866 |              41.05  |
+| W2        | Train-era weeks 1-30                           |            29 |                      65.52 |                     1.753  |                   3.1487 |              71.9   |
+| W2        | Contaminated historical validation weeks 31-40 |            11 |                      45.45 |                    -1.7186 |                   0.4777 |              35.5   |
+| W4        | All valid weeks                                |            38 |                      65.79 |                     3.6791 |                   3.563  |              72.57  |
 | W4        | Early half                                     |            19 |                      68.42 |                     5.1554 |                   4.9302 |              76.52  |
-| W4        | Late half                                      |            19 |                      57.89 |                     1.7413 |                   0.3347 |              63.93  |
-| W4        | Train-era weeks 1-30                           |            30 |                      63.33 |                     4.7377 |                   3.2641 |              69.565 |
-| W4        | Contaminated historical validation weeks 31-40 |             8 |                      62.5  |                     1.7498 |                   0.2637 |              64.27  |
+| W4        | Late half                                      |            19 |                      63.16 |                     2.0461 |                   2.1959 |              64.61  |
+| W4        | Train-era weeks 1-30                           |            29 |                      65.52 |                     5.1554 |                   4.1478 |              74.2   |
+| W4        | Contaminated historical validation weeks 31-40 |             9 |                      66.67 |                     2.0461 |                   1.679  |              64.61  |
 
 ## 5. Alpha Decomposition: L0 / L1 / B0
 
@@ -76,10 +76,10 @@ L0 is blind random from the signal pool. L1 is random after production-like elig
 
 | horizon       |   mature_eval_weeks |   l0_signal_median_pct |   l1_screened_median_pct |   b0_l2_median_pct |   screening_alpha_weekly_spread_median_pct |   ranking_alpha_weekly_spread_median_pct |   active_rank_weeks_count |   active_rank_spread_ranking_pct |   active_rank_win_rate_b0_vs_l1_pct |   p_val_ranking_wilcoxon | interpretation                                                                        |
 |:--------------|--------------------:|-----------------------:|-------------------------:|-------------------:|-------------------------------------------:|-----------------------------------------:|--------------------------:|---------------------------------:|------------------------------------:|-------------------------:|:--------------------------------------------------------------------------------------|
-| W1            |                  40 |                 0.1385 |                   0.233  |             0.6535 |                                    -0.0328 |                                        0 |                        21 |                           0      |                             47.619  |                   0.433  | W1 ranking alpha not proven; screening/total lift is visible but weak.                |
-| W2            |                  40 |                -0.2741 |                   0.4064 |             0.5809 |                                     0.6646 |                                        0 |                        21 |                           0      |                             47.619  |                   0.4445 | Supportive context; not the primary ranking-alpha claim.                              |
-| W4            |                  38 |                -0.8725 |                   0.7277 |             1.2573 |                                     1.0081 |                                        0 |                        19 |                           2.0774 |                             52.6316 |                   0.0299 | W4 ranking alpha is a promising historical signal, pending forward shadow validation. |
-| AsOf executed |                  40 |                -0.8332 |                   0.8019 |             2.0443 |                                     0      |                                        0 |                        21 |                           0.8432 |                             57.1429 |                   0.1262 | Supportive context; not the primary ranking-alpha claim.                              |
+| W1            |                  40 |                 0.107  |                   0.3193 |             0.8302 |                                    -0.0474 |                                        0 |                        21 |                           0      |                             47.619  |                   0.4688 | W1 ranking alpha not proven; screening/total lift is visible but weak.                |
+| W2            |                  40 |                -0.366  |                   0.3261 |             0.7127 |                                     0.9162 |                                        0 |                        21 |                           0      |                             47.619  |                   0.286  | Supportive context; not the primary ranking-alpha claim.                              |
+| W4            |                  38 |                -0.714  |                   0.8902 |             1.7125 |                                     1.0431 |                                        0 |                        19 |                           2.3786 |                             57.8947 |                   0.0262 | W4 ranking alpha is a promising historical signal, pending forward shadow validation. |
+| AsOf executed |                  40 |                -0.8431 |                   2.141  |             2.3388 |                                     0.1603 |                                        0 |                        21 |                           2.1722 |                             57.1429 |                   0.0854 | Supportive context; not the primary ranking-alpha claim.                              |
 
 ## 6. Methodology Notes
 

@@ -2,7 +2,7 @@
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
 **样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `0190860ec3e15457f1c079dec3844e8994d29d1b85886aa177642ceafb898225`)  
+**输入来源**：`frozen_rules_manifest.json` (SHA256: `c57078a044b43346367f06c50ece3195db1599028941aa51e5af7a9ea4741b97`)  
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]
@@ -16,11 +16,11 @@
 
 | 角色 / 规则 | 规则 ID | 复杂度 $C$ | W1 收益中位 | W2 收益中位 | W4 收益中位 | 全周期收益中位 | 止损发生率 | vs L1 胜率 | 定位与建议 |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **PRODUCTION_BASELINE** | `B0_BASELINE` | $C=3$ | **+0.14%** | +0.03% | +0.23% | **+2.34%** | 30.0% | 50.0% | 生产继续保持 100% 冻结 |
-| **HISTORICAL_RETURN_WINNER** | `B0_BASELINE` | $C=3$ | **+0.14%** | +0.03% | +0.23% | **+2.34%** | 30.0% | 50.0% | 生产继续保持 100% 冻结 |
-| **LOWEST_STOP_CANDIDATE** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-1.93%** | -1.71% | -2.72% | **-2.13%** | 40.0% | 20.0% | 研究观察候选 (Shadow) |
-| **SIMPLER_EQUIVALENT** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-1.93%** | -1.71% | -2.72% | **-2.13%** | 40.0% | 20.0% | 研究观察候选 (Shadow) |
-| **PARETO_BALANCED_RULE** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-1.93%** | -1.71% | -2.72% | **-2.13%** | 40.0% | 20.0% | 研究观察候选 (Shadow) |
+| **PRODUCTION_BASELINE** | `B0_BASELINE` | $C=3$ | **+0.69%** | +1.60% | +3.77% | **+5.47%** | 27.3% | 63.6% | 生产继续保持 100% 冻结 |
+| **HISTORICAL_RETURN_WINNER** | `B0_BASELINE` | $C=3$ | **+0.69%** | +1.60% | +3.77% | **+5.47%** | 27.3% | 63.6% | 生产继续保持 100% 冻结 |
+| **LOWEST_STOP_CANDIDATE** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-0.26%** | +0.55% | +0.06% | **-0.08%** | 39.4% | 36.4% | 研究观察候选 (Shadow) |
+| **SIMPLER_EQUIVALENT** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-0.26%** | +0.55% | +0.06% | **-0.08%** | 39.4% | 36.4% | 研究观察候选 (Shadow) |
+| **PARETO_BALANCED_RULE** | `SIMPLER_PURE_CLOSE_POS` | $C=1$ | **-0.26%** | +0.55% | +0.06% | **-0.08%** | 39.4% | 36.4% | 研究观察候选 (Shadow) |
 
 ---
 
