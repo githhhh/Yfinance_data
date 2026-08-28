@@ -73,7 +73,15 @@ def sha256_file(path: Path) -> str:
 
 
 def git_show_bytes(ref: str, path: Path) -> bytes:
-    return subprocess.check_output(["git", "show", f"{ref}:{path.as_posix()}"])
+    path_obj = Path(path)
+    try:
+        repo_path = path_obj.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        repo_path = path_obj.as_posix()
+    return subprocess.check_output(
+        ["git", "show", f"{ref}:{repo_path}"],
+        cwd=REPO_ROOT,
+    )
 
 
 def git_show_csv(ref: str, path: Path) -> pd.DataFrame:
@@ -205,7 +213,7 @@ def _write_v2_manifest(baseline_ref: str) -> Path:
     repo_root = REPO_ROOT
     manifest["manifest_version"] = "2.1-eps-recalibrated-v2"
     manifest["source_base_commit"] = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], text=True
+        ["git", "rev-parse", "HEAD"], text=True, cwd=REPO_ROOT
     ).strip()
     manifest["freeze_type"] = "DATA_REVISION_ONLY"
     manifest["data_revision"] = "EPS_RECALIBRATED_V2"
