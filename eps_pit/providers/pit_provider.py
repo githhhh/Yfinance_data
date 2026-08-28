@@ -1094,10 +1094,15 @@ class SECProvider:
         if facts is None:
             facts = self._load_bulk_companyfacts(cik)
         if facts is None:
-            facts = self._get_json(
-                self.FACTS_URL.format(cik=cik),
-                label=f"SEC companyfacts for {normalize_symbol(symbol)}",
-            )
+            try:
+                facts = self._get_json(
+                    self.FACTS_URL.format(cik=cik),
+                    label=f"SEC companyfacts for {normalize_symbol(symbol)}",
+                )
+            except RuntimeError as exc:
+                if str(exc).endswith("HTTP 404"):
+                    return []
+                raise
         self.companyfacts_cache.write(cache_file, facts)
         records = self._parse_company_facts(normalize_symbol(symbol), facts)
         for record in records:

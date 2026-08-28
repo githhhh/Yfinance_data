@@ -395,6 +395,18 @@ def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
     assert len(calls) == 3
 
 
+def test_sec_companyfacts_404_is_a_clean_missing_history(monkeypatch, tmp_path):
+    provider = SECProvider(tmp_path, rate_limit_sleep=0, max_retries=0)
+    provider._cik_map = {"PBT": "0000319654"}
+    monkeypatch.setattr(
+        provider.session,
+        "get",
+        lambda url, timeout, **kwargs: _FakeSECResponse(404),
+    )
+
+    assert provider.fetch_quarterly_history("PBT") == []
+
+
 def test_sec_403_switches_same_project_user_agent_before_circuit_break(monkeypatch, tmp_path):
     calls = []
 
@@ -1140,4 +1152,3 @@ def test_yahoo_historical_uses_event_reported_eps_not_current_statement_value(
     assert result["prior_year_eps"] == 1.0
     assert result["eps_yoy_growth"] == 50.0
     assert result["source"] == "YahooHistoricalEvent"
-
