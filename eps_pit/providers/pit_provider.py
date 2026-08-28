@@ -75,12 +75,6 @@ YAHOO_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.35
 YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
 YAHOO_EMPTY_RESULT_BACKOFF_SECONDS = (1.0, 3.0)
 
-# Current persisted snapshots are date-keyed. Make that contract explicit:
-# a snapshot includes information available through the end of that ET calendar
-# date. If strategy semantics later move to the 16:00 ET close, this policy can
-# be changed centrally without silently mixing timestamp meanings.
-EPS_SNAPSHOT_CUTOFF_POLICY = "calendar_date_eod_et"
-
 _SEC_RATE_LOCK = threading.Lock()
 _SEC_LAST_REQUEST_AT: float | None = None
 _SEC_BLOCKED_HOST_ERRORS: dict[str, RuntimeError] = {}
@@ -148,51 +142,10 @@ def safe_float(value: object) -> float | None:
     return result if math.isfinite(result) else None
 
 
-def availability_timestamp(record: dict[str, Any]) -> str:
-    if str(record.get("source") or "").lower().startswith("yahoo"):
-        return str(record.get("earnings_release_at") or "").strip()
-    return str(
-        record.get("accepted_at")
-        or record.get("filing_date")
-        or ""
-    ).strip()
-
-
 def availability_date(record: dict[str, Any]) -> str:
-    return date10(availability_timestamp(record))
-
-
-def snapshot_cutoff_timestamp(snapshot_date: object) -> pd.Timestamp | None:
-    snapshot = date10(snapshot_date)
-    if not snapshot:
-        return None
-    # Date-keyed policy: end of the snapshot date in New York time.
-    return (
-        pd.Timestamp(snapshot)
-        .tz_localize("America/New_York")
-        + pd.Timedelta(days=1)
-        - pd.Timedelta(microseconds=1)
-    )
-
-
-def is_visible_by_snapshot(record: dict[str, Any], snapshot_date: object) -> bool:
-    cutoff = snapshot_cutoff_timestamp(snapshot_date)
-    if cutoff is None:
-        return False
-    raw = availability_timestamp(record)
-    if not raw:
-        return False
-    try:
-        observed = pd.Timestamp(raw)
-    except Exception:
-        return False
-    if observed.tzinfo is None:
-        # SEC accepted timestamps and date-only fallbacks are interpreted in
-        # ET under the current date-keyed contract.
-        observed = observed.tz_localize("America/New_York")
-    else:
-        observed = observed.tz_convert("America/New_York")
-    return observed <= cutoff
+    if str(record.get("source") or "").lower().startswith("yahoo"):
+        return date10(record.get("earnings_release_at"))
+    return date10(record.get("filing_date")) or date10(record.get("accepted_at"))
 
 
 def duration_days(record: dict[str, Any]) -> int | None:
@@ -254,12 +207,7 @@ def _latest_visible_fact_versions(
         eps = safe_float(raw.get("eps_diluted"))
         end = date10(raw.get("report_period"))
         available = availability_date(raw)
-        if (
-            eps is None
-            or not end
-            or not available
-            or not is_visible_by_snapshot(raw, snapshot)
-        ):
+        if eps is None or not end or not available or available > snapshot:
             continue
         item = dict(raw)
         item["_eps"] = eps
