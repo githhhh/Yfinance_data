@@ -3,7 +3,7 @@ import pytest
 
 import yfinance_data
 import eps_pit.lookup as eps_lookup
-from eps_pit import EPSMissingReason
+from eps_pit import EPSMissingReason, EPSResolveMode
 from eps_pit.lookup import SignalEPSLookup
 
 
@@ -46,6 +46,41 @@ def test_current_pool_does_not_publish_when_live_tradingview_fails_and_pit_canno
     with pytest.raises(RuntimeError, match="EPS provider failure"):
         yfinance_data.BreakoutFollowPoolRun.weekend().save_snapshot(_pool("ERR"))
     assert not pool_path.exists()
+
+
+def test_pool_publication_uses_live_mode_and_repo_pit_path_by_default(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pit_path = tmp_path / "signal_eps_pit.csv"
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(pit_path))
+    monkeypatch.setattr(eps_lookup, "current_eps_observation_date", lambda: "2026-08-28")
+    calls = []
+
+    def fake_enrich(pool, **kwargs):
+        calls.append(kwargs)
+        df = pool.copy()
+        df["eps_yoy_growth"] = 260.0
+        df["eps_yoy_growth_source"] = "YahooLiveObserved"
+        df["eps_yoy_growth_status"] = "resolved"
+        df["eps_yoy_growth_missing_reason"] = pd.NA
+        df["eps_growth_type"] = "TURNAROUND"
+        return df
+
+    monkeypatch.setattr(yfinance_data, "enrich_pool_with_signal_eps", fake_enrich)
+
+    yfinance_data.BreakoutFollowPoolRun.weekend().save_snapshot(
+        _pool("ALOT", snapshot_date="2026-08-26")
+    )
+
+    assert calls == [
+        {
+            "refresh_missing": True,
+            "mode": EPSResolveMode.LIVE,
+            "csv_path": str(pit_path),
+        }
+    ]
+    saved = pd.read_csv(pool_path)
+    assert saved.loc[0, "eps_yoy_growth_source"] == "YahooLiveObserved"
 
 
 def test_current_pool_rejects_invalid_signal_snapshot_before_writing_anything(

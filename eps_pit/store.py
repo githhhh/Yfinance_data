@@ -17,6 +17,17 @@ from eps_pit.models import (
 from eps_pit.providers.pit_provider import date10, normalize_symbol, safe_float
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PIT_CSV_PATH = PROJECT_ROOT / "us" / "signal_eps_pit.csv"
+
+
+def _resolve_csv_path(csv_path: str | os.PathLike[str]) -> str:
+    path = Path(csv_path)
+    if path.is_absolute():
+        return str(path)
+    return str(PROJECT_ROOT / path)
+
+
 PIT_COLUMNS = [
     "snapshot_date",
     "code",
@@ -55,8 +66,8 @@ class EPSPITStoreError(RuntimeError):
 
 
 class EPSPITStore:
-    def __init__(self, csv_path: str = "us/signal_eps_pit.csv"):
-        self.csv_path = csv_path
+    def __init__(self, csv_path: str | os.PathLike[str] = DEFAULT_PIT_CSV_PATH):
+        self.csv_path = _resolve_csv_path(csv_path)
 
     @staticmethod
     def _norm_code(code: object) -> str:

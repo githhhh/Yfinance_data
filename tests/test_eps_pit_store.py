@@ -1,9 +1,20 @@
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from eps_pit import EPSMissingReason, EPSResult, EPSStatus
 from eps_pit.models import EPS_RESOLVER_VERSION
 from eps_pit.store import EPSPITStore, EPSPITStoreError
+
+
+def test_default_store_path_is_repo_root_relative(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    store = EPSPITStore()
+
+    expected = Path(__file__).resolve().parents[1] / "us" / "signal_eps_pit.csv"
+    assert Path(store.csv_path) == expected
 
 
 def test_store_persists_resolved_only(tmp_path):

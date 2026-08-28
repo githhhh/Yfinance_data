@@ -286,6 +286,7 @@ def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
         pool,
         refresh_missing=before > 0,
         mode=EPSResolveMode.LIVE,
+        csv_path=_pit_store_path(),
     )
     after = _signal_eps_missing_count(enriched)
     repaired = before - after
