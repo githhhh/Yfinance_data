@@ -20,6 +20,7 @@ def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
         "eps_yoy_growth_source",
         "eps_yoy_growth_status",
         "eps_yoy_growth_missing_reason",
+        "eps_growth_type",
     ):
         if column not in df.columns:
             df[column] = pd.NA
@@ -29,6 +30,7 @@ def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
     df.loc[signal_mask, "eps_yoy_growth_source"] = "PIT"
     df.loc[signal_mask, "eps_yoy_growth_status"] = "resolved"
     df.loc[signal_mask, "eps_yoy_growth_missing_reason"] = pd.NA
+    df.loc[signal_mask, "eps_growth_type"] = "GROWTH"
     return df
 
 
