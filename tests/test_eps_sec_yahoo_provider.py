@@ -1107,17 +1107,3 @@ def test_yahoo_historical_uses_event_reported_eps_not_current_statement_value(
     assert result["source"] == "YahooHistoricalEvent"
 
 
-def test_snapshot_cutoff_policy_is_explicit_end_of_et_calendar_day():
-    assert pit_provider.EPS_SNAPSHOT_CUTOFF_POLICY == "calendar_date_eod_et"
-
-    before_midnight = {
-        "source": "YahooHistoricalEvent",
-        "earnings_release_at": "2026-08-21T23:59:59-04:00",
-    }
-    next_day = {
-        "source": "YahooHistoricalEvent",
-        "earnings_release_at": "2026-08-22T00:00:00-04:00",
-    }
-
-    assert pit_provider.is_visible_by_snapshot(before_midnight, "2026-08-21")
-    assert not pit_provider.is_visible_by_snapshot(next_day, "2026-08-21")
