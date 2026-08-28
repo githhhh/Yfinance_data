@@ -1323,8 +1323,7 @@ class YahooFundamentalsProvider:
 
         Historical/replay reconstruction requires a matched Yahoo earnings
         release timestamp. A true current LIVE observation may instead use the
-        fact that the income statement is observable now; in that case every
-        returned row is effective no earlier than observed_on.
+        fact that the income statement is observable now.
         """
         sym = normalize_symbol(symbol)
         if not sym:
@@ -1332,7 +1331,7 @@ class YahooFundamentalsProvider:
 
         observation = date10(observed_on) if observed_on is not None else ""
         if not require_release_date and not observation:
-            raise ValueError("Yahoo live observation requires observed_on")
+            observation = dt.date.today().isoformat()
 
         cache_file = self.cache_dir / f"{sym}.json"
         if require_release_date:

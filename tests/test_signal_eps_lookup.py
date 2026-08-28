@@ -188,8 +188,14 @@ def test_live_mode_batches_tradingview_and_persists_exact_snapshot(monkeypatch, 
     assert stored is not None and stored.eps_yoy_growth == 88.0
 
 
-def test_persistent_store_is_reused_without_network(monkeypatch, tmp_path):
-    pit_path = tmp_path / "signal_eps_pit.csv"
+def test_default_cache_path_is_selected_by_mode(
+    monkeypatch,
+    tmp_path,
+):
+    live_pit_path = tmp_path / "signal_eps_pit.csv"
+    replay_pit_path = tmp_path / "signal_eps_pit_replay.csv"
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", str(live_pit_path))
+    monkeypatch.setattr(SignalEPSLookup, "DEFAULT_REPLAY_CSV_PATH", str(replay_pit_path))
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_tradingview_eps",
@@ -200,9 +206,22 @@ def test_persistent_store_is_reused_without_network(monkeypatch, tmp_path):
         "ABC",
         mode=EPSResolveMode.LIVE,
         observation_date="2026-08-21",
-        csv_path=str(pit_path),
     )
     assert first.eps_yoy_growth == 25.0
+    assert EPSPITStore(str(live_pit_path)).get("2026-08-21", "ABC").source == "TV_DIRECT"
+    assert not replay_pit_path.exists()
+
+    calls = []
+
+    def fake_historical(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 42.0,
+                "source": "SEC",
+                "effective_date": "2026-08-01",
+            }
+        }
 
     monkeypatch.setattr(
         SignalEPSLookup,
@@ -212,17 +231,81 @@ def test_persistent_store_is_reused_without_network(monkeypatch, tmp_path):
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("network must not be used"))),
+        staticmethod(fake_historical),
     )
     second = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.REPLAY,
+    )
+
+    assert second.eps_yoy_growth == 42.0
+    assert second.source == "SEC"
+    assert EPSPITStore(str(live_pit_path)).get("2026-08-21", "ABC").source == "TV_DIRECT"
+    assert EPSPITStore(str(replay_pit_path)).get("2026-08-21", "ABC").source == "SEC"
+    assert calls == [
+        (
+            "2026-08-21",
+            ["ABC"],
+            {"allow_current_yahoo": False},
+        )
+    ]
+
+
+def test_replay_reuses_historical_cache_without_network(monkeypatch, tmp_path):
+    pit_path = tmp_path / "signal_eps_pit.csv"
+    EPSPITStore(str(pit_path)).upsert(
+        __import__("eps_pit").EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-21",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=42.0,
+            source="SEC",
+            effective_date="2026-08-01",
+        )
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("historical cache should be reused"))),
+    )
+
+    result = resolve_signal_eps(
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.REPLAY,
         csv_path=str(pit_path),
     )
 
-    assert second.eps_yoy_growth == 25.0
-    assert second.source == "TV_DIRECT"
+    assert result.eps_yoy_growth == 42.0
+    assert result.source == "SEC"
+
+
+def test_replay_reuses_legacy_cache_without_source(monkeypatch, tmp_path):
+    pit_path = tmp_path / "signal_eps_pit.csv"
+    EPSPITStore(str(pit_path)).upsert(
+        __import__("eps_pit").EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-21",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=42.0,
+            effective_date="2026-08-01",
+        )
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("legacy cache should be reused"))),
+    )
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.REPLAY,
+        csv_path=str(pit_path),
+    )
+
+    assert result.eps_yoy_growth == 42.0
 
 
 def test_existing_upstream_eps_is_preserved_tagged_and_persisted(tmp_path):

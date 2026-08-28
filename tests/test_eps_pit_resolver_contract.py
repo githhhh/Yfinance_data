@@ -1,9 +1,17 @@
+import inspect
+
 import pandas as pd
 import pytest
 
 from eps_pit import EPSMissingReason, EPSResolveMode, EPSStatus
 from eps_pit.lookup import SignalEPSLookup, enrich_pool_with_signal_eps, resolve_signal_eps
 from eps_pit.store import EPSPITStore
+
+
+def test_sec_yahoo_fetch_api_does_not_expose_observation_date():
+    signature = inspect.signature(SignalEPSLookup.fetch_sec_yahoo_eps)
+
+    assert "observation_date" not in signature.parameters
 
 
 def test_replay_mode_never_calls_current_tradingview(monkeypatch, tmp_path):
@@ -144,6 +152,69 @@ def test_invalid_mode_snapshot_and_code_are_contract_errors(tmp_path):
         resolve_signal_eps("2026-08-21", pd.NA, mode=EPSResolveMode.REPLAY, csv_path=path)
 
 
+def test_live_mode_rejects_future_snapshot_before_provider_calls(monkeypatch, tmp_path):
+    pit_path = tmp_path / "pit.csv"
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(lambda codes: (_ for _ in ()).throw(AssertionError("TV forbidden"))),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("PIT forbidden"))),
+    )
+
+    with pytest.raises(ValueError, match="future"):
+        resolve_signal_eps(
+            "2026-08-22",
+            "ABC",
+            mode=EPSResolveMode.LIVE,
+            csv_path=str(pit_path),
+            observation_date="2026-08-21",
+        )
+
+    assert not pit_path.exists()
+
+
+def test_live_pool_enrichment_rejects_future_snapshot_before_provider_calls(
+    monkeypatch,
+    tmp_path,
+):
+    pit_path = tmp_path / "pit.csv"
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(lambda codes: (_ for _ in ()).throw(AssertionError("TV forbidden"))),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("PIT forbidden"))),
+    )
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-22",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": pd.NA,
+            },
+        ]
+    )
+
+    with pytest.raises(ValueError, match="future"):
+        enrich_pool_with_signal_eps(
+            pool,
+            csv_path=str(pit_path),
+            refresh_missing=True,
+            mode=EPSResolveMode.LIVE,
+            observation_date="2026-08-21",
+        )
+
+    assert not pit_path.exists()
+
+
 def test_signal_rows_are_validated_before_any_partial_pit_write(monkeypatch, tmp_path):
     pit_path = tmp_path / "pit.csv"
     monkeypatch.setattr(
@@ -205,7 +276,7 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
     assert set(enriched["eps_yoy_growth_status"]) == {EPSStatus.PROVIDER_ERROR.value}
 
 
-def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
+def test_live_mode_allows_current_state_providers_without_observation_date_gate(
     monkeypatch,
     tmp_path,
 ):
@@ -213,9 +284,9 @@ def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
         SignalEPSLookup,
         "fetch_tradingview_eps",
         staticmethod(
-            lambda codes: (_ for _ in ()).throw(
-                AssertionError("current TradingView forbidden for older snapshot")
-            )
+            lambda codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.TV_FIELD_NULL}
+            }
         ),
     )
     calls = []
@@ -225,8 +296,8 @@ def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
         return {
             codes[0]: {
                 "eps_yoy_growth": 33.0,
-                "source": "SEC",
-                "effective_date": "2026-08-20",
+                "source": "YahooLiveObserved",
+                "effective_date": snapshot,
             }
         }
 
@@ -242,11 +313,12 @@ def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
 
     assert result.status is EPSStatus.RESOLVED
     assert result.eps_yoy_growth == 33.0
+    assert result.source == "YahooLiveObserved"
     assert calls == [
         (
             "2026-08-26",
             ["ABC"],
-            {"allow_current_yahoo": False, "observation_date": None},
+            {"allow_current_yahoo": True},
         )
     ]
 
@@ -291,19 +363,22 @@ def test_true_live_snapshot_allows_current_yahoo_fallback(monkeypatch, tmp_path)
             ["ALOT"],
             {
                 "allow_current_yahoo": True,
-                "observation_date": "2026-08-27",
             },
         )
     ]
 
 
-def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_path):
+def test_live_existing_stage2_value_is_preserved_for_live_pool_publication(
+    monkeypatch,
+    tmp_path,
+):
+    pit_path = tmp_path / "pit.csv"
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_tradingview_eps",
         staticmethod(
             lambda codes: (_ for _ in ()).throw(
-                AssertionError("stale Stage2 must not trigger current TV")
+                AssertionError("existing live EPS should not refresh")
             )
         ),
     )
@@ -311,13 +386,9 @@ def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_p
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes, **kwargs: {
-                codes[0]: {
-                    "eps_yoy_growth": 42.0,
-                    "source": "SEC",
-                    "effective_date": "2026-08-20",
-                }
-            }
+            lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(
+                AssertionError("existing live EPS should not refresh")
+            )
         ),
     )
 
@@ -333,14 +404,18 @@ def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_p
     )
     enriched = enrich_pool_with_signal_eps(
         pool,
-        csv_path=str(tmp_path / "pit.csv"),
+        csv_path=str(pit_path),
         refresh_missing=True,
         mode=EPSResolveMode.LIVE,
         observation_date="2026-08-27",
     )
 
-    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
-    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+    assert enriched.loc[0, "eps_yoy_growth"] == 999.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "TV_STAGE2"
+    stored = EPSPITStore(str(pit_path)).get("2026-08-26", "ABC")
+    assert stored is not None
+    assert stored.eps_yoy_growth == 999.0
+    assert stored.effective_date == "2026-08-26"
 
 
 def test_replay_never_trusts_prefilled_pool_eps(monkeypatch, tmp_path):

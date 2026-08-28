@@ -1,3 +1,4 @@
+import datetime as dt
 import io
 import os
 import time
@@ -612,6 +613,36 @@ def test_yahoo_current_observation_does_not_require_historical_release_dates(
     assert result["effective_date"] == "2026-08-27"
 
 
+def test_yahoo_live_current_observation_defaults_to_runtime_date(
+    monkeypatch,
+    tmp_path,
+):
+    class CurrentOnlyTicker:
+        @property
+        def quarterly_income_stmt(self):
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-04-30"): [0.08],
+                    pd.Timestamp("2025-04-30"): [-0.05],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", lambda symbol: CurrentOnlyTicker())
+    provider = YahooFundamentalsProvider(tmp_path / "live-default-observation")
+
+    records = provider.fetch_quarterly_history(
+        "ALOT",
+        require_release_date=False,
+        refresh=True,
+    )
+
+    observed_on = dt.date.today().isoformat()
+    assert records
+    assert all(record["source"] == "YahooLiveObserved" for record in records)
+    assert all(record["earnings_release_at"] == observed_on for record in records)
+
+
 def test_yahoo_historical_reconstruction_still_requires_release_dates(
     monkeypatch,
     tmp_path,
@@ -1109,5 +1140,4 @@ def test_yahoo_historical_uses_event_reported_eps_not_current_statement_value(
     assert result["prior_year_eps"] == 1.0
     assert result["eps_yoy_growth"] == 50.0
     assert result["source"] == "YahooHistoricalEvent"
-
 
