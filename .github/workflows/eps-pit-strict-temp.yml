@@ -1,0 +1,20 @@
+name: EPS PIT strict replay temp
+
+on:
+  push:
+    branches:
+      - fix/eps-pit-strict-replay
+
+jobs:
+  eps-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pytest yfinance tradingview-screener
+      - name: Run EPS PIT contracts
+        run: |
+          python -m pytest             tests/test_eps_pit_store.py             tests/test_eps_sec_yahoo_provider.py             tests/test_eps_pit_composite.py             tests/test_eps_pit_resolver_contract.py             tests/test_signal_eps_lookup.py             dashboard/tests/test_eps_publication_contract.py             dashboard/tests/test_eps_publication_contract_extended.py             dashboard/tests/test_yfinance_data_contract.py             -q -k "not sec_endpoints_user_agent_smoke"
