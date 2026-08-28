@@ -341,3 +341,96 @@ def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_p
 
     assert enriched.loc[0, "eps_yoy_growth"] == 42.0
     assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+
+
+def test_replay_never_trusts_prefilled_pool_eps(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 42.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("REPLAY must never call TradingView")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(fake_pit),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-21",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": 999.0,
+                "eps_yoy_growth_source": "POOL_EXISTING",
+            }
+        ]
+    )
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(tmp_path / "pit.csv"),
+        refresh_missing=False,
+        mode=EPSResolveMode.REPLAY,
+        observation_date="2026-08-27",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+    assert len(calls) == 1
+
+
+def test_resolver_reuses_bound_sec_cik_hint(monkeypatch, tmp_path):
+    store = EPSPITStore(str(tmp_path / "pit.csv"))
+    store.upsert(
+        __import__("eps_pit").EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-20",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=10.0,
+            source="SEC",
+            effective_date="2026-08-01",
+            sec_cik="0000123456",
+        )
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append(kwargs)
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 20.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.REPLAY,
+        csv_path=str(tmp_path / "pit.csv"),
+        observation_date="2026-08-27",
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert calls[0]["sec_cik_hints"] == {"ABC": "0000123456"}
