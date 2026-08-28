@@ -173,8 +173,9 @@ def test_yahoo_zero_denominator_is_terminal_even_if_sec_failed(monkeypatch):
     assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
 
 
-def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
+def test_sec_zero_denominator_queries_yahoo_for_historical_confirmation(monkeypatch):
     provider = SECYahooEPSProvider()
+    calls = []
     sec_records = [
         {
             "report_period": "2025-06-30",
@@ -197,19 +198,45 @@ def test_sec_zero_denominator_is_terminal_without_yahoo_call(monkeypatch):
             "unit": "USD/shares",
         },
     ]
-    monkeypatch.setattr(provider.sec, "fetch_quarterly_history", lambda symbol, **kwargs: sec_records)
+    yahoo_records = [
+        {
+            "report_period": "2025-06-30",
+            "eps_diluted": 0.0,
+            "earnings_release_at": "2025-08-01",
+            "period_type": "quarter",
+            "source": "YahooHistoricalEvent",
+            "concept": "DilutedEPS",
+            "unit": "USD/shares",
+        },
+        {
+            "report_period": "2026-06-30",
+            "eps_diluted": 0.05,
+            "earnings_release_at": "2026-08-01",
+            "period_type": "quarter",
+            "source": "YahooHistoricalEvent",
+            "concept": "DilutedEPS",
+            "unit": "USD/shares",
+        },
+    ]
     monkeypatch.setattr(
-        provider.yahoo,
+        provider.sec,
         "fetch_quarterly_history",
-        lambda symbol, **kwargs: (_ for _ in ()).throw(
-            AssertionError("SEC zero is terminal; Yahoo should not be queried")
-        ),
+        lambda symbol, **kwargs: sec_records,
     )
+
+    def yahoo_fetch(symbol, **kwargs):
+        calls.append(kwargs)
+        return yahoo_records
+
+    monkeypatch.setattr(provider.yahoo, "fetch_quarterly_history", yahoo_fetch)
 
     result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-21")
 
-    assert result is None
     assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
+    assert result["growth_type"] == "ZERO_BASE"
+    assert result["sec_prior_year_eps"] == 0.0
+    assert result["yahoo_prior_year_eps"] == 0.0
+    assert len(calls) == 1
 
 
 def test_historical_prefers_sec_and_never_calls_yahoo_when_sec_resolves(monkeypatch):
