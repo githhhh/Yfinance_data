@@ -30,6 +30,7 @@ EPS_PUBLICATION_COLUMNS = (
     "eps_yoy_growth_source",
     "eps_yoy_growth_status",
     "eps_yoy_growth_missing_reason",
+    "eps_growth_type",
 )
 
 
