@@ -25,8 +25,6 @@ from eps_pit.models import EPSGrowthType, EPSMissingReason
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE_DIR = PROJECT_ROOT / "output" / "eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-SEC_PROJECT_NAME = "Yfinance_data"
-SEC_PROJECT_VERSION = "3.0"
 SEC_USER_AGENT_CONTACTS = (
     "contact@quantresearch.org",
     "research@financialanalytics.io",
@@ -49,10 +47,7 @@ SEC_USER_AGENT_CONTACTS = (
     "admin@investmentdataservice.com",
     "support@corefinanceresearch.org",
 )
-DEFAULT_SEC_USER_AGENTS = tuple(
-    f"{SEC_PROJECT_NAME}/{SEC_PROJECT_VERSION} EPS-PIT {contact}"
-    for contact in SEC_USER_AGENT_CONTACTS
-)
+DEFAULT_SEC_USER_AGENTS = SEC_USER_AGENT_CONTACTS
 SEC_MAX_403_USER_AGENT_SWITCHES = 2
 
 
@@ -805,9 +800,8 @@ class SECProvider:
                 error = RuntimeError(f"{label} HTTP 403")
                 if self._switch_user_agent_after_403():
                     logging.warning(
-                        "%s rejected SEC User-Agent; retrying with another %s identity variant",
+                        "%s rejected SEC User-Agent; retrying with another configured identity variant",
                         label,
-                        SEC_PROJECT_NAME,
                     )
                     continue
                 self._block_host(url, error)
@@ -896,9 +890,8 @@ class SECProvider:
                     if self._switch_user_agent_after_403():
                         logging.warning(
                             "%s rejected SEC User-Agent; retrying bulk download "
-                            "with another %s identity variant",
+                            "with another configured identity variant",
                             label,
-                            SEC_PROJECT_NAME,
                         )
                         continue
                     self._block_host(url, error)
