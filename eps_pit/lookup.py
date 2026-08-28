@@ -83,6 +83,7 @@ class SignalEPSLookup:
         *,
         allow_current_yahoo: bool = False,
         observation_date: object | None = None,
+        sec_cik_hints: dict[str, str] | None = None,
     ) -> dict[str, dict[str, Any]]:
         snap = cls._normalize_date(snapshot_date)
         observation = cls._normalize_date(observation_date) if observation_date else ""
@@ -104,6 +105,7 @@ class SignalEPSLookup:
                 snap,
                 allow_current_yahoo=allow_current_yahoo,
                 observation_date=observation if allow_current_yahoo else None,
+                sec_cik_hint=(sec_cik_hints or {}).get(symbol),
             )
             if record is not None:
                 results[symbol] = record
@@ -160,6 +162,7 @@ class SignalEPSLookup:
             current_period=cls._normalize_date(record.get("current_period")) or None,
             prior_year_period=cls._normalize_date(record.get("prior_year_period")) or None,
             calculation_method=str(record.get("calculation_method") or "") or None,
+            sec_cik=str(record.get("sec_cik") or "").strip() or None,
             source_record_id=str(record.get("source_record_id") or "") or None,
         )
 
@@ -237,11 +240,13 @@ class SignalEPSLookup:
         pit_error: Exception | None = None
         pit_entry: dict[str, Any] | None = None
         try:
+            sec_cik = store.get_sec_cik(sym)
             pit_entry = cls.fetch_sec_yahoo_eps(
                 snap,
                 [sym],
                 allow_current_yahoo=current_state_allowed,
                 observation_date=observed_on if current_state_allowed else None,
+                sec_cik_hints={sym: sec_cik} if sec_cik else None,
             ).get(sym)
         except Exception as exc:
             pit_error = exc
