@@ -148,6 +148,10 @@ class EPSPITStore:
             EPSStatus.RESOLVED.value,
             EPSStatus.EXPECTED_UNAVAILABLE.value,
         }:
+            if eps is not None:
+                raise EPSPITStoreError(
+                    f"EPS PIT record has value with non-resolved status: {sym} {snap}"
+                )
             return None
         if status_raw == EPSStatus.RESOLVED.value and eps is None:
             raise EPSPITStoreError(
