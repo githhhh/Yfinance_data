@@ -111,7 +111,7 @@ def run_historical_validation_unblind(
     champions = manifest.get("champions", {})
     logger.info(f"Integrity check passed! Loaded frozen manifest (SHA256: {manifest_sha}) with {len(champions)} champions.")
 
-    all_weeks = sorted(baseline_df["snapshot_date"].unique())
+    all_weeks = sorted(events_df["snapshot_date"].astype(str).unique())
     validation_weeks = sorted(contaminated_validation_dates(all_weeks))
     if not validation_weeks:
         raise RuntimeError(

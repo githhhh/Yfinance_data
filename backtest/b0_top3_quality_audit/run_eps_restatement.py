@@ -469,7 +469,7 @@ def run(*, baseline_ref: str, n_draws: int = 1000, seed: int = 42) -> dict[str, 
     price_path = DATA / "signal_daily_prices.parquet"
     weekly_path = DATA / "candidate_weekly_outcomes.parquet"
     train_weekly_path = DATA / "frozen/train_candidate_weekly_outcomes.parquet"
-    selector_path = Path("dashboard/skill_industry_eps_known.py")
+    selector_path = REPO_ROOT / "dashboard/skill_industry_eps_known.py"
     frozen_before = {
         "price": sha256_file(price_path),
         "weekly": sha256_file(weekly_path),
@@ -502,6 +502,11 @@ def run(*, baseline_ref: str, n_draws: int = 1000, seed: int = 42) -> dict[str, 
     invariant_df["reference_semantics"] = "OLD_EPS_BASELINE_EXPECTED_TO_DRIFT"
     invariant_df.to_csv(
         OUT / "b0_production_invariant_audit.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+    invariant_df.to_csv(
+        OUT / "b0_old_eps_golden_comparison.csv",
         index=False,
         encoding="utf-8-sig",
     )
