@@ -56,8 +56,9 @@ from backtest.b0_top3_quality_audit.universe import (
 )
 
 LOG = logging.getLogger("eps_restatement")
-ROOT = Path("backtest/b0_top3_quality_audit")
-POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT / "backtest/b0_top3_quality_audit"
+POOL_ROOT = REPO_ROOT / "backtest/ibd_skill_replay_pools"
 DATA = ROOT / "data"
 OUT = ROOT / "output"
 GOLDEN = ROOT / "golden"
@@ -201,7 +202,7 @@ def _canonical_manifest_hash(payload: dict[str, Any]) -> str:
 def _write_v2_manifest(baseline_ref: str) -> Path:
     old_path = OUT / "frozen_rules_manifest.json"
     manifest = git_show_json(baseline_ref, old_path)
-    repo_root = Path.cwd()
+    repo_root = REPO_ROOT
     manifest["manifest_version"] = "2.1-eps-recalibrated-v2"
     manifest["source_base_commit"] = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], text=True
@@ -306,6 +307,23 @@ def _augment_eps_impact(
         for _, r in new_events.iterrows()
     }
 
+    old_pit_lookup: dict[tuple[str, str], float] = {}
+    try:
+        old_pit = git_show_csv(
+            baseline_ref,
+            REPO_ROOT / "us/signal_eps_pit.csv",
+        )
+        if {"snapshot_date", "code", "eps_yoy_growth"}.issubset(old_pit.columns):
+            old_pit["eps_yoy_growth"] = pd.to_numeric(
+                old_pit["eps_yoy_growth"], errors="coerce"
+            )
+            old_pit_lookup = {
+                (str(r["snapshot_date"]), str(r["code"])): float(r["eps_yoy_growth"])
+                for _, r in old_pit.dropna(subset=["eps_yoy_growth"]).iterrows()
+            }
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        old_pit_lookup = {}
+
     old_b0 = git_show_csv(baseline_ref, OUT / "b0_selection_events.csv")
     old_pick = {
         (str(r["snapshot_date"]), str(r["code"])): int(r["pick_order"])
@@ -323,6 +341,8 @@ def _augment_eps_impact(
         old_row = old_lookup.get(key)
         new_row = new_lookup.get(key)
         old_eps = to_float(row.get("old_eps"))
+        if old_eps is None:
+            old_eps = old_pit_lookup.get(key)
         new_eps = to_float(row.get("new_eps"))
         old_e0.append(bool(old_row is not None and _explicit_eligible(old_row, old_eps)))
         new_e0.append(bool(new_row is not None and _explicit_eligible(new_row, new_eps)))

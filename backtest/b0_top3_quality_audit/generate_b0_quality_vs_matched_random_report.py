@@ -145,7 +145,7 @@ def summarize_stability(
 ) -> pd.DataFrame:
     """Summarize beat-random stability across time segments."""
     rows: list[dict[str, Any]] = []
-    train_dates: set[str] = set()
+    train_dates_set: set[str] = set()
     contaminated_dates: set[str] = set()
     if three_tier_weekly_df is not None and not three_tier_weekly_df.empty:
         all_eval_dates = sorted(three_tier_weekly_df["snapshot_date"].astype(str).unique())
@@ -165,7 +165,7 @@ def summarize_stability(
             ("Early half", df.iloc[:midpoint]),
             ("Late half", df.iloc[midpoint:]),
         ]
-        if train_dates:
+        if train_dates_set:
             segments.append(("Train-era weeks 1-30", df[df["snapshot_date"].astype(str).isin(train_dates_set)]))
         if contaminated_dates:
             segments.append(
