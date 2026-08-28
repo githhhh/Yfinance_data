@@ -47,6 +47,31 @@ class EPSPITStore:
     def _norm_date(value: object) -> str:
         return date10(value)
 
+    @staticmethod
+    def _norm_cik(value: object) -> str | None:
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except Exception:
+            pass
+        text = str(value).strip()
+        if text.endswith(".0") and text[:-2].isdigit():
+            text = text[:-2]
+        return text.zfill(10) if text.isdigit() else None
+
+    @staticmethod
+    def _norm_text(value: object) -> str:
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        return str(value).strip()
+
     def _read(self) -> pd.DataFrame:
         path = Path(self.csv_path)
         if not path.exists():
@@ -92,7 +117,7 @@ class EPSPITStore:
         if rows.empty:
             return None
         row = rows.iloc[0]
-        resolver_version = str(row.get("resolver_version") or "").strip()
+        resolver_version = self._norm_text(row.get("resolver_version"))
         if resolver_version != EPS_RESOLVER_VERSION:
             # Resolver policy changes can alter source ordering, historical
             # visibility, or calculation semantics. Never let a legacy cached
@@ -172,9 +197,9 @@ class EPSPITStore:
         if rows.empty:
             return None
         values = {
-            str(value).strip().zfill(10)
-            for value in rows["sec_cik"].dropna()
-            if str(value).strip() and str(value).strip().lower() != "nan"
+            cik
+            for value in rows["sec_cik"]
+            if (cik := self._norm_cik(value)) is not None
         }
         if len(values) > 1:
             raise EPSPITStoreError(
