@@ -701,8 +701,11 @@ class SECProvider:
             int(max_403_user_agent_switches),
             0,
         )
+        env_user_agent = str(os.getenv("SEC_USER_AGENT") or "").strip()
         if user_agent:
             self._user_agent_candidates = [str(user_agent).strip()]
+        elif env_user_agent:
+            self._user_agent_candidates = [env_user_agent]
         else:
             candidates = list(DEFAULT_SEC_USER_AGENTS)
             random.shuffle(candidates)
@@ -856,9 +859,8 @@ class SECProvider:
     def _download_file(self, url: str, destination: Path, *, label: str) -> None:
         """Download a large SEC archive with resumable Range requests.
 
-        A stable .part file is preserved across retries and process restarts.
-        HTTP 206 appends to the partial file. If the server ignores Range and
-        returns HTTP 200, the partial file is safely restarted from byte zero.
+        403 User-Agent switching has its own bounded budget and does not consume
+        the transport retry budget used for 408/429/5xx or interrupted streams.
         """
         blocked = self._blocked_host_error(url)
         if blocked is not None:
@@ -867,9 +869,9 @@ class SECProvider:
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = self._partial_download_path(destination)
         metadata_path = self._partial_metadata_path(destination)
-        attempts = self.max_retries + 1
+        retry_attempt = 0
 
-        for attempt in range(attempts):
+        while True:
             offset = partial.stat().st_size if partial.exists() else 0
             request_headers = None
             if offset > 0:
@@ -888,9 +890,26 @@ class SECProvider:
             )
 
             try:
+                if response.status_code == 403:
+                    error = RuntimeError(f"{label} HTTP 403")
+                    if self._switch_user_agent_after_403():
+                        logging.warning(
+                            "%s rejected SEC User-Agent; retrying bulk download "
+                            "with another %s identity variant",
+                            label,
+                            SEC_PROJECT_NAME,
+                        )
+                        continue
+                    self._block_host(url, error)
+                    raise error
+
                 if response.status_code == 416 and offset > 0:
                     content_range = str(response.headers.get("Content-Range") or "")
-                    total_text = content_range.rsplit("/", 1)[-1] if "/" in content_range else ""
+                    total_text = (
+                        content_range.rsplit("/", 1)[-1]
+                        if "/" in content_range
+                        else ""
+                    )
                     try:
                         total_size = int(total_text)
                     except ValueError:
@@ -907,8 +926,10 @@ class SECProvider:
                         return
                     partial.unlink(missing_ok=True)
                     metadata_path.unlink(missing_ok=True)
-                    if attempt + 1 < attempts:
+                    if retry_attempt < self.max_retries:
+                        retry_attempt += 1
                         continue
+                    raise RuntimeError(f"{label} HTTP 416")
 
                 if response.status_code in {200, 206}:
                     append = response.status_code == 206 and offset > 0
@@ -941,26 +962,26 @@ class SECProvider:
 
                     mode = "ab" if append else "wb"
                     if not append:
-                        # HTTP 200 after a Range/If-Range request means the
-                        # remote archive changed (or Range was ignored); restart
-                        # the local partial and bind it to the new validator.
                         metadata_path.unlink(missing_ok=True)
                     self._write_partial_metadata(metadata_path, response)
+
                     try:
                         with partial.open(mode) as handle:
                             for chunk in response.iter_content(chunk_size=1024 * 1024):
                                 if chunk:
                                     handle.write(chunk)
                     except requests.RequestException:
-                        if attempt + 1 < attempts:
-                            time.sleep(0.5 * (2 ** attempt))
+                        if retry_attempt < self.max_retries:
+                            time.sleep(0.5 * (2 ** retry_attempt))
+                            retry_attempt += 1
                             continue
                         raise
 
                     downloaded_size = partial.stat().st_size
                     if expected_total >= 0 and downloaded_size < expected_total:
-                        if attempt + 1 < attempts:
-                            time.sleep(0.5 * (2 ** attempt))
+                        if retry_attempt < self.max_retries:
+                            time.sleep(0.5 * (2 ** retry_attempt))
+                            retry_attempt += 1
                             continue
                         raise RuntimeError(
                             f"{label} incomplete download: "
@@ -977,9 +998,6 @@ class SECProvider:
                     try:
                         self._validate_downloaded_zip(partial, label=label)
                     except Exception:
-                        # If the server declared a complete body, a bad ZIP is
-                        # corruption/version mismatch rather than an incomplete
-                        # resumable transfer. Force the next run to start clean.
                         if expected_total >= 0 and downloaded_size == expected_total:
                             partial.unlink(missing_ok=True)
                             metadata_path.unlink(missing_ok=True)
@@ -990,27 +1008,15 @@ class SECProvider:
 
                 if (
                     response.status_code in SEC_RETRYABLE_STATUS_CODES
-                    and attempt + 1 < attempts
+                    and retry_attempt < self.max_retries
                 ):
-                    time.sleep(self._retry_delay(response, attempt))
+                    time.sleep(self._retry_delay(response, retry_attempt))
+                    retry_attempt += 1
                     continue
 
-                error = RuntimeError(f"{label} HTTP {response.status_code}")
-                if response.status_code == 403:
-                    if self._switch_user_agent_after_403():
-                        logging.warning(
-                            "%s rejected SEC User-Agent; retrying bulk download "
-                            "with another %s identity variant",
-                            label,
-                            SEC_PROJECT_NAME,
-                        )
-                        continue
-                    self._block_host(url, error)
-                raise error
+                raise RuntimeError(f"{label} HTTP {response.status_code}")
             finally:
                 response.close()
-
-        raise RuntimeError(f"{label} download failed")
 
     def ensure_bulk_companyfacts(self) -> Path:
         """Refresh the nightly SEC bulk archive at most once per provider run."""
