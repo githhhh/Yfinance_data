@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from eps_pit.models import EPSResult, EPSStatus
+from eps_pit.models import EPS_RESOLVER_VERSION, EPSResult, EPSStatus
 from eps_pit.providers.pit_provider import date10, normalize_symbol, safe_float
 
 
@@ -25,6 +25,7 @@ PIT_COLUMNS = [
     "status",
     "missing_reason",
     "source_record_id",
+    "resolver_version",
     "retrieved_at",
 ]
 
@@ -90,6 +91,12 @@ class EPSPITStore:
         if rows.empty:
             return None
         row = rows.iloc[0]
+        resolver_version = str(row.get("resolver_version") or "").strip()
+        if resolver_version != EPS_RESOLVER_VERSION:
+            # Resolver policy changes can alter source ordering, historical
+            # visibility, or calculation semantics. Never let a legacy cached
+            # observation silently bypass the active policy.
+            return None
         eps = safe_float(row.get("eps_yoy_growth"))
         if eps is None:
             # New stores persist resolved observations only. Ignore legacy
@@ -141,6 +148,7 @@ class EPSPITStore:
             prior_year_period=date10(s("prior_year_period")) or None,
             calculation_method=s("calculation_method"),
             source_record_id=s("source_record_id"),
+            resolver_version=resolver_version,
         )
 
     def upsert(self, result: EPSResult) -> None:
@@ -174,6 +182,7 @@ class EPSPITStore:
         record["code"] = sym
         record["eps_yoy_growth"] = eps
         record["effective_date"] = effective
+        record["resolver_version"] = EPS_RESOLVER_VERSION
         record["retrieved_at"] = pd.Timestamp.utcnow().isoformat()
         rows = df[PIT_COLUMNS].to_dict("records")
         rows.append({column: record.get(column) for column in PIT_COLUMNS})
