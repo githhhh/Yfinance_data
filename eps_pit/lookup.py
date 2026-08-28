@@ -393,6 +393,10 @@ class SignalEPSLookup:
             except Exception:
                 existing_source = str(source_raw).strip() if source_raw is not None else None
 
+            replay_revalidation = (
+                existing_eps is not None
+                and mode is EPSResolveMode.REPLAY
+            )
             stale_current_replacement = (
                 existing_eps is not None
                 and mode is EPSResolveMode.LIVE
@@ -403,7 +407,7 @@ class SignalEPSLookup:
                     "POOL_EXISTING",
                 })
             )
-            if stale_current_replacement:
+            if replay_revalidation or stale_current_replacement:
                 # A current-state Stage2 value observed after this snapshot
                 # cannot be backdated. Re-resolve the old snapshot from strict
                 # PIT sources instead of silently stamping effective_date=snap.
@@ -450,7 +454,11 @@ class SignalEPSLookup:
                 sym,
                 mode=mode,
                 csv_path=csv_path,
-                allow_network=refresh_missing or stale_current_replacement,
+                allow_network=(
+                    refresh_missing
+                    or stale_current_replacement
+                    or replay_revalidation
+                ),
                 _allow_live_current_provider=not tv_batch_attempted,
                 _live_current_outcome=live_outcome,
                 _live_current_error=tv_batch_error if current_state_allowed else None,
