@@ -22,7 +22,8 @@ import yfinance as yf
 from eps_pit.models import EPSMissingReason
 
 
-DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CACHE_DIR = PROJECT_ROOT / "output" / "eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_PROJECT_NAME = "Yfinance_data"
 SEC_PROJECT_VERSION = "3.0"
