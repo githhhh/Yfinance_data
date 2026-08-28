@@ -951,8 +951,9 @@ class SECProvider:
         symbol: str,
         *,
         prefer_bulk: bool = False,
+        cik_hint: str | None = None,
     ) -> list[dict[str, Any]]:
-        cik = self.get_cik(symbol)
+        cik = str(cik_hint).strip().zfill(10) if cik_hint else self.get_cik(symbol)
         if not cik:
             return []
         cache_file = self.cache_dir / f"{normalize_symbol(symbol)}.json"
@@ -975,7 +976,10 @@ class SECProvider:
                 label=f"SEC companyfacts for {normalize_symbol(symbol)}",
             )
         self.companyfacts_cache.write(cache_file, facts)
-        return self._parse_company_facts(normalize_symbol(symbol), facts)
+        records = self._parse_company_facts(normalize_symbol(symbol), facts)
+        for record in records:
+            record["sec_cik"] = cik
+        return records
 
     def get_cik(self, symbol: str) -> str | None:
         sym = normalize_symbol(symbol)
