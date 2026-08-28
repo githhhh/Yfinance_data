@@ -369,3 +369,174 @@ def test_historical_clean_sec_missing_is_not_upgraded_by_yahoo_failure(monkeypat
 
     assert result is None
     assert reason is EPSMissingReason.NO_QUARTERLY_EPS
+
+
+def test_replay_sec_zero_base_is_reconciled_by_same_period_yahoo_event(monkeypatch):
+    provider = SECYahooEPSProvider()
+
+    sec_records = [
+        {
+            "report_period": "2025-06-30",
+            "start": "2025-04-01",
+            "eps_diluted": 0.0,
+            "filing_date": "2025-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "sec_cik": "0002100805",
+            "source_record_id": "sec-prior",
+        },
+        {
+            "report_period": "2026-06-30",
+            "start": "2026-04-01",
+            "eps_diluted": 0.05,
+            "filing_date": "2026-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "sec_cik": "0002100805",
+            "source_record_id": "sec-current",
+        },
+    ]
+    yahoo_records = [
+        {
+            "report_period": "2025-06-30",
+            "eps_diluted": -0.014205,
+            "earnings_release_at": "2025-08-05",
+            "period_type": "quarter",
+            "source": "YahooHistoricalEvent",
+            "concept": "DilutedEPS",
+            "unit": "USD/shares",
+            "source_record_id": "yahoo-prior",
+        },
+        {
+            "report_period": "2026-06-30",
+            "eps_diluted": 0.05,
+            "earnings_release_at": "2026-08-05",
+            "period_type": "quarter",
+            "source": "YahooHistoricalEvent",
+            "concept": "DilutedEPS",
+            "unit": "USD/shares",
+            "source_record_id": "yahoo-current",
+        },
+    ]
+
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: sec_records,
+    )
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: yahoo_records,
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed("JAN", "2026-08-28")
+
+    assert reason is None
+    assert result["source"] == "SEC+YahooHistoricalEvent"
+    assert result["current_period"] == "2026-06-30"
+    assert result["prior_year_period"] == "2025-06-30"
+    assert result["current_eps"] == 0.05
+    assert result["prior_year_eps"] == -0.014205
+    assert result["eps_yoy_growth"] == 451.9887363604
+    assert result["growth_type"] == "TURNAROUND"
+    assert result["sec_current_eps"] == 0.05
+    assert result["sec_prior_year_eps"] == 0.0
+    assert result["yahoo_current_eps"] == 0.05
+    assert result["yahoo_prior_year_eps"] == -0.014205
+
+
+def test_replay_sec_numeric_does_not_query_yahoo_for_reconciliation(monkeypatch):
+    provider = SECYahooEPSProvider()
+    sec_records = [
+        {
+            "report_period": "2025-06-30",
+            "start": "2025-04-01",
+            "eps_diluted": 1.0,
+            "filing_date": "2025-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+        },
+        {
+            "report_period": "2026-06-30",
+            "start": "2026-04-01",
+            "eps_diluted": 1.5,
+            "filing_date": "2026-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+        },
+    ]
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: sec_records,
+    )
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(
+            AssertionError("normal SEC replay result must not query Yahoo")
+        ),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed("TEST", "2026-08-28")
+
+    assert reason is None
+    assert result["source"] == "SEC"
+    assert result["eps_yoy_growth"] == 50.0
+    assert result["growth_type"] == "GROWTH"
+    assert "yahoo_current_eps" not in result
+
+
+def test_replay_sec_zero_base_stays_nonblocking_when_yahoo_confirmation_fails(
+    monkeypatch,
+):
+    provider = SECYahooEPSProvider()
+    sec_records = [
+        {
+            "report_period": "2025-06-30",
+            "start": "2025-04-01",
+            "eps_diluted": 0.0,
+            "filing_date": "2025-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "source_record_id": "sec-prior",
+        },
+        {
+            "report_period": "2026-06-30",
+            "start": "2026-04-01",
+            "eps_diluted": 0.05,
+            "filing_date": "2026-08-05",
+            "period_type": "quarter",
+            "source": "SEC",
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "source_record_id": "sec-current",
+        },
+    ]
+    monkeypatch.setattr(
+        provider.sec,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: sec_records,
+    )
+    monkeypatch.setattr(
+        provider.yahoo,
+        "fetch_quarterly_history",
+        lambda symbol, **kwargs: (_ for _ in ()).throw(RuntimeError("Yahoo outage")),
+    )
+
+    result, reason = provider.fetch_eps_yoy_detailed("JAN", "2026-08-28")
+
+    assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
+    assert result["growth_type"] == "ZERO_BASE"
+    assert result["sec_prior_year_eps"] == 0.0
