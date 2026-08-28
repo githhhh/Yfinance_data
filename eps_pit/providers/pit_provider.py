@@ -24,28 +24,35 @@ from eps_pit.models import EPSMissingReason
 
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-DEFAULT_SEC_USER_AGENTS = (
-    "QuantResearch contact@quantresearch.org",
-    "FinancialAnalytics research@financialanalytics.io",
-    "MarketDataEngine support@marketdataengine.com",
-    "AlphaDataSystem data@alphadatasystem.net",
-    "EquityResearchLab info@equityresearchlab.org",
-    "MacroQuantAnalytics dev@macroquantanalytics.com",
-    "CapitalDataPlatform ops@capitaldataplatform.org",
-    "SecuritiesInsights info@securitiesinsights.net",
-    "FundamentalMetrics tech@fundamentalmetrics.io",
-    "TradingSignalResearch data@tradingsignalresearch.com",
-    "GlobalAssetAnalytics contact@globalassetanalytics.org",
-    "ApexQuantitative research@apexquantitative.com",
-    "PortfolioIntelligence support@portfoliointelligence.net",
-    "SystematicEquity dev@systematicequity.io",
-    "ValuationDataLabs info@valuationdatalabs.org",
-    "EdgeAnalyticsGroup contact@edgeanalyticsgroup.com",
-    "SignalVectorLabs data@signalvectorlabs.net",
-    "MarketStructureTech tech@marketstructuretech.io",
-    "InvestmentDataService admin@investmentdataservice.com",
-    "CoreFinanceResearch support@corefinanceresearch.org",
+SEC_PROJECT_NAME = "Yfinance_data"
+SEC_PROJECT_VERSION = "3.0"
+SEC_USER_AGENT_CONTACTS = (
+    "contact@quantresearch.org",
+    "research@financialanalytics.io",
+    "support@marketdataengine.com",
+    "data@alphadatasystem.net",
+    "info@equityresearchlab.org",
+    "dev@macroquantanalytics.com",
+    "ops@capitaldataplatform.org",
+    "info@securitiesinsights.net",
+    "tech@fundamentalmetrics.io",
+    "data@tradingsignalresearch.com",
+    "contact@globalassetanalytics.org",
+    "research@apexquantitative.com",
+    "support@portfoliointelligence.net",
+    "dev@systematicequity.io",
+    "info@valuationdatalabs.org",
+    "contact@edgeanalyticsgroup.com",
+    "data@signalvectorlabs.net",
+    "tech@marketstructuretech.io",
+    "admin@investmentdataservice.com",
+    "support@corefinanceresearch.org",
 )
+DEFAULT_SEC_USER_AGENTS = tuple(
+    f"{SEC_PROJECT_NAME}/{SEC_PROJECT_VERSION} EPS-PIT {contact}"
+    for contact in SEC_USER_AGENT_CONTACTS
+)
+SEC_MAX_403_USER_AGENT_SWITCHES = 2
 
 
 def get_sec_user_agent() -> str:
@@ -658,6 +665,7 @@ class SECProvider:
         max_retries: int = 2,
         bulk_companyfacts_zip: Path | None = None,
         user_agent: str | None = None,
+        max_403_user_agent_switches: int = SEC_MAX_403_USER_AGENT_SWITCHES,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -666,6 +674,18 @@ class SECProvider:
         self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
         self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
         self.max_retries = max(int(max_retries), 0)
+        self.max_403_user_agent_switches = max(
+            int(max_403_user_agent_switches),
+            0,
+        )
+        if user_agent:
+            self._user_agent_candidates = [str(user_agent).strip()]
+        else:
+            candidates = list(DEFAULT_SEC_USER_AGENTS)
+            random.shuffle(candidates)
+            self._user_agent_candidates = candidates
+        self._user_agent_index = 0
+        self._user_agent_switches = 0
         self._cik_map: dict[str, str] | None = None
         self._cik_map_error: Exception | None = None
         self._bulk_members: dict[str, str] | None = None
@@ -676,7 +696,8 @@ class SECProvider:
             or (self.cache_dir / SEC_BULK_COMPANYFACTS_FILENAME)
         )
         self.session = requests.Session()
-        self.session.headers.update(build_sec_request_headers(user_agent))
+        initial_user_agent = self._user_agent_candidates[0] if self._user_agent_candidates else user_agent
+        self.session.headers.update(build_sec_request_headers(initial_user_agent))
 
     @property
     def headers(self) -> dict[str, str]:
@@ -713,6 +734,19 @@ class SECProvider:
                     pass
         return 0.5 * (2 ** attempt)
 
+    def _switch_user_agent_after_403(self) -> bool:
+        if (
+            self._user_agent_switches >= self.max_403_user_agent_switches
+            or self._user_agent_index + 1 >= len(self._user_agent_candidates)
+        ):
+            return False
+        self._user_agent_index += 1
+        self._user_agent_switches += 1
+        self.session.headers["User-Agent"] = self._user_agent_candidates[
+            self._user_agent_index
+        ]
+        return True
+
     @staticmethod
     def _blocked_host_error(url: str) -> RuntimeError | None:
         host = (urlparse(url).hostname or "").lower()
@@ -729,8 +763,8 @@ class SECProvider:
         if blocked is not None:
             raise blocked
 
-        attempts = self.max_retries + 1
-        for attempt in range(attempts):
+        retry_attempt = 0
+        while True:
             self._throttle()
             response = self.session.get(url, timeout=15)
 
@@ -740,22 +774,27 @@ class SECProvider:
                 except Exception as exc:
                     raise RuntimeError(f"{label} returned invalid JSON") from exc
 
+            if response.status_code == 403:
+                error = RuntimeError(f"{label} HTTP 403")
+                if self._switch_user_agent_after_403():
+                    logging.warning(
+                        "%s rejected SEC User-Agent; retrying with another %s identity variant",
+                        label,
+                        SEC_PROJECT_NAME,
+                    )
+                    continue
+                self._block_host(url, error)
+                raise error
+
             if (
                 response.status_code in SEC_RETRYABLE_STATUS_CODES
-                and attempt + 1 < attempts
+                and retry_attempt < self.max_retries
             ):
-                time.sleep(self._retry_delay(response, attempt))
+                time.sleep(self._retry_delay(response, retry_attempt))
+                retry_attempt += 1
                 continue
 
-            error = RuntimeError(f"{label} HTTP {response.status_code}")
-            if response.status_code == 403:
-                # Hosted/cloud egress can be blocked independently of request
-                # identity. Stop the entire SEC client for this run after the
-                # first access-denied response instead of hammering every CIK.
-                self._block_host(url, error)
-            raise error
-
-        raise RuntimeError(f"{label} request failed")
+            raise RuntimeError(f"{label} HTTP {response.status_code}")
 
     @staticmethod
     def _partial_download_path(destination: Path) -> Path:
@@ -935,6 +974,14 @@ class SECProvider:
 
                 error = RuntimeError(f"{label} HTTP {response.status_code}")
                 if response.status_code == 403:
+                    if self._switch_user_agent_after_403():
+                        logging.warning(
+                            "%s rejected SEC User-Agent; retrying bulk download "
+                            "with another %s identity variant",
+                            label,
+                            SEC_PROJECT_NAME,
+                        )
+                        continue
                     self._block_host(url, error)
                 raise error
             finally:
