@@ -256,6 +256,7 @@ def test_publication_rejects_non_finite_resolved_eps(tmp_path, monkeypatch):
             eps_yoy_growth_source="TEST",
             eps_yoy_growth_status="resolved",
             eps_yoy_growth_missing_reason=pd.NA,
+            eps_growth_type="GROWTH",
         ),
     )
 
