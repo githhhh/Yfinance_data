@@ -5,15 +5,22 @@ import pandas as pd
 from eps_pit import EPSResolveMode, EPSStatus
 from eps_pit.lookup import SignalEPSLookup, enrich_pool_with_signal_eps, resolve_signal_eps
 from eps_pit.store import EPSPITStore
+from eps_pit.models import EPS_RESOLVER_VERSION
 
 
 def test_signal_eps_enrichment_uses_pit_then_sec_yahoo_for_signal_rows(tmp_path, monkeypatch):
     pit_path = tmp_path / "signal_eps_pit.csv"
     pd.DataFrame(
-        [{"snapshot_date": "2026-08-14", "code": "PIT", "eps_yoy_growth": 31.5}]
+        [{
+            "snapshot_date": "2026-08-14",
+            "code": "PIT",
+            "eps_yoy_growth": 31.5,
+            "status": "resolved",
+            "resolver_version": EPS_RESOLVER_VERSION,
+        }]
     ).to_csv(pit_path, index=False)
 
-    def fake_fetch(snapshot_date, codes):
+    def fake_fetch(snapshot_date, codes, **kwargs):
         assert snapshot_date == "2026-08-14"
         assert codes in (["MISS"], ["SECY"])
         if codes == ["SECY"]:
@@ -58,19 +65,24 @@ def test_signal_eps_enrichment_uses_pit_then_sec_yahoo_for_signal_rows(tmp_path,
     assert enriched.loc[3, "eps_yoy_growth_status"] == EPSStatus.EXPECTED_UNAVAILABLE.value
 
 
-def test_signal_eps_enrichment_refreshes_only_missing_signal_rows(monkeypatch, tmp_path):
+def test_signal_eps_replay_revalidates_prefilled_signal_rows(monkeypatch, tmp_path):
     requested_codes = []
 
-    def fake_fetch(snapshot_date, codes):
+    def fake_fetch(snapshot_date, codes, **kwargs):
         requested_codes.extend(codes)
         return {
             "MISS": {
                 "eps_yoy_growth": 55.0,
-                "source": "Yahoo",
+                "source": "YahooHistoricalEvent",
                 "effective_date": "2026-08-05",
                 "current_eps": 1.55,
                 "prior_year_eps": 1.00,
-            }
+            },
+            "EXISTING": {
+                "eps_yoy_growth": 13.0,
+                "source": "SEC",
+                "effective_date": "2026-08-01",
+            },
         }
 
     monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_fetch))
@@ -90,15 +102,15 @@ def test_signal_eps_enrichment_refreshes_only_missing_signal_rows(monkeypatch, t
         mode=EPSResolveMode.REPLAY,
     )
 
-    assert requested_codes == ["MISS"]
+    assert requested_codes == ["MISS", "EXISTING"]
     assert enriched.loc[0, "eps_yoy_growth"] == 55.0
-    assert enriched.loc[1, "eps_yoy_growth"] == 12.0
-    assert enriched.loc[1, "eps_yoy_growth_source"] == "POOL_EXISTING"
+    assert enriched.loc[1, "eps_yoy_growth"] == 13.0
+    assert enriched.loc[1, "eps_yoy_growth_source"] == "SEC"
     assert pd.isna(enriched.loc[2, "eps_yoy_growth"])
 
 
 def test_signal_eps_enrichment_can_disable_direct_refresh(monkeypatch, tmp_path):
-    def fake_fetch(snapshot_date, codes):
+    def fake_fetch(snapshot_date, codes, **kwargs):
         raise AssertionError("direct refresh should be disabled")
 
     monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_fetch))
@@ -124,7 +136,7 @@ def test_replay_mode_never_calls_tradingview(monkeypatch, tmp_path):
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: {codes[0]: {"missing_reason": "NO_QUARTERLY_EPS"}}),
+        staticmethod(lambda snapshot, codes, **kwargs: {codes[0]: {"missing_reason": "NO_QUARTERLY_EPS"}}),
     )
 
     result = resolve_signal_eps(
@@ -155,7 +167,7 @@ def test_live_mode_batches_tradingview_and_persists_exact_snapshot(monkeypatch, 
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: (_ for _ in ()).throw(AssertionError("TV should resolve first"))),
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("TV should resolve first"))),
     )
 
     pool = pd.DataFrame(
@@ -166,6 +178,7 @@ def test_live_mode_batches_tradingview_and_persists_exact_snapshot(monkeypatch, 
         csv_path=str(pit_path),
         refresh_missing=True,
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
     )
 
     assert calls == [["TV"]]
@@ -186,6 +199,7 @@ def test_persistent_store_is_reused_without_network(monkeypatch, tmp_path):
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(pit_path),
     )
     assert first.eps_yoy_growth == 25.0
@@ -198,7 +212,7 @@ def test_persistent_store_is_reused_without_network(monkeypatch, tmp_path):
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: (_ for _ in ()).throw(AssertionError("network must not be used"))),
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(AssertionError("network must not be used"))),
     )
     second = resolve_signal_eps(
         "2026-08-21",
@@ -222,6 +236,7 @@ def test_existing_upstream_eps_is_preserved_tagged_and_persisted(tmp_path):
         csv_path=str(pit_path),
         refresh_missing=False,
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
     )
 
     assert enriched.loc[0, "eps_yoy_growth"] == 37.5
@@ -238,13 +253,14 @@ def test_provider_error_is_explicit_and_not_persisted(monkeypatch, tmp_path):
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: (_ for _ in ()).throw(RuntimeError("temporary outage"))),
+        staticmethod(lambda snapshot, codes, **kwargs: (_ for _ in ()).throw(RuntimeError("temporary outage"))),
     )
 
     result = resolve_signal_eps(
         "2026-08-21",
         "ERR",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(pit_path),
     )
 
@@ -257,7 +273,7 @@ def test_expected_unavailable_is_not_persisted(monkeypatch, tmp_path):
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: {"MISS": {"missing_reason": "NO_PRIOR_YEAR_QUARTER"}}),
+        staticmethod(lambda snapshot, codes, **kwargs: {"MISS": {"missing_reason": "NO_PRIOR_YEAR_QUARTER"}}),
     )
 
     result = resolve_signal_eps(

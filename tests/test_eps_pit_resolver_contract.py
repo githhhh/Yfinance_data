@@ -16,7 +16,7 @@ def test_replay_mode_never_calls_current_tradingview(monkeypatch, tmp_path):
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -41,7 +41,7 @@ def test_live_tv_error_plus_pit_missing_is_provider_error(monkeypatch, tmp_path)
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -51,6 +51,7 @@ def test_live_tv_error_plus_pit_missing_is_provider_error(monkeypatch, tmp_path)
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(tmp_path / "pit.csv"),
     )
     assert result.status is EPSStatus.PROVIDER_ERROR
@@ -68,7 +69,7 @@ def test_live_tv_error_can_be_overridden_by_strict_pit_success(monkeypatch, tmp_
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {
                     "eps_yoy_growth": 50.0,
                     "source": "SEC",
@@ -82,10 +83,43 @@ def test_live_tv_error_can_be_overridden_by_strict_pit_success(monkeypatch, tmp_
         "2026-08-21",
         "ABC",
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         csv_path=str(tmp_path / "pit.csv"),
     )
     assert result.status is EPSStatus.RESOLVED
     assert result.eps_yoy_growth == 50.0
+
+
+def test_live_tv_field_null_preserves_pit_business_missing_reason(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.TV_FIELD_NULL}
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
+            }
+        ),
+    )
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.EXPECTED_UNAVAILABLE
+    assert result.missing_reason is EPSMissingReason.NO_QUARTERLY_EPS
 
 
 def test_refresh_disabled_is_not_mislabeled_expected_unavailable(tmp_path):
@@ -134,6 +168,7 @@ def test_signal_rows_are_validated_before_any_partial_pit_write(monkeypatch, tmp
             csv_path=str(pit_path),
             refresh_missing=True,
             mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
         )
     assert not pit_path.exists()
 
@@ -148,7 +183,7 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": EPSMissingReason.NO_QUARTERLY_EPS}
             }
         ),
@@ -165,5 +200,315 @@ def test_live_batch_tradingview_failure_marks_all_unresolved_signals_provider_er
         csv_path=str(tmp_path / "pit.csv"),
         refresh_missing=True,
         mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-21",
     )
     assert set(enriched["eps_yoy_growth_status"]) == {EPSStatus.PROVIDER_ERROR.value}
+
+
+def test_live_rerun_of_older_snapshot_never_calls_current_state_providers(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("current TradingView forbidden for older snapshot")
+            )
+        ),
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 33.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-26",
+        "ABC",
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert result.eps_yoy_growth == 33.0
+    assert calls == [
+        (
+            "2026-08-26",
+            ["ABC"],
+            {"allow_current_yahoo": False, "observation_date": None},
+        )
+    ]
+
+
+def test_true_live_snapshot_allows_current_yahoo_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: {
+                codes[0]: {"missing_reason": EPSMissingReason.TV_FIELD_NULL}
+            }
+        ),
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 260.0,
+                "source": "YahooLiveObserved",
+                "effective_date": "2026-08-27",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-27",
+        "ALOT",
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+        csv_path=str(tmp_path / "pit.csv"),
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert result.source == "YahooLiveObserved"
+    assert calls == [
+        (
+            "2026-08-27",
+            ["ALOT"],
+            {
+                "allow_current_yahoo": True,
+                "observation_date": "2026-08-27",
+            },
+        )
+    ]
+
+
+def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("stale Stage2 must not trigger current TV")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                codes[0]: {
+                    "eps_yoy_growth": 42.0,
+                    "source": "SEC",
+                    "effective_date": "2026-08-20",
+                }
+            }
+        ),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-26",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": 999.0,
+            }
+        ]
+    )
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(tmp_path / "pit.csv"),
+        refresh_missing=True,
+        mode=EPSResolveMode.LIVE,
+        observation_date="2026-08-27",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+
+
+def test_replay_never_trusts_prefilled_pool_eps(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 42.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("REPLAY must never call TradingView")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(fake_pit),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-21",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": 999.0,
+                "eps_yoy_growth_source": "POOL_EXISTING",
+            }
+        ]
+    )
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(tmp_path / "pit.csv"),
+        refresh_missing=False,
+        mode=EPSResolveMode.REPLAY,
+        observation_date="2026-08-27",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+    assert len(calls) == 1
+
+
+def test_resolver_reuses_bound_sec_cik_hint(monkeypatch, tmp_path):
+    store = EPSPITStore(str(tmp_path / "pit.csv"))
+    store.upsert(
+        __import__("eps_pit").EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-20",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=10.0,
+            source="SEC",
+            effective_date="2026-08-01",
+            sec_cik="0000123456",
+        )
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append(kwargs)
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 20.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.REPLAY,
+        csv_path=str(tmp_path / "pit.csv"),
+        observation_date="2026-08-27",
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert calls[0]["sec_cik_hints"] == {"ABC": "0000123456"}
+
+
+def test_replay_reconciled_zero_base_persists_dual_source_evidence_and_projects_growth_type(
+    monkeypatch,
+    tmp_path,
+):
+    pit_path = tmp_path / "signal_eps_pit.csv"
+
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                "JAN": {
+                    "eps_yoy_growth": 451.9887363604,
+                    "source": "SEC+YahooHistoricalEvent",
+                    "effective_date": "2026-08-05",
+                    "current_eps": 0.05,
+                    "prior_year_eps": -0.014205,
+                    "current_period": "2026-06-30",
+                    "prior_year_period": "2025-06-30",
+                    "growth_type": "TURNAROUND",
+                    "calculation_method": "sec_zero_base_reconciled_yahoo_event",
+                    "sec_cik": "0002100805",
+                    "sec_current_eps": 0.05,
+                    "sec_prior_year_eps": 0.0,
+                    "sec_current_period": "2026-06-30",
+                    "sec_prior_year_period": "2025-06-30",
+                    "sec_effective_date": "2026-08-05",
+                    "sec_source_record_id": "sec-current",
+                    "yahoo_current_eps": 0.05,
+                    "yahoo_prior_year_eps": -0.014205,
+                    "yahoo_current_period": "2026-06-30",
+                    "yahoo_prior_year_period": "2025-06-30",
+                    "yahoo_effective_date": "2026-08-05",
+                    "yahoo_source_record_id": "yahoo-current",
+                }
+            }
+        ),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-28",
+                "code": "JAN",
+                "signal": True,
+                "eps_yoy_growth": pd.NA,
+            }
+        ]
+    )
+
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(pit_path),
+        refresh_missing=True,
+        mode=EPSResolveMode.REPLAY,
+        observation_date="2026-08-28",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 451.9887363604
+    assert enriched.loc[0, "eps_growth_type"] == "TURNAROUND"
+
+    stored = pd.read_csv(pit_path, dtype={"sec_cik": str})
+    row = stored.iloc[0]
+    assert row["current_period"] == "2026-06-30"
+    assert row["prior_year_period"] == "2025-06-30"
+    assert row["current_eps"] == 0.05
+    assert row["prior_year_eps"] == -0.014205
+    assert row["growth_type"] == "TURNAROUND"
+    assert row["sec_current_eps"] == 0.05
+    assert row["sec_prior_year_eps"] == 0.0
+    assert row["sec_current_period"] == "2026-06-30"
+    assert row["sec_prior_year_period"] == "2025-06-30"
+    assert row["yahoo_current_eps"] == 0.05
+    assert row["yahoo_prior_year_eps"] == -0.014205
+    assert row["yahoo_current_period"] == "2026-06-30"
+    assert row["yahoo_prior_year_period"] == "2025-06-30"

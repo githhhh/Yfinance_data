@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from eps_pit import EPSMissingReason, EPSResult, EPSStatus
+from eps_pit.models import EPS_RESOLVER_VERSION
 from eps_pit.store import EPSPITStore, EPSPITStoreError
 
 
@@ -59,6 +60,7 @@ def test_store_rejects_future_effective_date_on_read(tmp_path):
                 "eps_yoy_growth": 25.0,
                 "status": "resolved",
                 "effective_date": "2026-09-01",
+                "resolver_version": EPS_RESOLVER_VERSION,
             }
         ]
     ).to_csv(path, index=False)
@@ -107,9 +109,56 @@ def test_store_rejects_value_with_non_resolved_status(tmp_path):
                 "code": "ABC",
                 "eps_yoy_growth": 25.0,
                 "status": "provider_error",
+                "resolver_version": EPS_RESOLVER_VERSION,
             }
         ]
     ).to_csv(path, index=False)
 
     with pytest.raises(EPSPITStoreError, match="non-resolved status"):
         EPSPITStore(str(path)).get("2026-08-21", "ABC")
+
+
+def test_store_ignores_legacy_resolver_version(tmp_path):
+    path = tmp_path / "signal_eps_pit.csv"
+    pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-21",
+                "code": "ABC",
+                "eps_yoy_growth": 25.0,
+                "status": "resolved",
+                "effective_date": "2026-08-01",
+                "resolver_version": "eps_pit_v2",
+            }
+        ]
+    ).to_csv(path, index=False)
+
+    assert EPSPITStore(str(path)).get("2026-08-21", "ABC") is None
+
+
+def test_store_persists_and_reuses_single_sec_cik_binding(tmp_path):
+    path = tmp_path / "signal_eps_pit.csv"
+    store = EPSPITStore(str(path))
+    store.upsert(
+        EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-21",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=25.0,
+            source="SEC",
+            effective_date="2026-08-01",
+            sec_cik="0000123456",
+        )
+    )
+    store.upsert(
+        EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-28",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=30.0,
+            source="YahooLiveObserved",
+            effective_date="2026-08-28",
+        )
+    )
+
+    assert store.get_sec_cik("ABC") == "0000123456"

@@ -29,7 +29,7 @@ def test_current_pool_does_not_publish_on_eps_provider_error(tmp_path, monkeypat
     monkeypatch.setattr(
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
-        staticmethod(lambda snapshot, codes: {codes[0]: {"missing_reason": "PROVIDER_ERROR"}}),
+        staticmethod(lambda snapshot, codes, **kwargs: {codes[0]: {"missing_reason": "PROVIDER_ERROR"}}),
     )
 
     with pytest.raises(RuntimeError, match="BF Pool signal EPS provider failure: ERR"):
@@ -47,7 +47,7 @@ def test_expected_eps_unavailable_is_published_with_reason(tmp_path, monkeypatch
         SignalEPSLookup,
         "fetch_sec_yahoo_eps",
         staticmethod(
-            lambda snapshot, codes: {
+            lambda snapshot, codes, **kwargs: {
                 codes[0]: {"missing_reason": "NO_PRIOR_YEAR_QUARTER"}
             }
         ),
