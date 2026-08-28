@@ -8,6 +8,8 @@ from typing import Any, Sequence
 
 import pandas as pd
 
+from backtest.replay_eps import replay_signal_eps_lookup
+
 from dashboard.skill_industry_eps_known import (
     SkillCandidate,
     rank_skill_industry_eps_known,
@@ -27,7 +29,8 @@ def replay_b0_on_pool(
     df = pool_df.copy()
     df["snapshot_date"] = snapshot_date
 
-    selected: list[SkillCandidate] = select_skill_industry_eps_known(df, limit=limit)
+    with replay_signal_eps_lookup(allow_network=False):
+        selected: list[SkillCandidate] = select_skill_industry_eps_known(df, limit=limit)
     rows: list[dict[str, Any]] = []
 
     for pick_idx, item in enumerate(selected, 1):

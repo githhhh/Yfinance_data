@@ -12,6 +12,8 @@ import math
 from typing import Any
 import pandas as pd
 
+from backtest.replay_eps import get_replay_signal_eps
+
 
 def to_float(value: object) -> float | None:
     try:
@@ -44,9 +46,7 @@ def get_effective_eps_pit(row: pd.Series | dict[str, Any], code: str) -> float |
     if not snapshot or not code:
         return None
     try:
-        from eps_pit.lookup import get_signal_eps
-
-        return get_signal_eps(snapshot, code)
+        return get_replay_signal_eps(snapshot, code, allow_network=False)
     except Exception:
         return None
 

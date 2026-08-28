@@ -16,6 +16,8 @@ from typing import Any
 
 import pandas as pd
 
+from eps_pit import EPSResolveMode, enrich_pool_with_signal_eps
+
 from . import (
     EXPECTED_POOL_FIELDS,
     HistoricalPklCandidate,
@@ -390,6 +392,12 @@ def run_one_week(
         pool = repair_research_fields(pool)
         pool = normalize_empty_pool_schema(pool)
         pool = clear_snapshot_contaminated_eps(pool)
+        pool = enrich_pool_with_signal_eps(
+            pool,
+            snapshot_date=snapshot_date,
+            refresh_missing=True,
+            mode=EPSResolveMode.REPLAY,
+        )
         pool = enrich_pool_with_asof_52w_high(pool, daily_clip.data, expected_last_trading_day)
         pool.to_csv(pool_path, index=False, encoding="utf-8-sig")
         audit = audit_pool_schema(pool)

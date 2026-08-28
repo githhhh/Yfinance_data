@@ -397,8 +397,17 @@ def enrich_pool_with_asof_52w_high(
 
 
 def clear_snapshot_contaminated_eps(pool: pd.DataFrame) -> pd.DataFrame:
+    """Clear live/current EPS facts before historical REPLAY re-resolution."""
     result = pool.copy()
-    result["eps_yoy_growth"] = pd.NA
+    for column in (
+        "eps_yoy_growth",
+        "eps_yoy_growth_source",
+        "eps_yoy_growth_status",
+        "eps_yoy_growth_missing_reason",
+        "eps_growth_type",
+    ):
+        if column in result.columns or column == "eps_yoy_growth":
+            result[column] = pd.NA
     return result
 
 

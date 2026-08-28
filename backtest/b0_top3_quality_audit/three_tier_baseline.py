@@ -22,6 +22,7 @@ import pandas as pd
 from scipy import stats
 
 from backtest.b0_top3_quality_audit.eligibility import is_production_eligible_pit
+from backtest.replay_eps import replay_signal_eps_lookup
 from dashboard.skill_industry_eps_known import select_skill_industry_eps_known
 
 logger = logging.getLogger(__name__)
@@ -167,12 +168,13 @@ def run_three_tier_baseline(
 
     # 1. Run deterministic B0 baseline to get recommendations across all snapshot weeks
     b0_recs_by_snap: dict[str, list[str]] = {}
-    for snap_date, snap_df in events_df.groupby("snapshot_date"):
-        snap_df_copy = snap_df.copy()
-        snap_df_copy["snapshot_date"] = snap_date
-        selected_candidates = select_skill_industry_eps_known(snap_df_copy, limit=pick_limit)
-        if selected_candidates:
-            b0_recs_by_snap[str(snap_date)] = [c.code for c in selected_candidates]
+    with replay_signal_eps_lookup(allow_network=False):
+        for snap_date, snap_df in events_df.groupby("snapshot_date"):
+            snap_df_copy = snap_df.copy()
+            snap_df_copy["snapshot_date"] = snap_date
+            selected_candidates = select_skill_industry_eps_known(snap_df_copy, limit=pick_limit)
+            if selected_candidates:
+                b0_recs_by_snap[str(snap_date)] = [c.code for c in selected_candidates]
             
     valid_b0_weeks = sorted(b0_recs_by_snap.keys())
 

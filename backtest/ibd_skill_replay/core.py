@@ -7,6 +7,8 @@ from typing import Iterable
 import math
 import pandas as pd
 
+from backtest.replay_eps import get_replay_signal_eps
+
 
 @dataclass(frozen=True)
 class SnapshotMeta:
@@ -205,8 +207,7 @@ def repair_pool_fields(pool: pd.DataFrame, prices: dict[str, pd.DataFrame], *, s
             repaired.at[idx, "dist_to_52w_high_pct_repair_method"] = "snapshot_close_vs_52w_high"
         if to_float(row.get("eps_yoy_growth")) is None:
             try:
-                from eps_pit.lookup import get_signal_eps
-                eps_val = get_signal_eps(snapshot_date, code)
+                eps_val = get_replay_signal_eps(snapshot_date, code, allow_network=False)
                 if eps_val is not None:
                     repaired.at[idx, "eps_yoy_growth"] = eps_val
                     repaired.at[idx, "eps_yoy_growth_repair_method"] = "pit_signal_supplement"
@@ -237,8 +238,7 @@ def select_current_skill_top3(pool: pd.DataFrame) -> ReplayResult:
             snap = str(row_obj.get("snapshot_date", "")).strip()
             if snap:
                 try:
-                    from eps_pit.lookup import get_signal_eps
-                    eps = get_signal_eps(snap, item.code)
+                    eps = get_replay_signal_eps(snap, item.code, allow_network=False)
                 except Exception:
                     pass
         industry_key = item.industry.strip().lower()
@@ -261,8 +261,7 @@ def select_current_skill_top3(pool: pd.DataFrame) -> ReplayResult:
             snap = str(row_obj.get("snapshot_date", "")).strip()
             if snap:
                 try:
-                    from eps_pit.lookup import get_signal_eps
-                    eps = get_signal_eps(snap, item.code)
+                    eps = get_replay_signal_eps(snap, item.code, allow_network=False)
                 except Exception:
                     pass
         if item.raw_rank <= 5 and eps is None:
@@ -417,8 +416,7 @@ def _old_item(row: pd.Series, row_idx: int) -> ReplayItem:
         code = str(row.get("code", "")).strip()
         if snap and code:
             try:
-                from eps_pit.lookup import get_signal_eps
-                eps = get_signal_eps(snap, code)
+                eps = get_replay_signal_eps(snap, code, allow_network=False)
             except Exception:
                 pass
     cur = to_float(row.get("current_vs_ibd_candidate_pct"))

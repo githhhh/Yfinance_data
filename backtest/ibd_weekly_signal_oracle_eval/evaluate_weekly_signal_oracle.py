@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path.cwd()))
 from backtest.ibd_skill_iteration.core import rank_reasoning_candidates
 from backtest.ibd_skill_replay.core import compute_path_metrics, to_float
 from backtest.ibd_skill_replay.run_ytd_replay import _load_price_cache
+from backtest.replay_eps import get_replay_signal_eps, replay_signal_eps_lookup
 from backtest.ibd_weekly_signal_oracle_eval.price_cache import resolve_price_cache
 import eps_pit.lookup as eps_lookup
 
@@ -138,7 +139,8 @@ def pool_scope() -> dict[str, object]:
 @contextmanager
 def eps_mode(enabled: bool):
     if enabled:
-        yield
+        with replay_signal_eps_lookup(allow_network=False):
+            yield
         return
     old = eps_lookup.get_signal_eps
     eps_lookup.get_signal_eps = lambda snapshot_date, code: None
@@ -154,7 +156,7 @@ def effective_eps(snapshot: str, code: str, row_val: object, enabled: bool) -> f
         return val
     if not enabled:
         return None
-    return eps_lookup.get_signal_eps(str(snapshot), str(code))
+    return get_replay_signal_eps(str(snapshot), str(code), allow_network=False)
 
 
 def signal_mask(frame: pd.DataFrame) -> pd.Series:

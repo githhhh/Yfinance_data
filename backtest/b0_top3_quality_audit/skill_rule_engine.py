@@ -26,6 +26,8 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 
+from backtest.replay_eps import replay_signal_eps_lookup
+
 from dashboard.skill_industry_eps_known import (
     SkillCandidate,
     effective_eps,
@@ -46,7 +48,8 @@ class RuleSpec:
 
 def get_production_eligible_pool(pool_df: pd.DataFrame) -> list[SkillCandidate]:
     """Extract production eligible candidate pool (100% aligned with select_skill_industry_eps_known)."""
-    candidates = rank_skill_industry_eps_known(pool_df)
+    with replay_signal_eps_lookup(allow_network=False):
+        candidates = rank_skill_industry_eps_known(pool_df)
     eligible: list[SkillCandidate] = []
     for item in candidates:
         if item.entry_status != "ACTIONABLE":
