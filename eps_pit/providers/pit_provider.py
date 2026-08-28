@@ -322,6 +322,7 @@ def _derive_record(
         "unit": minuend.get("unit"),
         "period_type": "quarter",
         "source": minuend.get("source") or "SEC",
+        "sec_cik": minuend.get("sec_cik"),
         "source_record_id": f"{method}({','.join(source_ids)})",
         "_available_date": effective,
         "calculation_method": method,
