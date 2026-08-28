@@ -62,10 +62,14 @@ class SECYahooEPSProvider:
         def fetch_sec() -> dict[str, Any] | None:
             nonlocal sec_reason, sec_error
             try:
+                sec_kwargs: dict[str, Any] = {
+                    "prefer_bulk": not allow_current_yahoo,
+                }
+                if sec_cik_hint:
+                    sec_kwargs["cik_hint"] = sec_cik_hint
                 sec_history = self.sec.fetch_quarterly_history(
                     symbol,
-                    prefer_bulk=not allow_current_yahoo,
-                    cik_hint=sec_cik_hint,
+                    **sec_kwargs,
                 )
                 result, sec_reason = calculate_latest_eps_yoy_diagnostic(
                     sec_history, snapshot_date
