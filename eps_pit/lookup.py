@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from eps_pit.models import EPSMissingReason, EPSResolveMode, EPSResult, EPSStatus
+from eps_pit.models import EPSGrowthType, EPSMissingReason, EPSResolveMode, EPSResult, EPSStatus
 from eps_pit.providers.pit_provider import date10, normalize_symbol, safe_float
 from eps_pit.providers.sec_yahoo_provider import SECYahooEPSProvider
 from eps_pit.providers.tradingview_provider import TradingViewEPSProvider
@@ -83,6 +83,7 @@ class SignalEPSLookup:
         *,
         allow_current_yahoo: bool = False,
         observation_date: object | None = None,
+        sec_cik_hints: dict[str, str] | None = None,
     ) -> dict[str, dict[str, Any]]:
         snap = cls._normalize_date(snapshot_date)
         observation = cls._normalize_date(observation_date) if observation_date else ""
@@ -104,9 +105,13 @@ class SignalEPSLookup:
                 snap,
                 allow_current_yahoo=allow_current_yahoo,
                 observation_date=observation if allow_current_yahoo else None,
+                sec_cik_hint=(sec_cik_hints or {}).get(symbol),
             )
             if record is not None:
-                results[symbol] = record
+                item = dict(record)
+                if reason is not None:
+                    item["missing_reason"] = reason
+                results[symbol] = item
             else:
                 results[symbol] = {
                     "missing_reason": reason or EPSMissingReason.NO_QUARTERLY_EPS
@@ -148,6 +153,15 @@ class SignalEPSLookup:
             # Current/provider-reported observations are known to have been
             # available at least by the snapshot at which we captured them.
             effective = snap
+        growth_type_raw = str(record.get("growth_type") or "").strip()
+        try:
+            growth_type = EPSGrowthType(growth_type_raw) if growth_type_raw else None
+        except ValueError:
+            growth_type = None
+
+        def date_field(name: str) -> str | None:
+            return cls._normalize_date(record.get(name)) or None
+
         return EPSResult(
             code=sym,
             snapshot_date=snap,
@@ -157,9 +171,69 @@ class SignalEPSLookup:
             effective_date=effective,
             current_eps=safe_float(record.get("current_eps")),
             prior_year_eps=safe_float(record.get("prior_year_eps")),
-            current_period=cls._normalize_date(record.get("current_period")) or None,
-            prior_year_period=cls._normalize_date(record.get("prior_year_period")) or None,
+            current_period=date_field("current_period"),
+            prior_year_period=date_field("prior_year_period"),
             calculation_method=str(record.get("calculation_method") or "") or None,
+            growth_type=growth_type,
+            sec_cik=str(record.get("sec_cik") or "").strip() or None,
+            sec_current_eps=safe_float(record.get("sec_current_eps")),
+            sec_prior_year_eps=safe_float(record.get("sec_prior_year_eps")),
+            sec_current_period=date_field("sec_current_period"),
+            sec_prior_year_period=date_field("sec_prior_year_period"),
+            sec_effective_date=date_field("sec_effective_date"),
+            sec_source_record_id=str(record.get("sec_source_record_id") or "") or None,
+            yahoo_current_eps=safe_float(record.get("yahoo_current_eps")),
+            yahoo_prior_year_eps=safe_float(record.get("yahoo_prior_year_eps")),
+            yahoo_current_period=date_field("yahoo_current_period"),
+            yahoo_prior_year_period=date_field("yahoo_prior_year_period"),
+            yahoo_effective_date=date_field("yahoo_effective_date"),
+            yahoo_source_record_id=str(record.get("yahoo_source_record_id") or "") or None,
+            source_record_id=str(record.get("source_record_id") or "") or None,
+        )
+
+    @classmethod
+    def _expected_from_record(
+        cls,
+        sym: str,
+        snap: str,
+        record: dict[str, Any],
+        reason: EPSMissingReason,
+    ) -> EPSResult:
+        growth_type_raw = str(record.get("growth_type") or "").strip()
+        try:
+            growth_type = EPSGrowthType(growth_type_raw) if growth_type_raw else None
+        except ValueError:
+            growth_type = None
+
+        def date_field(name: str) -> str | None:
+            return cls._normalize_date(record.get(name)) or None
+
+        return EPSResult(
+            code=sym,
+            snapshot_date=snap,
+            status=EPSStatus.EXPECTED_UNAVAILABLE,
+            source=str(record.get("source") or "") or None,
+            effective_date=date_field("effective_date"),
+            current_eps=safe_float(record.get("current_eps")),
+            prior_year_eps=safe_float(record.get("prior_year_eps")),
+            current_period=date_field("current_period"),
+            prior_year_period=date_field("prior_year_period"),
+            calculation_method=str(record.get("calculation_method") or "") or None,
+            growth_type=growth_type,
+            missing_reason=reason,
+            sec_cik=str(record.get("sec_cik") or "").strip() or None,
+            sec_current_eps=safe_float(record.get("sec_current_eps")),
+            sec_prior_year_eps=safe_float(record.get("sec_prior_year_eps")),
+            sec_current_period=date_field("sec_current_period"),
+            sec_prior_year_period=date_field("sec_prior_year_period"),
+            sec_effective_date=date_field("sec_effective_date"),
+            sec_source_record_id=str(record.get("sec_source_record_id") or "") or None,
+            yahoo_current_eps=safe_float(record.get("yahoo_current_eps")),
+            yahoo_prior_year_eps=safe_float(record.get("yahoo_prior_year_eps")),
+            yahoo_current_period=date_field("yahoo_current_period"),
+            yahoo_prior_year_period=date_field("yahoo_prior_year_period"),
+            yahoo_effective_date=date_field("yahoo_effective_date"),
+            yahoo_source_record_id=str(record.get("yahoo_source_record_id") or "") or None,
             source_record_id=str(record.get("source_record_id") or "") or None,
         )
 
@@ -237,16 +311,23 @@ class SignalEPSLookup:
         pit_error: Exception | None = None
         pit_entry: dict[str, Any] | None = None
         try:
+            sec_cik = store.get_sec_cik(sym)
+            pit_kwargs: dict[str, Any] = {
+                "allow_current_yahoo": current_state_allowed,
+                "observation_date": observed_on if current_state_allowed else None,
+            }
+            if sec_cik:
+                pit_kwargs["sec_cik_hints"] = {sym: sec_cik}
             pit_entry = cls.fetch_sec_yahoo_eps(
                 snap,
                 [sym],
-                allow_current_yahoo=current_state_allowed,
-                observation_date=observed_on if current_state_allowed else None,
+                **pit_kwargs,
             ).get(sym)
         except Exception as exc:
             pit_error = exc
             logging.warning("Signal EPS PIT provider error for %s: %s", sym, exc)
 
+        semantic_result: EPSResult | None = None
         if pit_entry is not None:
             resolved = cls._resolved_from_record(sym, snap, pit_entry)
             if resolved is not None:
@@ -257,6 +338,13 @@ class SignalEPSLookup:
             )
             if pit_reason is EPSMissingReason.PROVIDER_ERROR:
                 pit_error = RuntimeError("PIT provider reported technical failure")
+            else:
+                semantic_result = cls._expected_from_record(
+                    sym,
+                    snap,
+                    pit_entry,
+                    pit_reason,
+                )
         else:
             pit_reason = EPSMissingReason.NO_QUARTERLY_EPS
 
@@ -281,6 +369,16 @@ class SignalEPSLookup:
             reason = tv_reason
         else:
             reason = EPSMissingReason.NO_QUARTERLY_EPS
+
+        if semantic_result is not None:
+            semantic_result = EPSResult(
+                **{
+                    **semantic_result.__dict__,
+                    "missing_reason": reason,
+                }
+            )
+            store.upsert(semantic_result)
+            return semantic_result
 
         return EPSResult(
             code=sym,
@@ -313,6 +411,7 @@ class SignalEPSLookup:
             "eps_yoy_growth_source",
             "eps_yoy_growth_status",
             "eps_yoy_growth_missing_reason",
+            "eps_growth_type",
         ):
             if column not in df.columns:
                 df[column] = pd.NA
@@ -393,6 +492,10 @@ class SignalEPSLookup:
             except Exception:
                 existing_source = str(source_raw).strip() if source_raw is not None else None
 
+            replay_revalidation = (
+                existing_eps is not None
+                and mode is EPSResolveMode.REPLAY
+            )
             stale_current_replacement = (
                 existing_eps is not None
                 and mode is EPSResolveMode.LIVE
@@ -403,7 +506,7 @@ class SignalEPSLookup:
                     "POOL_EXISTING",
                 })
             )
-            if stale_current_replacement:
+            if replay_revalidation or stale_current_replacement:
                 # A current-state Stage2 value observed after this snapshot
                 # cannot be backdated. Re-resolve the old snapshot from strict
                 # PIT sources instead of silently stamping effective_date=snap.
@@ -412,6 +515,7 @@ class SignalEPSLookup:
                 df.at[idx, "eps_yoy_growth_source"] = pd.NA
                 df.at[idx, "eps_yoy_growth_status"] = pd.NA
                 df.at[idx, "eps_yoy_growth_missing_reason"] = pd.NA
+                df.at[idx, "eps_growth_type"] = pd.NA
 
             if existing_eps is not None:
                 source = existing_source
@@ -420,6 +524,8 @@ class SignalEPSLookup:
                 df.at[idx, "eps_yoy_growth_status"] = EPSStatus.RESOLVED.value
                 df.at[idx, "eps_yoy_growth_missing_reason"] = pd.NA
                 df.at[idx, "eps_yoy_growth_source"] = source
+                if pd.isna(row.get("eps_growth_type")):
+                    df.at[idx, "eps_growth_type"] = pd.NA
                 if snap and sym:
                     store.upsert(
                         EPSResult(
@@ -450,7 +556,11 @@ class SignalEPSLookup:
                 sym,
                 mode=mode,
                 csv_path=csv_path,
-                allow_network=refresh_missing or stale_current_replacement,
+                allow_network=(
+                    refresh_missing
+                    or stale_current_replacement
+                    or replay_revalidation
+                ),
                 _allow_live_current_provider=not tv_batch_attempted,
                 _live_current_outcome=live_outcome,
                 _live_current_error=tv_batch_error if current_state_allowed else None,
@@ -459,6 +569,9 @@ class SignalEPSLookup:
             df.at[idx, "eps_yoy_growth_status"] = result.status.value
             df.at[idx, "eps_yoy_growth_missing_reason"] = (
                 result.missing_reason.value if result.missing_reason else pd.NA
+            )
+            df.at[idx, "eps_growth_type"] = (
+                result.growth_type.value if result.growth_type else pd.NA
             )
             if result.is_resolved:
                 df.at[idx, "eps_yoy_growth"] = result.eps_yoy_growth

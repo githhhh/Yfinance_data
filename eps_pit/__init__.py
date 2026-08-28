@@ -6,9 +6,10 @@ from eps_pit.lookup import (
     get_signal_eps,
     resolve_signal_eps,
 )
-from eps_pit.models import EPSMissingReason, EPSResolveMode, EPSResult, EPSStatus
+from eps_pit.models import EPSGrowthType, EPSMissingReason, EPSResolveMode, EPSResult, EPSStatus
 
 __all__ = [
+    "EPSGrowthType",
     "EPSMissingReason",
     "EPSResolveMode",
     "EPSResult",

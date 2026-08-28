@@ -341,3 +341,174 @@ def test_live_existing_stage2_value_is_not_backdated_on_rerun(monkeypatch, tmp_p
 
     assert enriched.loc[0, "eps_yoy_growth"] == 42.0
     assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+
+
+def test_replay_never_trusts_prefilled_pool_eps(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append((snapshot, codes, kwargs))
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 42.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_tradingview_eps",
+        staticmethod(
+            lambda codes: (_ for _ in ()).throw(
+                AssertionError("REPLAY must never call TradingView")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(fake_pit),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-21",
+                "code": "ABC",
+                "signal": True,
+                "eps_yoy_growth": 999.0,
+                "eps_yoy_growth_source": "POOL_EXISTING",
+            }
+        ]
+    )
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(tmp_path / "pit.csv"),
+        refresh_missing=False,
+        mode=EPSResolveMode.REPLAY,
+        observation_date="2026-08-27",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 42.0
+    assert enriched.loc[0, "eps_yoy_growth_source"] == "SEC"
+    assert len(calls) == 1
+
+
+def test_resolver_reuses_bound_sec_cik_hint(monkeypatch, tmp_path):
+    store = EPSPITStore(str(tmp_path / "pit.csv"))
+    store.upsert(
+        __import__("eps_pit").EPSResult(
+            code="ABC",
+            snapshot_date="2026-08-20",
+            status=EPSStatus.RESOLVED,
+            eps_yoy_growth=10.0,
+            source="SEC",
+            effective_date="2026-08-01",
+            sec_cik="0000123456",
+        )
+    )
+    calls = []
+
+    def fake_pit(snapshot, codes, **kwargs):
+        calls.append(kwargs)
+        return {
+            codes[0]: {
+                "eps_yoy_growth": 20.0,
+                "source": "SEC",
+                "effective_date": "2026-08-20",
+                "sec_cik": "0000123456",
+            }
+        }
+
+    monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_pit))
+
+    result = resolve_signal_eps(
+        "2026-08-21",
+        "ABC",
+        mode=EPSResolveMode.REPLAY,
+        csv_path=str(tmp_path / "pit.csv"),
+        observation_date="2026-08-27",
+    )
+
+    assert result.status is EPSStatus.RESOLVED
+    assert calls[0]["sec_cik_hints"] == {"ABC": "0000123456"}
+
+
+def test_replay_reconciled_zero_base_persists_dual_source_evidence_and_projects_growth_type(
+    monkeypatch,
+    tmp_path,
+):
+    pit_path = tmp_path / "signal_eps_pit.csv"
+
+    monkeypatch.setattr(
+        SignalEPSLookup,
+        "fetch_sec_yahoo_eps",
+        staticmethod(
+            lambda snapshot, codes, **kwargs: {
+                "JAN": {
+                    "eps_yoy_growth": 451.9887363604,
+                    "source": "SEC+YahooHistoricalEvent",
+                    "effective_date": "2026-08-05",
+                    "current_eps": 0.05,
+                    "prior_year_eps": -0.014205,
+                    "current_period": "2026-06-30",
+                    "prior_year_period": "2025-06-30",
+                    "growth_type": "TURNAROUND",
+                    "calculation_method": "sec_zero_base_reconciled_yahoo_event",
+                    "sec_cik": "0002100805",
+                    "sec_current_eps": 0.05,
+                    "sec_prior_year_eps": 0.0,
+                    "sec_current_period": "2026-06-30",
+                    "sec_prior_year_period": "2025-06-30",
+                    "sec_effective_date": "2026-08-05",
+                    "sec_source_record_id": "sec-current",
+                    "yahoo_current_eps": 0.05,
+                    "yahoo_prior_year_eps": -0.014205,
+                    "yahoo_current_period": "2026-06-30",
+                    "yahoo_prior_year_period": "2025-06-30",
+                    "yahoo_effective_date": "2026-08-05",
+                    "yahoo_source_record_id": "yahoo-current",
+                }
+            }
+        ),
+    )
+
+    pool = pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-08-28",
+                "code": "JAN",
+                "signal": True,
+                "eps_yoy_growth": pd.NA,
+            }
+        ]
+    )
+
+    enriched = enrich_pool_with_signal_eps(
+        pool,
+        csv_path=str(pit_path),
+        refresh_missing=True,
+        mode=EPSResolveMode.REPLAY,
+        observation_date="2026-08-28",
+    )
+
+    assert enriched.loc[0, "eps_yoy_growth"] == 451.9887363604
+    assert enriched.loc[0, "eps_growth_type"] == "TURNAROUND"
+
+    stored = pd.read_csv(pit_path, dtype={"sec_cik": str})
+    row = stored.iloc[0]
+    assert row["current_period"] == "2026-06-30"
+    assert row["prior_year_period"] == "2025-06-30"
+    assert row["current_eps"] == 0.05
+    assert row["prior_year_eps"] == -0.014205
+    assert row["growth_type"] == "TURNAROUND"
+    assert row["sec_current_eps"] == 0.05
+    assert row["sec_prior_year_eps"] == 0.0
+    assert row["sec_current_period"] == "2026-06-30"
+    assert row["sec_prior_year_period"] == "2025-06-30"
+    assert row["yahoo_current_eps"] == 0.05
+    assert row["yahoo_prior_year_eps"] == -0.014205
+    assert row["yahoo_current_period"] == "2026-06-30"
+    assert row["yahoo_prior_year_period"] == "2025-06-30"

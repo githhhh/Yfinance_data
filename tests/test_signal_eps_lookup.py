@@ -5,12 +5,19 @@ import pandas as pd
 from eps_pit import EPSResolveMode, EPSStatus
 from eps_pit.lookup import SignalEPSLookup, enrich_pool_with_signal_eps, resolve_signal_eps
 from eps_pit.store import EPSPITStore
+from eps_pit.models import EPS_RESOLVER_VERSION
 
 
 def test_signal_eps_enrichment_uses_pit_then_sec_yahoo_for_signal_rows(tmp_path, monkeypatch):
     pit_path = tmp_path / "signal_eps_pit.csv"
     pd.DataFrame(
-        [{"snapshot_date": "2026-08-14", "code": "PIT", "eps_yoy_growth": 31.5}]
+        [{
+            "snapshot_date": "2026-08-14",
+            "code": "PIT",
+            "eps_yoy_growth": 31.5,
+            "status": "resolved",
+            "resolver_version": EPS_RESOLVER_VERSION,
+        }]
     ).to_csv(pit_path, index=False)
 
     def fake_fetch(snapshot_date, codes, **kwargs):
@@ -58,7 +65,7 @@ def test_signal_eps_enrichment_uses_pit_then_sec_yahoo_for_signal_rows(tmp_path,
     assert enriched.loc[3, "eps_yoy_growth_status"] == EPSStatus.EXPECTED_UNAVAILABLE.value
 
 
-def test_signal_eps_enrichment_refreshes_only_missing_signal_rows(monkeypatch, tmp_path):
+def test_signal_eps_replay_revalidates_prefilled_signal_rows(monkeypatch, tmp_path):
     requested_codes = []
 
     def fake_fetch(snapshot_date, codes, **kwargs):
@@ -66,11 +73,16 @@ def test_signal_eps_enrichment_refreshes_only_missing_signal_rows(monkeypatch, t
         return {
             "MISS": {
                 "eps_yoy_growth": 55.0,
-                "source": "Yahoo",
+                "source": "YahooHistoricalEvent",
                 "effective_date": "2026-08-05",
                 "current_eps": 1.55,
                 "prior_year_eps": 1.00,
-            }
+            },
+            "EXISTING": {
+                "eps_yoy_growth": 13.0,
+                "source": "SEC",
+                "effective_date": "2026-08-01",
+            },
         }
 
     monkeypatch.setattr(SignalEPSLookup, "fetch_sec_yahoo_eps", staticmethod(fake_fetch))
@@ -90,10 +102,10 @@ def test_signal_eps_enrichment_refreshes_only_missing_signal_rows(monkeypatch, t
         mode=EPSResolveMode.REPLAY,
     )
 
-    assert requested_codes == ["MISS"]
+    assert requested_codes == ["MISS", "EXISTING"]
     assert enriched.loc[0, "eps_yoy_growth"] == 55.0
-    assert enriched.loc[1, "eps_yoy_growth"] == 12.0
-    assert enriched.loc[1, "eps_yoy_growth_source"] == "POOL_EXISTING"
+    assert enriched.loc[1, "eps_yoy_growth"] == 13.0
+    assert enriched.loc[1, "eps_yoy_growth_source"] == "SEC"
     assert pd.isna(enriched.loc[2, "eps_yoy_growth"])
 
 

@@ -12,3 +12,6 @@ token_*.json
 # Big EPUB and unpacked cache
 How_to_Make_Money_in_Stocks.epub
 
+
+# Local EPS PIT provider/download cache
+output/eps_pit_cache/

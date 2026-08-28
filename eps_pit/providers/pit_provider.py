@@ -19,33 +19,36 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from eps_pit.models import EPSMissingReason
+from eps_pit.models import EPSGrowthType, EPSMissingReason
 
 
-DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CACHE_DIR = PROJECT_ROOT / "output" / "eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-DEFAULT_SEC_USER_AGENTS = (
-    "QuantResearch contact@quantresearch.org",
-    "FinancialAnalytics research@financialanalytics.io",
-    "MarketDataEngine support@marketdataengine.com",
-    "AlphaDataSystem data@alphadatasystem.net",
-    "EquityResearchLab info@equityresearchlab.org",
-    "MacroQuantAnalytics dev@macroquantanalytics.com",
-    "CapitalDataPlatform ops@capitaldataplatform.org",
-    "SecuritiesInsights info@securitiesinsights.net",
-    "FundamentalMetrics tech@fundamentalmetrics.io",
-    "TradingSignalResearch data@tradingsignalresearch.com",
-    "GlobalAssetAnalytics contact@globalassetanalytics.org",
-    "ApexQuantitative research@apexquantitative.com",
-    "PortfolioIntelligence support@portfoliointelligence.net",
-    "SystematicEquity dev@systematicequity.io",
-    "ValuationDataLabs info@valuationdatalabs.org",
-    "EdgeAnalyticsGroup contact@edgeanalyticsgroup.com",
-    "SignalVectorLabs data@signalvectorlabs.net",
-    "MarketStructureTech tech@marketstructuretech.io",
-    "InvestmentDataService admin@investmentdataservice.com",
-    "CoreFinanceResearch support@corefinanceresearch.org",
+SEC_USER_AGENT_CONTACTS = (
+    "contact@quantresearch.org",
+    "research@financialanalytics.io",
+    "support@marketdataengine.com",
+    "data@alphadatasystem.net",
+    "info@equityresearchlab.org",
+    "dev@macroquantanalytics.com",
+    "ops@capitaldataplatform.org",
+    "info@securitiesinsights.net",
+    "tech@fundamentalmetrics.io",
+    "data@tradingsignalresearch.com",
+    "contact@globalassetanalytics.org",
+    "research@apexquantitative.com",
+    "support@portfoliointelligence.net",
+    "dev@systematicequity.io",
+    "info@valuationdatalabs.org",
+    "contact@edgeanalyticsgroup.com",
+    "data@signalvectorlabs.net",
+    "tech@marketstructuretech.io",
+    "admin@investmentdataservice.com",
+    "support@corefinanceresearch.org",
 )
+DEFAULT_SEC_USER_AGENTS = SEC_USER_AGENT_CONTACTS
+SEC_MAX_403_USER_AGENT_SWITCHES = 2
 
 
 def get_sec_user_agent() -> str:
@@ -133,6 +136,33 @@ def safe_float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return result if math.isfinite(result) else None
+
+
+def classify_eps_growth(
+    current_eps: object,
+    prior_year_eps: object,
+) -> EPSGrowthType | None:
+    current = safe_float(current_eps)
+    prior = safe_float(prior_year_eps)
+    if current is None or prior is None:
+        return None
+    if prior == 0:
+        return EPSGrowthType.ZERO_BASE
+    if prior < 0:
+        if current > 0:
+            return EPSGrowthType.TURNAROUND
+        if current > prior:
+            return EPSGrowthType.LOSS_NARROWING
+        if current < prior:
+            return EPSGrowthType.LOSS_WIDENING
+        return EPSGrowthType.FLAT
+    if current < 0:
+        return EPSGrowthType.PROFIT_TO_LOSS
+    if current > prior:
+        return EPSGrowthType.GROWTH
+    if current < prior:
+        return EPSGrowthType.DECLINE
+    return EPSGrowthType.FLAT
 
 
 def availability_date(record: dict[str, Any]) -> str:
@@ -287,6 +317,7 @@ def _derive_record(
         "unit": minuend.get("unit"),
         "period_type": "quarter",
         "source": minuend.get("source") or "SEC",
+        "sec_cik": minuend.get("sec_cik"),
         "source_record_id": f"{method}({','.join(source_ids)})",
         "_available_date": effective,
         "calculation_method": method,
@@ -499,6 +530,48 @@ def _find_prior_year_record(
     return max(nearest, key=lambda item: item[1])[2]
 
 
+def latest_eps_pair_evidence(
+    records: list[dict[str, Any]],
+    snapshot_date: object,
+) -> dict[str, Any] | None:
+    """Return the latest visible current/prior EPS pair even for a zero base."""
+    eligible = select_visible_quarters(records, snapshot_date)
+    if not eligible:
+        return None
+    latest_period = max(date10(record.get("report_period")) for record in eligible)
+    current_candidates = [
+        record
+        for record in eligible
+        if date10(record.get("report_period")) == latest_period
+    ]
+    current_candidates.sort(key=_concept_priority, reverse=True)
+
+    for current in current_candidates:
+        prior = _find_prior_year_record(current, eligible)
+        if prior is None:
+            continue
+        current_eps = safe_float(current.get("_eps", current.get("eps_diluted")))
+        prior_eps = safe_float(prior.get("_eps", prior.get("eps_diluted")))
+        if current_eps is None or prior_eps is None:
+            continue
+        return {
+            "source": current.get("source") or "SEC/Yahoo",
+            "effective_date": str(
+                current.get("_available_date") or availability_date(current)
+            ),
+            "current_eps": current_eps,
+            "prior_year_eps": prior_eps,
+            "current_period": latest_period,
+            "prior_year_period": date10(prior.get("report_period")),
+            "growth_type": classify_eps_growth(current_eps, prior_eps).value
+            if classify_eps_growth(current_eps, prior_eps)
+            else None,
+            "sec_cik": current.get("sec_cik"),
+            "source_record_id": current.get("source_record_id"),
+        }
+    return None
+
+
 def calculate_latest_eps_yoy_diagnostic(
     records: list[dict[str, Any]],
     snapshot_date: object,
@@ -538,6 +611,12 @@ def calculate_latest_eps_yoy_diagnostic(
             "current_period": latest_period,
             "prior_year_period": date10(prior.get("report_period")),
             "calculation_method": current.get("calculation_method") or "reported_quarter",
+            "growth_type": (
+                classify_eps_growth(current_eps, prior_eps).value
+                if classify_eps_growth(current_eps, prior_eps)
+                else None
+            ),
+            "sec_cik": current.get("sec_cik"),
             "source_record_id": current.get("source_record_id"),
         }, None
 
@@ -605,6 +684,7 @@ class SECProvider:
         max_retries: int = 2,
         bulk_companyfacts_zip: Path | None = None,
         user_agent: str | None = None,
+        max_403_user_agent_switches: int = SEC_MAX_403_USER_AGENT_SWITCHES,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -613,6 +693,21 @@ class SECProvider:
         self.companyfacts_cache = TTLJSONCache(companyfacts_cache_ttl_seconds)
         self.bulk_cache_ttl_seconds = max(int(bulk_cache_ttl_seconds), 0)
         self.max_retries = max(int(max_retries), 0)
+        self.max_403_user_agent_switches = max(
+            int(max_403_user_agent_switches),
+            0,
+        )
+        env_user_agent = str(os.getenv("SEC_USER_AGENT") or "").strip()
+        if user_agent:
+            self._user_agent_candidates = [str(user_agent).strip()]
+        elif env_user_agent:
+            self._user_agent_candidates = [env_user_agent]
+        else:
+            candidates = list(DEFAULT_SEC_USER_AGENTS)
+            random.shuffle(candidates)
+            self._user_agent_candidates = candidates
+        self._user_agent_index = 0
+        self._user_agent_switches = 0
         self._cik_map: dict[str, str] | None = None
         self._cik_map_error: Exception | None = None
         self._bulk_members: dict[str, str] | None = None
@@ -623,7 +718,8 @@ class SECProvider:
             or (self.cache_dir / SEC_BULK_COMPANYFACTS_FILENAME)
         )
         self.session = requests.Session()
-        self.session.headers.update(build_sec_request_headers(user_agent))
+        initial_user_agent = self._user_agent_candidates[0] if self._user_agent_candidates else user_agent
+        self.session.headers.update(build_sec_request_headers(initial_user_agent))
 
     @property
     def headers(self) -> dict[str, str]:
@@ -660,6 +756,19 @@ class SECProvider:
                     pass
         return 0.5 * (2 ** attempt)
 
+    def _switch_user_agent_after_403(self) -> bool:
+        if (
+            self._user_agent_switches >= self.max_403_user_agent_switches
+            or self._user_agent_index + 1 >= len(self._user_agent_candidates)
+        ):
+            return False
+        self._user_agent_index += 1
+        self._user_agent_switches += 1
+        self.session.headers["User-Agent"] = self._user_agent_candidates[
+            self._user_agent_index
+        ]
+        return True
+
     @staticmethod
     def _blocked_host_error(url: str) -> RuntimeError | None:
         host = (urlparse(url).hostname or "").lower()
@@ -676,8 +785,8 @@ class SECProvider:
         if blocked is not None:
             raise blocked
 
-        attempts = self.max_retries + 1
-        for attempt in range(attempts):
+        retry_attempt = 0
+        while True:
             self._throttle()
             response = self.session.get(url, timeout=15)
 
@@ -687,22 +796,26 @@ class SECProvider:
                 except Exception as exc:
                     raise RuntimeError(f"{label} returned invalid JSON") from exc
 
+            if response.status_code == 403:
+                error = RuntimeError(f"{label} HTTP 403")
+                if self._switch_user_agent_after_403():
+                    logging.warning(
+                        "%s rejected SEC User-Agent; retrying with another configured identity variant",
+                        label,
+                    )
+                    continue
+                self._block_host(url, error)
+                raise error
+
             if (
                 response.status_code in SEC_RETRYABLE_STATUS_CODES
-                and attempt + 1 < attempts
+                and retry_attempt < self.max_retries
             ):
-                time.sleep(self._retry_delay(response, attempt))
+                time.sleep(self._retry_delay(response, retry_attempt))
+                retry_attempt += 1
                 continue
 
-            error = RuntimeError(f"{label} HTTP {response.status_code}")
-            if response.status_code == 403:
-                # Hosted/cloud egress can be blocked independently of request
-                # identity. Stop the entire SEC client for this run after the
-                # first access-denied response instead of hammering every CIK.
-                self._block_host(url, error)
-            raise error
-
-        raise RuntimeError(f"{label} request failed")
+            raise RuntimeError(f"{label} HTTP {response.status_code}")
 
     @staticmethod
     def _partial_download_path(destination: Path) -> Path:
@@ -741,9 +854,8 @@ class SECProvider:
     def _download_file(self, url: str, destination: Path, *, label: str) -> None:
         """Download a large SEC archive with resumable Range requests.
 
-        A stable .part file is preserved across retries and process restarts.
-        HTTP 206 appends to the partial file. If the server ignores Range and
-        returns HTTP 200, the partial file is safely restarted from byte zero.
+        403 User-Agent switching has its own bounded budget and does not consume
+        the transport retry budget used for 408/429/5xx or interrupted streams.
         """
         blocked = self._blocked_host_error(url)
         if blocked is not None:
@@ -752,9 +864,9 @@ class SECProvider:
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = self._partial_download_path(destination)
         metadata_path = self._partial_metadata_path(destination)
-        attempts = self.max_retries + 1
+        retry_attempt = 0
 
-        for attempt in range(attempts):
+        while True:
             offset = partial.stat().st_size if partial.exists() else 0
             request_headers = None
             if offset > 0:
@@ -773,9 +885,25 @@ class SECProvider:
             )
 
             try:
+                if response.status_code == 403:
+                    error = RuntimeError(f"{label} HTTP 403")
+                    if self._switch_user_agent_after_403():
+                        logging.warning(
+                            "%s rejected SEC User-Agent; retrying bulk download "
+                            "with another configured identity variant",
+                            label,
+                        )
+                        continue
+                    self._block_host(url, error)
+                    raise error
+
                 if response.status_code == 416 and offset > 0:
                     content_range = str(response.headers.get("Content-Range") or "")
-                    total_text = content_range.rsplit("/", 1)[-1] if "/" in content_range else ""
+                    total_text = (
+                        content_range.rsplit("/", 1)[-1]
+                        if "/" in content_range
+                        else ""
+                    )
                     try:
                         total_size = int(total_text)
                     except ValueError:
@@ -792,8 +920,10 @@ class SECProvider:
                         return
                     partial.unlink(missing_ok=True)
                     metadata_path.unlink(missing_ok=True)
-                    if attempt + 1 < attempts:
+                    if retry_attempt < self.max_retries:
+                        retry_attempt += 1
                         continue
+                    raise RuntimeError(f"{label} HTTP 416")
 
                 if response.status_code in {200, 206}:
                     append = response.status_code == 206 and offset > 0
@@ -826,26 +956,26 @@ class SECProvider:
 
                     mode = "ab" if append else "wb"
                     if not append:
-                        # HTTP 200 after a Range/If-Range request means the
-                        # remote archive changed (or Range was ignored); restart
-                        # the local partial and bind it to the new validator.
                         metadata_path.unlink(missing_ok=True)
                     self._write_partial_metadata(metadata_path, response)
+
                     try:
                         with partial.open(mode) as handle:
                             for chunk in response.iter_content(chunk_size=1024 * 1024):
                                 if chunk:
                                     handle.write(chunk)
                     except requests.RequestException:
-                        if attempt + 1 < attempts:
-                            time.sleep(0.5 * (2 ** attempt))
+                        if retry_attempt < self.max_retries:
+                            time.sleep(0.5 * (2 ** retry_attempt))
+                            retry_attempt += 1
                             continue
                         raise
 
                     downloaded_size = partial.stat().st_size
                     if expected_total >= 0 and downloaded_size < expected_total:
-                        if attempt + 1 < attempts:
-                            time.sleep(0.5 * (2 ** attempt))
+                        if retry_attempt < self.max_retries:
+                            time.sleep(0.5 * (2 ** retry_attempt))
+                            retry_attempt += 1
                             continue
                         raise RuntimeError(
                             f"{label} incomplete download: "
@@ -862,9 +992,6 @@ class SECProvider:
                     try:
                         self._validate_downloaded_zip(partial, label=label)
                     except Exception:
-                        # If the server declared a complete body, a bad ZIP is
-                        # corruption/version mismatch rather than an incomplete
-                        # resumable transfer. Force the next run to start clean.
                         if expected_total >= 0 and downloaded_size == expected_total:
                             partial.unlink(missing_ok=True)
                             metadata_path.unlink(missing_ok=True)
@@ -875,19 +1002,15 @@ class SECProvider:
 
                 if (
                     response.status_code in SEC_RETRYABLE_STATUS_CODES
-                    and attempt + 1 < attempts
+                    and retry_attempt < self.max_retries
                 ):
-                    time.sleep(self._retry_delay(response, attempt))
+                    time.sleep(self._retry_delay(response, retry_attempt))
+                    retry_attempt += 1
                     continue
 
-                error = RuntimeError(f"{label} HTTP {response.status_code}")
-                if response.status_code == 403:
-                    self._block_host(url, error)
-                raise error
+                raise RuntimeError(f"{label} HTTP {response.status_code}")
             finally:
                 response.close()
-
-        raise RuntimeError(f"{label} download failed")
 
     def ensure_bulk_companyfacts(self) -> Path:
         """Refresh the nightly SEC bulk archive at most once per provider run."""
@@ -951,8 +1074,9 @@ class SECProvider:
         symbol: str,
         *,
         prefer_bulk: bool = False,
+        cik_hint: str | None = None,
     ) -> list[dict[str, Any]]:
-        cik = self.get_cik(symbol)
+        cik = str(cik_hint).strip().zfill(10) if cik_hint else self.get_cik(symbol)
         if not cik:
             return []
         cache_file = self.cache_dir / f"{normalize_symbol(symbol)}.json"
@@ -975,7 +1099,10 @@ class SECProvider:
                 label=f"SEC companyfacts for {normalize_symbol(symbol)}",
             )
         self.companyfacts_cache.write(cache_file, facts)
-        return self._parse_company_facts(normalize_symbol(symbol), facts)
+        records = self._parse_company_facts(normalize_symbol(symbol), facts)
+        for record in records:
+            record["sec_cik"] = cik
+        return records
 
     def get_cik(self, symbol: str) -> str | None:
         sym = normalize_symbol(symbol)
@@ -1232,12 +1359,24 @@ class YahooFundamentalsProvider:
                 continue
 
             if require_release_date:
-                release_at = self._match_release_date(period_end, events)
-                if not release_at:
+                release_event = self._match_release_event(period_end, events)
+                if not release_event:
                     self.missing_release_periods.append(period_end)
                     continue
-                source = "Yahoo"
-                source_record_id = f"yahoo_income_{period_end}"
+                release_at = str(release_event["earnings_release_at"])
+                # Historical Yahoo PIT must use the EPS value Yahoo reported
+                # at that earnings event. Using today's quarterly income
+                # statement value with an old release date can leak later
+                # restatements into replay.
+                event_eps = safe_float(release_event.get("eps_diluted"))
+                if event_eps is None:
+                    self.missing_release_periods.append(period_end)
+                    continue
+                eps = event_eps
+                source = "YahooHistoricalEvent"
+                source_record_id = (
+                    f"yahoo_event_{period_end}_{release_at}"
+                )
             else:
                 # This does not claim to know the historical release timestamp.
                 # It records only that the current Yahoo statement was observed
@@ -1308,24 +1447,44 @@ class YahooFundamentalsProvider:
         return result
 
     @staticmethod
-    def _match_release_date(period_end: str, events: list[dict[str, Any]]) -> str | None:
+    def _match_release_event(
+        period_end: str,
+        events: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
         period = date10(period_end)
         if not period:
             return None
         period_date = dt.date.fromisoformat(period)
-        candidates: list[tuple[int, str]] = []
+        candidates: list[tuple[int, str, dict[str, Any]]] = []
         for event in events:
             release = date10(event.get("earnings_release_at"))
-            if not release:
+            event_eps = safe_float(event.get("eps_diluted"))
+            if not release or event_eps is None:
                 continue
             release_date = dt.date.fromisoformat(release)
             delta = (release_date - period_date).days
             if 0 <= delta <= 75:
-                candidates.append((delta, str(event.get("earnings_release_at") or release)))
+                candidates.append(
+                    (
+                        delta,
+                        str(event.get("earnings_release_at") or release),
+                        event,
+                    )
+                )
         if not candidates:
             return None
-        candidates.sort(key=lambda item: item[0])
-        return candidates[0][1]
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return dict(candidates[0][2])
+
+    @classmethod
+    def _match_release_date(
+        cls,
+        period_end: str,
+        events: list[dict[str, Any]],
+    ) -> str | None:
+        """Compatibility wrapper for callers that only need the timestamp."""
+        event = cls._match_release_event(period_end, events)
+        return str(event.get("earnings_release_at")) if event else None
 
     @staticmethod
     def _income_statement_is_stale(

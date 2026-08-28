@@ -394,7 +394,7 @@ def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
     assert len(calls) == 3
 
 
-def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
+def test_sec_403_switches_same_project_user_agent_before_circuit_break(monkeypatch, tmp_path):
     calls = []
 
     def fake_get(url, timeout, **kwargs):
@@ -410,7 +410,7 @@ def test_sec_403_fails_immediately_without_blind_retry(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         provider._get_json(provider.TICKERS_URL, label="SEC ticker map")
 
-    assert len(calls) == 1
+    assert len(calls) == pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1
 
 
 def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path):
@@ -438,7 +438,9 @@ def test_sec_403_is_shared_across_providers_for_same_host(monkeypatch, tmp_path)
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         second._get_json(second.TICKERS_URL, label="SEC ticker map")
 
-    assert calls == [first.TICKERS_URL]
+    assert calls == [
+        first.TICKERS_URL
+    ] * (pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1)
 
 
 def test_sec_403_does_not_block_other_sec_host(monkeypatch, tmp_path):
@@ -527,7 +529,9 @@ def test_sec_403_circuit_breaker_is_shared_across_provider_instances(
     with pytest.raises(RuntimeError, match="SEC ticker map HTTP 403"):
         second._get_json(second.TICKERS_URL, label="SEC ticker map")
 
-    assert first_calls == [first.TICKERS_URL]
+    assert first_calls == [
+        first.TICKERS_URL
+    ] * (pit_provider.SEC_MAX_403_USER_AGENT_SWITCHES + 1)
     assert second_calls == []
 
 
@@ -1064,3 +1068,46 @@ def test_yahoo_live_zero_prior_is_terminal_after_current_observation(
 
     assert result is None
     assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO
+
+
+def test_yahoo_historical_uses_event_reported_eps_not_current_statement_value(
+    monkeypatch,
+    tmp_path,
+):
+    class RestatedTicker:
+        def get_earnings_dates(self, limit=32):
+            index = pd.to_datetime(["2026-08-01", "2025-08-01"])
+            return pd.DataFrame(
+                {"Reported EPS": [1.5, 1.0]},
+                index=index,
+            )
+
+        @property
+        def quarterly_income_stmt(self):
+            # Today's statement has a restated prior-year value. Historical PIT
+            # must not backfill this revised value into the 2025 event.
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-06-30"): [1.5],
+                    pd.Timestamp("2025-06-30"): [0.8],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", lambda symbol: RestatedTicker())
+    provider = YahooFundamentalsProvider(tmp_path, rate_limit_sleep=0)
+
+    records = provider.fetch_quarterly_history(
+        "TEST",
+        require_release_date=True,
+        refresh=True,
+    )
+    result, reason = calculate_latest_eps_yoy_diagnostic(records, "2026-08-21")
+
+    assert reason is None
+    assert result["current_eps"] == 1.5
+    assert result["prior_year_eps"] == 1.0
+    assert result["eps_yoy_growth"] == 50.0
+    assert result["source"] == "YahooHistoricalEvent"
+
+

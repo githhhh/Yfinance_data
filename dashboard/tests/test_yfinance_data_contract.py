@@ -8,6 +8,7 @@ import pytest
 
 import yfinance_data
 from eps_pit.lookup import SignalEPSLookup
+from eps_pit.models import EPS_RESOLVER_VERSION
 
 
 def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
@@ -19,6 +20,7 @@ def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
         "eps_yoy_growth_source",
         "eps_yoy_growth_status",
         "eps_yoy_growth_missing_reason",
+        "eps_growth_type",
     ):
         if column not in df.columns:
             df[column] = pd.NA
@@ -28,6 +30,7 @@ def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
     df.loc[signal_mask, "eps_yoy_growth_source"] = "PIT"
     df.loc[signal_mask, "eps_yoy_growth_status"] = "resolved"
     df.loc[signal_mask, "eps_yoy_growth_missing_reason"] = pd.NA
+    df.loc[signal_mask, "eps_growth_type"] = "GROWTH"
     return df
 
 
@@ -109,7 +112,13 @@ def test_pool_run_supplements_signal_eps_before_publishing(tmp_path, monkeypatch
     pit_path = tmp_path / "signal_eps_pit.csv"
 
     pd.DataFrame(
-        [{"snapshot_date": "2026-08-14", "code": "PIT", "eps_yoy_growth": 31.5}]
+        [{
+            "snapshot_date": "2026-08-14",
+            "code": "PIT",
+            "eps_yoy_growth": 31.5,
+            "status": "resolved",
+            "resolver_version": EPS_RESOLVER_VERSION,
+        }]
     ).to_csv(pit_path, index=False)
 
     SignalEPSLookup.clear_cache()
