@@ -1,9 +1,299 @@
 {
-  "pool_dir": "backtest/ibd_skill_replay_pools",
-  "pool_files": 43,
-  "signal_rows": 2738,
-  "filled_rows": 2380,
-  "unresolved_rows": 358,
-  "signal_eps_pit_path": "backtest/ibd_skill_replay_pools/signal_eps_pit.csv",
-  "audit_summary_path": "backtest/ibd_skill_replay_pools/eps_signal_refresh_audit/summary.csv"
+  "data_revision": "EPS_RECALIBRATED_V2",
+  "weeks": [
+    {
+      "snapshot_date": "2025-10-10",
+      "signal_rows": 12,
+      "resolved_rows": 10,
+      "unresolved_rows": 2,
+      "coverage_pct": 83.3333
+    },
+    {
+      "snapshot_date": "2025-10-24",
+      "signal_rows": 29,
+      "resolved_rows": 27,
+      "unresolved_rows": 2,
+      "coverage_pct": 93.1034
+    },
+    {
+      "snapshot_date": "2025-10-31",
+      "signal_rows": 28,
+      "resolved_rows": 22,
+      "unresolved_rows": 6,
+      "coverage_pct": 78.5714
+    },
+    {
+      "snapshot_date": "2025-11-07",
+      "signal_rows": 15,
+      "resolved_rows": 14,
+      "unresolved_rows": 1,
+      "coverage_pct": 93.3333
+    },
+    {
+      "snapshot_date": "2025-11-14",
+      "signal_rows": 18,
+      "resolved_rows": 13,
+      "unresolved_rows": 5,
+      "coverage_pct": 72.2222
+    },
+    {
+      "snapshot_date": "2025-11-21",
+      "signal_rows": 8,
+      "resolved_rows": 8,
+      "unresolved_rows": 0,
+      "coverage_pct": 100.0
+    },
+    {
+      "snapshot_date": "2025-11-28",
+      "signal_rows": 36,
+      "resolved_rows": 31,
+      "unresolved_rows": 5,
+      "coverage_pct": 86.1111
+    },
+    {
+      "snapshot_date": "2025-12-05",
+      "signal_rows": 30,
+      "resolved_rows": 25,
+      "unresolved_rows": 5,
+      "coverage_pct": 83.3333
+    },
+    {
+      "snapshot_date": "2025-12-12",
+      "signal_rows": 26,
+      "resolved_rows": 24,
+      "unresolved_rows": 2,
+      "coverage_pct": 92.3077
+    },
+    {
+      "snapshot_date": "2025-12-19",
+      "signal_rows": 19,
+      "resolved_rows": 17,
+      "unresolved_rows": 2,
+      "coverage_pct": 89.4737
+    },
+    {
+      "snapshot_date": "2025-12-26",
+      "signal_rows": 17,
+      "resolved_rows": 13,
+      "unresolved_rows": 4,
+      "coverage_pct": 76.4706
+    },
+    {
+      "snapshot_date": "2026-01-02",
+      "signal_rows": 15,
+      "resolved_rows": 9,
+      "unresolved_rows": 6,
+      "coverage_pct": 60.0
+    },
+    {
+      "snapshot_date": "2026-01-09",
+      "signal_rows": 40,
+      "resolved_rows": 33,
+      "unresolved_rows": 7,
+      "coverage_pct": 82.5
+    },
+    {
+      "snapshot_date": "2026-01-16",
+      "signal_rows": 21,
+      "resolved_rows": 18,
+      "unresolved_rows": 3,
+      "coverage_pct": 85.7143
+    },
+    {
+      "snapshot_date": "2026-01-23",
+      "signal_rows": 14,
+      "resolved_rows": 9,
+      "unresolved_rows": 5,
+      "coverage_pct": 64.2857
+    },
+    {
+      "snapshot_date": "2026-01-30",
+      "signal_rows": 17,
+      "resolved_rows": 14,
+      "unresolved_rows": 3,
+      "coverage_pct": 82.3529
+    },
+    {
+      "snapshot_date": "2026-02-13",
+      "signal_rows": 27,
+      "resolved_rows": 19,
+      "unresolved_rows": 8,
+      "coverage_pct": 70.3704
+    },
+    {
+      "snapshot_date": "2026-02-20",
+      "signal_rows": 18,
+      "resolved_rows": 14,
+      "unresolved_rows": 4,
+      "coverage_pct": 77.7778
+    },
+    {
+      "snapshot_date": "2026-02-27",
+      "signal_rows": 27,
+      "resolved_rows": 21,
+      "unresolved_rows": 6,
+      "coverage_pct": 77.7778
+    },
+    {
+      "snapshot_date": "2026-03-06",
+      "signal_rows": 9,
+      "resolved_rows": 8,
+      "unresolved_rows": 1,
+      "coverage_pct": 88.8889
+    },
+    {
+      "snapshot_date": "2026-03-13",
+      "signal_rows": 10,
+      "resolved_rows": 9,
+      "unresolved_rows": 1,
+      "coverage_pct": 90.0
+    },
+    {
+      "snapshot_date": "2026-03-20",
+      "signal_rows": 8,
+      "resolved_rows": 8,
+      "unresolved_rows": 0,
+      "coverage_pct": 100.0
+    },
+    {
+      "snapshot_date": "2026-03-27",
+      "signal_rows": 10,
+      "resolved_rows": 9,
+      "unresolved_rows": 1,
+      "coverage_pct": 90.0
+    },
+    {
+      "snapshot_date": "2026-04-02",
+      "signal_rows": 45,
+      "resolved_rows": 40,
+      "unresolved_rows": 5,
+      "coverage_pct": 88.8889
+    },
+    {
+      "snapshot_date": "2026-04-10",
+      "signal_rows": 69,
+      "resolved_rows": 63,
+      "unresolved_rows": 6,
+      "coverage_pct": 91.3043
+    },
+    {
+      "snapshot_date": "2026-04-17",
+      "signal_rows": 96,
+      "resolved_rows": 84,
+      "unresolved_rows": 12,
+      "coverage_pct": 87.5
+    },
+    {
+      "snapshot_date": "2026-04-24",
+      "signal_rows": 80,
+      "resolved_rows": 68,
+      "unresolved_rows": 12,
+      "coverage_pct": 85.0
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "signal_rows": 105,
+      "resolved_rows": 90,
+      "unresolved_rows": 15,
+      "coverage_pct": 85.7143
+    },
+    {
+      "snapshot_date": "2026-05-08",
+      "signal_rows": 128,
+      "resolved_rows": 110,
+      "unresolved_rows": 18,
+      "coverage_pct": 85.9375
+    },
+    {
+      "snapshot_date": "2026-05-15",
+      "signal_rows": 66,
+      "resolved_rows": 56,
+      "unresolved_rows": 10,
+      "coverage_pct": 84.8485
+    },
+    {
+      "snapshot_date": "2026-05-22",
+      "signal_rows": 87,
+      "resolved_rows": 79,
+      "unresolved_rows": 8,
+      "coverage_pct": 90.8046
+    },
+    {
+      "snapshot_date": "2026-05-29",
+      "signal_rows": 112,
+      "resolved_rows": 102,
+      "unresolved_rows": 10,
+      "coverage_pct": 91.0714
+    },
+    {
+      "snapshot_date": "2026-06-05",
+      "signal_rows": 108,
+      "resolved_rows": 97,
+      "unresolved_rows": 11,
+      "coverage_pct": 89.8148
+    },
+    {
+      "snapshot_date": "2026-06-12",
+      "signal_rows": 268,
+      "resolved_rows": 251,
+      "unresolved_rows": 17,
+      "coverage_pct": 93.6567
+    },
+    {
+      "snapshot_date": "2026-06-18",
+      "signal_rows": 145,
+      "resolved_rows": 136,
+      "unresolved_rows": 9,
+      "coverage_pct": 93.7931
+    },
+    {
+      "snapshot_date": "2026-06-26",
+      "signal_rows": 211,
+      "resolved_rows": 206,
+      "unresolved_rows": 5,
+      "coverage_pct": 97.6303
+    },
+    {
+      "snapshot_date": "2026-07-02",
+      "signal_rows": 120,
+      "resolved_rows": 110,
+      "unresolved_rows": 10,
+      "coverage_pct": 91.6667
+    },
+    {
+      "snapshot_date": "2026-07-10",
+      "signal_rows": 83,
+      "resolved_rows": 70,
+      "unresolved_rows": 13,
+      "coverage_pct": 84.3373
+    },
+    {
+      "snapshot_date": "2026-07-17",
+      "signal_rows": 174,
+      "resolved_rows": 165,
+      "unresolved_rows": 9,
+      "coverage_pct": 94.8276
+    },
+    {
+      "snapshot_date": "2026-07-24",
+      "signal_rows": 106,
+      "resolved_rows": 97,
+      "unresolved_rows": 9,
+      "coverage_pct": 91.5094
+    },
+    {
+      "snapshot_date": "2026-07-31",
+      "signal_rows": 114,
+      "resolved_rows": 106,
+      "unresolved_rows": 8,
+      "coverage_pct": 92.9825
+    },
+    {
+      "snapshot_date": "2026-08-07",
+      "signal_rows": 167,
+      "resolved_rows": 162,
+      "unresolved_rows": 5,
+      "coverage_pct": 97.006
+    }
+  ]
 }

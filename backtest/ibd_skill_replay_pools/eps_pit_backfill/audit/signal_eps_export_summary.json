@@ -1,7 +1,5 @@
 {
-  "signal_rows": 2738,
-  "exported_rows": 2738,
-  "filled_rows": 2605,
-  "unique_signal_weeks": 42,
-  "unique_export_weeks": 42
+  "data_revision": "EPS_RECALIBRATED_V2",
+  "path": "backtest/ibd_skill_replay_pools/signal_eps_pit.csv",
+  "resolved_rows": 2467
 }
