@@ -241,12 +241,16 @@ class SignalEPSLookup:
         pit_entry: dict[str, Any] | None = None
         try:
             sec_cik = store.get_sec_cik(sym)
+            pit_kwargs: dict[str, Any] = {
+                "allow_current_yahoo": current_state_allowed,
+                "observation_date": observed_on if current_state_allowed else None,
+            }
+            if sec_cik:
+                pit_kwargs["sec_cik_hints"] = {sym: sec_cik}
             pit_entry = cls.fetch_sec_yahoo_eps(
                 snap,
                 [sym],
-                allow_current_yahoo=current_state_allowed,
-                observation_date=observed_on if current_state_allowed else None,
-                sec_cik_hints={sym: sec_cik} if sec_cik else None,
+                **pit_kwargs,
             ).get(sym)
         except Exception as exc:
             pit_error = exc
