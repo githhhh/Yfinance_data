@@ -27,6 +27,7 @@ class SECYahooEPSProvider:
         *,
         allow_current_yahoo: bool = False,
         observation_date: object | None = None,
+        sec_cik_hint: str | None = None,
     ) -> tuple[dict[str, Any] | None, EPSMissingReason | None]:
         """Resolve with a mode-specific source order.
 
@@ -64,6 +65,7 @@ class SECYahooEPSProvider:
                 sec_history = self.sec.fetch_quarterly_history(
                     symbol,
                     prefer_bulk=not allow_current_yahoo,
+                    cik_hint=sec_cik_hint,
                 )
                 result, sec_reason = calculate_latest_eps_yoy_diagnostic(
                     sec_history, snapshot_date
@@ -162,11 +164,13 @@ class SECYahooEPSProvider:
         *,
         allow_current_yahoo: bool = False,
         observation_date: object | None = None,
+        sec_cik_hint: str | None = None,
     ) -> dict[str, Any] | None:
         result, _ = self.fetch_eps_yoy_detailed(
             symbol,
             snapshot_date,
             allow_current_yahoo=allow_current_yahoo,
             observation_date=observation_date,
+            sec_cik_hint=sec_cik_hint,
         )
         return result
