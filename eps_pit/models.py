@@ -5,6 +5,9 @@ from enum import Enum
 from typing import Any
 
 
+EPS_RESOLVER_VERSION = "eps_pit_v3"
+
+
 class EPSResolveMode(Enum):
     LIVE = "live"
     REPLAY = "replay"
@@ -43,6 +46,7 @@ class EPSResult:
     calculation_method: str | None = None
     missing_reason: EPSMissingReason | None = None
     source_record_id: str | None = None
+    resolver_version: str = EPS_RESOLVER_VERSION
 
     @property
     def is_resolved(self) -> bool:
@@ -63,4 +67,5 @@ class EPSResult:
             "status": self.status.value,
             "missing_reason": self.missing_reason.value if self.missing_reason else None,
             "source_record_id": self.source_record_id,
+            "resolver_version": self.resolver_version,
         }
