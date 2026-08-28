@@ -106,12 +106,34 @@ class SECYahooEPSProvider:
         if yahoo_error is not None and sec_error is not None:
             raise RuntimeError("; ".join(provider_errors))
 
-        # A technical failure matters whenever no source resolved a value or
-        # reached a terminal semantic outcome. Do not silently downgrade an
-        # incomplete run into EXPECTED_UNAVAILABLE.
-        if provider_errors:
+        primary_name = "Yahoo" if allow_current_yahoo else "SEC"
+        primary_reason = yahoo_reason if allow_current_yahoo else sec_reason
+        primary_error = yahoo_error if allow_current_yahoo else sec_error
+        secondary_name = "SEC" if allow_current_yahoo else "Yahoo"
+        secondary_error = sec_error if allow_current_yahoo else yahoo_error
+
+        # Fail-close applies to loss of the authoritative/primary observation,
+        # not to an optional fallback failing after the primary provider already
+        # completed normally and returned a clean semantic absence. Otherwise a
+        # blocked secondary source can incorrectly turn NO_PRIOR_YEAR_QUARTER or
+        # NO_QUARTERLY_EPS into PROVIDER_ERROR even though the primary request
+        # itself succeeded.
+        if primary_error is None and secondary_error is not None:
             logging.warning(
-                "Signal EPS PIT provider error for %s with no resolved fallback: %s",
+                "Signal EPS %s fallback failed for %s after clean %s outcome %s; "
+                "preserving primary semantic result",
+                secondary_name,
+                symbol,
+                primary_name,
+                primary_reason.value,
+            )
+            return None, primary_reason
+
+        # If the primary source itself failed technically, a non-resolving
+        # secondary source cannot establish completeness. Preserve fail-close.
+        if primary_error is not None:
+            logging.warning(
+                "Signal EPS PIT primary provider error for %s with no resolved fallback: %s",
                 symbol,
                 "; ".join(provider_errors),
             )

@@ -833,3 +833,92 @@ def test_sec_bulk_resume_restarts_when_remote_archive_changed(monkeypatch, tmp_p
     assert destination.read_bytes() == new_payload
     assert not partial.exists()
     assert not metadata.exists()
+
+
+def test_yahoo_live_retries_silent_sparse_income_until_yoy_pair_is_available(
+    monkeypatch,
+    tmp_path,
+):
+    calls = {"ticker": 0}
+    sleeps = []
+
+    class SparseTicker:
+        @property
+        def quarterly_income_stmt(self):
+            call = calls["ticker"]
+            if call == 1:
+                return pd.DataFrame()
+            if call == 2:
+                return pd.DataFrame(
+                    {
+                        pd.Timestamp("2026-04-30"): [0.08],
+                    },
+                    index=["Diluted EPS"],
+                )
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-04-30"): [0.08],
+                    pd.Timestamp("2025-04-30"): [-0.05],
+                },
+                index=["Diluted EPS"],
+            )
+
+    def fake_ticker(symbol):
+        calls["ticker"] += 1
+        return SparseTicker()
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", fake_ticker)
+    monkeypatch.setattr(pit_provider.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    provider = YahooFundamentalsProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        max_rate_limit_retries=0,
+    )
+    records = provider.fetch_quarterly_history(
+        "ALOT",
+        require_release_date=False,
+        observed_on="2026-08-27",
+        refresh=True,
+    )
+    result, reason = calculate_latest_eps_yoy_diagnostic(records, "2026-08-27")
+
+    assert calls["ticker"] == 3
+    assert sleeps == list(pit_provider.YAHOO_EMPTY_RESULT_BACKOFF_SECONDS)
+    assert reason is None
+    assert result["eps_yoy_growth"] == 260.0
+    assert result["source"] == "YahooLiveObserved"
+
+
+def test_yahoo_live_zero_prior_is_terminal_after_current_observation(
+    monkeypatch,
+    tmp_path,
+):
+    class JanTicker:
+        @property
+        def quarterly_income_stmt(self):
+            return pd.DataFrame(
+                {
+                    pd.Timestamp("2026-06-30"): [0.05],
+                    pd.Timestamp("2025-06-30"): [0.0],
+                },
+                index=["Diluted EPS"],
+            )
+
+    monkeypatch.setattr(pit_provider.yf, "Ticker", lambda symbol: JanTicker())
+
+    provider = YahooFundamentalsProvider(
+        tmp_path,
+        rate_limit_sleep=0,
+        max_rate_limit_retries=0,
+    )
+    records = provider.fetch_quarterly_history(
+        "JAN",
+        require_release_date=False,
+        observed_on="2026-08-27",
+        refresh=True,
+    )
+    result, reason = calculate_latest_eps_yoy_diagnostic(records, "2026-08-27")
+
+    assert result is None
+    assert reason is EPSMissingReason.PRIOR_YEAR_EPS_ZERO

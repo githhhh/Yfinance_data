@@ -39,6 +39,7 @@ SEC_BULK_CACHE_TTL_SECONDS = 24 * 60 * 60
 
 YAHOO_DEFAULT_REQUEST_INTERVAL_SECONDS = 0.35
 YAHOO_RATE_LIMIT_BACKOFF_SECONDS = (5.0, 15.0, 30.0)
+YAHOO_EMPTY_RESULT_BACKOFF_SECONDS = (1.0, 3.0)
 
 _SEC_RATE_LOCK = threading.Lock()
 _SEC_LAST_REQUEST_AT: float | None = None
@@ -1099,21 +1100,50 @@ class YahooFundamentalsProvider:
         )
 
     def _fetch_payload(self, symbol: str, *, include_events: bool) -> dict[str, Any]:
-        attempts = self.max_rate_limit_retries + 1
-        for attempt in range(attempts):
+        rate_limit_attempt = 0
+        empty_result_attempt = 0
+
+        while True:
             self._throttle()
             ticker = yf.Ticker(symbol)
             try:
                 events = self._fetch_earnings_dates(ticker) if include_events else []
                 income = self._fetch_income_stmt_eps(ticker)
-                return {"events": events, "income": income}
             except Exception as exc:
-                if not self._is_rate_limit_error(exc) or attempt + 1 >= attempts:
+                if (
+                    not self._is_rate_limit_error(exc)
+                    or rate_limit_attempt >= self.max_rate_limit_retries
+                ):
                     raise
-                delay_index = min(attempt, len(YAHOO_RATE_LIMIT_BACKOFF_SECONDS) - 1)
+                delay_index = min(
+                    rate_limit_attempt,
+                    len(YAHOO_RATE_LIMIT_BACKOFF_SECONDS) - 1,
+                )
                 time.sleep(YAHOO_RATE_LIMIT_BACKOFF_SECONDS[delay_index])
+                rate_limit_attempt += 1
+                continue
 
-        raise RuntimeError(f"Yahoo fundamentals request failed for {symbol}")
+            # Older/current yfinance builds can silently surface an empty or
+            # one-row quarterly statement for a transient fundamentals request
+            # instead of raising. A LIVE YoY calculation cannot be established
+            # from fewer than two observations, so retry a small bounded number
+            # of times before accepting it as a clean semantic miss.
+            if (
+                not include_events
+                and len(income) < 2
+                and empty_result_attempt < len(YAHOO_EMPTY_RESULT_BACKOFF_SECONDS)
+            ):
+                logging.warning(
+                    "Yahoo LIVE quarterly EPS returned only %s row(s) for %s; "
+                    "retrying current observation",
+                    len(income),
+                    normalize_symbol(symbol),
+                )
+                time.sleep(YAHOO_EMPTY_RESULT_BACKOFF_SECONDS[empty_result_attempt])
+                empty_result_attempt += 1
+                continue
+
+            return {"events": events, "income": income}
 
     @property
     def last_missing_release_date_count(self) -> int:
