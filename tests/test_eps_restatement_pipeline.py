@@ -47,6 +47,7 @@ def test_eps_recalibration_allows_only_eps_column_changes():
     after["eps_yoy_growth"] = 42.0
     after["eps_yoy_growth_source"] = "SEC"
     after["eps_yoy_growth_status"] = "resolved"
+    after["eps_yoy_growth_repair_method"] = pd.NA
     _assert_non_eps_unchanged(before, after, Path("pool.csv"))
 
     bad = after.copy()
@@ -108,3 +109,6 @@ def test_explicit_e0_eligibility_uses_corrected_eps_fact_only():
     )
     assert _explicit_eligible(row, 12.0) is True
     assert _explicit_eligible(row, None) is False
+    missing_industry = row.copy()
+    missing_industry["industry"] = pd.NA
+    assert _explicit_eligible(missing_industry, 12.0) is False

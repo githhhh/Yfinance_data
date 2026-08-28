@@ -246,6 +246,12 @@ def _write_v2_manifest(baseline_ref: str) -> Path:
         "evaluate_rule_signatures_sha256": sha256_file(
             ROOT / "evaluate_rule_signatures.py"
         ),
+        "research_windows_sha256": sha256_file(
+            ROOT / "research_windows.py"
+        ),
+        "replay_eps_sha256": sha256_file(
+            REPO_ROOT / "backtest/replay_eps.py"
+        ),
     }
     manifest["data_fingerprints"] = {
         "train_candidate_events_parquet_sha256": sha256_file(
@@ -282,7 +288,8 @@ def _explicit_eligible(row: pd.Series, eps: float | None) -> bool:
         return False
     if eps is None:
         return False
-    if not str(row.get("industry", "") or "").strip():
+    industry = str(row.get("industry", "") or "").strip()
+    if not industry or industry.lower() in {"nan", "none", "<na>"}:
         return False
     return True
 

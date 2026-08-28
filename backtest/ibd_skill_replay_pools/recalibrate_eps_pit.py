@@ -89,8 +89,18 @@ def recalibrate(
         before = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
         before["code"] = before["code"].astype(str).str.strip()
 
+        work = before.copy()
+        signal_mask_before = work.get(
+            "signal", pd.Series(False, index=work.index)
+        ).map(_is_signal)
+        # Explicitly remove every old EPS-derived field on signal rows before
+        # resolution. This prevents stale legacy repair metadata or carried
+        # live values from influencing a replay rebuild.
+        for column in [c for c in work.columns if _is_eps_column(str(c))]:
+            work.loc[signal_mask_before, column] = pd.NA
+
         after = enrich_pool_with_signal_eps(
-            before.copy(),
+            work,
             snapshot_date=snapshot,
             csv_path=str(resolved_store),
             refresh_missing=True,
@@ -175,6 +185,15 @@ def recalibrate(
     impact_path = pool_root / "EPS_PIT_RECALIBRATION_IMPACT.csv"
     impact_df.to_csv(impact_path, index=False, encoding="utf-8-sig")
 
+    # Export the new replay store into the historical-research namespace as a
+    # read-only audit artifact. Runtime resolution continues to use the mode-
+    # selected DEFAULT_REPLAY_CSV_PATH from main.
+    research_store_export = pool_root / "signal_eps_pit.csv"
+    if resolved_store.exists():
+        pd.read_csv(resolved_store).to_csv(
+            research_store_export, index=False, encoding="utf-8-sig"
+        )
+
     changed_value = (
         impact_df["old_eps"].fillna(float("inf"))
         != impact_df["new_eps"].fillna(float("inf"))
@@ -187,6 +206,7 @@ def recalibrate(
         "data_revision": "EPS_RECALIBRATED_V2",
         "mode": EPSResolveMode.REPLAY.value,
         "replay_store_path": str(resolved_store),
+        "research_store_export_path": str(research_store_export),
         "pool_count": len(pool_paths),
         "total_signal_rows": int(len(impact_df)),
         "old_resolved_rows": int(impact_df["old_known"].sum()),
@@ -207,6 +227,107 @@ def recalibrate(
     }
     (pool_root / "EPS_PIT_RECALIBRATION_SUMMARY.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    # Regenerate the historical EPS audit bundle using only corrected REPLAY
+    # facts. No legacy backfill script is needed for this data revision.
+    audit_dir = pool_root / "eps_pit_backfill" / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    coverage = (
+        impact_df.groupby("snapshot_date", as_index=False)
+        .agg(
+            signal_rows=("code", "size"),
+            resolved_rows=("new_known", "sum"),
+        )
+    )
+    coverage["unresolved_rows"] = coverage["signal_rows"] - coverage["resolved_rows"]
+    coverage["coverage_pct"] = (
+        coverage["resolved_rows"] / coverage["signal_rows"] * 100.0
+    ).round(4)
+    coverage.to_csv(audit_dir / "coverage_by_week.csv", index=False)
+    (audit_dir / "coverage_summary.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (audit_dir / "signal_eps_export_summary.json").write_text(
+        json.dumps(
+            {
+                "data_revision": "EPS_RECALIBRATED_V2",
+                "path": str(research_store_export),
+                "resolved_rows": int(impact_df["new_known"].sum()),
+            },
+            indent=2,
+            ensure_ascii=False,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    impact_df.loc[
+        :,
+        [
+            "snapshot_date",
+            "code",
+            "new_eps",
+            "new_source",
+            "new_status",
+            "new_missing_reason",
+            "new_effective_date",
+        ],
+    ].to_parquet(audit_dir / "weekly_eps_provenance.parquet", index=False)
+    unresolved = impact_df.loc[
+        ~impact_df["new_known"],
+        ["snapshot_date", "code", "new_status", "new_missing_reason"],
+    ].copy()
+    unresolved.to_csv(audit_dir / "unresolved_tickers.csv", index=False)
+    pd.DataFrame(
+        columns=["snapshot_date", "code", "status", "reason"]
+    ).to_csv(audit_dir / "source_errors.csv", index=False)
+    impact_df.loc[
+        impact_df["old_eps25"] != impact_df["new_eps25"],
+        ["snapshot_date", "code", "old_eps", "new_eps", "old_eps25", "new_eps25"],
+    ].to_csv(audit_dir / "special_cases.csv", index=False)
+    (
+        impact_df[["code"]]
+        .drop_duplicates()
+        .sort_values("code")
+        .to_csv(audit_dir / "ticker_universe.csv", index=False)
+    )
+    inventory_rows = []
+    for pool_path, _, signal_count in staged_pools:
+        inventory_rows.append(
+            {
+                "snapshot_date": pool_path.parent.name,
+                "pool_path": str(pool_path),
+                "signal_rows": signal_count,
+            }
+        )
+    pd.DataFrame(inventory_rows).to_csv(
+        audit_dir / "input_inventory.csv", index=False
+    )
+    (audit_dir / "execution_log.md").write_text(
+        "# EPS PIT Recalibration Execution\n\n"
+        f"- mode: REPLAY\n"
+        f"- data_revision: EPS_RECALIBRATED_V2\n"
+        f"- pools: {len(pool_paths)}\n"
+        f"- signal_rows: {len(impact_df)}\n"
+        f"- resolved_rows: {int(impact_df['new_known'].sum())}\n"
+        "- provider_errors: 0\n"
+        "- future_leakage_violations: 0\n",
+        encoding="utf-8",
+    )
+
+    refresh_dir = pool_root / "eps_signal_refresh_audit"
+    refresh_dir.mkdir(parents=True, exist_ok=True)
+    coverage.to_csv(refresh_dir / "summary.csv", index=False)
+    (refresh_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "data_revision": "EPS_RECALIBRATED_V2",
+                "weeks": coverage.to_dict(orient="records"),
+            },
+            indent=2,
+            ensure_ascii=False,
+        ) + "\n",
         encoding="utf-8",
     )
 

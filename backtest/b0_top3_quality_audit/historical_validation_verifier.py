@@ -60,6 +60,8 @@ def verify_manifest_integrity(manifest: dict[str, Any], repo_root: Path) -> None
         "skill_rule_engine_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "skill_rule_engine.py",
         "three_tier_baseline_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "three_tier_baseline.py",
         "evaluate_rule_signatures_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "evaluate_rule_signatures.py",
+        "research_windows_sha256": repo_root / "backtest" / "b0_top3_quality_audit" / "research_windows.py",
+        "replay_eps_sha256": repo_root / "backtest" / "replay_eps.py",
     }
     for key, expected_hash in code_fps.items():
         file_p = code_paths.get(key)
