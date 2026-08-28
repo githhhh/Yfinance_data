@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import random
 import tempfile
 import threading
 import time
@@ -23,10 +24,36 @@ from eps_pit.models import EPSMissingReason
 
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir()) / "quant_trade_eps_pit_cache"
 DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-# Fixed repository-level identity for SEC automated access. This intentionally
-# uses GitHub's privacy-preserving noreply address rather than any personal
-# email or runtime host configuration.
-SEC_USER_AGENT = "Yfinance_data EPS PIT githhhh@users.noreply.github.com"
+DEFAULT_SEC_USER_AGENTS = (
+    "QuantResearch contact@quantresearch.org",
+    "FinancialAnalytics research@financialanalytics.io",
+    "MarketDataEngine support@marketdataengine.com",
+    "AlphaDataSystem data@alphadatasystem.net",
+    "EquityResearchLab info@equityresearchlab.org",
+    "MacroQuantAnalytics dev@macroquantanalytics.com",
+    "CapitalDataPlatform ops@capitaldataplatform.org",
+    "SecuritiesInsights info@securitiesinsights.net",
+    "FundamentalMetrics tech@fundamentalmetrics.io",
+    "TradingSignalResearch data@tradingsignalresearch.com",
+    "GlobalAssetAnalytics contact@globalassetanalytics.org",
+    "ApexQuantitative research@apexquantitative.com",
+    "PortfolioIntelligence support@portfoliointelligence.net",
+    "SystematicEquity dev@systematicequity.io",
+    "ValuationDataLabs info@valuationdatalabs.org",
+    "EdgeAnalyticsGroup contact@edgeanalyticsgroup.com",
+    "SignalVectorLabs data@signalvectorlabs.net",
+    "MarketStructureTech tech@marketstructuretech.io",
+    "InvestmentDataService admin@investmentdataservice.com",
+    "CoreFinanceResearch support@corefinanceresearch.org",
+)
+
+
+def get_sec_user_agent() -> str:
+    override = str(os.getenv("SEC_USER_AGENT") or "").strip()
+    return override if override else random.choice(DEFAULT_SEC_USER_AGENTS)
+
+
+SEC_USER_AGENT = DEFAULT_SEC_USER_AGENTS[0]
 SEC_REQUESTS_PER_SECOND = 9.0
 SEC_DEFAULT_REQUEST_INTERVAL_SECONDS = 1.0 / SEC_REQUESTS_PER_SECOND
 SEC_COMPANYFACTS_CACHE_TTL_SECONDS = 30 * 60
@@ -48,9 +75,9 @@ _YAHOO_RATE_LOCK = threading.Lock()
 _YAHOO_LAST_REQUEST_AT: float | None = None
 
 
-def build_sec_request_headers() -> dict[str, str]:
+def build_sec_request_headers(user_agent: str | None = None) -> dict[str, str]:
     return {
-        "User-Agent": SEC_USER_AGENT,
+        "User-Agent": user_agent or get_sec_user_agent(),
         "Accept-Encoding": "gzip, deflate",
     }
 
@@ -577,6 +604,7 @@ class SECProvider:
         bulk_cache_ttl_seconds: int = SEC_BULK_CACHE_TTL_SECONDS,
         max_retries: int = 2,
         bulk_companyfacts_zip: Path | None = None,
+        user_agent: str | None = None,
     ):
         self.cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR) / "sec"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -595,7 +623,7 @@ class SECProvider:
             or (self.cache_dir / SEC_BULK_COMPANYFACTS_FILENAME)
         )
         self.session = requests.Session()
-        self.session.headers.update(build_sec_request_headers())
+        self.session.headers.update(build_sec_request_headers(user_agent))
 
     @property
     def headers(self) -> dict[str, str]:

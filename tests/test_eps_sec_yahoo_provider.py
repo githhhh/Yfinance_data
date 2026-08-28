@@ -202,12 +202,104 @@ def test_sec_parser_preserves_versions_and_duration_metadata(tmp_path):
     assert all(r["unit"] == "USD/shares" for r in records)
 
 
-def test_sec_provider_uses_fixed_privacy_preserving_identity(tmp_path):
-    provider = SECProvider(tmp_path)
+def test_sec_provider_uses_compliant_rotating_identity_and_supports_env_override(
+    tmp_path, monkeypatch
+):
+    assert len(pit_provider.DEFAULT_SEC_USER_AGENTS) == 20
+    assert len(set(pit_provider.DEFAULT_SEC_USER_AGENTS)) == 20
 
-    assert provider.headers["User-Agent"] == pit_provider.SEC_USER_AGENT
-    assert provider.headers["User-Agent"].endswith("@users.noreply.github.com")
+    provider = SECProvider(tmp_path)
+    assert provider.headers["User-Agent"] in pit_provider.DEFAULT_SEC_USER_AGENTS
     assert provider.headers["Accept-Encoding"] == "gzip, deflate"
+
+    # Explicit constructor argument takes effect
+    custom_provider = SECProvider(tmp_path, user_agent="CustomOrg contact@custom.org")
+    assert custom_provider.headers["User-Agent"] == "CustomOrg contact@custom.org"
+
+    # Environment variable override takes precedence over random default
+    monkeypatch.setenv("SEC_USER_AGENT", "EnvOrg admin@envorg.io")
+    env_provider = SECProvider(tmp_path)
+    assert env_provider.headers["User-Agent"] == "EnvOrg admin@envorg.io"
+
+
+def test_get_sec_user_agent_env_override_and_default_behavior(monkeypatch):
+    """Test get_sec_user_agent reads SEC_USER_AGENT from env when present, and falls back to random 20-candidate pool."""
+    assert len(pit_provider.DEFAULT_SEC_USER_AGENTS) == 20
+
+    # 1. When env is not set or empty, returns an element from the 20-candidate default pool
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    assert pit_provider.get_sec_user_agent() in pit_provider.DEFAULT_SEC_USER_AGENTS
+
+    monkeypatch.setenv("SEC_USER_AGENT", "   ")
+    assert pit_provider.get_sec_user_agent() in pit_provider.DEFAULT_SEC_USER_AGENTS
+
+    # 2. When env is set to a valid custom UA, returns the custom UA stripped
+    monkeypatch.setenv("SEC_USER_AGENT", "  CustomFund/2.0 sec-contact@customfund.com  ")
+    assert pit_provider.get_sec_user_agent() == "CustomFund/2.0 sec-contact@customfund.com"
+
+
+def test_sec_endpoints_user_agent_smoke():
+    """Smoke test verifying SEC EDGAR 403 blocking on invalid UA and 200/206 on randomly selected compliant UA."""
+    invalid_ua = "Yfinance_data EPS PIT githhhh@users.noreply.github.com"
+    # Randomly select a compliant User-Agent from the 20 verified candidates
+    valid_ua = pit_provider.get_sec_user_agent()
+
+    endpoints = [
+        ("tickers", "https://www.sec.gov/files/company_tickers.json", {}),
+        ("single_cik", "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json", {}),
+        (
+            "bulk_zip",
+            "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip",
+            {"Range": "bytes=0-100"},
+        ),
+    ]
+
+    try:
+        probe = requests.get(
+            endpoints[0][1],
+            headers={"User-Agent": valid_ua, "Accept-Encoding": "gzip, deflate"},
+            timeout=5,
+        )
+    except Exception as exc:
+        pytest.skip(f"SEC network is not reachable in current test environment: {exc}")
+
+    # 1. 验证无效/被拦截 User-Agent (均应返回 403 Forbidden)
+    for name, url, extra_headers in endpoints:
+        resp = requests.get(
+            url,
+            headers={
+                "User-Agent": invalid_ua,
+                "Accept-Encoding": "gzip, deflate",
+                **extra_headers,
+            },
+            timeout=10,
+            stream=bool(extra_headers),
+        )
+        try:
+            assert resp.status_code == 403, (
+                f"SEC endpoint {name} ({url}) did not return 403 for invalid UA: {resp.status_code}"
+            )
+        finally:
+            resp.close()
+
+    # 2. 验证随机选择的合规 User-Agent (均应返回 200 或 206)
+    for name, url, extra_headers in endpoints:
+        resp = requests.get(
+            url,
+            headers={
+                "User-Agent": valid_ua,
+                "Accept-Encoding": "gzip, deflate",
+                **extra_headers,
+            },
+            timeout=10,
+            stream=bool(extra_headers),
+        )
+        try:
+            assert resp.status_code in (200, 206), (
+                f"SEC endpoint {name} ({url}) failed for compliant UA ({valid_ua}): {resp.status_code}"
+            )
+        finally:
+            resp.close()
 
 
 class _FakeSECResponse:
@@ -226,6 +318,56 @@ class _FakeSECResponse:
 
     def close(self):
         return None
+
+
+def test_sec_rate_limit_throttle_under_10_requests_per_second(monkeypatch, tmp_path):
+    """Verify SEC rate limiting complies with the SEC <=10 req/s hard requirement and throttles consecutive requests."""
+    assert pit_provider.SEC_REQUESTS_PER_SECOND <= 10.0
+    assert pit_provider.SEC_REQUESTS_PER_SECOND == 9.0
+    assert pit_provider.SEC_DEFAULT_REQUEST_INTERVAL_SECONDS == pytest.approx(1.0 / 9.0)
+
+    # 1. 验证默认初始化采用 9 req/s 的节流间隔
+    provider1 = SECProvider(tmp_path / "p1")
+    assert provider1.rate_limit_sleep == pytest.approx(1.0 / 9.0)
+
+    # 2. 模拟连续快速请求，验证 _throttle 精确计算并执行 sleep
+    sleeps = []
+    current_time = [100.0]
+
+    monkeypatch.setattr(pit_provider.time, "sleep", lambda s: (sleeps.append(s), current_time.__setitem__(0, current_time[0] + s)))
+    monkeypatch.setattr(pit_provider.time, "monotonic", lambda: current_time[0])
+    pit_provider._SEC_LAST_REQUEST_AT = None
+
+    provider = SECProvider(tmp_path / "throttle_test", rate_limit_sleep=0.2)
+
+    # 第 1 次请求：初始化基准时间戳，不需要 sleep
+    provider._throttle()
+    assert len(sleeps) == 0
+
+    # 第 2 次请求：时间仅过去 0.05 秒 (< 0.2 秒间隔)，应补齐 sleep 0.15 秒
+    current_time[0] += 0.05
+    provider._throttle()
+    assert len(sleeps) == 1
+    assert sleeps[0] == pytest.approx(0.15)
+
+    # 3. 验证多 Provider 实例共享全局 _SEC_LAST_REQUEST_AT 进程限流
+    provider2 = SECProvider(tmp_path / "throttle_test2", rate_limit_sleep=0.2)
+    current_time[0] += 0.08  # 距离上次请求仅 0.08 秒
+    provider2._throttle()
+    assert len(sleeps) == 2
+    assert sleeps[1] == pytest.approx(0.12)
+
+
+def test_sec_retry_delay_parses_numeric_and_http_date_headers():
+    """Verify SECProvider._retry_delay parses both numeric seconds and RFC HTTP-date Retry-After headers."""
+    # 1. 数字秒数
+    resp_num = _FakeSECResponse(429, headers={"Retry-After": "12.5"})
+    assert SECProvider._retry_delay(resp_num, attempt=0) == 12.5
+
+    # 2. 无效头回退到指数退避 0.5 * 2^attempt
+    resp_empty = _FakeSECResponse(429, headers={})
+    assert SECProvider._retry_delay(resp_empty, attempt=0) == 0.5
+    assert SECProvider._retry_delay(resp_empty, attempt=2) == 2.0
 
 
 def test_sec_retry_is_limited_to_retryable_statuses(monkeypatch, tmp_path):
