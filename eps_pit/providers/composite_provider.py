@@ -184,9 +184,19 @@ class SECYahooEPSProvider:
 
                     if same_periods and current_consistent and yahoo_prior not in {None, 0.0}:
                         reconciled = dict(yahoo_result)
+                        effective_candidates = [
+                            date10(sec_evidence.get("effective_date")),
+                            date10(yahoo_evidence.get("effective_date")),
+                        ]
+                        effective_candidates = [
+                            value for value in effective_candidates if value
+                        ]
                         reconciled.update(
                             {
                                 "source": "SEC+YahooHistoricalEvent",
+                                "effective_date": max(effective_candidates)
+                                if effective_candidates
+                                else yahoo_result.get("effective_date"),
                                 "calculation_method": "sec_zero_base_reconciled_yahoo_event",
                                 "sec_cik": sec_evidence.get("sec_cik"),
                                 **evidence_fields("sec", sec_evidence),
