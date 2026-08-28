@@ -288,7 +288,10 @@ def _explicit_eligible(row: pd.Series, eps: float | None) -> bool:
         return False
     if eps is None:
         return False
-    industry = str(row.get("industry", "") or "").strip()
+    industry_value = row.get("industry", "")
+    if industry_value is None or pd.isna(industry_value):
+        return False
+    industry = str(industry_value).strip()
     if not industry or industry.lower() in {"nan", "none", "<na>"}:
         return False
     return True
