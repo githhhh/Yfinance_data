@@ -421,6 +421,41 @@ def _write_restatement_report(
     impact_summary: dict[str, Any],
     frozen_hashes: dict[str, str],
 ) -> Path:
+    def old_new(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+        return git_show_csv(baseline_ref, path), pd.read_csv(path)
+
+    def fmt(value: object) -> str:
+        value = to_float(value)
+        return "N/A" if value is None else f"{value:.4f}"
+
+    def comparison_rows(
+        old: pd.DataFrame, new: pd.DataFrame, *, keys: list[str], values: list[str]
+    ) -> list[str]:
+        old_i = old.set_index(keys)
+        new_i = new.set_index(keys)
+        rows: list[str] = []
+        for key in old_i.index.intersection(new_i.index):
+            old_row, new_row = old_i.loc[key], new_i.loc[key]
+            name = " / ".join(key) if isinstance(key, tuple) else str(key)
+            for column in values:
+                if column not in old_i.columns or column not in new_i.columns:
+                    continue
+                old_value, new_value = to_float(old_row[column]), to_float(new_row[column])
+                delta = None if old_value is None or new_value is None else new_value - old_value
+                rows.append(f"| {name} | {column} | {fmt(old_value)} | {fmt(new_value)} | {fmt(delta)} |")
+        return rows
+
+    root = OUT
+    three_old, three_new = old_new(root / "three_tier_alpha_summary.csv")
+    random_old, random_new = old_new(root / "b0_quality_vs_matched_random_horizon_summary.csv")
+    rank_old, rank_new = old_new(root / "b0_topk_marginal_contribution_summary.csv")
+    eps25_old, eps25_new = old_new(root / "layer1_tightening_probe_summary.csv")
+    three_rows = comparison_rows(three_old, three_new, keys=["metric"], values=["weekly_spread_screening_pct", "weekly_spread_ranking_pct", "weekly_spread_total_pct", "win_rate_l1_vs_l0_pct", "win_rate_l2_vs_l1_pct", "p_val_screening_wilcoxon", "p_val_ranking_wilcoxon"])
+    random_rows = comparison_rows(random_old, random_new, keys=["horizon"], values=["b0_median_return_pct", "matched_random_p50_median_return_pct", "paired_spread_median_pct", "b0_mean_return_pct", "matched_random_p50_mean_return_pct", "paired_spread_mean_pct", "beat_random_p50_rate_pct"])
+    rank_rows = comparison_rows(rank_old, rank_new, keys=["horizon", "segment"], values=["hyp_a_r3_minus_r2_median_spread_pct", "hyp_a_r3_gt_r2_win_rate_pct", "hyp_a_wilcoxon_p", "mc3_median_pct", "mc3_mean_pct", "mc3_win_rate_pct", "mc3_wilcoxon_p"])
+    eps25_old = eps25_old[(eps25_old["probe_name"] == "T_EPS25") & (eps25_old["segment"] == "All historical")]
+    eps25_new = eps25_new[(eps25_new["probe_name"] == "T_EPS25") & (eps25_new["segment"] == "All historical")]
+    eps25_rows = comparison_rows(eps25_old, eps25_new, keys=["horizon"], values=["paired_median_spread_pct", "paired_mean_spread_pct", "win_rate_pct", "wilcoxon_p", "paired_weeks"])
     lines = [
         "# EPS Recalibration Research Restatement",
         "",
@@ -438,6 +473,35 @@ def _write_restatement_report(
         f"- B0 selected-count changed weeks: {impact_summary['b0_selected_count_changed_weeks']}",
         f"- B0 code-set/order changed weeks: {impact_summary['b0_codes_changed_weeks']}",
         f"- B0 order-only changed weeks: {impact_summary['b0_order_only_changed_weeks']}",
+        "",
+        "## EPS PIT Data Revision",
+        "",
+        *[f"- {label}: {json.loads((POOL_ROOT / 'EPS_PIT_RECALIBRATION_SUMMARY.json').read_text())[key]}" for label, key in [("Historical pools", "pool_count"), ("Signal rows", "total_signal_rows"), ("Old resolved", "old_resolved_rows"), ("New resolved", "new_resolved_rows"), ("EPS value changed", "eps_value_changed_count"), ("Unknown -> known", "unknown_to_known_count"), ("Known -> unknown", "known_to_unknown_count"), ("Source changed", "source_changed_count"), ("EPS >= 25 state changed", "eps25_state_changed_count"), ("Provider errors", "new_provider_error_count"), ("Future leakage violations", "future_leakage_violation_count")]],
+        "",
+        "## All-Historical Old -> New: Three-Tier",
+        "",
+        "| Contribution / horizon | Metric | Old | New | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *three_rows,
+        "",
+        "## B0 vs Matched-N Random",
+        "",
+        "| Horizon | Metric | Old | New | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *random_rows,
+        "",
+        "## Rank Diagnostics and Top3 vs Top2 / MC3",
+        "",
+        "| Horizon / segment | Metric | Old | New | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *rank_rows,
+        "",
+        "## EPS25 Tightening Probe",
+        "",
+        "| Horizon | Metric | Old | New | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *eps25_rows,
+        "- Verdict: MIXED / NOT YET DEMONSTRATED.",
         "",
         "## Frozen outcome invariants",
         "",
