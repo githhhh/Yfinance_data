@@ -69,6 +69,15 @@ def _rate(num: float, den: float) -> float:
     return round(float(num) / float(den) * 100.0, 2)
 
 
+def describe_statistical_support(p_value: float) -> str:
+    """Describe two-sided statistical support without overstating p >= 0.05."""
+    return (
+        "statistically significant"
+        if p_value < 0.05
+        else "directional and not statistically significant"
+    )
+
+
 def wilcoxon_signed_rank_p(diffs: Sequence[float | int]) -> float:
     """Paired Wilcoxon signed-rank two-sided test on non-zero differences."""
     d = np.asarray(diffs, dtype=float)
@@ -639,7 +648,7 @@ def render_report_markdown(
     w1_mc2_u = m_dict[1].get('mc2_mean_pct', np.nan)
     w4_mc2_m = m_dict[4].get('mc2_median_pct', np.nan)
     w4_mc2_u = m_dict[4].get('mc2_mean_pct', np.nan)
-    support = "statistically significant" if w2_a_p < 0.05 else "directional and not statistically significant"
+    support = describe_statistical_support(w2_a_p)
     md.append(f"  - **Rank3 vs Rank2:** W2 median spread is `{w2_a_med:+.2f}%` with `{w2_a_win:.1f}%` win rate (Wilcoxon $p={w2_a_p:.4f}$): {support}. This is diagnostic only, not demonstrated fine-ranking support.")
     md.append(f"  - **Rank1 vs Rank2 (支持性弱):** Rank1 相对于 Rank2 未达到双侧统计显著水平，周胜率仅在 50% 附近波动。")
     md.append(f"  - **MC2 边际贡献分布 (左尾拖累而非每周恶化):** W1 median MC2 为 `{w1_mc2_m:+.2f}%` (mean `{w1_mc2_u:+.2f}%`)，W4 median MC2 为 `{w4_mc2_m:+.2f}%` (mean `{w4_mc2_u:+.2f}%`)。中位数在 W1/W4 为正，说明 Rank2 表现弱主要是由少数严重亏损的左尾事件（如生物科技板块/未缩量回撤）拉低均值，而非每周系统性拖累。")

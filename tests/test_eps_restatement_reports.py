@@ -1,16 +1,36 @@
 from pathlib import Path
 
+from backtest.b0_top3_quality_audit.generate_b0_rank_topk_audit import (
+    describe_statistical_support,
+)
+from backtest.b0_top3_quality_audit.run_eps_restatement import (
+    _write_restatement_report,
+    sha256_file,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_restatement_report_has_quantitative_sections_and_corrected_verdicts():
-    report = (ROOT / "backtest/b0_top3_quality_audit/output/EPS_RECALIBRATION_RESEARCH_RESTATEMENT.md").read_text()
+def test_restatement_builder_has_quantitative_sections_and_corrected_verdicts(tmp_path):
+    audit_root = ROOT / "backtest/b0_top3_quality_audit"
+    report_path = _write_restatement_report(
+        "593bd333181da4fe301b3f61397c7bc95ac86ced",
+        {"e0_membership_changed_count": 22, "e0_affected_weeks": 10,
+         "b0_selected_count_changed_weeks": 0, "b0_codes_changed_weeks": 6,
+         "b0_order_only_changed_weeks": 2},
+        {"price": sha256_file(audit_root / "data/signal_daily_prices.parquet"),
+         "weekly": sha256_file(audit_root / "data/candidate_weekly_outcomes.parquet"),
+         "train_weekly": sha256_file(audit_root / "data/frozen/train_candidate_weekly_outcomes.parquet")},
+        output_path=tmp_path / "restatement.md",
+    )
+    report = report_path.read_text()
     for heading in (
         "EPS PIT Data Revision",
         "All-Historical Old -> New: Three-Tier",
         "B0 vs Matched-N Random",
+        "Matched Random Percentile Old -> New",
         "Rank Diagnostics and Top3 vs Top2 / MC3",
+        "Rank1 / Rank2 / Rank3 Median Return Old -> New",
         "EPS25 Tightening Probe",
     ):
         assert heading in report
@@ -36,8 +56,5 @@ def test_validation_generator_uses_fixed_calendar_and_v2_manifest():
     assert "共 10 周" not in report
 
 
-def test_rank_report_never_calls_p2872_significant():
-    report = (ROOT / "backtest/b0_top3_quality_audit/output/B0_RANK_POSITION_TOPK_AUDIT_REPORT.md").read_text()
-    line = next(line for line in report.splitlines() if "p=0.2872" in line)
-    assert "not statistically significant" in line
-    assert "显著战胜" not in line
+def test_rank_significance_formatter_marks_p2872_directional_only():
+    assert describe_statistical_support(0.2872) == "directional and not statistically significant"

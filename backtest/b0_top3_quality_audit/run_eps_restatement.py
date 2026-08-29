@@ -420,6 +420,7 @@ def _write_restatement_report(
     baseline_ref: str,
     impact_summary: dict[str, Any],
     frozen_hashes: dict[str, str],
+    output_path: Path | None = None,
 ) -> Path:
     def old_new(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         return git_show_csv(baseline_ref, path), pd.read_csv(path)
@@ -448,11 +449,50 @@ def _write_restatement_report(
     root = OUT
     three_old, three_new = old_new(root / "three_tier_alpha_summary.csv")
     random_old, random_new = old_new(root / "b0_quality_vs_matched_random_horizon_summary.csv")
+    percentile_old, percentile_new = old_new(
+        root / "b0_quality_vs_matched_random_percentile_summary.csv"
+    )
     rank_old, rank_new = old_new(root / "b0_topk_marginal_contribution_summary.csv")
+    rank_position_old, rank_position_new = old_new(
+        root / "b0_rank_position_quality_summary.csv"
+    )
     eps25_old, eps25_new = old_new(root / "layer1_tightening_probe_summary.csv")
     three_rows = comparison_rows(three_old, three_new, keys=["metric"], values=["weekly_spread_screening_pct", "weekly_spread_ranking_pct", "weekly_spread_total_pct", "win_rate_l1_vs_l0_pct", "win_rate_l2_vs_l1_pct", "p_val_screening_wilcoxon", "p_val_ranking_wilcoxon"])
     random_rows = comparison_rows(random_old, random_new, keys=["horizon"], values=["b0_median_return_pct", "matched_random_p50_median_return_pct", "paired_spread_median_pct", "b0_mean_return_pct", "matched_random_p50_mean_return_pct", "paired_spread_mean_pct", "beat_random_p50_rate_pct"])
+    primary_horizons = ["W1", "W2", "W4"]
+    percentile_old = percentile_old[percentile_old["horizon"].isin(primary_horizons)]
+    percentile_new = percentile_new[percentile_new["horizon"].isin(primary_horizons)]
+    percentile_rows = comparison_rows(
+        percentile_old,
+        percentile_new,
+        keys=["horizon"],
+        values=["median_percentile", "mean_percentile", "weeks_gt_p50_pct"],
+    )
     rank_rows = comparison_rows(rank_old, rank_new, keys=["horizon", "segment"], values=["hyp_a_r3_minus_r2_median_spread_pct", "hyp_a_r3_gt_r2_win_rate_pct", "hyp_a_wilcoxon_p", "mc3_median_pct", "mc3_mean_pct", "mc3_win_rate_pct", "mc3_wilcoxon_p"])
+    rank_position_old = rank_position_old[
+        (rank_position_old["segment"] == "All common-support weeks")
+        & rank_position_old["horizon"].isin(primary_horizons)
+        & rank_position_old["rank_position"].isin(["Rank1", "Rank2", "Rank3"])
+    ]
+    rank_position_new = rank_position_new[
+        (rank_position_new["segment"] == "All common-support weeks")
+        & rank_position_new["horizon"].isin(primary_horizons)
+        & rank_position_new["rank_position"].isin(["Rank1", "Rank2", "Rank3"])
+    ]
+    rank_position_old_i = rank_position_old.set_index(["horizon", "rank_position"])
+    rank_position_new_i = rank_position_new.set_index(["horizon", "rank_position"])
+    rank_position_rows: list[str] = []
+    for horizon in primary_horizons:
+        for rank in ("Rank1", "Rank2", "Rank3"):
+            key = (horizon, rank)
+            if key not in rank_position_old_i.index or key not in rank_position_new_i.index:
+                continue
+            old_value = to_float(rank_position_old_i.loc[key, "median_return_pct"])
+            new_value = to_float(rank_position_new_i.loc[key, "median_return_pct"])
+            delta = None if old_value is None or new_value is None else new_value - old_value
+            rank_position_rows.append(
+                f"| {horizon} | {rank} | {fmt(old_value)} | {fmt(new_value)} | {fmt(delta)} |"
+            )
     eps25_old = eps25_old[(eps25_old["probe_name"] == "T_EPS25") & (eps25_old["segment"] == "All historical")]
     eps25_new = eps25_new[(eps25_new["probe_name"] == "T_EPS25") & (eps25_new["segment"] == "All historical")]
     eps25_rows = comparison_rows(eps25_old, eps25_new, keys=["horizon"], values=["paired_median_spread_pct", "paired_mean_spread_pct", "win_rate_pct", "wilcoxon_p", "paired_weeks"])
@@ -490,11 +530,23 @@ def _write_restatement_report(
         "| :--- | :--- | ---: | ---: | ---: |",
         *random_rows,
         "",
+        "## Matched Random Percentile Old -> New",
+        "",
+        "| Horizon | Metric | Old | New | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *percentile_rows,
+        "",
         "## Rank Diagnostics and Top3 vs Top2 / MC3",
         "",
         "| Horizon / segment | Metric | Old | New | Delta |",
         "| :--- | :--- | ---: | ---: | ---: |",
         *rank_rows,
+        "",
+        "## Rank1 / Rank2 / Rank3 Median Return Old -> New",
+        "",
+        "| Horizon | Rank | Old Median | New Median | Delta |",
+        "| :--- | :--- | ---: | ---: | ---: |",
+        *rank_position_rows,
         "",
         "## EPS25 Tightening Probe",
         "",
@@ -542,7 +594,7 @@ def _write_restatement_report(
         "",
         "The audit intentionally does not search new rules, change selectors, or reselect champions.",
     ]
-    path = OUT / "EPS_RECALIBRATION_RESEARCH_RESTATEMENT.md"
+    path = output_path or OUT / "EPS_RECALIBRATION_RESEARCH_RESTATEMENT.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 

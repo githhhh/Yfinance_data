@@ -88,6 +88,20 @@
 | W4 | paired_spread_mean_pct | 2.6325 | 3.5630 | 0.9305 |
 | W4 | beat_random_p50_rate_pct | 63.1600 | 65.7900 | 2.6300 |
 
+## Matched Random Percentile Old -> New
+
+| Horizon | Metric | Old | New | Delta |
+| :--- | :--- | ---: | ---: | ---: |
+| W1 | median_percentile | 54.9750 | 57.5750 | 2.6000 |
+| W1 | mean_percentile | 56.4872 | 57.8377 | 1.3505 |
+| W1 | weeks_gt_p50_pct | 55.0000 | 57.5000 | 2.5000 |
+| W2 | median_percentile | 64.0900 | 68.9000 | 4.8100 |
+| W2 | mean_percentile | 57.4362 | 58.8220 | 1.3858 |
+| W2 | weeks_gt_p50_pct | 57.5000 | 60.0000 | 2.5000 |
+| W4 | median_percentile | 65.5200 | 72.5700 | 7.0500 |
+| W4 | mean_percentile | 59.8313 | 62.0203 | 2.1890 |
+| W4 | weeks_gt_p50_pct | 63.1600 | 65.7900 | 2.6300 |
+
 ## Rank Diagnostics and Top3 vs Top2 / MC3
 
 | Horizon / segment | Metric | Old | New | Delta |
@@ -232,6 +246,20 @@
 | W4 / Late half | mc3_mean_pct | 0.3350 | -0.3018 | -0.6368 |
 | W4 / Late half | mc3_win_rate_pct | 60.0000 | 60.0000 | 0.0000 |
 | W4 / Late half | mc3_wilcoxon_p | 0.6250 | 0.7695 | 0.1445 |
+
+## Rank1 / Rank2 / Rank3 Median Return Old -> New
+
+| Horizon | Rank | Old Median | New Median | Delta |
+| :--- | :--- | ---: | ---: | ---: |
+| W1 | Rank1 | 0.3201 | 0.3201 | 0.0000 |
+| W1 | Rank2 | -0.0472 | 0.0459 | 0.0931 |
+| W1 | Rank3 | 0.5562 | 0.3369 | -0.2193 |
+| W2 | Rank1 | 0.4071 | 1.9559 | 1.5488 |
+| W2 | Rank2 | -0.6604 | -0.6604 | 0.0000 |
+| W2 | Rank3 | 0.5976 | 0.1996 | -0.3980 |
+| W4 | Rank1 | 2.8094 | 1.5779 | -1.2315 |
+| W4 | Rank2 | 0.9170 | 2.7660 | 1.8490 |
+| W4 | Rank3 | 3.8111 | 3.7664 | -0.0447 |
 
 ## EPS25 Tightening Probe
 
