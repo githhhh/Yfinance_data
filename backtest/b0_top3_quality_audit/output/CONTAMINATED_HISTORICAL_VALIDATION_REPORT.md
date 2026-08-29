@@ -1,8 +1,8 @@
-# Contaminated Historical Validation Audit Report (Weeks 31~40)
+# Contaminated Historical Validation Audit Report
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
-**样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `c57078a044b43346367f06c50ece3195db1599028941aa51e5af7a9ea4741b97`)  
+**Fixed calendar**：2026-05-29 至 2026-08-07（11 个 snapshot weeks）<br>
+**输入来源**：`backtest/b0_top3_quality_audit/output/frozen_rules_manifest_eps_recalibrated_v2.json` (SHA256: `c57078a044b43346367f06c50ece3195db1599028941aa51e5af7a9ea4741b97`)<br>
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]
@@ -12,7 +12,7 @@
 
 ---
 
-## 一、历史验证集 (Weeks 31~40) 表现总表
+## 一、Contaminated Historical Validation 表现总表
 
 | 角色 / 规则 | 规则 ID | 复杂度 $C$ | W1 收益中位 | W2 收益中位 | W4 收益中位 | 全周期收益中位 | 止损发生率 | vs L1 胜率 | 定位与建议 |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|

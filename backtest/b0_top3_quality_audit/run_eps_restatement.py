@@ -453,10 +453,30 @@ def _write_restatement_report(
         "- Layer-1 eligibility / industry / ranking decomposition",
         "- Fixed-date contaminated historical validation",
         "",
-        "Interpretation must compare the regenerated CSVs against the old baseline "
-        "and label each prior conclusion RETAINED / WEAKENED / STRENGTHENED / "
-        "REVERSED / NO_LONGER_IDENTIFIABLE. This runner intentionally does not "
-        "search new rules or select new champions.",
+        "## Attribution caveat",
+        "",
+        "All-historical comparisons isolate the EPS data revision most directly. "
+        "Train/contaminated-validation old-to-new deltas are not attributable solely "
+        "to EPS recalibration: the legacy baseline used positional week slicing while "
+        "V2 uses the fixed calendar (Train 2025-10-10..2026-05-22; contaminated "
+        "validation 2026-05-29..2026-08-07).",
+        "",
+        "## Prior-conclusion restatement",
+        "",
+        "| Prior conclusion | Verdict | Corrected interpretation |",
+        "| :--- | :--- | :--- |",
+        "| Pure Eligibility | RETAINED | Directionally positive; independent proof remains not demonstrated. |",
+        "| ACTIONABLE | RETAINED | Operationally critical gate. |",
+        "| Geometry | RETAINED | Quality/sanity filter; independent return alpha not demonstrated. |",
+        "| EPS Known | RETAINED | PIT data-quality/completeness gate; independent return alpha not demonstrated. |",
+        "| Industry Diversity | RETAINED | Portfolio construction only; robust independent advantage not demonstrated. |",
+        "| B0 W4 quality | STRENGTHENED | Promising historical medium-horizon signal, pending virgin forward validation. |",
+        "| Fine-rank monotonicity | RETAINED | Not demonstrated; B0 remains a non-monotonic top-bucket selector. |",
+        "| R3 vs R2 | WEAKENED | Prior statistical support largely disappeared after recalibration. |",
+        "| Top3 vs Top2 / MC3 | WEAKENED | Median W4 contribution remains directional but less stable. |",
+        "| Layer2 | RETAINED | No Layer2 rule qualifies. |",
+        "",
+        "The audit intentionally does not search new rules, change selectors, or reselect champions.",
     ]
     path = OUT / "EPS_RECALIBRATION_RESEARCH_RESTATEMENT.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

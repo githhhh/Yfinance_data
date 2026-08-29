@@ -639,7 +639,8 @@ def render_report_markdown(
     w1_mc2_u = m_dict[1].get('mc2_mean_pct', np.nan)
     w4_mc2_m = m_dict[4].get('mc2_median_pct', np.nan)
     w4_mc2_u = m_dict[4].get('mc2_mean_pct', np.nan)
-    md.append(f"  - **Rank3 vs Rank2 (支持性强):** Rank3 在 W2 显著战胜 Rank2 (中位数利差 `{w2_a_med:+.2f}%`, 胜率 `{w2_a_win:.1f}%`, Wilcoxon $p={w2_a_p:.4f}$)，W1/W3/W4 均呈现明显正向利差。")
+    support = "statistically significant" if w2_a_p < 0.05 else "directional and not statistically significant"
+    md.append(f"  - **Rank3 vs Rank2:** W2 median spread is `{w2_a_med:+.2f}%` with `{w2_a_win:.1f}%` win rate (Wilcoxon $p={w2_a_p:.4f}$): {support}. This is diagnostic only, not demonstrated fine-ranking support.")
     md.append(f"  - **Rank1 vs Rank2 (支持性弱):** Rank1 相对于 Rank2 未达到双侧统计显著水平，周胜率仅在 50% 附近波动。")
     md.append(f"  - **MC2 边际贡献分布 (左尾拖累而非每周恶化):** W1 median MC2 为 `{w1_mc2_m:+.2f}%` (mean `{w1_mc2_u:+.2f}%`)，W4 median MC2 为 `{w4_mc2_m:+.2f}%` (mean `{w4_mc2_u:+.2f}%`)。中位数在 W1/W4 为正，说明 Rank2 表现弱主要是由少数严重亏损的左尾事件（如生物科技板块/未缩量回撤）拉低均值，而非每周系统性拖累。")
     md.append("")
@@ -768,7 +769,7 @@ def render_report_markdown(
             f"{r['hyp_c_wilcoxon_p']:.4f} | [{r['hyp_c_boot_ci95_low']:+.2f}%, {r['hyp_c_boot_ci95_high']:+.2f}%] | {qual} |"
         )
     md.append("")
-    md.append("> **方法论洞察：** Rank3 相比 Rank2 的优势在统计上显著高于 Rank1 相比 Rank2 的优势。这进一步印证了 Rank2 的弱势并非简单的阶梯递减，而是 Rank3 具有独特的路径恢复能力。")
+    md.append("> **方法论洞察：** Rank-position contrasts are descriptive diagnostics. They do not demonstrate a stable monotonic ordering or justify rank-rule changes.")
     md.append("")
     md.append("---")
     md.append("")
@@ -817,8 +818,12 @@ def render_report_markdown(
             )
     md.append("")
     md.append("### 阶段稳定性发现：")
-    md.append("1. **Train 阶段：** Rank3 强于 Rank2 的现象突出（W1/W2/W3 R3>R2 胜率均为 73.3%，W4 达到 80.0%）；")
-    md.append("2. **Contaminated Validation 阶段：** Rank3 > Rank2 胜率仍维持在 55%~62%，但组合层 MC3 中位数在 W3/W4 发生倒挂（-0.24% / -0.15%）；")
+    train_rows = marginal_df[marginal_df["segment"] == "Train-era weeks 1-30"]
+    val_rows = marginal_df[marginal_df["segment"] == "Contaminated validation weeks 31-40"]
+    train_rates = ", ".join(f"{r['horizon']} {r['hyp_a_r3_gt_r2_win_rate_pct']:.1f}%" for _, r in train_rows.iterrows()) or "N/A"
+    val_rates = ", ".join(f"{r['horizon']} {r['hyp_a_r3_gt_r2_win_rate_pct']:.1f}%" for _, r in val_rows.iterrows()) or "N/A"
+    md.append(f"1. **Train 阶段（当前 fixed calendar）：** R3>R2 周胜率为 {train_rates}。")
+    md.append(f"2. **Contaminated Validation 阶段（当前 fixed calendar）：** R3>R2 周胜率为 {val_rates}；仅作诊断。")
     md.append("3. **治理警示：** 31~40 周为已知历史样本，不可等同于真实的 Virgin OOS 前向测试。")
     md.append("")
     md.append("---")

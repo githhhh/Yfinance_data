@@ -29,7 +29,7 @@
 ### Q3. “Top2 明显更差”这个说法：
 - **结论：PARTIALLY SUPPORTED**
 - **证据分层分析（动态提取）：**
-  - **Rank3 vs Rank2 (支持性强):** Rank3 在 W2 显著战胜 Rank2 (中位数利差 `+0.07%`, 胜率 `52.0%`, Wilcoxon $p=0.2872$)，W1/W3/W4 均呈现明显正向利差。
+  - **Rank3 vs Rank2:** W2 median spread is `+0.07%` with `52.0%` win rate (Wilcoxon $p=0.2872$): directional and not statistically significant. This is diagnostic only, not demonstrated fine-ranking support.
   - **Rank1 vs Rank2 (支持性弱):** Rank1 相对于 Rank2 未达到双侧统计显著水平，周胜率仅在 50% 附近波动。
   - **MC2 边际贡献分布 (左尾拖累而非每周恶化):** W1 median MC2 为 `+0.04%` (mean `-0.56%`)，W4 median MC2 为 `+1.23%` (mean `+2.10%`)。中位数在 W1/W4 为正，说明 Rank2 表现弱主要是由少数严重亏损的左尾事件（如生物科技板块/未缩量回撤）拉低均值，而非每周系统性拖累。
 
@@ -136,7 +136,7 @@
 | W3 | 24 | +0.84% | -0.87% | 45.8% | 0.9888 | [-5.10%, +7.38%] | Not Significant |
 | W4 | 23 | -4.21% | -2.46% | 43.5% | 0.7090 | [-16.69%, +6.97%] | Not Significant |
 
-> **方法论洞察：** Rank3 相比 Rank2 的优势在统计上显著高于 Rank1 相比 Rank2 的优势。这进一步印证了 Rank2 的弱势并非简单的阶梯递减，而是 Rank3 具有独特的路径恢复能力。
+> **方法论洞察：** Rank-position contrasts are descriptive diagnostics. They do not demonstrate a stable monotonic ordering or justify rank-rule changes.
 
 ---
 
@@ -171,8 +171,8 @@
 | W4 | Contaminated validation weeks 31-40 | 9 | -1.77% (+1.71%) | +4.19% (+3.36%) | +3.77% (+0.95%) | 66.7% | +0.20% (-0.53%) |
 
 ### 阶段稳定性发现：
-1. **Train 阶段：** Rank3 强于 Rank2 的现象突出（W1/W2/W3 R3>R2 胜率均为 73.3%，W4 达到 80.0%）；
-2. **Contaminated Validation 阶段：** Rank3 > Rank2 胜率仍维持在 55%~62%，但组合层 MC3 中位数在 W3/W4 发生倒挂（-0.24% / -0.15%）；
+1. **Train 阶段（当前 fixed calendar）：** R3>R2 周胜率为 W1 64.3%, W2 64.3%, W3 57.1%, W4 57.1%。
+2. **Contaminated Validation 阶段（当前 fixed calendar）：** R3>R2 周胜率为 W1 45.5%, W2 36.4%, W3 60.0%, W4 66.7%；仅作诊断。
 3. **治理警示：** 31~40 周为已知历史样本，不可等同于真实的 Virgin OOS 前向测试。
 
 ---

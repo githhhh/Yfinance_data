@@ -207,12 +207,13 @@ def run_historical_validation_unblind(
     val_df.to_csv(out_csv, index=False)
     logger.info(f"Saved historical validation evaluation CSV to {out_csv}")
 
-    # Generate Markdown Report
-    report = f"""# Contaminated Historical Validation Audit Report (Weeks 31~40)
+    # Generate Markdown Report from the actual fixed-date calendar.
+    manifest_label = manifest_path.resolve().relative_to(repo_root.resolve()).as_posix()
+    report = f"""# Contaminated Historical Validation Audit Report
 
 **测试性质**：历史验证集单向出表 (One-Way Historical Validation Disclosure)  
-**样本窗口**：第 31~40 周 (2026-05-29 至 2026-08-07，共 10 周)  
-**输入来源**：`frozen_rules_manifest.json` (SHA256: `{manifest_sha}`)  
+**Fixed calendar**：{CONTAMINATED_VALIDATION_START} 至 {CONTAMINATED_VALIDATION_END}（{len(validation_weeks)} 个 snapshot weeks）<br>
+**输入来源**：`{manifest_label}` (SHA256: `{manifest_sha}`)<br>
 **隔离原则**：本报告仅单向输出审计数据，**严禁反馈回演进引擎进行调参或规则重构**。
 
 > [!WARNING]
@@ -222,7 +223,7 @@ def run_historical_validation_unblind(
 
 ---
 
-## 一、历史验证集 (Weeks 31~40) 表现总表
+## 一、Contaminated Historical Validation 表现总表
 
 | 角色 / 规则 | 规则 ID | 复杂度 $C$ | W1 收益中位 | W2 收益中位 | W4 收益中位 | 全周期收益中位 | 止损发生率 | vs L1 胜率 | 定位与建议 |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
