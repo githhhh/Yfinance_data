@@ -448,7 +448,9 @@ def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_
     current = pd.DataFrame(
         [
             {"code": "NEW_ACTION", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 50.0, "latest_close": 51.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 104.0, "ibd_entry_status": None},
+            # The legacy quant_trade bridge rounded this funnel distance to two
+            # decimals before selecting Futu ACTIONABLE codes.
+            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 105.004, "ibd_entry_status": None},
             {"code": "CARRY_EXTENDED", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 106.0, "ibd_entry_status": None},
             {"code": "CURRENT_OVERRIDE", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 0, "ibd_candidate_price": 100.0, "latest_close": 101.0, "ibd_entry_status": "UNCONFIRMED"},
         ]
