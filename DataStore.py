@@ -6,9 +6,11 @@ import yfinance as yf
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
+from pathlib import Path
 from eps_screener import run_screener as run_eps_screener
 from stage2_screener import run_screener as run_stage2_screener, load_whitelist, WHITELIST_PATH
 from data_providers import DataProviderFactory, YahooDataProvider
+from market_universe import build_download_universe
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
@@ -20,44 +22,11 @@ MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
 def read_stock_list(stock_list_dir="us"):
-    """Read and merge all CSV data sources under stock_list_dir.
-    
-    Convention: all CSV files must have a `code` column containing clean ticker symbols.
-    """
-    tickers = set()
-    merged_sources = []
-    
-    # Auto-discover and merge ALL CSV data sources under us/
-    import glob
-    csv_files = sorted(glob.glob(os.path.join(stock_list_dir, "*.csv")))
-    
-    if not csv_files:
-        print(f"[Merge] WARNING: No CSV files found in {stock_list_dir}/")
-    
-    for csv_path in csv_files:
-        try:
-            df = pd.read_csv(csv_path)
-            if 'code' not in df.columns:
-                print(f"[Merge] ⚠️  WARNING: {csv_path} has no 'code' column — skipped (columns found: {list(df.columns)})")
-                continue
-            codes = df['code'].dropna().astype(str).tolist()
-            if not codes:
-                print(f"[Merge] {csv_path}: 'code' column is empty — skipped")
-                continue
-            tickers.update([t.replace(".", "-") for t in codes])
-            merged_sources.append(f"{os.path.basename(csv_path)} ({len(codes)} tickers)")
-        except Exception as e:
-            print(f"[Merge] ⚠️  ERROR reading {csv_path}: {e}")
-    
-    # Print merge summary
-    print(f"\n[Merge] === Data Source Summary ===")
-    for src in merged_sources:
-        print(f"[Merge]   ✓ {src}")
-    
-    final_list = list(tickers)
-    
-    print(f"[Merge] Total unique tickers after dedup: {len(final_list)}")
-    return final_list
+    """Return the named strategy inputs that require market-data coverage."""
+    source_directory = Path(stock_list_dir)
+    tickers = build_download_universe(data_root=source_directory.parent)
+    print(f"[Merge] Explicit download universe: {len(tickers)} unique tickers")
+    return tickers
 
 def download_single_stock(stock_code, period, interval):
     """Download data for a single stock using default Yahoo provider (legacy alias)."""
@@ -174,7 +143,7 @@ if __name__ == "__main__":
     # Fallback 机制: 检查 Stage2 白名单是否存在
     stage2_available = load_whitelist() is not None
     if stage2_available:
-        # 正常路径: glob union (screener CSVs 已被 Stage2 过滤)
+        # 正常路径: explicit input union; each source keeps its own screening semantics.
         tickers = read_stock_list()
         if tickers:
             # 写入 Fallback 快照
@@ -192,7 +161,7 @@ if __name__ == "__main__":
             print(f"[DataStore] Fallback 读取 {FILTER_SNAPSHOT_PATH}: {len(tickers)} 只")
         else:
             tickers = read_stock_list()
-            print(f"[DataStore] Fallback 快照不存在，使用 glob union: {len(tickers)} 只")
+            print(f"[DataStore] Fallback 快照不存在，使用显式输入集合: {len(tickers)} 只")
 
     if not tickers:
         print("No tickers to download.")

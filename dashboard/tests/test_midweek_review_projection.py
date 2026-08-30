@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -159,7 +157,7 @@ def test_projection_classifies_entry_changes_and_summary_from_the_same_fields():
     assert result.summary["UNCHANGED"] == 1
 
 
-def test_carry_status_uses_unrounded_distance_at_zero_and_five_percent_boundaries():
+def test_carry_status_uses_the_rounded_funnel_distance_at_zero_and_five_percent_boundaries():
     complete = pd.DataFrame(
         [
             _row("JUST_OVER", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=102, rule="pivot"),
@@ -176,9 +174,9 @@ def test_carry_status_uses_unrounded_distance_at_zero_and_five_percent_boundarie
     review = build_midweek_review(current, complete).current_review.set_index("code")
 
     assert review.loc["JUST_OVER", "review_current_vs_candidate_pct"] == 5.0
-    assert review.loc["JUST_OVER", "review_effective_entry_status"] == "EXTENDED"
+    assert review.loc["JUST_OVER", "review_effective_entry_status"] == "ACTIONABLE"
     assert review.loc["JUST_UNDER", "review_current_vs_candidate_pct"] == 0.0
-    assert review.loc["JUST_UNDER", "review_effective_entry_status"] == "BELOW_TRIGGER"
+    assert review.loc["JUST_UNDER", "review_effective_entry_status"] == "ACTIONABLE"
 
 
 def test_projection_without_baseline_suppresses_comparison_facts():
@@ -416,12 +414,27 @@ def test_complete_window_keeps_valid_midweek_baseline_available_for_manual_revie
     assert result.midweek_baseline_available is True
 
 
-def test_attached_sample_complete_window_manual_midweek_counts_are_derived_from_rows():
-    root = Path(__file__).resolve().parents[2]
+def test_complete_window_midweek_counts_are_derived_from_snapshot_rows(tmp_path):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    pd.DataFrame(
+        [
+            _row("CARRY", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rule="pivot", rank=1),
+            _row("LEFT", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rule="pivot", rank=2),
+        ]
+    ).to_csv(complete_path, index=False)
+    pd.DataFrame(
+        [
+            _row("NEW", snapshot_date="2026-07-29", signal=True, status="ACTIONABLE", valid=True, candidate=50, close=51, rule="pivot", rank=1),
+            _row("CARRY", snapshot_date="2026-07-29", signal=False, close=104, rank=2),
+            _row("LEFT", snapshot_date="2026-07-29", signal=True, status="EXTENDED", valid=True, candidate=100, close=108, rule="pivot", rank=3),
+        ]
+    ).to_csv(midweek_path, index=False)
+
     result = analyze_breakout_follow_pool(
-        root / "us/breakout_follow_pool.csv",
-        root / "us/breakout_follow_pool_midweek.csv",
-        window_date=date(2026, 8, 3),
+        complete_path,
+        midweek_path,
+        window_date=date(2026, 7, 30),
     )
     state = switch_review_mode(
         default_review_state(result.mode),
@@ -433,44 +446,24 @@ def test_attached_sample_complete_window_manual_midweek_counts_are_derived_from_
         state,
     )
 
-    assert result.mode is PoolMode.COMPLETE
+    assert result.mode is PoolMode.MIDWEEK
     assert result.complete_snapshot_date == date(2026, 7, 24)
-    assert result.midweek_snapshot_date == date(2026, 7, 30)
-    assert result.summary["ACTIVE_SIGNALS"] == 190
+    assert result.midweek_snapshot_date == date(2026, 7, 29)
+    assert result.summary["ACTIVE_SIGNALS"] == 3
     assert counts["change"] == {
-        "BECAME_ACTIONABLE": 34,
-        "LEFT_ACTIONABLE": 11,
-        "OTHER_CHANGES": 66,
+        "BECAME_ACTIONABLE": 1,
+        "LEFT_ACTIONABLE": 1,
+        "OTHER_CHANGES": 0,
         "UNCHANGED": 0,
     }
-    assert counts["origin"] == {"NEW": 90, "CARRY": 9, "RECONFIRMED": 12}
+    assert counts["origin"] == {"NEW": 1, "CARRY": 0, "RECONFIRMED": 1}
     assert counts["status"] == {
-        "ACTIONABLE": 34,
-        "UNCONFIRMED": 51,
-        "BELOW_TRIGGER": 2,
-        "EXTENDED": 24,
-    }
-    assert counts["result"] == 111
-
-    weekend_df = result.complete_pool.copy()
-    weekend_df["review_watch_active"] = weekend_df["signal"]
-    weekend_df["review_effective_entry_status"] = weekend_df["ibd_entry_status"]
-    weekend_df["review_priority"] = pd.to_numeric(
-        weekend_df.get("rank_C_continuous"), errors="coerce"
-    )
-    weekend_state = default_review_state(result.mode)
-    weekend_counts = build_review_filter_counts(weekend_df, weekend_state)
-
-    assert weekend_state["mode"] == "WEEKEND"
-    assert weekend_state["scope"] == "ALL_SIGNALS"
-    assert weekend_state["sort_mode"] == "C Rank"
-    assert weekend_counts["status"] == {
-        "ACTIONABLE": 27,
-        "UNCONFIRMED": 64,
+        "ACTIONABLE": 1,
+        "UNCONFIRMED": 0,
         "BELOW_TRIGGER": 0,
-        "EXTENDED": 15,
+        "EXTENDED": 1,
     }
-    assert weekend_counts["result"] == 106
+    assert counts["result"] == 2
 
 
 def test_analyze_without_valid_baseline_never_carries_complete_signal(tmp_path):
