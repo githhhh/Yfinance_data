@@ -5,6 +5,9 @@ __pycache__/
 token.json
 token_*.json
 *.token
+.env
+*.env
+
 
 # EPUB Unpacked Book
 .ibd_book_unpacked/
@@ -17,3 +20,12 @@ outputs/
 
 # Local EPS PIT provider/download cache
 output/eps_pit_cache/
+
+# RD-Agent research temporary workspace and logs
+git_ignore_folder/
+log/
+pickle_cache/
+selector.log
+prompt_cache.db
+backtest/b0_multifactor_challenge/agent_workspace/replay/
+

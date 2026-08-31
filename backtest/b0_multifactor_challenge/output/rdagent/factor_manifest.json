@@ -1,0 +1,59 @@
+{
+  "agent_framework": "Microsoft RD-Agent 0.8.0 via LiteLLM",
+  "llm_model": "gemini/gemini-3.5-flash",
+  "embedding_model": "gemini/gemini-embedding-001",
+  "step_count": 2,
+  "train_boundary": "2026-05-22",
+  "factors": [
+    {
+      "name": "risk_adj_mom_20",
+      "column": "agent_factor_risk_adj_mom_20",
+      "formula": "mom_20 / (rv_20 + 1e-5)",
+      "description": "20-day momentum normalized by 20-day realized volatility",
+      "code_path": "factors/risk_adj_mom_20.py",
+      "audit_passed": true,
+      "leakage": false,
+      "data_snooping": false
+    },
+    {
+      "name": "risk_adj_mom_10",
+      "column": "agent_factor_risk_adj_mom_10",
+      "formula": "mom_10 / (rv_20 + 1e-5)",
+      "description": "10-day momentum normalized by 20-day realized volatility",
+      "code_path": "factors/risk_adj_mom_10.py",
+      "audit_passed": true,
+      "leakage": false,
+      "data_snooping": false
+    },
+    {
+      "name": "risk_adj_mom_60",
+      "column": "agent_factor_risk_adj_mom_60",
+      "formula": "mom_60 / (rv_20 + 1e-5)",
+      "description": "60-day momentum normalized by 20-day realized volatility",
+      "code_path": "factors/risk_adj_mom_60.py",
+      "audit_passed": true,
+      "leakage": false,
+      "data_snooping": false
+    },
+    {
+      "name": "vol_confirmed_mom_20",
+      "column": "agent_factor_vol_confirmed_mom_20",
+      "formula": "mom_20 * vol_ratio_5_20",
+      "description": "20-day momentum accelerated by 5-to-20 day volume ratio",
+      "code_path": "factors/vol_confirmed_mom_20.py",
+      "audit_passed": true,
+      "leakage": false,
+      "data_snooping": false
+    },
+    {
+      "name": "prox_52w_high",
+      "column": "agent_factor_prox_52w_high",
+      "formula": "-dist_to_52w_high_pct",
+      "description": "Proximity to 52-week high (negative distance)",
+      "code_path": "factors/prox_52w_high.py",
+      "audit_passed": true,
+      "leakage": false,
+      "data_snooping": false
+    }
+  ]
+}

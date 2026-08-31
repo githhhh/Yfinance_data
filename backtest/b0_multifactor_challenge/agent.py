@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, shutil, subprocess
+import json, os, shutil, subprocess, sys
 from pathlib import Path
 import pandas as pd
 from .config import *
@@ -46,13 +46,27 @@ def write_task_spec():
 
 
 def run_official_rdagent(step_n: int=2):
+    import sys
     train_dir,debug_dir,_=prepare_agent_data(); write_task_spec()
-    if shutil.which('rdagent') is None:
+    # Resolve rdagent binary in same env as the running interpreter
+    env_bin=Path(sys.executable).resolve().parent
+    rdagent_bin=shutil.which('rdagent') or (env_bin/'rdagent' if (env_bin/'rdagent').exists() else None)
+    if rdagent_bin is None:
         raise RuntimeError('rdagent CLI not found; pip install rdagent in the local research env')
+    # Load .env so subprocess inherits LLM API key without printing it
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parents[2]/'.env',override=False)
+    except ImportError:
+        pass
+    if not (os.environ.get('OPENAI_API_KEY') or os.environ.get('GEMINI_API_KEY')):
+        raise RuntimeError('No LLM API key set; put OPENAI_API_KEY or GEMINI_API_KEY in .env')
     env=os.environ.copy()
+    # Ensure conda bin is on PATH for rdagent's own subprocess calls
+    env['PATH']=str(env_bin)+os.pathsep+env.get('PATH','')
     env['FACTOR_CoSTEER_DATA_FOLDER']=str(train_dir)
     env['FACTOR_CoSTEER_DATA_FOLDER_DEBUG']=str(debug_dir)
-    return subprocess.run(['rdagent','fin_factor',f'--step_n={step_n}'],env=env,check=False,text=True).returncode
+    return subprocess.run([str(rdagent_bin),'fin_factor',f'--step-n={step_n}'],env=env,check=False,text=True).returncode
 
 
 def replay_factor_code(name: str, factor_py: Path, panel_path: Path | None=None):
@@ -63,7 +77,7 @@ def replay_factor_code(name: str, factor_py: Path, panel_path: Path | None=None)
     for src in full_dir.iterdir():
         shutil.copy2(src,run_dir/src.name)
     shutil.copy2(factor_py,run_dir/'factor.py')
-    proc=subprocess.run([os.environ.get('PYTHON','python'),'factor.py'],cwd=run_dir,text=True,capture_output=True)
+    proc=subprocess.run([os.environ.get('PYTHON',sys.executable),'factor.py'],cwd=run_dir,text=True,capture_output=True)
     if proc.returncode!=0:
         raise RuntimeError(f'factor replay failed: {proc.stdout}\n{proc.stderr}')
     result=run_dir/'result.h5'
