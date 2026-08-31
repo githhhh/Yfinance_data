@@ -1,0 +1,4 @@
+horizon,weeks,negative_weeks,positive_weeks,one_pick_ruins_weeks,one_pick_ruins_rate_all_pct,one_pick_ruins_rate_negative_pct,mean_loss_concentration_negative_weeks,mean_gain_concentration_positive_weeks,left10_mean_worst_pick_loss_concentration,right10_mean_best_pick_gain_concentration
+W1,25,8,17,2,8,25,0.7468324164586142,0.7537453903567144,0.6876228945302106,0.6632114118212032
+W2,25,10,15,3,12,30,0.7260717661981511,0.7649338642352927,0.6541607115995592,0.6703646094057972
+W4,23,9,14,6,26.08695652173913,66.66666666666667,0.8091162965216502,0.7235021470269131,0.627564036833181,0.8528453602634309
