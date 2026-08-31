@@ -7,6 +7,7 @@ publication.
 
 from __future__ import annotations
 
+from functools import lru_cache
 import logging
 from pathlib import Path
 
@@ -33,13 +34,14 @@ def _clean_text(value: object) -> str | None:
     return text if text and text.lower() != "nan" else None
 
 
-def load_industry_lookup(*, data_root: str | Path | None = None) -> dict[str, tuple[str, str]]:
-    """Load screener industry values from low to high authority priority."""
-    root = Path(data_root) if data_root is not None else _default_data_root()
+@lru_cache(maxsize=None)
+def _load_industry_lookup_for_root(root: str) -> dict[str, tuple[str, str]]:
+    """Load one data root once per process from low to high source priority."""
+    data_root = Path(root)
     lookup: dict[str, tuple[str, str]] = {}
 
     for relative_path in INDUSTRY_SOURCE_FILES:
-        source_path = root / relative_path
+        source_path = data_root / relative_path
         if not source_path.exists():
             logging.warning("BF Pool industry source missing: %s", source_path)
             continue
@@ -65,6 +67,12 @@ def load_industry_lookup(*, data_root: str | Path | None = None) -> dict[str, tu
 
     logging.info("BF Pool industry lookup loaded: %s mappings", len(lookup))
     return lookup
+
+
+def load_industry_lookup(*, data_root: str | Path | None = None) -> dict[str, tuple[str, str]]:
+    """Return the per-process cached screener industry lookup for one data root."""
+    root = Path(data_root) if data_root is not None else _default_data_root()
+    return _load_industry_lookup_for_root(str(root.resolve()))
 
 
 def enrich_pool_with_industry(
