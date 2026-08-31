@@ -1,0 +1,12 @@
+{
+  "rows": 2738,
+  "weeks": 42,
+  "train_end": "2026-05-22",
+  "contaminated_validation": [
+    "2026-05-29",
+    "2026-08-07"
+  ],
+  "forward_start": "2026-08-28",
+  "price_max_le_snapshot_checked": true,
+  "source": "EPS_RECALIBRATED_V2 frozen pools/outcomes/prices"
+}

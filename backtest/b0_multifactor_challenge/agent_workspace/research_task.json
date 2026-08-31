@@ -1,0 +1,21 @@
+{
+  "objective": "Discover continuous, PIT-safe factors that improve weekly Top3 ranking relative to frozen B0.",
+  "agent_data_boundary": "train only through 2026-05-22",
+  "primary_label": "W4 return, evaluated externally; agent never receives labels",
+  "constraints": [
+    "no future/outcome columns",
+    "no ticker/date-specific rules",
+    "continuous preferred",
+    "must execute on candidate_panel.h5",
+    "output result.h5"
+  ],
+  "candidate_dimensions": [
+    "breakout geometry",
+    "buy-point/high proximity",
+    "volume/demand",
+    "momentum/MA trend",
+    "volatility/risk",
+    "signal-type interactions",
+    "EPS/quality interactions"
+  ]
+}

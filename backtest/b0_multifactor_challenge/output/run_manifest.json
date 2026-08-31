@@ -1,0 +1,62 @@
+{
+  "feature_mode": "f1",
+  "features": [
+    "current_vs_ibd_candidate_pct",
+    "ibd_entry_volume_ratio",
+    "volume_ratio",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+    "ibd_entry_close_vs_trigger_pct",
+    "dist_to_52w_high_pct",
+    "eps_yoy_growth",
+    "base_depth_pct",
+    "base_duration_weeks",
+    "base_mbox_count",
+    "pullback_pct",
+    "pullback_duration_weeks",
+    "C_continuous",
+    "pullback_v_is_dry",
+    "trigger_pos",
+    "eps_known",
+    "rule_ceiling",
+    "rule_pivot",
+    "rule_ma10_touch_confirm",
+    "rule_ceiling_pullback",
+    "rule_three_weeks_tight",
+    "px_vs_ma10",
+    "px_vs_ma20",
+    "px_vs_ma50",
+    "ma10_slope_5",
+    "ma20_slope_5",
+    "ma50_slope_10",
+    "mom_5",
+    "mom_10",
+    "mom_20",
+    "mom_60",
+    "rv_20",
+    "atr_14_pct",
+    "vol_ratio_5_20",
+    "up_day_ratio_20",
+    "drawdown_20",
+    "rel_spy_20",
+    "rel_spy_60"
+  ],
+  "train_folds": 3,
+  "purge_weeks": 4,
+  "contaminated_validation": [
+    "2026-05-29",
+    "2026-08-07"
+  ],
+  "models": [
+    "ridge",
+    "elastic",
+    "lgbm(optional)"
+  ],
+  "primary_horizons": [
+    1,
+    2,
+    4
+  ],
+  "selection": "same b0_eligible universe; Top3; distinct industry",
+  "censoring": "select first, then require complete Top3 horizon labels"
+}
