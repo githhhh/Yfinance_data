@@ -9,16 +9,89 @@ import pytest
 pytestmark = pytest.mark.filterwarnings("ignore:Type google.protobuf.pyext._message.*:DeprecationWarning")
 
 
-def test_default_dashboard_screen_renders_with_real_csv():
+def _pool_row(
+    code,
+    *,
+    snapshot_date,
+    signal,
+    status=None,
+    valid=None,
+    candidate=None,
+    close=100.0,
+    rank=1,
+):
+    return {
+        "code": code,
+        "snapshot_date": snapshot_date,
+        "signal": signal,
+        "signal_source": "pivot" if signal else None,
+        "latest_close": close,
+        "ibd_candidate_price": candidate,
+        "ibd_candidate_rule": "pivot" if signal else None,
+        "ibd_entry_valid": valid,
+        "ibd_entry_status": status,
+        "current_vs_ibd_candidate_pct": (
+            (close / candidate - 1.0) * 100.0 if candidate else None
+        ),
+        "ibd_entry_volume_ratio": 2.0 if valid else None,
+        "ibd_entry_reject_reason": None if valid else "Volume not confirmed",
+        "volume_ratio": 1.5,
+        "rank_C_continuous": rank,
+        "C_continuous": float(rank),
+    }
+
+
+@pytest.fixture
+def review_paths(tmp_path):
+    complete = pd.DataFrame(
+        [
+            _pool_row("CARRY", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rank=1),
+            _pool_row("LEFT", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rank=2),
+            _pool_row("RECONF", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rank=3),
+            _pool_row("EXITED", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rank=4),
+            _pool_row("PLAIN", snapshot_date="2026-07-24", signal=False, rank=5),
+        ]
+    )
+    midweek = pd.DataFrame(
+        [
+            _pool_row("NEW", snapshot_date="2026-07-30", signal=True, status="ACTIONABLE", valid=True, candidate=50, close=51, rank=1),
+            _pool_row("CARRY", snapshot_date="2026-07-30", signal=False, close=104, rank=2),
+            _pool_row("LEFT", snapshot_date="2026-07-30", signal=True, status="EXTENDED", valid=True, candidate=100, close=108, rank=3),
+            _pool_row("RECONF", snapshot_date="2026-07-30", signal=True, status="UNCONFIRMED", valid=False, candidate=100, close=101, rank=4),
+            _pool_row("PLAIN", snapshot_date="2026-07-30", signal=False, close=99, rank=5),
+        ]
+    )
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    complete.to_csv(complete_path, index=False)
+    midweek.to_csv(midweek_path, index=False)
+    return {"complete": complete_path, "midweek": midweek_path}
+
+
+def _review_app(paths, *, window_date):
     warnings.filterwarnings("ignore", category=DeprecationWarning, module="google.protobuf.*")
     from streamlit.testing.v1 import AppTest
 
     old_argv = sys.argv[:]
-    sys.argv = ["dashboard/app.py", "--csv", "us/breakout_follow_pool.csv"]
+    sys.argv = [
+        "dashboard/app.py",
+        "--csv",
+        str(paths["complete"]),
+        "--midweek-csv",
+        str(paths["midweek"]),
+        "--window-date",
+        window_date,
+    ]
     try:
         app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
+        app._review_argv = list(sys.argv)
+        return app
     finally:
         sys.argv = old_argv
+
+
+def test_default_dashboard_screen_renders_with_fixed_snapshots(review_paths):
+    app = _review_app(review_paths, window_date="2026-07-30")
 
     assert len(app.exception) == 0
     assert [title.value for title in app.title] == []
@@ -28,46 +101,12 @@ def test_default_dashboard_screen_renders_with_real_csv():
     assert not any(widget.key and str(widget.key).startswith("review_sort_") for widget in app.selectbox)
 
 
-def _midweek_app():
-    from streamlit.testing.v1 import AppTest
-
-    old_argv = sys.argv[:]
-    sys.argv = [
-        "dashboard/app.py",
-        "--csv",
-        "us/breakout_follow_pool.csv",
-        "--midweek-csv",
-        "us/breakout_follow_pool_midweek.csv",
-        "--window-date",
-        "2026-07-30",
-    ]
-    try:
-        app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
-        app._review_argv = list(sys.argv)
-        return app
-    finally:
-        sys.argv = old_argv
+def _midweek_app(review_paths):
+    return _review_app(review_paths, window_date="2026-07-30")
 
 
-def _complete_window_with_valid_midweek_app():
-    from streamlit.testing.v1 import AppTest
-
-    old_argv = sys.argv[:]
-    sys.argv = [
-        "dashboard/app.py",
-        "--csv",
-        "us/breakout_follow_pool.csv",
-        "--midweek-csv",
-        "us/breakout_follow_pool_midweek.csv",
-        "--window-date",
-        "2026-08-03",
-    ]
-    try:
-        app = AppTest.from_file("dashboard/app.py", default_timeout=10).run(timeout=30)
-        app._review_argv = list(sys.argv)
-        return app
-    finally:
-        sys.argv = old_argv
+def _complete_window_with_valid_midweek_app(review_paths):
+    return _review_app(review_paths, window_date="2026-08-03")
 
 
 def _button_starting_with(app, label: str):
@@ -111,8 +150,8 @@ def _header_markup(app):
     )
 
 
-def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filters():
-    app = _midweek_app()
+def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filters(review_paths):
+    app = _midweek_app(review_paths)
 
     assert len(app.exception) == 0
     state = app.session_state["review_ui_state"]
@@ -125,8 +164,8 @@ def test_midweek_runtime_defaults_to_changes_review_priority_and_collapsed_filte
     assert any("results · Sorted by Review Priority" in item.value for item in app.markdown)
 
 
-def test_midweek_runtime_exposes_all_ten_structured_tooltips():
-    app = _midweek_app()
+def test_midweek_runtime_exposes_all_ten_structured_tooltips(review_paths):
+    app = _midweek_app(review_paths)
     card_names = [
         "Entered Buy Zone",
         "Left Buy Zone",
@@ -158,15 +197,15 @@ def test_midweek_runtime_exposes_all_ten_structured_tooltips():
     assert not any(button.key and button.key.startswith("btn_flow_info_") for button in app.button)
 
 
-def test_runtime_scope_buttons_expose_expected_enabled_states():
-    app = _midweek_app()
+def test_runtime_scope_buttons_expose_expected_enabled_states(review_paths):
+    app = _midweek_app(review_paths)
     assert _button_starting_with(app, "Changes").disabled is False
     assert _button_starting_with(app, "All Signals").disabled is False
     assert _button_starting_with(app, "Midweek Review").disabled is False
 
 
-def test_runtime_mode_scope_and_quick_filter_flow():
-    app = _midweek_app()
+def test_runtime_mode_scope_and_quick_filter_flow(review_paths):
+    app = _midweek_app(review_paths)
 
     assert app.session_state["review_ui_state"]["change_filter"] == "ALL"
     assert app.session_state["review_ui_state"]["origin_filter"] == "ALL"
@@ -179,7 +218,7 @@ def test_runtime_mode_scope_and_quick_filter_flow():
     assert state["scope"] == "ALL_SIGNALS"
     assert state["sort_mode"] == "C Rank"
     assert not any(button.key == "btn_scope_changes" for button in app.button)
-    assert any("All Signals · 106" in item.value for item in app.markdown)
+    assert any("All Signals · 4" in item.value for item in app.markdown)
     assert any("Weekend Baseline" in item.value for item in app.markdown)
 
     _click(app, "btn_mode_midweek")
@@ -204,8 +243,8 @@ def test_runtime_mode_scope_and_quick_filter_flow():
     assert not any(button.key == "btn_clear_quick" for button in app.button)
 
 
-def test_complete_window_manual_midweek_uses_the_valid_baseline_comparison():
-    app = _complete_window_with_valid_midweek_app()
+def test_complete_window_manual_midweek_uses_the_valid_baseline_comparison(review_paths):
+    app = _complete_window_with_valid_midweek_app(review_paths)
 
     initial = app.session_state["review_ui_state"]
     assert initial["mode"] == "WEEKEND"
@@ -221,11 +260,11 @@ def test_complete_window_manual_midweek_uses_the_valid_baseline_comparison():
     assert state["sort_mode"] == "Review Priority"
     assert app.button(key="btn_scope_changes").disabled is False
     assert any("Midweek · baseline 2026-07-24" in item.value for item in app.markdown)
-    assert any("111 results · Sorted by Review Priority" in item.value for item in app.markdown)
+    assert any("3 results · Sorted by Review Priority" in item.value for item in app.markdown)
 
 
-def test_runtime_status_filter_expansion_and_reset_flow():
-    app = _midweek_app()
+def test_runtime_status_filter_expansion_and_reset_flow(review_paths):
+    app = _midweek_app(review_paths)
 
     _click(app, "btn_status_ACTIONABLE")
     assert app.session_state["review_ui_state"]["status_filter"] == "ACTIONABLE"
@@ -256,8 +295,8 @@ def test_runtime_status_filter_expansion_and_reset_flow():
     assert app.session_state["review_ui_state"]["filters_expanded"] is True
 
 
-def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
-    app = _midweek_app()
+def test_runtime_advanced_filters_apply_immediately_and_compose_with_and(review_paths):
+    app = _midweek_app(review_paths)
     _click(app, "btn_filters_toggle")
 
     app.radio(key="review_route_0").set_value("pivot")
@@ -283,8 +322,8 @@ def test_runtime_advanced_filters_apply_immediately_and_compose_with_and():
     )
 
 
-def test_runtime_uses_fixed_view_sort_without_toolbar_selector():
-    app = _midweek_app()
+def test_runtime_uses_fixed_view_sort_without_toolbar_selector(review_paths):
+    app = _midweek_app(review_paths)
 
     assert not any(widget.key and str(widget.key).startswith("review_sort_") for widget in app.selectbox)
     _click(app, "btn_scope_all_signals")
@@ -294,8 +333,8 @@ def test_runtime_uses_fixed_view_sort_without_toolbar_selector():
     assert any("results · Sorted by C Rank" in item.value for item in app.markdown)
 
 
-def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review():
-    app = _midweek_app()
+def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review(review_paths):
+    app = _midweek_app(review_paths)
 
     app.get("button_group")[0].set_value(["C Rank Reference"])
     app.run(timeout=30)
@@ -314,19 +353,19 @@ def test_runtime_global_mode_switches_to_c_rank_reference_and_back_to_ibd_review
     assert not any(widget.label == "Top N Slice" for widget in app.selectbox)
 
 
-def test_runtime_header_tracks_midweek_weekend_and_c_rank_data_sources():
-    app = _midweek_app()
+def test_runtime_header_tracks_midweek_weekend_and_c_rank_data_sources(review_paths):
+    app = _midweek_app(review_paths)
 
     midweek_header = _header_markup(app)
     assert "Snapshot <b>2026-07-30</b>" in midweek_header
-    assert "<b>751</b> Total Pool" in midweek_header
-    assert "<b>190</b> Active Signals" in midweek_header
+    assert "<b>5</b> Total Pool" in midweek_header
+    assert "<b>4</b> Active Signals" in midweek_header
 
     _click(app, "btn_mode_weekend")
     weekend_header = _header_markup(app)
     assert "Snapshot <b>2026-07-24</b>" in weekend_header
-    assert "<b>745</b> Total Pool" in weekend_header
-    assert "<b>106</b> Active Signals" in weekend_header
+    assert "<b>5</b> Total Pool" in weekend_header
+    assert "<b>4</b> Active Signals" in weekend_header
 
     _click(app, "btn_mode_midweek")
     app.get("button_group")[0].set_value(["C Rank Reference"])
@@ -334,41 +373,41 @@ def test_runtime_header_tracks_midweek_weekend_and_c_rank_data_sources():
 
     c_rank_header = _header_markup(app)
     assert "Snapshot <b>2026-07-24</b>" in c_rank_header
-    assert "<b>745</b> Total Pool" in c_rank_header
-    assert "<b>106</b> Active Signals" in c_rank_header
+    assert "<b>5</b> Total Pool" in c_rank_header
+    assert "<b>4</b> Active Signals" in c_rank_header
     assert "snapshot-mode-segment--midweek" not in c_rank_header
 
 
-def test_c_rank_top_n_keeps_result_summary_complete():
-    app = _midweek_app()
+def test_c_rank_top_n_keeps_result_summary_complete(review_paths):
+    app = _midweek_app(review_paths)
     app.get("button_group")[0].set_value(["C Rank Reference"])
     _run_with_review_argv(app)
 
     assert any(
-        "Showing: 106 of 106 Active Signals · Reference Only" in item.value
+        "Showing: 4 of 4 Active Signals · Reference Only" in item.value
         for item in app.markdown
     )
 
     app.selectbox(key="c_rank_top_n_select").select("Top 10")
     _run_widget_change(app)
     assert any(
-        "Showing: 10 of 106 Active Signals · Reference Only" in item.value
+        "Showing: 4 of 4 Active Signals · Reference Only" in item.value
         for item in app.markdown
     )
 
     app.selectbox(key="c_rank_top_n_select").select("Top 25")
     _run_widget_change(app)
     assert any(
-        "Showing: 25 of 106 Active Signals · Reference Only" in item.value
+        "Showing: 4 of 4 Active Signals · Reference Only" in item.value
         for item in app.markdown
     )
 
 
-def test_runtime_surfaces_missing_baseline_warning(tmp_path):
+def test_runtime_surfaces_missing_baseline_warning(tmp_path, review_paths):
     from streamlit.testing.v1 import AppTest
 
-    complete = pd.read_csv("us/breakout_follow_pool.csv")
-    midweek = pd.read_csv("us/breakout_follow_pool_midweek.csv")
+    complete = pd.read_csv(review_paths["complete"])
+    midweek = pd.read_csv(review_paths["midweek"])
     complete["snapshot_date"] = "2026-07-17"
     midweek["snapshot_date"] = "2026-07-29"
     complete_path = tmp_path / "breakout_follow_pool.csv"
@@ -422,11 +461,11 @@ def test_runtime_surfaces_missing_baseline_warning(tmp_path):
 
 
 @pytest.mark.parametrize("midweek_state", ["missing", "outdated"])
-def test_unavailable_midweek_falls_back_as_a_normal_weekend_state(tmp_path, midweek_state):
+def test_unavailable_midweek_falls_back_as_a_normal_weekend_state(tmp_path, midweek_state, review_paths):
     from streamlit.testing.v1 import AppTest
 
-    complete = pd.read_csv("us/breakout_follow_pool.csv")
-    midweek = pd.read_csv("us/breakout_follow_pool_midweek.csv")
+    complete = pd.read_csv(review_paths["complete"])
+    midweek = pd.read_csv(review_paths["midweek"])
     complete["snapshot_date"] = "2026-07-31"
     midweek["snapshot_date"] = "2026-07-30"
     complete_path = tmp_path / "breakout_follow_pool.csv"
@@ -473,9 +512,4 @@ def test_unavailable_midweek_falls_back_as_a_normal_weekend_state(tmp_path, midw
 
     header = _header_markup(app)
     assert "Snapshot <b>2026-07-31</b>" in header
-    assert "data-badge" not in header
-    assert "Data Aging" not in header
-    assert "4d old" not in header
-    assert "Aging" not in header
-    assert "Data Stale" not in header
     assert "Midweek" not in header

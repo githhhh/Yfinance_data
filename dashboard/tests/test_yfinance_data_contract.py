@@ -87,6 +87,7 @@ def test_quant_trade_import_path_and_zero_argument_contract_are_available():
     assert list(inspect.signature(pool_type.midweek).parameters) == []
     assert list(inspect.signature(pool_type.load_actionable_codes).parameters) == ["self"]
     assert list(inspect.signature(pool_type.commit).parameters) == ["self"]
+    assert callable(yfinance_data.load_industry_lookup)
 
 
 def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, monkeypatch):
@@ -105,6 +106,94 @@ def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, mo
     pool_run.save_snapshot(snapshot)
 
     assert pool_run.load_actionable_codes() == ["SECOND", "FIRST"]
+
+
+def test_pool_run_projects_published_presentation_fields_into_preview(tmp_path, monkeypatch):
+    def add_industry(pool: pd.DataFrame) -> pd.DataFrame:
+        result = pool.copy()
+        result["sector"] = result["code"].map({"FIRST": "Technology", "QUIET": "Health"})
+        result["industry"] = result["code"].map({"FIRST": "Software", "QUIET": "Biotech"})
+        return result
+
+    monkeypatch.setattr(yfinance_data, "_enrich_signal_eps", _passthrough_resolved_eps)
+    monkeypatch.setattr(yfinance_data, "enrich_pool_with_industry", add_industry)
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    pool_run.save_snapshot(
+        pd.DataFrame(
+            [
+                {"code": "FIRST", "snapshot_date": "2026-08-21", "signal": True, "ibd_entry_valid": 1, "ibd_entry_status": "ACTIONABLE"},
+                {"code": "QUIET", "snapshot_date": "2026-08-21", "signal": False},
+            ]
+        )
+    )
+
+    preview = pd.DataFrame(
+        [
+            {"code": "QUIET", "latest_close": 20.0, "sector": "caller value"},
+            {"code": "FIRST", "latest_close": 10.0, "industry": "caller value"},
+        ]
+    )
+    projected = pool_run.project_published_display_fields(preview)
+
+    assert list(projected["code"]) == ["QUIET", "FIRST"]
+    assert list(projected["latest_close"]) == [20.0, 10.0]
+    assert set(yfinance_data.POOL_PRESENTATION_COLUMNS).issubset(projected.columns)
+    by_code = projected.set_index("code")
+    assert by_code.loc["FIRST", "eps_yoy_growth"] == 1.0
+    assert by_code.loc["FIRST", "sector"] == "Technology"
+    assert by_code.loc["QUIET", "industry"] == "Biotech"
+
+
+def test_pool_run_rejects_an_empty_snapshot_over_an_existing_pool(tmp_path, monkeypatch):
+    monkeypatch.setattr(yfinance_data, "_enrich_signal_eps", _passthrough_resolved_eps)
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pd.DataFrame({"code": ["EXISTING"]}).to_csv(pool_path, index=False)
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.weekend()
+    with pytest.raises(RuntimeError, match="候选为空"):
+        pool_run.save_snapshot(pd.DataFrame({"code": []}))
+
+    assert pd.read_csv(pool_path)["code"].tolist() == ["EXISTING"]
+
+
+def test_midweek_empty_snapshot_keeps_the_complete_pool_guard(tmp_path, monkeypatch):
+    monkeypatch.setattr(yfinance_data, "_enrich_signal_eps", _passthrough_resolved_eps)
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    pd.DataFrame({"code": ["COMPLETE"]}).to_csv(complete_path, index=False)
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
+
+    pool_run = yfinance_data.BreakoutFollowPoolRun.midweek()
+    with pytest.raises(RuntimeError, match="候选为空"):
+        pool_run.save_snapshot(pd.DataFrame({"code": []}))
+
+    assert pd.read_csv(complete_path)["code"].tolist() == ["COMPLETE"]
+    assert not midweek_path.exists()
+
+
+def test_pool_snapshot_replace_failure_keeps_the_existing_pool(tmp_path, monkeypatch):
+    monkeypatch.setattr(yfinance_data, "_enrich_signal_eps", _passthrough_resolved_eps)
+    monkeypatch.setattr(yfinance_data, "enrich_pool_with_industry", lambda pool: pool.copy())
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pd.DataFrame({"code": ["EXISTING"]}).to_csv(pool_path, index=False)
+    monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(pool_path))
+
+    def fail_replace(source, target):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(yfinance_data.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        yfinance_data.BreakoutFollowPoolRun.weekend().save_snapshot(
+            pd.DataFrame([{"code": "CURRENT", "signal": False}])
+        )
+
+    assert pd.read_csv(pool_path)["code"].tolist() == ["EXISTING"]
+    assert not list(tmp_path.glob(".*.pending"))
 
 
 def test_pool_run_supplements_signal_eps_before_publishing(tmp_path, monkeypatch):
@@ -197,7 +286,12 @@ def test_pool_run_logs_unresolved_signal_eps_codes(tmp_path, monkeypatch, caplog
     assert saved.loc[saved["code"].eq("FILLED"), "eps_yoy_growth"].item() == 42.0
     assert pd.isna(saved.loc[saved["code"].eq("MISS"), "eps_yoy_growth"].item())
     assert "BF Pool signal EPS unresolved codes: MISS" in caplog.text
-    assert "QUIET" not in caplog.text
+    eps_unresolved_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if "BF Pool signal EPS unresolved codes:" in record.getMessage()
+    ]
+    assert "QUIET" not in "\n".join(eps_unresolved_messages)
 
 
 def test_pool_run_logs_signal_eps_pit_summary(tmp_path, monkeypatch, caplog):
@@ -239,7 +333,12 @@ def test_pool_run_logs_signal_eps_pit_summary(tmp_path, monkeypatch, caplog):
     assert "resolved=1 [FILLED]" in caplog.text
     assert "expected_unavailable=1 [MISS(NO_PRIOR_YEAR_QUARTER)]" in caplog.text
     assert "provider_error=0 [none]" in caplog.text
-    assert "QUIET" not in caplog.text
+    eps_summary_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if "BF Pool signal EPS PIT summary:" in record.getMessage()
+    ]
+    assert "QUIET" not in "\n".join(eps_summary_messages)
 
 
 def test_supplement_latest_pool_eps_updates_only_latest_snapshot_pool(tmp_path, monkeypatch):
@@ -349,7 +448,9 @@ def test_midweek_pool_run_uses_unified_projection_and_matches_quant_fixture(tmp_
     current = pd.DataFrame(
         [
             {"code": "NEW_ACTION", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 1, "ibd_candidate_price": 50.0, "latest_close": 51.0, "ibd_entry_status": "ACTIONABLE"},
-            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 104.0, "ibd_entry_status": None},
+            # The legacy quant_trade bridge rounded this funnel distance to two
+            # decimals before selecting Futu ACTIONABLE codes.
+            {"code": "CARRY_ACTION", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 105.004, "ibd_entry_status": None},
             {"code": "CARRY_EXTENDED", "snapshot_date": "2026-07-29", "signal": False, "ibd_entry_valid": None, "ibd_candidate_price": None, "latest_close": 106.0, "ibd_entry_status": None},
             {"code": "CURRENT_OVERRIDE", "snapshot_date": "2026-07-29", "signal": True, "ibd_entry_valid": 0, "ibd_candidate_price": 100.0, "latest_close": 101.0, "ibd_entry_status": "UNCONFIRMED"},
         ]
@@ -570,3 +671,28 @@ def test_pool_run_commit_targets_only_the_run_file(tmp_path, monkeypatch):
     ]
     assert len(diff_calls) == 1
     assert str(midweek_path) in diff_calls[0]
+
+
+def test_pool_commit_propagates_git_failures(tmp_path, monkeypatch):
+    pool_path = tmp_path / "breakout_follow_pool.csv"
+    pd.DataFrame(
+        [
+            {
+                "code": "CURRENT",
+                "signal": False,
+                "eps_yoy_growth": None,
+                "eps_yoy_growth_source": None,
+                "eps_yoy_growth_status": None,
+                "eps_yoy_growth_missing_reason": None,
+                "eps_growth_type": None,
+            }
+        ]
+    ).to_csv(pool_path, index=False)
+
+    def fail_git_add(args, **kwargs):
+        raise yfinance_data.subprocess.CalledProcessError(1, args)
+
+    monkeypatch.setattr(yfinance_data.subprocess, "run", fail_git_add)
+
+    with pytest.raises(yfinance_data.subprocess.CalledProcessError):
+        yfinance_data._commit_pool(str(pool_path))

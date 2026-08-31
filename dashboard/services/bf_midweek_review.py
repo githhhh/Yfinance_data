@@ -168,9 +168,12 @@ def _nonempty_status(value: Any, *, code: str) -> str:
 def _calculate_status(entry_valid: Any, candidate: float, latest_close: float) -> str:
     if _to_bool(entry_valid) is not True:
         return "UNCONFIRMED"
-    if latest_close < candidate:
+    # Keep Carry status aligned with the two-decimal funnel field published by
+    # quant_trade for ordinary signal rows.
+    current_vs_candidate_pct = round((latest_close / candidate - 1.0) * 100.0, 2)
+    if current_vs_candidate_pct < 0.0:
         return "BELOW_TRIGGER"
-    if latest_close <= candidate * 1.05:
+    if current_vs_candidate_pct <= 5.0:
         return "ACTIONABLE"
     return "EXTENDED"
 
