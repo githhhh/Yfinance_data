@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from hashlib import sha256
 from pathlib import Path
@@ -17,6 +18,7 @@ import pandas as pd
 
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
 from eps_pit import EPSResolveMode, EPSStatus, SignalEPSLookup, enrich_pool_with_signal_eps
+from .pool_industry import enrich_pool_with_industry, load_industry_lookup
 
 
 DATA_ROOT = str(Path(__file__).resolve().parents[1])
@@ -32,6 +34,7 @@ EPS_PUBLICATION_COLUMNS = (
     "eps_yoy_growth_missing_reason",
     "eps_growth_type",
 )
+POOL_PRESENTATION_COLUMNS = (*EPS_PUBLICATION_COLUMNS, "sector", "industry")
 
 
 def _is_truthy(value) -> bool:
@@ -65,8 +68,62 @@ def _pool_codes(pool: pd.DataFrame) -> frozenset[str]:
     return frozenset(normalized)
 
 
+def _ensure_pool_industry_columns(pool: pd.DataFrame) -> pd.DataFrame:
+    result = pool.copy()
+    for column in ("sector", "industry"):
+        if column not in result.columns:
+            result[column] = pd.NA
+    return result
+
+
+def _reject_empty_pool_overwrite(path: str, candidate_codes: frozenset[str], *, name: str) -> None:
+    if candidate_codes:
+        return
+
+    # The previous strategy-side guard always inspected the complete Pool,
+    # including during a midweek run. Keep that protection in the authority:
+    # an empty current-left snapshot must not clear a non-empty complete Pool
+    # merely because this is the first midweek publication for the week.
+    protected_paths = [path]
+    if path != BREAKOUT_FOLLOW_POOL_PATH:
+        protected_paths.append(BREAKOUT_FOLLOW_POOL_PATH)
+
+    for protected_path in dict.fromkeys(protected_paths):
+        if not os.path.exists(protected_path):
+            continue
+        try:
+            existing = pd.read_csv(protected_path, dtype={"code": str}, encoding="utf-8-sig")
+            existing_codes = _pool_codes(existing)
+        except Exception as exc:
+            raise RuntimeError(f"BF {name} Pool 候选为空且无法验证现有快照") from exc
+        if existing_codes:
+            raise RuntimeError(
+                f"BF {name} Pool 保存拦截: 已发布 Pool 包含 {len(existing_codes)} 条记录，"
+                "本轮候选为空"
+            )
+
+
 def _snapshot_digest(path: str) -> str:
     return sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _write_pool_snapshot_atomically(pool: pd.DataFrame, path: str) -> None:
+    """Replace a published Pool only after its complete CSV is written nearby."""
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, pending_path = tempfile.mkstemp(
+        prefix=f".{os.path.basename(path)}.",
+        suffix=".pending",
+        dir=directory,
+    )
+    os.close(fd)
+    try:
+        pool.to_csv(pending_path, index=False, encoding="utf-8-sig")
+        os.replace(pending_path, path)
+    except Exception:
+        if os.path.exists(pending_path):
+            os.unlink(pending_path)
+        raise
 
 
 def _pool_snapshot_date(path: str) -> str:
@@ -358,12 +415,14 @@ class BreakoutFollowPoolRun:
 
     def save_snapshot(self, pool: pd.DataFrame) -> None:
         # Weekend and midweek intentionally share this exact publication path:
-        # structure -> LIVE EPS PIT enrichment -> publication invariant -> CSV.
-        _pool_codes(pool)
+        # structure -> LIVE EPS PIT + industry -> publication invariant -> CSV.
+        candidate_codes = _pool_codes(pool)
+        _reject_empty_pool_overwrite(self.path, candidate_codes, name=self.name)
         pool = _enrich_signal_eps(pool)
+        pool = enrich_pool_with_industry(pool)
+        pool = _ensure_pool_industry_columns(pool)
         _validate_eps_publication_contract(pool)
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-        pool.to_csv(self.path, index=False, encoding="utf-8-sig")
+        _write_pool_snapshot_atomically(pool, self.path)
         self._published_digest = _snapshot_digest(self.path)
 
     def ensure_current_snapshot(self) -> pd.DataFrame:
@@ -384,6 +443,24 @@ class BreakoutFollowPoolRun:
         if self._midweek:
             return _load_midweek_actionable_codes(pool)
         return _load_complete_actionable_codes(pool)
+
+    def project_published_display_fields(self, preview: pd.DataFrame) -> pd.DataFrame:
+        """Return a preview with display fields copied from this published snapshot."""
+        preview_codes = _pool_codes(preview)
+        published = self.ensure_current_snapshot()
+        published_codes = _pool_codes(published)
+        if preview_codes != published_codes:
+            raise ValueError(f"BF {self.name} Preview code 集合与本轮权威 Pool 不一致")
+
+        result = preview.copy()
+        published_by_code = published.set_index("code")
+        for column in POOL_PRESENTATION_COLUMNS:
+            result[column] = (
+                result["code"].map(published_by_code[column])
+                if column in published_by_code.columns
+                else pd.NA
+            )
+        return result
 
     def commit(self) -> None:
         self.ensure_current_snapshot()
@@ -433,13 +510,16 @@ def _commit_pool(pool_path: str) -> None:
                 time.sleep(5)
     except subprocess.CalledProcessError as exc:
         logging.error("Git操作失败: %s", exc)
+        raise
     except Exception as exc:
         logging.error("检查并提交文件时出错: %s", exc)
+        raise
 
 
 __all__ = [
     "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH",
     "BREAKOUT_FOLLOW_POOL_PATH",
     "BreakoutFollowPoolRun",
+    "load_industry_lookup",
     "supplement_latest_pool_signal_eps",
 ]
