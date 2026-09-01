@@ -155,14 +155,17 @@ def test_monte_carlo_missing_return_does_not_fill_zero():
         WeeklyPortfolioOutcome(
             snapshot_date=s,
             selector_id="B0_ORIGINAL",
-            family="baseline",
             horizon="W4",
             pick_count=2,
+            slot_coverage=0.667,
+            active_week=True,
+            full_top3=False,
             selected_codes=["AAPL", "MSFT"],
             selection_quality_return=5.0,
             capital_adjusted_return=3.33,
+            selection_quality_stop8=0.0,
             capital_adjusted_stop8=0.0,
-            slot_coverage=0.667,
+            one_pick_ruined=False,
             is_mature=True,
         )
         for s in snaps

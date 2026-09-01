@@ -1,6 +1,6 @@
 {
-  "frozen_at": "2026-09-01T15:46:16.690893",
-  "ledger_hash": "b6d7207e790511ccb0cf11ae6aa79a0d862d6be83a61153aeb87fdcf8e4efe87",
+  "frozen_at": "2026-09-01T16:03:31.965766",
+  "ledger_hash": "8f6be2d2242b5338f6cc55d06b8062c119351394d1ed1847558f1104f46298d0",
   "num_proposals": 38,
   "proposals": [
     {
@@ -118,63 +118,63 @@
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_core",
-      "family": "ltr",
-      "spec_hash": "7810b2dabddb2688b59a8522258ec6653b9d36ea6e7f834e29d4ef713b96de63",
+      "policy_id": "LINEAR_RANK__linear_core",
+      "family": "linear_ranking",
+      "spec_hash": "e390fc2a87b5aa74a25dea784d3c347053e7fe83b75c5b1d7c0445061d324bb8",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_momentum",
-      "family": "ltr",
-      "spec_hash": "34608e958d67a99bf1ae424b4b64afe54f57abce46cd82cf00a1cac4a70c1270",
+      "policy_id": "LINEAR_RANK__linear_momentum",
+      "family": "linear_ranking",
+      "spec_hash": "cd9068b002d45bd8a10d736253734691331a79d44d2818c673b52c9d29b330ea",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_volume",
-      "family": "ltr",
-      "spec_hash": "256a5289ac6ac8b6036ae3bab151bab234e4b9db0e7b30bf06b6c8583e7414a4",
+      "policy_id": "LINEAR_RANK__linear_volume",
+      "family": "linear_ranking",
+      "spec_hash": "b606f7fc362e50a6ddb508d109e87dc96deb65c50e9d0bcb4f016abaac678691",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_geom",
-      "family": "ltr",
-      "spec_hash": "6495bc090f18f7526bdc7d64132636aacaf145d331da3eafa3ede89d9f91c6c6",
+      "policy_id": "LINEAR_RANK__linear_geom",
+      "family": "linear_ranking",
+      "spec_hash": "b3c2f556c7644a725961887ff6d4d35a819b3645e9d95df4304b37b583c5b49c",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_core_max2",
-      "family": "ltr",
-      "spec_hash": "774415c28b4a932f95ac46e1596a7ef7610ea6af36d478826cffd6760ebefaca",
+      "policy_id": "LINEAR_RANK__linear_core_max2",
+      "family": "linear_ranking",
+      "spec_hash": "5f1b01d23f49d2547fe0847020e6051ecce9e2a62878a3ccf51ee08de2e09414",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_mom_max2",
-      "family": "ltr",
-      "spec_hash": "17a3f4c2538999049b1dbe73a52db4b469077e291cba43d5a0d26699c6b4c5e9",
+      "policy_id": "LINEAR_RANK__linear_mom_max2",
+      "family": "linear_ranking",
+      "spec_hash": "adee6df53eb16723c35c1e0d3e4c34fd186069124a1542139070641420e68365",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_slope",
-      "family": "ltr",
-      "spec_hash": "6c2da2c349919141d8a3a81a130149f6fba33a67b6e5dffc5b4657c1b8a0ca1d",
+      "policy_id": "LINEAR_RANK__linear_slope",
+      "family": "linear_ranking",
+      "spec_hash": "5188b7c3035dd0cfffc325ed7d8d97fdb6f4646526d1b4c58ef7967b9cb5eb8c",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_full",
-      "family": "ltr",
-      "spec_hash": "424bc84881e74cf056b86acb18be431e888735a77c8d53c0a48a0e2ebd25644d",
+      "policy_id": "LINEAR_RANK__linear_full",
+      "family": "linear_ranking",
+      "spec_hash": "93c0a9a3cac487e8f0d77479dde2990f42820c83fe6809fe86e4d18f7d53835b",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_tight",
-      "family": "ltr",
-      "spec_hash": "ed07848064e0e65aa8215d75bc9ee59f7f71dc6abb58756b8785837a73b712ca",
+      "policy_id": "LINEAR_RANK__linear_tight",
+      "family": "linear_ranking",
+      "spec_hash": "be38370961aec7f678dbba4d735201447712299e0b5cc6905949bcce8d7b34fc",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "LTR__pairwise_fast_mom",
-      "family": "ltr",
-      "spec_hash": "3dba5d9deb5a2e6a37906c71e871a0c2833256d096a9245452e7763e6fce261e",
+      "policy_id": "LINEAR_RANK__linear_fast_mom",
+      "family": "linear_ranking",
+      "spec_hash": "daac617c899df6ae66b08993b37ea14c71181d3aca56cc79000a4fe07ee9791b",
       "fitted_state_hash": "none"
     },
     {
@@ -202,33 +202,33 @@
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "NOVEL__dry_heavy",
-      "family": "novel",
-      "spec_hash": "70290dfa05ca1fead3153f814cc1a498b49905881ec99e92a25a05889cd92e13",
+      "policy_id": "NOVEL_HEURISTIC__dry_heavy",
+      "family": "novel_heuristic",
+      "spec_hash": "6fb268d43f810ce8e7356fc961c41c493466db444a98b745ce50e529362a18b8",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "NOVEL__dry_moderate",
-      "family": "novel",
-      "spec_hash": "5db9a4e49844ecdf298f52969c2c25d77c394b90986c5d5218ead902248f228f",
+      "policy_id": "NOVEL_HEURISTIC__dry_moderate",
+      "family": "novel_heuristic",
+      "spec_hash": "b0d375a67544ca7200632bdb1160794ae8279f081655edca182ca972cd40f989",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "NOVEL__vol_spike_focus",
-      "family": "novel",
-      "spec_hash": "d32407460aeffb145f5abf3cc3b735ab05af12da5af0260d64702a23a7742495",
+      "policy_id": "NOVEL_HEURISTIC__vol_spike_focus",
+      "family": "novel_heuristic",
+      "spec_hash": "119304ca9ebab78d0194ad436bb16d4efddb6fbd34111b81e9120e1ed3057100",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "NOVEL__dry_heavy_max2",
-      "family": "novel",
-      "spec_hash": "ea69c79462b7d011155dd3368dca02db911c0c1cc94b7bc384540e79a65c93d5",
+      "policy_id": "NOVEL_HEURISTIC__dry_heavy_max2",
+      "family": "novel_heuristic",
+      "spec_hash": "a55e7c1a98571b933d12601dd02e542308a0d04602230f2070cc03e8071fdb67",
       "fitted_state_hash": "none"
     },
     {
-      "policy_id": "NOVEL__vol_spike_max2",
-      "family": "novel",
-      "spec_hash": "367322cfcbf188d80f75a5d25435eeb053c8408151e52e3c1be21dfd55969cab",
+      "policy_id": "NOVEL_HEURISTIC__vol_spike_max2",
+      "family": "novel_heuristic",
+      "spec_hash": "316b0a242cb2fc62bc2d49b136cb97386b9c502b402ee9778c65931cb86ce9b9",
       "fitted_state_hash": "none"
     }
   ]
