@@ -72,13 +72,15 @@ def _create_model(name: str, seed: int = RANDOM_SEED):
         raise ValueError(f"Unknown model name: {name}")
 
 
-def _cvar(series: pd.Series, q: float = 0.10) -> float:
-    vals = series.dropna().to_numpy(dtype=float)
-    if len(vals) < 3:
+def compute_cvar(returns: np.ndarray | pd.Series, alpha: float = 0.10) -> float:
+    """Unified Conditional Value at Risk (CVaR10 / Expected Shortfall)."""
+    arr = np.asarray(returns, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
         return np.nan
-    cutoff = np.quantile(vals, q)
-    tail = vals[vals <= cutoff]
-    return float(np.mean(tail)) if len(tail) > 0 else np.nan
+    k = max(1, int(np.ceil(len(arr) * alpha)))
+    sorted_arr = np.sort(arr)
+    return float(np.mean(sorted_arr[:k]))
 
 
 def compute_weekly_metrics(picks: pd.DataFrame, selector_id: str, segment: str) -> list[dict]:
@@ -101,7 +103,6 @@ def compute_weekly_metrics(picks: pd.DataFrame, selector_id: str, segment: str) 
                 ret_vals = rets.values
                 
                 # Internal concentration metrics
-                # Worst pick contribution to total return
                 worst_idx = np.argmin(ret_vals)
                 best_idx = np.argmax(ret_vals)
                 mean_ret = float(np.mean(ret_vals))
@@ -147,10 +148,9 @@ def compute_tail_metrics(weekly_metrics_df: pd.DataFrame) -> pd.DataFrame:
         
         p10 = float(np.quantile(vals, 0.10))
         p90 = float(np.quantile(vals, 0.90))
-        cvar10 = _cvar(rets, 0.10)
-        cvar20 = _cvar(rets, 0.20)
+        cvar10 = compute_cvar(rets, 0.10)
+        cvar20 = compute_cvar(rets, 0.20)
         
-        # Top 10% / Top 20% mean
         top10_cutoff = np.quantile(vals, 0.90)
         top10_mean = float(np.mean(vals[vals >= top10_cutoff]))
         top20_cutoff = np.quantile(vals, 0.80)
@@ -186,6 +186,79 @@ def compute_tail_metrics(weekly_metrics_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
+def compute_paired_tail_metrics(
+    challenger_weekly: pd.DataFrame,
+    b0_weekly: pd.DataFrame,
+    selector_id: str,
+    segment: str,
+) -> pd.DataFrame:
+    """Compute paired tail metrics strictly on identical common-support snapshot dates."""
+    records = []
+    for h in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS):
+        h_str = f'W{h}'
+        ch_sub = challenger_weekly[(challenger_weekly.selector_id == selector_id) & (challenger_weekly.segment == segment) & (challenger_weekly.horizon == h_str)]
+        b0_sub = b0_weekly[(b0_weekly.selector_id == 'B0') & (b0_weekly.segment == segment) & (b0_weekly.horizon == h_str)]
+        
+        merged = pd.merge(
+            ch_sub[['snapshot_date', 'return_pct', 'stop_rate', 'one_pick_ruined']],
+            b0_sub[['snapshot_date', 'return_pct', 'stop_rate', 'one_pick_ruined']],
+            on='snapshot_date',
+            suffixes=('_ch', '_b0'),
+            how='inner',
+        )
+        if len(merged) < 3:
+            continue
+            
+        ch_rets = merged['return_pct_ch'].to_numpy(dtype=float)
+        b0_rets = merged['return_pct_b0'].to_numpy(dtype=float)
+        ch_stops = merged['stop_rate_ch'].to_numpy(dtype=float)
+        b0_stops = merged['stop_rate_b0'].to_numpy(dtype=float)
+        
+        ch_cvar10 = compute_cvar(ch_rets, 0.10)
+        b0_cvar10 = compute_cvar(b0_rets, 0.10)
+        
+        ch_p10 = float(np.quantile(ch_rets, 0.10))
+        b0_p10 = float(np.quantile(b0_rets, 0.10))
+        
+        ch_top10 = float(np.mean(ch_rets[ch_rets >= np.quantile(ch_rets, 0.90)]))
+        b0_top10 = float(np.mean(b0_rets[b0_rets >= np.quantile(b0_rets, 0.90)]))
+        
+        ch_tr10 = ch_top10 / abs(ch_cvar10) if abs(ch_cvar10) > 1e-6 else np.nan
+        b0_tr10 = b0_top10 / abs(b0_cvar10) if abs(b0_cvar10) > 1e-6 else np.nan
+        
+        ch_neg = np.sum(ch_rets < 0)
+        b0_neg = np.sum(b0_rets < 0)
+        
+        records.append({
+            'selector_id': selector_id,
+            'segment': segment,
+            'horizon': h_str,
+            'support_weeks': len(merged),
+            'challenger_mean': float(np.mean(ch_rets)),
+            'b0_mean': float(np.mean(b0_rets)),
+            'mean_spread': float(np.mean(ch_rets - b0_rets)),
+            'challenger_median': float(np.median(ch_rets)),
+            'b0_median': float(np.median(b0_rets)),
+            'median_spread': float(np.median(ch_rets - b0_rets)),
+            'challenger_cvar10': ch_cvar10,
+            'b0_cvar10': b0_cvar10,
+            'cvar_delta': float(ch_cvar10 - b0_cvar10),
+            'challenger_p10': ch_p10,
+            'b0_p10': b0_p10,
+            'challenger_top10_mean': ch_top10,
+            'b0_top10_mean': b0_top10,
+            'challenger_tail_ratio10': ch_tr10,
+            'b0_tail_ratio10': b0_tr10,
+            'challenger_stop_rate_pct': float(100.0 * np.mean(ch_stops)),
+            'b0_stop_rate_pct': float(100.0 * np.mean(b0_stops)),
+            'stop_delta_pct': float(100.0 * np.mean(ch_stops - b0_stops)),
+            'challenger_one_pick_ruins_pct': float(100.0 * merged['one_pick_ruined_ch'].sum() / max(1, ch_neg)),
+            'b0_one_pick_ruins_pct': float(100.0 * merged['one_pick_ruined_b0'].sum() / max(1, b0_neg)),
+            'one_pick_ruins_delta_pct': float(100.0 * (merged['one_pick_ruined_ch'].sum() / max(1, ch_neg) - merged['one_pick_ruined_b0'].sum() / max(1, b0_neg))),
+        })
+    return pd.DataFrame(records)
+
+
 def bootstrap_comparison(
     challenger_weekly: pd.DataFrame,
     b0_weekly: pd.DataFrame,
@@ -200,7 +273,7 @@ def bootstrap_comparison(
         how='inner',
     )
     if len(merged) < 3:
-        return {'support_weeks': len(merged), 'mean_spread_ci': [np.nan, np.nan], 'median_spread_ci': [np.nan, np.nan], 'cvar_diff_ci': [np.nan, np.nan]}
+        return {'support_weeks': len(merged), 'mean_spread_ci_95': [np.nan, np.nan], 'median_spread_ci_95': [np.nan, np.nan], 'cvar_diff_ci_95': [np.nan, np.nan]}
         
     rng = np.random.RandomState(seed)
     n = len(merged)
@@ -217,11 +290,11 @@ def bootstrap_comparison(
         sample_b0 = b0_rets[idx]
         
         diff = sample_ch - sample_b0
-        mean_spreads.append(np.mean(diff))
-        median_spreads.append(np.median(diff))
+        mean_spreads.append(float(np.mean(diff)))
+        median_spreads.append(float(np.median(diff)))
         
-        ch_cvar = np.mean(sample_ch[sample_ch <= np.quantile(sample_ch, 0.10)]) if len(sample_ch) >= 5 else np.nan
-        b0_cvar = np.mean(sample_b0[sample_b0 <= np.quantile(sample_b0, 0.10)]) if len(sample_b0) >= 5 else np.nan
+        ch_cvar = compute_cvar(sample_ch, 0.10)
+        b0_cvar = compute_cvar(sample_b0, 0.10)
         cvar_diffs.append(ch_cvar - b0_cvar)
         
     return {
@@ -237,42 +310,50 @@ def bootstrap_comparison(
 def classify_champion(
     train_oof_metrics: dict,
     val_metrics: dict,
-    bootstrap_res: dict,
+    bootstrap_res: dict | None = None,
 ) -> str:
-    """Classify challenger under Champion Hierarchy."""
-    val_med_spread = val_metrics.get('median_spread_pct', -999)
-    val_mean_spread = val_metrics.get('mean_spread_pct', -999)
-    val_cvar_delta = val_metrics.get('cvar_delta', -999)  # positive means less negative (better)
-    val_stop_delta = val_metrics.get('stop_delta_pct', 999) # negative means fewer stops (better)
-    val_support = val_metrics.get('weeks', 0)
+    """Classify challenger under Champion Hierarchy without any default PARETO catch-all."""
+    val_med_spread = val_metrics.get('median_spread', val_metrics.get('median_spread_pct', np.nan))
+    val_mean_spread = val_metrics.get('mean_spread', val_metrics.get('mean_spread_pct', np.nan))
+    val_cvar_delta = val_metrics.get('cvar_delta', np.nan)  # positive means less negative (better downside)
+    val_stop_delta = val_metrics.get('stop_delta_pct', np.nan) # negative means fewer stops (better)
+    val_support = val_metrics.get('support_weeks', val_metrics.get('weeks', 0))
     
-    oof_med_spread = train_oof_metrics.get('median_spread_pct', -999)
+    oof_med_spread = train_oof_metrics.get('median_spread', train_oof_metrics.get('median_spread_pct', np.nan))
+    oof_mean_spread = train_oof_metrics.get('mean_spread', train_oof_metrics.get('mean_spread_pct', np.nan))
     
-    if val_support < 4:
+    # 1. Check support sufficiency
+    if val_support < 4 or np.isnan(val_med_spread) or np.isnan(val_cvar_delta):
         return 'INSUFFICIENT EVIDENCE'
         
-    # Check direction reversal
-    if (oof_med_spread > 0 and val_med_spread < -2.0) or (oof_med_spread < -1.0 and val_med_spread > 3.0):
+    # 2. Check direction reversal / instability
+    if (oof_med_spread > 2.0 and val_med_spread < -1.0) or (oof_med_spread < -1.0 and val_med_spread > 2.0) or (oof_med_spread > 0 and val_mean_spread < -3.0):
         return 'UNSTABLE'
         
-    # Dominates B0
-    if val_med_spread >= 0.0 and val_mean_spread >= 0.0 and val_cvar_delta >= -1.5 and val_stop_delta <= 5.0 and oof_med_spread >= -0.5:
+    # 3. Dominates B0
+    if val_med_spread >= -0.05 and val_mean_spread >= 0.0 and val_cvar_delta >= -0.5 and val_stop_delta <= 0.5 and oof_med_spread >= -0.5:
         return 'DOMINATES B0'
         
-    # High Return / High Risk
-    if (val_med_spread > 1.0 or val_mean_spread > 1.0) and (val_cvar_delta < -2.5 or val_stop_delta > 8.0):
+    # 4. High Return / High Risk
+    if (val_med_spread >= 1.0 or val_mean_spread >= 1.0) and (val_cvar_delta < -2.0 or val_stop_delta > 2.0):
         return 'HIGH RETURN / HIGH RISK'
         
-    # Lower Return / Lower Risk
-    if (val_med_spread < 0.0 or val_mean_spread < 0.0) and (val_cvar_delta > 2.0 and val_stop_delta < -5.0):
+    # 5. Lower Return / Lower Risk
+    if (val_med_spread < -1.0 or val_mean_spread < -1.0) and (val_cvar_delta >= 2.0 or val_stop_delta <= -2.0):
         return 'LOWER RETURN / LOWER RISK'
         
-    # Pareto Peer
-    if abs(val_med_spread) <= 1.5 and abs(val_cvar_delta) <= 2.0:
+    # 6. Pareto Peer (True trade-off, strictly defined)
+    # Trade-off Case A: Return approx equal, Downside materially better
+    pareto_a = (abs(val_med_spread) <= 1.0 and abs(val_mean_spread) <= 1.0) and (val_cvar_delta >= 2.0 or val_stop_delta <= -2.0)
+    # Trade-off Case B: Return materially better, Downside approx equal
+    pareto_b = (val_med_spread >= 2.0 or val_mean_spread >= 2.0) and (val_cvar_delta >= -1.0 and val_stop_delta <= 1.0)
+    if pareto_a or pareto_b:
         return 'PARETO PEER'
         
-    # Inferior
+    # 7. Inferior (Return worse and Risk worse or equal)
     if val_med_spread < 0.0 and val_mean_spread < 0.0 and (val_cvar_delta <= 0.0 or val_stop_delta >= 0.0):
         return 'INFERIOR'
         
-    return 'PARETO PEER'
+    # 8. Strict fallback: Never catch-all PARETO
+    return 'INSUFFICIENT EVIDENCE'
+

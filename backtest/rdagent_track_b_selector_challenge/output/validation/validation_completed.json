@@ -1,0 +1,13 @@
+{
+  "validated_at": "2026-09-01T12:12:13.534244",
+  "locked_code_hash": "649573a56c1107193176bf179f0de71a945f97fb250070afd936c91f505f052b",
+  "locked_panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
+  "locked_challengers_evaluated": [
+    "signal_f1_lgbm_w4_distinct_industry",
+    "actionable_f1_lgbm_w4_distinct_industry",
+    "signal_agent_elastic_w1_distinct_industry",
+    "actionable_agent_lgbm_w4_distinct_industry",
+    "actionable_agent_lgbm_w1_portfolio_aware"
+  ],
+  "single_run_enforced": true
+}

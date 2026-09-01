@@ -1,4 +1,0 @@
-selector_id,family,industry_constraint,portfolio_objective,lambda_vol,lambda_overheat,lambda_industry_dup,candidate_pool_size,complexity
-pure_rank,pure_rank,none,max_score,0.0,0.0,0.0,10,low
-distinct_industry,distinct_industry,hard_distinct,max_score_distinct_ind,0.0,0.0,0.0,10,low
-portfolio_aware,portfolio_aware,soft_penalty,score_minus_vol_and_overheat_and_dup_ind,0.5,0.3,2.0,8,medium

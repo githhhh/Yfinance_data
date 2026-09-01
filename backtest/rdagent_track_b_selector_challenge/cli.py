@@ -10,15 +10,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from .config import *
-from .diagnostics import run_lane_diagnostic, run_pullback_dry_diagnostic
+from .diagnostics import (
+    compute_cvar,
+    run_lane_diagnostic,
+    run_pullback_dry_diagnostic,
+    run_pullback_encoding_experiment,
+)
 from .evaluate import (
-    _cvar,
     _create_model,
     _folds,
     _get_features,
     _prep_xy,
     bootstrap_comparison,
     classify_champion,
+    compute_paired_tail_metrics,
     compute_tail_metrics,
     compute_weekly_metrics,
 )
@@ -30,8 +35,32 @@ from .factor_audit import (
     deterministic_replay_factor,
 )
 from .panel import get_full_panel, get_universe_panel, write_universe_manifest
-from .rdagent_bridge import create_safe_train_dataset, run_rdagent_discovery
+from .rdagent_bridge import create_safe_train_dataset, file_sha256, run_rdagent_discovery
 from .selectors import SelectorConfig, apply_selector
+
+
+def compute_codebase_hash() -> str:
+    """Compute combined sha256 hash of all Python source files in the challenge package."""
+    h = hashlib.sha256()
+    for fp in sorted(CHALLENGE_ROOT.glob('*.py')):
+        h.update(fp.name.encode('utf-8'))
+        h.update(fp.read_bytes())
+    return h.hexdigest()
+
+
+def compute_panel_hash() -> str:
+    """Compute sha256 hash of candidate factor panel parquet file."""
+    panel_p = DATA / 'candidate_factor_panel.parquet' if (DATA / 'candidate_factor_panel.parquet').exists() else PANEL_SOURCE
+    return file_sha256(panel_p)
+
+
+def get_git_sha() -> str:
+    """Get current git commit hash."""
+    try:
+        res = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=str(ROOT), capture_output=True, text=True)
+        return res.stdout.strip()
+    except Exception:
+        return 'unknown'
 
 
 def cmd_diagnostic(args):
@@ -43,13 +72,16 @@ def cmd_diagnostic(args):
     pb_diag = run_pullback_dry_diagnostic(panel)
     print(f"Pullback dry diagnostic created at {OUT / 'pullback_dry_diagnostic.csv'}")
     
+    pb_exp = run_pullback_encoding_experiment(panel)
+    print(f"Pullback encoding experiment created at {OUT / 'train' / 'pullback_encoding_experiment.csv'}")
+    
     lane_diag = run_lane_diagnostic(panel)
     print(f"Lane diagnostic created at {OUT / 'lane_monotonicity_diagnostic.csv'}")
 
 
 def cmd_rdagent(args):
     print(f"=== Running Phase 3 RD-Agent Discovery (budget: {args.step_n} steps) ===")
-    prov = run_rdagent_discovery(step_n=args.step_n)
+    prov = run_rdagent_discovery(step_n=args.step_n, run_id=args.run_id)
     print(f"RD-Agent run completed. Exit code: {prov['exit_code']}. Run ID: {prov['run_id']}")
 
 
@@ -60,39 +92,45 @@ def cmd_audit(args):
     replay_ws = AGENT_WORKSPACE / 'replay_audit'
     replay_ws.mkdir(parents=True, exist_ok=True)
     
-    # Identify discovered factor python files in RAW_RDAGENT
     RAW_RDAGENT.mkdir(parents=True, exist_ok=True)
-    factor_candidates = [p for p in sorted(RAW_RDAGENT.glob('*.py')) if not p.name.startswith('__')]
     
+    # 1. Identify active run factors vs legacy unverified factors
     audit_results = []
     accepted_factor_data = {}
     
-    # We audit each factor file
-    for fp in factor_candidates:
+    # Scan run subdirectories in raw_rdagent
+    run_dirs = [d for d in RAW_RDAGENT.iterdir() if d.is_dir() and d.name.startswith('run_')]
+    latest_run_dir = sorted(run_dirs)[-1] if run_dirs else None
+    
+    active_factor_files = []
+    if latest_run_dir and (latest_run_dir / 'factors').exists():
+        active_factor_files = [p for p in (latest_run_dir / 'factors').glob('*.py') if not p.name.startswith('__')]
+        
+    # Read provenance of active run
+    run_prov = {}
+    if latest_run_dir and (latest_run_dir / 'provenance.json').exists():
+        run_prov = json.loads((latest_run_dir / 'provenance.json').read_text(encoding='utf-8'))
+        
+    cap_map = {c['captured_factor_path']: c for c in run_prov.get('captured_factors', [])}
+    
+    # Audit active run factors
+    for fp in active_factor_files:
         fname = fp.stem
         code = fp.read_text(encoding='utf-8')
+        curr_hash = file_sha256(fp)
         
         leak_pass, leak_reason = check_code_leakage(code)
-        
-        # Test deterministic replay on train data
         replay_ok, replay_msg, res_df, out_hash = deterministic_replay_factor(fname, fp, train_dir, replay_ws)
         
-        origin = 'rdagent_original'
-        if 'gemini' in code.lower() or 'modified' in fname.lower():
-            origin = 'gemini_modified'
-            
-        desc = "Dynamic volatility and volume-confirmed momentum factor"
-        if 'prox' in fname.lower() or 'high' in fname.lower():
-            desc = "Proximity to 52-week high (negative distance)"
-        elif 'risk_adj_mom_20' in fname:
-            desc = "20-day momentum normalized by 20-day realized volatility"
-        elif 'risk_adj_mom_10' in fname:
-            desc = "10-day momentum normalized by 20-day realized volatility"
-        elif 'risk_adj_mom_60' in fname:
-            desc = "60-day momentum normalized by 20-day realized volatility"
-        elif 'vol_confirmed' in fname:
-            desc = "20-day momentum accelerated by 5-to-20 day volume ratio"
-            
+        rel_path = str(fp.relative_to(CHALLENGE_ROOT))
+        prov_info = cap_map.get(rel_path, {})
+        source_hash = prov_info.get('source_artifact_hash', '')
+        
+        # Provenance verification: Must match exactly
+        is_rdagent_original = bool(source_hash and (source_hash == curr_hash))
+        origin = 'rdagent_original' if is_rdagent_original else 'unverified_active_run'
+        
+        desc = "Dynamic volatility / volume confirmed alpha factor"
         sem_ok = True
         sem_msg = "OK"
         red_status = "DISTINCT"
@@ -100,7 +138,6 @@ def cmd_audit(args):
         max_corr = 0.0
         
         if replay_ok and res_df is not None:
-            # Check semantic direction & redundancy on Train panel
             tmp = res_df.reset_index()
             tmp.columns = ['datetime', 'code', 'val']
             tmp['snapshot_date'] = pd.to_datetime(tmp['datetime']).dt.strftime('%Y-%m-%d')
@@ -111,8 +148,9 @@ def cmd_audit(args):
                 sem_ok, sem_msg = audit_semantic_direction(merged['val'], fname, desc, merged)
                 red_status, red_feat, max_corr = audit_redundancy(merged['val'], merged, [*BASE_FEATURES, *TECH_FEATURES])
                 
-        accepted = bool(leak_pass and replay_ok and sem_ok and (red_status == 'DISTINCT'))
+        accepted = bool(leak_pass and replay_ok and sem_ok and (red_status == 'DISTINCT') and is_rdagent_original)
         rej_reason = []
+        if not is_rdagent_original: rej_reason.append("Provenance hash mismatch or missing run artifact record")
         if not leak_pass: rej_reason.append(leak_reason)
         if not replay_ok: rej_reason.append(replay_msg)
         if not sem_ok: rej_reason.append(sem_msg)
@@ -121,7 +159,7 @@ def cmd_audit(args):
         ar = FactorAuditResult(
             factor_name=fname,
             origin=origin,
-            rdagent_run_id='rdagent_track_b_discovery',
+            rdagent_run_id=run_prov.get('run_id', 'unknown'),
             description=desc,
             formula=f"Code in {fp.name}",
             code_path=str(fp.relative_to(ROOT) if fp.is_relative_to(ROOT) else fp.name),
@@ -135,10 +173,12 @@ def cmd_audit(args):
             redundant_with_feature=red_feat,
             correlation_max=round(max_corr, 4),
             output_hash=out_hash,
+            source_artifact_path=prov_info.get('source_artifact_path', ''),
+            source_artifact_hash=source_hash,
+            captured_factor_hash=curr_hash,
         )
         audit_results.append(ar)
         
-        # If accepted, replay on full data to import into candidate panel
         if accepted:
             full_ok, _, full_res, _ = deterministic_replay_factor(fname, fp, full_dir, replay_ws / 'full')
             if full_ok and full_res is not None:
@@ -147,19 +187,46 @@ def cmd_audit(args):
                 tmp_f['snapshot_date'] = pd.to_datetime(tmp_f['datetime']).dt.strftime('%Y-%m-%d')
                 tmp_f['code'] = tmp_f['code'].astype(str).str.upper()
                 accepted_factor_data[f"agent_factor_{fname}"] = tmp_f
-                
+
+    # 2. Audit legacy unverified factors
+    legacy_dir = RAW_RDAGENT / 'legacy_unverified'
+    if legacy_dir.exists():
+        for fp in sorted(legacy_dir.glob('*.py')):
+            fname = fp.stem
+            curr_hash = file_sha256(fp)
+            audit_results.append(FactorAuditResult(
+                factor_name=fname,
+                origin='legacy_unverified',
+                rdagent_run_id='legacy_challenge',
+                description='Legacy factor from previous experiment',
+                formula=f'Legacy code in {fp.name}',
+                code_path=str(fp.relative_to(ROOT) if fp.is_relative_to(ROOT) else fp.name),
+                semantic_direction='UNKNOWN',
+                leakage_pass=True,
+                redundancy_status='UNKNOWN',
+                train_only_discovery=False,
+                replay_pass=False,
+                accepted=False,
+                rejection_reason='copied from previous experiment; not attributable to current Track B RD-Agent run',
+                redundant_with_feature='',
+                correlation_max=0.0,
+                output_hash='',
+                source_artifact_path='',
+                source_artifact_hash='',
+                captured_factor_hash=curr_hash,
+            ))
+            
     manifest = {
+        'active_run_id': run_prov.get('run_id', 'none'),
         'total_audited': len(audit_results),
         'accepted_count': sum(1 for a in audit_results if a.accepted),
         'rejected_count': sum(1 for a in audit_results if not a.accepted),
         'factors': [asdict(a) for a in audit_results],
     }
+    OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'factor_manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     print(f"Audit completed: {manifest['accepted_count']} accepted, {manifest['rejected_count']} rejected.")
-    for a in audit_results:
-        status_str = "ACCEPTED" if a.accepted else f"REJECTED ({a.rejection_reason})"
-        print(f"  - {a.factor_name}: {status_str}")
-        
+    
     # Update local panel with accepted agent factors
     local_panel_p = DATA / 'candidate_factor_panel.parquet'
     updated_panel = panel.copy()
@@ -170,45 +237,16 @@ def cmd_audit(args):
         updated_panel[col_name] = pd.to_numeric(merged[col_name], errors='coerce')
     updated_panel.to_parquet(local_panel_p, index=False)
     print(f"Updated local panel with {len(accepted_factor_data)} accepted agent factor columns.")
-    
-    # Compute factor diagnostics (IC & Quintiles)
-    diag_rows = []
-    for a in audit_results:
-        f_col = f"agent_factor_{a.factor_name}" if a.accepted else a.factor_name
-        if f_col not in updated_panel.columns:
-            continue
-        for seg, mask in {
-            'train': updated_panel.snapshot_date <= TRAIN_END,
-            'contaminated_validation': (updated_panel.snapshot_date >= CONTAM_VAL_START) & (updated_panel.snapshot_date <= CONTAM_VAL_END),
-        }.items():
-            sub = updated_panel[mask]
-            for h in (1, 2, 4):
-                ret_c = f"w{h}_return_pct"
-                ics = []
-                for _, g in sub.groupby('snapshot_date'):
-                    s = pd.concat([pd.to_numeric(g[f_col], errors='coerce'), pd.to_numeric(g[ret_c], errors='coerce')], axis=1).dropna()
-                    if len(s) >= 5 and s.iloc[:, 0].nunique() >= 2 and s.iloc[:, 1].nunique() >= 2:
-                        ic = float(s.iloc[:, 0].rank().corr(s.iloc[:, 1].rank()))
-                        if np.isfinite(ic):
-                            ics.append(ic)
-                diag_rows.append({
-                    'factor': a.factor_name,
-                    'segment': seg,
-                    'horizon': f'W{h}',
-                    'weeks_ic': len(ics),
-                    'mean_ic': round(float(np.mean(ics)), 4) if ics else np.nan,
-                    'median_ic': round(float(np.median(ics)), 4) if ics else np.nan,
-                    'ic_positive_pct': round(100.0 * float((np.array(ics) > 0).mean()), 2) if ics else np.nan,
-                    'accepted': a.accepted,
-                })
-    pd.DataFrame(diag_rows).to_csv(OUT / 'factor_diagnostics.csv', index=False)
-    print("Factor diagnostics CSV saved.")
 
 
-def cmd_train_and_evaluate(args):
-    print("=== Running Track B Train OOF & Evaluation Pipeline ===")
+
+def cmd_train(args):
+    print("=== Running Phase 5 Train OOF Walk-Forward (Train <= 2026-05-22 ONLY) ===")
     panel = get_full_panel()
-    OUT.mkdir(parents=True, exist_ok=True)
+    train_panel = panel[panel.snapshot_date <= TRAIN_END].copy()
+    
+    train_out = OUT / 'train'
+    train_out.mkdir(parents=True, exist_ok=True)
     
     # 1. Define Selectors
     selector_configs = [
@@ -221,38 +259,19 @@ def cmd_train_and_evaluate(args):
         ),
     ]
     
-    # Save selector registry
-    sel_rows = [
-        {
-            'selector_id': sc.selector_id,
-            'family': sc.family,
-            'industry_constraint': sc.industry_constraint,
-            'portfolio_objective': sc.portfolio_objective,
-            'lambda_vol': sc.lambda_vol,
-            'lambda_overheat': sc.lambda_overheat,
-            'lambda_industry_dup': sc.lambda_industry_dup,
-            'candidate_pool_size': sc.candidate_pool_size,
-            'complexity': sc.complexity,
-        }
-        for sc in selector_configs
-    ]
-    pd.DataFrame(sel_rows).to_csv(OUT / 'selector_registry.csv', index=False)
-    
-    # 2. Build Models across Universes S (Signal) & A (ACTIONABLE)
+    # 2. Build Models on Train Folds
     models = ['ridge', 'elastic', 'lgbm']
     feature_modes = ['f1']
-    # Check if agent factors exist in panel
-    if any(c.startswith('agent_factor_') for c in panel.columns):
+    if any(c.startswith('agent_factor_') for c in train_panel.columns):
         feature_modes.append('agent')
         
-    all_predictions = []
-    
-    train_weeks = sorted(panel.loc[panel.snapshot_date <= TRAIN_END, 'snapshot_date'].unique())
-    sealed_train_weeks = train_weeks[:-PURGE_WEEKS] if len(train_weeks) > PURGE_WEEKS else []
+    train_weeks = sorted(train_panel['snapshot_date'].unique())
     folds = _folds(train_weeks)
     
+    all_predictions = []
+    
     for u_name in UNIVERSES:
-        u_panel = get_universe_panel(panel, u_name)
+        u_panel = get_universe_panel(train_panel, u_name)
         
         for f_mode in feature_modes:
             features = _get_features(u_panel, f_mode)
@@ -261,11 +280,6 @@ def cmd_train_and_evaluate(args):
                 label = f'w{h}_return_pct'
                 
                 for m_name in models:
-                    model_template = _create_model(m_name)
-                    if model_template is None:
-                        continue
-                        
-                    # Train OOF walk-forward folds
                     for fold_idx, (tr_w, va_w) in enumerate(folds):
                         tr_data = u_panel[u_panel.snapshot_date.isin(tr_w) & u_panel[label].notna()]
                         va_data = u_panel[u_panel.snapshot_date.isin(va_w)].copy()
@@ -293,36 +307,11 @@ def cmd_train_and_evaluate(args):
                         z['fold'] = fold_idx
                         all_predictions.append(z)
                         
-                    # Sealed Validation prediction (Train sealed -> Contaminated Validation)
-                    tr_data = u_panel[u_panel.snapshot_date.isin(sealed_train_weeks) & u_panel[label].notna()]
-                    va_data = u_panel[(u_panel.snapshot_date >= CONTAM_VAL_START) & (u_panel.snapshot_date <= CONTAM_VAL_END)].copy()
-                    if not tr_data.empty and not va_data.empty:
-                        xt, y, xs = _prep_xy(tr_data, va_data, features, label)
-                        m = _create_model(m_name)
-                        m.fit(xt, y)
-                        
-                        keep_cols = ['snapshot_date', 'code', 'industry', 'current_vs_ibd_candidate_pct', 'rv_20']
-                        for x_col in [f'w{x}_return_pct' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
-                            if x_col in va_data.columns: keep_cols.append(x_col)
-                        for x_col in [f'w{x}_stop8' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
-                            if x_col in va_data.columns: keep_cols.append(x_col)
-                            
-                        z = va_data[[c for c in keep_cols if c in va_data.columns]].copy()
-                        z['score'] = m.predict(xs)
-                        z['universe'] = u_name
-                        z['feature_mode'] = f_mode
-                        z['model_type'] = m_name
-                        z['target_horizon'] = f'W{h}'
-                        z['model_id'] = f"{u_name}_{f_mode}_{m_name}_w{h}"
-                        z['segment'] = 'contaminated_validation'
-                        z['fold'] = -1
-                        all_predictions.append(z)
-                        
     pred_df = pd.concat(all_predictions, ignore_index=True) if all_predictions else pd.DataFrame()
-    pred_df.to_parquet(OUT / 'cv_predictions.parquet', index=False)
-    print(f"Saved {len(pred_df)} prediction rows to cv_predictions.parquet")
+    pred_df.to_parquet(train_out / 'cv_predictions.parquet', index=False)
+    print(f"Saved {len(pred_df)} Train OOF prediction rows to output/train/cv_predictions.parquet")
     
-    # 3. Apply Selectors to form Top3 Picks & Weekly Metrics
+    # 3. Apply Selectors to form Train OOF Top3 Picks & Weekly Metrics
     all_picks = []
     all_weekly_metrics = []
     
@@ -339,79 +328,264 @@ def cmd_train_and_evaluate(args):
                     w_mets = compute_weekly_metrics(picks, full_sel_id, seg)
                     all_weekly_metrics.extend(w_mets)
                     
-    # 4. Add Frozen B0 Baseline Picks & Metrics
-    b0 = panel[panel.is_b0 == 1].copy()
-    b0['selector_id'] = 'B0'
-    b0['model_pick_order'] = b0.get('pick_order', 1)
+    # 4. Add Frozen B0 Baseline on Train
+    b0_train = train_panel[train_panel.is_b0 == 1].copy()
+    b0_train['selector_id'] = 'B0'
+    b0_train['segment'] = 'train_oof'
+    b0_train['model_pick_order'] = b0_train.get('pick_order', 1)
     
-    b0_train = b0[b0.snapshot_date <= TRAIN_END].copy()
-    b0_val = b0[(b0.snapshot_date >= CONTAM_VAL_START) & (b0.snapshot_date <= CONTAM_VAL_END)].copy()
-    
-    b0_train_picks = b0_train.assign(segment='train_oof')
-    b0_val_picks = b0_val.assign(segment='contaminated_validation')
-    
-    all_picks.append(b0_train_picks)
-    all_picks.append(b0_val_picks)
-    
-    all_weekly_metrics.extend(compute_weekly_metrics(b0_train_picks, 'B0', 'train_oof'))
-    all_weekly_metrics.extend(compute_weekly_metrics(b0_val_picks, 'B0', 'contaminated_validation'))
+    all_picks.append(b0_train)
+    all_weekly_metrics.extend(compute_weekly_metrics(b0_train, 'B0', 'train_oof'))
     
     df_picks = pd.concat(all_picks, ignore_index=True, sort=False)
     df_weekly = pd.DataFrame(all_weekly_metrics)
     
-    df_picks.to_csv(OUT / 'top3_picks.csv', index=False)
-    df_weekly.to_csv(OUT / 'weekly_metrics.csv', index=False)
-    print(f"Top3 picks ({len(df_picks)}) and weekly metrics ({len(df_weekly)}) saved.")
+    df_picks.to_csv(train_out / 'top3_picks.csv', index=False)
+    df_weekly.to_csv(train_out / 'weekly_metrics.csv', index=False)
     
-    # 5. Compute Tail Metrics & Concentration
-    df_tail = compute_tail_metrics(df_weekly)
-    df_tail.to_csv(OUT / 'tail_metrics.csv', index=False)
-    
-    # 6. Paired Comparison vs B0 (Primary: Full3 Common Support)
-    paired_rows = []
-    b0_mets = df_weekly[df_weekly.selector_id == 'B0']
-    
-    b0_grouped = b0_mets[['segment', 'snapshot_date', 'horizon', 'return_pct', 'stop_rate']].rename(
-        columns={'return_pct': 'b0_return', 'stop_rate': 'b0_stop'}
-    )
-    
-    for (sel_id, seg, h), m in df_weekly[df_weekly.selector_id != 'B0'].groupby(['selector_id', 'segment', 'horizon']):
-        q = m.merge(b0_grouped, on=['segment', 'snapshot_date', 'horizon'], how='inner')
-        if q.empty:
+    # 5. Compute Train Paired Tail Metrics vs B0
+    paired_tail_dfs = []
+    for sel_id in df_weekly['selector_id'].unique():
+        if sel_id == 'B0':
             continue
-        spread = q['return_pct'] - q['b0_return']
-        stop_delta = q['stop_rate'] - q['b0_stop']
-        
-        # Calculate CVaR delta
-        ch_cvar = _cvar(q['return_pct'], 0.10)
-        b0_cvar = _cvar(q['b0_return'], 0.10)
-        cvar_delta = ch_cvar - b0_cvar if np.isfinite(ch_cvar) and np.isfinite(b0_cvar) else np.nan
-        
-        paired_rows.append({
-            'selector_id': sel_id,
-            'segment': seg,
-            'horizon': h,
-            'weeks': len(q),
-            'median_spread_pct': float(spread.median()),
-            'mean_spread_pct': float(spread.mean()),
-            'beat_b0_pct': float(100.0 * (spread > 0).mean()),
-            'stop_delta_pct': float(100.0 * stop_delta.mean()),
-            'cvar_delta': cvar_delta,
-            'worst_spread_pct': float(spread.min()),
-            'best_spread_pct': float(spread.max()),
-        })
-        
-    df_paired = pd.DataFrame(paired_rows)
-    df_paired.to_csv(OUT / 'b0_paired_comparison.csv', index=False)
-    print(f"Paired comparison ({len(df_paired)}) saved.")
+        pt_df = compute_paired_tail_metrics(df_weekly, df_weekly, sel_id, 'train_oof')
+        if not pt_df.empty:
+            paired_tail_dfs.append(pt_df)
+            
+    df_paired_tail = pd.concat(paired_tail_dfs, ignore_index=True) if paired_tail_dfs else pd.DataFrame()
+    df_paired_tail.to_csv(train_out / 'paired_tail_metrics.csv', index=False)
     
-    # 7. Deterministic Bootstrap for Primary W4 Comparisons
-    bootstrap_rows = []
-    b0_w4_val = df_weekly[(df_weekly.selector_id == 'B0') & (df_weekly.segment == 'contaminated_validation') & (df_weekly.horizon == 'W4')]
+    # 6. Generate Train Summary Table for Shortlist Selection
+    summary_rows = []
+    for sel_id, g in df_paired_tail[df_paired_tail.horizon == 'W4'].groupby('selector_id'):
+        row = g.iloc[0].to_dict()
+        # Pareto score on Train OOF: median_spread + 0.5 * min(0, cvar_delta) - 0.5 * max(0, stop_delta_pct)
+        pareto_score = (
+            row.get('median_spread', 0.0)
+            + 0.5 * min(0.0, row.get('cvar_delta', 0.0))
+            - 0.5 * max(0.0, row.get('stop_delta_pct', 0.0))
+        )
+        row['pareto_score'] = round(pareto_score, 4)
+        summary_rows.append(row)
+        
+    df_summary = pd.DataFrame(summary_rows).sort_values('pareto_score', ascending=False)
+    df_summary.to_csv(train_out / 'train_summary.csv', index=False)
+    print(f"Train OOF completed. Evaluated {len(df_summary)} challenger configurations on Train OOF.")
+
+
+def cmd_lock(args):
+    print("=== Running Phase 6 Shortlist Selection & Research Sealing ===")
+    train_summary_p = OUT / 'train' / 'train_summary.csv'
+    if not train_summary_p.exists():
+        raise RuntimeError("Train summary not found. Run 'python -m backtest.rdagent_track_b_selector_challenge.cli train' first.")
+        
+    df_sum = pd.read_csv(train_summary_p)
     
-    for sel_id, g in df_weekly[(df_weekly.selector_id != 'B0') & (df_weekly.segment == 'contaminated_validation') & (df_weekly.horizon == 'W4')].groupby('selector_id'):
+    # Strict deterministic Train-only Pareto selection rules:
+    # 1. Filter to candidates with support >= 6 weeks on Train OOF
+    valid_cands = df_sum[df_sum['support_weeks'] >= 6].copy()
+    if valid_cands.empty:
+        valid_cands = df_sum.copy()
+        
+    locked_challengers = []
+    
+    # Bucket 1: Best Signal F1 Challenger
+    sig_f1 = valid_cands[valid_cands.selector_id.str.startswith('signal_f1_')]
+    if not sig_f1.empty:
+        best_sig_f1 = sig_f1.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
+        locked_challengers.append((best_sig_f1, "Best Train OOF Pareto score in Signal F1 bucket"))
+        
+    # Bucket 2: Best ACTIONABLE F1 Challenger
+    act_f1 = valid_cands[valid_cands.selector_id.str.startswith('actionable_f1_')]
+    if not act_f1.empty:
+        best_act_f1 = act_f1.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
+        locked_challengers.append((best_act_f1, "Best Train OOF Pareto score in ACTIONABLE F1 bucket"))
+        
+    # Bucket 3: Best Signal Agent Challenger (if agent factors exist)
+    sig_agent = valid_cands[valid_cands.selector_id.str.startswith('signal_agent_')]
+    if not sig_agent.empty:
+        best_sig_ag = sig_agent.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
+        locked_challengers.append((best_sig_ag, "Best Train OOF Pareto score in Signal Agent bucket"))
+        
+    # Bucket 4: Best ACTIONABLE Agent Challenger (if agent factors exist)
+    act_agent = valid_cands[valid_cands.selector_id.str.startswith('actionable_agent_')]
+    if not act_agent.empty:
+        best_act_ag = act_agent.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
+        locked_challengers.append((best_act_ag, "Best Train OOF Pareto score in ACTIONABLE Agent bucket"))
+        
+    # Bucket 5: Best Portfolio-Aware Challenger (if distinct from above)
+    port_aware = valid_cands[valid_cands.selector_id.str.contains('portfolio_aware')]
+    if not port_aware.empty:
+        best_port = port_aware.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
+        if best_port not in [c[0] for c in locked_challengers]:
+            locked_challengers.append((best_port, "Best Train OOF Pareto score in Portfolio-Aware family"))
+            
+    # Capped at <= 5 challengers
+    locked_challengers = locked_challengers[:5]
+    locked_ids = [c[0] for c in locked_challengers]
+    
+    # Read factor manifest
+    fac_manifest_p = OUT / 'factor_manifest.json'
+    fac_manifest = json.loads(fac_manifest_p.read_text(encoding='utf-8')) if fac_manifest_p.exists() else {}
+    
+    lock_manifest = {
+        'created_at': datetime.datetime.now().isoformat(),
+        'git_sha': get_git_sha(),
+        'code_hash': compute_codebase_hash(),
+        'panel_hash': compute_panel_hash(),
+        'train_end': TRAIN_END,
+        'validation_window': f"{CONTAM_VAL_START} .. {CONTAM_VAL_END}",
+        'purge_weeks': PURGE_WEEKS,
+        'random_seed': RANDOM_SEED,
+        'bootstrap_rounds': BOOTSTRAP_ROUNDS,
+        'accepted_agent_factors': [f['factor_name'] for f in fac_manifest.get('factors', []) if f.get('accepted')],
+        'locked_challenger_ids': locked_ids,
+        'locked_challengers_spec': {
+            c_id: {
+                'selection_rule': reason,
+                'train_oof_metrics': df_sum[df_sum.selector_id == c_id].iloc[0].to_dict() if not df_sum[df_sum.selector_id == c_id].empty else {}
+            }
+            for c_id, reason in locked_challengers
+        },
+        'selection_rule_description': "Deterministic Train-only Pareto selection on Train OOF W4 (support >= 6, max pareto_score per bucket, capped <= 5)",
+    }
+    
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / 'research_lock_manifest.json').write_text(json.dumps(lock_manifest, indent=2), encoding='utf-8')
+    print("=== Research State Successfully Sealed ===")
+    print(f"Locked {len(locked_ids)} challengers:")
+    for c_id, reason in locked_challengers:
+        print(f"  - {c_id} ({reason})")
+
+
+def cmd_validate(args):
+    print("=== Running Phase 7 Sealed Validation Evaluation ===")
+    lock_p = OUT / 'research_lock_manifest.json'
+    if not lock_p.exists():
+        raise RuntimeError("Validation blocked: No research_lock_manifest.json found. Run 'python -m backtest.rdagent_track_b_selector_challenge.cli lock' first.")
+        
+    lock_data = json.loads(lock_p.read_text(encoding='utf-8'))
+    
+    # 1. Verify code and data hashes match lock
+    curr_code_hash = compute_codebase_hash()
+    curr_panel_hash = compute_panel_hash()
+    
+    if curr_code_hash != lock_data.get('code_hash'):
+        raise RuntimeError(f"Validation blocked: Code hash mismatch! Locked={lock_data.get('code_hash')}, Current={curr_code_hash}")
+    if curr_panel_hash != lock_data.get('panel_hash'):
+        raise RuntimeError(f"Validation blocked: Panel hash mismatch! Locked={lock_data.get('panel_hash')}, Current={curr_panel_hash}")
+        
+    # 2. Check single-run constraint
+    val_out = OUT / 'validation'
+    val_completed_p = val_out / 'validation_completed.json'
+    if val_completed_p.exists() and not getattr(args, 'technical_rerun', False):
+        raise RuntimeError("Validation blocked: Validation has already been executed. Rerunning requires explicit --technical-rerun flag.")
+        
+    val_out.mkdir(parents=True, exist_ok=True)
+    locked_ids = lock_data.get('locked_challenger_ids', [])
+    print(f"Evaluating {len(locked_ids)} locked challengers on Contaminated Validation period ({CONTAM_VAL_START} .. {CONTAM_VAL_END})")
+    
+    panel = get_full_panel()
+    train_weeks = sorted(panel.loc[panel.snapshot_date <= TRAIN_END, 'snapshot_date'].unique())
+    sealed_train_weeks = train_weeks[:-PURGE_WEEKS] if len(train_weeks) > PURGE_WEEKS else []
+    
+    # Define selectors
+    selector_dict = {
+        'pure_rank': SelectorConfig('pure_rank', 'pure_rank', 'none', 'max_score', complexity='low'),
+        'distinct_industry': SelectorConfig('distinct_industry', 'distinct_industry', 'hard_distinct', 'max_score_distinct_ind', complexity='low'),
+        'portfolio_aware': SelectorConfig(
+            'portfolio_aware', 'portfolio_aware', 'soft_penalty',
+            'score_minus_vol_and_overheat_and_dup_ind',
+            lambda_vol=0.5, lambda_overheat=0.3, lambda_industry_dup=2.0, candidate_pool_size=8, complexity='medium'
+        ),
+    }
+    
+    val_predictions = []
+    val_picks_list = []
+    val_weekly_metrics = []
+    
+    # Parse locked challenger IDs: <universe>_<fmode>_<model>_w<h>_<selector>
+    for full_id in locked_ids:
+        parts = full_id.split('_')
+        u_name = parts[0]
+        f_mode = parts[1]
+        m_name = parts[2]
+        h_str = parts[3]
+        h = int(h_str.replace('w', ''))
+        sel_key = '_'.join(parts[4:])
+        
+        sel_cfg = selector_dict.get(sel_key, SelectorConfig(sel_key, sel_key, 'none', 'score', complexity='low'))
+        
+        u_panel = get_universe_panel(panel, u_name)
+        features = _get_features(u_panel, f_mode)
+        label = f'w{h}_return_pct'
+        
+        tr_data = u_panel[u_panel.snapshot_date.isin(sealed_train_weeks) & u_panel[label].notna()]
+        va_data = u_panel[(u_panel.snapshot_date >= CONTAM_VAL_START) & (u_panel.snapshot_date <= CONTAM_VAL_END)].copy()
+        
+        if tr_data.empty or va_data.empty:
+            continue
+            
+        xt, y, xs = _prep_xy(tr_data, va_data, features, label)
+        m = _create_model(m_name)
+        m.fit(xt, y)
+        
+        keep_cols = ['snapshot_date', 'code', 'industry', 'current_vs_ibd_candidate_pct', 'rv_20']
+        for x_col in [f'w{x}_return_pct' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
+            if x_col in va_data.columns: keep_cols.append(x_col)
+        for x_col in [f'w{x}_stop8' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
+            if x_col in va_data.columns: keep_cols.append(x_col)
+            
+        z = va_data[[c for c in keep_cols if c in va_data.columns]].copy()
+        z['score'] = m.predict(xs)
+        z['selector_id'] = full_id
+        z['segment'] = 'contaminated_validation'
+        val_predictions.append(z)
+        
+        # Apply selector
+        picks = apply_selector(z, sel_cfg, score_col='score')
+        if not picks.empty:
+            picks['selector_id'] = full_id
+            picks['segment'] = 'contaminated_validation'
+            val_picks_list.append(picks)
+            
+            w_mets = compute_weekly_metrics(picks, full_id, 'contaminated_validation')
+            val_weekly_metrics.extend(w_mets)
+            
+    # Add B0 Baseline on Validation
+    b0_val = panel[(panel.is_b0 == 1) & (panel.snapshot_date >= CONTAM_VAL_START) & (panel.snapshot_date <= CONTAM_VAL_END)].copy()
+    b0_val['selector_id'] = 'B0'
+    b0_val['segment'] = 'contaminated_validation'
+    b0_val['model_pick_order'] = b0_val.get('pick_order', 1)
+    
+    val_picks_list.append(b0_val)
+    val_weekly_metrics.extend(compute_weekly_metrics(b0_val, 'B0', 'contaminated_validation'))
+    
+    df_val_preds = pd.concat(val_predictions, ignore_index=True) if val_predictions else pd.DataFrame()
+    df_val_picks = pd.concat(val_picks_list, ignore_index=True)
+    df_val_weekly = pd.DataFrame(val_weekly_metrics)
+    
+    df_val_preds.to_parquet(val_out / 'cv_predictions.parquet', index=False)
+    df_val_picks.to_csv(val_out / 'top3_picks.csv', index=False)
+    df_val_weekly.to_csv(val_out / 'weekly_metrics.csv', index=False)
+    
+    # Paired Tail Metrics on Same Support
+    paired_tail_dfs = []
+    for sel_id in locked_ids:
+        pt_df = compute_paired_tail_metrics(df_val_weekly, df_val_weekly, sel_id, 'contaminated_validation')
+        if not pt_df.empty:
+            paired_tail_dfs.append(pt_df)
+            
+    df_paired_tail = pd.concat(paired_tail_dfs, ignore_index=True) if paired_tail_dfs else pd.DataFrame()
+    df_paired_tail.to_csv(val_out / 'paired_tail_metrics.csv', index=False)
+    
+    # Paired Bootstrap Comparison
+    b0_w4_val = df_val_weekly[(df_val_weekly.selector_id == 'B0') & (df_val_weekly.horizon == 'W4')]
+    boot_rows = []
+    for sel_id in locked_ids:
+        g = df_val_weekly[(df_val_weekly.selector_id == sel_id) & (df_val_weekly.horizon == 'W4')]
         b_res = bootstrap_comparison(g, b0_w4_val)
-        bootstrap_rows.append({
+        boot_rows.append({
             'selector_id': sel_id,
             'horizon': 'W4',
             'support_weeks': b_res['support_weeks'],
@@ -424,82 +598,129 @@ def cmd_train_and_evaluate(args):
             'cvar_diff_ci_low': b_res['cvar_diff_ci_95'][0],
             'cvar_diff_ci_high': b_res['cvar_diff_ci_95'][1],
         })
-    df_boot = pd.DataFrame(bootstrap_rows)
-    df_boot.to_csv(OUT / 'bootstrap_summary.csv', index=False)
+    df_boot = pd.DataFrame(boot_rows)
+    df_boot.to_csv(val_out / 'bootstrap_summary.csv', index=False)
     
-    # 8. Champion Matrix
+    # Champion Classification Matrix
     champ_rows = []
-    for sel_id in df_paired['selector_id'].unique():
-        tr_w4 = df_paired[(df_paired.selector_id == sel_id) & (df_paired.segment == 'train_oof') & (df_paired.horizon == 'W4')]
-        val_w4 = df_paired[(df_paired.selector_id == sel_id) & (df_paired.segment == 'contaminated_validation') & (df_paired.horizon == 'W4')]
-        
-        tr_dict = tr_w4.iloc[0].to_dict() if not tr_w4.empty else {}
-        val_dict = val_w4.iloc[0].to_dict() if not val_w4.empty else {}
-        
+    train_summary_p = OUT / 'train' / 'train_summary.csv'
+    df_tr_sum = pd.read_csv(train_summary_p) if train_summary_p.exists() else pd.DataFrame()
+    
+    for sel_id in locked_ids:
+        val_w4 = df_paired_tail[(df_paired_tail.selector_id == sel_id) & (df_paired_tail.horizon == 'W4')]
+        tr_w4 = df_tr_sum[df_tr_sum.selector_id == sel_id]
         boot_sub = df_boot[df_boot.selector_id == sel_id]
+        
+        val_dict = val_w4.iloc[0].to_dict() if not val_w4.empty else {}
+        tr_dict = tr_w4.iloc[0].to_dict() if not tr_w4.empty else {}
         boot_dict = boot_sub.iloc[0].to_dict() if not boot_sub.empty else {}
         
         classification = classify_champion(tr_dict, val_dict, boot_dict)
         champ_rows.append({
             'selector_id': sel_id,
             'classification': classification,
-            'train_oof_w4_med_spread': tr_dict.get('median_spread_pct', np.nan),
+            'train_oof_w4_med_spread': tr_dict.get('median_spread', np.nan),
+            'train_oof_w4_mean_spread': tr_dict.get('mean_spread', np.nan),
             'train_oof_w4_cvar_delta': tr_dict.get('cvar_delta', np.nan),
             'train_oof_w4_stop_delta': tr_dict.get('stop_delta_pct', np.nan),
-            'val_w4_med_spread': val_dict.get('median_spread_pct', np.nan),
-            'val_w4_mean_spread': val_dict.get('mean_spread_pct', np.nan),
+            'val_w4_med_spread': val_dict.get('median_spread', np.nan),
+            'val_w4_mean_spread': val_dict.get('mean_spread', np.nan),
             'val_w4_cvar_delta': val_dict.get('cvar_delta', np.nan),
             'val_w4_stop_delta': val_dict.get('stop_delta_pct', np.nan),
-            'val_support_weeks': val_dict.get('weeks', 0),
+            'val_support_weeks': val_dict.get('support_weeks', 0),
         })
-    df_champ = pd.DataFrame(champ_rows).sort_values(['val_w4_med_spread', 'val_w4_mean_spread'], ascending=[False, False])
-    df_champ.to_csv(OUT / 'champion_matrix.csv', index=False)
-    print(f"Champion matrix generated with {len(df_champ)} models.")
-
-
-def cmd_seal(args):
-    print("=== Writing Research Lock Manifest ===")
-    git_sha = "unknown"
-    try:
-        git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-    except Exception:
-        pass
-        
-    manifest = {
-        'lock_timestamp': datetime.datetime.now().isoformat(),
-        'git_sha': git_sha,
-        'train_boundary': f'<= {TRAIN_END}',
-        'contaminated_validation_boundary': f'{CONTAM_VAL_START} .. {CONTAM_VAL_END}',
-        'purge_weeks': PURGE_WEEKS,
-        'universes': list(UNIVERSES),
-        'base_features': BASE_FEATURES,
-        'tech_features': TECH_FEATURES,
-        'random_seed': RANDOM_SEED,
-        'bootstrap_rounds': BOOTSTRAP_ROUNDS,
+    df_champ = pd.DataFrame(champ_rows)
+    df_champ.to_csv(val_out / 'champion_matrix.csv', index=False)
+    
+    val_receipt = {
+        'validated_at': datetime.datetime.now().isoformat(),
+        'locked_code_hash': lock_data.get('code_hash'),
+        'locked_panel_hash': lock_data.get('panel_hash'),
+        'locked_challengers_evaluated': locked_ids,
+        'single_run_enforced': True,
     }
-    (OUT / 'research_lock_manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-    print("Research state sealed.")
+    val_completed_p.write_text(json.dumps(val_receipt, indent=2), encoding='utf-8')
+    print("=== Validation Completed & Formally Recorded ===")
+    print(df_champ)
+
+
+def to_md_table(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "_No data_\n"
+    headers = [str(c) for c in df.columns]
+    lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
+    for _, row in df.iterrows():
+        lines.append("| " + " | ".join(str(row[c]) for c in df.columns) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def cmd_report(args):
+    print("=== Generating Final Report ===")
+    # Reads train summary, lock manifest, and validation outputs to write TRACK_B_FINAL_REPORT.md
+    lock_p = OUT / 'research_lock_manifest.json'
+    val_champ_p = OUT / 'validation' / 'champion_matrix.csv'
+    val_tail_p = OUT / 'validation' / 'paired_tail_metrics.csv'
+    val_boot_p = OUT / 'validation' / 'bootstrap_summary.csv'
+    
+    lock_data = json.loads(lock_p.read_text(encoding='utf-8')) if lock_p.exists() else {}
+    df_champ = pd.read_csv(val_champ_p) if val_champ_p.exists() else pd.DataFrame()
+    df_tail = pd.read_csv(val_tail_p) if val_tail_p.exists() else pd.DataFrame()
+    df_boot = pd.read_csv(val_boot_p) if val_boot_p.exists() else pd.DataFrame()
+    
+    report_text = f"""# Track B: Breaking B0 Ranking + Top3 Selection - Rigorous Research Report
+
+## 1. Research Protocol & Infrastructure Integrity
+- **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
+- **Sealed Validation**: Exactly {len(lock_data.get('locked_challenger_ids', []))} shortlisted challengers were locked prior to evaluating validation period.
+- **Code & Panel Hashes**:
+  - Code Hash: `{lock_data.get('code_hash')}`
+  - Panel Hash: `{lock_data.get('panel_hash')}`
+  - Git SHA: `{lock_data.get('git_sha')}`
+
+## 2. Locked Challengers Evaluation & Champion Classification
+"""
+    if not df_champ.empty:
+        report_text += "\n### Champion Classification Matrix\n"
+        report_text += to_md_table(df_champ)
+        
+    if not df_tail.empty:
+        report_text += "\n\n### Validation Paired Tail Metrics vs B0 (Identical Common Support)\n"
+        report_text += to_md_table(df_tail[df_tail.horizon == 'W4'])
+
+    prov_data = {k: lock_data.get(k) for k in ['code_hash', 'panel_hash', 'git_sha']}
+    report_text += f"\n## Provenance Details\n\n```json\n{json.dumps(prov_data, indent=2)}\n```\n"
+        
+    (OUT / 'TRACK_B_FINAL_REPORT.md').write_text(report_text, encoding='utf-8')
+    print(f"Report written to {OUT / 'TRACK_B_FINAL_REPORT.md'}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="RD-Agent Track B Selector Challenge CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
     
-    p_diag = subparsers.add_parser("diagnostic", help="Run pullback and lane diagnostics")
+    p_diag = subparsers.add_parser("diagnostic", help="Run empirical diagnostics & pullback experiments")
     p_diag.set_defaults(func=cmd_diagnostic)
     
     p_rd = subparsers.add_parser("rdagent", help="Run RD-Agent discovery")
     p_rd.add_argument("--step-n", type=int, default=3, help="RD-Agent evolving loop step count")
+    p_rd.add_argument("--run-id", type=str, default=None, help="Custom run ID")
     p_rd.set_defaults(func=cmd_rdagent)
     
     p_audit = subparsers.add_parser("audit", help="Run 4-stage factor audit")
     p_audit.set_defaults(func=cmd_audit)
     
-    p_eval = subparsers.add_parser("evaluate", help="Train models and evaluate selectors")
-    p_eval.set_defaults(func=cmd_train_and_evaluate)
+    p_train = subparsers.add_parser("train", help="Run Train OOF walk-forward only")
+    p_train.set_defaults(func=cmd_train)
     
-    p_seal = subparsers.add_parser("seal", help="Seal research manifest")
-    p_seal.set_defaults(func=cmd_seal)
+    p_lock = subparsers.add_parser("lock", help="Seal research manifest and lock shortlist")
+    p_lock.set_defaults(func=cmd_lock)
+    
+    p_val = subparsers.add_parser("validate", help="Run sealed validation evaluation")
+    p_val.add_argument("--technical-rerun", action="store_true", help="Allow technical rerun if already validated")
+    p_val.set_defaults(func=cmd_validate)
+    
+    p_rep = subparsers.add_parser("report", help="Generate final research report")
+    p_rep.set_defaults(func=cmd_report)
     
     args = parser.parse_args()
     args.func(args)
@@ -507,3 +728,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

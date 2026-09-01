@@ -6,13 +6,15 @@ from .config import *
 from .panel import get_full_panel, get_universe_panel
 
 
-def _cvar(series: pd.Series, q: float = 0.10) -> float:
-    vals = series.dropna().to_numpy(dtype=float)
-    if len(vals) < 3:
+def compute_cvar(returns: np.ndarray | pd.Series, alpha: float = 0.10) -> float:
+    """Unified Conditional Value at Risk (CVaR10 / Expected Shortfall)."""
+    arr = np.asarray(returns, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
         return np.nan
-    cutoff = np.quantile(vals, q)
-    tail = vals[vals <= cutoff]
-    return float(np.mean(tail)) if len(tail) > 0 else np.nan
+    k = max(1, int(np.ceil(len(arr) * alpha)))
+    sorted_arr = np.sort(arr)
+    return float(np.mean(sorted_arr[:k]))
 
 
 def _spearman(x: pd.Series, y: pd.Series) -> float:
@@ -35,16 +37,10 @@ def run_pullback_dry_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFra
     }
 
     for u_name, u_df in universes.items():
-        # Categorize pullback_v_is_dry state
-        # 1.0 -> 'True', 0.0 -> 'False', NaN -> 'Missing'
         dry_raw = u_df['pullback_v_is_dry']
         state = pd.Series('Missing', index=u_df.index)
         state[dry_raw == 1.0] = 'True'
         state[dry_raw == 0.0] = 'False'
-        
-        # Also compute encodings
-        enc_sym = dry_raw.map({1.0: 1.0, 0.0: -1.0}).fillna(0.0)
-        enc_reward = dry_raw.map({1.0: 1.0, 0.0: 0.0}).fillna(0.0)
 
         for st in ('True', 'False', 'Missing', 'All'):
             sub = u_df if st == 'All' else u_df[state == st]
@@ -63,30 +59,24 @@ def run_pullback_dry_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFra
                 ret_col = f'w{h}_return_pct'
                 stop_col = f'w{h}_stop8'
                 
-                rets = pd.to_numeric(sub.get(ret_col), errors='coerce').dropna()
-                stops = np.where(sub[stop_col].isna(), False, sub[stop_col].values).astype(bool) if stop_col in sub.columns else np.zeros(len(sub), dtype=bool)
+                # Filter to mature rows where return is valid (notna)
+                if ret_col in sub.columns:
+                    valid_mask = pd.to_numeric(sub[ret_col], errors='coerce').notna()
+                    sub_mature = sub[valid_mask]
+                    rets = pd.to_numeric(sub_mature[ret_col], errors='coerce').dropna()
+                else:
+                    sub_mature = sub.iloc[0:0]
+                    rets = pd.Series(dtype=float)
+                    
+                stops = np.where(sub_mature[stop_col].isna(), False, sub_mature[stop_col].values).astype(bool) if stop_col in sub_mature.columns else np.zeros(len(sub_mature), dtype=bool)
                 
-                rec[f'w{h}_count'] = len(rets)
+                rec[f'w{h}_mature_count'] = len(rets)
                 rec[f'w{h}_mean_pct'] = round(float(rets.mean()), 3) if len(rets) > 0 else np.nan
                 rec[f'w{h}_median_pct'] = round(float(rets.median()), 3) if len(rets) > 0 else np.nan
                 rec[f'w{h}_p10_pct'] = round(float(np.quantile(rets, 0.10)), 3) if len(rets) >= 5 else np.nan
                 rec[f'w{h}_p90_pct'] = round(float(np.quantile(rets, 0.90)), 3) if len(rets) >= 5 else np.nan
-                rec[f'w{h}_cvar10_pct'] = round(_cvar(rets, 0.10), 3)
+                rec[f'w{h}_cvar10_pct'] = round(compute_cvar(rets, 0.10), 3)
                 rec[f'w{h}_stop8_rate_pct'] = round(100.0 * float(stops.mean()), 2) if len(stops) > 0 else np.nan
-                
-                # Profit20 before stop8 indicator if available
-                if 'profit20_hit' in sub.columns:
-                    p20 = np.where(sub['profit20_hit'].isna(), False, sub['profit20_hit'].values).astype(bool)
-                    rec['profit20_rate_pct'] = round(100.0 * float(p20.mean()), 2)
-
-            # Signal type breakdown
-            if 'ibd_candidate_rule' in sub.columns:
-                rules = sub['ibd_candidate_rule'].value_counts(normalize=True).to_dict()
-                rec['top_signal_type'] = sub['ibd_candidate_rule'].mode().iloc[0] if not sub['ibd_candidate_rule'].empty else 'none'
-                rec['ceiling_pct'] = round(100.0 * rules.get('ceiling', 0.0), 1)
-                rec['ceiling_pullback_pct'] = round(100.0 * rules.get('ceiling_pullback', 0.0), 1)
-                rec['pivot_pct'] = round(100.0 * rules.get('pivot', 0.0), 1)
-                rec['ma10_touch_pct'] = round(100.0 * rules.get('ma10_touch_confirm', 0.0), 1)
 
             records.append(rec)
 
@@ -96,8 +86,79 @@ def run_pullback_dry_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFra
     return df_out
 
 
+def run_pullback_encoding_experiment(panel: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Controlled Train-only comparison of pullback_v_is_dry encodings (symmetric, reward_only, ignored)."""
+    if panel is None:
+        panel = get_full_panel()
+        
+    train_panel = panel[panel.snapshot_date <= TRAIN_END].copy()
+    from .evaluate import _folds, _prep_xy, _create_model
+    
+    rows = []
+    for u_name in ('actionable', 'signal'):
+        u_df = get_universe_panel(train_panel, u_name)
+        weeks = sorted(u_df['snapshot_date'].unique())
+        folds = _folds(weeks)
+        if not folds:
+            continue
+            
+        base_cols = [c for c in BASE_FEATURES if c in u_df.columns and c != 'pullback_v_is_dry'] + [c for c in TECH_FEATURES if c in u_df.columns]
+        
+        for enc_name in ('symmetric', 'reward_only', 'ignored'):
+            mod_df = u_df.copy()
+            if enc_name == 'symmetric':
+                mod_df['pullback_v_is_dry'] = mod_df['pullback_v_is_dry'].map({1.0: 1.0, 0.0: -1.0}).fillna(0.0)
+                feat_cols = base_cols + ['pullback_v_is_dry']
+            elif enc_name == 'reward_only':
+                mod_df['pullback_v_is_dry'] = mod_df['pullback_v_is_dry'].map({1.0: 1.0, 0.0: 0.0}).fillna(0.0)
+                feat_cols = base_cols + ['pullback_v_is_dry']
+            elif enc_name == 'ignored':
+                feat_cols = base_cols
+                
+            for h in (1, 2, 4):
+                label_col = f'w{h}_return_pct'
+                stop_col = f'w{h}_stop8'
+                
+                oof_picks = []
+                for tr_w, va_w in folds:
+                    tr = mod_df[mod_df.snapshot_date.isin(tr_w) & mod_df[label_col].notna()]
+                    va = mod_df[mod_df.snapshot_date.isin(va_w)]
+                    if len(tr) < 20 or va.empty:
+                        continue
+                    xt, y, xs = _prep_xy(tr, va, feat_cols, label_col)
+                    m = _create_model('ridge')
+                    m.fit(xt, y)
+                    va_pred = va.copy()
+                    va_pred['score'] = m.predict(xs)
+                    for _, g in va_pred.groupby('snapshot_date'):
+                        top = g.sort_values('score', ascending=False).head(3)
+                        oof_picks.append(top)
+                        
+                if oof_picks:
+                    picks_df = pd.concat(oof_picks)
+                    rets = pd.to_numeric(picks_df[label_col], errors='coerce').dropna()
+                    stops = np.where(picks_df[stop_col].isna(), False, picks_df[stop_col].values).astype(bool) if stop_col in picks_df.columns else np.zeros(len(picks_df), dtype=bool)
+                    
+                    rows.append({
+                        'universe': u_name,
+                        'encoding': enc_name,
+                        'horizon': f'W{h}',
+                        'train_oof_picks': len(picks_df),
+                        'mean_return_pct': float(rets.mean()) if len(rets) > 0 else np.nan,
+                        'median_return_pct': float(rets.median()) if len(rets) > 0 else np.nan,
+                        'cvar10_pct': compute_cvar(rets, 0.10),
+                        'stop8_rate_pct': float(100.0 * stops.mean()) if len(stops) > 0 else np.nan,
+                    })
+                    
+    df_exp = pd.DataFrame(rows)
+    train_out_dir = OUT / 'train'
+    train_out_dir.mkdir(parents=True, exist_ok=True)
+    df_exp.to_csv(train_out_dir / 'pullback_encoding_experiment.csv', index=False)
+    return df_exp
+
+
 def run_lane_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Analyze whether B0 lanes have empirical monotonicity."""
+    """Analyze historical unconditional lane outcome associations (Exploratory Hypothesis)."""
     if panel is None:
         panel = get_full_panel()
         
@@ -129,12 +190,14 @@ def run_lane_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFrame:
         summary.append({
             'lane': lane,
             'count': len(g),
-            'w4_count': len(w4),
+            'w4_mature_count': len(w4),
             'w4_mean': float(w4.mean()) if len(w4) > 0 else np.nan,
             'w4_median': float(w4.median()) if len(w4) > 0 else np.nan,
-            'w4_cvar10': _cvar(w4, 0.10),
+            'w4_cvar10': compute_cvar(w4, 0.10),
             'w4_stop8_rate_pct': float(100.0 * stops.mean()) if len(stops) > 0 else np.nan,
+            'diagnostic_note': 'Exploratory association only; not independent causal evidence.'
         })
     df_sum = pd.DataFrame(summary).sort_values('w4_median', ascending=False)
     df_sum.to_csv(OUT / 'lane_monotonicity_diagnostic.csv', index=False)
     return df_sum
+

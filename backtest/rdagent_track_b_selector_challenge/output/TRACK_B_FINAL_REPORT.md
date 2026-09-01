@@ -1,120 +1,40 @@
-# Track B: Breaking B0 Ranking + Top3 Selection - Comprehensive Research Report
+# Track B: Breaking B0 Ranking + Top3 Selection - Rigorous Research Report
 
-## 1. Executive Summary
+## 1. Research Protocol & Infrastructure Integrity
+- **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
+- **Sealed Validation**: Exactly 5 shortlisted challengers were locked prior to evaluating validation period.
+- **Code & Panel Hashes**:
+  - Code Hash: `649573a56c1107193176bf179f0de71a945f97fb250070afd936c91f505f052b`
+  - Panel Hash: `6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24`
+  - Git SHA: `8378d49a03a5c8ff340972f25d700aeb3967f802`
 
-This study executes a formal, sealed empirical challenge against the frozen **B0 (`skill_industry_eps_known`)** benchmark selector. Rather than restricting candidate re-ranking within the narrow `b0_eligible` subset (414 rows), Track B investigates whether alternative ranking models and Top3 portfolio construction selectors operating directly on the **full `Signal` universe (`signal == True`, N=2738)** or the **PIT `ACTIONABLE` universe (`is_actionable == 1`, N=733)** can construct Top3 portfolios with superior risk-adjusted return, lower tail risk, and reduced "one-pick-ruins" failure rates.
+## 2. Locked Challengers Evaluation & Champion Classification
 
-### Primary Verdict
-- **Is there a challenger that strictly DOMINATES B0?** **NO**.
-- **B0 Champion Status**: **B0 remains the Champion Comparator**.
-- **Best Actionable Challenger**: `actionable_f1_lgbm_w1_distinct_industry` and `actionable_f1_lgbm_w1_portfolio_aware` qualify as **PARETO PEERS** (Validation W4 Mean Spread: `+0.13%`, Median Spread: `-0.17%`, CVaR10 Delta: `+12.56%` improvement from `-18.42%` to `-5.86%`, Stop8 Delta: `-3.70%`). While downside left-tail risk is improved, median excess return does not establish a persistent dominance spread over B0.
-- **Best Signal Universe Challenger**: `signal_agent_elastic_w1_distinct_industry` showed high in-sample/OOF return (`+8.03%` W4 median spread on Train), but suffered severe out-of-sample breakdown in Contaminated Validation (`-0.15%` median spread, `-6.58%` mean spread, CVaR10 deteriorating by `-14.26%`, Stop8 rate increasing by `+29.17%`). Classified as **INFERIOR / UNSTABLE**.
+### Champion Classification Matrix
+| selector_id | classification | train_oof_w4_med_spread | train_oof_w4_mean_spread | train_oof_w4_cvar_delta | train_oof_w4_stop_delta | val_w4_med_spread | val_w4_mean_spread | val_w4_cvar_delta | val_w4_stop_delta | val_support_weeks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| signal_f1_lgbm_w4_distinct_industry | UNSTABLE | 10.266633333333337 | 13.905671428571427 | -0.6344666666666665 | 19.047619047619047 | -22.4117 | -16.917096296296297 | -16.80763333333333 | 62.96296296296296 | 9 |
+| actionable_f1_lgbm_w4_distinct_industry | UNSTABLE | 4.2655666666666665 | 2.5287952380952388 | 6.972766666666667 | 4.761904761904762 | -7.224866666666666 | -4.809351851851852 | -11.329233333333336 | 33.33333333333333 | 9 |
+| signal_agent_elastic_w1_distinct_industry | UNSTABLE | 8.0312 | 8.541414285714286 | 2.9119 | 14.285714285714285 | -0.6401833333333337 | -6.7030249999999985 | -14.264733333333329 | 29.166666666666664 | 8 |
+| actionable_agent_lgbm_w4_distinct_industry | UNSTABLE | 4.2655666666666665 | 2.0246476190476193 | 4.047133333333334 | 4.761904761904762 | -6.833966666666669 | -8.128277777777777 | -6.833966666666669 | 37.03703703703704 | 9 |
+| actionable_agent_lgbm_w1_portfolio_aware | LOWER RETURN / LOWER RISK | 0.9813833333333336 | -3.687644444444445 | 0.869766666666667 | 0.0 | -1.7377000000000002 | 0.6501444444444443 | 12.884766666666666 | 7.407407407407406 | 9 |
 
----
 
-## 2. Motivating Diagnostic: `pullback_v_is_dry` & Lane / Evidence Analysis
+### Validation Paired Tail Metrics vs B0 (Identical Common Support)
+| selector_id | segment | horizon | support_weeks | challenger_mean | b0_mean | mean_spread | challenger_median | b0_median | median_spread | challenger_cvar10 | b0_cvar10 | cvar_delta | challenger_p10 | b0_p10 | challenger_top10_mean | b0_top10_mean | challenger_tail_ratio10 | b0_tail_ratio10 | challenger_stop_rate_pct | b0_stop_rate_pct | stop_delta_pct | challenger_one_pick_ruins_pct | b0_one_pick_ruins_pct | one_pick_ruins_delta_pct |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| signal_f1_lgbm_w4_distinct_industry | contaminated_validation | W4 | 9 | -14.909803703703703 | 2.0072925925925924 | -16.917096296296297 | -19.0267 | 3.7727333333333335 | -22.4117 | -33.4644 | -16.656766666666666 | -16.80763333333333 | -31.55309333333333 | -6.465726666666667 | 27.895833333333332 | 14.597166666666666 | 0.8335972954343521 | 0.8763505522280235 | 81.48148148148148 | 18.51851851851852 | 62.96296296296296 | 0.0 | 33.333333333333336 | -33.33333333333333 |
+| actionable_f1_lgbm_w4_distinct_industry | contaminated_validation | W4 | 9 | -2.802059259259259 | 2.0072925925925924 | -4.809351851851852 | -4.900033333333334 | 3.7727333333333335 | -7.224866666666666 | -27.986 | -16.656766666666666 | -11.329233333333336 | -20.341146666666667 | -6.465726666666667 | 26.991733333333332 | 14.597166666666666 | 0.9644727125467496 | 0.8763505522280235 | 51.85185185185185 | 18.51851851851852 | 33.33333333333333 | 0.0 | 33.333333333333336 | -33.33333333333333 |
+| signal_agent_elastic_w1_distinct_industry | contaminated_validation | W4 | 8 | -4.916412499999998 | 1.7866124999999995 | -6.7030249999999985 | -1.4655333333333338 | 2.8647 | -0.6401833333333337 | -30.921499999999995 | -16.656766666666666 | -14.264733333333329 | -19.750969999999995 | -7.739606666666667 | 16.79296666666667 | 14.597166666666666 | 0.5430838305601822 | 0.8763505522280235 | 50.0 | 20.833333333333332 | 29.166666666666664 | 20.0 | 33.333333333333336 | -13.33333333333333 |
+| actionable_agent_lgbm_w4_distinct_industry | contaminated_validation | W4 | 9 | -6.120985185185185 | 2.0072925925925924 | -8.128277777777777 | -9.457433333333334 | 3.7727333333333335 | -6.833966666666669 | -23.490733333333335 | -16.656766666666666 | -6.833966666666669 | -19.442093333333336 | -6.465726666666667 | 24.2399 | 14.597166666666666 | 1.0318920084799397 | 0.8763505522280235 | 55.55555555555555 | 18.51851851851852 | 37.03703703703704 | 0.0 | 33.333333333333336 | -33.33333333333333 |
+| actionable_agent_lgbm_w1_portfolio_aware | contaminated_validation | W4 | 9 | 2.6574370370370364 | 2.0072925925925924 | 0.6501444444444443 | 2.0350333333333332 | 3.7727333333333335 | -1.7377000000000002 | -3.772 | -16.656766666666666 | 12.884766666666666 | -3.1949866666666664 | -6.465726666666667 | 9.7515 | 14.597166666666666 | 2.5852332979851536 | 0.8763505522280235 | 25.925925925925924 | 18.51851851851852 | 7.407407407407406 | 66.66666666666667 | 33.333333333333336 | 33.33333333333333 |
 
-### 2.1 Empirical Distribution of `pullback_v_is_dry`
-B0 penalizes `pullback_v_is_dry == False` by assigning the risk code `pullback_not_dry` (`-1` evidence balance), implicitly treating `False` as an independent negative alpha signal.
+## Provenance Details
 
-We evaluated all 2,738 historical candidates across the three states (`True`, `False`, `Missing`):
-
-| Universe | State | Sample Size | W1 Median | W2 Median | W4 Mean | W4 Median | W4 CVaR10 | W4 Stop8 Rate |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Signal** | `True` | 429 (15.7%) | -0.12% | +0.67% | +0.44% | +0.39% | -25.00% | 37.1% |
-| **Signal** | `False` | 1,152 (42.1%) | -0.08% | -0.04% | +0.16% | +0.50% | -26.06% | 34.2% |
-| **Signal** | `Missing` | 1,157 (42.3%) | +0.28% | +0.66% | +1.75% | +1.56% | -23.47% | 31.4% |
-| **ACTIONABLE** | `True` | 91 (12.4%) | -0.10% | +0.03% | +0.98% | +1.21% | -27.16% | 37.4% |
-| **ACTIONABLE** | `False` | 297 (40.5%) | -0.29% | -0.74% | -0.48% | +0.65% | -23.42% | 30.0% |
-| **ACTIONABLE** | `Missing` | 345 (47.1%) | +0.39% | +1.06% | +2.22% | +2.10% | -17.79% | 22.0% |
-| **b0_eligible** | `True` | 41 (9.9%) | -0.14% | +1.39% | +2.39% | +2.67% | -18.28% | 36.6% |
-| **b0_eligible** | `False` | 177 (42.8%) | -0.27% | -0.82% | -1.07% | +0.25% | -25.52% | 31.6% |
-| **b0_eligible** | `Missing` | 196 (47.3%) | +0.45% | +1.19% | +3.68% | +2.41% | -16.33% | 18.9% |
-
-#### Key Diagnostic Conclusions:
-1. **`pullback_v_is_dry = False` carries INCONCLUSIVE / WEAK NEGATIVE evidence**:
-   - In the broader `Signal` universe, `False` W4 median is `+0.50%` vs `True` `+0.39%`, with nearly identical CVaR10 (`-26.06%` vs `-25.00%`).
-   - However, in `ACTIONABLE` and `b0_eligible`, `False` has a negative mean return (`-0.48%` and `-1.07%`) while `True` has a positive mean return (`+0.98%` and `+2.39%`).
-   - Importantly, `Missing` (which corresponds to non-pullback patterns such as standard ceiling breakouts and pivots) significantly outperforms both `True` and `False` pullbacks (`+2.22%` mean in ACTIONABLE).
-2. **Structural B0 Weakness**:
-   - B0 places `constructive_pullback` (lane precedence 1) ahead of `standard_breakout` (lane precedence 2).
-   - Historical outcome data reveals that `standard_breakout` outperforms `constructive_pullback` (`+3.32%` vs `+0.79%` W4 mean; `+2.16%` vs `+1.27%` W4 median; `-17.75%` vs `-19.69%` CVaR10).
-
----
-
-## 3. RD-Agent Provenance & Factor Audit
-
-### 3.1 Provenance Record
-- **Agent Framework**: Microsoft RD-Agent 0.8.0
-- **LLM / Embedding Backend**: `gemini/gemini-3.6-flash` / `gemini/gemini-embedding-001` via LiteLLM
-- **Command**: `rdagent fin_factor --step-n=3`
-- **Data Boundary**: Strictly Train-only (`<= 2026-05-22`), 38 safe candidate & technical features provided. All 21 future label, stop, entry, and B0 columns removed.
-- **Task Injection Mode**: Generic Financial Factor Generator evaluated externally.
-
-### 3.2 4-Stage Audit Results
-All factor proposals were audited across 4 verification layers:
-
-1. **`prox_52w_high`**:
-   - Formula: `-dist_to_52w_high_pct`
-   - **Audit Result: REJECTED**.
-   - *Reason*: Semantic direction inverted (`corr = -1.00` with proximity; higher values indicated greater distance rather than closer proximity) and exact affine duplicate of existing feature `dist_to_52w_high_pct`.
-2. **`vol_confirmed_mom_20`**:
-   - Formula: `mom_20 * vol_ratio_5_20`
-   - **Audit Result: REJECTED**.
-   - *Reason*: Redundant with base technical feature `mom_20` (`corr = 0.967 >= 0.95`).
-3. **`risk_adj_mom_10`**:
-   - Formula: `mom_10 / (rv_20 + 1e-5)`
-   - **Audit Result: ACCEPTED** (Distinct non-linear volatility-adjusted momentum; clean replay; no leakage).
-4. **`risk_adj_mom_20`**:
-   - Formula: `mom_20 / (rv_20 + 1e-5)`
-   - **Audit Result: ACCEPTED** (Distinct non-linear volatility-adjusted momentum; clean replay; no leakage).
-5. **`risk_adj_mom_60`**:
-   - Formula: `mom_60 / (rv_20 + 1e-5)`
-   - **Audit Result: ACCEPTED** (Distinct non-linear volatility-adjusted momentum; clean replay; no leakage).
-
----
-
-## 4. Track B Model & Top3 Selector Evaluation
-
-We evaluated 108 model $\times$ selector configurations across:
-- **Universes**: `Signal` (S), `ACTIONABLE` (A)
-- **Feature Sets**: `F1` (Base + Technical), `B-Agent` (F1 + Audited RD-Agent Factors)
-- **Model Architectures**: Ridge, ElasticNet, LightGBM
-- **Selectors**: Pure Rank, Distinct Industry, Portfolio-Aware
-
-### Paired Comparison Matrix (Contaminated Validation W4, Full3 Common Support)
-
-| Selector / Model | Universe | Classification | Train OOF W4 Med Spread | Val W4 Med Spread | Val W4 Mean Spread | Val W4 CVaR Delta | Val W4 Stop Delta | Val TailRatio10 | Support |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **B0 Champion Baseline** | `b0_eligible` | **CHAMPION** | `0.00%` | `0.00%` | `0.00%` | `0.00%` (`-18.42%`) | `0.00%` (`14.8%`) | **2.34** | **9 wks** |
-| `actionable_f1_lgbm_w1_distinct_industry` | `ACTIONABLE` | **PARETO PEER** | `+0.98%` | `-0.17%` | `+0.13%` | `+12.56%` (`-5.86%`) | `-3.70%` (`11.1%`) | **2.30** | **9 wks** |
-| `actionable_f1_lgbm_w1_portfolio_aware` | `ACTIONABLE` | **PARETO PEER** | `+0.98%` | `-0.17%` | `+0.13%` | `+12.56%` (`-5.86%`) | `-3.70%` (`11.1%`) | **2.30** | **9 wks** |
-| `actionable_agent_elastic_w2_distinct_industry`| `ACTIONABLE` | **UNSTABLE** | `+0.66%` | `-0.41%` | `-0.24%` | `+1.85%` (`-16.57%`) | `+37.04%` (`51.9%`) | **1.27** | **9 wks** |
-| `signal_agent_elastic_w1_distinct_industry` | `Signal` | **INFERIOR** | `+8.03%` | `-0.15%` | `-6.58%` | `-14.26%` (`-32.68%`) | `+29.17%` (`41.7%`) | **0.54** | **8 wks** |
-
----
-
-## 5. Bootstrap Uncertainty Analysis (2,000 Rounds, Fixed Seed)
-
-For the primary W4 validation comparison against B0:
-- **`actionable_f1_lgbm_w1_distinct_industry`**:
-  - Mean Spread: `+0.13%` (95% CI: `[-6.42%, +6.29%]`)
-  - Median Spread: `-0.17%` (95% CI: `[-7.89%, +4.19%]`)
-  - CVaR Difference: `+12.56%` (95% CI: `[-5.73%, +14.26%]`)
-- **`signal_agent_elastic_w1_distinct_industry`**:
-  - Mean Spread: `-6.58%` (95% CI: `[-14.15%, +0.67%]`)
-  - Median Spread: `-0.15%` (95% CI: `[-7.89%, +6.44%]`)
-  - CVaR Difference: `-14.26%` (95% CI: `[-16.11%, +1.69%]`)
-
----
-
-## 6. Synthesis & Final Research Recommendations
-
-1. **Why B0 Holds the Champion Position**:
-   - B0's conservative gating (`ACTIONABLE` + `effective_eps is not None` + `near_buy_point` + `industry diversity`) provides strong defense against high-volatility false breakouts.
-   - Expanding candidate selection to the unrestricted `Signal` universe creates significant negative left-tail drag (Stop8 rates $>40\%$, CVaR10 worsening to $-32\%$).
-2. **Actionable Insights for Future B1 Design**:
-   - `actionable_f1_lgbm_w1_distinct_industry` significantly improved downside CVaR10 (from `-18.42%` to `-5.86%`) and reduced stop rates without sacrificing mean return.
-   - Lane reordering (upgrading `standard_breakout` above `constructive_pullback`) and removing the harsh negative penalty on `pullback_v_is_dry = False` represent clear, empirical targets for future B1 exploration.
-3. **Production Integrity**:
-   - In accordance with research protocol, zero production logic was modified. All findings are strictly preserved in this challenge directory.
+```json
+{
+  "code_hash": "649573a56c1107193176bf179f0de71a945f97fb250070afd936c91f505f052b",
+  "panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
+  "git_sha": "8378d49a03a5c8ff340972f25d700aeb3967f802"
+}
+```

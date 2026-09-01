@@ -24,7 +24,7 @@ LEAK_EXACT_COLS = {
 @dataclass
 class FactorAuditResult:
     factor_name: str
-    origin: str  # 'rdagent_original', 'gemini_modified', 'gemini_authored'
+    origin: str  # 'rdagent_original', 'legacy_unverified', 'gemini_modified', 'gemini_authored'
     rdagent_run_id: str
     description: str
     formula: str
@@ -39,6 +39,9 @@ class FactorAuditResult:
     redundant_with_feature: str = ''
     correlation_max: float = 0.0
     output_hash: str = ''
+    source_artifact_path: str = ''
+    source_artifact_hash: str = ''
+    captured_factor_hash: str = ''
 
 
 def check_code_leakage(code_text: str) -> tuple[bool, str]:

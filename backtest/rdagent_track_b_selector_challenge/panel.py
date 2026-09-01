@@ -37,6 +37,8 @@ def get_universe_panel(panel: pd.DataFrame, universe: str) -> pd.DataFrame:
         return panel[sig & (act_col | stat_col)].copy()
     elif u == 'b0_eligible':
         # DIAGNOSTIC / COMPARISON ONLY - NEVER A CHALLENGER UNIVERSE
+        if 'b0_eligible' not in panel.columns:
+            return panel.iloc[0:0].copy()
         return panel[panel['b0_eligible'] == True].copy()
     else:
         raise ValueError(f"Unknown universe: {universe}. Must be 'signal' or 'actionable'")
