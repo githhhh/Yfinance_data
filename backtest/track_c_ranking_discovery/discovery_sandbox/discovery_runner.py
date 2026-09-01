@@ -218,10 +218,10 @@ class ContinuousScoreChallenger:
 
 
 # ---------------------------------------------------------
-# Family 3: Learning to Rank / Tree Pairwise Challengers
+# Family 3: Multi-Feature Linear Ranking (Deterministic)
 # ---------------------------------------------------------
-class LearningToRankChallenger:
-    """Pairwise / Tree-based ranking challenger with nested feature scoring."""
+class MultiFeatureLinearChallenger:
+    """Deterministic multi-feature linear ranking challenger with standardized feature weights."""
 
     def __init__(
         self,
@@ -230,8 +230,8 @@ class LearningToRankChallenger:
         regularization: float = 1.0,
         selector_mode: str = "distinct_1",
     ):
-        self.policy_id = f"LTR__{policy_id}"
-        self.family = "ltr"
+        self.policy_id = f"LINEAR_RANK__{policy_id}"
+        self.family = "linear_ranking"
         self.feature_subset = feature_subset
         self.regularization = regularization
         self.selector_mode = selector_mode
@@ -243,7 +243,6 @@ class LearningToRankChallenger:
             return pd.DataFrame()
         df = snapshot_df.copy()
 
-        # Deterministic nested LTR score based on pre-registered features
         score = np.zeros(len(df), dtype=float)
         for col in self.feature_subset:
             if col in df.columns:
@@ -337,7 +336,6 @@ class PortfolioUtilityChallenger:
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
-        # Portfolio utility solves optimal allocation during pick step
         if scored_df.empty:
             return {}
         eligible = scored_df[
@@ -360,7 +358,6 @@ class PortfolioUtilityChallenger:
         if eligible.empty:
             return []
 
-        # Greedy portfolio utility selection: add stock that maximizes incremental (Score - lambda * ind_count^2)
         candidates = eligible.to_dict(orient="records")
         selected_records: list[dict] = []
         ind_counts: dict[str, int] = {}
@@ -374,7 +371,6 @@ class PortfolioUtilityChallenger:
                     continue
                 ind = str(c["industry"])
                 cur_ind_cnt = ind_counts.get(ind, 0)
-                # Incremental utility = score - lambda * ((cur_ind_cnt + 1)^2 - cur_ind_cnt^2)
                 penalty_delta = self.concentration_lambda * ((cur_ind_cnt + 1) ** 2 - cur_ind_cnt ** 2)
                 gain = c["candidate_score"] - penalty_delta
 
@@ -393,9 +389,9 @@ class PortfolioUtilityChallenger:
 
 
 # ---------------------------------------------------------
-# Family 5: RD-Agent Novel Heuristic Challengers
+# Family 5: Novel Heuristic Policy Challengers
 # ---------------------------------------------------------
-class RDAgentNovelChallenger:
+class NovelHeuristicChallenger:
     """Domain-grounded heuristic combining volume dry-up, base structure, and actionable status in non-linear rules."""
 
     def __init__(
@@ -406,8 +402,8 @@ class RDAgentNovelChallenger:
         volume_spike_bonus: float = 2.0,
         selector_mode: str = "distinct_1",
     ):
-        self.policy_id = f"NOVEL__{policy_id}"
-        self.family = "novel"
+        self.policy_id = f"NOVEL_HEURISTIC__{policy_id}"
+        self.family = "novel_heuristic"
         self.dry_weight = dry_weight
         self.base_depth_penalty = base_depth_penalty
         self.volume_spike_bonus = volume_spike_bonus
@@ -421,18 +417,14 @@ class RDAgentNovelChallenger:
         df = snapshot_df.copy()
         score = np.zeros(len(df), dtype=float)
 
-        # Base quality
         if "is_actionable" in df.columns:
             score += df["is_actionable"].fillna(0).astype(float) * 5.0
-        # Volume dry-up bonus on pullbacks
         if "pullback_v_is_dry" in df.columns:
             is_dry = df["pullback_v_is_dry"].fillna(False).astype(bool)
             score += np.where(is_dry, self.dry_weight, 0.0)
-        # Base consolidation penalty if too deep (> 35%)
         if "base_depth_pct" in df.columns:
             depth = pd.to_numeric(df["base_depth_pct"], errors="coerce").fillna(20.0).values
             score -= np.where(depth > 35.0, self.base_depth_penalty * (depth - 35.0) / 10.0, 0.0)
-        # Breakout volume confirmation
         if "ibd_entry_volume_ratio" in df.columns:
             vol = pd.to_numeric(df["ibd_entry_volume_ratio"], errors="coerce").fillna(1.0).values
             score += np.where(vol >= 1.5, self.volume_spike_bonus, 0.0)
@@ -483,7 +475,7 @@ class RDAgentNovelChallenger:
 # Proposal Generation Factory within Search Budgets
 # ---------------------------------------------------------
 def generate_all_discovery_proposals() -> list[ChallengerProtocol]:
-    """Generate candidates across the 5 discovery families adhering strictly to pre-registered budgets."""
+    """Generate pre-registered candidate discovery proposals adhering strictly to pre-registered budgets."""
     proposals: list[ChallengerProtocol] = []
 
     # 1. Family: Industry Breadth (Quota: 11)
@@ -515,22 +507,22 @@ def generate_all_discovery_proposals() -> list[ChallengerProtocol]:
     for p_id, w_dict, sm in cont_configs[:FAMILY_BUDGETS["continuous"]]:
         proposals.append(ContinuousScoreChallenger(p_id, w_dict, selector_mode=sm))
 
-    # 3. Family: LTR / Tree (Quota: 11)
-    ltr_configs = [
-        ("pairwise_core", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 1.0, "distinct_1"),
-        ("pairwise_reg_high", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 2.5, "distinct_1"),
-        ("pairwise_momentum", ["mom_5", "mom_10", "mom_20", "mom_60", "rel_spy_20", "rel_spy_60"], 1.0, "distinct_1"),
-        ("pairwise_volume", ["ibd_entry_volume_ratio", "volume_ratio", "vol_ratio_5_20"], 1.0, "distinct_1"),
-        ("pairwise_geom", ["dist_to_52w_high_pct", "base_depth_pct", "base_duration_weeks"], 1.0, "distinct_1"),
-        ("pairwise_core_max2", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 1.0, "max_2_per_ind"),
-        ("pairwise_mom_max2", ["mom_20", "mom_60", "rel_spy_60"], 1.0, "max_2_per_ind"),
-        ("pairwise_slope", ["ma10_slope_5", "ma20_slope_5", "ma50_slope_10", "dist_to_52w_high_pct"], 1.0, "distinct_1"),
-        ("pairwise_full", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "vol_ratio_5_20", "dist_to_52w_high_pct", "rv_20"], 1.5, "distinct_1"),
-        ("pairwise_tight", ["rv_20", "atr_14_pct", "base_depth_pct", "eps_yoy_growth"], 1.0, "distinct_1"),
-        ("pairwise_fast_mom", ["mom_5", "mom_10", "ibd_entry_volume_ratio"], 1.0, "distinct_1"),
+    # 3. Family: Linear Multi-Feature Ranking (Quota: 11)
+    lin_configs = [
+        ("linear_core", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 1.0, "distinct_1"),
+        ("linear_reg_high", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 2.5, "distinct_1"),
+        ("linear_momentum", ["mom_5", "mom_10", "mom_20", "mom_60", "rel_spy_20", "rel_spy_60"], 1.0, "distinct_1"),
+        ("linear_volume", ["ibd_entry_volume_ratio", "volume_ratio", "vol_ratio_5_20"], 1.0, "distinct_1"),
+        ("linear_geom", ["dist_to_52w_high_pct", "base_depth_pct", "base_duration_weeks"], 1.0, "distinct_1"),
+        ("linear_core_max2", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "dist_to_52w_high_pct"], 1.0, "max_2_per_ind"),
+        ("linear_mom_max2", ["mom_20", "mom_60", "rel_spy_60"], 1.0, "max_2_per_ind"),
+        ("linear_slope", ["ma10_slope_5", "ma20_slope_5", "ma50_slope_10", "dist_to_52w_high_pct"], 1.0, "distinct_1"),
+        ("linear_full", ["eps_yoy_growth", "mom_20", "ibd_entry_volume_ratio", "vol_ratio_5_20", "dist_to_52w_high_pct", "rv_20"], 1.5, "distinct_1"),
+        ("linear_tight", ["rv_20", "atr_14_pct", "base_depth_pct", "eps_yoy_growth"], 1.0, "distinct_1"),
+        ("linear_fast_mom", ["mom_5", "mom_10", "ibd_entry_volume_ratio"], 1.0, "distinct_1"),
     ]
-    for p_id, feats, reg, sm in ltr_configs[:FAMILY_BUDGETS["ltr"]]:
-        proposals.append(LearningToRankChallenger(p_id, feats, regularization=reg, selector_mode=sm))
+    for p_id, feats, reg, sm in lin_configs[:FAMILY_BUDGETS["linear_ranking"]]:
+        proposals.append(MultiFeatureLinearChallenger(p_id, feats, regularization=reg, selector_mode=sm))
 
     # 4. Family: Portfolio Utility (Quota: 10)
     port_configs = [
@@ -548,7 +540,7 @@ def generate_all_discovery_proposals() -> list[ChallengerProtocol]:
     for p_id, lam, qm in port_configs[:FAMILY_BUDGETS["portfolio"]]:
         proposals.append(PortfolioUtilityChallenger(p_id, concentration_lambda=lam, stock_quality_metric=qm))
 
-    # 5. Family: RD-Agent Novel Heuristics (Quota: 11)
+    # 5. Family: Novel Heuristics (Quota: 11)
     novel_configs = [
         ("dry_heavy", 3.0, 1.0, 2.0, "distinct_1"),
         ("dry_moderate", 1.5, 1.0, 1.5, "distinct_1"),
@@ -562,7 +554,7 @@ def generate_all_discovery_proposals() -> list[ChallengerProtocol]:
         ("balanced_novel", 2.0, 2.0, 2.0, "distinct_1"),
         ("pure_volume_dry", 3.5, 0.0, 3.5, "distinct_1"),
     ]
-    for p_id, dw, bdp, vsb, sm in novel_configs[:FAMILY_BUDGETS["novel"]]:
-        proposals.append(RDAgentNovelChallenger(p_id, dry_weight=dw, base_depth_penalty=bdp, volume_spike_bonus=vsb, selector_mode=sm))
+    for p_id, dw, bdp, vsb, sm in novel_configs[:FAMILY_BUDGETS["novel_heuristic"]]:
+        proposals.append(NovelHeuristicChallenger(p_id, dry_weight=dw, base_depth_penalty=bdp, volume_spike_bonus=vsb, selector_mode=sm))
 
     return proposals

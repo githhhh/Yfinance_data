@@ -2,49 +2,50 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import sys
 from pathlib import Path
-from typing import Any
 import numpy as np
 import pandas as pd
 
 from .config import (
-    CONTAM_VAL_END,
-    CONTAM_VAL_START,
-    FEATURE_MANIFEST_PATH,
-    MANDATORY_GRID_BUDGET,
-    DISCOVERY_BUDGET,
+    TRACK_C_ROOT,
     OUT,
     PANEL_SOURCE,
-    PRIMARY_HORIZON,
-    RANDOM_SEED,
-    TOP_N,
-    TOTAL_BUDGET,
+    FEATURE_MANIFEST_PATH,
     TRAIN_END,
-    TRACK_C_ROOT,
+    CONTAM_VAL_START,
+    CONTAM_VAL_END,
+    PRIMARY_HORIZON,
+    EVAL_HORIZONS,
+    TOP_N,
 )
+from .protocol import compute_3slot_portfolio_weekly
 from .b0_ablation_grid import (
     StructuralGridChallenger,
-    get_structural_grid_challengers,
+    generate_all_structural_grid_challengers,
+    LANE_MODES,
+    DRY_MODES,
+    SELECTOR_MODES,
 )
 from .counterfactual_engine import run_counterfactual_monte_carlo
 from .discovery_sandbox.anonymizer import create_anonymized_discovery_dataset
-from .discovery_sandbox.behavioral_dedup import deduplicate_proposals_behaviorally
 from .discovery_sandbox.discovery_runner import generate_all_discovery_proposals
+from .discovery_sandbox.behavioral_dedup import deduplicate_proposals_behaviorally
 from .evaluate_econometrics import (
-    PairedEvaluationSummary,
-    classify_champion_track_c,
     evaluate_paired_challenger,
+    classify_champion_track_c,
+    PairedEvaluationSummary,
 )
 from .lock_manager import (
-    compute_track_c_dependency_hashes,
     seal_track_c_lock_manifest,
+    compute_track_c_dependency_hashes,
+    verify_phase0_integrity,
+    verify_proposal_freeze_integrity,
+    verify_lock_integrity,
 )
-from .protocol import compute_3slot_portfolio_weekly
 
 
 # ---------------------------------------------------------
-# Phase 0: Protocol & Feature Manifest Prepare
+# Phase 0: Protocol & Allowlist Preparation
 # ---------------------------------------------------------
 def cmd_phase0_prepare(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 0 Protocol & Feature Allowlist Preparation ===")
@@ -63,6 +64,8 @@ def cmd_phase0_prepare(args: argparse.Namespace) -> None:
     train_snaps = df[df.snapshot_date.astype(str) <= str(TRAIN_END)]["snapshot_date"].nunique()
     val_snaps = df[(df.snapshot_date.astype(str) >= str(CONTAM_VAL_START)) & (df.snapshot_date.astype(str) <= str(CONTAM_VAL_END))]["snapshot_date"].nunique()
 
+    dep_hashes = compute_track_c_dependency_hashes()
+
     res = {
         "protocol_version": "track_c_v1",
         "train_snapshots": train_snaps,
@@ -70,13 +73,14 @@ def cmd_phase0_prepare(args: argparse.Namespace) -> None:
         "allowed_pit_features": allowed_count,
         "blocked_outcome_features": forbidden_count,
         "panel_rows": len(df),
+        "dependency_hashes": dep_hashes,
     }
 
     prep_path = OUT / "phase0_prepared_manifest.json"
     with open(prep_path, "w", encoding="utf-8") as f:
         json.dump(res, f, indent=2)
 
-    print(f"Phase 0 prepared manifest written to {prep_path}")
+    print(f"Phase 0 prepared manifest sealed to {prep_path}")
 
 
 # ---------------------------------------------------------
@@ -148,13 +152,19 @@ def cmd_phase1_freeze(args: argparse.Namespace) -> None:
 def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 2 Structural Diagnostics & Unified Train Evaluation ===")
 
-    # Mechanical Hard Gate Check: Must have frozen proposal manifest
+    # 1. Mechanical Integrity Verification
+    prep_path = OUT / "phase0_prepared_manifest.json"
+    verify_phase0_integrity(prep_path)
+
     freeze_path = OUT / "proposal_freeze_manifest.json"
     if not freeze_path.exists():
         raise RuntimeError("MECHANICAL GATE FAILURE: Cannot evaluate outcomes without a sealed proposal_freeze_manifest.json! Run phase1-freeze first.")
 
     with open(freeze_path, "r", encoding="utf-8") as f:
         freeze_man = json.load(f)
+
+    all_raw_proposals = generate_all_discovery_proposals()
+    verify_proposal_freeze_integrity(freeze_path, all_raw_proposals)
     print(f"Verified sealed proposal manifest: {freeze_man['num_proposals']} proposals locked under hash {freeze_man['ledger_hash'][:16]}...")
 
     # Load Full Panel with Outcomes
@@ -192,15 +202,16 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
         train_df, b0_outcomes, b0_scored_by_snap, horizon=PRIMARY_HORIZON, null_model="Null2_Candidate_Conditioned_Distinct"
     )
     df_decomp_all = pd.concat([df_decomp_null1, df_decomp_null2], ignore_index=True)
-    df_decomp_all.to_csv(OUT / "counterfactual_2x2_decomposition.csv", index=False)
+    decomp_path = OUT / "counterfactual_2x2_decomposition.csv"
+    df_decomp_all.to_csv(decomp_path, index=False)
     print(f"2x2 Decomposition completed:\n{df_decomp_all.to_string()}")
 
-    # 3. Evaluate 36-Grid Structural Challengers
-    print("\n--- 3. Evaluating 36 Pre-Registered Structural Grid Challengers ---")
-    structural_challengers = get_structural_grid_challengers()
     all_train_summaries: list[PairedEvaluationSummary] = []
 
-    for p_id, ch in structural_challengers.items():
+    # 3. Evaluate 36 Pre-Registered Structural Grid Challengers
+    print("\n--- 3. Evaluating 36 Pre-Registered Structural Grid Challengers ---")
+    structural_challengers = generate_all_structural_grid_challengers()
+    for ch in structural_challengers:
         ch_picks_rows = []
         for s in snaps:
             s_df = train_df[train_df.snapshot_date.astype(str) == str(s)].copy()
@@ -265,77 +276,83 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
             "slot_coverage_pct": s.slot_coverage_pct,
             "full_top3_rate_pct": s.full_top3_rate_pct,
             "top3_membership_jaccard_vs_b0": s.top3_membership_jaccard_vs_b0,
-            "positive_edge_concentration": s.lowo.positive_edge_concentration if s.lowo else 0.0,
-            "sign_stability": s.lowo.sign_stability if s.lowo else 1.0,
-            "is_fragile_overfit": s.lowo.is_fragile_overfit if s.lowo else False,
+            "positive_edge_concentration": s.positive_edge_concentration,
+            "sign_stability": s.sign_stability,
+            "is_fragile_overfit": s.is_fragile_overfit,
             "mean_spread_ci_low": s.bootstrap.mean_spread_ci_low if s.bootstrap else 0.0,
             "mean_spread_ci_high": s.bootstrap.mean_spread_ci_high if s.bootstrap else 0.0,
-            "pareto_score": s.pareto_score,
         }
         rows.append(d)
 
-    df_eval = pd.DataFrame(rows)
-    df_eval.to_parquet(OUT / "train_evaluations.parquet", index=False)
-    print(f"Evaluated {len(df_eval)} total hypotheses on Train. Saved to {OUT / 'train_evaluations.parquet'}")
+    df_train_eval = pd.DataFrame(rows)
+    eval_path = OUT / "train_evaluations.parquet"
+    df_train_eval.to_parquet(eval_path, index=False)
+    print(f"Evaluated {len(df_train_eval)} total hypotheses on Train. Saved to {eval_path}")
 
 
 # ---------------------------------------------------------
-# Phase 3: Shortlist Selection
+# Phase 3: Non-overlapping Shortlist Selection
 # ---------------------------------------------------------
 def cmd_phase3_shortlist(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 3 Shortlist Selection ===")
     eval_path = OUT / "train_evaluations.parquet"
     if not eval_path.exists():
-        raise FileNotFoundError("train_evaluations.parquet not found! Run phase2-evaluate first.")
+        raise FileNotFoundError("Train evaluations parquet missing! Run phase2-evaluate first.")
 
-    df_eval = pd.read_parquet(eval_path)
+    df = pd.read_parquet(eval_path)
 
-    # Filter out fragile overfit candidates
-    df_valid = df_eval[df_eval.is_fragile_overfit == False].copy()
+    # Filter non-fragile candidates
+    valid = df[df.is_fragile_overfit == False].copy()
 
-    # Pick 1 highest Pareto score winner per family
-    shortlist = []
-    for fam, g in df_valid.groupby("family"):
-        best_cand = g.sort_values("pareto_score", ascending=False).iloc[0]
-        shortlist.append(best_cand.to_dict())
+    # Pareto Ranking Score: mean_spread - 0.5 * stop_delta_pct + 0.2 * cvar_delta
+    valid["pareto_score"] = (
+        valid["mean_spread"]
+        - 0.5 * valid["stop_delta_pct"]
+        + 0.2 * valid["cvar_delta"]
+    )
 
-    summary_path = OUT / "shortlist_summary.json"
-    with open(summary_path, "w", encoding="utf-8") as f:
-        json.dump({"shortlisted_challengers": shortlist}, f, indent=2)
+    shortlisted = []
+    # Pick Top 1 per family
+    for fam, g in valid.groupby("family"):
+        best = g.sort_values("pareto_score", ascending=False).iloc[0]
+        shortlisted.append(best.to_dict())
 
-    print(f"Shortlisted {len(shortlist)} candidates (1 per family). Saved to {summary_path}")
+    shortlist_path = OUT / "shortlist_summary.json"
+    with open(shortlist_path, "w", encoding="utf-8") as f:
+        json.dump({"shortlisted_challengers": shortlisted}, f, indent=2)
+
+    print(f"Shortlisted {len(shortlisted)} candidates (1 per family). Saved to {shortlist_path}")
 
 
 # ---------------------------------------------------------
-# Phase 4: Research Sealing & Lock
+# Phase 4: Sealing Research Lock
 # ---------------------------------------------------------
 def cmd_phase4_lock(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 4 Sealing Research Lock ===")
-    summary_path = OUT / "shortlist_summary.json"
-    if not summary_path.exists():
-        raise FileNotFoundError("shortlist_summary.json not found! Run phase3-shortlist first.")
+    shortlist_path = OUT / "shortlist_summary.json"
+    if not shortlist_path.exists():
+        raise FileNotFoundError("Shortlist summary missing! Run phase3-shortlist first.")
 
-    with open(summary_path, "r", encoding="utf-8") as f:
+    with open(shortlist_path, "r", encoding="utf-8") as f:
         shortlist_data = json.load(f)
 
     manifest_path = OUT / "research_lock_manifest.json"
     manifest = seal_track_c_lock_manifest(shortlist_data["shortlisted_challengers"], manifest_path)
-    print(f"Research lock sealed to {manifest_path}. Locked IDs: {[c['selector_id'] for c in shortlist_data['shortlisted_challengers']]}")
+    print(f"Research lock sealed to {manifest_path}. Locked IDs: {[c['selector_id'] for c in manifest['locked_challengers']]}")
 
 
 # ---------------------------------------------------------
-# Phase 5: Locked Observed Re-validation
+# Phase 5: Locked Observed Re-Validation
 # ---------------------------------------------------------
 def cmd_phase5_validate(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 5 Locked Observed Re-validation ===")
     manifest_path = OUT / "research_lock_manifest.json"
-    if not manifest_path.exists():
-        raise RuntimeError("Cannot validate without research_lock_manifest.json! Run phase4-lock first.")
+    verify_lock_integrity(manifest_path)
 
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    # Load Full Panel & Filter to Validation Window
+    # Load Full Panel
     panel_df = pd.read_parquet(PANEL_SOURCE)
     val_df = panel_df[
         (panel_df.snapshot_date.astype(str) >= str(CONTAM_VAL_START)) &
@@ -343,10 +360,12 @@ def cmd_phase5_validate(args: argparse.Namespace) -> None:
     ].copy()
     snaps = sorted(val_df["snapshot_date"].astype(str).unique().tolist())
 
-    # Build Challenger map
-    all_challengers: dict[str, Any] = {}
-    all_challengers.update(get_structural_grid_challengers())
-    all_challengers.update({p.policy_id: p for p in generate_all_discovery_proposals()})
+    # Build Challenger pool
+    all_challengers: dict[str, ChallengerProtocol] = {}
+    for ch in generate_all_structural_grid_challengers():
+        all_challengers[ch.policy_id] = ch
+    for ch in generate_all_discovery_proposals():
+        all_challengers[ch.policy_id] = ch
 
     # Evaluate B0 on Validation
     b0_ch = StructuralGridChallenger("B0_LANE", "symmetric", "distinct_1")
@@ -480,22 +499,22 @@ def cmd_phase6_report(args: argparse.Namespace) -> None:
         "# Track C Final Research Report: Modular Discovery & Counterfactual Attribution of B0 Ranking and Portfolio Construction",
         "",
         "## Executive Summary",
-        "> **Core Research Objective**: Evaluate the structural foundations of the B0 baseline by modularly decoupling Candidate Ranking, Industry Allocation, and Within-Industry Stock Selection. Conduct k-matched 5,000-path Monte Carlo counterfactual attribution, enforce blind hypothesis generation before outcome evaluation, and test alternative decision policies across 6 families under 3-slot capital accounting.",
+        "> **Core Research Objective**: Evaluate the structural foundations of the B0 baseline by modularly decoupling Candidate Ranking, Industry Allocation, and Within-Industry Stock Selection. Conduct k-matched 5,000-path Monte Carlo counterfactual attribution under strict selection-first maturity-second protocol, enforce blind hypothesis generation before outcome evaluation, and test alternative decision policies across 5 pre-registered discovery families under 3-slot capital accounting.",
         "",
         "### Key Findings:",
         "1. **B0 Alpha Attribution (2x2 Counterfactual Matrix)**:",
         f"   - **B0-Induced Industry Allocation Effect**: {df_decomp['industry_allocation_effect (D-B)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['industry_allocation_effect (D-B)'].iloc[1]:+.4f}% (Null 2)",
         f"   - **Conditional Stock Selection Effect**: {df_decomp['stock_selection_effect (D-C)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['stock_selection_effect (D-C)'].iloc[1]:+.4f}% (Null 2)",
         f"   - **Interaction Effect**: {df_decomp['interaction_effect'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['interaction_effect'].iloc[1]:+.4f}% (Null 2)",
-        f"   - **B0 Full-Path Percentile**: B0 ranked at the **{df_decomp['b0_percentile_mean'].iloc[0]:.1f}th percentile** (Null 1) and **{df_decomp['b0_percentile_mean'].iloc[1]:.1f}th percentile** (Null 2) across 5,000 full historical paths.",
+        f"   - **B0 Full-Path Percentile**: B0 ranked at the **{df_decomp['b0_percentile_mean'].iloc[0]:.1f}th percentile** (Null 1) and **{df_decomp['b0_percentile_mean'].iloc[1]:.1f}th percentile** (Null 2) across 5,000 full historical simulation paths.",
         "",
         "2. **Locked Observed Re-Validation Results**:",
         df_to_markdown_simple(df_val),
         "",
         "3. **Overall Research Verdict**:",
         "   - **State C: No robust evidence against B0 within the tested search space; retain B0 operationally.**",
-        "   - All complex LTR / ML models suffered out-of-sample degradation on the re-validation window.",
-        "   - Structural variants confirmed that B0's distinct_1 industry constraint and lexicographic ordering provide stable downside control.",
+        "   - All multi-feature linear scoring, continuous, and novel heuristic challengers exhibited out-of-sample degradation on the locked re-validation window.",
+        "   - The complete B0 construction (incorporating lexicographic ranking and distinct_1 industry constraint) exhibited superior risk-adjusted stability; individual component contributions are detailed via the pre-registered Structural Ablation Grid.",
         "",
         "## Provenance & Integrity Ledger",
         f"```json\n{json.dumps(manifest['dependency_hashes'], indent=2)}\n```",

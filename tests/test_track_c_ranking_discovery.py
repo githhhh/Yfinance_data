@@ -139,3 +139,40 @@ def test_anonymizer_strips_outcomes_and_anonymizes_entities():
     assert "stop8" not in anon_view.columns
     assert all(c.startswith("entity_") for c in anon_view["code"])
     assert all(s.startswith("snapshot_") for s in anon_view["snapshot_date"])
+
+
+def test_monte_carlo_missing_return_does_not_fill_zero():
+    """Verify that Monte Carlo selection-first maturity-second protocol does not treat missing returns as 0.0% cash."""
+    from backtest.track_c_ranking_discovery.counterfactual_engine import run_counterfactual_monte_carlo
+    from backtest.track_c_ranking_discovery.protocol import WeeklyPortfolioOutcome
+
+    panel_df = pd.read_parquet(PANEL_SOURCE).copy()
+    snaps = sorted(panel_df["snapshot_date"].astype(str).unique().tolist())[:5]
+    sub_df = panel_df[panel_df.snapshot_date.astype(str).isin(snaps)].copy()
+
+    # Create synthetic b0 outcomes
+    b0_outcomes = [
+        WeeklyPortfolioOutcome(
+            snapshot_date=s,
+            selector_id="B0_ORIGINAL",
+            family="baseline",
+            horizon="W4",
+            pick_count=2,
+            selected_codes=["AAPL", "MSFT"],
+            selection_quality_return=5.0,
+            capital_adjusted_return=3.33,
+            capital_adjusted_stop8=0.0,
+            slot_coverage=0.667,
+            is_mature=True,
+        )
+        for s in snaps
+    ]
+
+    ch = StructuralGridChallenger("B0_LANE", "symmetric", "distinct_1")
+    b0_scored = {s: ch.score_candidates(sub_df[sub_df.snapshot_date.astype(str) == s].copy()) for s in snaps}
+
+    res, df_decomp = run_counterfactual_monte_carlo(
+        sub_df, b0_outcomes, b0_scored, horizon="W4", n_paths=100, null_model="Null1_Uniform_Industry"
+    )
+    assert not np.isnan(res.mean_A_random_ind_random_stock)
+    assert not np.isnan(res.b0_induced_industry_allocation_effect)

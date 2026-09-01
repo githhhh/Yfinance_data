@@ -81,7 +81,8 @@ def run_counterfactual_monte_carlo(
             ind_to_best_code[ind] = g.sort_values("raw_rank")["code"].iloc[0]
 
         industries = list(ind_to_codes.keys())
-        code_to_ret = dict(zip(el["code"], el[ret_col].fillna(0.0)))
+        # DO NOT fillna(0.0) - preserve exact raw outcome (selection-first, maturity-second)
+        code_to_ret = dict(zip(el["code"], pd.to_numeric(el[ret_col], errors="coerce")))
         cand_list = el[["code", "industry_key"]].to_dict(orient="records")
 
         b0_codes = b0_out.selected_codes
@@ -108,35 +109,54 @@ def run_counterfactual_monte_carlo(
 
             # Branch A: Random ind x Random stock
             sum_ret_a = 0.0
+            has_nan_a = False
             for ind in sampled_inds:
                 c_pool = ind_to_codes.get(ind)
                 if c_pool:
                     chosen = c_pool[rng.integers(0, len(c_pool))]
-                    sum_ret_a += code_to_ret.get(chosen, 0.0)
-            path_A_cap_rets[p, s_idx] = sum_ret_a / float(TOP_N)
+                    r = code_to_ret.get(chosen, np.nan)
+                    if np.isnan(r):
+                        has_nan_a = True
+                        break
+                    sum_ret_a += r
+            path_A_cap_rets[p, s_idx] = np.nan if has_nan_a else (sum_ret_a / float(TOP_N))
 
             # Branch B: Random ind x B0-best stock in ind
             sum_ret_b = 0.0
+            has_nan_b = False
             for ind in sampled_inds:
                 best_c = ind_to_best_code.get(ind)
                 if best_c:
-                    sum_ret_b += code_to_ret.get(best_c, 0.0)
-            path_B_cap_rets[p, s_idx] = sum_ret_b / float(TOP_N)
+                    r = code_to_ret.get(best_c, np.nan)
+                    if np.isnan(r):
+                        has_nan_b = True
+                        break
+                    sum_ret_b += r
+            path_B_cap_rets[p, s_idx] = np.nan if has_nan_b else (sum_ret_b / float(TOP_N))
 
             # Branch C: B0 ind x Random stock in ind
             sum_ret_c = 0.0
+            has_nan_c = False
             for ind in b0_industries:
                 c_pool = ind_to_codes.get(ind)
                 if c_pool:
                     chosen = c_pool[rng.integers(0, len(c_pool))]
-                    sum_ret_c += code_to_ret.get(chosen, 0.0)
-            path_C_cap_rets[p, s_idx] = sum_ret_c / float(TOP_N)
+                    r = code_to_ret.get(chosen, np.nan)
+                    if np.isnan(r):
+                        has_nan_c = True
+                        break
+                    sum_ret_c += r
+            path_C_cap_rets[p, s_idx] = np.nan if has_nan_c else (sum_ret_c / float(TOP_N))
 
-    # Compute path statistics over mature weeks
+    # Compute path statistics over mature weeks (using nan-safe functions)
     mature_indices = [snap_indices[s] for s in mature_snaps]
-    path_A_mature_means = path_A_cap_rets[:, mature_indices].mean(axis=1)
-    path_B_mature_means = path_B_cap_rets[:, mature_indices].mean(axis=1)
-    path_C_mature_means = path_C_cap_rets[:, mature_indices].mean(axis=1)
+    path_A_sub = path_A_cap_rets[:, mature_indices]
+    path_B_sub = path_B_cap_rets[:, mature_indices]
+    path_C_sub = path_C_cap_rets[:, mature_indices]
+
+    path_A_mature_means = np.nanmean(path_A_sub, axis=1)
+    path_B_mature_means = np.nanmean(path_B_sub, axis=1)
+    path_C_mature_means = np.nanmean(path_C_sub, axis=1)
 
     b0_mature_cap_rets = np.array([b0_map[s].capital_adjusted_return for s in mature_snaps])
     b0_mean = float(np.mean(b0_mature_cap_rets))
@@ -146,7 +166,7 @@ def run_counterfactual_monte_carlo(
 
     # Percentile of B0 vs Path A distribution (pure baseline)
     pct_mean = float((path_A_mature_means < b0_mean).mean() * 100.0)
-    path_A_medians = np.median(path_A_cap_rets[:, mature_indices], axis=1)
+    path_A_medians = np.nanmedian(path_A_sub, axis=1)
     pct_med = float((path_A_medians < b0_med).mean() * 100.0)
 
     # 2x2 Mean values across 5,000 paths

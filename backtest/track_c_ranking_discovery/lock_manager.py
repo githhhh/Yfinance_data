@@ -8,6 +8,7 @@ from .config import (
     TRACK_C_ROOT,
     PRODUCTION_SKILL_PATH,
     PANEL_SOURCE,
+    FEATURE_MANIFEST_PATH,
     TRAIN_END,
     CONTAM_VAL_START,
     CONTAM_VAL_END,
@@ -28,7 +29,7 @@ def compute_hash_of_file(path: Path) -> str:
 
 def compute_track_c_dependency_hashes() -> dict[str, str]:
     """Compute combined SHA256 hash for Track C package and production dependencies."""
-    # 1. Challenge package hash
+    # 1. Package source files
     pkg_files = sorted(
         list(TRACK_C_ROOT.glob("*.py")) +
         list(TRACK_C_ROOT.glob("*.json")) +
@@ -41,8 +42,15 @@ def compute_track_c_dependency_hashes() -> dict[str, str]:
             h_pkg.update(f.read())
     pkg_hash = h_pkg.hexdigest()
 
-    # 2. Production B0 skill hash
+    # 2. Key individual module hashes
+    feat_man_hash = compute_hash_of_file(FEATURE_MANIFEST_PATH)
+    protocol_hash = compute_hash_of_file(TRACK_C_ROOT / "protocol.py")
+    b0_ablation_hash = compute_hash_of_file(TRACK_C_ROOT / "b0_ablation_grid.py")
+    cf_engine_hash = compute_hash_of_file(TRACK_C_ROOT / "counterfactual_engine.py")
+    eval_econ_hash = compute_hash_of_file(TRACK_C_ROOT / "evaluate_econometrics.py")
+    disc_runner_hash = compute_hash_of_file(TRACK_C_ROOT / "discovery_sandbox" / "discovery_runner.py")
     b0_hash = compute_hash_of_file(PRODUCTION_SKILL_PATH)
+    panel_hash = compute_hash_of_file(PANEL_SOURCE)
 
     # 3. Combined codebase hash
     h_all = hashlib.sha256()
@@ -52,8 +60,65 @@ def compute_track_c_dependency_hashes() -> dict[str, str]:
     return {
         "codebase_hash": h_all.hexdigest(),
         "challenge_package_hash": pkg_hash,
+        "feature_manifest_hash": feat_man_hash,
+        "protocol_hash": protocol_hash,
+        "b0_ablation_grid_hash": b0_ablation_hash,
+        "counterfactual_engine_hash": cf_engine_hash,
+        "evaluate_econometrics_hash": eval_econ_hash,
+        "discovery_runner_hash": disc_runner_hash,
         "production_b0_hash": b0_hash,
+        "panel_hash": panel_hash,
     }
+
+
+def verify_phase0_integrity(manifest_path: Path) -> None:
+    """Verify Phase 0 manifest hashes match current environment before evaluation."""
+    if not manifest_path.exists():
+        raise RuntimeError(f"Phase 0 manifest missing at {manifest_path}!")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    cur_hashes = compute_track_c_dependency_hashes()
+    stored_hashes = data.get("dependency_hashes", {})
+    for k, v in stored_hashes.items():
+        if cur_hashes.get(k) != v:
+            raise RuntimeError(f"Phase 0 integrity mismatch for {k}: stored {v[:16]} != current {cur_hashes.get(k, '')[:16]}")
+
+
+def verify_proposal_freeze_integrity(
+    freeze_manifest_path: Path,
+    current_proposals: list[Any],
+) -> None:
+    """Verify sealed proposal freeze manifest matches currently instantiated proposals."""
+    if not freeze_manifest_path.exists():
+        raise RuntimeError(f"Proposal freeze manifest missing at {freeze_manifest_path}!")
+    with open(freeze_manifest_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    frozen_spec_map = {p["policy_id"]: p["spec_hash"] for p in data["proposals"]}
+    curr_spec_map = {p.policy_id: p.spec_hash for p in current_proposals}
+
+    for p_id, spec_h in frozen_spec_map.items():
+        if p_id not in curr_spec_map:
+            raise RuntimeError(f"Frozen proposal {p_id} missing from current proposal generator!")
+        if curr_spec_map[p_id] != spec_h:
+            raise RuntimeError(f"Proposal {p_id} spec hash altered after freeze! Frozen: {spec_h[:16]}, Current: {curr_spec_map[p_id][:16]}")
+
+
+def verify_lock_integrity(manifest_path: Path) -> None:
+    """Verify Phase 4 lock manifest hashes match current environment before validation."""
+    if not manifest_path.exists():
+        raise RuntimeError(f"Research lock manifest missing at {manifest_path}!")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    cur_hashes = compute_track_c_dependency_hashes()
+    stored_hashes = manifest.get("dependency_hashes", {})
+
+    for k in ("codebase_hash", "challenge_package_hash", "production_b0_hash"):
+        if stored_hashes.get(k) != cur_hashes.get(k):
+            raise RuntimeError(
+                f"Lock integrity mismatch for {k}! Sealed: {stored_hashes.get(k, '')[:16]}..., Current: {cur_hashes.get(k, '')[:16]}..."
+            )
 
 
 def seal_track_c_lock_manifest(
@@ -78,7 +143,7 @@ def seal_track_c_lock_manifest(
         code_dirty = False
 
     if code_dirty:
-        raise RuntimeError("Cannot seal Track C manifest with uncommitted Python/JSON code changes!")
+        raise RuntimeError("Cannot seal Track C manifest with uncommitted Python code changes!")
 
     manifest = {
         "protocol_version": "track_c_v1",

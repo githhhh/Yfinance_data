@@ -38,9 +38,9 @@ FAMILY_BUDGETS = {
     "structural": 36,
     "industry_breadth": 11,
     "continuous": 11,
-    "ltr": 11,
+    "linear_ranking": 11,
     "portfolio": 10,
-    "novel": 11,
+    "novel_heuristic": 11,
 }
 
 # LOWO Overfit Pre-Registered Fragility Rule
