@@ -163,6 +163,31 @@ def test_pareto_is_not_default_fallback():
     assert res_fallback == 'INSUFFICIENT EVIDENCE'
 
 
+def test_classify_champion_equivalent_vs_dominates():
+    """Verify classify_champion assigns EQUIVALENT TO B0 for all-zero/immaterial deltas and DOMINATES only for strict improvements."""
+    # All zero deltas -> EQUIVALENT TO B0
+    res_zero = classify_champion(
+        {'median_spread': 0.0, 'mean_spread': 0.0},
+        {'support_weeks': 8, 'median_spread': 0.0, 'mean_spread': 0.0, 'cvar_delta': 0.0, 'stop_delta_pct': 0.0}
+    )
+    assert res_zero == 'EQUIVALENT TO B0'
+    
+    # Immaterial deltas (|spread| <= 0.05, |cvar/stop| <= 0.5) -> EQUIVALENT TO B0
+    res_immat = classify_champion(
+        {'median_spread': 0.0, 'mean_spread': 0.0},
+        {'support_weeks': 8, 'median_spread': 0.03, 'mean_spread': 0.02, 'cvar_delta': 0.1, 'stop_delta_pct': -0.2}
+    )
+    assert res_immat == 'EQUIVALENT TO B0'
+    
+    # Strict material improvement without degradation -> DOMINATES B0
+    res_dom = classify_champion(
+        {'median_spread': 1.0, 'mean_spread': 1.0},
+        {'support_weeks': 8, 'median_spread': 1.5, 'mean_spread': 1.2, 'cvar_delta': 1.0, 'stop_delta_pct': -2.0}
+    )
+    assert res_dom == 'DOMINATES B0'
+
+
+
 def test_paired_tail_uses_identical_snapshot_support():
     """Verify compute_paired_tail_metrics computes metrics strictly on identical common-support weeks."""
     df_ch = pd.DataFrame({
@@ -351,10 +376,35 @@ def test_pullback_encodings_are_actually_evaluated():
         'code': [f'T{i}' for i in range(40)],
         'snapshot_date': [f'2026-01-{i%10 + 1:02d}' for i in range(40)],
     })
-    exp_df = run_pullback_encoding_experiment(mock_train)
+    exp_df = run_pullback_encoding_experiment(mock_train, write_output=False)
     assert not exp_df.empty
     assert set(exp_df['dry_policy'].unique()) == {'symmetric', 'reward_only', 'ignored'}
     assert set(exp_df['selector'].unique()) == {'distinct_1', 'pure_top3', 'max_2_per_ind'}
+
+
+def test_adapter_parity_with_production_on_full_panel():
+    """Verify _reasoned_item_variant(symmetric) is 100% field-by-field identical to production reasoned_item across full panel."""
+    from dashboard.skill_industry_eps_known import reasoned_item, is_review_universe
+    from backtest.rdagent_track_b_selector_challenge.b0_challengers import _reasoned_item_variant
+    
+    panel = get_full_panel()
+    
+    tested = 0
+    for idx, row in panel.iterrows():
+        if not is_review_universe(row):
+            continue
+        tested += 1
+        prod_item = reasoned_item(row, idx)
+        var_item = _reasoned_item_variant(row, idx, 'symmetric')
+        
+        assert prod_item.code == var_item.code
+        assert prod_item.lane == var_item.lane
+        assert prod_item.reason_codes == var_item.reason_codes
+        assert prod_item.risk_codes == var_item.risk_codes
+        assert prod_item.sort_key == var_item.sort_key
+        assert prod_item.feature_values == var_item.feature_values
+        
+    assert tested > 2000
 
 
 def test_b0_original_reproduces_production_ranking_100_percent():

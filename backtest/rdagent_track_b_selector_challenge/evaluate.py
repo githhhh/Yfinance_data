@@ -312,7 +312,18 @@ def classify_champion(
     val_metrics: dict,
     bootstrap_res: dict | None = None,
 ) -> str:
-    """Classify challenger under Champion Hierarchy without any default PARETO catch-all."""
+    """Classify challenger under Champion Hierarchy without any default PARETO catch-all.
+    
+    Categories:
+      - INSUFFICIENT EVIDENCE: support < 4 weeks or missing critical metrics
+      - UNSTABLE: severe out-of-sample directional reversal or collapse
+      - EQUIVALENT TO B0: all validation deltas vs B0 are within immaterial noise (|spread| <= 0.05%, |cvar/stop delta| <= 0.5%)
+      - DOMINATES B0: strictly >= 1 core dimension materially improved with no material degradation
+      - HIGH RETURN / HIGH RISK: return materially higher at the cost of materially worse downside/stop
+      - LOWER RETURN / LOWER RISK: downside/stop materially better with lower return
+      - PARETO PEER: genuine multi-objective trade-off
+      - INFERIOR: return worse and risk worse or equal
+    """
     val_med_spread = val_metrics.get('median_spread', val_metrics.get('median_spread_pct', np.nan))
     val_mean_spread = val_metrics.get('mean_spread', val_metrics.get('mean_spread_pct', np.nan))
     val_cvar_delta = val_metrics.get('cvar_delta', np.nan)  # positive means less negative (better downside)
@@ -330,19 +341,46 @@ def classify_champion(
     if (oof_med_spread > 2.0 and val_med_spread < -1.0) or (oof_med_spread < -1.0 and val_med_spread > 2.0) or (oof_med_spread > 0 and val_mean_spread < -3.0):
         return 'UNSTABLE'
         
-    # 3. Dominates B0
-    if val_med_spread >= -0.05 and val_mean_spread >= 0.0 and val_cvar_delta >= -0.5 and val_stop_delta <= 0.5 and oof_med_spread >= -0.5:
+    # 3. Check Equivalent to B0 (All material deltas approximately zero / tied)
+    is_immaterial = (
+        abs(val_med_spread) <= 0.05 and
+        abs(val_mean_spread) <= 0.05 and
+        abs(val_cvar_delta) <= 0.5 and
+        abs(val_stop_delta) <= 0.5
+    )
+    if is_immaterial:
+        return 'EQUIVALENT TO B0'
+        
+    # 4. Strict Dominates B0 (Requires at least one strict material improvement and NO material degradation)
+    has_material_win = (
+        val_med_spread > 0.05 or
+        val_mean_spread > 0.05 or
+        val_cvar_delta > 0.5 or
+        val_stop_delta < -0.5
+    )
+    has_no_degradation = (
+        val_med_spread >= -0.05 and
+        val_mean_spread >= -0.05 and
+        val_cvar_delta >= -0.5 and
+        val_stop_delta <= 0.5
+    )
+    if has_material_win and has_no_degradation and oof_med_spread >= -0.5:
+        # Check bootstrap CI if available
+        if bootstrap_res:
+            ci_low = bootstrap_res.get('mean_spread_ci_95', [np.nan, np.nan])[0]
+            if not np.isnan(ci_low) and ci_low < -2.0:
+                return 'INSUFFICIENT EVIDENCE'
         return 'DOMINATES B0'
         
-    # 4. High Return / High Risk
+    # 5. High Return / High Risk
     if (val_med_spread >= 1.0 or val_mean_spread >= 1.0) and (val_cvar_delta < -2.0 or val_stop_delta > 2.0):
         return 'HIGH RETURN / HIGH RISK'
         
-    # 5. Lower Return / Lower Risk
+    # 6. Lower Return / Lower Risk
     if (val_med_spread < -1.0 or val_mean_spread < -1.0) and (val_cvar_delta >= 2.0 or val_stop_delta <= -2.0):
         return 'LOWER RETURN / LOWER RISK'
         
-    # 6. Pareto Peer (True trade-off, strictly defined)
+    # 7. Pareto Peer (True trade-off, strictly defined)
     # Trade-off Case A: Return approx equal, Downside materially better
     pareto_a = (abs(val_med_spread) <= 1.0 and abs(val_mean_spread) <= 1.0) and (val_cvar_delta >= 2.0 or val_stop_delta <= -2.0)
     # Trade-off Case B: Return materially better, Downside approx equal
@@ -350,10 +388,11 @@ def classify_champion(
     if pareto_a or pareto_b:
         return 'PARETO PEER'
         
-    # 7. Inferior (Return worse and Risk worse or equal)
+    # 8. Inferior (Return worse and Risk worse or equal)
     if val_med_spread < 0.0 and val_mean_spread < 0.0 and (val_cvar_delta <= 0.0 or val_stop_delta >= 0.0):
         return 'INFERIOR'
         
-    # 8. Strict fallback: Never catch-all PARETO
+    # 9. Strict fallback: Never catch-all PARETO
     return 'INSUFFICIENT EVIDENCE'
+
 
