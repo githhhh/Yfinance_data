@@ -22,9 +22,6 @@ from .protocol import compute_3slot_portfolio_weekly
 from .b0_ablation_grid import (
     StructuralGridChallenger,
     generate_all_structural_grid_challengers,
-    LANE_MODES,
-    DRY_MODES,
-    SELECTOR_MODES,
 )
 from .counterfactual_engine import run_counterfactual_monte_carlo
 from .discovery_sandbox.anonymizer import create_anonymized_discovery_dataset
