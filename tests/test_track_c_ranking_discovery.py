@@ -306,3 +306,28 @@ def test_rdagent_outcome_blind_summary_handles_boolean_features():
     assert actionable["p50"] == pytest.approx(1.0)
     assert geom["p50"] == pytest.approx(0.0)
     assert summary["numeric"]["eps_yoy_growth"]["p50"] == pytest.approx(25.0)
+
+
+
+def test_rdagent_model_config_honors_custom_deepseek_endpoint(monkeypatch):
+    from backtest.track_c_ranking_discovery.discovery_sandbox.rdagent_policy_bridge import (
+        _load_rdagent_model_config,
+    )
+
+    monkeypatch.delenv("TRACK_C_RDAGENT_MODEL", raising=False)
+    monkeypatch.delenv("RD_AGENT_MODEL", raising=False)
+    monkeypatch.setenv("CHAT_MODEL", "deepseek/deepseek-v4-pro")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+    monkeypatch.setenv("DEEPSEEK_API_BASE", "https://example.invalid/v1")
+    monkeypatch.setenv("REASONING_EFFORT", "high")
+    monkeypatch.setenv("RETRY_WAIT_SECONDS", "15")
+    monkeypatch.setenv("MAX_RETRY", "15")
+
+    cfg = _load_rdagent_model_config()
+
+    assert cfg["model"] == "deepseek/deepseek-v4-pro"
+    assert cfg["api_key"] == "sk-test"
+    assert cfg["api_base"] == "https://example.invalid/v1"
+    assert cfg["reasoning_effort"] == "high"
+    assert cfg["retry_wait_seconds"] == 15.0
+    assert cfg["max_retry"] == 15

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +34,8 @@ def _safe_model_name(model: str) -> str:
     return str(model or "").strip()
 
 
-def _load_rdagent_model_config() -> dict[str, str]:
-    """Load the same LiteLLM-style environment used by RD-Agent, without exposing secrets."""
+def _load_rdagent_model_config() -> dict[str, Any]:
+    """Load root .env settings used by the local DeepSeek-backed RD-Agent bridge."""
     load_dotenv(ROOT / ".env", override=False)
 
     model = (
@@ -43,18 +44,50 @@ def _load_rdagent_model_config() -> dict[str, str]:
         or os.environ.get("CHAT_MODEL")
         or "deepseek/deepseek-v4-pro"
     ).strip()
-
-    if not (
+    api_key = (
         os.environ.get("DEEPSEEK_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
         or os.environ.get("AZURE_API_KEY")
-    ):
+        or ""
+    ).strip()
+    api_base = (
+        os.environ.get("DEEPSEEK_API_BASE")
+        or os.environ.get("OPENAI_API_BASE")
+        or ""
+    ).strip()
+
+    if not api_key:
         raise RuntimeError(
-            "Track C RD-Agent policy discovery requires LLM credentials in root .env "
-            "(for example DEEPSEEK_API_KEY / OPENAI_API_KEY)."
+            "Track C RD-Agent policy discovery requires DEEPSEEK_API_KEY "
+            "(or compatible OPENAI_API_KEY) in root .env."
+        )
+    if model.startswith("deepseek/") and not api_base:
+        raise RuntimeError(
+            "DeepSeek Track C discovery requires DEEPSEEK_API_BASE in root .env "
+            "so the sealed run cannot silently fall back to another endpoint."
         )
 
-    return {"model": model, "backend": "litellm"}
+    try:
+        max_retry = max(1, int(os.environ.get("MAX_RETRY", "15")))
+    except ValueError as exc:
+        raise RuntimeError("MAX_RETRY must be an integer >= 1") from exc
+    try:
+        retry_wait_seconds = max(0.0, float(os.environ.get("RETRY_WAIT_SECONDS", "15")))
+    except ValueError as exc:
+        raise RuntimeError("RETRY_WAIT_SECONDS must be a non-negative number") from exc
+
+    return {
+        "model": model,
+        "backend": "litellm",
+        "api_key": api_key,
+        "api_base": api_base,
+        "max_retry": max_retry,
+        "retry_wait_seconds": retry_wait_seconds,
+        # Recorded for provenance only. We intentionally do not forward it to
+        # OpenAI-compatible DeepSeek chat/completions because provider support
+        # is endpoint-specific.
+        "reasoning_effort": os.environ.get("REASONING_EFFORT", "").strip(),
+    }
 
 
 def _outcome_blind_summary(anon_df: pd.DataFrame) -> dict[str, Any]:
@@ -115,8 +148,8 @@ def _extract_json_payload(text: str) -> dict[str, Any]:
     return obj
 
 
-def _call_litellm(model: str, prompt: str) -> str:
-    """Call the configured RD-Agent chat backend through LiteLLM."""
+def _call_litellm(cfg: dict[str, Any], prompt: str) -> str:
+    """Call the configured DeepSeek endpoint through LiteLLM with fail-closed retries."""
     try:
         from litellm import completion
     except Exception as exc:
@@ -135,19 +168,36 @@ def _call_litellm(model: str, prompt: str) -> str:
         },
         {"role": "user", "content": prompt},
     ]
-    kwargs = {"model": model, "messages": messages, "temperature": 0.8}
-    try:
-        response = completion(response_format={"type": "json_object"}, **kwargs)
-    except Exception:
-        response = completion(**kwargs)
+    kwargs: dict[str, Any] = {
+        "model": cfg["model"],
+        "messages": messages,
+        "temperature": 0.8,
+        "api_key": cfg["api_key"],
+    }
+    if cfg.get("api_base"):
+        kwargs["api_base"] = cfg["api_base"]
 
-    try:
-        content = response.choices[0].message.content
-    except Exception as exc:
-        raise RuntimeError("RD-Agent LiteLLM response did not contain choices[0].message.content") from exc
-    if not content:
-        raise RuntimeError("RD-Agent LiteLLM returned an empty response.")
-    return str(content)
+    max_retry = int(cfg["max_retry"])
+    retry_wait = float(cfg["retry_wait_seconds"])
+    last_exc: Exception | None = None
+
+    for attempt in range(1, max_retry + 1):
+        try:
+            response = completion(**kwargs)
+            content = response.choices[0].message.content
+            if not content:
+                raise RuntimeError("RD-Agent LiteLLM returned an empty response.")
+            return str(content)
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= max_retry:
+                break
+            time.sleep(retry_wait)
+
+    raise RuntimeError(
+        f"RD-Agent LiteLLM call failed after {max_retry} attempts "
+        f"using model={cfg['model']!r} and the configured DeepSeek api_base."
+    ) from last_exc
 
 
 def run_rdagent_policy_discovery(
@@ -178,7 +228,7 @@ def run_rdagent_policy_discovery(
             budget=budget,
             data_summary=summary,
         )
-        response_text = _call_litellm(model, prompt)
+        response_text = _call_litellm(cfg, prompt)
         payload = _extract_json_payload(response_text)
         proposals = payload.get("proposals")
         if not isinstance(proposals, list) or not proposals:
@@ -232,6 +282,11 @@ def run_rdagent_policy_discovery(
         "engine": "track_c_rdagent_policy_bridge",
         "backend": cfg["backend"],
         "model": _safe_model_name(model),
+        "api_base_configured": bool(cfg.get("api_base")),
+        "max_retry": int(cfg["max_retry"]),
+        "retry_wait_seconds": float(cfg["retry_wait_seconds"]),
+        "reasoning_effort_configured": str(cfg.get("reasoning_effort") or ""),
+        "reasoning_effort_forwarded": False,
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "train_only": True,
         "outcome_blind": True,
