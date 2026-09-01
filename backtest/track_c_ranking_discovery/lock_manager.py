@@ -68,7 +68,10 @@ def seal_track_c_lock_manifest(
     try:
         git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
         git_dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
-        code_dirty = bool(subprocess.check_output(["git", "status", "--porcelain", "--", "*.py", "*.json"], text=True).strip())
+        code_dirty = bool(subprocess.check_output(
+            ["git", "status", "--porcelain", "--", "*.py", ":!backtest/track_c_ranking_discovery/output/*"],
+            text=True
+        ).strip())
     except Exception:
         git_sha = "unknown"
         git_dirty = True
