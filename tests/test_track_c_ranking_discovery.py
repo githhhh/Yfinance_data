@@ -282,3 +282,27 @@ def test_counterfactual_uses_paired_common_support_for_missing_random_outcomes()
     assert result.mean_A_random_ind_random_stock >= (4.0 / 3.0) - 1e-6
     assert result.mean_A_random_ind_random_stock <= (6.0 / 3.0) + 1e-6
     assert bool(df.iloc[0]["paired_common_support"]) is True
+
+
+
+def test_rdagent_outcome_blind_summary_handles_boolean_features():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.rdagent_policy_bridge import (
+        _outcome_blind_summary,
+    )
+
+    anon = pd.DataFrame({
+        "code": ["entity_001", "entity_002", "entity_003", "entity_004"],
+        "snapshot_date": ["snapshot_001"] * 4,
+        "is_actionable": [True, False, True, True],
+        "has_geom_failure": [False, False, True, False],
+        "eps_yoy_growth": [10.0, 20.0, 30.0, 40.0],
+    })
+
+    summary = _outcome_blind_summary(anon)
+    actionable = summary["numeric"]["is_actionable"]
+    geom = summary["numeric"]["has_geom_failure"]
+
+    assert actionable["non_null"] == 4
+    assert actionable["p50"] == pytest.approx(1.0)
+    assert geom["p50"] == pytest.approx(0.0)
+    assert summary["numeric"]["eps_yoy_growth"]["p50"] == pytest.approx(25.0)

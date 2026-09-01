@@ -71,7 +71,13 @@ def _outcome_blind_summary(anon_df: pd.DataFrame) -> dict[str, Any]:
             continue
         s = anon_df[col]
         if pd.api.types.is_numeric_dtype(s):
-            vals = pd.to_numeric(s, errors="coerce").dropna()
+            # Pandas reports bool as numeric, but NumPy 2.x quantile interpolation
+            # cannot subtract boolean values. Normalize every numeric summary
+            # input to float64 before quantile calculation.
+            if pd.api.types.is_bool_dtype(s):
+                vals = s.astype("float64").dropna()
+            else:
+                vals = pd.to_numeric(s, errors="coerce").astype("float64").dropna()
             if vals.empty:
                 continue
             qs = vals.quantile([0.1, 0.25, 0.5, 0.75, 0.9]).to_dict()
