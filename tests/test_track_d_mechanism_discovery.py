@@ -209,3 +209,23 @@ def test_policy_dsl_rejects_duplicate_policy_ids_with_different_specs():
     assert len(kept) == 1
     assert len(dropped) == 1
     assert dropped[0]["reason"] == "duplicate_policy_id_with_different_spec"
+
+
+
+def test_track_d_evidence_bundle_handles_boolean_pit_quantiles():
+    from backtest.track_d_mechanism_discovery.research_loop import build_evidence_bundle
+
+    discovery = pd.DataFrame({
+        "pullback_v_is_dry": [True, False, True, True],
+        "mom_20": [0.10, 0.20, 0.30, 0.40],
+    })
+    mechanism = pd.DataFrame([{"policy_id": "probe", "mean_spread": 0.0}])
+    evidence = build_evidence_bundle(
+        mechanism,
+        {"case_count": 0, "labels": {}, "numeric_contrasts": []},
+        discovery,
+    )
+
+    dry = evidence["pit_distributions"]["pullback_v_is_dry"]
+    assert dry["p50"] == pytest.approx(1.0)
+    assert evidence["pit_distributions"]["mom_20"]["p50"] == pytest.approx(0.25)

@@ -69,7 +69,14 @@ def build_evidence_bundle(
     ]
     distributions={}
     for col in numeric_cols[:40]:
-        s=pd.to_numeric(discovery_df[col],errors="coerce").dropna()
+        raw=discovery_df[col]
+        # Pandas treats bool as numeric, but NumPy 2.x quantile interpolation
+        # cannot subtract boolean values. Normalize every numeric PIT summary
+        # series to float64 before quantile calculation.
+        if pd.api.types.is_bool_dtype(raw):
+            s=raw.astype("Float64").dropna().astype("float64")
+        else:
+            s=pd.to_numeric(raw,errors="coerce").astype("float64").dropna()
         if s.empty:
             continue
         distributions[col]={
