@@ -1,855 +1,883 @@
 {
-  "run_id": "track_c_20260901T085545Z_3e454bd2",
-  "source_git_sha": "3b69d16b0fb4abf66fa1d0c843f4d779688a0095",
+  "run_id": "track_c_20260901T092408Z_f20f50cf",
+  "source_git_sha": "95f5bd9b9a14b4bdb5d84ef96d87228c5fb4886e",
   "proposal_engine": "rdagent_model",
   "rdagent_provenance_path": "rdagent_policy_discovery/provenance.json",
-  "rdagent_provenance_hash": "6561592e2dac3b238582f311f3fa2b9fd46cd39595583152d39e40d6c16726ad",
+  "rdagent_provenance_hash": "1c13343b824d343324d4c9326350059bb1d5fe1731d26b467a3b48f20807765f",
   "proposals": [
     {
-      "policy_id": "IND_BREADTH__actionable_count_top_industry",
+      "policy_id": "IND_BREADTH__two_plus_one_with_actionable_count",
       "family": "industry_breadth",
-      "name": "actionable_count_top_industry",
-      "hypothesis": "Select the industry with the highest count of ACTIONABLE IBD entries as primary signal; industries with multiple confirmed setups indicate institutional interest and sector-wide momentum.",
+      "name": "two_plus_one_with_actionable_count",
+      "hypothesis": "Limiting 2+1 allocation to periods with multiple industry candidates reduces single-sector concentration risk. Actionable count captures breadth of confirmed setups.",
+      "spec_params": {
+        "breadth_metric": "actionable_count",
+        "allow_dynamic_2_plus_1": true,
+        "min_breadth_for_2": 3
+      },
+      "spec_hash": "26b976e64753366d4b9fce8d60d528ee70618ffcde6a22d1219d9331204508ce",
+      "fitted_state_hash": "none",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
+      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "IND_BREADTH__volume_based_two_position",
+      "family": "industry_breadth",
+      "name": "volume_based_two_position",
+      "hypothesis": "Volume breadth signals institutional interest across sectors. Two positions when market-wide participation is healthy, one when narrow.",
+      "spec_params": {
+        "breadth_metric": "volume_breadth",
+        "allow_dynamic_2_plus_1": false,
+        "min_breadth_for_2": 2
+      },
+      "spec_hash": "032fd9e8078e69b0909ae3b321cfd191893128b7576428b346ac3bc97e150338",
+      "fitted_state_hash": "none",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
+      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "IND_BREADTH__quality_count_strict_2_plus_1",
+      "family": "industry_breadth",
+      "name": "quality_count_strict_2_plus_1",
+      "hypothesis": "Combining quality signal count with dynamic sizing targets periods with abundant high-conviction setups. More stocks implies stronger market structure.",
+      "spec_params": {
+        "breadth_metric": "quality_and_count",
+        "allow_dynamic_2_plus_1": true,
+        "min_breadth_for_2": 2
+      },
+      "spec_hash": "86e4ea83eee73439179767edfbcdd8abcb53ee6c84f52ae02dd081b3d669d165",
+      "fitted_state_hash": "none",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
+      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "IND_BREADTH__actionable_breadth_cash_guard",
+      "family": "industry_breadth",
+      "name": "actionable_breadth_cash_guard",
+      "hypothesis": "Using actionable count as gate to cash: insufficient breadth signals market lacks confirmations, stay defensive until conditions improve.",
       "spec_params": {
         "breadth_metric": "actionable_count",
         "allow_dynamic_2_plus_1": false,
         "min_breadth_for_2": 3
       },
-      "spec_hash": "a2580e3122c3616abd90f8f5bcad75cae4b3ed6c809772be23cd1ece9fc17095",
+      "spec_hash": "87c628ea6dca206b9e9ce71563d45cdb8a2a045be0001a31194205a09f541845",
       "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
       "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "IND_BREADTH__volume_breadth_within_industry",
+      "policy_id": "IND_BREADTH__quality_count_flexible_2_plus_1",
       "family": "industry_breadth",
-      "name": "volume_breadth_within_industry",
-      "hypothesis": "Rank industries by aggregate volume_ratio (5-day vs 20-day) across candidates; sustained volume expansion across multiple stocks signals broad institutional participation.",
-      "spec_params": {
-        "breadth_metric": "volume_breadth",
-        "allow_dynamic_2_plus_1": true,
-        "min_breadth_for_2": 2
-      },
-      "spec_hash": "d29254b628e5c49868a93b2aaaee0810d8116525f3c5c9a61cff13dad555fd6d",
-      "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
-      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "IND_BREADTH__quality_and_count_balanced",
-      "family": "industry_breadth",
-      "name": "quality_and_count_balanced",
-      "hypothesis": "Combine actionable count with average quality score (lower dist_to_52w_high and higher mom_20) to find sectors where strength is both broad and confirmed by price action.",
-      "spec_params": {
-        "breadth_metric": "quality_and_count",
-        "allow_dynamic_2_plus_1": false,
-        "min_breadth_for_2": 2
-      },
-      "spec_hash": "a5d01fcafd92956cfeadaafbf50d51ad701678c2a9fa9cdbe3e91360bac00806",
-      "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
-      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "IND_BREADTH__rel_strength_breadth_filter",
-      "family": "industry_breadth",
-      "name": "rel_strength_breadth_filter",
-      "hypothesis": "Filter industries where average rel_spy_20 across candidates is positive; breadth with positive relative strength vs market indicates sector outperformance with confirmation.",
+      "name": "quality_count_flexible_2_plus_1",
+      "hypothesis": "Flexible 2+1 with lower threshold captures medium-breadth environments. Quality_and_count balances signal count with relative strength.",
       "spec_params": {
         "breadth_metric": "quality_and_count",
         "allow_dynamic_2_plus_1": true,
         "min_breadth_for_2": 3
       },
-      "spec_hash": "b8daca04ba6beb9f5fe6cfec74a2969627e065f8721780cf609eb962e7e88ce7",
+      "spec_hash": "320fe73732e324756d4ad3913cc225a25e9bb645e0d2c95bcec19fe62b0abd6e",
       "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
       "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "IND_BREADTH__pullback_dryness_breadth",
+      "policy_id": "IND_BREADTH__actionable_p75_threshold",
       "family": "industry_breadth",
-      "name": "pullback_dryness_breadth",
-      "hypothesis": "Prioritize industries where multiple candidates show pullback_v_is_dry=1 with shallow pullback_pct; dry pullbacks indicate supply absorption and potential for clean breakouts.",
+      "name": "actionable_p75_threshold",
+      "hypothesis": "Higher percentile threshold on actionable count filters to strongest breadth environments. 2+1 rewards exceptional market structure.",
       "spec_params": {
-        "breadth_metric": "volume_breadth",
-        "allow_dynamic_2_plus_1": false,
-        "min_breadth_for_2": 3
-      },
-      "spec_hash": "24ce4967d9fd3e53ee956950bbee97457e60e1b5572786500cd3854aac073326",
-      "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
-      "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "IND_BREADTH__base_structure_breadth",
-      "family": "industry_breadth",
-      "name": "base_structure_breadth",
-      "hypothesis": "Select industries where candidates have proper base_depth_pct (-15 to -35%) and adequate base_duration_weeks (13+); proper basing indicates accumulation before launch.",
-      "spec_params": {
-        "breadth_metric": "quality_and_count",
+        "breadth_metric": "actionable_count",
         "allow_dynamic_2_plus_1": true,
         "min_breadth_for_2": 2
       },
-      "spec_hash": "7ce248fb210c822e90a1bf69c303bccaf75831dcec05b650defde061975dab86",
+      "spec_hash": "6d79935c24dc1980817d5fd0942f853ddb68924a5992d6b18921dbce88cd6124",
       "fitted_state_hash": "none",
-      "source_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
+      "source_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
       "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__momentum_breakout_composite",
+      "policy_id": "CONT_SCORE__rel_strength_momentum_composite",
       "family": "continuous",
-      "name": "momentum_breakout_composite",
-      "hypothesis": "Combining price momentum across timeframes with volume confirmation captures stocks in accelerating uptrends with institutional accumulation.",
+      "name": "rel_strength_momentum_composite",
+      "hypothesis": "Combining relative strength versus SPY with raw price momentum captures stocks in sustained uptrends outperforming the market. The dual timeframe (20d + 60d) ensures both intermediate and longer-term leadership are valued.",
       "spec_params": {
         "weights": {
-          "mom_5": 2.5,
-          "mom_20": 3.0,
-          "mom_60": 1.5,
-          "volume_ratio": 2.0,
-          "rv_20": -1.0
+          "rel_spy_20": 2.5,
+          "rel_spy_60": 3.0,
+          "mom_20": 1.5,
+          "mom_60": 1.0
         },
-        "selector_mode": "pure_top3"
+        "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "ab9db102c720f8d9d28bf0be1103052e65adf1c9f87137d5c3f046e92e0cde92",
+      "spec_hash": "4d812b659e49313b3a295f8fac3dfbcd09df7c57d92fcc8d81dad55dbc54a71d",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__pullback_dry_volume_entry",
+      "policy_id": "CONT_SCORE__pullback_dry_volume_reversal",
       "family": "continuous",
-      "name": "pullback_dry_volume_entry",
-      "hypothesis": "Stocks pulling back with shrinking volume (dry) indicate distribution absence; combined with tight stops via low ATR, offers favorable risk/reward.",
+      "name": "pullback_dry_volume_reversal",
+      "hypothesis": "Pullback recovery candidates where volume has dried up (suggesting distribution complete) combined with moderate pullback depth may represent high-probability bounce setups. Shallow pullbacks with confirmed volume drying are prioritized.",
       "spec_params": {
         "weights": {
           "pullback_v_is_dry": 4.0,
-          "pullback_pct": 2.5,
-          "atr_14_pct": -2.0,
-          "rv_20": -1.5
+          "pullback_pct": -2.5,
+          "mom_5": 2.0,
+          "mom_10": 1.5
+        },
+        "selector_mode": "pure_top3"
+      },
+      "spec_hash": "b1e532dc58a80abd51f47130f10e999754132037cf92b4d1262e46b29ae0a7a7",
+      "fitted_state_hash": "none",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
+      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "CONT_SCORE__ma_alignment_trend_strength",
+      "family": "continuous",
+      "name": "ma_alignment_trend_strength",
+      "hypothesis": "Stocks trading above multiple moving averages with positive slopes across short, medium, and long terms exhibit structural uptrends. Price-to-MA distances and slopes jointly measure trend quality.",
+      "spec_params": {
+        "weights": {
+          "px_vs_ma10": 2.0,
+          "px_vs_ma20": 2.5,
+          "px_vs_ma50": 1.5,
+          "ma10_slope_5": 1.0,
+          "ma20_slope_5": 1.0,
+          "ma50_slope_10": 1.0
         },
         "selector_mode": "distinct_1"
       },
-      "spec_hash": "9f8ed655ea8a6347a45e1959c248600225286d11ce09831fa390a02b8fcf917a",
+      "spec_hash": "0bd3cefd965cfb113d51c0116f7ff628dadb3b6e51558daa3d1b4215ef182ab5",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__ma_gradient_strength",
+      "policy_id": "CONT_SCORE__base_quality_breakout_composite",
       "family": "continuous",
-      "name": "ma_gradient_strength",
-      "hypothesis": "Rising moving averages with positive slopes across multiple timeframes indicate sustained uptrend; combining slope with price premium vs MAs captures trend quality.",
+      "name": "base_quality_breakout_composite",
+      "hypothesis": "Depth of consolidation and structural micro-box count proxy for base quality. Shallower bases with more micro-structure formation (supply absorption) combined with recent volume ratio signal institutional accumulation.",
       "spec_params": {
         "weights": {
-          "ma10_slope_5": 2.0,
-          "ma20_slope_5": 2.5,
-          "ma50_slope_10": 2.0,
-          "px_vs_ma20": 1.5
+          "base_depth_pct": 3.0,
+          "base_mbox_count": 2.0,
+          "volume_ratio": 1.5,
+          "mom_10": 1.0
         },
         "selector_mode": "pure_top3"
       },
-      "spec_hash": "ca95237d176d689bf5f02f43f719b5f8a81b6aa775f3abb50af7fa754d7ec87a",
+      "spec_hash": "823c767a360149030328d9e39dc7032dda02651b3014b940a147aad861287609",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__earnings_acceleration_momentum",
+      "policy_id": "CONT_SCORE__volatility_adjusted_momentum_quality",
       "family": "continuous",
-      "name": "earnings_acceleration_momentum",
-      "hypothesis": "Positive EPS growth YoY with strong recent momentum captures fundamental-improvement-driven uptrades; EPS quality combined with price action.",
+      "name": "volatility_adjusted_momentum_quality",
+      "hypothesis": "Dividing momentum by realized volatility normalizes for stock-specific noise, identifying stocks with strong directional moves relative to their typical fluctuation. Higher ratios indicate cleaner trend quality.",
       "spec_params": {
         "weights": {
-          "eps_yoy_growth": 3.0,
-          "mom_20": 2.5,
-          "rel_spy_20": 2.0,
-          "up_day_ratio_20": 1.0
+          "mom_20": 4.0,
+          "rv_20": -3.0,
+          "mom_5": 1.5,
+          "mom_10": 1.0
         },
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "2e1b36a698b5588d9bbe2f5930da74ad9a99fa34618621add8b5672d887c0daf",
+      "spec_hash": "be3a259cf4c755708ae5fdd1e41f6398d3ce6ccdcce680e0649ef6036a712894",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__consolidation_depth_structure",
+      "policy_id": "CONT_SCORE__eps_acceleration_price_correlation",
       "family": "continuous",
-      "name": "consolidation_depth_structure",
-      "hypothesis": "Deeper bases (more negative depth %) with more micro-boxes indicate thorough consolidation; longer bases allow more institutional accumulation.",
+      "name": "eps_acceleration_price_correlation",
+      "hypothesis": "Stocks where EPS growth is available and accelerating combined with positive short-term momentum may have earnings-driven upside. This composite weights fundamental growth signal with recent price confirmation.",
       "spec_params": {
         "weights": {
-          "base_depth_pct": -2.5,
-          "base_mbox_count": 2.0,
-          "base_duration_weeks": 1.5,
-          "dist_to_52w_high_pct": -1.5
+          "eps_known": 2.0,
+          "eps_yoy_growth": 3.5,
+          "mom_5": 1.5,
+          "mom_10": 1.0
+        },
+        "selector_mode": "distinct_1"
+      },
+      "spec_hash": "77d108c293cd13fbcda51692515a38e7c5ce5e595afba5b9aba6a5dfed7cbe0c",
+      "fitted_state_hash": "none",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
+      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "CONT_SCORE__upday_ratio_momentum_consistency",
+      "family": "continuous",
+      "name": "upday_ratio_momentum_consistency",
+      "hypothesis": "Proportion of up days over 20 periods measures internal consistency of trend. Combined with momentum, this penalizes stocks with erratic positive returns and rewards smooth, persistent advancement.",
+      "spec_params": {
+        "weights": {
+          "up_day_ratio_20": 3.0,
+          "mom_20": 2.0,
+          "mom_10": 1.5,
+          "mom_5": 1.0
         },
         "selector_mode": "pure_top3"
       },
-      "spec_hash": "109a3a91ba830f08eb70b7adef6e199a287c74def0df459a0cc0cf8c1c4b4f32",
+      "spec_hash": "aebf402b0be323f42d41e2ddb48a1405c26a3f6e5bbb73820c4be2e6b01b8e17",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__near_52w_high_momentum",
+      "policy_id": "CONT_SCORE__52w_high_proximity_breakout",
       "family": "continuous",
-      "name": "near_52w_high_momentum",
-      "hypothesis": "Stocks near 52-week highs with positive momentum have broken resistance and continue strength; distance to high proxies for breakout confirmation.",
+      "name": "52w_high_proximity_breakout",
+      "hypothesis": "Stocks near 52-week highs with tight distance are often in new high base breakouts. Combined with IBD candidate proximity (distance to trigger), this captures stocks on verge of confirmed breakouts.",
       "spec_params": {
         "weights": {
           "dist_to_52w_high_pct": 4.0,
-          "mom_10": 2.5,
-          "mom_20": 1.5,
-          "volume_ratio": 1.5
-        },
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "39a2c913e23739106da0262532ff985ea8964de2a0abb634b6e419f3afb74c6c",
-      "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
-      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "CONT_SCORE__actionable_ibd_quality",
-      "family": "continuous",
-      "name": "actionable_ibd_quality",
-      "hypothesis": "IBD ACTIONABLE status filters for technically sound setups; combining with entry quality metrics and avoiding extended names reduces chop.",
-      "spec_params": {
-        "weights": {
-          "is_actionable": 3.5,
-          "ibd_entry_volume_ratio": 2.5,
-          "ibd_entry_close_position": 2.0,
-          "ibd_entry_breakout_range_ratio": 1.5
+          "current_vs_ibd_candidate_pct": 2.5,
+          "mom_5": 1.0,
+          "volume_ratio": 1.0
         },
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "5b45c2640bf192683f98849065e737605bdd17b5ea22236aafd3a12d024bd4f0",
+      "spec_hash": "596e079bee174dbcbbb32e473de2a7b6b51c5ff100fe612e88fbd71926729d56",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__sector_relative_strength",
+      "policy_id": "CONT_SCORE__atr_adjusted_entry_quality",
       "family": "continuous",
-      "name": "sector_relative_strength",
-      "hypothesis": "Outperforming sector peers on relative strength indicates top-of-sector leadership; combining with absolute momentum filters strong leaders.",
+      "name": "atr_adjusted_entry_quality",
+      "hypothesis": "ATR as percentage captures stock volatility for position sizing context. Combining with momentum and distance to trigger normalizes entry quality across different volatility regimes.",
       "spec_params": {
         "weights": {
-          "rel_spy_20": 2.5,
-          "rel_spy_60": 2.0,
-          "mom_20": 2.0,
-          "mom_5": 1.5
-        },
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "c50fca036bd2b5a18d8130a9e663d7013b87141223204ce88d93748f1e277d30",
-      "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
-      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "CONT_SCORE__entry_distance_risk_adjusted",
-      "family": "continuous",
-      "name": "entry_distance_risk_adjusted",
-      "hypothesis": "Close proximity to IBD candidate trigger reduces slippage risk; combining entry distance with volatility conditions position for efficient entry.",
-      "spec_params": {
-        "weights": {
-          "current_vs_ibd_candidate_pct": -3.0,
-          "atr_14_pct": -2.0,
-          "mom_5": 2.0,
-          "rv_20": -1.5
-        },
-        "selector_mode": "pure_top3"
-      },
-      "spec_hash": "146329253d8ad36b6ce6e8707c4321ee85b8d5312516adeac06099051b0f1eb5",
-      "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
-      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "CONT_SCORE__tight_pullback_rebound",
-      "family": "continuous",
-      "name": "tight_pullback_rebound",
-      "hypothesis": "Stocks pulling back minimally then rebounding show resilience; combined with momentum strength captures quick recoveries in strong trends.",
-      "spec_params": {
-        "weights": {
-          "pullback_pct_off_peak": 3.5,
           "mom_10": 2.5,
-          "mom_5": 2.0,
-          "volume_ratio": 1.5
+          "atr_14_pct": -1.5,
+          "current_vs_ibd_candidate_pct": 2.0,
+          "px_vs_ma20": 1.5
         },
         "selector_mode": "distinct_1"
       },
-      "spec_hash": "0b7dc394e6c451382eb3c9f375c34a96dee0940cf35bfa674738622c90660535",
+      "spec_hash": "81c25d36478f9a07322e9715f8a5a8793c9042f31b329eae002eb5b54851f48e",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "CONT_SCORE__pivot_ma10_confirm_composite",
+      "policy_id": "CONT_SCORE__persistent_uptrend_score",
       "family": "continuous",
-      "name": "pivot_ma10_confirm_composite",
-      "hypothesis": "Pivot rule stocks confirmed by MA10 touch represent classic IBD setups; combining with short-term momentum and relative strength adds edge.",
+      "name": "persistent_uptrend_score",
+      "hypothesis": "Multi-timeframe momentum alignment (5, 10, 20, 60 days) rewards stocks showing consistent acceleration across horizons. This captures both short-term breakout strength and longer-term trend persistence.",
       "spec_params": {
         "weights": {
-          "mom_20": 2.5,
+          "mom_5": 1.5,
           "mom_10": 2.0,
+          "mom_20": 2.5,
+          "mom_60": 2.0
+        },
+        "selector_mode": "pure_top3"
+      },
+      "spec_hash": "935373e60d4fc2e8605ed510dbf254da950e0e9ae5e9eb4c5ad8c69d65298552",
+      "fitted_state_hash": "none",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
+      "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "CONT_SCORE__pullback_recovery_with_strength",
+      "family": "continuous",
+      "name": "pullback_recovery_with_strength",
+      "hypothesis": "Pullback candidates with positive off-peak percentage (recovering from recent highs) combined with relative strength signal stocks bouncing while maintaining market leadership. Duration of pullback ensures adequate consolidation time.",
+      "spec_params": {
+        "weights": {
+          "pullback_pct_off_peak": 3.0,
           "rel_spy_20": 2.5,
-          "px_vs_ma10": 1.5,
-          "up_day_ratio_20": 1.0
+          "pullback_duration_weeks": 1.0,
+          "mom_10": 1.5
         },
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "3c01e6b444e2e08c52c4fa80faab30960e10f6701579cced39e2008edc3a0f05",
+      "spec_hash": "7c09b71cd4277c51ef63cc4d5e51e03c12613d31fbcf4e1258026d39a2db7812",
       "fitted_state_hash": "none",
-      "source_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "source_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "LINEAR_RANK__base_structure_52w_proximity",
+      "policy_id": "LINEAR_RANK__breakout_momentum_volume",
       "family": "linear_ranking",
-      "name": "base_structure_52w_proximity",
-      "hypothesis": "Combine base quality (depth, duration, micro-box count) with 52-week high proximity. Shallow bases near highs with sufficient consolidation structure suggest institutional accumulation and potential breakout.",
-      "spec_params": {
-        "feature_subset": [
-          "base_depth_pct",
-          "base_duration_weeks",
-          "base_mbox_count",
-          "dist_to_52w_high_pct"
-        ],
-        "regularization": 1.0,
-        "selector_mode": "pure_top3"
-      },
-      "spec_hash": "50fbb008e2f80d43eaa2d4696664f9784adc8d948609ec16e8f3d85fe1458953",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__pullback_recovery_dry",
-      "family": "linear_ranking",
-      "name": "pullback_recovery_dry",
-      "hypothesis": "Target dry pullbacks (volume drying up confirms supply absorption) combined with tight price recovery. Close above MA10 after shallow pullback with declining volume indicates successful restocking.",
-      "spec_params": {
-        "feature_subset": [
-          "pullback_v_is_dry",
-          "pullback_pct",
-          "px_vs_ma10",
-          "mom_5"
-        ],
-        "regularization": 0.5,
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "6cafcb71c573deb8cba05ff6ffe8a4be14d28183c52fed066f5cec056f498235",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__low_vol_actionable_momentum",
-      "family": "linear_ranking",
-      "name": "low_vol_actionable_momentum",
-      "hypothesis": "Low-volatility actionable candidates with strong momentum. Reduced volatility suggests stable basing; ACTIONABLE status implies valid setup; momentum confirms upward thrust.",
-      "spec_params": {
-        "feature_subset": [
-          "rv_20",
-          "is_actionable",
-          "mom_20",
-          "atr_14_pct"
-        ],
-        "regularization": 1.5,
-        "selector_mode": "max_2_per_ind"
-      },
-      "spec_hash": "5d8be1789e0148dff646156a7d146956a532165500af0799110e208486be8c29",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__momentum_breadth_combo",
-      "family": "linear_ranking",
-      "name": "momentum_breadth_combo",
-      "hypothesis": "Combine price momentum with market breadth (up-day ratio) and relative strength. Stocks outperforming on both absolute and relative basis with consistent daily gains show broad institutional support.",
-      "spec_params": {
-        "feature_subset": [
-          "mom_20",
-          "up_day_ratio_20",
-          "rel_spy_20",
-          "px_vs_ma20"
-        ],
-        "regularization": 0.75,
-        "selector_mode": "pure_top3"
-      },
-      "spec_hash": "aaeff30359fec034ba57de14264c10e060ead9da7f14d1e3a15023c8f58205e3",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__ibd_candidate_tight_entry",
-      "family": "linear_ranking",
-      "name": "ibd_candidate_tight_entry",
-      "hypothesis": "Stocks close to IBD candidate trigger (<3%) with tight recent pullbacks and positive momentum. Near-trigger proximity reduces lag to entry; tight pullback indicates solid base; momentum confirms direction.",
+      "name": "breakout_momentum_volume",
+      "hypothesis": "Near IBD trigger with strong 5-day momentum and elevated volume ratio suggests institutional accumulation during breakout setup.",
       "spec_params": {
         "feature_subset": [
           "current_vs_ibd_candidate_pct",
-          "pullback_pct_off_peak",
-          "mom_10",
+          "mom_5",
           "volume_ratio"
         ],
-        "regularization": 0.5,
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "b62b8c2dceb515222acf1a3c5c4a1955d62e468590c784b310b30ef32cb87274",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__volume_breakout_confirm",
-      "family": "linear_ranking",
-      "name": "volume_breakout_confirm",
-      "hypothesis": "IBD entry day volume surge (>2x average) combined with strong close position (>75% of range) and tight trigger proximity. Volume confirms institutional commitment; close position validates buying strength.",
-      "spec_params": {
-        "feature_subset": [
-          "ibd_entry_volume_ratio",
-          "ibd_entry_close_position",
-          "ibd_entry_close_vs_trigger_pct",
-          "mom_5"
-        ],
-        "regularization": 0.5,
-        "selector_mode": "max_2_per_ind"
-      },
-      "spec_hash": "44ca1c46e7088519e9648e5458ed429b9367ae0d170428b7abb98bebb0734849",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__trend_slope_strength",
-      "family": "linear_ranking",
-      "name": "trend_slope_strength",
-      "hypothesis": "Rising moving average slopes across multiple timeframes combined with strong 60-day momentum. Persistent upward slope in MA10/20/50 indicates durable uptrend; momentum confirms acceleration.",
-      "spec_params": {
-        "feature_subset": [
-          "ma10_slope_5",
-          "ma20_slope_5",
-          "ma50_slope_10",
-          "mom_60"
-        ],
-        "regularization": 1.0,
+        "regularization": 1.5,
         "selector_mode": "pure_top3"
       },
-      "spec_hash": "ad391d4c1197b7c4d5a2049e1ef39e92d719050a6e0e50b14ecb4f8840b19e8c",
+      "spec_hash": "dc98be369065ab92287c48532d4b98b675ebdbda1c3511752a94bc49dcbc01bf",
       "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
       "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "LINEAR_RANK__eps_growth_momentum_lead",
+      "policy_id": "LINEAR_RANK__earnings_quality_momentum",
       "family": "linear_ranking",
-      "name": "eps_growth_momentum_lead",
-      "hypothesis": "Positive EPS growth with accelerating short-term momentum and strong relative strength. Earnings quality combined with price leadership suggests fundamental and technical alignment.",
+      "name": "earnings_quality_momentum",
+      "hypothesis": "Known EPS with strong YoY growth combined with 20-day momentum captures fundamentally-driven uptrends.",
       "spec_params": {
         "feature_subset": [
+          "eps_known",
           "eps_yoy_growth",
-          "mom_20",
-          "rel_spy_60",
-          "dist_to_52w_high_pct"
+          "mom_20"
         ],
         "regularization": 2.0,
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "c4acac1daee0cb37220e301a682a3d7e15b316e8807ae27c8ad7b023bba52874",
+      "spec_hash": "8e640f732bc9e8d2f96e2dd8ec3efa26cf904113640d467c8c8fca2e33256ec1",
       "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
       "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "LINEAR_RANK__extended_dry_recovery",
+      "policy_id": "LINEAR_RANK__relative_strength_momentum",
       "family": "linear_ranking",
-      "name": "extended_dry_recovery",
-      "hypothesis": "Extended stocks (above triggers) with dry pullbacks recovering. Pullback-v_is_dry indicates supply absorption; recovery momentum signals resumption. Suitable for pullback entry in trending stocks.",
+      "name": "relative_strength_momentum",
+      "hypothesis": "60-day relative strength vs SPY indicates market-leading stocks with sector rotation tailwinds.",
       "spec_params": {
         "feature_subset": [
-          "pullback_v_is_dry",
-          "pullback_pct_off_peak",
+          "rel_spy_60",
           "mom_20",
-          "mom_5"
+          "dist_to_52w_high_pct"
         ],
-        "regularization": 0.75,
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "4499eb3c9391589a376c9169b769d8ede8b1fcc80ea3fa9fd19f9b1736a5bc89",
-      "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
-      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "LINEAR_RANK__consolidation_vol_confirm",
-      "family": "linear_ranking",
-      "name": "consolidation_vol_confirm",
-      "hypothesis": "Extended base duration with recent volume expansion. Long consolidation allows base building; volume increase suggests institutional activity; momentum confirms direction.",
-      "spec_params": {
-        "feature_subset": [
-          "base_duration_weeks",
-          "volume_ratio",
-          "vol_ratio_5_20",
-          "mom_10"
-        ],
-        "regularization": 1.5,
+        "regularization": 1.0,
         "selector_mode": "pure_top3"
       },
-      "spec_hash": "b3a7edbfeec1a197805aabadeceed970967a32ddebc36cb3dfe5c2dda048236e",
+      "spec_hash": "00e2b9187c1c4435f8b40da9a03b78d0e75f29fe2d4e1b8e47ea2683be8dbc8c",
       "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
       "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "LINEAR_RANK__relative_momentum_actionable",
+      "policy_id": "LINEAR_RANK__pullback_recovery_setup",
       "family": "linear_ranking",
-      "name": "relative_momentum_actionable",
-      "hypothesis": "Relative strength leadership combined with market breadth and actionable status. Stocks outperforming SPY with consistent up-days and valid IBD setup prioritize leaders with confirmed technicals.",
+      "name": "pullback_recovery_setup",
+      "hypothesis": "Shallow pullback with dried volume and positive momentum off lows captures mean reversion with institutional confirmation.",
       "spec_params": {
         "feature_subset": [
-          "rel_spy_20",
+          "pullback_pct",
+          "pullback_v_is_dry",
+          "mom_10"
+        ],
+        "regularization": 2.5,
+        "selector_mode": "distinct_1"
+      },
+      "spec_hash": "948d6ca442a44a52bde81897186fe0044743c48467687ff1f64fe23d021c815d",
+      "fitted_state_hash": "none",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "LINEAR_RANK__tight_consolidation_uptrend",
+      "family": "linear_ranking",
+      "name": "tight_consolidation_uptrend",
+      "hypothesis": "Moderate base depth with extended duration forms stable bases; short momentum confirms launch readiness.",
+      "spec_params": {
+        "feature_subset": [
+          "base_depth_pct",
+          "base_duration_weeks",
+          "mom_5"
+        ],
+        "regularization": 1.25,
+        "selector_mode": "max_2_per_ind"
+      },
+      "spec_hash": "fb8319543955901d5d4f0040fff3de75ffa6690359b85faa6c811dfbfa1efe91",
+      "fitted_state_hash": "none",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "LINEAR_RANK__high_close_breakout_quality",
+      "family": "linear_ranking",
+      "name": "high_close_breakout_quality",
+      "hypothesis": "High close position within breakout bar range with tight ATR indicates strong commitment and contained risk.",
+      "spec_params": {
+        "feature_subset": [
+          "ibd_entry_close_position",
+          "atr_14_pct",
+          "mom_5"
+        ],
+        "regularization": 3.0,
+        "selector_mode": "distinct_1"
+      },
+      "spec_hash": "299a918c6aa5899d0c24df5845f808818b05d8fbba1ea9f7131d0a251dce8e62",
+      "fitted_state_hash": "none",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "LINEAR_RANK__low_volatility_growth",
+      "family": "linear_ranking",
+      "name": "low_volatility_growth",
+      "hypothesis": "Lower realized volatility with positive momentum and positive price relative to MAs filters smooth uptrends.",
+      "spec_params": {
+        "feature_subset": [
+          "rv_20",
           "mom_20",
-          "is_actionable",
-          "up_day_ratio_20"
+          "px_vs_ma20"
+        ],
+        "regularization": 1.75,
+        "selector_mode": "pure_top3"
+      },
+      "spec_hash": "86fc1155162919a98c40ba8e820fa580ec8ade69cc398d1da214678e4f4725b9",
+      "fitted_state_hash": "none",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "LINEAR_RANK__ma_uptrend_confluence",
+      "family": "linear_ranking",
+      "name": "ma_uptrend_confluence",
+      "hypothesis": "Positive MA slopes across multiple timeframes with price above MAs indicates durable structural uptrend.",
+      "spec_params": {
+        "feature_subset": [
+          "ma10_slope_5",
+          "ma20_slope_5",
+          "px_vs_ma50"
         ],
         "regularization": 1.0,
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "2fb8a4552c1e71641e87246fedbf3039cd0a77d42b49c3eed074cba8cf11c87b",
+      "spec_hash": "47ac652749d2d5567d19e46a359dbf22a8527a2d8b791c93809f0b9ec3ad6d13",
       "fitted_state_hash": "none",
-      "source_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
       "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "PORT_UTIL__conservative_momentum_concentrated",
-      "family": "portfolio",
-      "name": "conservative_momentum_concentrated",
-      "hypothesis": "Low lambda (0.5) with momentum_first prioritizes strong recent price action while avoiding over-concentration; appropriate given the right-skewed momentum distributions (mom_20 p75=0.20) and need for signal clarity in low-signal environment where median is_actionable=0.",
+      "policy_id": "LINEAR_RANK__actionable_ibd_quality",
+      "family": "linear_ranking",
+      "name": "actionable_ibd_quality",
+      "hypothesis": "ACTIONABLE status with near 52-week high and strong volume on entry captures IBD-validated breakout candidates.",
       "spec_params": {
-        "concentration_lambda": 0.5,
-        "stock_quality_metric": "momentum_first"
+        "feature_subset": [
+          "is_actionable",
+          "dist_to_52w_high_pct",
+          "ibd_entry_volume_ratio"
+        ],
+        "regularization": 0.75,
+        "selector_mode": "distinct_1"
       },
-      "spec_hash": "20c99703a907173d4122ad8e26a41b22ee15aec987616692650d52a5fc822378",
+      "spec_hash": "bc9bd23640625c8dc20bbafceccb88d49324e44e12d1c4d2e950a68a174399e2",
       "fitted_state_hash": "none",
-      "source_response_hash": "f69d29a58e4034e3a303323f2e49bd2612ada450b19ea37df92feda4b54e9192",
-      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "PORT_UTIL__balanced_quality_focused",
-      "family": "portfolio",
-      "name": "balanced_quality_focused",
-      "hypothesis": "Medium lambda (1.5) with balanced metric balances EPS quality (median eps_yoy_growth=34.6%) against momentum, avoiding over-weighting volatile growth extremes (p90=400%); defensible since 35% of snapshots lack EPS data, requiring fallback logic.",
+      "policy_id": "LINEAR_RANK__momentum_acceleration",
+      "family": "linear_ranking",
+      "name": "momentum_acceleration",
+      "hypothesis": "Improving up-day ratio with positive short-term momentum acceleration captures increasing buying pressure.",
       "spec_params": {
-        "concentration_lambda": 1.5,
-        "stock_quality_metric": "balanced"
+        "feature_subset": [
+          "up_day_ratio_20",
+          "mom_5",
+          "mom_20"
+        ],
+        "regularization": 2.25,
+        "selector_mode": "pure_top3"
       },
-      "spec_hash": "e3718ede0754c356239e373f9c20f40684dc4e15214370f3c451dac4516f0a33",
+      "spec_hash": "899c0617b21ad263499cb70f1dbb11bba112f6de39b6d6d9f968c85d0c563b0d",
       "fitted_state_hash": "none",
-      "source_response_hash": "f69d29a58e4034e3a303323f2e49bd2612ada450b19ea37df92feda4b54e9192",
-      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "PORT_UTIL__ultra_low_concentration_balanced",
-      "family": "portfolio",
-      "name": "ultra_low_concentration_balanced",
-      "hypothesis": "Lambda 0.3 minimizes single-stock risk given the high null rate on b0_eligible (median=0) and UNCONFIRMED status dominance (57%); balanced metric ensures quality guards without over-relying on sparse actionable signals.",
+      "policy_id": "LINEAR_RANK__conservative_quality_composite",
+      "family": "linear_ranking",
+      "name": "conservative_quality_composite",
+      "hypothesis": "Lower vol, positive relative strength, and known earnings with moderate momentum balances risk and opportunity.",
       "spec_params": {
-        "concentration_lambda": 0.3,
-        "stock_quality_metric": "balanced"
-      },
-      "spec_hash": "c354ccc72fd64a705f82f6f1f2bb3894009cbbdbfc738895aca83f0ed5ad7ee6",
-      "fitted_state_hash": "none",
-      "source_response_hash": "f69d29a58e4034e3a303323f2e49bd2612ada450b19ea37df92feda4b54e9192",
-      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "PORT_UTIL__defensive_balanced_quality",
-      "family": "portfolio",
-      "name": "defensive_balanced_quality",
-      "hypothesis": "Lambda 0.8 prioritizes capital preservation via balanced metric, acknowledging the high UNCONFIRMED rate (57%) and median pullback_pct of -10.8%; quality scoring provides downside buffer in uncertain entry status environment.",
-      "spec_params": {
-        "concentration_lambda": 0.8,
-        "stock_quality_metric": "balanced"
-      },
-      "spec_hash": "0f298318caa419cca5b9f1dfb3c4ce8315f656d0664ce9c909ba60cfc2ede90d",
-      "fitted_state_hash": "none",
-      "source_response_hash": "f69d29a58e4034e3a303323f2e49bd2612ada450b19ea37df92feda4b54e9192",
-      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "NOVEL_HEURISTIC__dry_pullback_volume_breakout",
-      "family": "novel_heuristic",
-      "name": "dry_pullback_volume_breakout",
-      "hypothesis": "Stocks with dried-up pullback volume (low recent volume) combined with volume spike at entry signal institutional accumulation. Penalize deep bases to avoid late-stage bases. Apply strong bonus for volume spike at candidate trigger.",
-      "spec_params": {
-        "dry_weight": 4.5,
-        "base_depth_penalty": 3.2,
-        "volume_spike_bonus": 5.0,
+        "feature_subset": [
+          "rv_20",
+          "rel_spy_60",
+          "eps_known",
+          "mom_10"
+        ],
+        "regularization": 4.0,
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "eba2593ac7fee7d6b96ad407fd93af14e174628eba4f3374b26bc64f145e6df1",
+      "spec_hash": "b1799daebf0d5f27d7ca77d3b1f54d8905eedfa87622cf2dd45934b9e69a8b04",
       "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
-      "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
+      "source_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
+      "source_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "NOVEL_HEURISTIC__base_quality_momentum_thresh",
-      "family": "novel_heuristic",
-      "name": "base_quality_momentum_thresh",
-      "hypothesis": "Strong bases (shallow, longer duration) with positive short-term momentum above median threshold. Deep bases signal distribution; shallow pullbacks with momentum confirm setup health.",
+      "policy_id": "PORT_UTIL__ibd_actionable_vol_concentrator",
+      "family": "portfolio",
+      "name": "ibd_actionable_vol_concentrator",
+      "hypothesis": "Concentrate in ACTIONABLE IBD setups with confirmed volume breakouts; the volume ratio spike signals institutional accumulation at the precise entry trigger, improving risk-adjusted outcomes.",
       "spec_params": {
-        "dry_weight": 0.0,
-        "base_depth_penalty": 5.5,
-        "volume_spike_bonus": 1.8,
+        "concentration_lambda": 2.5,
+        "stock_quality_metric": "balanced"
+      },
+      "spec_hash": "31e32f2737ab790d5addd32e67843fe75e659401a7cb830497d7b0dcee519ede",
+      "fitted_state_hash": "none",
+      "source_response_hash": "9eec3655f7313ca2acd1d6ae8ba7dce1c79cf0ac4e4f9fda7c9585769f47cc24",
+      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "PORT_UTIL__momentum_first_concentrator",
+      "family": "portfolio",
+      "name": "momentum_first_concentrator",
+      "hypothesis": "Prioritize recent price momentum as the primary quality signal; stocks with sustained 20-day uptrends and relative strength versus SPY exhibit better continuation characteristics.",
+      "spec_params": {
+        "concentration_lambda": 3.0,
+        "stock_quality_metric": "momentum_first"
+      },
+      "spec_hash": "996627f9d3ab74708cf3e60204d8e4ab485406b63c45d0a94e4e046b0f7aaef6",
+      "fitted_state_hash": "none",
+      "source_response_hash": "9eec3655f7313ca2acd1d6ae8ba7dce1c79cf0ac4e4f9fda7c9585769f47cc24",
+      "source_response_path": "rdagent_policy_discovery/raw/portfolio.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "NOVEL_HEURISTIC__dry_pullback_breakout",
+      "family": "novel_heuristic",
+      "name": "dry_pullback_breakout",
+      "hypothesis": "Pullbacks with drying volume historically signal institutional accumulation; combine with breakout volume confirmation for higher-quality entries.",
+      "spec_params": {
+        "dry_weight": 4.5,
+        "base_depth_penalty": 1.0,
+        "volume_spike_bonus": 3.0,
         "selector_mode": "pure_top3"
       },
-      "spec_hash": "7c5ccf57729b296876f3fa5fbf199a42a4b5cfdcdbcea489314cc99b7670056e",
+      "spec_hash": "0a5fe732a149a4acb48c4384f60cb67c71a7decf2d0335ce59845569f57f0d21",
       "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
+      "source_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
       "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "NOVEL_HEURISTIC__actionable_ma_sandwich",
+      "policy_id": "NOVEL_HEURISTIC__shallow_base_strict_selection",
       "family": "novel_heuristic",
-      "name": "actionable_ma_sandwich",
-      "hypothesis": "ACTIONABLE status filtered by price sandwiched between MA10 and MA20 (not extended above MA50). Avoids stocks too far from moving averages while capturing proper base position.",
+      "name": "shallow_base_strict_selection",
+      "hypothesis": "Deep bases (>30% depth) historically exhibit weaker subsequent performance; penalize depth heavily while maintaining diverse sector exposure.",
       "spec_params": {
-        "dry_weight": 1.5,
-        "base_depth_penalty": 2.0,
-        "volume_spike_bonus": 2.5,
+        "dry_weight": 1.0,
+        "base_depth_penalty": 5.0,
+        "volume_spike_bonus": 2.0,
         "selector_mode": "distinct_1"
       },
-      "spec_hash": "1f479d38c445247ae693e9112070cb87daaf4129bdf07a59f139c62c1fc21c2f",
+      "spec_hash": "3202f5aaf250b032fa402b099e9ef0b5dcdfc6c2411e3261be6d4d77fbac6d5f",
       "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
+      "source_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
       "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     },
     {
-      "policy_id": "NOVEL_HEURISTIC__multi_tf_momentum_alignment",
+      "policy_id": "NOVEL_HEURISTIC__relative_strength_rotation",
       "family": "novel_heuristic",
-      "name": "multi_tf_momentum_alignment",
-      "hypothesis": "Multi-timeframe momentum alignment (5d, 10d, 20d all positive and rising) with dry volume pullback. Confirms broad-based accumulation across timeframes.",
-      "spec_params": {
-        "dry_weight": 3.8,
-        "base_depth_penalty": 2.5,
-        "volume_spike_bonus": 0.5,
-        "selector_mode": "pure_top3"
-      },
-      "spec_hash": "e1a8bab7f37770c348baa42fea3736bbb3c7ec03dbf29741edfd430291763796",
-      "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
-      "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "NOVEL_HEURISTIC__tight_entry_volume_confirm",
-      "family": "novel_heuristic",
-      "name": "tight_entry_volume_confirm",
-      "hypothesis": "Entry position tightness (close near high of range) combined with volume spike bonus. Strong closes in tight ranges with volume indicate institutional commitment.",
-      "spec_params": {
-        "dry_weight": 0.0,
-        "base_depth_penalty": 1.5,
-        "volume_spike_bonus": 4.2,
-        "selector_mode": "distinct_1"
-      },
-      "spec_hash": "c3f08c1310990a38e14f73364e2484b1a07ff7d3b138eadefe5e4f4b0b42d67d",
-      "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
-      "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
-      "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
-    },
-    {
-      "policy_id": "NOVEL_HEURISTIC__sector_momentum_filter",
-      "family": "novel_heuristic",
-      "name": "sector_momentum_filter",
-      "hypothesis": "Focus on Finance, Electronic Technology, and Producer Manufacturing sectors with positive 60-day momentum. Sector rotation awareness improves probability of leadership.",
+      "name": "relative_strength_rotation",
+      "hypothesis": "Stocks outperforming SPY over 20 days indicate sector rotation strength; favor relative strength while limiting concentration per industry.",
       "spec_params": {
         "dry_weight": 2.0,
-        "base_depth_penalty": 3.0,
+        "base_depth_penalty": 2.5,
+        "volume_spike_bonus": 2.5,
+        "selector_mode": "max_2_per_ind"
+      },
+      "spec_hash": "29aee6c84a0608b4a9ef59cb6be8227dc9d18b172b459b2250a21f6d7db481fd",
+      "fitted_state_hash": "none",
+      "source_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
+      "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "NOVEL_HEURISTIC__medium_base_duration",
+      "family": "novel_heuristic",
+      "name": "medium_base_duration",
+      "hypothesis": "Very short bases (<13 weeks) lack proper consolidation; very long bases (>65 weeks) may indicate distribution; medium-duration bases offer balanced risk/reward.",
+      "spec_params": {
+        "dry_weight": 2.5,
+        "base_depth_penalty": 4.0,
+        "volume_spike_bonus": 1.5,
+        "selector_mode": "distinct_1"
+      },
+      "spec_hash": "5450b84d07281db7f6b1193a6dfc0d8294709251e1844b184911547d1ac7edfa",
+      "fitted_state_hash": "none",
+      "source_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
+      "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
+      "source_model": "deepseek/deepseek-v4-pro",
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
+    },
+    {
+      "policy_id": "NOVEL_HEURISTIC__actionable_uptrend_confirmation",
+      "family": "novel_heuristic",
+      "name": "actionable_uptrend_confirmation",
+      "hypothesis": "ACTIONABLE status represents confirmed setups; require actionable flag while selecting for stocks with positive relative strength vs market.",
+      "spec_params": {
+        "dry_weight": 2.0,
+        "base_depth_penalty": 3.5,
         "volume_spike_bonus": 2.0,
         "selector_mode": "max_2_per_ind"
       },
-      "spec_hash": "23d6d98556a3cf5a49b87913237f59b190bcaff37facb7d95f69a108e6e71425",
+      "spec_hash": "5b2b9ad897e61778cc35aac7323c11c38ce948ccf30e6d89bb33c3495b573eb7",
       "fitted_state_hash": "none",
-      "source_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
+      "source_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
       "source_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt",
       "source_model": "deepseek/deepseek-v4-pro",
-      "proposal_engine": "rdagent_model"
+      "proposal_engine": "rdagent_model",
+      "execution_basis": "normalized_spec_params_only",
+      "hypothesis_role": "rationale_only_not_executable"
     }
   ],
   "rejected_schema_proposals": [],
   "dropped_duplicates": [
     {
-      "dropped_policy_id": "IND_BREADTH__strict_actionable_with_3plus",
-      "duplicate_of": "IND_BREADTH__actionable_count_top_industry",
+      "dropped_policy_id": "IND_BREADTH__actionable_threshold_guard",
+      "duplicate_of": "IND_BREADTH__two_plus_one_with_actionable_count",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "IND_BREADTH__momentum_alignment_breadth",
-      "duplicate_of": "IND_BREADTH__base_structure_breadth",
+      "dropped_policy_id": "IND_BREADTH__volume_breadth_median_gate",
+      "duplicate_of": "IND_BREADTH__volume_based_two_position",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "IND_BREADTH__extended_ceiling_rule_breadth",
-      "duplicate_of": "IND_BREADTH__pullback_dryness_breadth",
+      "dropped_policy_id": "IND_BREADTH__quality_count_conservative_2",
+      "duplicate_of": "IND_BREADTH__quality_count_strict_2_plus_1",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "IND_BREADTH__conservative_min_3_always",
-      "duplicate_of": "IND_BREADTH__actionable_count_top_industry",
+      "dropped_policy_id": "IND_BREADTH__volume_breadth_tight_2",
+      "duplicate_of": "IND_BREADTH__volume_based_two_position",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "IND_BREADTH__volatility_adjusted_breadth",
-      "duplicate_of": "IND_BREADTH__rel_strength_breadth_filter",
+      "dropped_policy_id": "IND_BREADTH__volume_breadth_absent_stance",
+      "duplicate_of": "IND_BREADTH__volume_based_two_position",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "PORT_UTIL__diversified_momentum_light",
-      "duplicate_of": "PORT_UTIL__conservative_momentum_concentrated",
+      "dropped_policy_id": "PORT_UTIL__dry_pullback_balanced",
+      "duplicate_of": "PORT_UTIL__ibd_actionable_vol_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__near_52w_high_concentrator",
+      "duplicate_of": "PORT_UTIL__momentum_first_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__tight_base_quality_selector",
+      "duplicate_of": "PORT_UTIL__ibd_actionable_vol_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__low_volatility_concentrator",
+      "duplicate_of": "PORT_UTIL__ibd_actionable_vol_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__eps_quality_momentum_hybrid",
+      "duplicate_of": "PORT_UTIL__ibd_actionable_vol_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__rel_spy_leader_momentum",
+      "duplicate_of": "PORT_UTIL__momentum_first_concentrator",
+      "jaccard_similarity": 1.0,
+      "rank_correlation": 1.0
+    },
+    {
+      "dropped_policy_id": "PORT_UTIL__entry_proximity_strict_selector",
+      "duplicate_of": "PORT_UTIL__ibd_actionable_vol_concentrator",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
       "dropped_policy_id": "PORT_UTIL__moderate_concentration_momentum",
-      "duplicate_of": "PORT_UTIL__conservative_momentum_concentrated",
+      "duplicate_of": "PORT_UTIL__momentum_first_concentrator",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "PORT_UTIL__quality_adjusted_balanced",
-      "duplicate_of": "PORT_UTIL__balanced_quality_focused",
+      "dropped_policy_id": "NOVEL_HEURISTIC__breakout_quality_focus",
+      "duplicate_of": "NOVEL_HEURISTIC__relative_strength_rotation",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "PORT_UTIL__aggressive_growth_momentum",
-      "duplicate_of": "PORT_UTIL__conservative_momentum_concentrated",
+      "dropped_policy_id": "NOVEL_HEURISTIC__low_volatility_acceleration",
+      "duplicate_of": "NOVEL_HEURISTIC__relative_strength_rotation",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "PORT_UTIL__high_conviction_momentum_concentrated",
-      "duplicate_of": "PORT_UTIL__conservative_momentum_concentrated",
+      "dropped_policy_id": "NOVEL_HEURISTIC__three_weeks_tight_momentum",
+      "duplicate_of": "NOVEL_HEURISTIC__shallow_base_strict_selection",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "PORT_UTIL__balanced_moderate_concentration",
-      "duplicate_of": "PORT_UTIL__balanced_quality_focused",
+      "dropped_policy_id": "NOVEL_HEURISTIC__high_up_day_ratio_momentum",
+      "duplicate_of": "NOVEL_HEURISTIC__dry_pullback_breakout",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     },
     {
-      "dropped_policy_id": "NOVEL_HEURISTIC__rs_base_combo",
-      "duplicate_of": "NOVEL_HEURISTIC__base_quality_momentum_thresh",
+      "dropped_policy_id": "NOVEL_HEURISTIC__extended_range_pullback",
+      "duplicate_of": "NOVEL_HEURISTIC__dry_pullback_breakout",
       "jaccard_similarity": 1.0,
-      "rank_correlation": 1.0
+      "rank_correlation": 0.9968
     },
     {
-      "dropped_policy_id": "NOVEL_HEURISTIC__pullback_recovery_atr_adjusted",
-      "duplicate_of": "NOVEL_HEURISTIC__multi_tf_momentum_alignment",
-      "jaccard_similarity": 1.0,
-      "rank_correlation": 1.0
-    },
-    {
-      "dropped_policy_id": "NOVEL_HEURISTIC__microbase_acceleration",
-      "duplicate_of": "NOVEL_HEURISTIC__actionable_ma_sandwich",
-      "jaccard_similarity": 1.0,
-      "rank_correlation": 1.0
-    },
-    {
-      "dropped_policy_id": "NOVEL_HEURISTIC__extended_avoid_unless_strong",
-      "duplicate_of": "NOVEL_HEURISTIC__dry_pullback_volume_breakout",
-      "jaccard_similarity": 1.0,
-      "rank_correlation": 1.0
-    },
-    {
-      "dropped_policy_id": "NOVEL_HEURISTIC__ma_slope_momentum_combo",
-      "duplicate_of": "NOVEL_HEURISTIC__multi_tf_momentum_alignment",
+      "dropped_policy_id": "NOVEL_HEURISTIC__volume_mbox_composite",
+      "duplicate_of": "NOVEL_HEURISTIC__shallow_base_strict_selection",
       "jaccard_similarity": 1.0,
       "rank_correlation": 1.0
     }

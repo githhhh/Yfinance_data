@@ -1,25 +1,25 @@
 {
   "protocol_version": "track_c_v1",
-  "run_id": "track_c_20260901T085545Z_3e454bd2",
-  "source_git_sha": "3b69d16b0fb4abf66fa1d0c843f4d779688a0095",
+  "run_id": "track_c_20260901T092408Z_f20f50cf",
+  "source_git_sha": "95f5bd9b9a14b4bdb5d84ef96d87228c5fb4886e",
   "train_snapshots": 31,
   "validation_snapshots": 11,
   "allowed_pit_features": 39,
   "blocked_outcome_features": 8,
   "panel_rows": 2738,
   "dependency_hashes": {
-    "challenge_package_hash": "1a27c415a6914e4504b74d3647c314f559c719668ecdf78375b37075a4780544",
+    "challenge_package_hash": "44b5389b3de16b56e0045af492048d13192a6c27f1b924373865c008e845a7f6",
     "feature_manifest_hash": "a161edccf0f54ebe8d58d062553f8674f163cd630da67bab3648899019f913eb",
     "protocol_hash": "0da0b1930d6d48b2de16be232f563f062d32d8c1dfc64ccfe64b1f6d96223848",
     "b0_ablation_grid_hash": "c6e66d890f270441f9d8b44784f0c8a4252ca39b76321dae9c1fc7a2b8350032",
     "counterfactual_engine_hash": "f7deaea191e564051477e9efc77587a76fe7cca284b873995dc5f9e793d2a642",
-    "evaluate_econometrics_hash": "bd864678483916f713ee50d262bd4c1484895ddd592ea1c2a6ddedaae79a746c",
-    "discovery_runner_hash": "805491d4793b3cf45c6a4ff060ec93b2aba5536f9ec86ebdbffd7c7166c969de",
+    "evaluate_econometrics_hash": "9a6e9f77e02da990d9be9ee51e7b1322741f614ab144ba987e4d732135b9d2b0",
+    "discovery_runner_hash": "6a81b09fb93620ed41fb78cb8e57e58fff46e92bbf2c4794e8304479ac499b2d",
     "rdagent_policy_bridge_hash": "bfe7ec632107465f7a7a3b88d033a215f2fb6e39a9f05f9d6098410952aebc90",
-    "blind_prompt_hash": "ccc5e60c3a481a2afeb9941b6d31afc2ad1637219dd2b19a44a5c86545fdbd3a",
+    "blind_prompt_hash": "eb4831a34c02393f15b44a990fdad23c3e6899ab172e7dd2351cd4e51444dcb9",
     "behavioral_dedup_hash": "d50b6c5c98464e2563c33268d186e23b447df904ac615fcbfcb5e0821cbad589",
     "production_b0_hash": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477",
     "panel_hash": "d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5",
-    "codebase_hash": "3e454bd2cadb14673f8aca9987ac5a6aea93f1d25418414a9fe352cfb395ac11"
+    "codebase_hash": "f20f50cfcd7e7d7083fc60029883a7982d8c320242d4ee4bd4d4f4488e2b5af4"
   }
 }

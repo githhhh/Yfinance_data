@@ -5,17 +5,26 @@
   "proposals": [
     {
       "family": "portfolio",
-      "name": "conservative_momentum_concentrated",
-      "hypothesis": "Low lambda (0.5) with momentum_first prioritizes strong recent price action while avoiding over-concentration; appropriate given the right-skewed momentum distributions (mom_20 p75=0.20) and need for signal clarity in low-signal environment where median is_actionable=0.",
+      "name": "ibd_actionable_vol_concentrator",
+      "hypothesis": "Concentrate in ACTIONABLE IBD setups with confirmed volume breakouts; the volume ratio spike signals institutional accumulation at the precise entry trigger, improving risk-adjusted outcomes.",
       "params": {
-        "concentration_lambda": 0.5,
+        "concentration_lambda": 2.5,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "momentum_first_concentrator",
+      "hypothesis": "Prioritize recent price momentum as the primary quality signal; stocks with sustained 20-day uptrends and relative strength versus SPY exhibit better continuation characteristics.",
+      "params": {
+        "concentration_lambda": 3.0,
         "stock_quality_metric": "momentum_first"
       }
     },
     {
       "family": "portfolio",
-      "name": "balanced_quality_focused",
-      "hypothesis": "Medium lambda (1.5) with balanced metric balances EPS quality (median eps_yoy_growth=34.6%) against momentum, avoiding over-weighting volatile growth extremes (p90=400%); defensible since 35% of snapshots lack EPS data, requiring fallback logic.",
+      "name": "dry_pullback_balanced",
+      "hypothesis": "Target pullbacks where volume has dried up, indicating supply absorption; combined with moderate pullback depth, this captures accumulation during normal correction phases.",
       "params": {
         "concentration_lambda": 1.5,
         "stock_quality_metric": "balanced"
@@ -23,44 +32,8 @@
     },
     {
       "family": "portfolio",
-      "name": "diversified_momentum_light",
-      "hypothesis": "High lambda (2.5) with momentum_first captures breadth in the wide momentum distribution (mom_60 range 0.05-0.61); compensates for sparse ACTIONABLE signals (only 274/1130) by diversifying across multiple moderate-strength candidates.",
-      "params": {
-        "concentration_lambda": 2.5,
-        "stock_quality_metric": "momentum_first"
-      }
-    },
-    {
-      "family": "portfolio",
-      "name": "ultra_low_concentration_balanced",
-      "hypothesis": "Lambda 0.3 minimizes single-stock risk given the high null rate on b0_eligible (median=0) and UNCONFIRMED status dominance (57%); balanced metric ensures quality guards without over-relying on sparse actionable signals.",
-      "params": {
-        "concentration_lambda": 0.3,
-        "stock_quality_metric": "balanced"
-      }
-    },
-    {
-      "family": "portfolio",
-      "name": "moderate_concentration_momentum",
-      "hypothesis": "Lambda 1.0 represents neutral concentration; momentum_first leverages the positively-skewed up_day_ratio_20 (median=0.60) and positive ma slopes across percentiles, targeting stocks in sustained uptrends.",
-      "params": {
-        "concentration_lambda": 1.0,
-        "stock_quality_metric": "momentum_first"
-      }
-    },
-    {
-      "family": "portfolio",
-      "name": "quality_adjusted_balanced",
-      "hypothesis": "Lambda 1.2 with balanced captures the moderate base_depth_pct range (median=-30.45%) indicating healthy pullbacks, while eps_known=1 for 85% of data enables reliable quality scoring; avoids over-concentration in extreme setups.",
-      "params": {
-        "concentration_lambda": 1.2,
-        "stock_quality_metric": "balanced"
-      }
-    },
-    {
-      "family": "portfolio",
-      "name": "aggressive_growth_momentum",
-      "hypothesis": "Lambda 2.0 with momentum_first targets the fat right tail of momentum features (mom_20 p90=0.35, mom_60 p90=0.61) which suggest accelerating growth; appropriate for capturing breakout candidates given pivot rule dominance (424/1130).",
+      "name": "near_52w_high_concentrator",
+      "hypothesis": "Stocks within 1% of 52-week highs with confirmed breakouts represent the strongest momentum profiles; proximity to highs signals ongoing institutional buying pressure.",
       "params": {
         "concentration_lambda": 2.0,
         "stock_quality_metric": "momentum_first"
@@ -68,29 +41,56 @@
     },
     {
       "family": "portfolio",
-      "name": "defensive_balanced_quality",
-      "hypothesis": "Lambda 0.8 prioritizes capital preservation via balanced metric, acknowledging the high UNCONFIRMED rate (57%) and median pullback_pct of -10.8%; quality scoring provides downside buffer in uncertain entry status environment.",
+      "name": "tight_base_quality_selector",
+      "hypothesis": "Prefer consolidation bases with tight depth (less than 20% decline) and limited micro-box formation; structured bases reduce noise and indicate coherent supply-demand equilibrium.",
       "params": {
-        "concentration_lambda": 0.8,
+        "concentration_lambda": 1.8,
         "stock_quality_metric": "balanced"
       }
     },
     {
       "family": "portfolio",
-      "name": "high_conviction_momentum_concentrated",
-      "hypothesis": "Lambda 1.8 with momentum_first targets high-conviction positions given the bimodal is_actionable distribution; the positive rel_spy_60 distribution (median=0.20) suggests relative strength screening can identify market-leading stocks.",
+      "name": "low_volatility_concentrator",
+      "hypothesis": "Lower realized volatility stocks may offer better risk-adjusted exposure; tighter price ranges reduce tail risk while maintaining participation in uptrends.",
       "params": {
-        "concentration_lambda": 1.8,
+        "concentration_lambda": 2.2,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "eps_quality_momentum_hybrid",
+      "hypothesis": "Combine EPS growth availability with positive momentum; earnings quality provides fundamental catalyst while momentum confirms market recognition of the improvement.",
+      "params": {
+        "concentration_lambda": 2.0,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "rel_spy_leader_momentum",
+      "hypothesis": "Stocks outperforming SPY over 60 days demonstrate sector rotation favorability; relative strength leaders capture market beta shifts and institutional sector allocation.",
+      "params": {
+        "concentration_lambda": 2.5,
         "stock_quality_metric": "momentum_first"
       }
     },
     {
       "family": "portfolio",
-      "name": "balanced_moderate_concentration",
-      "hypothesis": "Lambda 1.3 with balanced provides middle-ground exposure given the moderate rv_20 distribution (median=0.025) indicating typical volatility levels; balanced metric hedges against the 18.8% of data with missing volume_ratio and 5.4% missing rv_20.",
+      "name": "entry_proximity_strict_selector",
+      "hypothesis": "Stocks trading within 3% of their IBD candidate trigger price are at optimal entry points; deviation beyond this range increases slippage risk and reduces immediate upside.",
       "params": {
-        "concentration_lambda": 1.3,
+        "concentration_lambda": 1.5,
         "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "moderate_concentration_momentum",
+      "hypothesis": "A balanced approach using moderate concentration with momentum-first ranking captures trending opportunities while maintaining diversification across signals.",
+      "params": {
+        "concentration_lambda": 1.2,
+        "stock_quality_metric": "momentum_first"
       }
     }
   ]

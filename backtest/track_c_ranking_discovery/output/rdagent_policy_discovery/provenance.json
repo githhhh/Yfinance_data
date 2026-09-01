@@ -8,39 +8,39 @@
       "accepted_raw_proposals": 11,
       "budget": 11,
       "family": "industry_breadth",
-      "raw_response_hash": "60bfb8f11e11bf726182130a3fbeddf77e190a889d19a40824f0d7096cd38067",
+      "raw_response_hash": "c06bdfcd046e1d830fd7aa4243a5303f5cda2b9f43ddd0c6665497ad836920de",
       "raw_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt"
     },
     {
       "accepted_raw_proposals": 11,
       "budget": 11,
       "family": "continuous",
-      "raw_response_hash": "1ecf61ce93da67eb2e75193e885110502ef6922cffa9a9e4967216d63a6c32fc",
+      "raw_response_hash": "a2c28fc1ff90a1579cede2fa9df8bb7647dae5ff6e63cf112ff1bdb2b2f5a570",
       "raw_response_path": "rdagent_policy_discovery/raw/continuous.txt"
     },
     {
       "accepted_raw_proposals": 11,
       "budget": 11,
       "family": "linear_ranking",
-      "raw_response_hash": "640eb5f6cbe4053eb2737fdfd3a4d838167dd7ada16ee7e03e8f58ad28f47c25",
+      "raw_response_hash": "48bcbf284db600027356aa8e8215a64c8f7aac897fa4845bcfdb2364fb5dc97b",
       "raw_response_path": "rdagent_policy_discovery/raw/linear_ranking.txt"
     },
     {
       "accepted_raw_proposals": 10,
       "budget": 10,
       "family": "portfolio",
-      "raw_response_hash": "f69d29a58e4034e3a303323f2e49bd2612ada450b19ea37df92feda4b54e9192",
+      "raw_response_hash": "9eec3655f7313ca2acd1d6ae8ba7dce1c79cf0ac4e4f9fda7c9585769f47cc24",
       "raw_response_path": "rdagent_policy_discovery/raw/portfolio.txt"
     },
     {
       "accepted_raw_proposals": 11,
       "budget": 11,
       "family": "novel_heuristic",
-      "raw_response_hash": "d8b05f2be9b326d2198b4d045b8f86f4ba89026e7f376f642561e5b5a3b644f6",
+      "raw_response_hash": "3e4fd329dbd2d8da1efeacbab15a93b6045c521e194583ae37f3641a1af911c6",
       "raw_response_path": "rdagent_policy_discovery/raw/novel_heuristic.txt"
     }
   ],
-  "generated_at": "2026-09-01T09:00:02.246649+00:00",
+  "generated_at": "2026-09-01T09:28:10.793657+00:00",
   "max_retry": 15,
   "model": "deepseek/deepseek-v4-pro",
   "outcome_blind": true,
