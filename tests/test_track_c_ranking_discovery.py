@@ -179,3 +179,88 @@ def test_monte_carlo_missing_return_does_not_fill_zero():
     )
     assert not np.isnan(res.mean_A_random_ind_random_stock)
     assert not np.isnan(res.b0_induced_industry_allocation_effect)
+
+
+
+def test_rdagent_frozen_spec_roundtrip_and_tamper_detection():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        normalize_discovery_records,
+        instantiate_discovery_proposals,
+    )
+
+    raw = [{
+        "family": "continuous",
+        "name": "agent_roundtrip",
+        "hypothesis": "PIT-safe EPS and entry-volume ranking",
+        "params": {
+            "weights": {
+                "eps_yoy_growth": 2.0,
+                "ibd_entry_volume_ratio": 1.5,
+            },
+            "selector_mode": "distinct_1",
+        },
+        "source_response_hash": "abc123",
+        "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
+        "source_model": "deepseek/deepseek-v4-pro",
+    }]
+    policies, records = normalize_discovery_records(raw)
+    replayed = instantiate_discovery_proposals(records)
+    assert replayed[0].policy_id == policies[0].policy_id
+    assert replayed[0].spec_hash == policies[0].spec_hash
+
+    tampered = json.loads(json.dumps(records))
+    tampered[0]["spec_params"]["weights"]["eps_yoy_growth"] = 7.0
+    with pytest.raises(RuntimeError, match="spec_hash"):
+        instantiate_discovery_proposals(tampered)
+
+
+def test_counterfactual_uses_paired_common_support_for_missing_random_outcomes():
+    from backtest.track_c_ranking_discovery.counterfactual_engine import run_counterfactual_monte_carlo
+
+    snap = "2026-01-02"
+    scored = pd.DataFrame({
+        "code": ["AAA", "BBB", "CCC"],
+        "is_actionable": [1, 1, 1],
+        "has_geom_failure": [0, 0, 0],
+        "below_buy_point": [0, 0, 0],
+        "has_known_eps": [1, 1, 1],
+        "has_valid_industry": [1, 1, 1],
+        "industry_key": ["X", "X", "Y"],
+        "raw_rank": [1, 2, 3],
+    })
+    panel = pd.DataFrame({
+        "snapshot_date": [snap, snap, snap],
+        "code": ["AAA", "BBB", "CCC"],
+        "w4_return_pct": [6.0, 4.0, np.nan],
+        "w4_stop8": [0.0, 0.0, 0.0],
+    })
+    b0 = [WeeklyPortfolioOutcome(
+        snapshot_date=snap,
+        selector_id="B0_ORIGINAL",
+        horizon="W4",
+        pick_count=1,
+        slot_coverage=1 / 3,
+        active_week=True,
+        full_top3=False,
+        selected_codes=["AAA"],
+        selection_quality_return=6.0,
+        capital_adjusted_return=2.0,
+        selection_quality_stop8=0.0,
+        capital_adjusted_stop8=0.0,
+        one_pick_ruined=False,
+        is_mature=True,
+    )]
+
+    result, df = run_counterfactual_monte_carlo(
+        panel,
+        b0,
+        {snap: scored},
+        horizon="W4",
+        n_paths=400,
+        seed=123,
+        null_model="Null1_Uniform_Industry",
+    )
+    assert 0 < result.valid_paths < 400
+    assert result.mean_A_random_ind_random_stock >= (4.0 / 3.0) - 1e-6
+    assert result.mean_A_random_ind_random_stock <= (6.0 / 3.0) + 1e-6
+    assert bool(df.iloc[0]["paired_common_support"]) is True

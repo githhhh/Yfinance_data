@@ -18,14 +18,18 @@ from .config import (
     EVAL_HORIZONS,
     TOP_N,
 )
-from .protocol import compute_3slot_portfolio_weekly
+from .protocol import compute_3slot_portfolio_weekly, ChallengerProtocol
 from .b0_ablation_grid import (
     StructuralGridChallenger,
     generate_all_structural_grid_challengers,
 )
 from .counterfactual_engine import run_counterfactual_monte_carlo
 from .discovery_sandbox.anonymizer import create_anonymized_discovery_dataset
-from .discovery_sandbox.discovery_runner import generate_all_discovery_proposals
+from .discovery_sandbox.discovery_runner import (
+    normalize_discovery_records,
+    instantiate_discovery_proposals,
+)
+from .discovery_sandbox.rdagent_policy_bridge import run_rdagent_policy_discovery
 from .discovery_sandbox.behavioral_dedup import deduplicate_proposals_behaviorally
 from .evaluate_econometrics import (
     evaluate_paired_challenger,
@@ -35,6 +39,10 @@ from .evaluate_econometrics import (
 from .lock_manager import (
     seal_track_c_lock_manifest,
     compute_track_c_dependency_hashes,
+    compute_hash_of_file,
+    canonical_json_hash,
+    get_git_sha,
+    assert_track_c_source_clean,
     verify_phase0_integrity,
     verify_proposal_freeze_integrity,
     verify_lock_integrity,
@@ -46,6 +54,7 @@ from .lock_manager import (
 # ---------------------------------------------------------
 def cmd_phase0_prepare(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 0 Protocol & Feature Allowlist Preparation ===")
+    assert_track_c_source_clean()
     OUT.mkdir(parents=True, exist_ok=True)
 
     with open(FEATURE_MANIFEST_PATH, "r", encoding="utf-8") as f:
@@ -57,14 +66,22 @@ def cmd_phase0_prepare(args: argparse.Namespace) -> None:
     print(f"Feature allowlist validated: {allowed_count} PIT features allowed, {forbidden_count} outcome labels blocked.")
 
     # Validate panel shape
-    df = pd.read_parquet(PANEL_SOURCE)
+    df = pd.read_parquet(PANEL_SOURCE, columns=["snapshot_date"])
     train_snaps = df[df.snapshot_date.astype(str) <= str(TRAIN_END)]["snapshot_date"].nunique()
     val_snaps = df[(df.snapshot_date.astype(str) >= str(CONTAM_VAL_START)) & (df.snapshot_date.astype(str) <= str(CONTAM_VAL_END))]["snapshot_date"].nunique()
 
     dep_hashes = compute_track_c_dependency_hashes()
+    run_id = (
+        "track_c_"
+        + pd.Timestamp.now(tz="UTC").strftime("%Y%m%dT%H%M%SZ")
+        + "_"
+        + dep_hashes["codebase_hash"][:8]
+    )
 
     res = {
         "protocol_version": "track_c_v1",
+        "run_id": run_id,
+        "source_git_sha": get_git_sha(),
         "train_snapshots": train_snaps,
         "validation_snapshots": val_snaps,
         "allowed_pit_features": allowed_count,
@@ -84,63 +101,102 @@ def cmd_phase0_prepare(args: argparse.Namespace) -> None:
 # Phase 1: Blind Proposal Generation & Freeze
 # ---------------------------------------------------------
 def cmd_phase1_discover(args: argparse.Namespace) -> None:
-    print("=== Track C: Phase 1A Blind Proposal Generation & Behavioral Deduplication ===")
-    panel_df = pd.read_parquet(PANEL_SOURCE)
+    print("=== Track C: Phase 1A Blind RD-Agent Proposal Generation ===")
+    prep_path = OUT / "phase0_prepared_manifest.json"
+    phase0 = verify_phase0_integrity(prep_path)
 
-    # 1. Create anonymized, outcome-free Train dataset
-    anon_view, code_map, snap_map = create_anonymized_discovery_dataset(panel_df)
-    print(f"Anonymized discovery dataset created with {len(anon_view)} records across {len(snap_map)} snapshots.")
+    with open(FEATURE_MANIFEST_PATH, "r", encoding="utf-8") as f:
+        feature_manifest = json.load(f)
 
-    # 2. Instantiate blind proposals across 5 families
-    proposals = generate_all_discovery_proposals()
-    print(f"Generated {len(proposals)} candidate proposals across 5 discovery families.")
+    import pyarrow.parquet as pq
 
-    # 3. Perform outcome-blind behavioral deduplication on Train features
+    schema_cols = set(pq.ParquetFile(PANEL_SOURCE).schema.names)
+    allowed_features = [
+        k
+        for k, v in feature_manifest["features"].items()
+        if v.get("allowed_for_discovery") is True and k in schema_cols
+    ]
+    read_cols = list(dict.fromkeys(
+        [x for x in ["code", "snapshot_date", "industry", "sector"] if x in schema_cols]
+        + allowed_features
+    ))
+    panel_df = pd.read_parquet(PANEL_SOURCE, columns=read_cols)
+
+    anon_view, _, snap_map = create_anonymized_discovery_dataset(panel_df)
+    print(
+        f"Outcome-blind anonymized Train dataset: {len(anon_view)} rows, "
+        f"{len(snap_map)} snapshots."
+    )
+
+    raw_records, provenance = run_rdagent_policy_discovery(
+        anon_view,
+        feature_manifest,
+        OUT / "rdagent_policy_discovery",
+    )
+    proposals, normalized_records = normalize_discovery_records(raw_records)
+    print(f"RD-Agent produced {len(proposals)} executable blind proposals before dedup.")
+
     kept_proposals, dropped = deduplicate_proposals_behaviorally(proposals, anon_view)
-    print(f"Behavioral deduplication completed: {len(kept_proposals)} unique proposals retained, {len(dropped)} merged.")
+    normalized_map = {r["policy_id"]: r for r in normalized_records}
+    kept_records = [normalized_map[p.policy_id] for p in kept_proposals]
+    if not kept_records:
+        raise RuntimeError("Behavioral dedup removed every RD-Agent proposal; refusing outcome reveal.")
 
-    # Save proposal records
-    records = []
-    for p in kept_proposals:
-        records.append({
-            "policy_id": p.policy_id,
-            "family": p.family,
-            "spec_hash": p.spec_hash,
-            "fitted_state_hash": p.fitted_state_hash,
-        })
-
+    ledger = {
+        "run_id": phase0["run_id"],
+        "source_git_sha": phase0["source_git_sha"],
+        "proposal_engine": "rdagent_model",
+        "rdagent_provenance_path": provenance["provenance_path"],
+        "rdagent_provenance_hash": provenance["provenance_hash"],
+        "proposals": kept_records,
+        "dropped_duplicates": dropped,
+    }
     ledger_path = OUT / "proposals_ledger.json"
-    with open(ledger_path, "w", encoding="utf-8") as f:
-        json.dump({"proposals": records, "dropped_duplicates": dropped}, f, indent=2)
-
-    print(f"Proposals ledger written to {ledger_path}")
+    ledger_path.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+    print(
+        f"Blind RD-Agent ledger written with {len(kept_records)} candidates "
+        f"before any outcome evaluation: {ledger_path}"
+    )
 
 
 def cmd_phase1_freeze(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 1B Blind Proposal Ledger Freezing ===")
+    prep_path = OUT / "phase0_prepared_manifest.json"
+    phase0 = verify_phase0_integrity(prep_path)
+
     ledger_path = OUT / "proposals_ledger.json"
     if not ledger_path.exists():
-        raise FileNotFoundError("Cannot freeze proposals: proposals_ledger.json not found! Run phase1-discover first.")
-
-    with open(ledger_path, "r", encoding="utf-8") as f:
-        ledger = json.load(f)
-
-    h = hashlib.sha256()
-    h.update(json.dumps(ledger, sort_keys=True).encode())
-    freeze_hash = h.hexdigest()
+        raise FileNotFoundError("Cannot freeze proposals: run phase1-discover first.")
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    if ledger.get("run_id") != phase0.get("run_id"):
+        raise RuntimeError("Proposal ledger run_id does not match current Phase 0 run.")
 
     freeze_manifest = {
-        "frozen_at": pd.Timestamp.now().isoformat(),
-        "ledger_hash": freeze_hash,
+        "frozen_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "run_id": phase0["run_id"],
+        "source_git_sha": phase0["source_git_sha"],
+        "phase0_manifest_hash": compute_hash_of_file(prep_path),
+        "ledger_hash": canonical_json_hash(ledger),
+        "ledger_file_hash": compute_hash_of_file(ledger_path),
+        "rdagent_provenance_path": ledger["rdagent_provenance_path"],
+        "rdagent_provenance_hash": ledger["rdagent_provenance_hash"],
         "num_proposals": len(ledger["proposals"]),
         "proposals": ledger["proposals"],
     }
 
     freeze_path = OUT / "proposal_freeze_manifest.json"
-    with open(freeze_path, "w", encoding="utf-8") as f:
-        json.dump(freeze_manifest, f, indent=2)
-
-    print(f"Proposal freeze manifest successfully sealed to {freeze_path} (Hash: {freeze_hash[:16]}...)")
+    freeze_path.write_text(json.dumps(freeze_manifest, indent=2), encoding="utf-8")
+    frozen_policies = instantiate_discovery_proposals(freeze_manifest["proposals"])
+    verify_proposal_freeze_integrity(
+        freeze_path,
+        frozen_policies,
+        ledger_path=ledger_path,
+        phase0_manifest_path=prep_path,
+    )
+    print(
+        f"Proposal freeze sealed: {freeze_manifest['num_proposals']} policies, "
+        f"ledger={freeze_manifest['ledger_hash'][:16]}..."
+    )
 
 
 # ---------------------------------------------------------
@@ -160,9 +216,17 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
     with open(freeze_path, "r", encoding="utf-8") as f:
         freeze_man = json.load(f)
 
-    all_raw_proposals = generate_all_discovery_proposals()
-    verify_proposal_freeze_integrity(freeze_path, all_raw_proposals)
-    print(f"Verified sealed proposal manifest: {freeze_man['num_proposals']} proposals locked under hash {freeze_man['ledger_hash'][:16]}...")
+    frozen_discovery = instantiate_discovery_proposals(freeze_man["proposals"])
+    verify_proposal_freeze_integrity(
+        freeze_path,
+        frozen_discovery,
+        ledger_path=OUT / "proposals_ledger.json",
+        phase0_manifest_path=prep_path,
+    )
+    print(
+        f"Verified sealed RD-Agent proposal manifest: {freeze_man['num_proposals']} "
+        f"policies under {freeze_man['ledger_hash'][:16]}..."
+    )
 
     # Load Full Panel with Outcomes
     panel_df = pd.read_parquet(PANEL_SOURCE)
@@ -226,7 +290,7 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
 
     # 4. Evaluate Blind Discovery Challengers
     print("\n--- 4. Evaluating Blind Discovery Challengers ---")
-    discovery_challengers = {p.policy_id: p for p in generate_all_discovery_proposals()}
+    discovery_challengers = {p.policy_id: p for p in frozen_discovery}
     frozen_ids = [p["policy_id"] for p in freeze_man["proposals"]]
 
     for p_id in frozen_ids:
@@ -357,11 +421,21 @@ def cmd_phase5_validate(args: argparse.Namespace) -> None:
     ].copy()
     snaps = sorted(val_df["snapshot_date"].astype(str).unique().tolist())
 
-    # Build Challenger pool
+    # Build Challenger pool strictly from structural specs + sealed RD-Agent specs.
+    freeze_path = OUT / "proposal_freeze_manifest.json"
+    freeze_man = json.loads(freeze_path.read_text(encoding="utf-8"))
+    frozen_discovery = instantiate_discovery_proposals(freeze_man["proposals"])
+    verify_proposal_freeze_integrity(
+        freeze_path,
+        frozen_discovery,
+        ledger_path=OUT / "proposals_ledger.json",
+        phase0_manifest_path=OUT / "phase0_prepared_manifest.json",
+    )
+
     all_challengers: dict[str, ChallengerProtocol] = {}
     for ch in generate_all_structural_grid_challengers():
         all_challengers[ch.policy_id] = ch
-    for ch in generate_all_discovery_proposals():
+    for ch in frozen_discovery:
         all_challengers[ch.policy_id] = ch
 
     # Evaluate B0 on Validation
@@ -480,6 +554,7 @@ def df_to_markdown_simple(df: pd.DataFrame) -> str:
 # ---------------------------------------------------------
 def cmd_phase6_report(args: argparse.Namespace) -> None:
     print("=== Track C: Phase 6 Generating Final Comprehensive Report ===")
+    verify_lock_integrity(OUT / "research_lock_manifest.json")
     decomp_path = OUT / "counterfactual_2x2_decomposition.csv"
     val_path = OUT / "validation_results.parquet"
     train_path = OUT / "train_evaluations.parquet"
@@ -503,7 +578,7 @@ def cmd_phase6_report(args: argparse.Namespace) -> None:
         f"   - **B0-Induced Industry Allocation Effect**: {df_decomp['industry_allocation_effect (D-B)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['industry_allocation_effect (D-B)'].iloc[1]:+.4f}% (Null 2)",
         f"   - **Conditional Stock Selection Effect**: {df_decomp['stock_selection_effect (D-C)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['stock_selection_effect (D-C)'].iloc[1]:+.4f}% (Null 2)",
         f"   - **Interaction Effect**: {df_decomp['interaction_effect'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['interaction_effect'].iloc[1]:+.4f}% (Null 2)",
-        f"   - **B0 Full-Path Percentile**: B0 ranked at the **{df_decomp['b0_percentile_mean'].iloc[0]:.1f}th percentile** (Null 1) and **{df_decomp['b0_percentile_mean'].iloc[1]:.1f}th percentile** (Null 2) across 5,000 full historical simulation paths.",
+        f"   - **B0 Paired Full-Path Percentile**: on pathwise identical mature support, B0 beat **{df_decomp['b0_percentile_mean'].iloc[0]:.1f}%** of Null 1 paths and **{df_decomp['b0_percentile_mean'].iloc[1]:.1f}%** of Null 2 paths.",
         "",
         "2. **Locked Observed Re-Validation Results**:",
         df_to_markdown_simple(df_val),
@@ -525,6 +600,20 @@ def cmd_phase6_report(args: argparse.Namespace) -> None:
     print(f"Final report successfully generated at {report_path}")
 
 
+def cmd_materialize(args: argparse.Namespace) -> None:
+    """Single fail-closed local materialization path. Never patch source on failure."""
+    print("=== Track C sealed materialization: research source is immutable ===")
+    cmd_phase0_prepare(args)
+    cmd_phase1_discover(args)
+    cmd_phase1_freeze(args)
+    cmd_phase2_evaluate(args)
+    cmd_phase3_shortlist(args)
+    cmd_phase4_lock(args)
+    cmd_phase5_validate(args)
+    cmd_phase6_report(args)
+    print("=== Track C materialization complete; only output artifacts should now be committed ===")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Track C Modular Discovery & Counterfactual Attribution CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -537,6 +626,7 @@ def main() -> None:
     subparsers.add_parser("phase4-lock")
     subparsers.add_parser("phase5-validate")
     subparsers.add_parser("phase6-report")
+    subparsers.add_parser("materialize")
 
     args = parser.parse_args()
 
@@ -549,6 +639,7 @@ def main() -> None:
         "phase4-lock": cmd_phase4_lock,
         "phase5-validate": cmd_phase5_validate,
         "phase6-report": cmd_phase6_report,
+        "materialize": cmd_materialize,
     }
 
     dispatch[args.command](args)

@@ -558,3 +558,212 @@ def generate_all_discovery_proposals() -> list[ChallengerProtocol]:
         proposals.append(NovelHeuristicChallenger(p_id, dry_weight=dw, base_depth_penalty=bdp, volume_spike_bonus=vsb, selector_mode=sm))
 
     return proposals
+
+
+
+# ---------------------------------------------------------
+# Frozen RD-Agent proposal spec validation / instantiation
+# ---------------------------------------------------------
+def _allowed_discovery_feature_types() -> dict[str, str]:
+    with open(FEATURE_MANIFEST_PATH, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    return {
+        k: str(v.get("data_type", ""))
+        for k, v in manifest["features"].items()
+        if v.get("allowed_for_discovery") is True
+    }
+
+
+def _require_selector(value: object) -> str:
+    selector = str(value or "distinct_1")
+    if selector not in {"distinct_1", "max_2_per_ind", "pure_top3"}:
+        raise ValueError(f"Unsupported selector_mode: {selector}")
+    return selector
+
+
+def _bounded_float(value: object, lo: float, hi: float, name: str) -> float:
+    try:
+        x = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be numeric") from exc
+    if not np.isfinite(x) or x < lo or x > hi:
+        raise ValueError(f"{name} must be within [{lo}, {hi}], got {x}")
+    return x
+
+
+def instantiate_discovery_proposal(
+    record: dict[str, Any],
+) -> tuple[ChallengerProtocol, dict[str, Any]]:
+    """Validate one frozen RD-Agent spec and create its executable policy object."""
+    family = str(record.get("family") or "").strip()
+    name = str(record.get("name") or "").strip()
+    params = record.get("params")
+    if not name or not isinstance(params, dict):
+        raise ValueError("RD-Agent proposal requires non-empty name and params object")
+
+    feature_types = _allowed_discovery_feature_types()
+    numeric_allowed = {
+        k for k, typ in feature_types.items()
+        if typ in {"float", "int", "bool"}
+    }
+
+    if family == "industry_breadth":
+        metric = str(params.get("breadth_metric") or "")
+        if metric not in {"actionable_count", "volume_breadth", "quality_and_count"}:
+            raise ValueError(f"Unsupported breadth_metric: {metric}")
+        dynamic = bool(params.get("allow_dynamic_2_plus_1", True))
+        min_b = int(params.get("min_breadth_for_2", 2))
+        if min_b not in {2, 3}:
+            raise ValueError("min_breadth_for_2 must be 2 or 3")
+        normalized_params = {
+            "breadth_metric": metric,
+            "allow_dynamic_2_plus_1": dynamic,
+            "min_breadth_for_2": min_b,
+        }
+        policy = IndustryBreadthChallenger(
+            name,
+            breadth_metric=metric,
+            allow_dynamic_2_plus_1=dynamic,
+            min_breadth_for_2=min_b,
+        )
+
+    elif family == "continuous":
+        weights_raw = params.get("weights")
+        if not isinstance(weights_raw, dict) or not (2 <= len(weights_raw) <= 8):
+            raise ValueError("continuous.weights must contain 2..8 features")
+        weights: dict[str, float] = {}
+        for feature, weight in weights_raw.items():
+            if feature not in numeric_allowed:
+                raise ValueError(f"Feature {feature!r} is not an allowed numeric PIT feature")
+            w = _bounded_float(weight, -8.0, 8.0, f"weight[{feature}]")
+            if abs(w) < 1e-12:
+                raise ValueError(f"weight[{feature}] must be non-zero")
+            weights[str(feature)] = w
+        selector = _require_selector(params.get("selector_mode"))
+        normalized_params = {"weights": weights, "selector_mode": selector}
+        policy = ContinuousScoreChallenger(name, weights, selector_mode=selector)
+
+    elif family == "linear_ranking":
+        feats_raw = params.get("feature_subset")
+        if not isinstance(feats_raw, list):
+            raise ValueError("linear_ranking.feature_subset must be an array")
+        features = list(dict.fromkeys(str(x) for x in feats_raw))
+        if not (2 <= len(features) <= 8):
+            raise ValueError("linear_ranking.feature_subset must contain 2..8 unique features")
+        invalid = [x for x in features if x not in numeric_allowed]
+        if invalid:
+            raise ValueError(f"Non-PIT or non-numeric linear features: {invalid}")
+        regularization = _bounded_float(params.get("regularization", 1.0), 0.25, 5.0, "regularization")
+        selector = _require_selector(params.get("selector_mode"))
+        normalized_params = {
+            "feature_subset": features,
+            "regularization": regularization,
+            "selector_mode": selector,
+        }
+        policy = MultiFeatureLinearChallenger(
+            name,
+            features,
+            regularization=regularization,
+            selector_mode=selector,
+        )
+
+    elif family == "portfolio":
+        lam = _bounded_float(params.get("concentration_lambda", 1.0), 0.0, 5.0, "concentration_lambda")
+        metric = str(params.get("stock_quality_metric") or "balanced")
+        if metric not in {"balanced", "momentum_first"}:
+            raise ValueError(f"Unsupported stock_quality_metric: {metric}")
+        normalized_params = {
+            "concentration_lambda": lam,
+            "stock_quality_metric": metric,
+        }
+        policy = PortfolioUtilityChallenger(
+            name,
+            concentration_lambda=lam,
+            stock_quality_metric=metric,
+        )
+
+    elif family == "novel_heuristic":
+        dry = _bounded_float(params.get("dry_weight", 2.0), 0.0, 6.0, "dry_weight")
+        depth = _bounded_float(params.get("base_depth_penalty", 1.0), 0.0, 6.0, "base_depth_penalty")
+        vol = _bounded_float(params.get("volume_spike_bonus", 2.0), 0.0, 6.0, "volume_spike_bonus")
+        selector = _require_selector(params.get("selector_mode"))
+        normalized_params = {
+            "dry_weight": dry,
+            "base_depth_penalty": depth,
+            "volume_spike_bonus": vol,
+            "selector_mode": selector,
+        }
+        policy = NovelHeuristicChallenger(
+            name,
+            dry_weight=dry,
+            base_depth_penalty=depth,
+            volume_spike_bonus=vol,
+            selector_mode=selector,
+        )
+
+    else:
+        raise ValueError(f"Unsupported RD-Agent discovery family: {family!r}")
+
+    normalized_record = {
+        "policy_id": policy.policy_id,
+        "family": policy.family,
+        "name": name,
+        "hypothesis": str(record.get("hypothesis") or "").strip(),
+        "spec_params": normalized_params,
+        "spec_hash": policy.spec_hash,
+        "fitted_state_hash": policy.fitted_state_hash,
+        "source_response_hash": str(record.get("source_response_hash") or ""),
+        "source_response_path": str(record.get("source_response_path") or ""),
+        "source_model": str(record.get("source_model") or ""),
+        "proposal_engine": "rdagent_model",
+    }
+    return policy, normalized_record
+
+
+def normalize_discovery_records(
+    raw_records: list[dict[str, Any]],
+) -> tuple[list[ChallengerProtocol], list[dict[str, Any]]]:
+    """Validate model proposals, enforce family budgets, and return executable objects + frozen specs."""
+    policies: list[ChallengerProtocol] = []
+    records: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    family_counts: dict[str, int] = {}
+
+    for raw in raw_records:
+        policy, rec = instantiate_discovery_proposal(raw)
+        if policy.policy_id in seen_ids:
+            raise ValueError(f"Duplicate RD-Agent policy_id: {policy.policy_id}")
+        family_counts[policy.family] = family_counts.get(policy.family, 0) + 1
+        if family_counts[policy.family] > int(FAMILY_BUDGETS[policy.family]):
+            raise ValueError(f"RD-Agent exceeded family budget for {policy.family}")
+        seen_ids.add(policy.policy_id)
+        policies.append(policy)
+        records.append(rec)
+
+    if not policies:
+        raise RuntimeError("RD-Agent discovery produced zero executable proposals")
+    return policies, records
+
+
+def instantiate_discovery_proposals(
+    frozen_records: list[dict[str, Any]],
+) -> list[ChallengerProtocol]:
+    """Instantiate only from sealed normalized records; never regenerate discovery hypotheses."""
+    policies: list[ChallengerProtocol] = []
+    for rec in frozen_records:
+        raw = {
+            "family": rec["family"],
+            "name": rec["name"],
+            "hypothesis": rec.get("hypothesis", ""),
+            "params": rec["spec_params"],
+            "source_response_hash": rec.get("source_response_hash", ""),
+            "source_response_path": rec.get("source_response_path", ""),
+            "source_model": rec.get("source_model", ""),
+        }
+        policy, normalized = instantiate_discovery_proposal(raw)
+        if policy.policy_id != rec.get("policy_id"):
+            raise RuntimeError(f"Frozen policy_id mismatch for {rec.get('policy_id')}")
+        if policy.spec_hash != rec.get("spec_hash"):
+            raise RuntimeError(f"Frozen spec_hash mismatch for {policy.policy_id}")
+        policies.append(policy)
+    return policies

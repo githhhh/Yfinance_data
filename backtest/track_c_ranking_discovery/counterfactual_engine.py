@@ -1,29 +1,49 @@
 from __future__ import annotations
-import dataclasses
+
 from dataclasses import dataclass
-from typing import Any
+
 import numpy as np
 import pandas as pd
-from .config import MC_PATHS, RANDOM_SEED, TOP_N, PRIMARY_HORIZON
-from .protocol import compute_3slot_portfolio_weekly, WeeklyPortfolioOutcome
+
+from .config import MC_PATHS, RANDOM_SEED, TOP_N
+from .protocol import WeeklyPortfolioOutcome
 
 
 @dataclass
 class CounterfactualMatrixResult:
-    """Standardized 2x2 Counterfactual Decomposition Result."""
-    null_model: str  # 'Null1_Uniform_Industry' or 'Null2_Candidate_Conditioned_Distinct'
+    """2x2 counterfactual result on pathwise paired common support."""
+    null_model: str
     support_weeks: int
+    valid_paths: int
+    median_common_support_weeks: float
     mean_A_random_ind_random_stock: float
     mean_B_random_ind_b0_best_stock: float
     mean_C_b0_ind_random_stock: float
     mean_D_b0_native: float
-    b0_induced_industry_allocation_effect: float  # D - B (and C - A)
-    conditional_stock_selection_effect: float  # D - C (and B - A)
-    interaction_effect: float  # (D - B) - (C - A)
+    b0_induced_industry_allocation_effect: float
+    conditional_stock_selection_effect: float
+    interaction_effect: float
     b0_percentile_vs_5000_paths_mean: float
     b0_percentile_vs_5000_paths_median: float
     b0_percentile_vs_5000_paths_cvar: float
     b0_percentile_vs_5000_paths_stop: float
+
+
+def _safe_numeric(value: object) -> float:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return np.nan
+    return x if np.isfinite(x) else np.nan
+
+
+def _tail_cvar(values: np.ndarray) -> float:
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if vals.size == 0:
+        return np.nan
+    n_tail = max(1, int(vals.size * 0.1))
+    return float(np.mean(np.sort(vals)[:n_tail]))
 
 
 def run_counterfactual_monte_carlo(
@@ -35,178 +55,247 @@ def run_counterfactual_monte_carlo(
     seed: int = RANDOM_SEED,
     null_model: str = "Null1_Uniform_Industry",
 ) -> tuple[CounterfactualMatrixResult, pd.DataFrame]:
-    """Run 5,000 full historical simulation paths and 2x2 counterfactual decomposition using fast vectorization."""
+    """Run k-matched paths with selection-first / maturity-second paired support.
+
+    Missing selected outcomes are never converted to cash and never redrawn.
+    Each path is compared with B0 only on the exact weeks where the required
+    branches and B0 are jointly mature.
+    """
+    if null_model not in {
+        "Null1_Uniform_Industry",
+        "Null2_Candidate_Conditioned_Distinct",
+    }:
+        raise ValueError(f"Unsupported null model: {null_model}")
+
     rng = np.random.default_rng(seed)
     ret_col = f"{horizon.lower()}_return_pct"
     stop_col = f"{horizon.lower()}_stop8"
 
     snaps = sorted(b0_scored_by_snapshot.keys())
     b0_map = {o.snapshot_date: o for o in b0_weekly_outcomes}
-
-    # Pre-generate 5,000 paths for Branch A, B, C
-    path_A_cap_rets = np.zeros((n_paths, len(snaps)), dtype=np.float64)
-    path_B_cap_rets = np.zeros((n_paths, len(snaps)), dtype=np.float64)
-    path_C_cap_rets = np.zeros((n_paths, len(snaps)), dtype=np.float64)
-
-    mature_snaps = [s for s in snaps if b0_map[s].is_mature]
     snap_indices = {s: i for i, s in enumerate(snaps)}
+    n_snaps = len(snaps)
+
+    # NaN means "selected but outcome unavailable / branch unavailable".
+    # k=0 mature cash weeks are explicitly written as 0 below.
+    path_A_ret = np.full((n_paths, n_snaps), np.nan, dtype=float)
+    path_B_ret = np.full((n_paths, n_snaps), np.nan, dtype=float)
+    path_C_ret = np.full((n_paths, n_snaps), np.nan, dtype=float)
+    path_A_stop = np.full((n_paths, n_snaps), np.nan, dtype=float)
+
+    b0_ret = np.full(n_snaps, np.nan, dtype=float)
+    b0_stop = np.full(n_snaps, np.nan, dtype=float)
+    active_attr_mask = np.zeros(n_snaps, dtype=bool)
 
     for s in snaps:
-        s_idx = snap_indices[s]
-        b0_out = b0_map[s]
-        k = b0_out.pick_count
+        idx = snap_indices[s]
+        b0_out = b0_map.get(s)
+        if b0_out is None or not b0_out.is_mature:
+            continue
+
+        b0_ret[idx] = _safe_numeric(b0_out.capital_adjusted_return)
+        b0_stop[idx] = _safe_numeric(b0_out.capital_adjusted_stop8)
+        k = int(b0_out.pick_count)
 
         if k == 0:
+            # Full-path performance includes the same cash week for every branch.
+            path_A_ret[:, idx] = 0.0
+            path_B_ret[:, idx] = 0.0
+            path_C_ret[:, idx] = 0.0
+            path_A_stop[:, idx] = 0.0
             continue
 
+        active_attr_mask[idx] = True
         df_s = b0_scored_by_snapshot[s]
-        p_sub = panel_df[panel_df.snapshot_date.astype(str) == str(s)][["code", ret_col, stop_col]]
+        p_sub = panel_df[
+            panel_df.snapshot_date.astype(str) == str(s)
+        ][["code", ret_col, stop_col]]
         merged = df_s.merge(p_sub, on="code", how="left")
-        el = merged[
-            (merged.is_actionable == 1) &
-            (merged.has_geom_failure == 0) &
-            (merged.below_buy_point == 0) &
-            (merged.has_known_eps == 1) &
-            (merged.has_valid_industry == 1)
-        ].copy()
 
-        if el.empty or len(el) < k:
+        eligible = merged[
+            (merged.is_actionable == 1)
+            & (merged.has_geom_failure == 0)
+            & (merged.below_buy_point == 0)
+            & (merged.has_known_eps == 1)
+            & (merged.has_valid_industry == 1)
+        ].copy()
+        if eligible.empty or len(eligible) < k:
             continue
 
-        # Fast lookup structures
-        ind_to_codes = {}
-        ind_to_best_code = {}
-        for ind, g in el.groupby("industry_key"):
-            ind_to_codes[ind] = g["code"].tolist()
-            ind_to_best_code[ind] = g.sort_values("raw_rank")["code"].iloc[0]
+        ind_to_codes: dict[str, list[str]] = {}
+        ind_to_best_code: dict[str, str] = {}
+        for ind, g in eligible.groupby("industry_key"):
+            key = str(ind)
+            ind_to_codes[key] = g["code"].astype(str).tolist()
+            ind_to_best_code[key] = str(g.sort_values("raw_rank")["code"].iloc[0])
 
-        industries = list(ind_to_codes.keys())
-        # DO NOT fillna(0.0) - preserve exact raw outcome (selection-first, maturity-second)
-        code_to_ret = dict(zip(el["code"], pd.to_numeric(el[ret_col], errors="coerce")))
-        cand_list = el[["code", "industry_key"]].to_dict(orient="records")
+        industries = list(ind_to_codes)
+        if len(industries) < k:
+            continue
 
-        b0_codes = b0_out.selected_codes
-        b0_el = el[el.code.isin(b0_codes)]
-        b0_industries = b0_el["industry_key"].unique().tolist()
+        code_to_ret = {
+            str(c): _safe_numeric(r)
+            for c, r in zip(eligible["code"], pd.to_numeric(eligible[ret_col], errors="coerce"))
+        }
+        code_to_stop = {
+            str(c): _safe_numeric(v)
+            for c, v in zip(eligible["code"], pd.to_numeric(eligible[stop_col], errors="coerce"))
+        }
+        cand_list = eligible[["code", "industry_key"]].astype(str).to_dict(orient="records")
+
+        b0_codes = [str(x) for x in b0_out.selected_codes]
+        b0_eligible = eligible[eligible.code.astype(str).isin(b0_codes)]
+        b0_industries = b0_eligible["industry_key"].astype(str).unique().tolist()
+        if len(b0_industries) != k:
+            # The primary B0 is distinct_1; if this invariant is violated,
+            # attribution for the snapshot is undefined.
+            continue
+
+        def branch_metrics(codes: list[str]) -> tuple[float, float]:
+            if len(codes) != k:
+                return np.nan, np.nan
+            rets = np.array([code_to_ret.get(c, np.nan) for c in codes], dtype=float)
+            if not np.isfinite(rets).all():
+                return np.nan, np.nan
+            stops = np.array([code_to_stop.get(c, np.nan) for c in codes], dtype=float)
+            cap_ret = float(np.sum(rets) / float(TOP_N))
+            cap_stop = (
+                float(np.sum(stops) / float(TOP_N) * 100.0)
+                if np.isfinite(stops).all()
+                else np.nan
+            )
+            return cap_ret, cap_stop
 
         for p in range(n_paths):
-            # 1. Sample k industries for Branch A & B
             if null_model == "Null1_Uniform_Industry":
-                if len(industries) >= k:
-                    sampled_inds = rng.choice(industries, size=k, replace=False).tolist()
-                else:
-                    sampled_inds = industries
+                sampled_inds = rng.choice(industries, size=k, replace=False).tolist()
             else:
-                # Null 2: Candidate-conditioned distinct
-                perm_idx = rng.permutation(len(cand_list))
-                sampled_inds = []
-                for idx in perm_idx:
-                    ind = cand_list[idx]["industry_key"]
+                sampled_inds: list[str] = []
+                for perm_idx in rng.permutation(len(cand_list)):
+                    ind = cand_list[int(perm_idx)]["industry_key"]
                     if ind not in sampled_inds:
                         sampled_inds.append(ind)
-                    if len(sampled_inds) >= k:
+                    if len(sampled_inds) == k:
                         break
+                if len(sampled_inds) != k:
+                    continue
 
-            # Branch A: Random ind x Random stock
-            sum_ret_a = 0.0
-            has_nan_a = False
-            for ind in sampled_inds:
-                c_pool = ind_to_codes.get(ind)
-                if c_pool:
-                    chosen = c_pool[rng.integers(0, len(c_pool))]
-                    r = code_to_ret.get(chosen, np.nan)
-                    if np.isnan(r):
-                        has_nan_a = True
-                        break
-                    sum_ret_a += r
-            path_A_cap_rets[p, s_idx] = np.nan if has_nan_a else (sum_ret_a / float(TOP_N))
+            a_codes = [
+                ind_to_codes[ind][int(rng.integers(0, len(ind_to_codes[ind])))]
+                for ind in sampled_inds
+            ]
+            b_codes = [ind_to_best_code[ind] for ind in sampled_inds]
+            c_codes = [
+                ind_to_codes[ind][int(rng.integers(0, len(ind_to_codes[ind])))]
+                for ind in b0_industries
+            ]
 
-            # Branch B: Random ind x B0-best stock in ind
-            sum_ret_b = 0.0
-            has_nan_b = False
-            for ind in sampled_inds:
-                best_c = ind_to_best_code.get(ind)
-                if best_c:
-                    r = code_to_ret.get(best_c, np.nan)
-                    if np.isnan(r):
-                        has_nan_b = True
-                        break
-                    sum_ret_b += r
-            path_B_cap_rets[p, s_idx] = np.nan if has_nan_b else (sum_ret_b / float(TOP_N))
+            a_ret, a_stop = branch_metrics(a_codes)
+            b_ret, _ = branch_metrics(b_codes)
+            c_ret, _ = branch_metrics(c_codes)
+            path_A_ret[p, idx] = a_ret
+            path_B_ret[p, idx] = b_ret
+            path_C_ret[p, idx] = c_ret
+            path_A_stop[p, idx] = a_stop
 
-            # Branch C: B0 ind x Random stock in ind
-            sum_ret_c = 0.0
-            has_nan_c = False
-            for ind in b0_industries:
-                c_pool = ind_to_codes.get(ind)
-                if c_pool:
-                    chosen = c_pool[rng.integers(0, len(c_pool))]
-                    r = code_to_ret.get(chosen, np.nan)
-                    if np.isnan(r):
-                        has_nan_c = True
-                        break
-                    sum_ret_c += r
-            path_C_cap_rets[p, s_idx] = np.nan if has_nan_c else (sum_ret_c / float(TOP_N))
+    path_stats: list[tuple[float, float, float, float, int]] = []
+    mean_wins: list[bool] = []
+    median_wins: list[bool] = []
+    cvar_wins: list[bool] = []
+    stop_wins: list[bool] = []
 
-    # Compute path statistics over mature weeks (using nan-safe functions)
-    mature_indices = [snap_indices[s] for s in mature_snaps]
-    path_A_sub = path_A_cap_rets[:, mature_indices]
-    path_B_sub = path_B_cap_rets[:, mature_indices]
-    path_C_sub = path_C_cap_rets[:, mature_indices]
+    for p in range(n_paths):
+        # 2x2 attribution excludes k=0 weeks and requires A/B/C/D on identical support.
+        attr_mask = (
+            active_attr_mask
+            & np.isfinite(path_A_ret[p])
+            & np.isfinite(path_B_ret[p])
+            & np.isfinite(path_C_ret[p])
+            & np.isfinite(b0_ret)
+        )
+        if np.any(attr_mask):
+            path_stats.append(
+                (
+                    float(np.mean(path_A_ret[p, attr_mask])),
+                    float(np.mean(path_B_ret[p, attr_mask])),
+                    float(np.mean(path_C_ret[p, attr_mask])),
+                    float(np.mean(b0_ret[attr_mask])),
+                    int(np.sum(attr_mask)),
+                )
+            )
 
-    path_A_mature_means = np.nanmean(path_A_sub, axis=1)
-    path_B_mature_means = np.nanmean(path_B_sub, axis=1)
-    path_C_mature_means = np.nanmean(path_C_sub, axis=1)
+        # Full-path percentile is a paired comparison. A missing random week is
+        # removed from both A and B0 for that path; k=0 cash weeks remain included.
+        perf_mask = np.isfinite(path_A_ret[p]) & np.isfinite(b0_ret)
+        if np.any(perf_mask):
+            a_vals = path_A_ret[p, perf_mask]
+            d_vals = b0_ret[perf_mask]
+            mean_wins.append(float(np.mean(d_vals)) > float(np.mean(a_vals)))
+            median_wins.append(float(np.median(d_vals)) > float(np.median(a_vals)))
+            cvar_wins.append(_tail_cvar(d_vals) > _tail_cvar(a_vals))
 
-    b0_mature_cap_rets = np.array([b0_map[s].capital_adjusted_return for s in mature_snaps])
-    b0_mean = float(np.mean(b0_mature_cap_rets))
-    b0_med = float(np.median(b0_mature_cap_rets))
-    b0_cvar = float(np.mean(np.sort(b0_mature_cap_rets)[:max(1, int(len(b0_mature_cap_rets) * 0.1))]))
-    b0_stop = float(np.mean([b0_map[s].capital_adjusted_stop8 for s in mature_snaps]))
+            stop_mask = perf_mask & np.isfinite(path_A_stop[p]) & np.isfinite(b0_stop)
+            if np.any(stop_mask):
+                stop_wins.append(
+                    float(np.mean(b0_stop[stop_mask])) < float(np.mean(path_A_stop[p, stop_mask]))
+                )
 
-    # Percentile of B0 vs Path A distribution (pure baseline)
-    pct_mean = float((path_A_mature_means < b0_mean).mean() * 100.0)
-    path_A_medians = np.nanmedian(path_A_sub, axis=1)
-    pct_med = float((path_A_medians < b0_med).mean() * 100.0)
+    if not path_stats:
+        raise RuntimeError("Counterfactual simulation produced no path with paired A/B/C/D mature support.")
 
-    # 2x2 Mean values across 5,000 paths
-    mean_A = float(np.mean(path_A_mature_means))
-    mean_B = float(np.mean(path_B_mature_means))
-    mean_C = float(np.mean(path_C_mature_means))
-    mean_D = b0_mean
+    stats = np.asarray(path_stats, dtype=float)
+    mean_A = float(np.mean(stats[:, 0]))
+    mean_B = float(np.mean(stats[:, 1]))
+    mean_C = float(np.mean(stats[:, 2]))
+    mean_D = float(np.mean(stats[:, 3]))
+    support_counts = stats[:, 4]
 
-    # Decomposed effects
     ind_alloc_effect = mean_D - mean_B
     stock_sel_effect = mean_D - mean_C
-    interact_effect = (mean_D - mean_B) - (mean_C - mean_A)
+    interaction_effect = (mean_D - mean_B) - (mean_C - mean_A)
 
-    res = CounterfactualMatrixResult(
+    pct_mean = float(np.mean(mean_wins) * 100.0) if mean_wins else np.nan
+    pct_median = float(np.mean(median_wins) * 100.0) if median_wins else np.nan
+    pct_cvar = float(np.mean(cvar_wins) * 100.0) if cvar_wins else np.nan
+    pct_stop = float(np.mean(stop_wins) * 100.0) if stop_wins else np.nan
+
+    result = CounterfactualMatrixResult(
         null_model=null_model,
-        support_weeks=len(mature_snaps),
+        support_weeks=int(np.sum(active_attr_mask & np.isfinite(b0_ret))),
+        valid_paths=int(len(path_stats)),
+        median_common_support_weeks=float(np.median(support_counts)),
         mean_A_random_ind_random_stock=round(mean_A, 4),
         mean_B_random_ind_b0_best_stock=round(mean_B, 4),
         mean_C_b0_ind_random_stock=round(mean_C, 4),
         mean_D_b0_native=round(mean_D, 4),
         b0_induced_industry_allocation_effect=round(ind_alloc_effect, 4),
         conditional_stock_selection_effect=round(stock_sel_effect, 4),
-        interaction_effect=round(interact_effect, 4),
+        interaction_effect=round(interaction_effect, 4),
         b0_percentile_vs_5000_paths_mean=round(pct_mean, 2),
-        b0_percentile_vs_5000_paths_median=round(pct_med, 2),
-        b0_percentile_vs_5000_paths_cvar=round(float((path_A_mature_means < b0_cvar).mean() * 100.0), 2),
-        b0_percentile_vs_5000_paths_stop=round(float((path_A_mature_means < b0_stop).mean() * 100.0), 2),
+        b0_percentile_vs_5000_paths_median=round(pct_median, 2),
+        b0_percentile_vs_5000_paths_cvar=round(pct_cvar, 2),
+        b0_percentile_vs_5000_paths_stop=round(pct_stop, 2),
     )
 
-    df_decomp = pd.DataFrame([{
-        "null_model": null_model,
-        "A_random_ind_random_stock": mean_A,
-        "B_random_ind_b0_best_stock": mean_B,
-        "C_b0_ind_random_stock": mean_C,
-        "D_b0_native": mean_D,
-        "industry_allocation_effect (D-B)": ind_alloc_effect,
-        "stock_selection_effect (D-C)": stock_sel_effect,
-        "interaction_effect": interact_effect,
-        "b0_percentile_mean": pct_mean,
-        "b0_percentile_median": pct_med,
-    }])
-
-    return res, df_decomp
+    df = pd.DataFrame(
+        [
+            {
+                "null_model": null_model,
+                "A_random_ind_random_stock": mean_A,
+                "B_random_ind_b0_best_stock": mean_B,
+                "C_b0_ind_random_stock": mean_C,
+                "D_b0_native": mean_D,
+                "industry_allocation_effect (D-B)": ind_alloc_effect,
+                "stock_selection_effect (D-C)": stock_sel_effect,
+                "interaction_effect": interaction_effect,
+                "b0_percentile_mean": pct_mean,
+                "b0_percentile_median": pct_median,
+                "b0_percentile_cvar": pct_cvar,
+                "b0_percentile_stop": pct_stop,
+                "valid_paths": int(len(path_stats)),
+                "median_common_support_weeks": float(np.median(support_counts)),
+                "paired_common_support": True,
+            }
+        ]
+    )
+    return result, df
