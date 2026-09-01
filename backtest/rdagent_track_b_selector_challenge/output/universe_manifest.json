@@ -1,0 +1,36 @@
+{
+  "total_rows": 2738,
+  "total_weeks": 42,
+  "universes": {
+    "signal": {
+      "total_rows": 2738,
+      "total_weeks": 42,
+      "train_rows": 1130,
+      "train_weeks": 31,
+      "val_rows": 1608,
+      "val_weeks": 11,
+      "avg_candidates_per_week_train": 36.45,
+      "avg_candidates_per_week_val": 146.18
+    },
+    "actionable": {
+      "total_rows": 733,
+      "total_weeks": 42,
+      "train_rows": 274,
+      "train_weeks": 31,
+      "val_rows": 459,
+      "val_weeks": 11,
+      "avg_candidates_per_week_train": 8.84,
+      "avg_candidates_per_week_val": 41.73
+    },
+    "b0_eligible": {
+      "total_rows": 414,
+      "total_weeks": 40,
+      "train_rows": 145,
+      "train_weeks": 29,
+      "val_rows": 269,
+      "val_weeks": 11,
+      "avg_candidates_per_week_train": 5.0,
+      "avg_candidates_per_week_val": 24.45
+    }
+  }
+}

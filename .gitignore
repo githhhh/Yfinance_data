@@ -28,4 +28,5 @@ pickle_cache/
 selector.log
 prompt_cache.db
 backtest/b0_multifactor_challenge/agent_workspace/replay/
+backtest/rdagent_track_b_selector_challenge/agent_workspace/
 

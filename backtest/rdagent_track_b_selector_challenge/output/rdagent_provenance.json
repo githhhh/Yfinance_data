@@ -1,0 +1,64 @@
+{
+  "rdagent_version": "0.8.0",
+  "command": "rdagent fin_factor --step-n=3",
+  "chat_model": "gemini/gemini-3.6-flash",
+  "embedding_model": "gemini/gemini-embedding-001",
+  "step_n": 3,
+  "run_identifier": "rdagent_track_b_selector_discovery",
+  "exit_code": 0,
+  "task_injection_mode": "generic_financial_factor_generator_evaluated_externally",
+  "task_spec_read_verified": false,
+  "train_data_boundary": "<= 2026-05-22",
+  "safe_features_provided": 38,
+  "leakage_columns_excluded": [
+    "is_b0",
+    "pick_order",
+    "period",
+    "is_valid_entry",
+    "entry_status",
+    "entry_date",
+    "entry_open",
+    "stop_8_hit_ever",
+    "gap_stop",
+    "profit20_hit",
+    "max_drawdown_to_asof_pct",
+    "b0_eligible",
+    "b0_rank",
+    "w1_return_pct",
+    "w2_return_pct",
+    "w3_return_pct",
+    "w4_return_pct",
+    "w1_stop8",
+    "w2_stop8",
+    "w3_stop8",
+    "w4_stop8"
+  ],
+  "original_proposals": [
+    "risk_adj_mom_10",
+    "risk_adj_mom_20",
+    "risk_adj_mom_60",
+    "vol_confirmed_mom_20",
+    "prox_52w_high"
+  ],
+  "factor_paths": [
+    "raw_rdagent/risk_adj_mom_10.py",
+    "raw_rdagent/risk_adj_mom_20.py",
+    "raw_rdagent/risk_adj_mom_60.py",
+    "raw_rdagent/vol_confirmed_mom_20.py",
+    "raw_rdagent/prox_52w_high.py"
+  ],
+  "audit_summary": {
+    "total_audited": 5,
+    "accepted": 3,
+    "rejected": 2,
+    "accepted_factors": [
+      "risk_adj_mom_10",
+      "risk_adj_mom_20",
+      "risk_adj_mom_60"
+    ],
+    "rejected_factors": {
+      "prox_52w_high": "Semantic direction inverted (-1.00 correlation with proximity) and exact affine duplicate of dist_to_52w_high_pct",
+      "vol_confirmed_mom_20": "Redundant near-collinear with mom_20 (corr=0.967)"
+    }
+  }
+}
