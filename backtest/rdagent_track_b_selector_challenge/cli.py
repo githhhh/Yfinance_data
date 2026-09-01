@@ -55,15 +55,15 @@ def compute_panel_hash() -> str:
 
 
 def get_git_info() -> dict[str, str | bool]:
-    """Get current git commit hash and dirty status."""
+    """Get current git commit hash and code dirty status."""
     try:
         res = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=str(ROOT), capture_output=True, text=True)
         sha = res.stdout.strip()
-        status_res = subprocess.run(['git', 'status', '--porcelain'], cwd=str(ROOT), capture_output=True, text=True)
-        dirty = bool(status_res.stdout.strip())
-        return {'git_sha': sha, 'git_dirty': dirty}
+        code_status = subprocess.run(['git', 'status', '--porcelain', '--', '*.py'], cwd=str(ROOT), capture_output=True, text=True)
+        code_dirty = bool(code_status.stdout.strip())
+        return {'git_sha': sha, 'code_dirty': code_dirty}
     except Exception:
-        return {'git_sha': 'unknown', 'git_dirty': True}
+        return {'git_sha': 'unknown', 'code_dirty': True}
 
 
 def get_git_sha() -> str:
