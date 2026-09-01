@@ -1,0 +1,63 @@
+{
+  "protocol_version": "track_d_v1",
+  "objective": "Identify the minimal sufficient decision structure for BreakoutFollow Top-3 selection and synthesize a robust successor policy if one exists.",
+  "forbidden_terminal_claim": "No B1 beats B0",
+  "historical_window": {
+    "end": "2026-07-24",
+    "discovery_train_snapshots": 18,
+    "purge_snapshots": 4,
+    "locked_forward_blocks": 6,
+    "locked_forward_snapshots_per_block": 3,
+    "screening_blocks": 2,
+    "confirmation_blocks": 4,
+    "confirmation_weeks": 12
+  },
+  "research_directions": [
+    "mechanism_falsification",
+    "failure_archaeology",
+    "capacity_abstention",
+    "lane_mechanism",
+    "nonlinear_b1",
+    "adversarial_review"
+  ],
+  "rdagent": {
+    "model_source": "root .env CHAT_MODEL/RD_AGENT_MODEL/TRACK_D_RDAGENT_MODEL",
+    "role_sequence": [
+      "researcher",
+      "skeptic",
+      "experimental_designer",
+      "synthesizer"
+    ],
+    "unique_questions": 126,
+    "planned_provider_calls_before_retries": 552,
+    "hard_provider_attempt_limit": 650,
+    "max_tokens_per_call": 5000,
+    "duplicate_successful_prompt_policy": "refuse_or_cache",
+    "arbitrary_python_execution": false,
+    "policy_language": "restricted declarative PIT-only DSL",
+    "agent_screening_shortlist": 6
+  },
+  "fixed_mechanisms": [
+    "lane",
+    "dry_false_penalty",
+    "evidence_risk",
+    "freshness",
+    "eps_preference",
+    "weekly_volume",
+    "entry_volume",
+    "distinct1"
+  ],
+  "additional_mechanism": "adaptive capacity / abstention",
+  "common_selectable_universe": "b0_eligible == true",
+  "outcomes_visible_before_policy_freeze": "discovery-train only",
+  "outer_forward_outcomes_visible_before_policy_freeze": false,
+  "exit_states": [
+    "STATE_A_PROMOTE_B1_TO_FORWARD_SHADOW",
+    "STATE_B_REPAIR_B0",
+    "STATE_C_COMPRESS_B0",
+    "STATE_D_MECHANISM_MAP_WITH_B0_RETAINED"
+  ],
+  "production_mutation": false,
+  "outer_evaluation_rule": "Frozen policies are shortlisted on blocks 1-2 only; production-shadow gates are evaluated exclusively on untouched blocks 3-6.",
+  "minimal_b0_screening_rule": "Keep only the best screening candidate for each removal count (1..4) before untouched confirmation."
+}
