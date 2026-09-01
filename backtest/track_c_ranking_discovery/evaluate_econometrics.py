@@ -333,6 +333,6 @@ def classify_champion_track_c(
 
     # State B: Trade-offs or Unstable
     if val_summary.mean_spread < -1.0 or val_summary.median_spread < -1.0:
-        return "UNSTABLE (OOS DEGRADATION)"
+        return "UNSTABLE (NOT ROBUST ON OBSERVED VALIDATION)"
 
     return "NO ROBUST REPLACEMENT FOR B0 FOUND (RETAIN B0 OPERATIONALLY)"

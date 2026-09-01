@@ -60,6 +60,8 @@ The input summary is strictly Train-only and ticker/date anonymized.
 - Never use future returns, stop outcomes, B0 future performance, or post-snapshot data.
 - The final portfolio capacity is 0..3 stocks; do not force fill-to-3.
 - Policies must be generic and reproducible from PIT-safe snapshot features.
+- Executable behavior is determined ONLY by the family parameter schema below.
+- The hypothesis text is rationale only: do not claim filters, features, sectors, thresholds, or logic that cannot be represented by the submitted params.
 - Generate diverse hypotheses, not tiny coefficient perturbations of the same rule.
 - Return JSON only.
 

@@ -400,3 +400,94 @@ def test_rdagent_schema_fails_closed_when_family_has_no_valid_proposal():
 
     with pytest.raises(RuntimeError, match="zero executable proposals"):
         normalize_discovery_records(raw)
+
+
+
+def test_discovery_controlled_eligibility_exactly_matches_panel_b0_eligible():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        controlled_eligibility_mask,
+    )
+
+    panel = pd.read_parquet(PANEL_SOURCE)
+    mask = controlled_eligibility_mask(panel)
+    expected = panel["b0_eligible"].fillna(False).astype(bool)
+
+    assert np.array_equal(mask.to_numpy(dtype=bool), expected.to_numpy(dtype=bool))
+
+
+def test_all_discovery_families_use_exact_common_b0_eligible_universe():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        IndustryBreadthChallenger,
+        ContinuousScoreChallenger,
+        MultiFeatureLinearChallenger,
+        PortfolioUtilityChallenger,
+        NovelHeuristicChallenger,
+    )
+
+    # DROP_EPS intentionally has much stronger factor values but is outside the
+    # production B0 common universe. DROP_BLANK also has an invalid industry.
+    df = pd.DataFrame({
+        "code": ["KEEP", "DROP_EPS", "DROP_BLANK"],
+        "industry": ["Industry A", "Industry B", ""],
+        "b0_eligible": [True, False, False],
+        "is_actionable": [1, 1, 1],
+        "clear_geometry_failure": [0, 0, 0],
+        "current_vs_ibd_candidate_pct": [1.0, 1.0, 1.0],
+        "dist_to_52w_high_pct": [-2.0, 0.0, 0.0],
+        "eps_yoy_growth": [25.0, 500.0, 500.0],
+        "ibd_entry_volume_ratio": [1.5, 5.0, 5.0],
+        "volume_ratio": [1.2, 5.0, 5.0],
+        "mom_20": [0.05, 0.80, 0.90],
+        "mom_60": [0.10, 1.20, 1.30],
+        "pullback_v_is_dry": [True, True, True],
+        "base_depth_pct": [20.0, 10.0, 10.0],
+    })
+
+    challengers = [
+        IndustryBreadthChallenger(
+            "eligibility_gate",
+            breadth_metric="actionable_count",
+            allow_dynamic_2_plus_1=False,
+        ),
+        ContinuousScoreChallenger(
+            "eligibility_gate",
+            {"mom_20": 2.0, "eps_yoy_growth": 1.0},
+            selector_mode="pure_top3",
+        ),
+        MultiFeatureLinearChallenger(
+            "eligibility_gate",
+            ["mom_20", "eps_yoy_growth"],
+            regularization=1.0,
+            selector_mode="pure_top3",
+        ),
+        PortfolioUtilityChallenger(
+            "eligibility_gate",
+            concentration_lambda=1.0,
+            stock_quality_metric="balanced",
+        ),
+        NovelHeuristicChallenger(
+            "eligibility_gate",
+            dry_weight=2.0,
+            base_depth_penalty=1.0,
+            volume_spike_bonus=2.0,
+            selector_mode="pure_top3",
+        ),
+    ]
+
+    for challenger in challengers:
+        scored = challenger.score_candidates(df)
+        quotas = challenger.allocate_industries(scored)
+        picks = challenger.pick_stocks(scored, quotas)
+        assert picks == ["KEEP"], f"{challenger.family} escaped the B0 common universe: {picks}"
+
+
+def test_discovery_common_universe_fails_closed_without_b0_eligible():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        controlled_eligibility_mask,
+    )
+
+    with pytest.raises(RuntimeError, match="b0_eligible is missing"):
+        controlled_eligibility_mask(pd.DataFrame({
+            "code": ["AAA"],
+            "industry": ["Industry A"],
+        }))

@@ -19,6 +19,43 @@ from .anonymizer import create_anonymized_discovery_dataset
 from .behavioral_dedup import deduplicate_proposals_behaviorally
 
 
+def controlled_eligibility_mask(df: pd.DataFrame) -> pd.Series:
+    """Exact common-universe gate for all Track C discovery challengers.
+
+    b0_eligible is generated upstream by the production B0 semantics:
+    ACTIONABLE, no clear geometry failure, not below buy point,
+    effective EPS known, and non-empty industry. Discovery policies are
+    allowed to change ranking/allocation only, never the eligible universe.
+    """
+    if "b0_eligible" not in df.columns:
+        raise RuntimeError(
+            "Track C controlled-universe violation: b0_eligible is missing from the panel."
+        )
+
+    raw = df["b0_eligible"]
+    if pd.api.types.is_bool_dtype(raw):
+        mask = raw.fillna(False).astype(bool)
+    elif pd.api.types.is_numeric_dtype(raw):
+        mask = pd.to_numeric(raw, errors="coerce").fillna(0.0).eq(1.0)
+    else:
+        mask = raw.fillna("").astype(str).str.strip().str.lower().isin({"true", "1", "yes"})
+
+    # Defensive invariant check. Production b0_eligible already includes this,
+    # but never permit blank industries to enter an industry-aware selector.
+    if "industry" not in df.columns:
+        raise RuntimeError(
+            "Track C controlled-universe violation: industry is missing from the panel."
+        )
+    has_industry = df["industry"].fillna("").astype(str).str.strip().ne("")
+    return mask & has_industry
+
+
+def controlled_eligible(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+    return df.loc[controlled_eligibility_mask(df)].copy()
+
+
 # ---------------------------------------------------------
 # Family 1: Industry Breadth First Challengers
 # ---------------------------------------------------------
@@ -68,11 +105,7 @@ class IndustryBreadthChallenger:
         if scored_df.empty:
             return {}
 
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].copy()
+        eligible = controlled_eligible(scored_df)
 
         if eligible.empty:
             return {}
@@ -117,11 +150,7 @@ class IndustryBreadthChallenger:
         if scored_df.empty or not industry_quotas:
             return []
 
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].sort_values("candidate_score", ascending=False)
+        eligible = controlled_eligible(scored_df).sort_values("candidate_score", ascending=False)
 
         selected = []
         ind_counts: dict[str, int] = {}
@@ -184,11 +213,7 @@ class ContinuousScoreChallenger:
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
         if scored_df.empty:
             return {}
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ]
+        eligible = controlled_eligible(scored_df)
         inds = eligible["industry"].dropna().unique()
         quota = 1 if self.selector_mode == "distinct_1" else (2 if self.selector_mode == "max_2_per_ind" else TOP_N)
         return {ind: quota for ind in inds}
@@ -196,11 +221,7 @@ class ContinuousScoreChallenger:
     def pick_stocks(self, scored_df: pd.DataFrame, industry_quotas: dict[str, int]) -> list[str]:
         if scored_df.empty or not industry_quotas:
             return []
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].sort_values("candidate_score", ascending=False)
+        eligible = controlled_eligible(scored_df).sort_values("candidate_score", ascending=False)
 
         selected = []
         ind_counts: dict[str, int] = {}
@@ -258,11 +279,7 @@ class MultiFeatureLinearChallenger:
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
         if scored_df.empty:
             return {}
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ]
+        eligible = controlled_eligible(scored_df)
         inds = eligible["industry"].dropna().unique()
         quota = 1 if self.selector_mode == "distinct_1" else (2 if self.selector_mode == "max_2_per_ind" else TOP_N)
         return {ind: quota for ind in inds}
@@ -270,11 +287,7 @@ class MultiFeatureLinearChallenger:
     def pick_stocks(self, scored_df: pd.DataFrame, industry_quotas: dict[str, int]) -> list[str]:
         if scored_df.empty or not industry_quotas:
             return []
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].sort_values("candidate_score", ascending=False)
+        eligible = controlled_eligible(scored_df).sort_values("candidate_score", ascending=False)
 
         selected = []
         ind_counts: dict[str, int] = {}
@@ -338,22 +351,14 @@ class PortfolioUtilityChallenger:
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
         if scored_df.empty:
             return {}
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ]
+        eligible = controlled_eligible(scored_df)
         inds = eligible["industry"].dropna().unique()
         return {ind: TOP_N for ind in inds}
 
     def pick_stocks(self, scored_df: pd.DataFrame, industry_quotas: dict[str, int]) -> list[str]:
         if scored_df.empty:
             return []
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].copy()
+        eligible = controlled_eligible(scored_df)
 
         if eligible.empty:
             return []
@@ -438,11 +443,7 @@ class NovelHeuristicChallenger:
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
         if scored_df.empty:
             return {}
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ]
+        eligible = controlled_eligible(scored_df)
         inds = eligible["industry"].dropna().unique()
         quota = 1 if self.selector_mode == "distinct_1" else (2 if self.selector_mode == "max_2_per_ind" else TOP_N)
         return {ind: quota for ind in inds}
@@ -450,11 +451,7 @@ class NovelHeuristicChallenger:
     def pick_stocks(self, scored_df: pd.DataFrame, industry_quotas: dict[str, int]) -> list[str]:
         if scored_df.empty or not industry_quotas:
             return []
-        eligible = scored_df[
-            (scored_df.get("is_actionable", 1) == 1) &
-            (scored_df.get("has_geom_failure", 0) == 0) &
-            (scored_df.get("below_buy_point", 0) == 0)
-        ].sort_values("candidate_score", ascending=False)
+        eligible = controlled_eligible(scored_df).sort_values("candidate_score", ascending=False)
 
         selected = []
         ind_counts: dict[str, int] = {}
@@ -716,6 +713,8 @@ def instantiate_discovery_proposal(
         "source_response_path": str(record.get("source_response_path") or ""),
         "source_model": str(record.get("source_model") or ""),
         "proposal_engine": "rdagent_model",
+        "execution_basis": "normalized_spec_params_only",
+        "hypothesis_role": "rationale_only_not_executable",
     }
     return policy, normalized_record
 
