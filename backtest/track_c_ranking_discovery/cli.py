@@ -273,9 +273,9 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
             "slot_coverage_pct": s.slot_coverage_pct,
             "full_top3_rate_pct": s.full_top3_rate_pct,
             "top3_membership_jaccard_vs_b0": s.top3_membership_jaccard_vs_b0,
-            "positive_edge_concentration": s.positive_edge_concentration,
-            "sign_stability": s.sign_stability,
-            "is_fragile_overfit": s.is_fragile_overfit,
+            "positive_edge_concentration": s.lowo.positive_edge_concentration if s.lowo else 0.0,
+            "sign_stability": s.lowo.sign_stability if s.lowo else 0.0,
+            "is_fragile_overfit": s.lowo.is_fragile_overfit if s.lowo else False,
             "mean_spread_ci_low": s.bootstrap.mean_spread_ci_low if s.bootstrap else 0.0,
             "mean_spread_ci_high": s.bootstrap.mean_spread_ci_high if s.bootstrap else 0.0,
         }
