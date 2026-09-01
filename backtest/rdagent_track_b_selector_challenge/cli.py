@@ -241,14 +241,14 @@ def cmd_audit(args):
 
 
 def cmd_train(args):
-    print("=== Running Phase 5 Train OOF Walk-Forward (Train <= 2026-05-22 ONLY) ===")
+    print("=== Running Phase 5 Train Evaluation (Train <= 2026-05-22 ONLY) ===")
     panel = get_full_panel()
     train_panel = panel[panel.snapshot_date <= TRAIN_END].copy()
     
     train_out = OUT / 'train'
     train_out.mkdir(parents=True, exist_ok=True)
     
-    # 1. Define Selectors
+    # 1. Define ML Selectors
     selector_configs = [
         SelectorConfig('pure_rank', 'pure_rank', 'none', 'max_score', complexity='low'),
         SelectorConfig('distinct_industry', 'distinct_industry', 'hard_distinct', 'max_score_distinct_ind', complexity='low'),
@@ -259,7 +259,7 @@ def cmd_train(args):
         ),
     ]
     
-    # 2. Build Models on Train Folds
+    # 2. Build Models on Train Folds (ML Train OOF)
     models = ['ridge', 'elastic', 'lgbm']
     feature_modes = ['f1']
     if any(c.startswith('agent_factor_') for c in train_panel.columns):
@@ -311,7 +311,7 @@ def cmd_train(args):
     pred_df.to_parquet(train_out / 'cv_predictions.parquet', index=False)
     print(f"Saved {len(pred_df)} Train OOF prediction rows to output/train/cv_predictions.parquet")
     
-    # 3. Apply Selectors to form Train OOF Top3 Picks & Weekly Metrics
+    # 3. Apply Selectors to form ML Train OOF Top3 Picks & Weekly Metrics
     all_picks = []
     all_weekly_metrics = []
     
@@ -328,38 +328,75 @@ def cmd_train(args):
                     w_mets = compute_weekly_metrics(picks, full_sel_id, seg)
                     all_weekly_metrics.extend(w_mets)
                     
-    # 4. Add Frozen B0 Baseline on Train
-    b0_train = train_panel[train_panel.is_b0 == 1].copy()
-    b0_train['selector_id'] = 'B0'
-    b0_train['segment'] = 'train_oof'
-    b0_train['model_pick_order'] = b0_train.get('pick_order', 1)
+    # 4. Add Frozen B0 Baseline on Train (train_oof segment for ML comparison)
+    b0_train_oof = train_panel[train_panel.is_b0 == 1].copy()
+    b0_train_oof['selector_id'] = 'B0'
+    b0_train_oof['segment'] = 'train_oof'
+    b0_train_oof['model_pick_order'] = b0_train_oof.get('pick_order', 1)
+    all_picks.append(b0_train_oof)
+    all_weekly_metrics.extend(compute_weekly_metrics(b0_train_oof, 'B0', 'train_oof'))
     
-    all_picks.append(b0_train)
-    all_weekly_metrics.extend(compute_weekly_metrics(b0_train, 'B0', 'train_oof'))
+    # 5. Add Rule-Based B0 Challengers on Train (train_rule_eval segment)
+    from .b0_challengers import ALL_DRY_POLICIES, ALL_SELECTORS, select_b0_variant, challenger_id
     
+    # B0 reference for rule_eval segment
+    b0_train_rule = train_panel[train_panel.is_b0 == 1].copy()
+    b0_train_rule['selector_id'] = 'B0'
+    b0_train_rule['segment'] = 'train_rule_eval'
+    b0_train_rule['model_pick_order'] = b0_train_rule.get('pick_order', 1)
+    all_picks.append(b0_train_rule)
+    all_weekly_metrics.extend(compute_weekly_metrics(b0_train_rule, 'B0', 'train_rule_eval'))
+    
+    for dp in ALL_DRY_POLICIES:
+        for sel in ALL_SELECTORS:
+            cid = challenger_id(dp, sel)
+            if cid == 'B0_ORIGINAL__distinct_1':
+                # Exact B0 baseline already captured as B0
+                continue
+            rule_picks_list = []
+            for s_date in train_weeks:
+                snap_pool = train_panel[train_panel.snapshot_date == s_date]
+                if snap_pool.empty:
+                    continue
+                selected_cands = select_b0_variant(snap_pool, dry_policy=dp, selector=sel, limit=TOP_N)
+                if not selected_cands:
+                    continue
+                sel_codes = [c.code for c in selected_cands]
+                matched = snap_pool[snap_pool.code.isin(sel_codes)].copy()
+                for rank_i, code in enumerate(sel_codes, 1):
+                    matched.loc[matched.code == code, 'model_pick_order'] = rank_i
+                matched['selector_id'] = cid
+                matched['segment'] = 'train_rule_eval'
+                rule_picks_list.append(matched)
+                
+            if rule_picks_list:
+                df_rule_picks = pd.concat(rule_picks_list, ignore_index=True)
+                all_picks.append(df_rule_picks)
+                all_weekly_metrics.extend(compute_weekly_metrics(df_rule_picks, cid, 'train_rule_eval'))
+                
     df_picks = pd.concat(all_picks, ignore_index=True, sort=False)
     df_weekly = pd.DataFrame(all_weekly_metrics)
     
     df_picks.to_csv(train_out / 'top3_picks.csv', index=False)
     df_weekly.to_csv(train_out / 'weekly_metrics.csv', index=False)
     
-    # 5. Compute Train Paired Tail Metrics vs B0
+    # 6. Compute Train Paired Tail Metrics vs B0 (strictly on identical support per segment)
     paired_tail_dfs = []
-    for sel_id in df_weekly['selector_id'].unique():
+    for (sel_id, seg), _ in df_weekly.groupby(['selector_id', 'segment']):
         if sel_id == 'B0':
             continue
-        pt_df = compute_paired_tail_metrics(df_weekly, df_weekly, sel_id, 'train_oof')
+        pt_df = compute_paired_tail_metrics(df_weekly, df_weekly, sel_id, seg)
         if not pt_df.empty:
             paired_tail_dfs.append(pt_df)
             
     df_paired_tail = pd.concat(paired_tail_dfs, ignore_index=True) if paired_tail_dfs else pd.DataFrame()
     df_paired_tail.to_csv(train_out / 'paired_tail_metrics.csv', index=False)
     
-    # 6. Generate Train Summary Table for Shortlist Selection
+    # 7. Generate Train Summary Table for Shortlist Selection
     summary_rows = []
     for sel_id, g in df_paired_tail[df_paired_tail.horizon == 'W4'].groupby('selector_id'):
         row = g.iloc[0].to_dict()
-        # Pareto score on Train OOF: median_spread + 0.5 * min(0, cvar_delta) - 0.5 * max(0, stop_delta_pct)
+        # Pareto score on Train: median_spread + 0.5 * min(0, cvar_delta) - 0.5 * max(0, stop_delta_pct)
         pareto_score = (
             row.get('median_spread', 0.0)
             + 0.5 * min(0.0, row.get('cvar_delta', 0.0))
@@ -370,7 +407,7 @@ def cmd_train(args):
         
     df_summary = pd.DataFrame(summary_rows).sort_values('pareto_score', ascending=False)
     df_summary.to_csv(train_out / 'train_summary.csv', index=False)
-    print(f"Train OOF completed. Evaluated {len(df_summary)} challenger configurations on Train OOF.")
+    print(f"Train evaluation completed. Evaluated {len(df_summary)} challenger configurations on Train (ML + Rule-Based).")
 
 
 def cmd_lock(args):
@@ -382,38 +419,46 @@ def cmd_lock(args):
     df_sum = pd.read_csv(train_summary_p)
     
     # Strict deterministic Train-only Pareto selection rules:
-    # 1. Filter to candidates with support >= 6 weeks on Train OOF
+    # 1. Filter to candidates with support >= 6 weeks on Train
     valid_cands = df_sum[df_sum['support_weeks'] >= 6].copy()
     if valid_cands.empty:
         valid_cands = df_sum.copy()
         
     locked_challengers = []
     
-    # Bucket 1: Best Signal F1 Challenger
+    # Bucket 1: Best Rule-Based B0 Challenger (B0_DRY_ or B0_ORIGINAL variants)
+    rule_cands = valid_cands[valid_cands.selector_id.str.startswith('B0_DRY_') | valid_cands.selector_id.str.startswith('B0_ORIGINAL__')].copy()
+    if not rule_cands.empty:
+        # Prioritize primary hypothesis B0_DRY_REWARD_ONLY__distinct_1 on ties
+        rule_cands['is_primary_hyp'] = rule_cands['selector_id'].eq('B0_DRY_REWARD_ONLY__distinct_1').astype(int)
+        best_rule = rule_cands.sort_values(['pareto_score', 'is_primary_hyp', 'mean_spread'], ascending=[False, False, False]).iloc[0]['selector_id']
+        locked_challengers.append((best_rule, "Best Train Pareto score in Rule-Based B0 Challenger bucket"))
+    
+    # Bucket 2: Best Signal F1 Challenger
     sig_f1 = valid_cands[valid_cands.selector_id.str.startswith('signal_f1_')]
     if not sig_f1.empty:
         best_sig_f1 = sig_f1.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
         locked_challengers.append((best_sig_f1, "Best Train OOF Pareto score in Signal F1 bucket"))
         
-    # Bucket 2: Best ACTIONABLE F1 Challenger
+    # Bucket 3: Best ACTIONABLE F1 Challenger
     act_f1 = valid_cands[valid_cands.selector_id.str.startswith('actionable_f1_')]
     if not act_f1.empty:
         best_act_f1 = act_f1.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
         locked_challengers.append((best_act_f1, "Best Train OOF Pareto score in ACTIONABLE F1 bucket"))
         
-    # Bucket 3: Best Signal Agent Challenger (if agent factors exist)
+    # Bucket 4: Best Signal Agent Challenger (if agent factors exist)
     sig_agent = valid_cands[valid_cands.selector_id.str.startswith('signal_agent_')]
     if not sig_agent.empty:
         best_sig_ag = sig_agent.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
         locked_challengers.append((best_sig_ag, "Best Train OOF Pareto score in Signal Agent bucket"))
         
-    # Bucket 4: Best ACTIONABLE Agent Challenger (if agent factors exist)
+    # Bucket 5: Best ACTIONABLE Agent Challenger (if agent factors exist)
     act_agent = valid_cands[valid_cands.selector_id.str.startswith('actionable_agent_')]
     if not act_agent.empty:
         best_act_ag = act_agent.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
         locked_challengers.append((best_act_ag, "Best Train OOF Pareto score in ACTIONABLE Agent bucket"))
         
-    # Bucket 5: Best Portfolio-Aware Challenger (if distinct from above)
+    # Bucket 6: Best Portfolio-Aware Challenger (if distinct from above and room available)
     port_aware = valid_cands[valid_cands.selector_id.str.contains('portfolio_aware')]
     if not port_aware.empty:
         best_port = port_aware.sort_values('pareto_score', ascending=False).iloc[0]['selector_id']
@@ -447,7 +492,7 @@ def cmd_lock(args):
             }
             for c_id, reason in locked_challengers
         },
-        'selection_rule_description': "Deterministic Train-only Pareto selection on Train OOF W4 (support >= 6, max pareto_score per bucket, capped <= 5)",
+        'selection_rule_description': "Deterministic Train-only Pareto selection on Train W4 (support >= 6, max pareto_score per bucket, capped <= 5)",
     }
     
     OUT.mkdir(parents=True, exist_ok=True)
@@ -488,6 +533,9 @@ def cmd_validate(args):
     panel = get_full_panel()
     train_weeks = sorted(panel.loc[panel.snapshot_date <= TRAIN_END, 'snapshot_date'].unique())
     sealed_train_weeks = train_weeks[:-PURGE_WEEKS] if len(train_weeks) > PURGE_WEEKS else []
+    val_weeks = sorted(panel.loc[(panel.snapshot_date >= CONTAM_VAL_START) & (panel.snapshot_date <= CONTAM_VAL_END), 'snapshot_date'].unique())
+    
+    from .b0_challengers import select_b0_variant
     
     # Define selectors
     selector_dict = {
@@ -504,53 +552,88 @@ def cmd_validate(args):
     val_picks_list = []
     val_weekly_metrics = []
     
-    # Parse locked challenger IDs: <universe>_<fmode>_<model>_w<h>_<selector>
     for full_id in locked_ids:
-        parts = full_id.split('_')
-        u_name = parts[0]
-        f_mode = parts[1]
-        m_name = parts[2]
-        h_str = parts[3]
-        h = int(h_str.replace('w', ''))
-        sel_key = '_'.join(parts[4:])
-        
-        sel_cfg = selector_dict.get(sel_key, SelectorConfig(sel_key, sel_key, 'none', 'score', complexity='low'))
-        
-        u_panel = get_universe_panel(panel, u_name)
-        features = _get_features(u_panel, f_mode)
-        label = f'w{h}_return_pct'
-        
-        tr_data = u_panel[u_panel.snapshot_date.isin(sealed_train_weeks) & u_panel[label].notna()]
-        va_data = u_panel[(u_panel.snapshot_date >= CONTAM_VAL_START) & (u_panel.snapshot_date <= CONTAM_VAL_END)].copy()
-        
-        if tr_data.empty or va_data.empty:
-            continue
+        if full_id.startswith('B0_'):
+            # Rule-based challenger evaluation on Validation period
+            parts = full_id.split('__')
+            b0_prefix = parts[0]
+            sel_var = parts[1] if len(parts) > 1 else 'distinct_1'
             
-        xt, y, xs = _prep_xy(tr_data, va_data, features, label)
-        m = _create_model(m_name)
-        m.fit(xt, y)
-        
-        keep_cols = ['snapshot_date', 'code', 'industry', 'current_vs_ibd_candidate_pct', 'rv_20']
-        for x_col in [f'w{x}_return_pct' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
-            if x_col in va_data.columns: keep_cols.append(x_col)
-        for x_col in [f'w{x}_stop8' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
-            if x_col in va_data.columns: keep_cols.append(x_col)
+            if 'REWARD_ONLY' in b0_prefix:
+                dp = 'reward_only'
+            elif 'IGNORED' in b0_prefix:
+                dp = 'ignored'
+            else:
+                dp = 'symmetric'
+                
+            rule_val_picks = []
+            for s_date in val_weeks:
+                snap_pool = panel[panel.snapshot_date == s_date]
+                if snap_pool.empty:
+                    continue
+                selected_cands = select_b0_variant(snap_pool, dry_policy=dp, selector=sel_var, limit=TOP_N)
+                if not selected_cands:
+                    continue
+                sel_codes = [c.code for c in selected_cands]
+                matched = snap_pool[snap_pool.code.isin(sel_codes)].copy()
+                for rank_i, code in enumerate(sel_codes, 1):
+                    matched.loc[matched.code == code, 'model_pick_order'] = rank_i
+                matched['selector_id'] = full_id
+                matched['segment'] = 'contaminated_validation'
+                rule_val_picks.append(matched)
+                
+            if rule_val_picks:
+                df_rvp = pd.concat(rule_val_picks, ignore_index=True)
+                val_picks_list.append(df_rvp)
+                val_weekly_metrics.extend(compute_weekly_metrics(df_rvp, full_id, 'contaminated_validation'))
+                
+        else:
+            # ML challenger evaluation on Validation period
+            parts = full_id.split('_')
+            u_name = parts[0]
+            f_mode = parts[1]
+            m_name = parts[2]
+            h_str = parts[3]
+            h = int(h_str.replace('w', ''))
+            sel_key = '_'.join(parts[4:])
             
-        z = va_data[[c for c in keep_cols if c in va_data.columns]].copy()
-        z['score'] = m.predict(xs)
-        z['selector_id'] = full_id
-        z['segment'] = 'contaminated_validation'
-        val_predictions.append(z)
-        
-        # Apply selector
-        picks = apply_selector(z, sel_cfg, score_col='score')
-        if not picks.empty:
-            picks['selector_id'] = full_id
-            picks['segment'] = 'contaminated_validation'
-            val_picks_list.append(picks)
+            sel_cfg = selector_dict.get(sel_key, SelectorConfig(sel_key, sel_key, 'none', 'score', complexity='low'))
             
-            w_mets = compute_weekly_metrics(picks, full_id, 'contaminated_validation')
-            val_weekly_metrics.extend(w_mets)
+            u_panel = get_universe_panel(panel, u_name)
+            features = _get_features(u_panel, f_mode)
+            label = f'w{h}_return_pct'
+            
+            tr_data = u_panel[u_panel.snapshot_date.isin(sealed_train_weeks) & u_panel[label].notna()]
+            va_data = u_panel[(u_panel.snapshot_date >= CONTAM_VAL_START) & (u_panel.snapshot_date <= CONTAM_VAL_END)].copy()
+            
+            if tr_data.empty or va_data.empty:
+                continue
+                
+            xt, y, xs = _prep_xy(tr_data, va_data, features, label)
+            m = _create_model(m_name)
+            m.fit(xt, y)
+            
+            keep_cols = ['snapshot_date', 'code', 'industry', 'current_vs_ibd_candidate_pct', 'rv_20']
+            for x_col in [f'w{x}_return_pct' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
+                if x_col in va_data.columns: keep_cols.append(x_col)
+            for x_col in [f'w{x}_stop8' for x in (*PRIMARY_HORIZONS, *DIAGNOSTIC_HORIZONS)]:
+                if x_col in va_data.columns: keep_cols.append(x_col)
+                
+            z = va_data[[c for c in keep_cols if c in va_data.columns]].copy()
+            z['score'] = m.predict(xs)
+            z['selector_id'] = full_id
+            z['segment'] = 'contaminated_validation'
+            val_predictions.append(z)
+            
+            # Apply selector
+            picks = apply_selector(z, sel_cfg, score_col='score')
+            if not picks.empty:
+                picks['selector_id'] = full_id
+                picks['segment'] = 'contaminated_validation'
+                val_picks_list.append(picks)
+                
+                w_mets = compute_weekly_metrics(picks, full_id, 'contaminated_validation')
+                val_weekly_metrics.extend(w_mets)
             
     # Add B0 Baseline on Validation
     b0_val = panel[(panel.is_b0 == 1) & (panel.snapshot_date >= CONTAM_VAL_START) & (panel.snapshot_date <= CONTAM_VAL_END)].copy()
@@ -619,10 +702,10 @@ def cmd_validate(args):
         champ_rows.append({
             'selector_id': sel_id,
             'classification': classification,
-            'train_oof_w4_med_spread': tr_dict.get('median_spread', np.nan),
-            'train_oof_w4_mean_spread': tr_dict.get('mean_spread', np.nan),
-            'train_oof_w4_cvar_delta': tr_dict.get('cvar_delta', np.nan),
-            'train_oof_w4_stop_delta': tr_dict.get('stop_delta_pct', np.nan),
+            'train_w4_med_spread': tr_dict.get('median_spread', np.nan),
+            'train_w4_mean_spread': tr_dict.get('mean_spread', np.nan),
+            'train_w4_cvar_delta': tr_dict.get('cvar_delta', np.nan),
+            'train_w4_stop_delta': tr_dict.get('stop_delta_pct', np.nan),
             'val_w4_med_spread': val_dict.get('median_spread', np.nan),
             'val_w4_mean_spread': val_dict.get('mean_spread', np.nan),
             'val_w4_cvar_delta': val_dict.get('cvar_delta', np.nan),
@@ -656,40 +739,99 @@ def to_md_table(df: pd.DataFrame) -> str:
 
 def cmd_report(args):
     print("=== Generating Final Report ===")
-    # Reads train summary, lock manifest, and validation outputs to write TRACK_B_FINAL_REPORT.md
     lock_p = OUT / 'research_lock_manifest.json'
     val_champ_p = OUT / 'validation' / 'champion_matrix.csv'
     val_tail_p = OUT / 'validation' / 'paired_tail_metrics.csv'
     val_boot_p = OUT / 'validation' / 'bootstrap_summary.csv'
+    train_exp_p = OUT / 'train' / 'pullback_dry_policy_experiment.csv'
     
     lock_data = json.loads(lock_p.read_text(encoding='utf-8')) if lock_p.exists() else {}
     df_champ = pd.read_csv(val_champ_p) if val_champ_p.exists() else pd.DataFrame()
     df_tail = pd.read_csv(val_tail_p) if val_tail_p.exists() else pd.DataFrame()
     df_boot = pd.read_csv(val_boot_p) if val_boot_p.exists() else pd.DataFrame()
+    df_dry_exp = pd.read_csv(train_exp_p) if train_exp_p.exists() else pd.DataFrame()
+    
+    panel = get_full_panel()
+    
+    # 1. B0 Reproduction Audit vs Production
+    from dashboard.skill_industry_eps_known import rank_skill_industry_eps_known, select_skill_industry_eps_known
+    from .b0_challengers import rank_b0_original, select_b0_original, _reasoned_item_variant
+    
+    match_count = 0
+    total_snaps = 0
+    mismatch_snaps = []
+    for s_date, snap_df in panel.groupby('snapshot_date'):
+        total_snaps += 1
+        prod_sel = [c.code for c in select_skill_industry_eps_known(snap_df, limit=TOP_N)]
+        res_sel = [c.code for c in select_b0_original(snap_df, limit=TOP_N)]
+        if prod_sel == res_sel:
+            match_count += 1
+        else:
+            mismatch_snaps.append((s_date, prod_sel, res_sel))
+            
+    reprod_rate = round(100.0 * match_count / max(1, total_snaps), 2)
+    
+    # 2. Case Study: find representative pullback_v_is_dry == False candidate
+    case_study_md = ""
+    # Try finding OOMA or CRWD first
+    case_cands = panel[panel.code.isin(['OOMA', 'CRWD']) & (panel.pullback_v_is_dry == 0.0)]
+    if case_cands.empty:
+        # Pick any pullback candidate with pullback_v_is_dry == 0.0 in review universe
+        from dashboard.skill_industry_eps_known import is_review_universe, is_pullback_rule
+        pb_falses = panel[(panel.pullback_v_is_dry == 0.0) & panel.ibd_candidate_rule.apply(is_pullback_rule)]
+        if not pb_falses.empty:
+            case_cands = pb_falses.head(1)
+            
+    if not case_cands.empty:
+        c_row = case_cands.iloc[0]
+        c_code = str(c_row.get('code'))
+        c_snap = str(c_row.get('snapshot_date'))
+        c_rule = str(c_row.get('ibd_candidate_rule'))
+        
+        item_orig = _reasoned_item_variant(c_row, 0, 'symmetric')
+        item_rew = _reasoned_item_variant(c_row, 0, 'reward_only')
+        
+        case_study_md = f"""### Case Study: {c_code} (Snapshot: {c_snap}, Rule: {c_rule}, pullback_v_is_dry: False)
+| Metric / Attribute | B0_ORIGINAL (Symmetric Penalty) | B0_DRY_REWARD_ONLY (Reward Only) |
+| :--- | :--- | :--- |
+| **Reason Codes** | `{", ".join(item_orig.reason_codes)}` | `{", ".join(item_rew.reason_codes)}` |
+| **Risk Codes** | `{", ".join(item_orig.risk_codes)}` | `{", ".join(item_rew.risk_codes)}` |
+| **Pullback Penalty Applied** | `pullback_not_dry` in risk_codes | **None** (neutral) |
+| **Sort Key Prefix (Failure, Lane, Status, -(Ev-Risk), Risk)** | `{item_orig.sort_key[:5]}` | `{item_rew.sort_key[:5]}` |
+"""
     
     report_text = f"""# Track B: Breaking B0 Ranking + Top3 Selection - Rigorous Research Report
 
 ## 1. Research Protocol & Infrastructure Integrity
 - **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
+- **B0 Production Reproduction**: **{reprod_rate}%** exact match ({match_count}/{total_snaps} snapshot dates identical to `dashboard/skill_industry_eps_known.py`).
 - **Sealed Validation**: Exactly {len(lock_data.get('locked_challenger_ids', []))} shortlisted challengers were locked prior to evaluating validation period.
 - **Code & Panel Hashes**:
   - Code Hash: `{lock_data.get('code_hash')}`
   - Panel Hash: `{lock_data.get('panel_hash')}`
   - Git SHA: `{lock_data.get('git_sha')}`
 
-## 2. Locked Challengers Evaluation & Champion Classification
-"""
-    if not df_champ.empty:
-        report_text += "\n### Champion Classification Matrix\n"
-        report_text += to_md_table(df_champ)
-        
-    if not df_tail.empty:
-        report_text += "\n\n### Validation Paired Tail Metrics vs B0 (Identical Common Support)\n"
-        report_text += to_md_table(df_tail[df_tail.horizon == 'W4'])
+## 2. Dry-Policy & Top3 Selector Controlled Experiment (Train Period)
 
-    prov_data = {k: lock_data.get(k) for k in ['code_hash', 'panel_hash', 'git_sha']}
-    report_text += f"\n## Provenance Details\n\n```json\n{json.dumps(prov_data, indent=2)}\n```\n"
-        
+### Train-Only Dry-Policy Outcome Matrix
+{to_md_table(df_dry_exp[df_dry_exp.horizon == 'W4']) if not df_dry_exp.empty else "_No experiment data_"}
+
+{case_study_md}
+
+## 3. Locked Challengers Evaluation & Champion Classification
+
+### Champion Classification Matrix
+{to_md_table(df_champ) if not df_champ.empty else "_No champion data_"}
+
+### Validation Paired Tail Metrics vs B0 (Identical Common Support)
+{to_md_table(df_tail[df_tail.horizon == 'W4']) if not df_tail.empty else "_No tail metrics data_"}
+
+## 4. Provenance Details
+
+```json
+{json.dumps({k: lock_data.get(k) for k in ['code_hash', 'panel_hash', 'git_sha', 'locked_challenger_ids']}, indent=2)}
+```
+"""
     (OUT / 'TRACK_B_FINAL_REPORT.md').write_text(report_text, encoding='utf-8')
     print(f"Report written to {OUT / 'TRACK_B_FINAL_REPORT.md'}")
 
@@ -709,7 +851,7 @@ def main():
     p_audit = subparsers.add_parser("audit", help="Run 4-stage factor audit")
     p_audit.set_defaults(func=cmd_audit)
     
-    p_train = subparsers.add_parser("train", help="Run Train OOF walk-forward only")
+    p_train = subparsers.add_parser("train", help="Run Train evaluation (ML OOF + Rule-based)")
     p_train.set_defaults(func=cmd_train)
     
     p_lock = subparsers.add_parser("lock", help="Seal research manifest and lock shortlist")
@@ -728,4 +870,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
 

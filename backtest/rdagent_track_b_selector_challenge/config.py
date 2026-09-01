@@ -30,6 +30,9 @@ BOOTSTRAP_ROUNDS = 2000
 
 UNIVERSES = ('signal', 'actionable')
 
+DRY_POLICIES = ('symmetric', 'reward_only', 'ignored')
+B0_SELECTOR_VARIANTS = ('distinct_1', 'pure_top3', 'max_2_per_ind')
+
 BASE_FEATURES = [
     'current_vs_ibd_candidate_pct', 'ibd_entry_volume_ratio', 'volume_ratio',
     'ibd_entry_close_position', 'ibd_entry_breakout_range_ratio', 'ibd_entry_close_vs_trigger_pct',

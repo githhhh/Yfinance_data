@@ -322,42 +322,26 @@ def test_rdagent_origin_requires_current_run_source_hash():
 
 
 def test_pullback_encodings_are_actually_evaluated():
-    """Verify run_pullback_encoding_experiment computes Train OOF metrics for all 3 encodings."""
+    """Verify run_pullback_dry_policy_experiment computes metrics for all 3 policies and 3 selectors."""
     mock_train = pd.DataFrame({
         'signal': [True] * 40,
-        'is_actionable': [1.0] * 40,
+        'ibd_entry_status': ['ACTIONABLE'] * 40,
+        'ibd_candidate_rule': ['ceiling_pullback'] * 40,
         'pullback_v_is_dry': [1.0, 0.0, np.nan, 1.0] * 10,
-        'current_vs_ibd_candidate_pct': np.linspace(-5, 5, 40),
-        'ibd_entry_volume_ratio': np.linspace(1, 3, 40),
-        'volume_ratio': np.linspace(1, 3, 40),
+        'current_vs_ibd_candidate_pct': np.linspace(0.5, 4.5, 40),
+        'ibd_entry_volume_ratio': np.linspace(1.6, 2.5, 40),
+        'volume_ratio': np.linspace(1.4, 2.0, 40),
         'ibd_entry_close_position': [0.8] * 40,
         'ibd_entry_breakout_range_ratio': [1.1] * 40,
         'ibd_entry_close_vs_trigger_pct': [0.5] * 40,
         'dist_to_52w_high_pct': [-2.0] * 40,
-        'eps_yoy_growth': [25.0] * 40,
+        'eps_yoy_growth': [30.0] * 40,
         'base_depth_pct': [15.0] * 40,
         'base_duration_weeks': [8] * 40,
         'base_mbox_count': [3] * 40,
         'pullback_pct': [3.0] * 40,
         'pullback_duration_weeks': [2] * 40,
-        'C_continuous': [1.0] * 40,
-        'px_vs_ma10': [1.0] * 40,
-        'px_vs_ma20': [1.0] * 40,
-        'px_vs_ma50': [1.0] * 40,
-        'ma10_slope_5': [0.1] * 40,
-        'ma20_slope_5': [0.1] * 40,
-        'ma50_slope_10': [0.1] * 40,
-        'mom_5': [2.0] * 40,
-        'mom_10': [4.0] * 40,
-        'mom_20': [6.0] * 40,
-        'mom_60': [10.0] * 40,
-        'rv_20': [0.2] * 40,
-        'atr_14_pct': [2.5] * 40,
-        'vol_ratio_5_20': [1.1] * 40,
-        'up_day_ratio_20': [0.6] * 40,
-        'drawdown_20': [-3.0] * 40,
-        'rel_spy_20': [2.0] * 40,
-        'rel_spy_60': [5.0] * 40,
+        'industry': [f'Ind_{i%5}' for i in range(40)],
         'w1_return_pct': [2.0, -1.0, 3.0, 0.5] * 10,
         'w2_return_pct': [4.0, -2.0, 5.0, 1.0] * 10,
         'w4_return_pct': [8.0, -4.0, 10.0, 2.0] * 10,
@@ -365,8 +349,171 @@ def test_pullback_encodings_are_actually_evaluated():
         'w2_stop8': [False] * 40,
         'w4_stop8': [False, True, False, False] * 10,
         'code': [f'T{i}' for i in range(40)],
-        'snapshot_date': [f'2026-01-{i:02d}' for i in range(1, 41)],
+        'snapshot_date': [f'2026-01-{i%10 + 1:02d}' for i in range(40)],
     })
     exp_df = run_pullback_encoding_experiment(mock_train)
     assert not exp_df.empty
-    assert set(exp_df['encoding'].unique()) == {'symmetric', 'reward_only', 'ignored'}
+    assert set(exp_df['dry_policy'].unique()) == {'symmetric', 'reward_only', 'ignored'}
+    assert set(exp_df['selector'].unique()) == {'distinct_1', 'pure_top3', 'max_2_per_ind'}
+
+
+def test_b0_original_reproduces_production_ranking_100_percent():
+    """Verify B0_ORIGINAL directly produces 100% identical ranking and Top3 selection as production."""
+    from dashboard.skill_industry_eps_known import rank_skill_industry_eps_known, select_skill_industry_eps_known
+    from backtest.rdagent_track_b_selector_challenge.b0_challengers import rank_b0_original, select_b0_original
+    
+    mock_pool = pd.DataFrame({
+        'signal': [True, True, True, True, True],
+        'ibd_entry_status': ['ACTIONABLE', 'ACTIONABLE', 'ACTIONABLE', 'ACTIONABLE', 'RADAR'],
+        'ibd_candidate_rule': ['ceiling_pullback', 'pivot', 'ma10_touch_confirm', 'ceiling_pullback', 'ceiling'],
+        'pullback_v_is_dry': [1.0, 0.0, np.nan, 0.0, 1.0],
+        'current_vs_ibd_candidate_pct': [1.0, 2.0, 3.0, 4.0, 1.0],
+        'ibd_entry_volume_ratio': [2.0, 1.8, 1.6, 1.2, 2.0],
+        'volume_ratio': [1.5, 1.4, 1.3, 1.0, 1.5],
+        'ibd_entry_close_position': [0.8, 0.85, 0.75, 0.8, 0.9],
+        'ibd_entry_breakout_range_ratio': [1.2, 1.1, 1.0, 1.0, 1.2],
+        'dist_to_52w_high_pct': [-1.0, -2.0, -3.0, -4.0, -1.0],
+        'eps_yoy_growth': [35.0, 40.0, 25.0, 10.0, 50.0],
+        'industry': ['Software', 'Software', 'Semiconductors', 'Hardware', 'Software'],
+        'code': ['AAPL', 'MSFT', 'NVDA', 'DELL', 'GOOG'],
+        'snapshot_date': ['2026-01-02'] * 5,
+    })
+    
+    prod_ranked = rank_skill_industry_eps_known(mock_pool)
+    orig_ranked = rank_b0_original(mock_pool)
+    
+    assert len(prod_ranked) == len(orig_ranked)
+    for p, o in zip(prod_ranked, orig_ranked):
+        assert p.code == o.code
+        assert p.raw_rank == o.raw_rank
+        assert p.sort_key == o.sort_key
+        assert p.reason_codes == o.reason_codes
+        assert p.risk_codes == o.risk_codes
+        
+    prod_selected = select_skill_industry_eps_known(mock_pool, limit=3)
+    orig_selected = select_b0_original(mock_pool, limit=3)
+    assert [p.code for p in prod_selected] == [o.code for o in orig_selected]
+
+
+def test_b0_dry_reward_only_controlled_behavior():
+    """Verify B0_DRY_REWARD_ONLY rewards True but treats False as neutral (no penalty, no risk code)."""
+    from backtest.rdagent_track_b_selector_challenge.b0_challengers import (
+        _reasoned_item_variant,
+        rank_b0_variant,
+    )
+    
+    base_row = {
+        'signal': True,
+        'ibd_entry_status': 'ACTIONABLE',
+        'ibd_candidate_rule': 'ceiling_pullback',
+        'current_vs_ibd_candidate_pct': 1.5,
+        'ibd_entry_volume_ratio': 2.0,
+        'volume_ratio': 1.5,
+        'ibd_entry_close_position': 0.8,
+        'ibd_entry_breakout_range_ratio': 1.2,
+        'dist_to_52w_high_pct': -1.0,
+        'eps_yoy_growth': 35.0,
+        'industry': 'Software',
+        'snapshot_date': '2026-01-02',
+    }
+    
+    row_true = pd.Series({**base_row, 'code': 'T_TRUE', 'pullback_v_is_dry': 1.0})
+    row_false = pd.Series({**base_row, 'code': 'T_FALSE', 'pullback_v_is_dry': 0.0})
+    row_none = pd.Series({**base_row, 'code': 'T_NONE', 'pullback_v_is_dry': np.nan})
+    
+    # 1. Test in B0_ORIGINAL (symmetric penalty)
+    item_orig_false = _reasoned_item_variant(row_false, 1, 'symmetric')
+    assert 'pullback_not_dry' in item_orig_false.risk_codes
+    assert item_orig_false.sort_key[4] == 1 # risk_count == 1
+    
+    # 2. Test in B0_DRY_REWARD_ONLY
+    item_rew_true = _reasoned_item_variant(row_true, 0, 'reward_only')
+    item_rew_false = _reasoned_item_variant(row_false, 1, 'reward_only')
+    item_rew_none = _reasoned_item_variant(row_none, 2, 'reward_only')
+    
+    # True gets reward
+    assert 'dry_pullback' in item_rew_true.reason_codes
+    # False is strictly neutral
+    assert 'pullback_not_dry' not in item_rew_false.risk_codes
+    assert 'dry_pullback' not in item_rew_false.reason_codes
+    assert item_rew_false.sort_key[4] == 0 # risk_count == 0
+    
+    # False vs None are identical in business sort_key prefix
+    # Business prefix = (clear_failure, lane, status_bucket, -(ev-risk), risk_count)
+    assert item_rew_false.sort_key[:5] == item_rew_none.sort_key[:5]
+    
+    # In ranking, True ranks strictly ahead of False
+    pool = pd.DataFrame([row_false.to_dict(), row_true.to_dict()])
+    ranked = rank_b0_variant(pool, dry_policy='reward_only')
+    assert ranked[0].code == 'T_TRUE'
+    assert ranked[1].code == 'T_FALSE'
+
+
+def test_b0_dry_ignored_controlled_behavior():
+    """Verify B0_DRY_IGNORED eliminates all ranking differentiation from pullback_v_is_dry."""
+    from backtest.rdagent_track_b_selector_challenge.b0_challengers import _reasoned_item_variant
+    
+    base_row = {
+        'signal': True,
+        'ibd_entry_status': 'ACTIONABLE',
+        'ibd_candidate_rule': 'ceiling_pullback',
+        'current_vs_ibd_candidate_pct': 1.5,
+        'ibd_entry_volume_ratio': 2.0,
+        'volume_ratio': 1.5,
+        'ibd_entry_close_position': 0.8,
+        'ibd_entry_breakout_range_ratio': 1.2,
+        'dist_to_52w_high_pct': -1.0,
+        'eps_yoy_growth': 35.0,
+        'industry': 'Software',
+        'snapshot_date': '2026-01-02',
+    }
+    
+    row_true = pd.Series({**base_row, 'code': 'A', 'pullback_v_is_dry': 1.0})
+    row_false = pd.Series({**base_row, 'code': 'B', 'pullback_v_is_dry': 0.0})
+    row_none = pd.Series({**base_row, 'code': 'C', 'pullback_v_is_dry': np.nan})
+    
+    item_a = _reasoned_item_variant(row_true, 0, 'ignored')
+    item_b = _reasoned_item_variant(row_false, 1, 'ignored')
+    item_c = _reasoned_item_variant(row_none, 2, 'ignored')
+    
+    # None get any dry-related reason or risk codes
+    for item in (item_a, item_b, item_c):
+        assert 'dry_pullback' not in item.reason_codes
+        assert 'pullback_not_dry' not in item.risk_codes
+        
+    # Business sort key prefixes are 100% identical
+    assert item_a.sort_key[:5] == item_b.sort_key[:5] == item_c.sort_key[:5]
+
+
+def test_b0_selector_variants_share_identical_eligibility_universe():
+    """Verify distinct_1, pure_top3, and max_2_per_ind share identical eligibility gating."""
+    from backtest.rdagent_track_b_selector_challenge.b0_challengers import select_b0_variant
+    
+    mock_pool = pd.DataFrame({
+        'signal': [True, True, True, True, True, True],
+        'ibd_entry_status': ['ACTIONABLE', 'ACTIONABLE', 'ACTIONABLE', 'ACTIONABLE', 'RADAR', 'ACTIONABLE'],
+        'ibd_candidate_rule': ['pivot', 'pivot', 'pivot', 'pivot', 'pivot', 'pivot'],
+        'current_vs_ibd_candidate_pct': [1.0, 1.5, 2.0, 2.5, 1.0, -1.0], # Index 5 is below buy point
+        'ibd_entry_volume_ratio': [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+        'volume_ratio': [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+        'ibd_entry_close_position': [0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+        'ibd_entry_breakout_range_ratio': [1.2, 1.2, 1.2, 1.2, 1.2, 1.2],
+        'dist_to_52w_high_pct': [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],
+        'eps_yoy_growth': [35.0, 35.0, 35.0, 35.0, 35.0, 35.0],
+        'industry': ['Software', 'Software', 'Software', 'Software', 'Software', 'Software'],
+        'code': ['S1', 'S2', 'S3', 'S4', 'RADAR_STOCK', 'BELOW_BUY_STOCK'],
+        'snapshot_date': ['2026-01-02'] * 6,
+    })
+    
+    # distinct_1 allows max 1 from Software
+    sel_distinct = select_b0_variant(mock_pool, dry_policy='reward_only', selector='distinct_1', limit=3)
+    assert [s.code for s in sel_distinct] == ['S1']
+    
+    # max_2_per_ind allows max 2 from Software
+    sel_max2 = select_b0_variant(mock_pool, dry_policy='reward_only', selector='max_2_per_ind', limit=3)
+    assert [s.code for s in sel_max2] == ['S1', 'S2']
+    
+    # pure_top3 allows all top 3 from Software
+    sel_pure = select_b0_variant(mock_pool, dry_policy='reward_only', selector='pure_top3', limit=3)
+    assert [s.code for s in sel_pure] == ['S1', 'S2', 'S3']
+

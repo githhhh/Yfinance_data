@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-09-01T12:12:05.645464",
-  "git_sha": "8378d49a03a5c8ff340972f25d700aeb3967f802",
-  "code_hash": "649573a56c1107193176bf179f0de71a945f97fb250070afd936c91f505f052b",
+  "created_at": "2026-09-01T14:32:31.473451",
+  "git_sha": "aea015989601c1d7ade5a310a51521c08bafddf9",
+  "code_hash": "d596cddc1c46e6dad1b74fadcca4a6745a4d17b38d0ff93f8415345e0da5e4a3",
   "panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
   "train_end": "2026-05-22",
   "validation_window": "2026-05-29 .. 2026-08-07",
@@ -14,13 +14,44 @@
     "factor_a0e8acc1"
   ],
   "locked_challenger_ids": [
+    "B0_DRY_REWARD_ONLY__distinct_1",
     "signal_f1_lgbm_w4_distinct_industry",
     "actionable_f1_lgbm_w4_distinct_industry",
-    "signal_agent_elastic_w1_distinct_industry",
-    "actionable_agent_lgbm_w4_distinct_industry",
-    "actionable_agent_lgbm_w1_portfolio_aware"
+    "signal_agent_ridge_w1_portfolio_aware",
+    "actionable_agent_lgbm_w4_distinct_industry"
   ],
   "locked_challengers_spec": {
+    "B0_DRY_REWARD_ONLY__distinct_1": {
+      "selection_rule": "Best Train Pareto score in Rule-Based B0 Challenger bucket",
+      "train_oof_metrics": {
+        "selector_id": "B0_DRY_REWARD_ONLY__distinct_1",
+        "segment": "train_rule_eval",
+        "horizon": "W4",
+        "support_weeks": 14,
+        "challenger_mean": 5.444804761904762,
+        "b0_mean": 5.444804761904762,
+        "mean_spread": 0.0,
+        "challenger_median": 3.517433333333333,
+        "b0_median": 3.517433333333333,
+        "median_spread": 0.0,
+        "challenger_cvar10": -8.873283333333333,
+        "b0_cvar10": -8.873283333333333,
+        "cvar_delta": 0.0,
+        "challenger_p10": -6.958846666666666,
+        "b0_p10": -6.958846666666666,
+        "challenger_top10_mean": 30.896683333333332,
+        "b0_top10_mean": 30.896683333333332,
+        "challenger_tail_ratio10": 3.4819899435947232,
+        "b0_tail_ratio10": 3.4819899435947232,
+        "challenger_stop_rate_pct": 30.95238095238095,
+        "b0_stop_rate_pct": 30.95238095238095,
+        "stop_delta_pct": 0.0,
+        "challenger_one_pick_ruins_pct": 16.666666666666668,
+        "b0_one_pick_ruins_pct": 16.666666666666668,
+        "one_pick_ruins_delta_pct": 0.0,
+        "pareto_score": 0.0
+      }
+    },
     "signal_f1_lgbm_w4_distinct_industry": {
       "selection_rule": "Best Train OOF Pareto score in Signal F1 bucket",
       "train_oof_metrics": {
@@ -83,10 +114,10 @@
         "pareto_score": 1.8846
       }
     },
-    "signal_agent_elastic_w1_distinct_industry": {
+    "signal_agent_ridge_w1_portfolio_aware": {
       "selection_rule": "Best Train OOF Pareto score in Signal Agent bucket",
       "train_oof_metrics": {
-        "selector_id": "signal_agent_elastic_w1_distinct_industry",
+        "selector_id": "signal_agent_ridge_w1_portfolio_aware",
         "segment": "train_oof",
         "horizon": "W4",
         "support_weeks": 7,
@@ -144,38 +175,7 @@
         "one_pick_ruins_delta_pct": -25.0,
         "pareto_score": 1.8846
       }
-    },
-    "actionable_agent_lgbm_w1_portfolio_aware": {
-      "selection_rule": "Best Train OOF Pareto score in Portfolio-Aware family",
-      "train_oof_metrics": {
-        "selector_id": "actionable_agent_lgbm_w1_portfolio_aware",
-        "segment": "train_oof",
-        "horizon": "W4",
-        "support_weeks": 6,
-        "challenger_mean": 0.7363944444444445,
-        "b0_mean": 4.424038888888888,
-        "mean_spread": -3.687644444444445,
-        "challenger_median": -3.33195,
-        "b0_median": -3.1863499999999996,
-        "median_spread": 0.9813833333333336,
-        "challenger_cvar10": -9.282733333333333,
-        "b0_cvar10": -10.1525,
-        "cvar_delta": 0.869766666666667,
-        "challenger_p10": -7.694049999999999,
-        "b0_p10": -8.873283333333333,
-        "challenger_top10_mean": 19.743966666666665,
-        "b0_top10_mean": 32.01253333333333,
-        "challenger_tail_ratio10": 2.126956140791864,
-        "b0_tail_ratio10": 3.153167528523352,
-        "challenger_stop_rate_pct": 38.88888888888889,
-        "b0_stop_rate_pct": 38.88888888888889,
-        "stop_delta_pct": 0.0,
-        "challenger_one_pick_ruins_pct": 25.0,
-        "b0_one_pick_ruins_pct": 25.0,
-        "one_pick_ruins_delta_pct": 0.0,
-        "pareto_score": 0.9814
-      }
     }
   },
-  "selection_rule_description": "Deterministic Train-only Pareto selection on Train OOF W4 (support >= 6, max pareto_score per bucket, capped <= 5)"
+  "selection_rule_description": "Deterministic Train-only Pareto selection on Train W4 (support >= 6, max pareto_score per bucket, capped <= 5)"
 }

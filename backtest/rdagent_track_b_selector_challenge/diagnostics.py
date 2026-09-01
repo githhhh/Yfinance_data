@@ -86,75 +86,74 @@ def run_pullback_dry_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFra
     return df_out
 
 
-def run_pullback_encoding_experiment(panel: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Controlled Train-only comparison of pullback_v_is_dry encodings (symmetric, reward_only, ignored)."""
+def run_pullback_dry_policy_experiment(panel: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Controlled Train-only comparison of B0 dry-up policies (symmetric, reward_only, ignored)
+    across selector variants (distinct_1, pure_top3, max_2_per_ind) directly on production rule semantics."""
     if panel is None:
         panel = get_full_panel()
         
     train_panel = panel[panel.snapshot_date <= TRAIN_END].copy()
-    from .evaluate import _folds, _prep_xy, _create_model
+    from .b0_challengers import ALL_DRY_POLICIES, ALL_SELECTORS, select_b0_variant, challenger_id
+    
+    # Run over each snapshot_date in Train
+    snapshots = sorted(train_panel['snapshot_date'].unique())
     
     rows = []
-    for u_name in ('actionable', 'signal'):
-        u_df = get_universe_panel(train_panel, u_name)
-        weeks = sorted(u_df['snapshot_date'].unique())
-        folds = _folds(weeks)
-        if not folds:
-            continue
+    for dp in ALL_DRY_POLICIES:
+        for sel in ALL_SELECTORS:
+            cid = challenger_id(dp, sel)
+            picks_list = []
             
-        base_cols = [c for c in BASE_FEATURES if c in u_df.columns and c != 'pullback_v_is_dry'] + [c for c in TECH_FEATURES if c in u_df.columns]
-        
-        for enc_name in ('symmetric', 'reward_only', 'ignored'):
-            mod_df = u_df.copy()
-            if enc_name == 'symmetric':
-                mod_df['pullback_v_is_dry'] = mod_df['pullback_v_is_dry'].map({1.0: 1.0, 0.0: -1.0}).fillna(0.0)
-                feat_cols = base_cols + ['pullback_v_is_dry']
-            elif enc_name == 'reward_only':
-                mod_df['pullback_v_is_dry'] = mod_df['pullback_v_is_dry'].map({1.0: 1.0, 0.0: 0.0}).fillna(0.0)
-                feat_cols = base_cols + ['pullback_v_is_dry']
-            elif enc_name == 'ignored':
-                feat_cols = base_cols
+            for s_date in snapshots:
+                snap_pool = train_panel[train_panel.snapshot_date == s_date]
+                if snap_pool.empty:
+                    continue
+                selected_cands = select_b0_variant(snap_pool, dry_policy=dp, selector=sel, limit=TOP_N)
+                if not selected_cands:
+                    continue
+                sel_codes = [c.code for c in selected_cands]
+                # Match back to panel rows to get returns
+                matched = snap_pool[snap_pool.code.isin(sel_codes)].copy()
+                for rank_i, code in enumerate(sel_codes, 1):
+                    matched.loc[matched.code == code, 'model_pick_order'] = rank_i
+                picks_list.append(matched)
                 
+            if not picks_list:
+                continue
+                
+            picks_df = pd.concat(picks_list, ignore_index=True)
+            
             for h in (1, 2, 4):
-                label_col = f'w{h}_return_pct'
+                ret_col = f'w{h}_return_pct'
                 stop_col = f'w{h}_stop8'
                 
-                oof_picks = []
-                for tr_w, va_w in folds:
-                    tr = mod_df[mod_df.snapshot_date.isin(tr_w) & mod_df[label_col].notna()]
-                    va = mod_df[mod_df.snapshot_date.isin(va_w)]
-                    if len(tr) < 20 or va.empty:
-                        continue
-                    xt, y, xs = _prep_xy(tr, va, feat_cols, label_col)
-                    m = _create_model('ridge')
-                    m.fit(xt, y)
-                    va_pred = va.copy()
-                    va_pred['score'] = m.predict(xs)
-                    for _, g in va_pred.groupby('snapshot_date'):
-                        top = g.sort_values('score', ascending=False).head(3)
-                        oof_picks.append(top)
-                        
-                if oof_picks:
-                    picks_df = pd.concat(oof_picks)
-                    rets = pd.to_numeric(picks_df[label_col], errors='coerce').dropna()
-                    stops = np.where(picks_df[stop_col].isna(), False, picks_df[stop_col].values).astype(bool) if stop_col in picks_df.columns else np.zeros(len(picks_df), dtype=bool)
-                    
-                    rows.append({
-                        'universe': u_name,
-                        'encoding': enc_name,
-                        'horizon': f'W{h}',
-                        'train_oof_picks': len(picks_df),
-                        'mean_return_pct': float(rets.mean()) if len(rets) > 0 else np.nan,
-                        'median_return_pct': float(rets.median()) if len(rets) > 0 else np.nan,
-                        'cvar10_pct': compute_cvar(rets, 0.10),
-                        'stop8_rate_pct': float(100.0 * stops.mean()) if len(stops) > 0 else np.nan,
-                    })
-                    
+                rets = pd.to_numeric(picks_df[ret_col], errors='coerce').dropna()
+                stops = np.where(picks_df[stop_col].isna(), False, picks_df[stop_col].values).astype(bool) if stop_col in picks_df.columns else np.zeros(len(picks_df), dtype=bool)
+                
+                rows.append({
+                    'dry_policy': dp,
+                    'selector': sel,
+                    'challenger_id': cid,
+                    'horizon': f'W{h}',
+                    'train_picks_count': len(picks_df),
+                    'mature_weeks': int(picks_df.groupby('snapshot_date')[ret_col].count().eq(TOP_N).sum()),
+                    'mean_return_pct': float(round(rets.mean(), 3)) if len(rets) > 0 else np.nan,
+                    'median_return_pct': float(round(rets.median(), 3)) if len(rets) > 0 else np.nan,
+                    'cvar10_pct': float(round(compute_cvar(rets, 0.10), 3)),
+                    'stop8_rate_pct': float(round(100.0 * stops.mean(), 2)) if len(stops) > 0 else np.nan,
+                })
+                
     df_exp = pd.DataFrame(rows)
     train_out_dir = OUT / 'train'
     train_out_dir.mkdir(parents=True, exist_ok=True)
+    df_exp.to_csv(train_out_dir / 'pullback_dry_policy_experiment.csv', index=False)
+    # Also save as pullback_encoding_experiment.csv for backwards compatibility
     df_exp.to_csv(train_out_dir / 'pullback_encoding_experiment.csv', index=False)
     return df_exp
+
+
+# Backwards compatibility alias
+run_pullback_encoding_experiment = run_pullback_dry_policy_experiment
 
 
 def run_lane_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFrame:
