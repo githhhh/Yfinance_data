@@ -142,43 +142,61 @@ def test_anonymizer_strips_outcomes_and_anonymizes_entities():
 
 
 def test_monte_carlo_missing_return_does_not_fill_zero():
-    """Verify that Monte Carlo selection-first maturity-second protocol does not treat missing returns as 0.0% cash."""
+    """Missing selected outcomes must shrink paired support, never become 0% cash."""
     from backtest.track_c_ranking_discovery.counterfactual_engine import run_counterfactual_monte_carlo
-    from backtest.track_c_ranking_discovery.protocol import WeeklyPortfolioOutcome
 
-    panel_df = pd.read_parquet(PANEL_SOURCE).copy()
-    snaps = sorted(panel_df["snapshot_date"].astype(str).unique().tolist())[:5]
-    sub_df = panel_df[panel_df.snapshot_date.astype(str).isin(snaps)].copy()
-
-    # Create synthetic b0 outcomes
-    b0_outcomes = [
-        WeeklyPortfolioOutcome(
-            snapshot_date=s,
-            selector_id="B0_ORIGINAL",
-            horizon="W4",
-            pick_count=2,
-            slot_coverage=0.667,
-            active_week=True,
-            full_top3=False,
-            selected_codes=["AAPL", "MSFT"],
-            selection_quality_return=5.0,
-            capital_adjusted_return=3.33,
-            selection_quality_stop8=0.0,
-            capital_adjusted_stop8=0.0,
-            one_pick_ruined=False,
-            is_mature=True,
-        )
-        for s in snaps
-    ]
-
-    ch = StructuralGridChallenger("B0_LANE", "symmetric", "distinct_1")
-    b0_scored = {s: ch.score_candidates(sub_df[sub_df.snapshot_date.astype(str) == s].copy()) for s in snaps}
+    snap = "2026-01-02"
+    scored = pd.DataFrame({
+        "code": ["AAA", "BBB", "CCC"],
+        "is_actionable": [1, 1, 1],
+        "has_geom_failure": [0, 0, 0],
+        "below_buy_point": [0, 0, 0],
+        "has_known_eps": [1, 1, 1],
+        "has_valid_industry": [1, 1, 1],
+        "industry_key": ["X", "Y", "Z"],
+        "raw_rank": [1, 2, 3],
+    })
+    panel = pd.DataFrame({
+        "snapshot_date": [snap, snap, snap],
+        "code": ["AAA", "BBB", "CCC"],
+        "w4_return_pct": [6.0, 3.0, np.nan],
+        "w4_stop8": [0.0, 0.0, 0.0],
+    })
+    b0_outcomes = [WeeklyPortfolioOutcome(
+        snapshot_date=snap,
+        selector_id="B0_ORIGINAL",
+        horizon="W4",
+        pick_count=2,
+        slot_coverage=round(2 / 3, 4),
+        active_week=True,
+        full_top3=False,
+        selected_codes=["AAA", "BBB"],
+        selection_quality_return=4.5,
+        capital_adjusted_return=3.0,
+        selection_quality_stop8=0.0,
+        capital_adjusted_stop8=0.0,
+        one_pick_ruined=False,
+        is_mature=True,
+    )]
 
     res, df_decomp = run_counterfactual_monte_carlo(
-        sub_df, b0_outcomes, b0_scored, horizon="W4", n_paths=100, null_model="Null1_Uniform_Industry"
+        panel,
+        b0_outcomes,
+        {snap: scored},
+        horizon="W4",
+        n_paths=400,
+        seed=123,
+        null_model="Null1_Uniform_Industry",
     )
-    assert not np.isnan(res.mean_A_random_ind_random_stock)
-    assert not np.isnan(res.b0_induced_industry_allocation_effect)
+
+    # Only paths that sampled X+Y have common A/B/C/D mature support.
+    # Any path involving Z selected CCC and must be excluded, never treated as 0%.
+    assert 0 < res.valid_paths < 400
+    assert res.mean_A_random_ind_random_stock == pytest.approx(3.0)
+    assert res.mean_B_random_ind_b0_best_stock == pytest.approx(3.0)
+    assert res.mean_C_b0_ind_random_stock == pytest.approx(3.0)
+    assert res.mean_D_b0_native == pytest.approx(3.0)
+    assert bool(df_decomp.iloc[0]["paired_common_support"]) is True
 
 
 
