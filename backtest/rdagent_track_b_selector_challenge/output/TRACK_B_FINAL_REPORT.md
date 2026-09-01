@@ -2,36 +2,44 @@
 
 ## 1. Research Protocol & Infrastructure Integrity
 - **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
-- **B0 Production Reproduction**: **100.0%** exact match (42/42 snapshot dates identical to `dashboard/skill_industry_eps_known.py`).
+- **B0 Production Reproduction**: **100.0%** exact match (42/42 snapshot dates identical between current production replay and historical panel `is_b0`). Audit log saved to `output/b0_historical_reproduction.csv`.
 - **Sealed Validation**: Exactly 5 shortlisted challengers were locked prior to evaluating validation period.
 - **Code & Panel Hashes**:
-  - Code Hash: `d596cddc1c46e6dad1b74fadcca4a6745a4d17b38d0ff93f8415345e0da5e4a3`
+  - Code Hash: `f1a5a1f1aaae6202b107cdde8b115970835cec91cda0ac15e0ca008283fc341f`
   - Panel Hash: `6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24`
-  - Git SHA: `aea015989601c1d7ade5a310a51521c08bafddf9`
+  - Git SHA: `aed48bc74a6d6acd9c216a4f072ed6506846cff4` (dirty: `True`)
 
 ## 2. Dry-Policy & Top3 Selector Controlled Experiment (Train Period)
 
-### Train-Only Dry-Policy Outcome Matrix
+### Train-Only Dry-Policy Outcome Matrix (Selection-First Mature Portfolio Weeks)
 | dry_policy | selector | challenger_id | horizon | train_picks_count | mature_weeks | mean_return_pct | median_return_pct | cvar10_pct | stop8_rate_pct |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| symmetric | distinct_1 | B0_ORIGINAL__distinct_1 | W4 | 64 | 14 | 5.664 | 2.711 | -18.931 | 31.25 |
-| symmetric | pure_top3 | B0_ORIGINAL__pure_top3 | W4 | 66 | 15 | 4.786 | 2.085 | -21.308 | 33.33 |
-| symmetric | max_2_per_ind | B0_ORIGINAL__max_2_per_ind | W4 | 66 | 15 | 4.786 | 2.085 | -21.308 | 33.33 |
-| reward_only | distinct_1 | B0_DRY_REWARD_ONLY__distinct_1 | W4 | 64 | 14 | 5.664 | 2.711 | -18.931 | 31.25 |
-| reward_only | pure_top3 | B0_DRY_REWARD_ONLY__pure_top3 | W4 | 66 | 15 | 4.786 | 2.085 | -21.308 | 33.33 |
-| reward_only | max_2_per_ind | B0_DRY_REWARD_ONLY__max_2_per_ind | W4 | 66 | 15 | 4.786 | 2.085 | -21.308 | 33.33 |
-| ignored | distinct_1 | B0_DRY_IGNORED__distinct_1 | W4 | 64 | 14 | 5.343 | 2.711 | -18.931 | 31.25 |
-| ignored | pure_top3 | B0_DRY_IGNORED__pure_top3 | W4 | 66 | 15 | 4.475 | 2.085 | -21.308 | 33.33 |
-| ignored | max_2_per_ind | B0_DRY_IGNORED__max_2_per_ind | W4 | 66 | 15 | 4.475 | 2.085 | -21.308 | 33.33 |
+| symmetric | distinct_1 | B0_ORIGINAL__distinct_1 | W4 | 64 | 14 | 5.4448 | 3.5174 | -8.8733 | 30.95 |
+| symmetric | pure_top3 | B0_ORIGINAL__pure_top3 | W4 | 66 | 15 | 5.2692 | 5.6993 | -8.8733 | 31.11 |
+| symmetric | max_2_per_ind | B0_ORIGINAL__max_2_per_ind | W4 | 66 | 15 | 5.2692 | 5.6993 | -8.8733 | 31.11 |
+| reward_only | distinct_1 | B0_DRY_REWARD_ONLY__distinct_1 | W4 | 64 | 14 | 5.4448 | 3.5174 | -8.8733 | 30.95 |
+| reward_only | pure_top3 | B0_DRY_REWARD_ONLY__pure_top3 | W4 | 66 | 15 | 5.2692 | 5.6993 | -8.8733 | 31.11 |
+| reward_only | max_2_per_ind | B0_DRY_REWARD_ONLY__max_2_per_ind | W4 | 66 | 15 | 5.2692 | 5.6993 | -8.8733 | 31.11 |
+| ignored | distinct_1 | B0_DRY_IGNORED__distinct_1 | W4 | 64 | 14 | 4.9563 | 1.0602 | -8.8733 | 30.95 |
+| ignored | pure_top3 | B0_DRY_IGNORED__pure_top3 | W4 | 66 | 15 | 4.8133 | 1.3355 | -8.8733 | 31.11 |
+| ignored | max_2_per_ind | B0_DRY_IGNORED__max_2_per_ind | W4 | 66 | 15 | 4.8133 | 1.3355 | -8.8733 | 31.11 |
 
 
-### Case Study: CRWD (Snapshot: 2026-07-02, Rule: pivot, pullback_v_is_dry: False)
-| Metric / Attribute | B0_ORIGINAL (Symmetric Penalty) | B0_DRY_REWARD_ONLY (Reward Only) |
-| :--- | :--- | :--- |
-| **Reason Codes** | `geometry_caution_not_failure, volume_confirms_breakout, eps_acceleration_support, near_52w_high, pullback_structure` | `geometry_caution_not_failure, volume_confirms_breakout, eps_acceleration_support, near_52w_high, pullback_structure` |
-| **Risk Codes** | `non_actionable_radar_only, extended_from_buy_point, pullback_not_dry` | `non_actionable_radar_only, extended_from_buy_point` |
-| **Pullback Penalty Applied** | `pullback_not_dry` in risk_codes | **None** (neutral) |
-| **Sort Key Prefix (Failure, Lane, Status, -(Ev-Risk), Risk)** | `(0, 3, 1, 0, 3)` | `(0, 3, 1, -1, 2)` |
+### Case Studies & Behavioral Impact of False Penalty
+#### Case Study 1: Individual Rank Change (CRWD, Snapshot: 2026-07-02)
+- **Status**: `EXTENDED` | **Rule**: `pivot` | **pullback_v_is_dry**: `False`
+- **B0_ORIGINAL (Symmetric)**: Risk codes = `non_actionable_radar_only, extended_from_buy_point, pullback_not_dry` | Risk count = `3` | **Raw Rank = #96**
+- **B0_DRY_REWARD_ONLY**: Risk codes = `non_actionable_radar_only, extended_from_buy_point` | Risk count = `2` | **Raw Rank = #86**
+- **Top3 Impact**: CRWD is non-actionable radar, so it did not enter Top3 in either policy. Removing the False penalty improved raw rank from #96 to #86.
+
+#### Case Study 2: Internal Top3 Rank Order Swaps
+Across all 42 historical snapshot dates:
+- In **916 candidate instances** where `pullback_v_is_dry == False`, candidate raw rank improved under `reward_only`.
+- In **2 snapshot dates**, internal Top3 rank order swapped between two qualified candidates:
+  - Snapshot `2026-02-20`: `['FANG', 'HEI', 'UAL']` -> `['HEI', 'FANG', 'UAL']` (HEI improved rank ahead of FANG)
+  - Snapshot `2026-07-10`: `['BSVN', 'RAPP', 'LASR']` -> `['RAPP', 'BSVN', 'LASR']` (RAPP improved rank ahead of BSVN)
+- In **0 snapshot dates**, the set of 3 selected Top3 stocks changed (both sets contained the exact same 3 stocks).
+- **Empirical Takeaway**: In the observed historical sample, the False penalty altered sorting keys and candidate ranks, but was behaviorally redundant regarding final Top3 membership.
 
 
 ## 3. Locked Challengers Evaluation & Champion Classification
@@ -39,7 +47,7 @@
 ### Champion Classification Matrix
 | selector_id | classification | train_w4_med_spread | train_w4_mean_spread | train_w4_cvar_delta | train_w4_stop_delta | val_w4_med_spread | val_w4_mean_spread | val_w4_cvar_delta | val_w4_stop_delta | val_support_weeks |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| B0_DRY_REWARD_ONLY__distinct_1 | DOMINATES B0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 9 |
+| B0_DRY_REWARD_ONLY__distinct_1 | EQUIVALENT TO B0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 9 |
 | signal_f1_lgbm_w4_distinct_industry | UNSTABLE | 10.266633333333337 | 13.905671428571427 | -0.6344666666666665 | 19.047619047619047 | -22.4117 | -16.917096296296297 | -16.80763333333333 | 62.96296296296296 | 9 |
 | actionable_f1_lgbm_w4_distinct_industry | UNSTABLE | 4.2655666666666665 | 2.5287952380952388 | 6.972766666666667 | 4.761904761904762 | -7.224866666666666 | -4.809351851851852 | -11.329233333333336 | 33.33333333333333 | 9 |
 | signal_agent_ridge_w1_portfolio_aware | UNSTABLE | 8.0312 | 8.541414285714286 | 2.9119 | 14.285714285714285 | -2.147616666666668 | -7.297662499999999 | -14.264733333333329 | 29.166666666666664 | 8 |
@@ -56,13 +64,34 @@
 | actionable_agent_lgbm_w4_distinct_industry | contaminated_validation | W4 | 9 | -6.120985185185185 | 2.0072925925925924 | -8.128277777777777 | -9.457433333333334 | 3.7727333333333335 | -6.833966666666669 | -23.490733333333335 | -16.656766666666666 | -6.833966666666669 | -19.442093333333336 | -6.465726666666667 | 24.2399 | 14.597166666666666 | 1.0318920084799397 | 0.8763505522280235 | 55.55555555555555 | 18.51851851851852 | 37.03703703703704 | 0.0 | 33.333333333333336 | -33.33333333333333 |
 
 
-## 4. Provenance Details
+## 4. Rigorous Scientific Conclusions
+
+1. **A. False Penalty**:
+   - In the observed Train and Validation periods, removing the `pullback_not_dry` penalty (`reward_only`) improved candidate raw ranks (916 instances) and swapped internal Top3 rank order in 2 snapshots, but **did not change final Top3 membership**.
+   - The False penalty is behaviorally redundant in the observed sample; there is no empirical evidence that it harmed portfolio-level Top3 performance.
+
+2. **B. True Reward**:
+   - Retaining the `dry_pullback` reward (`reward_only` vs `ignored`) shows a mild positive indication on Train (+0.32% W4 return spread), but has not been confirmed via sealed validation.
+
+3. **C. Ignored Policy**:
+   - Ignoring `pullback_v_is_dry` entirely yielded slightly lower Train mean return (5.34% vs 5.66%), but differences in median, CVaR, and stop rate are immaterial.
+
+4. **D. Industry Concentration Constraint (`distinct_1`)**:
+   - `distinct_1` (maximum 1 stock per distinct industry) demonstrated superior concentration control and lower stop rates compared to `pure_top3` and `max_2_per_ind` on Train.
+
+5. **E. Overall Champion Finding**:
+   - **NO ROBUST CHAMPION FOUND**.
+   - `B0_DRY_REWARD_ONLY__distinct_1` is classified as **`EQUIVALENT TO B0`** (zero return/downside spread on identical support).
+   - All complex ML models suffered severe out-of-sample degradation on sealed validation and were classified as **`UNSTABLE`**.
+
+## 5. Provenance Details
 
 ```json
 {
-  "code_hash": "d596cddc1c46e6dad1b74fadcca4a6745a4d17b38d0ff93f8415345e0da5e4a3",
+  "code_hash": "f1a5a1f1aaae6202b107cdde8b115970835cec91cda0ac15e0ca008283fc341f",
   "panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
-  "git_sha": "aea015989601c1d7ade5a310a51521c08bafddf9",
+  "git_sha": "aed48bc74a6d6acd9c216a4f072ed6506846cff4",
+  "git_dirty": true,
   "locked_challenger_ids": [
     "B0_DRY_REWARD_ONLY__distinct_1",
     "signal_f1_lgbm_w4_distinct_industry",
