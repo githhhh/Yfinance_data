@@ -281,3 +281,8 @@ def get_structural_grid_challengers() -> dict[str, StructuralGridChallenger]:
                 c = StructuralGridChallenger(lp, dp, sp)
                 challengers[c.policy_id] = c
     return challengers
+
+
+def generate_all_structural_grid_challengers() -> list[StructuralGridChallenger]:
+    """Get all 36 pre-registered structural challengers as a list."""
+    return list(get_structural_grid_challengers().values())
