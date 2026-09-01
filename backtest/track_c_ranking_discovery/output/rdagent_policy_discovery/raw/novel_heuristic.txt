@@ -1,0 +1,128 @@
+
+
+
+{
+  "proposals": [
+    {
+      "family": "novel_heuristic",
+      "name": "dry_pullback_volume_breakout",
+      "hypothesis": "Stocks with dried-up pullback volume (low recent volume) combined with volume spike at entry signal institutional accumulation. Penalize deep bases to avoid late-stage bases. Apply strong bonus for volume spike at candidate trigger.",
+      "params": {
+        "dry_weight": 4.5,
+        "base_depth_penalty": 3.2,
+        "volume_spike_bonus": 5.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "base_quality_momentum_thresh",
+      "hypothesis": "Strong bases (shallow, longer duration) with positive short-term momentum above median threshold. Deep bases signal distribution; shallow pullbacks with momentum confirm setup health.",
+      "params": {
+        "dry_weight": 0.0,
+        "base_depth_penalty": 5.5,
+        "volume_spike_bonus": 1.8,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "actionable_ma_sandwich",
+      "hypothesis": "ACTIONABLE status filtered by price sandwiched between MA10 and MA20 (not extended above MA50). Avoids stocks too far from moving averages while capturing proper base position.",
+      "params": {
+        "dry_weight": 1.5,
+        "base_depth_penalty": 2.0,
+        "volume_spike_bonus": 2.5,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "rs_base_combo",
+      "hypothesis": "Combine 20-day relative strength vs SPY with base formation quality. High RS stocks in sound bases show market-leading behavior with institutional backing.",
+      "params": {
+        "dry_weight": 0.0,
+        "base_depth_penalty": 4.0,
+        "volume_spike_bonus": 1.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "multi_tf_momentum_alignment",
+      "hypothesis": "Multi-timeframe momentum alignment (5d, 10d, 20d all positive and rising) with dry volume pullback. Confirms broad-based accumulation across timeframes.",
+      "params": {
+        "dry_weight": 3.8,
+        "base_depth_penalty": 2.5,
+        "volume_spike_bonus": 0.5,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "tight_entry_volume_confirm",
+      "hypothesis": "Entry position tightness (close near high of range) combined with volume spike bonus. Strong closes in tight ranges with volume indicate institutional commitment.",
+      "params": {
+        "dry_weight": 0.0,
+        "base_depth_penalty": 1.5,
+        "volume_spike_bonus": 4.2,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "sector_momentum_filter",
+      "hypothesis": "Focus on Finance, Electronic Technology, and Producer Manufacturing sectors with positive 60-day momentum. Sector rotation awareness improves probability of leadership.",
+      "params": {
+        "dry_weight": 2.0,
+        "base_depth_penalty": 3.0,
+        "volume_spike_bonus": 2.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "pullback_recovery_atr_adjusted",
+      "hypothesis": "Pullback recovery pattern with ATR-adjusted volatility filter. Moderate pullbacks (not too deep) that show recovery with below-median ATR indicate controlled volatility breakouts.",
+      "params": {
+        "dry_weight": 2.8,
+        "base_depth_penalty": 4.5,
+        "volume_spike_bonus": 1.2,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "microbase_acceleration",
+      "hypothesis": "Stocks with micro-base formations (low mbox_count) showing acceleration. Tight bases with multiple weeks of tight action before breakout signal accumulation.",
+      "params": {
+        "dry_weight": 1.0,
+        "base_depth_penalty": 0.5,
+        "volume_spike_bonus": 3.5,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "extended_avoid_unless_strong",
+      "hypothesis": "Avoid EXTENDED status unless accompanied by strong volume spike and dry pullback. EXTENDED stocks with volume confirmation may still offer setups.",
+      "params": {
+        "dry_weight": 4.0,
+        "base_depth_penalty": 2.2,
+        "volume_spike_bonus": 5.5,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "ma_slope_momentum_combo",
+      "hypothesis": "Rising MA10 and MA20 slopes combined with positive pullback volume dryness. Moving average slope confirms trend health; dry pullback confirms supply absorption.",
+      "params": {
+        "dry_weight": 3.5,
+        "base_depth_penalty": 1.8,
+        "volume_spike_bonus": 1.5,
+        "selector_mode": "pure_top3"
+      }
+    }
+  ]
+}

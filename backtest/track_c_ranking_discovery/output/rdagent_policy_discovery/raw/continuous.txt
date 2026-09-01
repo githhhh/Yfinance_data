@@ -1,0 +1,164 @@
+
+
+```json
+{
+  "proposals": [
+    {
+      "family": "continuous",
+      "name": "momentum_breakout_composite",
+      "hypothesis": "Combining price momentum across timeframes with volume confirmation captures stocks in accelerating uptrends with institutional accumulation.",
+      "params": {
+        "weights": {
+          "mom_5": 2.5,
+          "mom_20": 3.0,
+          "mom_60": 1.5,
+          "volume_ratio": 2.0,
+          "rv_20": -1.0
+        },
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "pullback_dry_volume_entry",
+      "hypothesis": "Stocks pulling back with shrinking volume (dry) indicate distribution absence; combined with tight stops via low ATR, offers favorable risk/reward.",
+      "params": {
+        "weights": {
+          "pullback_v_is_dry": 4.0,
+          "pullback_pct": 2.5,
+          "atr_14_pct": -2.0,
+          "rv_20": -1.5
+        },
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "ma_gradient_strength",
+      "hypothesis": "Rising moving averages with positive slopes across multiple timeframes indicate sustained uptrend; combining slope with price premium vs MAs captures trend quality.",
+      "params": {
+        "weights": {
+          "ma10_slope_5": 2.0,
+          "ma20_slope_5": 2.5,
+          "ma50_slope_10": 2.0,
+          "px_vs_ma20": 1.5
+        },
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "earnings_acceleration_momentum",
+      "hypothesis": "Positive EPS growth YoY with strong recent momentum captures fundamental-improvement-driven uptrades; EPS quality combined with price action.",
+      "params": {
+        "weights": {
+          "eps_yoy_growth": 3.0,
+          "mom_20": 2.5,
+          "rel_spy_20": 2.0,
+          "up_day_ratio_20": 1.0
+        },
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "consolidation_depth_structure",
+      "hypothesis": "Deeper bases (more negative depth %) with more micro-boxes indicate thorough consolidation; longer bases allow more institutional accumulation.",
+      "params": {
+        "weights": {
+          "base_depth_pct": -2.5,
+          "base_mbox_count": 2.0,
+          "base_duration_weeks": 1.5,
+          "dist_to_52w_high_pct": -1.5
+        },
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "near_52w_high_momentum",
+      "hypothesis": "Stocks near 52-week highs with positive momentum have broken resistance and continue strength; distance to high proxies for breakout confirmation.",
+      "params": {
+        "weights": {
+          "dist_to_52w_high_pct": 4.0,
+          "mom_10": 2.5,
+          "mom_20": 1.5,
+          "volume_ratio": 1.5
+        },
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "actionable_ibd_quality",
+      "hypothesis": "IBD ACTIONABLE status filters for technically sound setups; combining with entry quality metrics and avoiding extended names reduces chop.",
+      "params": {
+        "weights": {
+          "is_actionable": 3.5,
+          "ibd_entry_volume_ratio": 2.5,
+          "ibd_entry_close_position": 2.0,
+          "ibd_entry_breakout_range_ratio": 1.5
+        },
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "sector_relative_strength",
+      "hypothesis": "Outperforming sector peers on relative strength indicates top-of-sector leadership; combining with absolute momentum filters strong leaders.",
+      "params": {
+        "weights": {
+          "rel_spy_20": 2.5,
+          "rel_spy_60": 2.0,
+          "mom_20": 2.0,
+          "mom_5": 1.5
+        },
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "entry_distance_risk_adjusted",
+      "hypothesis": "Close proximity to IBD candidate trigger reduces slippage risk; combining entry distance with volatility conditions position for efficient entry.",
+      "params": {
+        "weights": {
+          "current_vs_ibd_candidate_pct": -3.0,
+          "atr_14_pct": -2.0,
+          "mom_5": 2.0,
+          "rv_20": -1.5
+        },
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "tight_pullback_rebound",
+      "hypothesis": "Stocks pulling back minimally then rebounding show resilience; combined with momentum strength captures quick recoveries in strong trends.",
+      "params": {
+        "weights": {
+          "pullback_pct_off_peak": 3.5,
+          "mom_10": 2.5,
+          "mom_5": 2.0,
+          "volume_ratio": 1.5
+        },
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "continuous",
+      "name": "pivot_ma10_confirm_composite",
+      "hypothesis": "Pivot rule stocks confirmed by MA10 touch represent classic IBD setups; combining with short-term momentum and relative strength adds edge.",
+      "params": {
+        "weights": {
+          "mom_20": 2.5,
+          "mom_10": 2.0,
+          "rel_spy_20": 2.5,
+          "px_vs_ma10": 1.5,
+          "up_day_ratio_20": 1.0
+        },
+        "selector_mode": "max_2_per_ind"
+      }
+    }
+  ]
+}
+```

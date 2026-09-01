@@ -1,3 +1,3 @@
-null_model,A_random_ind_random_stock,B_random_ind_b0_best_stock,C_b0_ind_random_stock,D_b0_native,industry_allocation_effect (D-B),stock_selection_effect (D-C),interaction_effect,b0_percentile_mean,b0_percentile_median
-Null1_Uniform_Industry,2.2294356559139787,2.736955523010752,2.932624864086021,3.8978064516129036,1.1608509286021516,0.9651815875268825,0.4576617204301092,98.72,85.5
-Null2_Candidate_Conditioned_Distinct,2.078832952473118,2.865587927096774,2.9421949374193543,3.8978064516129036,1.0322185245161295,0.9556115141935493,0.1688565395698931,98.34,90.03999999999999
+null_model,A_random_ind_random_stock,B_random_ind_b0_best_stock,C_b0_ind_random_stock,D_b0_native,industry_allocation_effect (D-B),stock_selection_effect (D-C),interaction_effect,b0_percentile_mean,b0_percentile_median,b0_percentile_cvar,b0_percentile_stop,valid_paths,median_common_support_weeks,paired_common_support
+Null1_Uniform_Industry,2.38318983908046,2.9257110763218392,3.134874854712644,4.166620689655174,1.2409096133333346,1.0317458349425297,0.48922459770115045,98.72,85.5,78.4,56.379999999999995,5000,29.0,True
+Null2_Candidate_Conditioned_Distinct,2.222200742298851,3.0632146806896556,3.1451049331034486,4.166620689655174,1.1034060089655182,1.0215157565517252,0.18050181816092037,98.34,90.03999999999999,83.3,69.06,5000,29.0,True
