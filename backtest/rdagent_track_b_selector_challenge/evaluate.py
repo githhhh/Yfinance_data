@@ -367,7 +367,9 @@ def classify_champion(
     if has_material_win and has_no_degradation and oof_med_spread >= -0.5:
         # Check bootstrap CI if available
         if bootstrap_res:
-            ci_low = bootstrap_res.get('mean_spread_ci_95', [np.nan, np.nan])[0]
+            ci_low = bootstrap_res.get('mean_spread_ci_low', np.nan)
+            if np.isnan(ci_low) and 'mean_spread_ci_95' in bootstrap_res:
+                ci_low = bootstrap_res['mean_spread_ci_95'][0]
             if not np.isnan(ci_low) and ci_low < -2.0:
                 return 'INSUFFICIENT EVIDENCE'
         return 'DOMINATES B0'

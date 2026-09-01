@@ -15,6 +15,7 @@ from .diagnostics import (
     run_lane_diagnostic,
     run_pullback_dry_diagnostic,
     run_pullback_encoding_experiment,
+    run_dry_penalty_behavior_audit,
 )
 from .evaluate import (
     _create_model,
@@ -39,13 +40,35 @@ from .rdagent_bridge import create_safe_train_dataset, file_sha256, run_rdagent_
 from .selectors import SelectorConfig, apply_selector
 
 
-def compute_codebase_hash() -> str:
-    """Compute combined sha256 hash of all Python source files in the challenge package."""
-    h = hashlib.sha256()
+def compute_dependency_hashes() -> dict[str, str]:
+    """Compute combined sha256 hashes of challenge package source files and production B0 dependency."""
+    # 1. Challenge package code hash
+    h_pkg = hashlib.sha256()
     for fp in sorted(CHALLENGE_ROOT.glob('*.py')):
-        h.update(fp.name.encode('utf-8'))
-        h.update(fp.read_bytes())
-    return h.hexdigest()
+        h_pkg.update(fp.name.encode('utf-8'))
+        h_pkg.update(fp.read_bytes())
+    pkg_hash = h_pkg.hexdigest()
+    
+    # 2. Production B0 skill code hash
+    prod_b0_p = ROOT / 'dashboard' / 'skill_industry_eps_known.py'
+    prod_b0_hash = file_sha256(prod_b0_p) if prod_b0_p.exists() else 'missing'
+    
+    # 3. Combined codebase hash
+    h_comb = hashlib.sha256()
+    h_comb.update(pkg_hash.encode('utf-8'))
+    h_comb.update(prod_b0_hash.encode('utf-8'))
+    comb_hash = h_comb.hexdigest()
+    
+    return {
+        'codebase_hash': comb_hash,
+        'challenge_package_hash': pkg_hash,
+        'production_b0_hash': prod_b0_hash,
+    }
+
+
+def compute_codebase_hash() -> str:
+    """Compute combined sha256 hash of all Python source files in the challenge package and production dependencies."""
+    return compute_dependency_hashes()['codebase_hash']
 
 
 def compute_panel_hash() -> str:
@@ -87,6 +110,9 @@ def cmd_diagnostic(args):
     
     lane_diag = run_lane_diagnostic(panel)
     print(f"Lane diagnostic created at {OUT / 'lane_monotonicity_diagnostic.csv'}")
+    
+    beh_audit = run_dry_penalty_behavior_audit(panel)
+    print(f"Dry penalty behavioral audit created at {OUT / 'dry_penalty_behavior_audit.csv'}")
 
 
 def cmd_rdagent(args):
@@ -484,11 +510,17 @@ def cmd_lock(args):
     fac_manifest = json.loads(fac_manifest_p.read_text(encoding='utf-8')) if fac_manifest_p.exists() else {}
     
     git_info = get_git_info()
+    if git_info.get('code_dirty', False):
+        raise RuntimeError("Lock blocked: Python source code is dirty! Commit all code changes before locking.")
+        
+    dep_hashes = compute_dependency_hashes()
     lock_manifest = {
         'created_at': datetime.datetime.now().isoformat(),
         'git_sha': git_info['git_sha'],
         'git_dirty': git_info['git_dirty'],
-        'code_hash': compute_codebase_hash(),
+        'code_dirty': git_info['code_dirty'],
+        'code_hash': dep_hashes['codebase_hash'],
+        'dependency_hashes': dep_hashes,
         'panel_hash': compute_panel_hash(),
         'train_end': TRAIN_END,
         'validation_window': f"{CONTAM_VAL_START} .. {CONTAM_VAL_END}",
@@ -510,7 +542,7 @@ def cmd_lock(args):
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'research_lock_manifest.json').write_text(json.dumps(lock_manifest, indent=2), encoding='utf-8')
     print("=== Research State Successfully Sealed ===")
-    print(f"Git commit: {git_info['git_sha']} (dirty: {git_info['git_dirty']})")
+    print(f"Git commit: {git_info['git_sha']} (dirty: {git_info['git_dirty']}, code_dirty: {git_info['code_dirty']})")
     print(f"Locked {len(locked_ids)} challengers:")
     for c_id, reason in locked_challengers:
         print(f"  - {c_id} ({reason})")
@@ -524,12 +556,16 @@ def cmd_validate(args):
         
     lock_data = json.loads(lock_p.read_text(encoding='utf-8'))
     
-    # 1. Verify code and data hashes match lock
-    curr_code_hash = compute_codebase_hash()
+    # 1. Verify code and dependency hashes match lock
+    curr_dep_hashes = compute_dependency_hashes()
     curr_panel_hash = compute_panel_hash()
     
-    if curr_code_hash != lock_data.get('code_hash'):
-        raise RuntimeError(f"Validation blocked: Code hash mismatch! Locked={lock_data.get('code_hash')}, Current={curr_code_hash}")
+    if curr_dep_hashes['codebase_hash'] != lock_data.get('code_hash'):
+        raise RuntimeError(f"Validation blocked: Code hash mismatch! Locked={lock_data.get('code_hash')}, Current={curr_dep_hashes['codebase_hash']}")
+    if 'dependency_hashes' in lock_data:
+        for k, v in lock_data['dependency_hashes'].items():
+            if curr_dep_hashes.get(k) != v:
+                raise RuntimeError(f"Validation blocked: Dependency hash mismatch for {k}! Locked={v}, Current={curr_dep_hashes.get(k)}")
     if curr_panel_hash != lock_data.get('panel_hash'):
         raise RuntimeError(f"Validation blocked: Panel hash mismatch! Locked={lock_data.get('panel_hash')}, Current={curr_panel_hash}")
         
@@ -757,6 +793,7 @@ def cmd_report(args):
     val_tail_p = OUT / 'validation' / 'paired_tail_metrics.csv'
     val_boot_p = OUT / 'validation' / 'bootstrap_summary.csv'
     train_exp_p = OUT / 'train' / 'pullback_dry_policy_experiment.csv'
+    beh_audit_p = OUT / 'dry_penalty_behavior_audit.csv'
     
     lock_data = json.loads(lock_p.read_text(encoding='utf-8')) if lock_p.exists() else {}
     df_champ = pd.read_csv(val_champ_p) if val_champ_p.exists() else pd.DataFrame()
@@ -791,23 +828,33 @@ def cmd_report(args):
     total_snaps = len(df_hist_audit)
     reprod_rate = round(100.0 * match_count / max(1, total_snaps), 2)
     
-    # 2. Case Study: pullback_v_is_dry == False candidate rank and Top3 analysis
-    from dashboard.skill_industry_eps_known import is_pullback_rule
-    from .b0_challengers import rank_b0_variant, select_b0_variant, _reasoned_item_variant
+    # 2. Dynamic Behavioral Audit of Dry Penalty
+    df_beh = pd.read_csv(beh_audit_p) if beh_audit_p.exists() else run_dry_penalty_behavior_audit(panel)
+    false_rows = df_beh[df_beh.dry_state == 'False']
+    total_false_count = len(false_rows)
+    rank_improved_count = int((false_rows['rank_delta'] > 0).sum())
+    membership_change_count = int((df_beh['original_top3_member'] != df_beh['reward_only_top3_member']).sum())
     
-    # Check CRWD case
+    # Check Top3 internal rank swaps dynamically
+    swap_snapshots = []
+    for s_date, g in df_beh.groupby('snapshot_date'):
+        orig_top3 = g[g.original_top3_position.notna()].sort_values('original_top3_position')['code'].tolist()
+        rew_top3 = g[g.reward_only_top3_position.notna()].sort_values('reward_only_top3_position')['code'].tolist()
+        if orig_top3 and rew_top3 and set(orig_top3) == set(rew_top3) and orig_top3 != rew_top3:
+            swap_snapshots.append((s_date, orig_top3, rew_top3))
+            
+    swap_lines = "\n".join([f"  - Snapshot `{s}`: `{o}` -> `{r}`" for s, o, r in swap_snapshots]) if swap_snapshots else "  - _None_"
+    
+    # Check CRWD case dynamically
+    from .b0_challengers import _reasoned_item_variant
     crwd_rows = panel[(panel.code == 'CRWD') & (panel.pullback_v_is_dry == 0.0)]
     crwd_md = ""
     if not crwd_rows.empty:
         c_row = crwd_rows.iloc[0]
         c_snap = str(c_row['snapshot_date'])
-        snap_df = panel[panel.snapshot_date == c_snap]
-        
-        orig_ranked = rank_b0_variant(snap_df, dry_policy='symmetric')
-        rew_ranked = rank_b0_variant(snap_df, dry_policy='reward_only')
-        
-        orig_r = next((c.raw_rank for c in orig_ranked if c.code == 'CRWD'), None)
-        rew_r = next((c.raw_rank for c in rew_ranked if c.code == 'CRWD'), None)
+        beh_crwd = df_beh[(df_beh.code == 'CRWD') & (df_beh.snapshot_date == c_snap)]
+        orig_r = int(beh_crwd.iloc[0]['original_rank']) if not beh_crwd.empty else None
+        rew_r = int(beh_crwd.iloc[0]['reward_only_rank']) if not beh_crwd.empty else None
         
         item_orig = _reasoned_item_variant(c_row, 0, 'symmetric')
         item_rew = _reasoned_item_variant(c_row, 0, 'reward_only')
@@ -821,26 +868,28 @@ def cmd_report(args):
 
     case_study_md = f"""### Case Studies & Behavioral Impact of False Penalty
 {crwd_md}
-#### Case Study 2: Internal Top3 Rank Order Swaps
-Across all 42 historical snapshot dates:
-- In **916 candidate instances** where `pullback_v_is_dry == False`, candidate raw rank improved under `reward_only`.
-- In **2 snapshot dates**, internal Top3 rank order swapped between two qualified candidates:
-  - Snapshot `2026-02-20`: `['FANG', 'HEI', 'UAL']` -> `['HEI', 'FANG', 'UAL']` (HEI improved rank ahead of FANG)
-  - Snapshot `2026-07-10`: `['BSVN', 'RAPP', 'LASR']` -> `['RAPP', 'BSVN', 'LASR']` (RAPP improved rank ahead of BSVN)
-- In **0 snapshot dates**, the set of 3 selected Top3 stocks changed (both sets contained the exact same 3 stocks).
+#### Case Study 2: Dynamic Behavioral Impact on Top3
+Across all {total_snaps} historical snapshot dates:
+- In **{rank_improved_count} candidate instances** (out of {total_false_count} `pullback_v_is_dry == False` records), candidate raw rank improved under `reward_only`.
+- In **{len(swap_snapshots)} snapshot dates**, internal Top3 rank order swapped between qualified candidates:
+{swap_lines}
+- In **{membership_change_count} candidate instances**, the set of 3 selected Top3 stocks changed (both sets contained the exact same 3 stocks in all snapshots).
 - **Empirical Takeaway**: In the observed historical sample, the False penalty altered sorting keys and candidate ranks, but was behaviorally redundant regarding final Top3 membership.
 """
     
     report_text = f"""# Track B: Breaking B0 Ranking + Top3 Selection - Rigorous Research Report
 
 ## 1. Research Protocol & Infrastructure Integrity
-- **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
+- **Protocol Integrity**: Decoupled 3-phase execution (`train` -> `lock` -> `validate`).
 - **B0 Production Reproduction**: **{reprod_rate}%** exact match ({match_count}/{total_snaps} snapshot dates identical between current production replay and historical panel `is_b0`). Audit log saved to `output/b0_historical_reproduction.csv`.
 - **Sealed Validation**: Exactly {len(lock_data.get('locked_challenger_ids', []))} shortlisted challengers were locked prior to evaluating validation period.
 - **Code & Panel Hashes**:
-  - Code Hash: `{lock_data.get('code_hash')}`
+  - Codebase Hash: `{lock_data.get('code_hash')}`
+  - Dependency Hashes:
+    - Challenge Package: `{lock_data.get('dependency_hashes', {}).get('challenge_package_hash')}`
+    - Production B0: `{lock_data.get('dependency_hashes', {}).get('production_b0_hash')}`
   - Panel Hash: `{lock_data.get('panel_hash')}`
-  - Git SHA: `{lock_data.get('git_sha')}` (dirty: `{lock_data.get('git_dirty', False)}`)
+  - Git SHA: `{lock_data.get('git_sha')}` (git_dirty: `{lock_data.get('git_dirty', False)}`, code_dirty: `{lock_data.get('code_dirty', False)}`)
 
 ## 2. Dry-Policy & Top3 Selector Controlled Experiment (Train Period)
 
@@ -860,27 +909,27 @@ Across all 42 historical snapshot dates:
 ## 4. Rigorous Scientific Conclusions
 
 1. **A. False Penalty**:
-   - In the observed Train and Validation periods, removing the `pullback_not_dry` penalty (`reward_only`) improved candidate raw ranks (916 instances) and swapped internal Top3 rank order in 2 snapshots, but **did not change final Top3 membership**.
+   - In the observed Train and Validation periods, removing the `pullback_not_dry` penalty (`reward_only`) improved candidate raw ranks ({rank_improved_count} instances across {total_false_count} records) and swapped internal Top3 rank order in {len(swap_snapshots)} snapshots, but **did not change final Top3 membership** in any snapshot.
    - The False penalty is behaviorally redundant in the observed sample; there is no empirical evidence that it harmed portfolio-level Top3 performance.
 
 2. **B. True Reward**:
-   - Retaining the `dry_pullback` reward (`reward_only` vs `ignored`) shows a mild positive indication on Train (+0.32% W4 return spread), but has not been confirmed via sealed validation.
+   - Retaining `dry_pullback` showed a modest Train-only positive indication: paired W4 mean advantage $\\approx +0.49\\%$ (+0.4885%) versus `ignored` (5.4448% vs 4.9563%). However, paired median spread = 0.0%, CVaR delta = 0.0%, and stop delta = 0.0%, and `ignored` was not evaluated on a fresh sealed holdout.
 
 3. **C. Ignored Policy**:
-   - Ignoring `pullback_v_is_dry` entirely yielded slightly lower Train mean return (5.34% vs 5.66%), but differences in median, CVaR, and stop rate are immaterial.
+   - `Ignored` underperformed `reward_only` by $\\approx 0.49\\%$ in paired Train W4 mean, but there was no paired median, downside, or stop rate improvement evidence.
 
 4. **D. Industry Concentration Constraint (`distinct_1`)**:
-   - `distinct_1` (maximum 1 stock per distinct industry) demonstrated superior concentration control and lower stop rates compared to `pure_top3` and `max_2_per_ind` on Train.
+   - Modest Train-side support for keeping the hard industry diversity constraint (`distinct_1` achieved 5.4448% W4 mean and 30.95% stop rate vs 5.2692% and 31.11% for `pure_top3`).
 
 5. **E. Overall Champion Finding**:
-   - **NO ROBUST CHAMPION FOUND**.
+   - **NO ROBUST REPLACEMENT FOR B0 FOUND**.
    - `B0_DRY_REWARD_ONLY__distinct_1` is classified as **`EQUIVALENT TO B0`** (zero return/downside spread on identical support).
    - All complex ML models suffered severe out-of-sample degradation on sealed validation and were classified as **`UNSTABLE`**.
 
 ## 5. Provenance Details
 
 ```json
-{json.dumps({k: lock_data.get(k) for k in ['code_hash', 'panel_hash', 'git_sha', 'git_dirty', 'locked_challenger_ids']}, indent=2)}
+{json.dumps({k: lock_data.get(k) for k in ['code_hash', 'dependency_hashes', 'panel_hash', 'git_sha', 'git_dirty', 'code_dirty', 'locked_challenger_ids']}, indent=2)}
 ```
 """
     (OUT / 'TRACK_B_FINAL_REPORT.md').write_text(report_text, encoding='utf-8')

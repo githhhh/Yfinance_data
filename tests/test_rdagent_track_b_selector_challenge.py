@@ -185,6 +185,27 @@ def test_classify_champion_equivalent_vs_dominates():
         {'support_weeks': 8, 'median_spread': 1.5, 'mean_spread': 1.2, 'cvar_delta': 1.0, 'stop_delta_pct': -2.0}
     )
     assert res_dom == 'DOMINATES B0'
+    
+    # Bootstrap CI low < -2.0 blocks DOMINATES B0 -> INSUFFICIENT EVIDENCE
+    res_boot_blocked = classify_champion(
+        {'median_spread': 1.0, 'mean_spread': 1.0},
+        {'support_weeks': 8, 'median_spread': 1.5, 'mean_spread': 1.2, 'cvar_delta': 1.0, 'stop_delta_pct': -2.0},
+        bootstrap_res={'mean_spread_ci_low': -2.5, 'mean_spread_ci_high': 4.0}
+    )
+    assert res_boot_blocked == 'INSUFFICIENT EVIDENCE'
+
+
+def test_dependency_hashes_include_production_b0():
+    """Verify compute_dependency_hashes seals both challenge package and production B0 skill."""
+    from backtest.rdagent_track_b_selector_challenge.cli import compute_dependency_hashes
+    
+    dep_h = compute_dependency_hashes()
+    assert 'codebase_hash' in dep_h
+    assert 'challenge_package_hash' in dep_h
+    assert 'production_b0_hash' in dep_h
+    assert len(dep_h['codebase_hash']) == 64
+    assert len(dep_h['challenge_package_hash']) == 64
+    assert len(dep_h['production_b0_hash']) == 64
 
 
 

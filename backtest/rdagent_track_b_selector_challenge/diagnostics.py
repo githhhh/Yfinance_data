@@ -214,3 +214,66 @@ def run_lane_diagnostic(panel: pd.DataFrame | None = None) -> pd.DataFrame:
     df_sum.to_csv(OUT / 'lane_monotonicity_diagnostic.csv', index=False)
     return df_sum
 
+
+def run_dry_penalty_behavior_audit(
+    panel: pd.DataFrame | None = None,
+    output_dir: Path | None = None,
+    write_output: bool = True,
+) -> pd.DataFrame:
+    """Generate dynamic per-candidate behavioral audit of removing pullback False penalty."""
+    if panel is None:
+        panel = get_full_panel()
+        
+    from dashboard.skill_industry_eps_known import is_review_universe, is_pullback_rule
+    from .b0_challengers import rank_b0_variant, select_b0_variant
+    
+    rows = []
+    for s_date, snap_df in panel.groupby('snapshot_date'):
+        orig_ranked = rank_b0_variant(snap_df, dry_policy='symmetric')
+        rew_ranked = rank_b0_variant(snap_df, dry_policy='reward_only')
+        
+        orig_ranks = {c.code: (c.raw_rank, c.sort_key) for c in orig_ranked}
+        rew_ranks = {c.code: (c.raw_rank, c.sort_key) for c in rew_ranked}
+        
+        orig_top3_list = [c.code for c in select_b0_variant(snap_df, dry_policy='symmetric', selector='distinct_1', limit=TOP_N)]
+        rew_top3_list = [c.code for c in select_b0_variant(snap_df, dry_policy='reward_only', selector='distinct_1', limit=TOP_N)]
+        
+        for idx, row in snap_df.iterrows():
+            if not is_review_universe(row):
+                continue
+            code = str(row['code'])
+            rule = str(row.get('ibd_candidate_rule', ''))
+            if not is_pullback_rule(rule):
+                continue
+            dry_val = row.get('pullback_v_is_dry')
+            
+            orig_r, orig_k = orig_ranks.get(code, (None, None))
+            rew_r, rew_k = rew_ranks.get(code, (None, None))
+            
+            orig_pos = (orig_top3_list.index(code) + 1) if code in orig_top3_list else None
+            rew_pos = (rew_top3_list.index(code) + 1) if code in rew_top3_list else None
+            
+            rank_delta = (orig_r - rew_r) if (orig_r is not None and rew_r is not None) else 0
+            
+            rows.append({
+                'snapshot_date': s_date,
+                'code': code,
+                'rule': rule,
+                'dry_state': 'True' if dry_val == 1.0 else ('False' if dry_val == 0.0 else 'Missing'),
+                'original_rank': orig_r,
+                'reward_only_rank': rew_r,
+                'rank_delta': rank_delta,
+                'original_top3_position': orig_pos,
+                'reward_only_top3_position': rew_pos,
+                'original_top3_member': code in orig_top3_list,
+                'reward_only_top3_member': code in rew_top3_list,
+            })
+            
+    df_audit = pd.DataFrame(rows)
+    if write_output:
+        target_dir = output_dir or OUT
+        target_dir.mkdir(parents=True, exist_ok=True)
+        df_audit.to_csv(target_dir / 'dry_penalty_behavior_audit.csv', index=False)
+    return df_audit
+
+
