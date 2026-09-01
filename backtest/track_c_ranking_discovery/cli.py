@@ -236,7 +236,7 @@ def cmd_phase2_evaluate(args: argparse.Namespace) -> None:
                 ch_picks_rows.append(match_row)
 
         ch_picks_df = pd.DataFrame(ch_picks_rows) if ch_picks_rows else pd.DataFrame()
-        ch_outcomes = compute_3slot_portfolio_weekly(ch_picks_df, snaps, ch.policy_id, ch.family, PRIMARY_HORIZON)
+        ch_outcomes = compute_3slot_portfolio_weekly(ch_picks_df, snaps, ch.policy_id, PRIMARY_HORIZON)
         summary = evaluate_paired_challenger(ch_outcomes, b0_outcomes, ch.policy_id, ch.family, "train_discovery", PRIMARY_HORIZON)
         all_train_summaries.append(summary)
 

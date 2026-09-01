@@ -60,8 +60,8 @@ class IndustryBreadthChallenger:
 
         df["candidate_score"] = scores
         df["raw_rank"] = df["candidate_score"].rank(ascending=False, method="min")
-        df["has_geom_failure"] = (df.get("clear_geometry_failure", 0) == 1).astype(int)
-        df["below_buy_point"] = (df.get("current_vs_ibd_candidate_pct", 0) < 0).astype(int)
+        df["has_geom_failure"] = (df["clear_geometry_failure"] == 1).astype(int) if "clear_geometry_failure" in df.columns else np.zeros(len(df), dtype=int)
+        df["below_buy_point"] = (df["current_vs_ibd_candidate_pct"] < 0).astype(int) if "current_vs_ibd_candidate_pct" in df.columns else np.zeros(len(df), dtype=int)
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
@@ -177,8 +177,8 @@ class ContinuousScoreChallenger:
 
         df["candidate_score"] = score
         df["raw_rank"] = df["candidate_score"].rank(ascending=False, method="min")
-        df["has_geom_failure"] = (df.get("clear_geometry_failure", 0) == 1).astype(int)
-        df["below_buy_point"] = (df.get("current_vs_ibd_candidate_pct", 0) < 0).astype(int)
+        df["has_geom_failure"] = (df["clear_geometry_failure"] == 1).astype(int) if "clear_geometry_failure" in df.columns else np.zeros(len(df), dtype=int)
+        df["below_buy_point"] = (df["current_vs_ibd_candidate_pct"] < 0).astype(int) if "current_vs_ibd_candidate_pct" in df.columns else np.zeros(len(df), dtype=int)
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
@@ -252,8 +252,8 @@ class LearningToRankChallenger:
 
         df["candidate_score"] = score
         df["raw_rank"] = df["candidate_score"].rank(ascending=False, method="min")
-        df["has_geom_failure"] = (df.get("clear_geometry_failure", 0) == 1).astype(int)
-        df["below_buy_point"] = (df.get("current_vs_ibd_candidate_pct", 0) < 0).astype(int)
+        df["has_geom_failure"] = (df["clear_geometry_failure"] == 1).astype(int) if "clear_geometry_failure" in df.columns else np.zeros(len(df), dtype=int)
+        df["below_buy_point"] = (df["current_vs_ibd_candidate_pct"] < 0).astype(int) if "current_vs_ibd_candidate_pct" in df.columns else np.zeros(len(df), dtype=int)
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
@@ -332,8 +332,8 @@ class PortfolioUtilityChallenger:
 
         df["candidate_score"] = score
         df["raw_rank"] = df["candidate_score"].rank(ascending=False, method="min")
-        df["has_geom_failure"] = (df.get("clear_geometry_failure", 0) == 1).astype(int)
-        df["below_buy_point"] = (df.get("current_vs_ibd_candidate_pct", 0) < 0).astype(int)
+        df["has_geom_failure"] = (df["clear_geometry_failure"] == 1).astype(int) if "clear_geometry_failure" in df.columns else np.zeros(len(df), dtype=int)
+        df["below_buy_point"] = (df["current_vs_ibd_candidate_pct"] < 0).astype(int) if "current_vs_ibd_candidate_pct" in df.columns else np.zeros(len(df), dtype=int)
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
@@ -439,8 +439,8 @@ class RDAgentNovelChallenger:
 
         df["candidate_score"] = score
         df["raw_rank"] = df["candidate_score"].rank(ascending=False, method="min")
-        df["has_geom_failure"] = (df.get("clear_geometry_failure", 0) == 1).astype(int)
-        df["below_buy_point"] = (df.get("current_vs_ibd_candidate_pct", 0) < 0).astype(int)
+        df["has_geom_failure"] = (df["clear_geometry_failure"] == 1).astype(int) if "clear_geometry_failure" in df.columns else np.zeros(len(df), dtype=int)
+        df["below_buy_point"] = (df["current_vs_ibd_candidate_pct"] < 0).astype(int) if "current_vs_ibd_candidate_pct" in df.columns else np.zeros(len(df), dtype=int)
         return df
 
     def allocate_industries(self, scored_df: pd.DataFrame) -> dict[str, int]:
