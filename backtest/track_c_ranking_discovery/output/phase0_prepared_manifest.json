@@ -1,0 +1,8 @@
+{
+  "protocol_version": "track_c_v1",
+  "train_snapshots": 31,
+  "validation_snapshots": 11,
+  "allowed_pit_features": 39,
+  "blocked_outcome_features": 8,
+  "panel_rows": 2738
+}

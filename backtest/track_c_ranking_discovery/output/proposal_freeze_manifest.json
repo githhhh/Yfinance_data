@@ -1,0 +1,235 @@
+{
+  "frozen_at": "2026-09-01T15:46:16.690893",
+  "ledger_hash": "b6d7207e790511ccb0cf11ae6aa79a0d862d6be83a61153aeb87fdcf8e4efe87",
+  "num_proposals": 38,
+  "proposals": [
+    {
+      "policy_id": "IND_BREADTH__breadth_actionable_count_dynTrue_min2",
+      "family": "industry_breadth",
+      "spec_hash": "13bbcbc7469708284002e30377639b22ee565cf20fa68a878071cfdc53e66aad",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_actionable_count_dynTrue_min3",
+      "family": "industry_breadth",
+      "spec_hash": "98d089325044a7e3fca0d09b8c1f1b0437dacfa5d80d821ba2794c20c9c103b4",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_actionable_count_dynFalse_min2",
+      "family": "industry_breadth",
+      "spec_hash": "3cfca36d92ce0b2fb6d62d564aeb76205016277db512272c14cc9c908e227626",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_volume_breadth_dynTrue_min2",
+      "family": "industry_breadth",
+      "spec_hash": "1e8e496228d025fcc4817a130b653d0577214fabb56ad838899b245f76f3110a",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_volume_breadth_dynTrue_min3",
+      "family": "industry_breadth",
+      "spec_hash": "ced114e4e93dec0eea160dc97d50b40e00813b1a4393843e2d179f8062d2d951",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_volume_breadth_dynFalse_min2",
+      "family": "industry_breadth",
+      "spec_hash": "29a26d2165d6b2e12d44397c731dd33240b5d7bb28a605a1c60b49480ed92eab",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_quality_and_count_dynTrue_min2",
+      "family": "industry_breadth",
+      "spec_hash": "e532c61ea5c04ea8ec40be346781e66574af4da37b600a8be0713dfea07560b2",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "IND_BREADTH__breadth_quality_and_count_dynFalse_min2",
+      "family": "industry_breadth",
+      "spec_hash": "571d1ea64ee9a37010d11ea8d69b8bd14aec9d06c9d88c0ea0222d5fbb82ff09",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__eps_mom_vol",
+      "family": "continuous",
+      "spec_hash": "10c9a3172bf9b90701ac1107b75c50dfbdae7b09481aab5a02195cc88939791a",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__mom_heavy",
+      "family": "continuous",
+      "spec_hash": "9d3b13b70fbc30840d2ba4e0aa13da1a55ba4264bd3dff259a867b827c8f3304",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__eps_heavy",
+      "family": "continuous",
+      "spec_hash": "ed1673762ba15f2732692c8de58ec7a2aa1c9074969b5f2ea69ed8fd17eb67b4",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__vol_confirmed",
+      "family": "continuous",
+      "spec_hash": "d11215abd7a5e949e977702a2abbb57759eb7be1cece50f98f5a301b454ebf3a",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__quality_52w",
+      "family": "continuous",
+      "spec_hash": "f84901bb80b274da0f66e4613175f8508e68b1c9d318d5c6da3ab73345817c26",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__eps_mom_max2",
+      "family": "continuous",
+      "spec_hash": "2f09993e78b8e325932330971a61b2b5efa0ed57ac4b7255d2ab39172e55ac12",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__mom_heavy_max2",
+      "family": "continuous",
+      "spec_hash": "72ea883cce235775a61701b381192144a3bfa1bb43bbf770c64e15213bbaab0f",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__vol_confirmed_max2",
+      "family": "continuous",
+      "spec_hash": "ada94b0f8df500cfec5cfd49daaf19fbc0214fd7a2b4d0b8054e0f854903716f",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__tight_structure",
+      "family": "continuous",
+      "spec_hash": "85cd95cdb181046c349d7e79420b47767edc4c227908e94ebe0eb5a8a2d38fad",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__balanced_all",
+      "family": "continuous",
+      "spec_hash": "f7e9baec6c6fa4551dac44d527b2bc47ddc34e4d22f537f959425a8cd56c1fcf",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "CONT_SCORE__pure_breakout",
+      "family": "continuous",
+      "spec_hash": "4db307cfc62990f76291a2382a16b674596896d2f5302ebc6772c7795f207b5c",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_core",
+      "family": "ltr",
+      "spec_hash": "7810b2dabddb2688b59a8522258ec6653b9d36ea6e7f834e29d4ef713b96de63",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_momentum",
+      "family": "ltr",
+      "spec_hash": "34608e958d67a99bf1ae424b4b64afe54f57abce46cd82cf00a1cac4a70c1270",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_volume",
+      "family": "ltr",
+      "spec_hash": "256a5289ac6ac8b6036ae3bab151bab234e4b9db0e7b30bf06b6c8583e7414a4",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_geom",
+      "family": "ltr",
+      "spec_hash": "6495bc090f18f7526bdc7d64132636aacaf145d331da3eafa3ede89d9f91c6c6",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_core_max2",
+      "family": "ltr",
+      "spec_hash": "774415c28b4a932f95ac46e1596a7ef7610ea6af36d478826cffd6760ebefaca",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_mom_max2",
+      "family": "ltr",
+      "spec_hash": "17a3f4c2538999049b1dbe73a52db4b469077e291cba43d5a0d26699c6b4c5e9",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_slope",
+      "family": "ltr",
+      "spec_hash": "6c2da2c349919141d8a3a81a130149f6fba33a67b6e5dffc5b4657c1b8a0ca1d",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_full",
+      "family": "ltr",
+      "spec_hash": "424bc84881e74cf056b86acb18be431e888735a77c8d53c0a48a0e2ebd25644d",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_tight",
+      "family": "ltr",
+      "spec_hash": "ed07848064e0e65aa8215d75bc9ee59f7f71dc6abb58756b8785837a73b712ca",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "LTR__pairwise_fast_mom",
+      "family": "ltr",
+      "spec_hash": "3dba5d9deb5a2e6a37906c71e871a0c2833256d096a9245452e7763e6fce261e",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "PORT_UTIL__lambda_0_5_bal",
+      "family": "portfolio",
+      "spec_hash": "4a48ff54c488c1d9a5eda250de98cf25511ba1a0189ac8441fa3f7e979c29ee0",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "PORT_UTIL__lambda_1_0_bal",
+      "family": "portfolio",
+      "spec_hash": "582809650699af2d28109b0510eab178840b538c00d1caa8feb5de26c66bbdd8",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "PORT_UTIL__lambda_0_5_mom",
+      "family": "portfolio",
+      "spec_hash": "866c4b1c5418fa9f3ec9ceb1b94e5866f1eeb8066e4eb0492ac7c98afba02cea",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "PORT_UTIL__lambda_0_2_bal",
+      "family": "portfolio",
+      "spec_hash": "39807f33b95dede520ca83f523e80e8f0aaef8504146de86fbdaace20e0a5dea",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "NOVEL__dry_heavy",
+      "family": "novel",
+      "spec_hash": "70290dfa05ca1fead3153f814cc1a498b49905881ec99e92a25a05889cd92e13",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "NOVEL__dry_moderate",
+      "family": "novel",
+      "spec_hash": "5db9a4e49844ecdf298f52969c2c25d77c394b90986c5d5218ead902248f228f",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "NOVEL__vol_spike_focus",
+      "family": "novel",
+      "spec_hash": "d32407460aeffb145f5abf3cc3b735ab05af12da5af0260d64702a23a7742495",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "NOVEL__dry_heavy_max2",
+      "family": "novel",
+      "spec_hash": "ea69c79462b7d011155dd3368dca02db911c0c1cc94b7bc384540e79a65c93d5",
+      "fitted_state_hash": "none"
+    },
+    {
+      "policy_id": "NOVEL__vol_spike_max2",
+      "family": "novel",
+      "spec_hash": "367322cfcbf188d80f75a5d25435eeb053c8408151e52e3c1be21dfd55969cab",
+      "fitted_state_hash": "none"
+    }
+  ]
+}

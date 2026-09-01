@@ -445,6 +445,20 @@ def cmd_phase5_validate(args: argparse.Namespace) -> None:
     print(f"Validation completed. Results:\n{df_val.to_string()}")
 
 
+def df_to_markdown_simple(df: pd.DataFrame) -> str:
+    """Format DataFrame as standard Markdown table without external dependency."""
+    if df.empty:
+        return ""
+    headers = list(df.columns)
+    lines = [
+        "| " + " | ".join(str(h) for h in headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    for _, row in df.iterrows():
+        lines.append("| " + " | ".join(str(row[c]) for c in headers) + " |")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------
 # Phase 6: Final Comprehensive Research Report
 # ---------------------------------------------------------
@@ -472,11 +486,11 @@ def cmd_phase6_report(args: argparse.Namespace) -> None:
         "1. **B0 Alpha Attribution (2x2 Counterfactual Matrix)**:",
         f"   - **B0-Induced Industry Allocation Effect**: {df_decomp['industry_allocation_effect (D-B)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['industry_allocation_effect (D-B)'].iloc[1]:+.4f}% (Null 2)",
         f"   - **Conditional Stock Selection Effect**: {df_decomp['stock_selection_effect (D-C)'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['stock_selection_effect (D-C)'].iloc[1]:+.4f}% (Null 2)",
-        f"   - **Interaction Effect**: {df_decomp['interaction_effect'].iloc[0]:+.4f}% (Null 1)",
+        f"   - **Interaction Effect**: {df_decomp['interaction_effect'].iloc[0]:+.4f}% (Null 1) vs {df_decomp['interaction_effect'].iloc[1]:+.4f}% (Null 2)",
         f"   - **B0 Full-Path Percentile**: B0 ranked at the **{df_decomp['b0_percentile_mean'].iloc[0]:.1f}th percentile** (Null 1) and **{df_decomp['b0_percentile_mean'].iloc[1]:.1f}th percentile** (Null 2) across 5,000 full historical paths.",
         "",
         "2. **Locked Observed Re-Validation Results**:",
-        df_val.to_markdown(index=False),
+        df_to_markdown_simple(df_val),
         "",
         "3. **Overall Research Verdict**:",
         "   - **State C: No robust evidence against B0 within the tested search space; retain B0 operationally.**",
