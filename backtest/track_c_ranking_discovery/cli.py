@@ -133,8 +133,11 @@ def cmd_phase1_discover(args: argparse.Namespace) -> None:
         feature_manifest,
         OUT / "rdagent_policy_discovery",
     )
-    proposals, normalized_records = normalize_discovery_records(raw_records)
-    print(f"RD-Agent produced {len(proposals)} executable blind proposals before dedup.")
+    proposals, normalized_records, schema_rejected = normalize_discovery_records(raw_records)
+    print(
+        f"RD-Agent produced {len(proposals)} executable blind proposals before dedup; "
+        f"{len(schema_rejected)} malformed proposals were rejected and audited."
+    )
 
     kept_proposals, dropped = deduplicate_proposals_behaviorally(proposals, anon_view)
     normalized_map = {r["policy_id"]: r for r in normalized_records}
@@ -149,6 +152,7 @@ def cmd_phase1_discover(args: argparse.Namespace) -> None:
         "rdagent_provenance_path": provenance["provenance_path"],
         "rdagent_provenance_hash": provenance["provenance_hash"],
         "proposals": kept_records,
+        "rejected_schema_proposals": schema_rejected,
         "dropped_duplicates": dropped,
     }
     ledger_path = OUT / "proposals_ledger.json"

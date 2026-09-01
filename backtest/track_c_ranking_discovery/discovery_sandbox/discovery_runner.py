@@ -722,27 +722,70 @@ def instantiate_discovery_proposal(
 
 def normalize_discovery_records(
     raw_records: list[dict[str, Any]],
-) -> tuple[list[ChallengerProtocol], list[dict[str, Any]]]:
-    """Validate model proposals, enforce family budgets, and return executable objects + frozen specs."""
+) -> tuple[list[ChallengerProtocol], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate blind model proposals without letting one malformed item kill the family.
+
+    Invalid proposals are rejected individually and preserved in the audit ledger.
+    The run still fails closed if any family represented in the RD-Agent response
+    has zero executable proposals after schema validation.
+    """
     policies: list[ChallengerProtocol] = []
     records: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     family_counts: dict[str, int] = {}
 
+    attempted_families = {
+        str(raw.get("family") or "").strip()
+        for raw in raw_records
+        if str(raw.get("family") or "").strip()
+    }
+
+    def reject(raw: dict[str, Any], reason: str) -> None:
+        rejected.append({
+            "family": str(raw.get("family") or "").strip(),
+            "name": str(raw.get("name") or "").strip(),
+            "reason": str(reason),
+            "source_response_hash": str(raw.get("source_response_hash") or ""),
+            "source_response_path": str(raw.get("source_response_path") or ""),
+            "source_model": str(raw.get("source_model") or ""),
+        })
+
     for raw in raw_records:
-        policy, rec = instantiate_discovery_proposal(raw)
+        try:
+            policy, rec = instantiate_discovery_proposal(raw)
+        except (TypeError, ValueError) as exc:
+            reject(raw, f"schema_validation: {exc}")
+            continue
+
         if policy.policy_id in seen_ids:
-            raise ValueError(f"Duplicate RD-Agent policy_id: {policy.policy_id}")
-        family_counts[policy.family] = family_counts.get(policy.family, 0) + 1
-        if family_counts[policy.family] > int(FAMILY_BUDGETS[policy.family]):
-            raise ValueError(f"RD-Agent exceeded family budget for {policy.family}")
+            reject(raw, f"duplicate_policy_id: {policy.policy_id}")
+            continue
+
+        next_count = family_counts.get(policy.family, 0) + 1
+        if next_count > int(FAMILY_BUDGETS[policy.family]):
+            reject(raw, f"family_budget_exceeded: {policy.family}")
+            continue
+
+        family_counts[policy.family] = next_count
         seen_ids.add(policy.policy_id)
         policies.append(policy)
         records.append(rec)
 
     if not policies:
         raise RuntimeError("RD-Agent discovery produced zero executable proposals")
-    return policies, records
+
+    empty_families = sorted(
+        family for family in attempted_families
+        if family_counts.get(family, 0) == 0
+    )
+    if empty_families:
+        raise RuntimeError(
+            "RD-Agent family produced zero schema-valid executable proposals: "
+            + ", ".join(empty_families)
+        )
+
+    return policies, records, rejected
 
 
 def instantiate_discovery_proposals(

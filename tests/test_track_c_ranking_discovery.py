@@ -221,7 +221,8 @@ def test_rdagent_frozen_spec_roundtrip_and_tamper_detection():
         "source_response_path": "rdagent_policy_discovery/raw/continuous.txt",
         "source_model": "deepseek/deepseek-v4-pro",
     }]
-    policies, records = normalize_discovery_records(raw)
+    policies, records, rejected = normalize_discovery_records(raw)
+    assert rejected == []
     replayed = instantiate_discovery_proposals(records)
     assert replayed[0].policy_id == policies[0].policy_id
     assert replayed[0].spec_hash == policies[0].spec_hash
@@ -331,3 +332,71 @@ def test_rdagent_model_config_honors_custom_deepseek_endpoint(monkeypatch):
     assert cfg["reasoning_effort"] == "high"
     assert cfg["retry_wait_seconds"] == 15.0
     assert cfg["max_retry"] == 15
+
+
+
+def test_rdagent_schema_rejects_bad_item_without_killing_valid_family():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        normalize_discovery_records,
+    )
+
+    base_meta = {
+        "source_response_hash": "family-response-hash",
+        "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
+        "source_model": "deepseek/deepseek-v4-pro",
+    }
+    raw = [
+        {
+            **base_meta,
+            "family": "industry_breadth",
+            "name": "valid_breadth",
+            "hypothesis": "valid family member",
+            "params": {
+                "breadth_metric": "actionable_count",
+                "allow_dynamic_2_plus_1": True,
+                "min_breadth_for_2": 2,
+            },
+        },
+        {
+            **base_meta,
+            "family": "industry_breadth",
+            "name": "invalid_breadth_4",
+            "hypothesis": "model violated the pre-registered schema",
+            "params": {
+                "breadth_metric": "actionable_count",
+                "allow_dynamic_2_plus_1": False,
+                "min_breadth_for_2": 4,
+            },
+        },
+    ]
+
+    policies, records, rejected = normalize_discovery_records(raw)
+
+    assert len(policies) == 1
+    assert len(records) == 1
+    assert len(rejected) == 1
+    assert rejected[0]["name"] == "invalid_breadth_4"
+    assert "min_breadth_for_2 must be 2 or 3" in rejected[0]["reason"]
+
+
+def test_rdagent_schema_fails_closed_when_family_has_no_valid_proposal():
+    from backtest.track_c_ranking_discovery.discovery_sandbox.discovery_runner import (
+        normalize_discovery_records,
+    )
+
+    raw = [{
+        "family": "industry_breadth",
+        "name": "only_invalid",
+        "hypothesis": "invalid family",
+        "params": {
+            "breadth_metric": "actionable_count",
+            "allow_dynamic_2_plus_1": False,
+            "min_breadth_for_2": 4,
+        },
+        "source_response_hash": "hash",
+        "source_response_path": "rdagent_policy_discovery/raw/industry_breadth.txt",
+        "source_model": "deepseek/deepseek-v4-pro",
+    }]
+
+    with pytest.raises(RuntimeError, match="zero executable proposals"):
+        normalize_discovery_records(raw)
