@@ -1,13 +1,16 @@
 # Track B: Breaking B0 Ranking + Top3 Selection - Rigorous Research Report
 
 ## 1. Research Protocol & Infrastructure Integrity
-- **Protocol Integrity**: Fully decoupled 3-phase execution (`train` -> `lock` -> `validate`).
+- **Protocol Integrity**: Decoupled 3-phase execution (`train` -> `lock` -> `validate`).
 - **B0 Production Reproduction**: **100.0%** exact match (42/42 snapshot dates identical between current production replay and historical panel `is_b0`). Audit log saved to `output/b0_historical_reproduction.csv`.
 - **Sealed Validation**: Exactly 5 shortlisted challengers were locked prior to evaluating validation period.
 - **Code & Panel Hashes**:
-  - Code Hash: `f1a5a1f1aaae6202b107cdde8b115970835cec91cda0ac15e0ca008283fc341f`
+  - Codebase Hash: `6c97726eb83500bb5d9b5a3c8d4c7595c2390f88a2b1732ac68cd5b9689a60fd`
+  - Dependency Hashes:
+    - Challenge Package: `7456aace115d3a162a224419b07166939d4ebcf96d6de3bdee681097ae4ca279`
+    - Production B0: `115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477`
   - Panel Hash: `6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24`
-  - Git SHA: `aed48bc74a6d6acd9c216a4f072ed6506846cff4` (dirty: `True`)
+  - Git SHA: `dcbf7eb250f90880f65cf4769b20bed7d0862cdd` (git_dirty: `True`, code_dirty: `False`)
 
 ## 2. Dry-Policy & Top3 Selector Controlled Experiment (Train Period)
 
@@ -32,13 +35,13 @@
 - **B0_DRY_REWARD_ONLY**: Risk codes = `non_actionable_radar_only, extended_from_buy_point` | Risk count = `2` | **Raw Rank = #86**
 - **Top3 Impact**: CRWD is non-actionable radar, so it did not enter Top3 in either policy. Removing the False penalty improved raw rank from #96 to #86.
 
-#### Case Study 2: Internal Top3 Rank Order Swaps
+#### Case Study 2: Dynamic Behavioral Impact on Top3
 Across all 42 historical snapshot dates:
-- In **916 candidate instances** where `pullback_v_is_dry == False`, candidate raw rank improved under `reward_only`.
-- In **2 snapshot dates**, internal Top3 rank order swapped between two qualified candidates:
-  - Snapshot `2026-02-20`: `['FANG', 'HEI', 'UAL']` -> `['HEI', 'FANG', 'UAL']` (HEI improved rank ahead of FANG)
-  - Snapshot `2026-07-10`: `['BSVN', 'RAPP', 'LASR']` -> `['RAPP', 'BSVN', 'LASR']` (RAPP improved rank ahead of BSVN)
-- In **0 snapshot dates**, the set of 3 selected Top3 stocks changed (both sets contained the exact same 3 stocks).
+- In **916 candidate instances** (out of 1152 `pullback_v_is_dry == False` records), candidate raw rank improved under `reward_only`.
+- In **2 snapshot dates**, internal Top3 rank order swapped between qualified candidates:
+  - Snapshot `2026-02-20`: `['FANG', 'HEI']` -> `['HEI', 'FANG']`
+  - Snapshot `2026-07-10`: `['BSVN', 'RAPP', 'LASR']` -> `['RAPP', 'BSVN', 'LASR']`
+- In **0 candidate instances**, the set of 3 selected Top3 stocks changed (both sets contained the exact same 3 stocks in all snapshots).
 - **Empirical Takeaway**: In the observed historical sample, the False penalty altered sorting keys and candidate ranks, but was behaviorally redundant regarding final Top3 membership.
 
 
@@ -67,20 +70,20 @@ Across all 42 historical snapshot dates:
 ## 4. Rigorous Scientific Conclusions
 
 1. **A. False Penalty**:
-   - In the observed Train and Validation periods, removing the `pullback_not_dry` penalty (`reward_only`) improved candidate raw ranks (916 instances) and swapped internal Top3 rank order in 2 snapshots, but **did not change final Top3 membership**.
+   - In the observed Train and Validation periods, removing the `pullback_not_dry` penalty (`reward_only`) improved candidate raw ranks (916 instances across 1152 records) and swapped internal Top3 rank order in 2 snapshots, but **did not change final Top3 membership** in any snapshot.
    - The False penalty is behaviorally redundant in the observed sample; there is no empirical evidence that it harmed portfolio-level Top3 performance.
 
 2. **B. True Reward**:
-   - Retaining the `dry_pullback` reward (`reward_only` vs `ignored`) shows a mild positive indication on Train (+0.32% W4 return spread), but has not been confirmed via sealed validation.
+   - Retaining `dry_pullback` showed a modest Train-only positive indication: paired W4 mean advantage $\approx +0.49\%$ (+0.4885%) versus `ignored` (5.4448% vs 4.9563%). However, paired median spread = 0.0%, CVaR delta = 0.0%, and stop delta = 0.0%, and `ignored` was not evaluated on a fresh sealed holdout.
 
 3. **C. Ignored Policy**:
-   - Ignoring `pullback_v_is_dry` entirely yielded slightly lower Train mean return (5.34% vs 5.66%), but differences in median, CVaR, and stop rate are immaterial.
+   - `Ignored` underperformed `reward_only` by $\approx 0.49\%$ in paired Train W4 mean, but there was no paired median, downside, or stop rate improvement evidence.
 
 4. **D. Industry Concentration Constraint (`distinct_1`)**:
-   - `distinct_1` (maximum 1 stock per distinct industry) demonstrated superior concentration control and lower stop rates compared to `pure_top3` and `max_2_per_ind` on Train.
+   - Modest Train-side support for keeping the hard industry diversity constraint (`distinct_1` achieved 5.4448% W4 mean and 30.95% stop rate vs 5.2692% and 31.11% for `pure_top3`).
 
 5. **E. Overall Champion Finding**:
-   - **NO ROBUST CHAMPION FOUND**.
+   - **NO ROBUST REPLACEMENT FOR B0 FOUND**.
    - `B0_DRY_REWARD_ONLY__distinct_1` is classified as **`EQUIVALENT TO B0`** (zero return/downside spread on identical support).
    - All complex ML models suffered severe out-of-sample degradation on sealed validation and were classified as **`UNSTABLE`**.
 
@@ -88,10 +91,16 @@ Across all 42 historical snapshot dates:
 
 ```json
 {
-  "code_hash": "f1a5a1f1aaae6202b107cdde8b115970835cec91cda0ac15e0ca008283fc341f",
+  "code_hash": "6c97726eb83500bb5d9b5a3c8d4c7595c2390f88a2b1732ac68cd5b9689a60fd",
+  "dependency_hashes": {
+    "codebase_hash": "6c97726eb83500bb5d9b5a3c8d4c7595c2390f88a2b1732ac68cd5b9689a60fd",
+    "challenge_package_hash": "7456aace115d3a162a224419b07166939d4ebcf96d6de3bdee681097ae4ca279",
+    "production_b0_hash": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477"
+  },
   "panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
-  "git_sha": "aed48bc74a6d6acd9c216a4f072ed6506846cff4",
+  "git_sha": "dcbf7eb250f90880f65cf4769b20bed7d0862cdd",
   "git_dirty": true,
+  "code_dirty": false,
   "locked_challenger_ids": [
     "B0_DRY_REWARD_ONLY__distinct_1",
     "signal_f1_lgbm_w4_distinct_industry",

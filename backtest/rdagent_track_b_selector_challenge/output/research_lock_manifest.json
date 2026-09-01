@@ -1,8 +1,14 @@
 {
-  "created_at": "2026-09-01T14:44:58.974991",
-  "git_sha": "aed48bc74a6d6acd9c216a4f072ed6506846cff4",
+  "created_at": "2026-09-01T15:08:56.894478",
+  "git_sha": "dcbf7eb250f90880f65cf4769b20bed7d0862cdd",
   "git_dirty": true,
-  "code_hash": "f1a5a1f1aaae6202b107cdde8b115970835cec91cda0ac15e0ca008283fc341f",
+  "code_dirty": false,
+  "code_hash": "6c97726eb83500bb5d9b5a3c8d4c7595c2390f88a2b1732ac68cd5b9689a60fd",
+  "dependency_hashes": {
+    "codebase_hash": "6c97726eb83500bb5d9b5a3c8d4c7595c2390f88a2b1732ac68cd5b9689a60fd",
+    "challenge_package_hash": "7456aace115d3a162a224419b07166939d4ebcf96d6de3bdee681097ae4ca279",
+    "production_b0_hash": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477"
+  },
   "panel_hash": "6886c8d721b808476aa8491bb2140e28a7f96fb07ad6e01f313aec06f5e17c24",
   "train_end": "2026-05-22",
   "validation_window": "2026-05-29 .. 2026-08-07",
