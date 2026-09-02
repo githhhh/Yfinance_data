@@ -82,23 +82,28 @@ def run_research(
     panel = build_weekend_event_panel(pools, eps)
     panel = add_forward_labels(panel, prices)
     panel = add_weekly_oracle_flags(panel)
+    evaluation_panel = mature_four_week_panel(panel)
+    if evaluation_panel.empty:
+        raise ValueError("No sufficiently mature 4W snapshot weeks for research evaluation")
 
     core_rule = primary_rule()
-    b0_selected = select_all_weeks(panel, None)
-    primary_selected = select_all_weeks(panel, core_rule)
+    b0_selected = select_all_weeks(evaluation_panel, None)
+    primary_selected = select_all_weeks(evaluation_panel, core_rule)
     b0_metrics = evaluate_selection(
-        panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
+        evaluation_panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
     )
     primary_metrics = compare_metrics(
-        evaluate_selection(panel, primary_selected, variant=core_rule.name),
+        evaluate_selection(
+            evaluation_panel, primary_selected, variant=core_rule.name
+        ),
         b0_metrics,
     )
     baseline_vs_primary = pd.DataFrame([b0_metrics, primary_metrics])
 
     rules = generate_candidate_rules()
-    full_rule_grid = evaluate_rule_grid(panel, rules)
+    full_rule_grid = evaluate_rule_grid(evaluation_panel, rules)
     fold_results, wf_champions, train_grid = run_walk_forward(
-        panel,
+        evaluation_panel,
         rules,
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
@@ -114,9 +119,9 @@ def run_research(
     champion_name = champion.name if champion is not None else ""
 
     audit_rule = champion if champion is not None else core_rule
-    audit_selected = select_all_weeks(panel, audit_rule)
-    missed_winners = missed_big_winners(panel, audit_selected)
-    included_losers = included_big_losers(panel, audit_selected)
+    audit_selected = select_all_weeks(evaluation_panel, audit_rule)
+    missed_winners = missed_big_winners(evaluation_panel, audit_selected)
+    included_losers = included_big_losers(evaluation_panel, audit_selected)
     if not missed_winners.empty:
         missed_winners.insert(0, "audit_rule", audit_rule.name)
     if not included_losers.empty:
@@ -132,6 +137,7 @@ def run_research(
 
     manifest = experiment_manifest(
         panel=panel,
+        evaluation_panel=evaluation_panel,
         pool_root=pool_root,
         price_cache=price_cache,
         eps_path=eps_path,
@@ -141,7 +147,7 @@ def run_research(
         champion_status=champion_status,
         champion=champion,
     )
-    data_audit = render_data_audit(panel, pools, eps)
+    data_audit = render_data_audit(panel, evaluation_panel, pools, eps)
     report = render_report(
         baseline_vs_primary=baseline_vs_primary,
         oos_stability=oos_stability,
@@ -248,6 +254,23 @@ def build_weekend_event_panel(
     return panel.reset_index(drop=True)
 
 
+def mature_four_week_panel(
+    panel: pd.DataFrame,
+    *,
+    min_complete_coverage: float = 0.80,
+) -> pd.DataFrame:
+    """Use only snapshot weeks with broad 4W outcome coverage for optimization."""
+    if panel.empty:
+        return panel.copy()
+    coverage = panel.groupby("snapshot_date")["forward_4w_censored"].apply(
+        lambda values: float(values.eq(False).mean())
+    )
+    mature_weeks = coverage[coverage >= min_complete_coverage].index.astype(str)
+    return panel[
+        panel["snapshot_date"].astype(str).isin(mature_weeks)
+    ].copy()
+
+
 def latest_review_list(panel: pd.DataFrame, rule) -> pd.DataFrame:
     if panel.empty:
         return pd.DataFrame()
@@ -324,6 +347,7 @@ def extended_exploratory_summary(panel: pd.DataFrame) -> pd.DataFrame:
 
 def render_data_audit(
     panel: pd.DataFrame,
+    evaluation_panel: pd.DataFrame,
     pools: list[tuple[str, pd.DataFrame, Path]],
     eps: pd.DataFrame,
 ) -> str:
@@ -340,6 +364,8 @@ def render_data_audit(
         f"- first snapshot: {weeks[0] if weeks else 'n/a'}",
         f"- last snapshot: {weeks[-1] if weeks else 'n/a'}",
         f"- active-signal events: {len(panel)}",
+        f"- 4W-mature evaluation weeks: {evaluation_panel['snapshot_date'].astype(str).nunique()}",
+        f"- 4W-mature evaluation events: {len(evaluation_panel)}",
         (
             f"- verified PIT EPS rows: {int(eps['pit_eps_state'].eq('VERIFIED').sum())}"
             if not eps.empty
@@ -368,6 +394,7 @@ def render_data_audit(
 def experiment_manifest(
     *,
     panel: pd.DataFrame,
+    evaluation_panel: pd.DataFrame,
     pool_root: Path,
     price_cache: Path,
     eps_path: Path,
@@ -391,6 +418,9 @@ def experiment_manifest(
         "eps_pit": str(eps_path),
         "eps_pit_sha256": content_hash(eps_path),
         "active_signal_weeks": len(weeks),
+        "mature_4w_evaluation_weeks": int(
+            evaluation_panel["snapshot_date"].astype(str).nunique()
+        ),
         "first_snapshot": weeks[0] if weeks else "",
         "last_snapshot": weeks[-1] if weeks else "",
         "horizons": HORIZONS,
