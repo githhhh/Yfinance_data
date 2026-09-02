@@ -37,7 +37,7 @@ MAX_TOKENS_PER_CALL = 5000
 # moving from the original 126-question protocol to the focused 78-question plan.
 CACHE_MIGRATION_ALLOWED_FROM = (
     "00770fb35b75248bfd197598887a83ee85cd042f",
-,)
+)
 RESEARCH_ROLE_SEQUENCE = ("researcher", "skeptic", "experimental_designer", "synthesizer")
 # Focused deep protocol: preserve completed foundational work and spend remaining
 # calls only on directions that can still change B1/Minimal-B0 design.
