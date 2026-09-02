@@ -178,6 +178,13 @@ def choose_retrospective_champion(
     if stability.empty:
         return None
     best = stability.iloc[0]
+    required = [
+        best["stability_floor"],
+        best["mean_opportunity_delta"],
+        best["mean_winner_delta_2_4w"],
+    ]
+    if not all(np.isfinite(float(value)) for value in required):
+        return None
     if (
         float(best["stability_floor"]) < 0.5
         or float(best["mean_opportunity_delta"]) <= 0.0
