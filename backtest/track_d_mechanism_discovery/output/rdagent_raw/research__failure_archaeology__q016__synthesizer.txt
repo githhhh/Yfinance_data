@@ -1,0 +1,49 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The 'tight-base continuation' mechanism—claiming that false-negative winners are distinguished by low up_day_ratio (≤0.50), low vol_ratio (≤1.25), modest momentum (mom_20 ≤0.10), tight entry proximity (ibd_entry_close_vs_trigger_pct ≤0.025), and low price extension (px_vs_ma20 <0.07)—is directionally plausible based on distributional medians but methodologically compromised. The 27-case discovery set was assembled using post-hoc outcome criteria (future W4 ≥8% and relative outperformance), which creates selection conditioning that guarantees the feature pattern appears 'lower' for false negatives regardless of predictive validity. Standardized deltas of -1.19, -1.05, and -1.00 are numerically large but interpretively vacuous without the denominator: the full non-pick population per snapshot (winners and losers). The skeptic's counterexamples—entity bfb308b24a and entity ad2bfdee3f, both cluster-conforming yet producing loss or small_win—demonstrate the pattern is neither sufficient nor necessary. The vol_ratio threshold incoherence (≤1.25 proposed vs. selected-winner median of 1.424) further undermines the mechanism's internal consistency. Pullback directionality contradicts the 'reduced exhaustion' narrative: false negatives have shallower median pullback (-7.3%) than selected winners (-15.9%), opposite to the expected pattern if deeper resets enable continuation. The unmeasured non-pick exclusion criterion (sector, fundamental, market-cap) introduces an omitted-variable threat that cannot be dismissed. Verdict is UNRESOLVED pending out-of-sample validation using the full non-pick denominator per snapshot.",
+  "falsifiers": [
+    "Out-of-sample test showing non-picks with the tight-base precursor set (up_day_ratio ≤0.50, vol_ratio ≤1.25, mom_20 ≤0.10, ibd_entry_close_vs_trigger_pct ≤0.025, px_vs_ma20 <0.07) produce large_win rate NOT significantly above baseline non-pick large_win rate (p > 0.10)",
+    "Demonstration that the non-pick exclusion reason (sector filter, fundamental screen, market-cap threshold) is documented and statistically explains outcome variance better than geometry alone",
+    "Within-snapshot analysis showing false-negative winners vs. false-negative losers share indistinguishable medians across the claimed precursor features (Mann-Whitney p > 0.30 for ≥4 of 5 features)",
+    "Replication of the feature separation pattern across ≥3 independent snapshot cohorts with pre-specified thresholds (no post-hoc adjustment)",
+    "Finding that B0 picks sharing identical 'tight-base' geometry (same feature ranges) produce ruin/loss rates comparable to false-negative non-picks, indicating geometry does not distinguish the populations"
+  ],
+  "actionable_design_principles": [
+    "Do not treat the tight-base pattern as a confirmed filter; use it as an exploratory flag requiring prospective validation before incorporation into selection logic",
+    "Require the full non-pick population per snapshot as the denominator for any distributional claim; numerator-only statistics are uninterpretable for discrimination",
+    "Distinguish between geometric precursors and the non-pick exclusion criterion—document what caused non-selection before attributing outcomes to geometry",
+    "Acknowledge that the proposed vol_ratio threshold (≤1.25) contradicts the selected-winner distribution; consider this an inconsistency requiring resolution rather than a feature boundary",
+    "Do not implement policy changes based on post-hoc calibrated thresholds; require forward-looking validation with pre-specified cutoffs"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Tight-base secondary screening flag (exploratory, not confirmed)",
+      "why_distinct": "Unlike existing B0 criteria that use post-hoc calibration, this flag would be tested as an additive signal for non-picks with no prior validation. It does not modify B0 selection but identifies candidates for potential re-evaluation.",
+      "features": ["up_day_ratio_20 <= 0.50", "vol_ratio_5_20 <= 1.25", "mom_20 <= 0.10", "px_vs_ma20 < 0.07", "ibd_entry_close_vs_trigger_pct <= 0.025"],
+      "capacity_relevance": "Potential to surface hidden winners among non-picks; requires out-of-sample validation with proper non-pick denominator before deployment as a production signal"
+    },
+    {
+      "idea": "Within-snapshot loser ratio test before adopting any precursor",
+      "why_distinct": "Unlike a simple feature comparison, this requires documenting that false-negative losers (not just winners) also exhibit the precursor pattern, ensuring the pattern is outcome-discriminative rather than merely descriptive of non-picks",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "px_vs_ma20"],
+      "capacity_relevance": "Establishes a falsification gate: if false-negative losers share the precursor pattern at rates comparable to winners, the mechanism is refuted and no policy change is warranted"
+    },
+    {
+      "idea": "Non-pick reason documentation requirement",
+      "why_distinct": "Separates geometric signal from exclusion cause; if non-picks are excluded for sector/fundamental reasons that correlate with outcomes, geometry is a proxy variable, not the mechanism",
+      "features": ["Non-pick_exclusion_reason (sector/fundamental/market_cap/unexplained)", "outcome_label", "w4_return_bucket"],
+      "capacity_relevance": "If outcomes are explained by documented exclusion reasons, the geometry-based policy is invalid and must be discarded regardless of feature separation"
+    },
+    {
+      "idea": "Asymmetric validation: B0 picks with tight-base geometry as control group",
+      "why_distinct": "If tight-base geometry explains outcomes, it should apply symmetrically; finding that B0 picks with identical geometry still produce ruin at high rates would indicate geometry alone is insufficient and non-pick status is not the causal variable",
+      "features": ["is_b0_pick", "up_day_ratio_20", "vol_ratio_5_20", "mom_20", "px_vs_ma20", "w4_return_bucket"],
+      "capacity_relevance": "Provides a falsification test using existing B0 picks as controls; if geometry is genuinely predictive, tight-base B0 picks should produce large_win rates comparable to tight-base non-picks"
+    }
+  ]
+}
+```

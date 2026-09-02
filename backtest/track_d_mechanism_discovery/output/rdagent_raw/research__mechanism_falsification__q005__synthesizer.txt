@@ -1,0 +1,53 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 60,
+  "mechanism_summary": "The question cannot be settled from frozen evidence because eps_preference is unmeasured in the 27-case archaeology. The researcher's redundancy claim derives from momentum features' large standardized deltas (up_day_ratio_20 -1.19, vol_ratio_5_20 -1.05, mom_20 -1.00, px_vs_ma50 -0.85) but commits an argument-from-silence: an unobserved feature's delta is structurally unknown, not zero. The skeptic raises four structurally valid objections the synthesis must absorb: (i) W4 ~20-day horizon is too short for fundamental signals whose half-life is 60-90 trading days, making any W4-scored redundancy test horizon-mismatched; (ii) IBD/Can-Slim-style models typically deploy EPS rank as a hard eligibility gate, not a continuous partial beta, so the researcher's P1 (continuous logistic coefficient) is mis-specified for the most likely functional form; (iii) the false_negative_relative label is partially circular - cases where B0 rejected a name that subsequently won may be correctly-applied gates, not missed winners; (iv) n=27 pooled across heterogeneous snapshots has no power to distinguish unconditional vs regime-conditional redundancy. The experimental designer's three tests (monotonicity, residual capacity, regime heterogeneity) would resolve the question but require the eps_preference vector itself plus adequate sample size. New analytical layer not in prior outputs: the construct of 'eps_preference' itself is ambiguous - it could be EPS rank, growth, stability, surprise, or revision, each with a different correlation with momentum and a different signal horizon - so 'redundancy' is not a single hypothesis but a family of at least five distinct sub-claims. Net: the redundancy hypothesis is neither supported nor falsified by frozen evidence; the prior probability of simple-additive redundancy should be lowered below the researcher's confident framing, but the independence hypothesis also lacks positive support here.",
+  "falsifiers": [
+    "FOR INDEPENDENCE (would falsify redundancy claim): A horse-race regression of W4 outcome on {mom_20, px_vs_ma20, px_vs_ma50, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20} plus the eps_preference vector produces partial |beta_eps| > 0.20 with Wald p < 0.05 - establishes that eps_preference adds orthogonal predictive information.",
+    "FOR INDEPENDENCE: Conditional mutual information I(W4_outcome; eps_preference | momentum_block) is significantly positive (non-parametric permutation test p < 0.05) - any non-zero information is sufficient to reject strong redundancy.",
+    "FOR INDEPENDENCE: The eps_preference x mom_20 interaction term is significant (|beta_int| > 0.15, p < 0.05) - eps_preference operates as a regime-conditional modulator, falsifying the simple-additive redundancy frame.",
+    "FOR INDEPENDENCE: After orthogonalizing eps_preference against the momentum block via residualization, the residual still separates selected_winners from false_positive_ruins with AUC > 0.65 - residual content is meaningful.",
+    "FOR REDUNDANCY (would falsify independence claim): Cross-sectional |r(eps_preference, mom_20)| > 0.55 across the B0 candidate universe AND partial |beta_eps| < 0.10 with p > 0.20 in the horse-race - convergence of two independent tests supports near-full redundancy.",
+    "FOR REDUNDANCY: SHAP or permutation importance of eps_preference in a gradient-boosted outcome model is < 5% of total importance AND < 50% of the largest momentum-feature importance.",
+    "REGIME SCOPE: If eps_preference importance varies by more than 2x across snapshot strata (as measured by within-stratum partial R^2), the unconditional redundancy claim must be replaced by a regime-conditional formulation - this is itself a partial falsification of the simple-redundancy frame."
+  ],
+  "actionable_design_principles": [
+    "DO NOT retire or retain eps_preference on the basis of frozen evidence alone - the test is structurally undefined without the feature vector itself; any policy decision made from this evidence carries irreducible model risk.",
+    "PRE-REGISTER the operational definition of eps_preference (EPS rank vs. EPS growth vs. EPS revision vs. EPS surprise vs. EPS stability) before testing - each construct implies a different correlation profile with momentum and a different signal horizon, so 'redundancy' must be sub-claim-specific.",
+    "USE horizon-appropriate outcome labels: if testing fundamental-signal contribution, run the horse-race on W12 and W26 outcomes in addition to W4; a fundamental signal can be a zero at W4 and the dominant factor at W26 - using only W4 guarantees horizon-mismatched inference.",
+    "DISTINGUISH gate-form vs score-form tests: if eps_preference is a hard eligibility filter, test by survival analysis (Kaplan-Meier on candidate pool filtered vs unfiltered) rather than by continuous partial beta; the score-form test systematically under-detects gate-form signal.",
+    "PRE-REGISTER falsification thresholds in BOTH directions before unblinding the eps_preference vector, to prevent researcher-degree-of-freedom bias in choosing the test that 'supports' the preferred conclusion.",
+    "ACCOUNT for selection bias in failure archaeology: the 27 cases are curated failure/edge cases, not random draws; any inference about unconditional redundancy vs independence must be corrected for the conditioning on selection failure - report sensitivity analysis under reweighting toward the full B0 candidate pool.",
+    "SEPARATE predictive mechanism from portfolio construction: even if eps_preference has small marginal signal at single-name level, evaluate its net portfolio contribution after accounting for correlation with the momentum factor; a 0.5pp hit-rate improvement can be wiped out by factor correlation at the portfolio level."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "eps_preference as a GATING (eligibility) signal rather than as a continuous additive weight in the composite score",
+      "why_distinct": "Treats eps_preference as a pre-score filter that operates on the candidate universe BEFORE momentum scoring. Its information content lives in the survival indicator (passes/fails the gate), not in a continuous partial beta. This functional form matches how IBD/Can-Slim-style models typically deploy EPS rank and avoids the horizon-mismatch and gate-vs-score misspecification issues raised by the skeptic.",
+      "features": ["eps_rank_min_threshold", "eps_growth_ttm_min", "eps_recent_quarter_sign"],
+      "capacity_relevance": "Bounded - the gate removes an estimated 30-50% of candidates, leaving the momentum block to score survivors; capacity of eps_preference as a continuous additive term is forced to zero by construction, but its information is captured in the survival step which must be scored separately."
+    },
+    {
+      "idea": "Replace lagging EPS level (eps_preference) with leading EPS revision (eps_revision_z)",
+      "why_distinct": "EPS revisions are a forward-looking, leading indicator with shorter signal half-life (typically 30-60 trading days) and lower cross-sectional correlation with momentum (|r| ~0.25-0.40 typical). This directly addresses the horizon-mismatch objection: W4 outcomes are informative for revisions but not for stale EPS levels. The replacement is construct-distinct from the original 'eps_preference' and tests a falsifiable sub-claim (P4 from the researcher).",
+      "features": ["eps_revision_30d_z", "eps_revision_60d_z", "eps_revision_dispersion_30d", "eps_revision_breadth"],
+      "capacity_relevance": "Higher than lagging EPS level - revisions are leading and have known lower correlation with price momentum; expected information-ratio contribution is bounded below by the level-feature capacity and above by the construct's leading-indicator property."
+    },
+    {
+      "idea": "Regime-conditional eps_preference: enters the model only when momentum regime is uncertain (mid-quartile of mom_20)",
+      "why_distinct": "Explicitly encodes the regime-heterogeneity hypothesis from the skeptic's attack: eps_preference is redundant in strong-trend regimes (where momentum dominates) but informative in transition/uncertain regimes. The interaction term eps_preference_z x mom_20_z is the dominant term, not the level. This avoids both the unconditional-redundancy over-claim AND the unconditional-independence over-claim by scoping the contribution to a specific regime band.",
+      "features": ["mom_20_z", "eps_preference_z", "mom_20_z_x_eps_preference_z", "mom_20_quartile_indicator"],
+      "capacity_relevance": "Bounded by degrees-of-freedom cost - interaction terms consume capacity; effective only if regime heterogeneity is real (i.e., the experimental designer's M3_regime_heterogeneity test rejects the null)."
+    },
+    {
+      "idea": "Fundamental-quality residual scorer: explicitly orthogonalize eps_preference against the momentum block and use only the residual",
+      "why_distinct": "Constructs the test OF redundancy INTO the feature definition itself: regress eps_preference on {mom_20, px_vs_ma20, px_vs_ma50, ma10_slope_5, up_day_ratio_20} and use only the orthogonal residual. This directly operationalizes the redundancy hypothesis and produces a feature whose relevance IS the answer to the question. If the residual has no predictive power, redundancy is established; if it does, independence is established. This converts an unfalsifiable argument-from-silence into a directly testable construct.",
+      "features": ["eps_growth_residual_after_momentum", "eps_stability_residual_after_momentum", "earnings_quality_residual_after_momentum"],
+      "capacity_relevance": "By construction bounded near zero - whatever survives orthogonalization IS the test of redundancy. The capacity is exactly the partial-R^2 contribution of the residual in a horse-race against the same momentum block."
+    }
+  ]
+}
+```

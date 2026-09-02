@@ -1,0 +1,80 @@
+
+
+
+{
+  "tests": [
+    {
+      "name": "trigger_distance_vs_price_extension_redundancy",
+      "features": ["ibd_entry_close_vs_trigger_pct", "px_vs_ma50", "vol_ratio_5_20"],
+      "comparison": "Within vol_ratio_5_20 decile, test whether ibd_entry_close_vs_trigger_pct and px_vs_ma50 are statistically independent vs. redundant. Use Spearman correlation conditioned on vol_ratio decile; pool across snapshots using Fisher Z-transform.",
+      "success_criterion": "Mean conditional Spearman ρ(ibd_entry_close_vs_trigger_pct, px_vs_ma50 | vol_ratio_decile) < 0.60, indicating the features capture distinct variance",
+      "failure_criterion": "Mean conditional ρ >= 0.60, indicating ibd_entry_close_vs_trigger_pct is redundant with px_vs_ma50 and the 'true geometry' claim lacks feature-level support"
+    },
+    {
+      "name": "non_pick_momentum_reversal_within_snapshot",
+      "features": ["ma20_slope_5", "up_day_ratio_20", "mom_20"],
+      "comparison": "Among non-pick entities (is_b0_pick=false) within each snapshot, compare w4_return_bucket distributions between ma20_slope_5 negative vs. non-negative subgroups, using Fisher's exact test per snapshot, then Stouffer-Z pooled across snapshots.",
+      "success_criterion": "Pooled odds ratio for large_win/win vs. loss/ruin between negative-ma20_slope and non-negative-ma20_slope subgroups exceeds 2.0, with pooled p < 0.05, confirming ma20_slope sign reversal captures non-pick winners independent of outcome-contingent labels",
+      "failure_criterion": "Pooled odds ratio <= 1.5 or p >= 0.10, indicating ma20_slope sign reversal has no predictive power for non-pick outcomes and the skeptic's outcome-contingency concern stands"
+    },
+    {
+      "name": "trigger_compression_vs_momentum_independence",
+      "features": ["ibd_entry_close_vs_trigger_pct", "mom_20", "up_day_ratio_20"],
+      "comparison": "Within non-pick entities, test whether ibd_entry_close_vs_trigger_pct < median predicts w4_return_bucket=large_win independent of mom_20 quartile, using stratified 2x2 tables per mom_20 quartile per snapshot, pooled Mantel-Haenszel OR across snapshots.",
+      "success_criterion": "Mantel-Haenszel pooled OR >= 2.5 for large_win vs. non-large_win at low trigger_pct across all mom_20 strata, indicating trigger-distance compression operates as a mechanism distinct from momentum",
+      "failure_criterion": "Pooled OR < 1.5 or significant homogeneity violation (Breslow-Day p < 0.05), indicating the trigger-distance effect is confounded by or redundant with momentum"
+    },
+    {
+      "name": "pullback_pct_temporal_precedence",
+      "features": ["pullback_pct", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Test whether pullback_pct is causally prior to ibd_entry_close_vs_trigger_pct or vice versa by examining their temporal ordering across cases with pullback_pct non-null. Compute cross-snapshot correlation of pullback_pct with subsequent ibd_entry_close_vs_trigger_pct changes to test if pullback_pct predicts geometry, or if both are parallel outcomes of entry quality.",
+      "success_criterion": "pullback_pct does not predict ibd_entry_close_vs_trigger_pct at next snapshot (partial r < 0.15 controlling for mom_20), supporting pullback_pct as outcome variable rather than causal predictor",
+      "failure_criterion": "pullback_pct significantly predicts subsequent ibd_entry_close_vs_trigger_pct (partial r >= 0.30), indicating it contains forward-looking information and the researcher's outcome-variable claim is false"
+    },
+    {
+      "name": "up_day_ratio_threshold_robustness_across_volatility_regimes",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "Within vol_ratio_5_20 tertiles (low/mid/high), test whether the up_day_ratio_20 threshold of 0.45 discriminates w4_return_bucket within non-pick cohort. Use stratified chi-square test per tertile, pooled across snapshots, to test if the threshold is regime-invariant.",
+      "success_criterion": "up_day_ratio_20 >= 0.45 is positively associated with large_win in at least 2 of 3 vol_ratio tertiles (OR > 1.5 per tertile), confirming the threshold is not regime-dependent",
+      "failure_criterion": "up_day_ratio_20 >= 0.45 shows OR < 1.0 in high-vol_ratio tertile OR contradicts direction in low-vol_ratio tertile, indicating the threshold is regime-contingent and the proposed Condition A filter is spurious"
+    },
+    {
+      "name": "dual_label_boundary_proximity",
+      "features": ["ibd_entry_close_vs_trigger_pct", "mom_20", "vol_ratio_5_20"],
+      "comparison": "For the dual-labeled entity (entity_6618d3e80c), compute its percentile rank within the full sample on each of the three key features. Compare to centroid positions of confirmed false_positive_ruin and confirmed selected_winner clusters using Mahalanobis distance (computed on ibd_entry_close_vs_trigger_pct, mom_20, vol_ratio_5_20).",
+      "success_criterion": "Dual-label entity is closer to the selected_winner cluster centroid than the false_positive_ruin centroid (Mahalanobis ratio < 1.0), indicating dual labeling reflects boundary ambiguity rather than label noise",
+      "failure_criterion": "Dual-label entity is equidistant or closer to false_positive_ruin centroid (ratio >= 1.0), indicating labeling protocol error rather than geometric boundary case"
+    },
+    {
+      "name": "snapshot_regime_vol_ratio_confounding",
+      "features": ["vol_ratio_5_20", "ibd_entry_close_vs_trigger_pct", "snapshot_anon"],
+      "comparison": "Treat snapshot_anon as a random effect. Fit a mixed-effects logistic regression predicting w4_return_bucket=large_win with vol_ratio_5_20 and ibd_entry_close_vs_trigger_pct as fixed effects, snapshot_anon as random intercept. Test whether ibd_entry_close_vs_trigger_pct effect persists after accounting for snapshot-level variance.",
+      "success_criterion": "ibd_entry_close_vs_trigger_pct has significant fixed effect (p < 0.05) after controlling for snapshot random effects, with ICC (intra-class correlation) for snapshot < 0.30, indicating the mechanism is not merely a regime artifact",
+      "failure_criterion": "ibd_entry_close_vs_trigger_pct effect becomes non-significant (p >= 0.15) after adding snapshot random effects, or ICC >= 0.50, indicating the apparent trigger-distance effect is confounded by snapshot-level heterogeneity"
+    },
+    {
+      "name": "selected_winner_compressed_trigger_ruin_test",
+      "features": ["ibd_entry_close_vs_trigger_pct", "w4_return_bucket"],
+      "comparison": "Among is_b0_pick=true entities, test whether low ibd_entry_close_vs_trigger_pct (< 0.025) is overrepresented among ruin/loss outcomes vs. large_win outcomes. This directly tests the skeptic's counterexample that compressed trigger-distance does not protect B0-selected picks from loss.",
+      "success_criterion": "Among B0 picks with ibd_entry_close_vs_trigger_pct < 0.025, ruin/loss rate <= 25%, indicating compressed trigger-distance is not a loss harbinger for selected picks",
+      "failure_criterion": "Among B0 picks with ibd_entry_close_vs_trigger_pct < 0.025, ruin/loss rate > 50%, directly contradicting the mechanism claim that trigger-distance compression identifies geometrically valid entries"
+    }
+  ],
+  "leakage_checks": [
+    "w4_return_bucket and outcome_label must never appear in feature arrays—these are outcome variables used only for test success criteria evaluation",
+    "snapshot_anon is a grouping variable for regime control, not a predictive feature—models must not extract snapshot identity as a predictor",
+    "All feature thresholds (0.45 for up_day_ratio, 0.025 for ibd_entry_close_vs_trigger_pct) must be pre-specified from prior analysis, not tuned to maximize test separation on current data",
+    "Tests must not condition on entity_anon identity—no entity-level fixed effects or entity-specific rules",
+    "Pullback variables (pullback_pct, pullback_duration_weeks) are pre-outcome at snapshot time only for entities where pullback occurred before the snapshot date—proxy must verify temporal precedence before including these as features"
+  ],
+  "priority_order": [
+    "trigger_distance_vs_price_extension_redundancy",
+    "non_pick_momentum_reversal_within_snapshot",
+    "trigger_compression_vs_momentum_independence",
+    "snapshot_regime_vol_ratio_confounding",
+    "pullback_pct_temporal_precedence",
+    "selected_winner_compressed_trigger_ruin_test",
+    "up_day_ratio_threshold_robustness_across_volatility_regimes",
+    "dual_label_boundary_proximity"
+  ]
+}

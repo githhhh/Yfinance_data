@@ -1,0 +1,37 @@
+{
+  "strongest_counterclaim": "ibd_entry_close_position and ibd_entry_volume_ratio are contemporaneous, mutually-redundant proxies for 'it was a strong breakout day.' They do not encode institutional accumulation versus thin-air drift in any way that survives extension, regime, or post-decision path; the high-high subset in the archaeology is dominated by extended-price blowoffs that the dual-labeled entity_6618d3e80c (and the ruin cases entity_84824e6a20 and entity_ccc90a671f, both with close>0.07 and vol_ratio>1.4) make explicit. The proposed encoding is therefore a sizing rule that concentrates capital on the most extended, most overbought B0 picks exactly when ruin risk is highest; 'adaptive capacity' here is structurally anti-adaptive.",
+  "attacks": [
+    {
+      "issue": "Redundancy / proxy substitution: close_position and volume_ratio are not orthogonal. Both spike on the same breakout session. The joint standardized deltas vs selected winners are only -0.46 and -0.50, far weaker than up_day_ratio_20 (-1.19), vol_ratio_5_20 (-1.05), or mom_20 (-1.00). Adding two weak, collinear signals does not recover what stronger trend features already encode; this is a textbook case of redundant feature stacking.",
+      "why_it_matters": "If the high-high subset is just a re-weighted subset of 'already-momentum-extended names,' then the position-sizing rule is not adding conviction differentiation, it is amplifying exposure on extended entries. This inverts the intended convexity improvement."
+    },
+    {
+      "issue": "Direct counterexample to the high-high = safe mechanism: entity_84824e6a20 has the highest close (0.074) and very high volume_ratio (1.63) in the archaeology — by the researcher's own metric this is the highest-conviction B0 pick — and it is a ruin. entity_ccc90a671f (close 0.070, vol 1.45) is also ruin. entity_8f0df3d38e (close 0.069, vol 1.24) is ruin. The 'institutional accumulation' interpretation collapses under these cases.",
+      "why_it_matters": "These are not edge cases; they sit at the extreme of the proposed conviction distribution. If the researcher's encoding sizes UP here, ruin magnitude increases proportionally. The mechanism predicts the opposite of what the evidence shows for the top of the proposed ranking."
+    },
+    {
+      "issue": "Snapshot clustering: snap_71486ed83c alone contributes at least 5 of the 27 cases, and snap_d0d57b1e40 and snap_b8420124eb each contribute multiple. Within a snapshot, close_position and volume_ratio share common regime drivers (single-session tape direction, single-day breadth). Any 'joint signal' is partially a snapshot-id confound masquerading as a feature.",
+      "why_it_matters": "Cross-sectional rank within a snapshot is not the same as cross-sectional rank across snapshots. A high-high conviction rank computed on the full B0 universe pools regimes where volume has opposite meaning (climactic accumulation vs climactic distribution). Without snapshot-stratified evaluation the within-B0 ranking is partly noise."
+    },
+    {
+      "issue": "Capacity ≠ alpha: even if high-high wins more often than low-high, sizing up after the breakout day means paying the full premium. The archaeology is computed at the IBD entry snapshot, which already incorporates the breakout move. Adaptive sizing into extended entries is a classic late-stage momentum trap, especially in cases like entity_6618d3e80c (px_vs_ma50 = 33.7%) and entity_b6bcccdf6a (px_vs_ma50 = 18.2%) where the breakout is layered on already-extended structure.",
+      "why_it_matters": "Sizing rules have a separate failure mode from eligibility: they improve Sharpe when payoff is convex in the signal, but worsen it when ruin risk is also convex in the signal. Here ruin risk appears to rise with the same conviction rank as the upside, which is the worst case for the proposed scaling."
+    },
+    {
+      "issue": "Dual-label entity_6618d3e80c explicitly shows that high conviction does not resolve dual-path outcomes: a high-close, high-volume, strong-trend B0 pick realized BOTH selected_winner and false_positive_ruin. A continuous position scalar assumes a single latent quality; the evidence is consistent with branching outcomes (win or ruin with comparable probability) at the top of the ranking.",
+      "why_it_matters": "If the best B0 picks have binary outcomes rather than graded ones, the right policy is binary (full or skip), and shrinking position size on 'disagreement' picks does nothing to address the dominant risk."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within snap_71486ed83c, snap_d0d57b1e40, and snap_b8420124eb, compute the high-high vs low-low ruin rate difference to determine whether the joint signal discriminates within a fixed regime or merely reflects snapshot-level differences.",
+    "Re-rank B0 picks by close+volume conviction after conditioning on px_vs_ma50 (extension) and on ma20_slope_5 (trend). If the high-high conviction premium disappears inside these strata, the proposed encoding is just a proxy for 'extended momentum'.",
+    "Identify any selected_winner with both close_position > 0.85 AND volume_ratio > 1.5 that subsequently had a meaningful pullback (e.g., pullback_pct worse than -15%). entity_2c58cebc59 (close 0.034, vol 1.62, pullback_pct = -25.1%) is a candidate — verify whether high conviction coexists with deep drawdowns even on winners.",
+    "Check whether false_positive_ruin cases systematically have HIGHER close_position than selected_winners. If ruins dominate the upper tail of close_position (as entity_84824e6a20 and entity_ccc90a671f suggest), the proposed rank is mis-specified: highest conviction = highest ruin probability."
+  ],
+  "what_would_change_my_mind": [
+    "Stratified-by-snapshot ruin frequencies in which the high-high bucket has materially lower ruin incidence than the low-low bucket across at least three different snapshots, with n >= 10 per cell.",
+    "Demonstration that the high-high conviction premium survives controlling for px_vs_ma50 and ma20_slope_5 (i.e., is not pure extension / pure trend), with effect size that exceeds the strongest single-feature alternative (up_day_ratio_20 alone).",
+    "Out-of-sample evidence where the conviction score is computed BEFORE the breakout completes (e.g., using prior-day close_position and volume_ratio) and still predicts W4 outcomes — currently the evidence is purely contemporaneous, which is contaminated with the post-breakout move itself.",
+    "A payoff-convexity diagnostic showing that ruin rate decreases faster than large_win rate as the conviction score rises; without this, scaling up the high-high bucket is unjustified."
+  ]
+}

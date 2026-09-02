@@ -1,0 +1,30 @@
+
+
+{
+  "mechanism_claim": "False-negative non-picks that become large winners exhibit compressed near-buy-point geometry: low px_vs_ma50 (<6%), modest mom_20 (<8%), and shallow pullback depth (<=-7.3%), producing a tight consolidation state that B0's selection criteria reject but which subsequently resolves into large winners.",
+  "evidence_for": [
+    "entity_535a1beed7: px_vs_ma50=0.024, mom_20=0.028, up_day_ratio_20=0.5, w4_return=large_win; false negative with maximally compressed geometry",
+    "entity_de1c657364: px_vs_ma50=0.054, mom_20=0.058, pullback_pct=-7.3, up_day_ratio_20=0.65, w4_return=large_win; matches compressed geometry pattern despite 8-week pullback duration",
+    "entity_05b4c6b1f7: px_vs_ma50=0.056, mom_20=0.070, vol_ratio_5_20=0.964, w4_return=large_win; lowest vol_ratio in large_win FN subset, under-the-radar consolidation",
+    "Numeric contrasts show FN median px_vs_ma50=0.056 vs SW median=0.127 (delta=-0.071, -0.85 sigma); FN median mom_20=0.058 vs SW median=0.163 (delta=-0.105, -1.00 sigma); FN median pullback_pct=-7.3 vs SW median=-15.9 (shallow by +8.6pp)",
+    "Selected winners entity_2f86543bf6 and entity_90a828939a share this compressed geometry (mom_20=0.008 and 0.036 respectively) yet still produce large_win outcomes, confirming the pattern is not exclusive to false negatives"
+  ],
+  "evidence_against": [
+    "entity_bfb308b24a: false_negative_relative with px_vs_ma50=0.027, mom_20=0.027, pullback_pct=-12.1, up_day_ratio_20=0.45, w4_return_bucket=loss; compressed geometry but failed to generate large_win",
+    "entity_ad2bfdee3f: false_negative_relative with px_vs_ma50=-0.033 (below MA50), mom_20=-0.046, up_day_ratio_20=0.45, w4_return=small_win; negative price-metric relationship, not compressed geometry",
+    "entity_df5478102d: false_negative_relative with px_vs_ma50=0.132 (elevated), mom_20=0.125, w4_return=small_win; geometry NOT compressed but still false negative, indicating compressed geometry is not necessary",
+    "Selected winners entity_ead73f4390 and entity_b00579f203 have HIGH px_vs_ma50 (0.185 and 0.230) with large_win outcomes, demonstrating that extended geometry can also produce winners, weakening the causal claim"
+  ],
+  "falsifiable_predictions": [
+    "In a validation sample, among non-B0-pick entities where px_vs_ma50 < 0.06 AND mom_20 < 0.08 AND vol_ratio_5_20 < 1.2, the large_win rate will be >= 35%, significantly exceeding the base rate for all non-picks",
+    "If a false-negative entity has compressed px_vs_ma50 < 0.05 but subsequently drops below its 50-day MA (px_vs_ma50 < 0) within 4 weeks of snapshot, the w4_return_bucket will NOT be large_win with >80% confidence",
+    "The vol_ratio_5_20 threshold of 1.2 distinguishes false-negative big winners from false-negative relative winners: FN large_win entities will have median vol_ratio < 1.2, while FN small_win entities will have median vol_ratio > 1.3",
+    "Entities with pullback_pct < -15 (deeper than FN median) but still non-picked will have lower large_win rates than entities with pullback_pct between -5 and -10, controlling for mom_20 and px_vs_ma50"
+  ],
+  "policy_implications": [
+    "B0 selection criteria may systematically reject valid setups by penalizing compressed near-buy-point geometry; relaxing px_vs_ma50 thresholds from current values to <0.10 could recover some false negatives",
+    "Adding a secondary filter for compressed-geometry non-picks could create a supplemental watchlist tier with independent signal generation, reducing correlation with primary B0 selections",
+    "Volume confirmation becomes critical for compressed-geometry picks: low vol_ratio_5_20 (<1.2) appears to identify stealth accumulation, while elevated vol_ratio may indicate distribution rather than base-building",
+    "The shallow-pullback false negatives (entity_de1c657364, entity_05b4c6b1f7) suggest tighter stop-loss placement is viable for this pattern since the compression itself signals limited downside from entry point"
+  ]
+}

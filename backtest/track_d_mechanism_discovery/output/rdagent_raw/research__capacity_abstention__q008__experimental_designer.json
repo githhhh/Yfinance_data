@@ -1,0 +1,128 @@
+{
+  "tests": [
+    {
+      "name": "intra_snapshot_nearest_neighbor_distance_separation",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "pullback_pct"
+      ],
+      "comparison": "For every entity, compute the standardized Euclidean distance to its nearest neighbor WITHIN the same snapshot_anon (a PIT proxy for candidate-redundancy at the level the evidence actually supports). Compare the distribution of this distance between (a) is_b0_pick=true false_positive_ruin cases and (b) is_b0_pick=true selected_winner cases. Then compare the SAME statistic computed ACROSS snapshots (distance to nearest neighbor in any other snapshot). If the intra-snapshot distance separates ruin from winner but the cross-snapshot distance does not, snapshot regime dominates and cluster-level dispersion is confounded. If BOTH separate, redundancy is the real mechanism.",
+      "success_criterion": "Mann-Whitney U on intra-snapshot nearest-neighbor distance yields p < 0.10 with ruin cases closer (lower distance) than winners, AND cross-snapshot distance yields p > 0.30 (no separation).",
+      "failure_criterion": "Intra-snapshot and cross-snapshot distances both separate ruin from winner equally well (regime hypothesis); OR neither separates them (clustering hypothesis fails entirely, mechanism is candidate-quality calibration)."
+    },
+    {
+      "name": "composite_feature_orthogonality_audit",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "mom_60",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Compute the Spearman rank-correlation matrix across ALL 27 entity-snapshot pairs between every pair of the eight PIT features listed. The researcher's proposed composite {up_day_ratio_20, z(vol_ratio_5_20), z(mom_20)} is informative only if its components are not near-perfectly collinear. This test also audits whether including px_vs_ma20, px_vs_ma50, ma10_slope_5, ma20_slope_5, or mom_60 adds independent information beyond the proposed triple.",
+      "success_criterion": "Maximum off-diagonal absolute rank-correlation among {up_day_ratio_20, vol_ratio_5_20, mom_20} is < 0.70 AND at least one of {px_vs_ma20, ma10_slope_5, mom_60} has |rho| < 0.50 with all three (i.e., adds orthogonal information that could replace or augment the composite).",
+      "failure_criterion": "All pairwise |rho| among the proposed triple exceeds 0.70 (composite is near-tautological, dispersion is uninformative) OR every other feature is also > 0.70 collinear with the triple (no usable orthogonal axis exists in the PIT allowlist)."
+    },
+    {
+      "name": "snapshot_fixed_effects_vs_within_snapshot_dispersion",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "pullback_pct",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "is_b0_pick"
+      ],
+      "comparison": "For each snapshot with >= 3 candidates, compute (a) the snapshot-level ruin rate conditional on is_b0_pick=true (regime statistic), (b) the within-snapshot cross-sectional range of the composite {z(up_day_ratio_20)+z(vol_ratio_5_20)+z(mom_20)} across candidates (the researcher's cluster_dispersion proxy at the level the evidence permits), and (c) the ruin rate of the TOP-composite candidate per snapshot. Compare (a) and (b) as univariate predictors of per-snapshot ruin via rank correlation. Also test (d): within each snapshot, does the BOTTOM-composite candidate's ruin rate differ from the TOP-composite candidate's ruin rate? If the snapshot-level mean predicts ruin but the within-snapshot dispersion does not, regime wins. If within-snapshot dispersion predicts conditional on snapshot fixed effects, cluster hypothesis survives.",
+      "success_criterion": "After de-meaning by snapshot_anon, the residual within-snapshot composite range shows a negative relationship with ruin probability of the highest-composite candidate (p < 0.15), AND the raw snapshot-mean composite is a weaker single predictor than the within-snapshot dispersion residual.",
+      "failure_criterion": "Raw snapshot-mean composite predicts ruin (|rho| > 0.40 with per-snapshot ruin rate) and within-snapshot dispersion adds no incremental information (residual dispersion |partial rho| < 0.10)."
+    },
+    {
+      "name": "slot_count_marginal_value_under_fixed_three_slot",
+      "features": [
+        "is_b0_pick",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "comparison": "For each snapshot with >= 3 candidates, simulate three fixed-3-slot allocation policies using only PIT features: (Policy A) fill all 3 slots with the top-3 by composite score; (Policy B) fill slot 1 with the top-1 by composite score, ABSTAIN slots 2 and 3; (Policy C) fill slot 1 with the top-1, then for slots 2 and 3 pick the two candidates that MAXIMIZE within-snapshot feature distance to slot 1 (an anti-redundancy policy that uses the same features the researcher proposed). The slot-1 ruin rate (is_b0_pick=true → false_positive_ruin) is the cost of action. Compare the per-snapshot ruin rate across A, B, C. This pre-specifies the economic comparison the question demands without invoking outer-forward returns.",
+      "success_criterion": "Policy C reduces per-snapshot ruin rate by >= 20% relative to Policy A AND by >= 10% relative to Policy B (anti-redundancy slot filling is additive when same-snapshot candidates exist); OR Policy B's ruin rate equals Policy A's ruin rate, meaning slots 2/3 contributed nothing positive and a 1-slot policy is economically equivalent.",
+      "failure_criterion": "Policy A and Policy C yield statistically indistinguishable ruin rates (slot-count diversification is not recoverable from PIT features alone) OR Policy B has ruin rate EQUAL to Policy C (abstention dominates; cluster-redundancy is irrelevant because slot 1's ruin rate is the binding constraint)."
+    },
+    {
+      "name": "contrarian_pullback_dispersion_confound",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "The researcher's composite uses only momentum/uptrend features, but pullback_pct shows a POSITIVE standardized delta (+0.64), meaning winners had DEEPER pullbacks than false_negatives — i.e., winners are contrarian on pullback but homogeneous on momentum. Test: stratify candidates into (i) deep-pullback (pullback_pct below snapshot median) and (ii) shallow-pullback (above median). Within each stratum, compute within-snapshot composite dispersion. If the deep-pullback winners cluster at LOW dispersion on the momentum composite but HIGH dispersion on pullback_pct, then cluster_dispersion computed only on momentum will mis-rank contrarian winners — directly attacking the composite's validity.",
+      "success_criterion": "Within the deep-pullback stratum, dispersion of pullback_pct separates winners from non-winners (p < 0.15) while dispersion of the momentum composite does NOT (p > 0.30).",
+      "failure_criterion": "Dispersion of the momentum composite separates winners in BOTH strata equally well (no contrarian confound), OR pullback_pct dispersion adds no incremental information beyond what the momentum composite already captures."
+    },
+    {
+      "name": "b0_selection_calibration_precondition",
+      "features": [
+        "is_b0_pick",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "pullback_pct"
+      ],
+      "comparison": "If the underlying problem is B0 selection calibration rather than clustering, then is_b0_pick=true false_positive_ruin cases should be feature-indistinguishable from is_b0_pick=false false_negative_relative cases. Compute the Mahalanobis distance (using the pooled feature covariance) between each false_positive_ruin and (a) the centroid of selected_winners, (b) the centroid of false_negative_relative. If the ruin centroid is closer to false_negative_relative than to selected_winner, the system is systematically failing to discriminate; cluster_dispersion cannot rescue a poorly-calibrated base selector. This is the precondition test the skeptic demands.",
+      "success_criterion": "Median Mahalanobis distance from false_positive_ruin cases to the false_negative_relative centroid is SMALLER than to the selected_winner centroid by >= 0.3 standard units (confirming mis-calibration of the base signal, NOT a clustering issue).",
+      "failure_criterion": "Median distance from false_positive_ruin to selected_winner is SMALLER than to false_negative_relative (base selection is well-calibrated and ruin is genuinely a clustering/portfolio-construction problem)."
+    },
+    {
+      "name": "snapshot_concentration_null_for_redundancy",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "pullback_pct",
+        "px_vs_ma50"
+      ],
+      "comparison": "The skeptic's strongest empirical observation is that 8 of 8 false_positive_ruin cases concentrate in 4-5 specific snapshots. Pre-specify a permutation null: under the hypothesis that ruin is independent of cluster composition, randomly reassign outcome_label across all 27 entity-snapshot pairs (preserving snapshot_anon stratification) 10,000 times and recompute the snapshot concentration statistic (max ruin count per snapshot). The observed concentration (>=2 ruins per snapshot in 4 snapshots) defines the test statistic. This quantifies whether snapshot concentration is more parsimonious than industry clustering without requiring industry labels.",
+      "success_criterion": "Observed snapshot-ruin-concentration percentile under permutation null exceeds 95th percentile (clustering hypothesis is needed because snapshot alone is insufficient to explain ruin concentration).",
+      "failure_criterion": "Observed concentration is below the 50th percentile of the permutation null (snapshot regime alone explains ruin; cluster_dispersion is unnecessary)."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that no feature in any test uses outcome_label, w4_return_bucket, or any derived forward-return statistic as input — the feature set must be strictly PIT at snapshot_anon timestamp.",
+    "Verify that snapshot_anon is used ONLY as a stratification / grouping key, never as a predictive feature itself (this respects the 'no calendar identity as a predictive feature' rule while still permitting regime controls).",
+    "Verify that is_b0_pick is used ONLY as a conditioning or comparison-group selector, not as a feature in the composite itself — it is a system-output label that may be safe PIT but should be audited for whether it constitutes leakage of the B0 selection logic.",
+    "Verify that entity_anon is never used as a feature, join key for prediction, or deduplication signal — it is an anonymization label, not a predictive input.",
+    "Verify that pullback_duration_weeks and pullback_pct are constructed from price history UP TO snapshot_anon only and contain no peeks beyond the snapshot date — these are the most leakage-prone features because pullback completion timing can be ambiguous.",
+    "Verify that all ibd_entry_* features (close_vs_trigger_pct, volume_ratio, close_position, breakout_range_ratio) are defined relative to the IBD entry trigger date which must precede the snapshot_anon — audit timestamps in the source data to confirm.",
+    "Verify that the composite {up_day_ratio_20, vol_ratio_5_20, mom_20} construction does not implicitly use forward returns via window-end selection — each component's window must close at or before snapshot_anon.",
+    "Verify that the slot-count test (Policy A/B/C) does not require any post-entry return data; the ruin-rate comparison must be derivable purely from outcome_label pre-classified in the frozen evidence (no outer-forward outcomes)."
+  ],
+  "priority_order": [
+    "intra_snapshot_nearest_neighbor_distance_separation",
+    "snapshot_fixed_effects_vs_within_snapshot_dispersion",
+    "composite_feature_orthogonality_audit",
+    "b0_selection_calibration_precondition",
+    "slot_count_marginal_value_under_fixed_three_slot",
+    "snapshot_concentration_null_for_redundancy",
+    "contrarian_pullback_dispersion_confound"
+  ]
+}

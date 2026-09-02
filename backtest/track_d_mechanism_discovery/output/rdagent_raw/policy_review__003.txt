@@ -1,0 +1,68 @@
+
+
+```json
+{
+  "reviews": [
+    {
+      "policy_id": "entry_proximity_two_stage_v1",
+      "concerns": [
+        "Linear weight of -3.0 on `ibd_entry_close_vs_trigger_pct` is partially redundant after the hard lte 0.04 screen — the dynamic range of the linear term is compressed to [0, 0.04], making it behave like a near-binary tiebreaker rather than a continuous signal.",
+        "Interaction term (-2.0) with `ma10_slope_5` uses raw identity on both sides; slope has scale and sign ambiguity (slopes near zero, negative slopes on downtrends), so the interaction term is sign-flippable in regimes that may not be PIT-stable.",
+        "`up_day_ratio_20` weight 0.7 is grafted at sub-threshold magnitude — looks like an inherited B0 residual that has no causal link to the entry-proximity mechanism being tested.",
+        "Capacity mode `score_gap` with gap=0.15 combined with max_positions=2 and industry_mode `max_2_per_ind` will produce routine capacity=1 outcomes whenever top-2 are close in entry-proximity score, manufacturing abstention against the very signal under test.",
+        "Two-stage filter conflates two ruin mechanisms: trigger-proximity (entry timing) and slope bias. The hard screen at 0.04 will discard many candidates whose ruin was driven by something other than trigger distance, biasing the survivor distribution."
+      ],
+      "novelty_0_100": 30,
+      "mechanism_clarity_0_100": 55
+    },
+    {
+      "policy_id": "ccm_gap_abstention_v1",
+      "concerns": [
+        "`gap=0.5` is enormous given feature weights summing to ~2.2 on z-scored inputs — a 0.5 standardized gap is multiple-sigma separation, so the binding constraint is essentially always the gap, not min_score=0.2.",
+        "`min_score=0.2` is dead code in practice — it never binds because the gap threshold supersedes it. This makes the 'tiered capacity' claim misleading; it is effectively single-threshold (gap-only).",
+        "`industry_mode: distinct_1` with `max_positions: 3` is internally inconsistent — distinct_1 caps effective slots at the number of industries represented, so max_positions=3 is aspirational rather than operational in concentrated universes.",
+        "Gap-as-PIT-confidence-proxy is well-known to fail in correlated regimes; when top candidates share a common factor, the gap shrinks for spurious (correlated) reasons, manufacturing abstention exactly when diversification is most needed.",
+        "Heavy feature overlap with sibling policies (mom_20, px_vs_ma50, up_day_ratio_20 all repeated) makes any cross-policy comparison of mechanism attribution unreliable."
+      ],
+      "novelty_0_100": 28,
+      "mechanism_clarity_0_100": 72
+    },
+    {
+      "policy_id": "weekly_volume_confirmation_gate",
+      "concerns": [
+        "Description names `weekly_volume` but the actual feature is `vol_ratio_5_20` (5-day vs 20-day ratio) — naming/semantic mismatch makes the falsification target ambiguous.",
+        "`mom_20` (4.0), `up_day_ratio_20` (3.0), `px_vs_ma50` (2.0) are highly collinear momentum/tempo proxies; together they form a redundant composite where the +1.5 confirmation gate is largely a re-statement of momentum already present in the linear terms.",
+        "The confirmation threshold requires vol>1.0 AND mom>0.10 AND px_vs_ma50>0 — three momentum-related gates stacked, so the 'independent information from volume' hypothesis is structurally untestable since volume contribution only fires after momentum has already won.",
+        "Hardcoded `vol>1.5` blowoff penalty is a magic number without economic justification; in regimes where 1.5 is the new normal, this systematically penalizes healthy breakouts.",
+        "Capacity `fixed: 3` with no abstention mechanism means the policy cannot demonstrate whether volume confirmation actually adds Sharpe or merely ranks within an always-fully-invested sleeve — the falsification design is too constrained."
+      ],
+      "novelty_0_100": 38,
+      "mechanism_clarity_0_100": 62
+    },
+    {
+      "policy_id": "divergence_triage_signal",
+      "concerns": [
+        "Hardcoded reference to 'entity_2f86543bf6 archetype' signals single-name overfitting; the +2.5 in the vol>1.4/mom<0.05 quadrant is being calibrated to one survivor rather than a population-level regularity.",
+        "Mechanism is internally contradictory: `mom_20` weight 5.0 establishes a momentum dominant policy, yet +2.5 is added in a low-momentum quadrant. The two signals are not orthogonal — the high-mom weight is still pulling the score in opposite direction, making the net effect in the divergence zone small and unstable.",
+        "`-1.5` penalty for vol>1.2 AND 0.15<mom<0.25 (the 'late-acceleration zone') and the +2.5 for vol>1.4/mom<0.05 partially cancel across the momentum continuum — the policy is effectively a band-pass filter on momentum with a sharp cliff at mom=0.05.",
+        "`gap=1.5` with `max=2` and `distinct_1` industry mode means this policy almost never fills its capacity — combined with mom_20 weight 5.0 (which has wide dynamic range), the gap threshold will routinely bind, manufacturing capacity<max outcomes.",
+        "Score gap of 1.5 on a scale where mom_20 alone has weight 5.0 means top1 must exceed top2 by 30% of a one-sigma momentum unit just to fill one slot — economically implausible precision requirement."
+      ],
+      "novelty_0_100": 48,
+      "mechanism_clarity_0_100": 45
+    },
+    {
+      "policy_id": "adaptive_capacity_abstention",
+      "concerns": [
+        "`min_score: 5.0` on z-scored features with weights summing to ~7 is at or above the empirical maximum of typical score distributions — this almost certainly forces capacity=0 in the majority of periods, making the '0/1/2/3 adaptive' framing false in practice (it is effectively an abstention-only policy).",
+        "The falsification target ('does 0/1/2/3 beat always-fixed-3') is rigged: by setting min_score at the extreme tail, the policy is structurally biased toward abstention, so the comparison becomes 'abstain often' vs 'always invested' — not a test of adaptive capacity but of cash drag.",
+        "Blowoff veto (-3.0 at vol>1.5 AND up_day<0.5) is a near-duplicate of weekly_volume_confirmation_gate's penalty (-2.0 at vol>1.5) — conceptual duplication of ruin-cluster detection without principled differentiation.",
+        "`top1_confidence` capacity mode with min_score gate stacks two abstention mechanisms (gap test AND score threshold) — failure modes compound non-additively, making the policy's abstention behavior hard to attribute.",
+        "Feature set (mom_20, up_day_ratio_20, px_vs_ma50) is the third policy using essentially the same composite, undermining the claim that capacity mechanism is the variable being tested across the Track D suite."
+      ],
+      "novelty_0_100": 32,
+      "mechanism_clarity_0_100": 78
+    }
+  ]
+}
+```

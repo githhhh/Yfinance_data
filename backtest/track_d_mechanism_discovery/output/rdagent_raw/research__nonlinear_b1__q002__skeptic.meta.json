@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__nonlinear_b1__q002__skeptic",
+  "prompt_hash": "dd051f0e1dd437e891fac3873b0f8e37a5a28df7f4691d4d1b3e86c4714b37fc",
+  "response_hash": "01a6af6ed44e4a8b64d1a7cdc4bcda899651a99e921a24e3d790e9f1002c33f3",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

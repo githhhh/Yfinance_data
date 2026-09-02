@@ -1,0 +1,81 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "baseline_rate_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "pullback_pct", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "P(large_win) for all non-picks vs P(large_win) for non-picks meeting stealth profile thresholds",
+      "success_criterion": "Non-picks meeting stealth profile (up_day_ratio_20 ≤ 0.55 AND vol_ratio_5_20 < 1.30 AND mom_20 ∈ [0.05, 0.12] AND ibd_entry_close_vs_trigger_pct < 0.025) achieve large-win rate ≥ 2× the baseline non-pick large-win rate",
+      "failure_criterion": "Stealth-profile non-picks achieve large-win rate < 1.5× baseline, OR the profile captures >60% of all non-picks (floor effect)"
+    },
+    {
+      "name": "false_negative_discrimination_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "pullback_pct", "px_vs_ma20", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Feature medians of false_negative_big_winner vs false_negative_relative vs false_positive_ruin",
+      "success_criterion": "At least 3 of the 6 features show significant rank-difference (p<0.10, two-sided) between false_negative_big_winner and false_positive_ruin outcomes",
+      "failure_criterion": "No feature achieves p<0.15 separation between false_negative_big_winner and false_positive_ruin; medians fall within overlapping quartiles"
+    },
+    {
+      "name": "null_pullback_mechanism_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "px_vs_ma20", "px_vs_ma50", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Null pullback non-picks vs non-null pullback non-picks across feature distributions and outcome rates",
+      "success_criterion": "Null pullback cases have (a) comparable large-win rate to shallow-pullback cases after matching on other features, AND (b) feature distributions not systematically different from null-missing-data expectation (e.g., are not concentrated in a single snapshot)",
+      "failure_criterion": "Null pullback cases concentrate in ≤2 snapshots, OR null pullback large-win rate differs by >15pp from matched shallow-pullback cases, indicating NULL is a data artifact rather than a breakout-path indicator"
+    },
+    {
+      "name": "b0_orthogonality_test",
+      "features": ["is_b0_pick", "up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Correlation between is_b0_pick flag and stealth-profile features; whether B0 non-picks with stealth profile have same large-win rate as B0 picks with stealth profile",
+      "success_criterion": "Spearman correlation between is_b0_pick and each stealth feature < 0.30, AND stealth-profile B0 picks have comparable large-win rate to stealth-profile B0 non-picks",
+      "failure_criterion": "is_b0_pick correlates >0.50 with any stealth feature (B0 already filters these stocks), OR stealth-profile B0 picks significantly outperform stealth-profile B0 non-picks, indicating the profile is not orthogonal to B0"
+    },
+    {
+      "name": "pullback_depth_threshold_test",
+      "features": ["pullback_pct", "pullback_duration_weeks", "mom_20", "up_day_ratio_20", "w4_return_bucket"],
+      "comparison": "Large-win rate across pullback_pct bins: (-5%, 0%), [-15%, -5%), < -15%, and null",
+      "success_criterion": "Large-win rate in [-15%, -5%] bin is ≥ 1.5× the rate in < -15% bin, validating shallow-pullback specificity",
+      "failure_criterion": "Large-win rate shows no monotonic trend with pullback depth; deep pullbacks (>-15%) produce comparable win rates to shallow pullbacks"
+    },
+    {
+      "name": "vol_ratio_threshold_test",
+      "features": ["vol_ratio_5_20", "mom_20", "outcome_label"],
+      "comparison": "Conditional large-win rate: (vol_ratio_5_20 < 1.30 AND mom_20 ∈ [0.05, 0.12]) vs (vol_ratio_5_20 ≥ 1.40 AND mom_20 < 0.05)",
+      "success_criterion": "Low-vol/low-mom combo yields ≥40% large-win rate; high-vol/low-mom combo yields <25% large-win rate",
+      "failure_criterion": "Both combos yield similar large-win rates within 10pp, invalidating the vol_ratio threshold as a discriminator"
+    },
+    {
+      "name": "cross_snapshot_stability_test",
+      "features": ["snapshot_anon", "mom_20", "up_day_ratio_20", "vol_ratio_5_20", "ibd_entry_close_vs_trigger_pct", "w4_return_bucket"],
+      "comparison": "Stealth-profile feature distributions and outcomes across snapshots with ≥3 non-picks each",
+      "success_criterion": "At least 3 snapshots show consistent stealth-feature medians (within ±0.05 for mom_20, ±0.08 for up_day_ratio_20) and large-win rates (within 20pp), indicating the pattern is not snapshot-specific",
+      "failure_criterion": "Feature medians and win rates vary >2× across snapshots, indicating pattern is an artifact of snapshot composition rather than a stable signal"
+    },
+    {
+      "name": "ruin_overlap_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "px_vs_ma20"],
+      "comparison": "Mahalanobis distance of false_positive_ruin cases vs false_negative_big_winner cases from stealth-profile centroid",
+      "success_criterion": "Median Mahalanobis distance of false_positive_ruin from stealth centroid is >1.5× the distance of false_negative_big_winner, OR at least one feature distinguishes ruin from big-winner with AUC >0.70",
+      "failure_criterion": "Ruin and big-winner cases are equidistant from stealth centroid; no single feature achieves AUC >0.65 for distinguishing them, confirming the profile cannot separate winners from catastrophes"
+    }
+  ],
+  "leakage_checks": [
+    "Confirm that all features (up_day_ratio_20, vol_ratio_5_20, mom_20, pullback_pct, ibd_entry_close_vs_trigger_pct, px_vs_ma20, px_vs_ma50) are computed from data available at snapshot time; no forward-looking information embedded",
+    "Verify that w4_return_bucket and outcome_label are post-snapshot labels, not used as inputs to feature-based partitioning",
+    "Ensure that snapshot_anon is used only for stratification, not as a predictive feature",
+    "Confirm that is_b0_pick is contemporaneous with snapshot (pre-decision flag), not a post-hoc classification",
+    "Check that pullback_pct and pullback_duration_weeks nulls are not systematically caused by post-snapshot outcomes (e.g., ruin cases having higher null rates due to truncation)"
+  ],
+  "priority_order": [
+    "baseline_rate_test",
+    "b0_orthogonality_test",
+    "false_negative_discrimination_test",
+    "ruin_overlap_test",
+    "null_pullback_mechanism_test",
+    "vol_ratio_threshold_test",
+    "pullback_depth_threshold_test",
+    "cross_snapshot_stability_test"
+  ]
+}
+```

@@ -1,0 +1,61 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 38,
+  "mechanism_summary": "Two distinct false-positive mechanisms were proposed: (A) weak momentum + tight price proximity exhausting base depth, and (B) momentum divergence signaled by elevated up_day_ratio_20. Evidence is WEAK. Counterexample entity_8ad5cd4795 violates Mechanism A (mom_20=0.004, px_vs_ma20=0.007, selected_winner) and counterexample entity_3adc078f01 violates Mechanism B (mom_20=0.172, up_day_ratio_20=0.65, ma20_slope_5=0.063, selected_winner). The strong feature-outcome correlations in numeric_contrasts (up_day_ratio_20 standardized_delta=-1.1882, mom_20=-1.0005) partially reflect label construction circularity, not independent predictive signal. The mechanical trigger-position hypothesis (ibd_entry_close_vs_trigger_pct mediating outcomes) was never tested and remains viable given that ruin vs winner medians differ substantially (0.048-0.051 vs 0.025-0.028). Small-N (N=8 ruin, N=11 winner) prevents threshold stability; a single case shift could alter thresholds by 30-50%. up_day_ratio_20 functions as a correlated proxy for trend quality but lacks standalone predictive power—it requires conditional architecture (elevated momentum plus declining MA velocity) that isn't consistently present in the data.",
+  "falsifiers": [
+    "Find at least 2 cases with mom_20 < 0.08 AND px_vs_ma20 < 0.05 that achieve selected_winner or large_win outcome—currently only 1 exists (entity_8ad5cd4795), insufficient to falsify given N=8 baseline",
+    "Find at least 2 cases with mom_20 > 0.15 AND up_day_ratio_20 > 0.60 AND ma20_slope_5 < 0.020 that are selected_winner—entity_3adc078f01 provides 1 counterexample but ma20_slope_5=0.063 exceeds the proposed threshold, leaving the divergence condition unfalsified",
+    "Demonstrate that base_depth_pct outperforms px_vs_ma20 in separating ruin from winner (AUC comparison)—numeric_contrasts show base_depth_pct standardized_delta=0.1942 vs px_vs_ma20=-0.5842, but the proxy claim remains unvalidated",
+    "Confirm trigger_position_null_hypothesis: ibd_entry_close_vs_trigger_pct alone achieves AUC < 0.55 AND feature-only model achieves AUC >= 0.70—mechanistic test remains pending",
+    "Demonstrate outcome_independence: at least one snapshot feature achieves Fisher's exact p < 0.10 across all 27 cases without filtering by is_b0_pick—this test was designed but results not reported",
+    "Small-N robustness: leave-one-out removal of any single false_positive_ruin case shifts optimal mom_20 threshold by >30% or px_vs_ma20 threshold by >30%—threshold instability not yet quantified"
+  ],
+  "actionable_design_principles": [
+    "Treat ibd_entry_close_vs_trigger_pct as a primary variable for mechanism testing before accepting feature-based explanations—its median differs substantially between outcome groups and requires controlled testing",
+    "Reject any feature-based filter that classifies entity_8ad5cd4795 as ruin-risk: mom_20=0.004, px_vs_ma20=0.007, up_day_ratio_20=0.70, selected_winner with large_win—this case violates both proposed mechanisms and must be incorporated into threshold logic",
+    "Acknowledge that up_day_ratio_20 is a risk modifier, not a primary signal: its predictive power depends on trend architecture (ma20_slope_5 direction) that is not reliably measured at snapshot time",
+    "Require prospective validation of any ruin-prediction filter across a minimum of 50 additional B0 picks before deployment—N=8 provides insufficient power for actionable thresholds",
+    "Do not use post-entry pullback metrics (pullback_duration_weeks, pullback_pct) as predictive inputs; they are outcome-correlated proxies unavailable at entry decision time"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage conditional filter: Stage 1 rejects mom_20 < 0.08 regardless of other features. Stage 2 flags (not rejects) up_day_ratio_20 > 0.60 but only downgrades to reject if ma20_slope_5 < 0.015 AND px_vs_ma20 < 0.08. Otherwise preserves the pick with elevated monitoring.",
+      "why_distinct": "Addresses the circularity problem by conditioning the up_day_ratio_20 filter on explicit architectural features rather than accepting the feature as a standalone predictor. The entity_8ad5cd4795 counterexample (weak momentum but winner due to strong ma20_slope_5=0.044) demonstrates this conditional structure is necessary.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "ma20_slope_5",
+        "px_vs_ma20"
+      ],
+      "capacity_relevance": "Moderate—reduces false-positive rate but the conditional thresholds lack robustness validation at N=8"
+    },
+    {
+      "idea": "Trigger position calibration test: for each snapshot, compute ibd_entry_close_vs_trigger_pct percentile within the rolling 20-day distribution. Reject picks where trigger fires in the top quartile (>75th percentile) unless mom_20 > 0.20.",
+      "why_distinct": "Tests the mechanical top-capture hypothesis directly rather than relying on feature-based prediction. If this simple position rule outperforms multi-feature models, it falsifies the researcher's mechanism claims and supports the skeptic's alternative.",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "mom_20"
+      ],
+      "capacity_relevance": "High—addresses the untested mechanistic alternative. If supported, dramatically simplifies the prediction problem."
+    },
+    {
+      "idea": "Proxy validation layer: whenever px_vs_ma20 < 0.08, require base_depth_pct as a secondary check. If base_depth_pct is not available (null), default to reject rather than accepting the proxy as sufficient.",
+      "why_distinct": "Addresses the proxy-squared concern by refusing to rely on a proxy when the direct measurement is unavailable or when the proxy's signal diverges from the underlying structural measure.",
+      "features": [
+        "px_vs_ma20",
+        "base_depth_pct"
+      ],
+      "capacity_relevance": "Low-moderate—adds a missing-data safeguard but doesn't resolve whether base_depth_pct actually outperforms px_vs_ma20 in prediction"
+    },
+    {
+      "idea": "Outcome-independent validation: hold out 5 randomly selected cases from the 27 as a prospective test set. Train threshold logic on remaining 22 cases. Report whether the held-out ruin cases would have been rejected and held-out winners preserved. Repeat across 3 random seeds.",
+      "why_distinct": "Directly addresses the circularity concern by forcing threshold development to generalize beyond the cases used to define the labels. Any claim of predictive power must survive this cross-validation structure.",
+      "features": [
+        "mom_20",
+        "px_vs_ma20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Critical—the only design principle that directly falsifies the skeptic's strongest counterclaim about outcome construction circularity"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "strongest_counterclaim": "dry_false_penalty's value is neither ranking nor downside-risk control — it is an in-sample label-leakage artifact of a 27-case failure archaeology whose base rates (8 ruins, 11 winners) are too small to statistically discriminate between the two candidate mechanisms. The 'return-ranking' reframe is a re-labeling of the same proxy, not a falsification. The honest verdict is UNRESOLVED, with the burden of proof falling on the ranking hypothesis because the alternative-mechanism space (liquidity, information asymmetry, sector-regime interaction) has not been ruled out.",
+  "attacks": [
+    {
+      "issue": "Sample-size / statistical-power artifact: 27 cases with 8 false_positive_ruin and 11 selected_winner cannot distinguish two mechanisms that produce overlapping predictions.",
+      "why_it_matters": "A penalty that improves risk-adjusted ruin rate by even 5pp would need ~150+ cases for 80% power at α=0.05. The 'evidence against' (ruin at up_day_ratio 0.65, winners at up_day_ratio 0.50) is well within what a true downside-control penalty would generate due to noise alone. The researcher treats individual entities (entity_3472243e0c, entity_55c2da490e) as decisive evidence when they are n=1 anecdotes."
+    },
+    {
+      "issue": "Pooling across heterogeneous snapshots destroys the temporal structure the penalty operates on. Cases span at least 12 distinct snapshots (snap_724342c280 through snap_b8420124eb), each its own cross-section.",
+      "why_it_matters": "dry_false_penalty is applied within-snapshot relative to peers. Pooling across snapshots mixes apples and oranges — entity_3472243e0c's up_day_ratio_20=0.65 may be top-quartile in its snapshot but bottom-quartile in another's. The 'ruin at high up_day_ratio' finding is mechanically guaranteed by pooling without snapshot-conditioning."
+    },
+    {
+      "issue": "Circular / contaminated label construction: 'false_positive_ruin' is defined by future W4 outcome conditional on B0 selection. The archaeology is itself a backtest using the same penalty outputs it claims to evaluate.",
+      "why_it_matters": "If the penalty's B0 selection rule is part of the label-generation pipeline, then any finding that 'the penalty failed to prevent ruin' is contaminated by the very rule under test. Out-of-time holdout where labels are frozen before penalty re-evaluation is the only valid test, and it is not present."
+    },
+    {
+      "issue": "Label noise (entity_6618d3e80c carries BOTH 'false_positive_ruin' AND 'selected_winner'). This contradicts the binary taxonomy the falsification depends on.",
+      "why_it_matters": "If even one label is incoherent, the whole contrast (ruin vs winner) loses its discriminator. The researcher uses this entity as evidence against the penalty's protective value, but a double-labeled entity proves the labeling scheme — not the penalty — is broken."
+    },
+    {
+      "issue": "Missing position-size confounder: ruin is defined as a return bucket, but the actual PnL impact depends on position weight, which is itself a function of the B0 score (of which the penalty is a component).",
+      "why_it_matters": "Cases the penalty filtered out would have had lower position sizes by construction. The 'false_negative big_winner' is not a counterfactual — those candidates would have received smaller weight, muting the 'big_winner' outcome. The proposed replacement (continuous rank) inherits this confound unless position size is held fixed."
+    },
+    {
+      "issue": "Alternative mechanism unaddressed: up_day_ratio_20 may proxy LIQUIDITY / INFORMATION ASYMMETRY (thinly traded names with low daily breadth), not 'dry risk' or 'return potential'.",
+      "why_it_matters": "A liquidity proxy protects against slippage and gap-risk, which is a third mechanism distinct from both ranking and downside control. The researcher's 2-axis replacement (breadth_score × participation_score) collapses information asymmetry into a continuous rank — discarding the very protective dimension the original penalty may have encoded."
+    },
+    {
+      "issue": "The proposed 'cleaner replacement' (sector-relative percentile rank) is itself a rank feature known to overfit in small cross-sections and to be unstable when sector membership drifts.",
+      "why_it_matters": "F3 (ruin ↓ to ≤6 AND large_win ↑ to ≥14) is proposed on the SAME 27 cases used to derive the replacement — this is in-sample refitting. Any continuous-rank replacement will mechanically appear superior in the training archaeology even if it is no better out-of-sample. The replacement claim is therefore unfalsifiable as stated."
+    },
+    {
+      "issue": "Null pullback_duration_weeks and pullback_pct in 14 of 27 rows — the penalty's most direct risk-relevant feature is missing for half the sample.",
+      "why_it_matters": "If pullback history is the operational definition of 'dry risk', then half the cases are unevaluable on the dependent dimension. The penalty's true purpose cannot be inferred from a sample where the relevant variable is NaN half the time."
+    },
+    {
+      "issue": "The F6 regime-conditioning test ('halve penalty weight when vol_ratio_5_20 > 1.5') is asserted without theoretical justification and is itself a candidate to be the dominant signal, not 'rank vs risk'.",
+      "why_it_matters": "If regime flag explains more variance than the penalty, then the penalty is an inert carrier variable and the 'ranking vs risk' debate is moot. The researcher added a regime test instead of resolving the original question."
+    }
+  ],
+  "counterexamples_to_sell": [
+    "An entity where the penalty triggered, ruin did NOT occur, and the position size was held constant — this would support the ranking-only interpretation.",
+    "An entity where the penalty did NOT trigger, ruin DID occur, but only in a regime the penalty was designed to exclude (e.g., a vol_ratio_5_20 < 1.0 case at low up_day_ratio) — falsifies regime-conditioning claim.",
+    "An out-of-time snapshot where the penalty was disabled and ruin rate was statistically indistinguishable from enabled-period ruin rate (paired binomial test, n≥30 events) — falsifies both ranking and risk-control necessity.",
+    "A 'dry' setup that won with positive risk-adjusted return AFTER transaction-cost adjustment including liquidity slippage — would re-open the liquidity-proxy alternative mechanism.",
+    "A 'broad' setup (up_day_ratio_20 ≥ 0.70) that ruined despite position sizing — proves breadth alone is insufficient and falsifies the F3 proposal.",
+    "Same-snapshot, same-sector twin pairs where one passes and one fails the penalty, with divergent outcomes — the natural experiment the archaeology lacks."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample (post-training-window) test with ≥100 entities where removing the penalty changes ruin rate by <3pp but raises large_win recall by ≥10pp AND the change is significant at α=0.05 — would convert my UNRESOLVED stance to 'ranking is the dominant mechanism'.",
+    "A controlled simulation where position size is fixed at the B0-median level for all candidates and the penalty's coefficient on ruin becomes statistically indistinguishable from zero — would convert me to 'neither mechanism, the penalty is inert'.",
+    "A within-snapshot, within-sector regression with fixed effects that shows up_day_ratio_20 enters ruin probability only through its interaction with liquidity (Amihud illiquidity or bid-ask spread) and not independently — would convert me to 'the penalty is a liquidity proxy and the replacement should include a spread-based feature'.",
+    "Evidence that 'dry' setups consistently show wider post-earnings bid-ask spread or higher realized slippage in the 4-week forward window — would open the liquidity-asymmetry mechanism as the actual causal channel and reject both ranking and risk-control framings.",
+    "A held-out re-evaluation where labels are generated by a DIFFERENT mechanism (e.g., drawdown-based ruin, not W4-return-based) and the penalty's role persists — would rule out label-leakage as the explanation.",
+    "Demonstration that entity_6618d3e80c's double-label is an error and the corrected label set removes the strongest 'ranking-not-risk' counterexample — without this, the contradiction remains unresolved."
+  ]
+}

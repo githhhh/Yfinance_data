@@ -1,0 +1,107 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "'dry_false_penalty' claims to detect and down-weight B0 candidates whose pre-entry condition resembles a 'dry' (low-conviction) profile that historically precipitated false-positive ruptures. The frozen failure-archaeology set can neither confirm nor refute this claim because (a) the dominant numeric contrasts compare false_negatives to selected_winners, but the penalty targets the false_positive error mode — these are mirror-image cohorts and the wrong contrast for testing conditional independence on the penalty's claimed axis; (b) the 27 archaeology cases were surfaced by B0's own primitives, so any 'redundancy' finding is partly a selection artifact that would persist even for an informative component; (c) at least 9 distinct snapshots are pooled, destroying the snapshot-conditional structure a regime detector would need to exhibit signal; (d) pullback inputs are null in 6/8 ruin cases, so the penalty is firing under undefined state; (e) the mix-label case entity_6618d3e80c is misread as counter-evidence when its very non-'dry' profile (px_vs_ma50=0.337, mom_20=0.251) makes it the ideal test that a correctly-gated penalty should NOT penalize. The researcher identifies real architectural concerns (overlap of primitives, completeness gaps, snapshot heterogeneity); the skeptic correctly identifies that the headline redundancy claim was earned on the wrong comparison and that a within-snapshot matched-pair + placebo-penalty test has not been run. Both readings are consistent with the data; cleaner evidence (Slot 1, 2, 3 of the experimental designer's protocol) is required before any production swap.",
+  "falsifiers": [
+    "F1 — Within-snapshot matched-pair sign test (Slot 2): if ≤55% of pairs have Δpenalty(ruin−control) > 0 with permutation p > 0.05, redundancy is supported and the component should be either orthogonalized or removed.",
+    "F2 — Within-snapshot orthogonal-residual meta-analysis (Slot 1): if Fisher-combined χ² is below the 95th percentile of the within-snapshot permutation null OR >40% of usable snapshots carry ρ of the opposite sign, the 'independence beyond B0 neighbors' claim is falsified.",
+    "F3 — Placebo-penalty test: if permuted-penalty ruin-association strength (within-snapshot Spearman meta) is statistically indistinguishable from the real penalty at α=0.10, the penalty is redundant with the six-feature vector it claims to complement.",
+    "F4 — Restricted-regime concentration: within the claimed 'dry' slice (up_day_ratio_20 ≤ 0.50 AND vol_ratio_5_20 ≤ 1.20 AND ma20_slope_5 ≤ 0), penalty's ruin-gradient must be statistically sharp (pooled AUC ≥ 0.65); flat gradient falsifies the 'dry' framing specifically, distinct from generic redundancy.",
+    "F5 — Additive-vs-tree ablation (Slot 3): if additive (b) AUC − baseline (a) AUC ≤ 0.01 AND tree (c) AUC − additive (b) AUC ≤ 0.01 with overlapping CIs, BOTH interpretations (linear lift and non-linear hinge) are refuted — component is uninformative, not merely mis-specified.",
+    "F6 — Held-out single-case gate: entity_6618d3e80c (mix-label, non-dry profile) must NOT be in the upper tercile of penalty_value across ruin cases; if it is, the gating condition is broken and all retrospective findings are tainted by selection-on-condition.",
+    "F7 — Holdout generalization: on an out-of-sample snapshot withhold, Spearman(penalty_residual, ruin) must exceed |ρ|=0.10 at p<0.05; failure falsifies incremental information in production-relevant regime.",
+    "F8 — Leave-one-snapshot-out stability: if Slot 1 result is driven by a single snapshot (any single holdout flips the combined sign or moves combined χ² below median), the component's claimed snapshot-conditional independence is unstable and falsified.",
+    "F9 — Completeness-aware rerun: restricting Slot 1/2 to cases with all six features AND pullback fields non-null must replicate the headline Spearman result; failure means the current signal is partially an artifact of asymmetric missingness.",
+    "F10 — Forward-leakage audit: any code path from penalty_value to outcome_label / w4_return_bucket / post-snapshot return field automatically falsifies the component's PIT-clean status regardless of predictive performance."
+  ],
+  "actionable_design_principles": [
+    "Test the error cohort the component targets. dry_false_penalty exists to discriminate false_positives from selected_winners conditioned on B0-entry approval — never use false_negatives as the control set, since the cohorts occupy opposite quadrants of the feature space and pooled medians across them are uninformative for this component.",
+    "Use within-snapshot matched-pair designs, not pooled contrasts, when the component is claimed to be a regime detector. Snapshot heterogeneity is non-trivial here (≥9 snapshots, distinct vol_ratio_5_20 and up_day_ratio_20 distributions), and pooling destroys exactly the conditional structure that would prove or disprove independence.",
+    "Audit data-completeness gates before applying any signal. With pullback null in 75% of ruin cases, the penalty is firing on incomplete state. Either impute deterministically and document, or gate penalty activation on full-feature availability and treat incomplete rows as 'penalty-inactive' rather than 'penalty-zero'.",
+    "Separate the falsification of redundancy from the falsification of the 'dry' descriptor. A component can be redundant yet the 'dry' concept can be real (encoded elsewhere); a component can carry weak signal under a non-'dry' framing. Test four orthogonal hypotheses — redundancy, regime-fit, linearity, calibration — rather than collapsing them.",
+    "Build snapshot-level placebo penalties before drawing falsification conclusions. Because the archaeology set is selected by B0 primitives, any redundancy finding is mechanically guaranteed without a placebo baseline. Permute penalty_value within snapshot 1000 times and compare Spearman distributions.",
+    "Keep matched-pair matching distance interpretable and auditable. Restrict to the six claimed 'most redundant' primitives (mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, ma10_slope_5, ibd_entry_close_vs_trigger_pct) as the primary distance, with pullback features as a robustness secondary — never distance on outcome or label fields.",
+    "When ablation indicates non-linear conditional lift (Slot 3c wins), replace the additive penalty with a depth-3 hinge or interaction feature, not a deeper black-box — the conditional structure should be auditable, and 'dry' should resolve to a transparent conjunction.",
+    "Insist on a holdout snapshot set for every slot. In-sample archaeology is necessary but insufficient; the component's claim is about future snapshot generalization, and leave-one-snapshot-out is the right unit."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "snapshot_matched_pair_falsifier",
+      "why_distinct": "Existing failure archaeology computes pooled medians across false_negatives vs selected_winners — the wrong cohort contrast for a false-positive-targeting component, and it ignores snapshot heterogeneity. This slot anchors a per-snapshot 1:1 matched-pair design (nearest neighbor in 6-feature standardized Euclidean within snapshot, ties broken by Mahalanobis) and tests Δpenalty via a permutation sign test on the matched pairs only.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "penalty_value",
+        "snapshot_anon",
+        "outcome_label"
+      ],
+      "capacity_relevance": "Pre-experimental verification gate (must pass before any production insertion); runtime audit on each new snapshot to detect drift in matched-pair sign rate; schema-level requirement defining how snapshots are bucketed for matched-pair sampling."
+    },
+    {
+      "idea": "placebo_penalty_injection_redundancy_test",
+      "why_distinct": "Because the archaeology set was selected by B0 primitives, structural redundancy cannot be diagnosed against itself alone. This slot injects a placebo penalty constructed by within-snapshot permutation of the real penalty_value, then compares (a) real-penalty ruin-association strength to (b) placebo-penalty ruin-association strength via within-snapshot Spearman meta-analysis (Fisher combined). Equality of distributions is the redundancy verdict; strictly larger real-penalty effect is the independence verdict.",
+      "features": [
+        "penalty_value",
+        "perm_within_snapshot_penalty_value",
+        "snapshot_anon",
+        "ruin_indicator",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Pre-experimental verification (mandatory before any swap to a residual-based replacement); holdout validation layer for the falsifier suite; capacity to run at runtime on each new snapshot via fixed-seed within-snapshot permutation to detect drift."
+    },
+    {
+      "idea": "data_completeness_gate_before_penalty",
+      "why_distinct": "Current state allows penalty_value to be non-null when pullback features are null, producing asymmetric activation that confounds the falsification. This slot defines a deterministic gate: penalty_value is 'active' only when all six primitives and both pullback fields are present, and 'inactive' (not zero — distinct) otherwise. The gate itself becomes an audit field tracked alongside penalty_value so retrospective analyses can distinguish 'inactive-on-incomplete' from 'active-and-low'.",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "snapshot_anon",
+        "penalty_value",
+        "penalty_activation_state"
+      ],
+      "capacity_relevance": "Runtime gating in production score (penalty contributes only when activation_state='active'); audit field for any retrospective Slot 1/2/3 rerun to control for asymmetric missingness; schema-enforced via dependency constraint."
+    },
+    {
+      "idea": "orthogonal_residual_score_replacement",
+      "why_distinct": "If Slot 1/2/3 results support non-redundancy, the existing penalty_value cannot be retained as-is because it conflates its own signal with the six primitives. This slot specifies a replacement score: regress each of {mom_20, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50} on the other five within snapshot, take the standardized residual vector, and use the residual magnitude (or a depth-3 hinge on it) as the new penalty. This makes 'independence from B0 neighbors' a property of the construction, not a future empirical finding.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "snapshot_anon",
+        "penalty_value_original",
+        "penalty_residual_score",
+        "penalty_residual_mom",
+        "penalty_residual_slope",
+        "penalty_residual_up_day",
+        "penalty_residual_vol",
+        "penalty_residual_ma50"
+      ],
+      "capacity_relevance": "Production score replacement when Slot 1+2 confirm non-redundancy AND Slot 3 indicates non-linearity; schema requirement defining residual computation per snapshot; runtime audit on residual distributions to detect snapshot-induced skew."
+    }
+  ]
+}
+```

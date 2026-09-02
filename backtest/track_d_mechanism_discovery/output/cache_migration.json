@@ -1,0 +1,9 @@
+{
+  "from_source_git_sha": "00770fb35b75248bfd197598887a83ee85cd042f",
+  "to_source_git_sha": "5edb5660e615dae02abd2783351b8b4b7e95a3f2",
+  "preserved_completed_cycles": 49,
+  "preserved_raw_meta_files": 198,
+  "request_budget_ledger_preserved": true,
+  "research_ledger_preserved": true,
+  "reason": "focused_track_d_protocol_reuses_only_matching_question_fingerprints"
+}

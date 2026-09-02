@@ -1,0 +1,26 @@
+{
+  "mechanism_claim": "False-positive B0 picks fail not from lack of short-term momentum, but from price extension into declining longer-term trend velocity. The specific failure mode is: (1) weak 20-day momentum (mom_20 < 0.10) combined with price already close to MA20 (px_vs_ma20 < 0.05) leaving no base-building room, or (2) strong momentum but up_day_ratio_20 divergence signaling accumulation exhaustion and imminent distribution. up_day_ratio_20 acts as a correlated proxy for quality rather than a true signal—it captures recent behavior but not the underlying trend architecture that determines whether a pullback is healthy or catastrophic.",
+  "evidence_for": [
+    "false_positive_ruin cases cluster into two distinct geometries: entity_40ea0cfb3b (mom_20=0.024, px_vs_ma20=0.028, up_day_ratio_20=0.5) and entity_55c2da490e (mom_20=0.036, px_vs_ma20=0.058) show weak momentum with price already near MA20—no base depth available for normal pullbacks; entity_8f0df3d38e (mom_20=0.176, up_day_ratio_20=0.65) and entity_3472243e0c (mom_20=0.242, up_day_ratio_20=0.65) show strong momentum but elevated recent up-day ratio signaling divergence from trend",
+    "selected_winner median mom_20=0.163 vs false_positive_ruin median ~0.145; winners have meaningful trend substance, not just recent acceleration",
+    "selected_winner px_vs_ma20 median ~0.076 vs false_positive_ruin ~0.064; winners have more runway above immediate resistance",
+    "numeric_contrasts show standardized_delta for mom_20 at -1.0005 and up_day_ratio_20 at -1.1882—the joint condition of low momentum AND low recent participation is the killer combination, not either alone",
+    "entity_8ad5cd4795 (selected_winner, up_day_ratio_20=0.7) disproves high up_day_ratio_20 alone being harmful; it has positive ma10_slope_5=0.044 and good momentum support"
+  ],
+  "evidence_against": [
+    "up_day_ratio_20=0.65 in entity_8f0df3d38e (false_positive_ruin) vs up_day_ratio_20=0.65 in entity_3adc078f01 (selected_winner with 42.3% pullback but large_win outcome)—the same feature value produces different results depending on base momentum architecture",
+    "vol_ratio_5_20 shows mixed signal: false_positive_ruin includes cases with both high (1.449) and low (0.906) volume ratios, suggesting it's not a primary filter",
+    "px_vs_ma50 alone doesn't separate: entity_ead73f4390 (selected_winner) has px_vs_ma50=0.185 while entity_8f0df3d38e (false_positive_ruin) has px_vs_ma50=0.088—need joint condition with mom_20"
+  ],
+  "falsifiable_predictions": [
+    "B0 picks with mom_20 < 0.08 AND px_vs_ma20 < 0.05 will produce ruin outcomes at >60% rate within 4 weeks",
+    "B0 picks with mom_20 > 0.15 AND up_day_ratio_20 > 0.60 AND ma20_slope_5 < 0.015 will produce ruin outcomes at >50% rate—prediction: adding ma20_slope_5 filter to the divergence condition identifies climax behavior specifically",
+    "B0 picks with mom_20 between 0.08-0.20 AND px_vs_ma20 > 0.08 AND vol_ratio_5_20 < 1.5 will produce winners at >65% rate—prediction: the combination of moderate momentum, price not extended, and normal volume defines the survivable base"
+  ],
+  "policy_implications": [
+    "Reject B0 picks where mom_20 < 0.10 regardless of up_day_ratio_20—the trend foundation is insufficient for normal pullback absorption",
+    "Flag (don't reject) B0 picks where up_day_ratio_20 > 0.60 but only if ma20_slope_5 > 0.025; if ma20_slope_5 < 0.020 on such picks, treat as high-ruin-risk despite positive momentum signal",
+    "Treat px_vs_ma20 as a positional proxy for remaining base depth—require px_vs_ma20 > 0.05 minimum, with tighter requirement (px_vs_ma20 > 0.10) for lower-momentum stocks",
+    "up_day_ratio_20 should be used as a risk modifier, not a primary signal—its predictive power is conditional on momentum architecture, not standalone"
+  ]
+}

@@ -1,0 +1,45 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 25,
+  "mechanism_summary": "There is a reproducible descriptive contrast between the false-negative class and the selected-winner class on a 'calm-tape' cluster (lower mom_20, lower vol_ratio_5_20, shallower pullback_pct, near-flat ma10/ma20 slopes, modest extension above MAs) at the PIT snapshot. However, three independent critiques prevent promotion from descriptive contrast to mechanism: (a) the discriminating features are mathematically guaranteed to load negatively on the FN arm because the FN label is threshold-defined against W4 returns that the same features proxy; (c) entity_bfb308b24a (FN-loss) sits inside the FN-large-win feature box on every 'quiet-coil' dimension, so within-class lift is unestablished; (b) snap_71486ed83c contributes >=6 of 27 cases and at least 2 of 3 FN-large-win cases, making the 'repeated PIT precursor' indistinguishable from a single-regime tape artifact. The 'absorption → breakout' narrative is one of several readings consistent with the data; it has not been separated from 'low-momentum names occasionally print +8% by chance' or 'threshold-defined tautology'.",
+  "falsifiers": [
+    "T1 (within-FN lift): in-bucket FN W4 large_win rate must exceed out-of-bucket FN W4 large_win rate by >=15pp with bootstrap 95% CI excluding zero; if precision (FN-large / (FN-large + FN-loss)) within the quiet-coil box is <=50%, the bucket is not operationally separable from loss and the mechanism claim collapses. This test has not been executed and is the gating criterion.",
+    "T2 (cross-snapshot replication): exclude snap_71486ed83c and verify the up_day_ratio_20 and vol_ratio_5_20 standardized deltas retain |dz|>=0.5 with preserved sign; cross-snapshot FN-large n must be >=3. Currently FN-large n is 3 total with >=2 from snap_71486ed83c, so the 'repeated' qualifier is currently unsupported.",
+    "T3 (threshold perturbation): at W4 threshold of 6% instead of 8%, and at relative threshold of 3pp instead of 5pp, the qualitative FN < SW ordering on mom_20, vol_ratio_5_20, px_vs_ma50 must hold. Any sign flip or magnitude drop below |dz|=0.3 indicates threshold-defined tautology rather than independent mechanism.",
+    "T6 (pullback null re-imputation): under impute-0 and impute-deep-correction rules, the 'FN shallower than SW' direction on pullback_pct must be preserved with magnitude >=5pp. Selective missingness (null pullback fields concentrated in short-tenure entities) currently biases the contrast upward.",
+    "Volume-feature directionality (T4): within FN, vol_ratio_5_20 must be either monotonically decreasing in large_win rate (rho<=-0.6) or peaked in [0.9,1.2] at >=2x surrounding bins; if non-monotonic and not peaked, 'volume dry-up' is not an actionable regime hypothesis.",
+    "Absorption-vs-noise separability (T7): FN-large-win names must show atr_14_pct and rv_20 below the SW median (constructive compression). If atr/rv are at or above SW median, the 'quiet tape' is indistinguishable from low-information noise rather than supply absorption."
+  ],
+  "actionable_design_principles": [
+    "Do not promote the FN-vs-SW descriptive contrast to a causal 'absorption' mechanism without first running the within-FN lift test (T1). The 29% large_win rate in the quiet-coil slice is indistinguishable from the unconditional FN rate and from base-rate chance.",
+    "Treat volume regime (vol_ratio_5_20) as a categorical rather than monotonic feature: 'volume confirms' (SW median 1.42) and 'volume dry-up' (entity_05b4c6b1f7 at 0.964) both appear in W4 winners, and FPR cases (entity_3472243e0c, entity_b6bcccdf6a) overlap on the same dimensions.",
+    "Stratify by snapshot before pooling any cross-sectional comparison; snap_71486ed83c dominance means any pooled statistic is at risk of single-tape conflation. Snapshot identity must never be a model input, but snapshot-conditioned normalization is required for feature comparison.",
+    "The slope-sign precondition (ma10_slope, ma20_slope both positive) is not empirically pinned: FN-large-win cases include mixed-sign slopes and FPR cases share positive slopes. Do not encode as a hard precondition; at most use as a soft tie-breaker.",
+    "Pullback_pct null handling must be explicit and pre-specified. Default-drop is biased because nulls concentrate in short-tenure entities; impute-0 and impute-deep-correction are both sensitivity checks that should be run.",
+    "Separate predictive mechanism from portfolio-construction: even if within-FN lift were established, smaller risk-size in the quiet-coil bucket relative to the explosive-momentum bucket is the correct downstream response to lower observed precision."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "candidate_quiet_coil(stamp, features) -> {eligible: bool, mode: 'explosive'|'coil', risk_scalar: float}",
+      "why_distinct": "Encodes the two-bucket generator as an explicit dual-mode candidate, with risk_scalar pre-committed to a lower value for the coil mode. Distinct from a single-threshold B0 filter because it explicitly carries the mode label and pre-commits differential risk; this makes the precision-versus-size tradeoff auditable rather than discretionary.",
+      "features": ["vol_ratio_5_20", "mom_20", "pullback_pct", "ma10_slope_5", "up_day_ratio_20"],
+      "capacity_relevance": "Reduces effective capacity allocated to coil-mode candidates; preserves capacity for explosive-mode candidates. Total portfolio capacity unchanged but per-name exposure asymmetric by mode."
+    },
+    {
+      "idea": "within_snapshot_zscore(feature_values, snapshot_id) -> normalized_features",
+      "why_distinct": "Forces cross-sectional feature comparison to be conditioned on snapshot identity before any pooling or ranking. Distinct from raw feature use because it neutralizes single-regime tape effects (e.g., snap_71486ed83c tape state) that would otherwise inflate or deflate standardized deltas. Snapshot identity is used as a stratification key, never as a model input.",
+      "features": ["vol_ratio_5_20", "mom_20", "px_vs_ma20", "px_vs_ma50", "up_day_ratio_20"],
+      "capacity_relevance": "Does not change capacity directly; improves the validity of any candidate-rank-based sizing by preventing single-snapshot dominance from biasing the rank."
+    },
+    {
+      "idea": "label_robustness_probe(label_def, feature_set) -> {sign_flip: bool, magnitude_floor: float}",
+      "why_distinct": "Operationalizes T3 by sweeping the FN-big-winner label threshold and reporting sign-flip and magnitude-floor statistics on the candidate feature set. Distinct from a single-label analysis because it makes the threshold-tautology critique actionable in policy: any candidate feature whose sign or magnitude is unstable across label perturbations must be down-weighted or excluded from the candidate composite.",
+      "features": ["mom_20", "vol_ratio_5_20", "px_vs_ma20", "px_vs_ma50", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Down-weighting or excluding fragile features does not directly change capacity; it changes which names are eligible at any capacity level, which indirectly affects capacity utilization on the explosive side."
+    }
+  ]
+}
+```

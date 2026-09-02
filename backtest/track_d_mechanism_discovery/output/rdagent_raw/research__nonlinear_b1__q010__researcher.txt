@@ -1,0 +1,36 @@
+
+
+```json
+{
+  "mechanism_claim": "ibd_entry_volume_ratio and ibd_entry_close_position form a nonlinear gating interaction on breakout persistence: when the entry close finishes in the upper third of its intraday range (close_position >= 0.85) AND entry-day volume exceeds ~1.7x baseline, the breakout carries institutional commitment that resists mean-reversion; when close_position is high but volume_ratio is below ~1.3, the late-session price extension is an exhaustion move on thin order flow that snaps back within W4. The piecewise interaction is asymmetric — volume_ratio sets the floor, close_position amplifies conviction above the floor, but neither alone is sufficient.",
+  "evidence_for": [
+    "Numeric contrasts show ibd_entry_volume_ratio separates false-negatives from selected-winners with std_delta -0.50 (median 1.60 vs 1.81) and ibd_entry_close_position with std_delta -0.46 (median 0.824 vs 0.863), placing both features in the moderate-effect regime.",
+    "Ruin cases (8 labeled false_positive_ruin) predominantly have vol_ratio_5_20 < 1.45: entity_8f0df3d38e (1.24), entity_3472243e0c (1.21), entity_55c2da490e (1.27), entity_b6bcccdf6a (1.31), entity_4fdc3699fd (1.38), entity_40ea0cfb3b (0.91), entity_ccc90a671f (1.45), entity_84824e6a20 (1.63) — the low-volume floor is where ruin concentrates.",
+    "entity_40ea0cfb3b is the cleanest signature: vol_ratio_5_20=0.906 (deep below floor) with close_vs_trigger=0.061 (extended), ma10_slope_5=0.025, up_day_ratio_20=0.5 — the textbook exhaustion-without-confirmation profile ending in ruin.",
+    "Selected winners with high conviction show vol_ratio_5_20 > 1.5 paired with non-trivial close_vs_trigger: entity_ead73f4390 (1.77, 0.002), entity_440e297253 (1.59, 0.050), entity_b00579f203 (1.58, 0.047), entity_2c58cebc59 (1.62, 0.034), entity_6618d3e80c (1.45, 0.051) — the upper-volume band persists.",
+    "False-negative cluster (not-B0 picks) shows systematically lower vol_ratio_5_20 (entity_535a1beed7=1.17, entity_bfb308b24a=1.19, entity_de1c657364=1.15, entity_d8e8e7b814=1.40, entity_df5478102d=1.41, entity_05b4c6b1f7=0.96) — B0's current rule is underweighting the volume gate, causing it to pass these up despite their subsequent large_win outcomes.",
+    "entity_6618d3e80c carries dual labels (false_positive_ruin|selected_winner), illustrating that the same close/volume combination can be ambiguous — consistent with a soft threshold rather than a hard switch."
+  ],
+  "evidence_against": [
+    "entity_bec51a4227 is a selected_winner with vol_ratio_5_20=1.007 (below the proposed floor) yet close_vs_trigger=0.0104 and up_day_ratio_20=0.7 — low volume did not preclude a large_win, weakening a strict floor at 1.3.",
+    "entity_2f86543bf6 wins large with negative ma10_slope_5=-0.0076 and ma20_slope_5=-0.0078 and up_day_ratio_20=0.35, showing the close/volume gate is not the sole determinant of outcome.",
+    "entity_ccc90a671f and entity_84824e6a20 are ruins at vol_ratio_5_20=1.45 and 1.63 respectively, indicating the volume floor alone does not separate winners from losers in the mid-band.",
+    "entity_ad2bfdee3f is a false-negative with vol_ratio_5_20=1.179 and ma20_slope_5 negative, suggesting some low-volume setups still produce small wins the B0 model misses — the gate is not a perfect sieve.",
+    "Standardized deltas of -0.50 and -0.46 are only moderate; if volume_ratio were truly the dominant gate, separation would be larger, indicating confounding from up_day_ratio_20 (-1.19 std delta), mom_20 (-1.00), and px_vs_ma50 (-0.85)."
+  ],
+  "falsifiable_predictions": [
+    "Among current B0 picks, the subset with ibd_entry_volume_ratio < 1.2 will exhibit ruin rate > 50% in W4, while the subset with volume_ratio > 1.7 AND close_position > 0.85 will exhibit large_win rate > 60%.",
+    "The interaction term volume_ratio * close_position will carry a positive and statistically significant coefficient (p < 0.05) in a logistic regression on ruin vs win labels after controlling for ma10_slope_5 and mom_20.",
+    "Demoting B0 picks in the 'low-volume-extended' cell (volume_ratio < 1.3 AND close_vs_trigger_pct > 0.04) will reduce portfolio ruin rate by > 20% relative to B0 baseline without changing the eligible universe size.",
+    "False-negative recovery: re-ranking the snap_71486ed83c batch (5 FN cases) using a piecewise rule that admits volume_ratio > 1.5 OR (volume_ratio > 1.2 AND close_position > 0.90) will recover > 60% of the currently-missed large_win outcomes.",
+    "The mid-band (1.3 <= volume_ratio < 1.7) will show bimodal outcomes contingent on close_position: close_position > 0.88 leans large_win, close_position < 0.80 leans loss/ruin."
+  ],
+  "policy_implications": [
+    "Encode a two-cell piecewise gate as a post-B0 filter (not a universe expander): pass when volume_ratio >= 1.7 AND close_position >= 0.85; soft-pass with size discount when 1.3 <= volume_ratio < 1.7 AND close_position >= 0.80; demote when volume_ratio < 1.3 regardless of close_position, OR when close_position < 0.75 regardless of volume.",
+    "Use the gate to shrink position size in the mid-band rather than hard-exclude, since entity_bec51a4227-class setups (low-volume but tight close_vs_trigger with high up_day_ratio_20) still produce winners.",
+    "Treat entity_6618d3e80c-class dual-labeled cases as position-sizing signals: same features can resolve either way, so cap exposure in the ambiguous upper-mid cell.",
+    "Pair the gate with the existing strong separators (up_day_ratio_20, mom_20) to avoid over-fitting to a single interaction — the standardized deltas indicate close_position and volume_ratio are necessary but not sufficient.",
+    "Monitor entity_bec51a4227-style exceptions (low volume_ratio but winner) as a regime-shift signal: if their frequency rises, the volume floor may need recalibration rather than being treated as fixed."
+  ]
+}
+```

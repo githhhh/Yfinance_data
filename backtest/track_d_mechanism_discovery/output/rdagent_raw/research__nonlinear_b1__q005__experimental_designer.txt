@@ -1,0 +1,30 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "PIT_pre_registered_interaction_with_NaN_stratum",
+      "features": ["pullback_v_is_dry", "ibd_entry_volume_ratio"],
+      "comparison": "Within B0-eligible universe only, compute ruin_rate separately for the 3x3 grid: pullback_v_is_dry in {True, False, NaN} x ibd_entry_volume_ratio in {low, mid, high} tertile. NaN pullback must be its OWN row, not pooled with dry=False. Pre-specify the ibd_entry_volume_ratio cut points on discovery data only, then freeze them for holdout.",
+      "success_criterion": "Within dry=True row, ruin_rate(mid) <= 1.5x ruin_rate(low) and ruin_rate(high) <= 0.5x ruin_rate(low) (monotonic dose-response on entry volume); AND within dry=False row, ruin_rate is FLAT across ratio tertiles (|max-min| <= 5pp), confirming the interaction is conditional not additive.",
+      "failure_criterion": "Dry=True row is non-monotonic; OR flatness in dry=False is violated (>5pp spread); OR the monotonicity in dry=True disappears when NaN rows are pooled into dry=False (i.e., signal lives only in the NaN-handling artifact)."
+    },
+    {
+      "name": "Volume_axis_disambiguation_vs_vol_ratio_5_20",
+      "features": ["ibd_entry_volume_ratio", "vol_ratio_5_20"],
+      "comparison": "Within B0 picks with pullback_v_is_dry=True, compute Spearman rank correlation between ibd_entry_volume_ratio and vol_ratio_5_20. Then compute ruin_rate by ibd_entry_volume_ratio tertile AND by vol_ratio_5_20 tertile. If the two features are near-proxies, the named interaction has no unique mechanism.",
+      "success_criterion": "Spearman(rho) < 0.7 between the two volume features within B0 picks; AND ruin_rate monotonicity under ibd_entry_volume_ratio tertiles is preserved (sign unchanged) within each vol_ratio_5_20 tertile stratum (partialling-out test), proving the named feature adds unique signal.",
+      "failure_criterion": "Spearman >= 0.7 (named feature is a proxy for the 5/20 ratio already in the stack); OR ruin_rate monotonicity under ibd_entry_volume_ratio flips sign inside at least one vol_ratio_5_20 stratum (the interaction is fully explained by the confounded variable)."
+    }
+  ],
+  "leakage_checks": [
+    "Verify pullback_v_is_dry and ibd_entry_volume_ratio are both stamped at snapshot t using only price/volume data observable at t; reject the test if either field requires post-entry W4 price to compute.",
+    "Confirm ibd_entry_volume_ratio is the entry-day normalized volume feature (not a smoothed 5/20 ratio relabeled); reject if the archaeology data shows them as the same column."
+  ],
+  "priority_order": [
+    "PIT_pre_registered_interaction_with_NaN_stratum",
+    "Volume_axis_disambiguation_vs_vol_ratio_5_20"
+  ]
+}
+```

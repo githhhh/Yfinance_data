@@ -1,0 +1,34 @@
+
+
+```json
+{
+  "mechanism_claim": "B0's 'eps_preference' term is NOT an independent predictive signal; it is a redundant proxy that primarily captures information already encoded in neighboring B0 technical/momentum terms (mom_20, px_vs_ma20, px_vs_ma50, ma10_slope_5) plus lagging fundamentals that price has already impounded.",
+  "evidence_for": [
+    "Frozen evidence does NOT contain 'eps_preference' as a measured feature; the strongest standardized-delta predictors are all technical/relative-strength terms (up_day_ratio_20 stdΔ=-1.19, vol_ratio_5_20 stdΔ=-1.05, mom_20 stdΔ=-1.00, px_vs_ma50 stdΔ=-0.85) — these are precisely the 'neighboring B0 terms' that would absorb any variance eps_preference could contribute.",
+    "False-positive ruins (n=8 of 27 cases) cluster with positive mom_20 (e.g., entity_3472243e0c mom_20=0.242, entity_b6bcccdf6a mom_20=0.176, entity_4fdc3699fd mom_20=0.185) yet failed — indicating that whatever fundamental screening eps_preference performs was insufficient to override deteriorating momentum/structure that price already disclosed.",
+    "Entity_6618d3e80c (selected_winner with ruin component) shows extreme px_vs_ma50=0.337 and mom_20=0.251 yet ended in partial ruin — classic pattern where pre-existing earnings strength (the eps_preference signal) failed to prevent a momentum break, consistent with eps_preference being a lagging, redundant filter.",
+    "EPS data is quarterly and stale-by-definition at the snapshot date, while mom_20, px_vs_ma20, ma10_slope_5 are real-time; in any horse-race, the real-time terms will dominate, leaving eps_preference as a near-zero marginal contributor.",
+    "Discovery-train contrast table shows mom_20 (median 0.058 vs 0.163) and px_vs_ma50 (median 0.056 vs 0.127) separate false_negatives from selected_winners with standardized deltas of -1.00 and -0.85 — magnitude consistent with these being the operative signal, not eps_preference."
+  ],
+  "evidence_against": [
+    "ABSENCE OF DIRECT EVIDENCE: eps_preference is not in the frozen feature set, so its coefficient, importance, or partial R² cannot be directly tested against neighbors from this evidence alone — any claim of redundancy rests on inference, not measurement.",
+    "Counter-example: entity_2c58cebc59 (selected_winner, large_win) has mom_20=0.321 with pullback_pct=-25.1 (deep prior drawdown) — a deep base with strong EPS+price rebound; here eps_preference COULD carry independent signal about fundamental quality surviving the drawdown, which technicals alone don't fully express.",
+    "entity_05b4c6b1f7 (false_negative_relative, large_win) shows mom_20=0.070 (modest) yet produced a large_win — this is the regime where fundamental quality (eps_preference proxy) might rescue names that momentum screens would reject; we cannot rule out eps_preference adding value in the low-momentum tail.",
+    "The numeric_contrasts array is truncated; we cannot inspect whether an EPS-related feature appears further down with a non-trivial standardized delta that would refute the redundancy claim."
+  ],
+  "falsifiable_predictions": [
+    "P1 (falsifies independence): In a logistic/horse-race regression of w4 outcome on {mom_20, px_vs_ma20, px_vs_ma50, ma10_slope_5, up_day_ratio_20} plus eps_preference, the partial standardized coefficient on eps_preference should be |β|<0.10 and Wald p>0.20. If |β|>0.20 with p<0.05 after conditioning on the five momentum terms, eps_preference IS independent and the redundancy claim is falsified.",
+    "P2 (falsifies timing claim): Compute point-bical correlation between eps_preference and mom_20 across all B0 candidates in the discovery train; if |r|>0.55 the redundancy claim is supported; if |r|<0.30, eps_preference carries orthogonal information and the claim is falsified.",
+    "P3 (falsifies failure-archaeology role): Among false_positive_ruin cases (n=8), the median eps_preference should NOT be distinguishable from selected_winner median (Mann-Whitney p>0.30). If p<0.10 with ruin cases having HIGHER eps_preference, eps_preference actively HURTS selection and the cleaner replacement (see below) is mandatory.",
+    "P4 (decay test): eps_preference measured at snapshot T versus next-reported-EPS-revision at T+20 trading days should show correlation |ρ|<0.20 — if revisions cluster above zero for selected_winners and below zero for false_positive_ruins, then eps_revisions (not eps_level) is the operative signal and 'eps_preference' as currently constructed is misspecified."
+  ],
+  "policy_implications": [
+    "REPLACE 'eps_preference' (level/lagging) with 'eps_revision_z' (normalized 30/60-day EPS-revision score from the estimate-change series). Revision is a leading indicator that has lower correlation with mom_20 (typically |r|≈0.25-0.40) and higher information ratio for fundamental regime change.",
+    "If eps_revisions are unavailable, REPLACE with a composite 'fundamental_quality_residual': regress EPS-growth/ROE/accruals on {mom_20, px_vs_ma50} and use the residual — this explicitly removes the collinear component and isolates any truly orthogonal fundamental content.",
+    "ADD an interaction term eps_revision_z × mom_20_z: if eps_preference truly mattered independently, this interaction should be the dominant term, not the level — the absence of interaction significance is itself evidence the main effect is redundant.",
+    "FAIL-SAFE THRESHOLD: Until P1 is tested, do not weight eps_preference above 0.10× in the B0 composite; cap its contribution so that momentum terms (which ARE measured in the frozen evidence) remain the primary signal.",
+    "PORTFOLIO SEPARATION: Even if eps_preference adds small orthogonal signal, its contribution should be evaluated at the single-name selection layer, not at portfolio construction — a 0.5pp hit rate improvement at single-name level can be wiped out by correlation with the momentum factor at the portfolio level.",
+    "NEXT-STAGE DATA REQUIREMENT: Mark eps_preference as RESOLVABLE-ONLY-WITH-DATA — the current frozen evidence is INSUFFICIENT to definitively settle redundancy vs. independence; request the eps_preference vector for the 27 case entities plus 200+ B0 candidates to run P1-P4."
+  ]
+}
+```

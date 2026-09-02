@@ -1,0 +1,129 @@
+{
+  "tests": [
+    {
+      "name": "within_snapshot_feature_discrimination",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within each snapshot id (e.g., snap_71486ed83c), compute per-snapshot z-scores of each feature across that snapshot's candidate pool, then compare the within-snapshot z-score distribution between w4_return_bucket='ruin' and w4_return_bucket='large_win'. This isolates candidate-level signal from snapshot-level (regime) signal.",
+      "success_criterion": "Median within-snapshot z-score for 'ruin' cases is ≤ -0.5 (below the snapshot median) for at least 3 of the 7 features, AND the rank-sum p-value between ruin and large_win z-score distributions is <0.10 for at least 2 features. This would confirm candidate-level discrimination survives snapshot demeaning.",
+      "failure_criterion": "Within-snapshot z-scores for ruin cases are statistically indistinguishable (p>0.30) from large_win cases for all 7 features. This would mean features are pure regime proxies and the candidate-level mechanism collapses."
+    },
+    {
+      "name": "composite_orthogonality_audit",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Compute the full Spearman rank-correlation matrix across these 7 features on all 27 archaeology cases. Perform PCA and report the proportion of variance explained by the first principal component. Test whether any pair has |ρ|>0.70.",
+      "success_criterion": "First PC explains <60% of variance AND no feature pair has |ρ|>0.70. This would justify a multi-feature composite as more than a momentum re-label.",
+      "failure_criterion": "First PC explains ≥75% of variance OR ≥3 feature pairs have |ρ|>0.70. This would confirm the skeptic's collinearity attack and invalidate any multi-feature composite as additive evidence."
+    },
+    {
+      "name": "prespecified_weak_third_quintile_test",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Pre-specify the weak-third rule (decision-time only, no outcome peeking) as: a candidate is 'weak' if at least 3 of 5 features fall in the bottom tertile of the cross-sectional distribution. Compute ruin rate and large_win rate for the weak bucket vs the strong bucket, using the same numeric_contrasts medians as the threshold seeds. Do NOT use false_negative labels in defining the bucket.",
+      "success_criterion": "Weak bucket ruin rate ≥35% AND strong bucket large_win rate ≥50%, with at least a 25pp gap on each tail. A non-overlapping confidence interval on ruin rates between buckets.",
+      "failure_criterion": "Weak bucket ruin rate <20% OR the ruin/large_win ratio is statistically indistinguishable between weak and strong buckets (binomial p>0.20). This would falsify the 'weak third = elevated ruin probability' mechanism."
+    },
+    {
+      "name": "counterfactual_portfolio_construction_within_snapshot",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "For each snapshot that has ≥3 candidates in the archaeology, simulate three portfolio constructions on the same set of cases: (A) 1-position — invest 100% in the highest-mom_20 candidate; (B) 2-position — invest 50/50 in top-2 by composite; (C) 3-position — 33/33/33 across all three. Use w4_return_bucket as ordinal proxy (ruin=-1, loss=-0.5, small_win=0.5, large_win=1) to compute portfolio score per construction. Compare mean portfolio score and worst-case score across constructions, restricted to within-snapshot comparisons.",
+      "success_criterion": "Mean portfolio score for (B) ≥ (C) by at least 0.2 ordinal units AND worst-case (B) ≥ worst-case (C). This would justify 'cash dominates weak third' as an empirical portfolio statement, not just a candidate-level claim.",
+      "failure_criterion": "Mean (C) > mean (B) by ≥0.1 OR worst-case (C) > worst-case (B). This would mean filling the third slot adds expected value on average, falsifying the cash-dominance claim at the portfolio level. Caveat: small snapshot count limits power — report effective N."
+    },
+    {
+      "name": "identical_signature_outcome_divergence",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "comparison": "Identify all pairs of cases within the same snapshot whose 5-feature vector has Euclidean distance in the bottom quartile (most similar profiles). For each such pair, compute the difference in ordinal w4_return_bucket score and report the median absolute divergence and the count of pairs with opposite-sign outcomes (ruin vs large_win).",
+      "success_criterion": "Among near-identical pairs within the same snapshot, ≤20% have opposite-sign outcomes. This would indicate features carry meaningful signal even at the within-snapshot level.",
+      "failure_criterion": "Among near-identical pairs within the same snapshot, ≥40% have opposite-sign outcomes. This would confirm an unmodeled factor dominates features, bounding any feature-based rule's maximum precision."
+    },
+    {
+      "name": "snapshot_concentration_bound",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Compute the ruin concentration: fraction of all 'ruin' cases that come from the single most-ruinous snapshot id. Also compute effective independent ruin sample size n_eff = (Σ_k p_k)^(-1) where p_k is ruin share of snapshot k. Compare n_eff to the naive n=8.",
+      "success_criterion": "No single snapshot contributes >40% of ruin cases AND n_eff ≥ 5. This would justify treating ruin cases as independent candidate-level observations.",
+      "failure_criterion": "One snapshot contributes ≥60% of ruin cases OR n_eff < 3. This would invalidate candidate-level ruin probability estimates and confirm the regime-proxy interpretation."
+    },
+    {
+      "name": "magnitude_asymmetry_via_bucket_anchoring",
+      "features": [
+        "pullback_pct",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "comparison": "Anchor on the two cases with the most extreme positive mom_20 (large_win-candidates) and two with the most extreme negative setup profiles within the ruin set. Compute the implied return-magnitude asymmetry using pullback_pct (where available) as a directional proxy: large_win cases have median pullback_pct of -15.9, ruin cases (when pullback exists) average -12.0. Test whether the candidate-feature profile that selects large_win is compatible with higher expected magnitude than the profile that selects ruin, using only features that DON'T require knowing the bucket.",
+      "success_criterion": "Average pullback_pct magnitude (deep base) for selected_winner-feature-signature cases exceeds average magnitude for ruin-feature-signature cases by ≥3pp. This would support the 'winner magnitude > loser magnitude' asymmetry that underpins Kelly-style position sizing on the third slot.",
+      "failure_criterion": "Magnitudes are within 2pp or invert (winner base shallower than loser base), in which case the 'asymmetric tail' mechanism that justifies avoiding the third slot collapses to a magnitude-symmetric bet where equal-weight is defensible."
+    },
+    {
+      "name": "rank_procedure_invariance_of_weak_third",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "For each snapshot with ≥3 candidates, define 'weak third' under THREE independent rank procedures: (i) pure mom_20, (ii) equal-weight composite of 6 features, (iii) px_vs_ma50 only. Compute the overlap (Jaccard index) of which candidate is labeled 'weak third' across the three rankers. Then test whether ruin rate is elevated within each ranker's 'weak third' set.",
+      "success_criterion": "Mean Jaccard ≥0.5 across ranker pairs AND ruin rate is elevated (≥30%) within each ranker's weak-third set. This would mean 'weak third' is a property of the candidate, not the ranker.",
+      "failure_criterion": "Mean Jaccard <0.30 OR ruin rate is elevated for one ranker but not the others. This would confirm the 'weak third' tier is ranker-induced, and the cash-vs-fill question must be reframed as 'which ranker do we trust' rather than 'is this candidate weak'."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that no feature in any test uses the w4_return_bucket, outcome_label, is_b0_pick, or any boolean label that was constructed using forward returns. The labels in the archaeology set were created using future W4 return thresholds per method_note; using them as predictors in a new rule would be label leakage.",
+    "Confirm the weak-third composite in 'prespecified_weak_third_quintile_test' is derived from feature distributions within the archaeology set WITHOUT conditioning on outcome bucket. Threshold tertiles must be set on the joint feature distribution, not on ruin-vs-win splits.",
+    "For 'within_snapshot_feature_discrimination', verify that snapshot id is used only as a fixed-effect control (demeaning/grouping variable) and never as a feature input to the predictive model.",
+    "Check that 'counterfactual_portfolio_construction_within_snapshot' does not assume the candidate pool within a snapshot is exchangeable — if the top-2 by composite have correlated outcomes, the 50/50 portfolio's variance is understated. Report pairwise outcome correlation within snapshot.",
+    "Verify 'magnitude_asymmetry_via_bucket_anchoring' does not circularly use the w4_return_bucket='ruin' label to select 'ruin-feature-signature cases'. Instead, define the ruin-feature signature from the PIT feature medians of the negative-outcome cluster computed BEFORE consulting bucket labels.",
+    "Ensure no test depends on calendar identity (week, month, year, day-of-week) as a feature or threshold. Snapshot id is acceptable only as a clustering/regime variable.",
+    "Confirm that 'identical_signature_outcome_divergence' uses only PIT features for the signature, and that 'outcome' is the ordinal bucket which is the only forward information accessed.",
+    "Check that no test requires outer-forward outcomes beyond the W4 bucket already in the frozen archaeology evidence; flag any test that would require new forward data collection as invalid."
+  ],
+  "priority_order": [
+    "within_snapshot_feature_discrimination",
+    "prespecified_weak_third_quintile_test",
+    "counterfactual_portfolio_construction_within_snapshot",
+    "snapshot_concentration_bound",
+    "composite_orthogonality_audit",
+    "rank_procedure_invariance_of_weak_third",
+    "identical_signature_outcome_divergence",
+    "magnitude_asymmetry_via_bucket_anchoring"
+  ]
+}

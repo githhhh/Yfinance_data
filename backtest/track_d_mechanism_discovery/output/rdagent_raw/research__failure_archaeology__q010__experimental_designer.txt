@@ -1,0 +1,63 @@
+
+
+{
+  "tests": [
+    {
+      "name": "denominator_stability_filter_test",
+      "features": ["ma10_slope_5", "ma20_slope_5", "mom_20", "vol_ratio_5_20", "up_day_ratio_20", "w4_return_bucket"],
+      "comparison": "Within cases where |ma20_slope_5| >= 0.01 (stable denominator), compare ruin_rate between slope_ratio_quartile_4 (top 25%) vs quartile_1-3 (bottom 75%). Compare this to the ruin-rate difference when including near-zero denominators.",
+      "success_criterion": "Ruin-rate difference between slope_ratio quartile_4 and quartile_1-3 remains statistically significant (p < 0.05) after excluding |ma20_slope_5| < 0.01 cases, with at most 20% attenuation in effect size.",
+      "failure_criterion": "Statistical significance disappears (p >= 0.05) or effect size attenuates by >50% after denominator filter, indicating the mechanism is a mathematical artifact of near-zero denominators."
+    },
+    {
+      "name": "confounder_decomposition_test",
+      "features": ["ibd_entry_close_vs_trigger_pct", "ma10_slope_5", "ma20_slope_5", "mom_20", "vol_ratio_5_20", "w4_return_bucket"],
+      "comparison": "Fit two logistic regressions on ruin outcome: (A) slope_ratio as sole predictor, (B) slope_ratio + ibd_entry_close_vs_trigger_pct as joint predictors. Compare marginal vs. partial R^2 and coefficients. Then swap—use ibd_entry_close_vs_trigger_pct as sole predictor vs. ibd_entry_close_vs_trigger_pct + slope_ratio. Test whether slope_ratio adds explanatory power beyond entry tightness.",
+      "success_criterion": "slope_ratio retains statistically significant coefficient (p < 0.05) after controlling for ibd_entry_close_vs_trigger_pct, and adding slope_ratio to a model already containing ibd_entry_close_vs_trigger_pct improves AUC by > 0.05.",
+      "failure_criterion": "slope_ratio becomes non-significant (p >= 0.10) after conditioning on ibd_entry_close_vs_trigger_pct, or adding slope_ratio to a model containing ibd_entry_close_vs_trigger_pct improves AUC by < 0.02, indicating entry tightness is the true predictor."
+    },
+    {
+      "name": "pullback_artifact_check",
+      "features": ["pullback_duration_weeks", "ma10_slope_5", "ma20_slope_5", "mom_20", "vol_ratio_5_20", "w4_return_bucket"],
+      "comparison": "Separate false_positive_ruin cases into two groups: (1) pullback_duration_weeks = 7.0 or null, (2) pullback_duration_weeks != 7.0. Compare the slope_ratio distribution between groups using a two-sample test. Also compare the feature distributions to check if the 7-week cluster has systematically different precursor features.",
+      "success_criterion": "No statistically significant difference (p >= 0.10) in slope_ratio or other precursor features between pullback_duration_weeks = 7.0/null vs. other values, indicating the 7-week cluster is not a data artifact.",
+      "failure_criterion": "pullback_duration_weeks = 7.0/null cases have significantly higher (p < 0.05) slope_ratio than other durations, suggesting the ruin classification may use a 7-week threshold that creates a self-fulfilling signal."
+    },
+    {
+      "name": "conditional_slope_ratio_test",
+      "features": ["ibd_entry_close_vs_trigger_pct", "ma10_slope_5", "ma20_slope_5", "mom_20", "w4_return_bucket"],
+      "comparison": "Within matched strata defined by ibd_entry_close_vs_trigger_pct buckets (0-0.02, 0.02-0.04, 0.04-0.08, >0.08), test whether slope_ratio separates ruin from non-ruin outcomes. This addresses whether the mechanism is a genuine predictor or an artifact of entry tightness stratification.",
+      "success_criterion": "In at least 3 of 4 ibd_entry buckets, ruin-rate is higher in slope_ratio > 1.5 subgroup vs. slope_ratio <= 1.5 subgroup, with pooled effect direction consistent across strata.",
+      "failure_criterion": "The ruin-rate difference by slope_ratio reverses sign or becomes insignificant within most ibd_entry buckets, indicating slope_ratio is not an independent mechanism."
+    },
+    {
+      "name": "probabilistic_interaction_test",
+      "features": ["ma10_slope_5", "ma20_slope_5", "vol_ratio_5_20", "mom_20", "up_day_ratio_20", "w4_return_bucket"],
+      "comparison": "Test whether the 'probabilistic' interpretation is itself falsifiable. If ruin probability is a function of slope_ratio, vol_ratio, mom_20, and up_day_ratio jointly, then for any fixed probability level, there should exist a tradeoff surface. Test: do cases with slope_ratio > 2.0 AND vol_ratio > 1.3 have ruin probability > 0.40, even when mom_20 and up_day_ratio are favorable? If yes, the mechanism is not fully probabilistic—high slope_ratio overrides other factors.",
+      "success_criterion": "Ruin probability in the high_slope_ratio_high_vol stratum (slope_ratio > 2.0 AND vol_ratio > 1.3) exceeds 0.40 regardless of mom_20/up_day_ratio values, confirming the slope_ratio operates as a threshold override rather than a probabilistic modifier.",
+      "failure_criterion": "Ruin probability in the high_slope_ratio_high_vol stratum falls below 0.40 when mom_20 > 0.20 AND up_day_ratio >= 0.65, indicating the mechanism is genuinely probabilistic and slope_ratio is not a deterministic override."
+    },
+    {
+      "name": "partial_correlation_test",
+      "features": ["mom_20", "ma10_slope_5", "ma20_slope_5", "vol_ratio_5_20", "up_day_ratio_20", "w4_return_bucket"],
+      "comparison": "Compute partial correlation between slope_ratio and ruin outcome after regressing out mom_20, vol_ratio_5_20, and up_day_ratio_20. This tests whether the claimed 'decoupling' of short-term from medium-term momentum is genuine (residual correlation) or spurious (correlation explained by other features).",
+      "success_criterion": "Partial correlation between slope_ratio and ruin remains significant (p < 0.05) after controlling for mom_20, vol_ratio_5_20, and up_day_ratio_20, confirming the short-term vs. medium-term divergence is an independent signal.",
+      "failure_criterion": "Partial correlation becomes non-significant (p >= 0.10) after controlling for the medium-term features, indicating slope_ratio is a proxy for mom_20, vol_ratio, or up_day_ratio rather than an independent divergence signal."
+    }
+  ],
+  "leakage_checks": [
+    "All features must be evaluated at snapshot time only; w4_return_bucket is used only as outcome variable, not as a predictor.",
+    "No calendar date features are used as inputs; tests are cross-sectional within snapshots.",
+    "Pullback features (pullback_duration_weeks, pullback_pct) are post-entry measurements and must not be used as predictors—only as stratification variables or outcome-adjacent checks.",
+    "Entity-level identifiers are not used as predictive features; only anonymized entity IDs for matching.",
+    "The 27-case sample is treated as a discovery set; tests should specify whether they are generating hypotheses (exploratory, p < 0.10 acceptable) or testing pre-specified claims (confirmatory, p < 0.05 required)."
+  ],
+  "priority_order": [
+    "denominator_stability_filter_test",
+    "confounder_decomposition_test",
+    "pullback_artifact_check",
+    "partial_correlation_test",
+    "conditional_slope_ratio_test",
+    "probabilistic_interaction_test"
+  ]
+}

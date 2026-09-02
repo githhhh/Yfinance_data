@@ -1,0 +1,30 @@
+{
+  "mechanism_claim": "The benefit attributed to distinct-1 diversification is a confound with base-maturity quality, not an independent diversification effect. 'Distinct-1' labels proxy for stocks that have completed longer (base_duration_weeks median 52 vs 44) and slightly deeper bases (base_depth_pct median -29.5 vs -25.8). The numeric_contrasts table shows base_duration carries a standardized delta of -0.42 between false negatives and selected winners, comparable in magnitude to many of the surface-level technical features (mom_20, vol_ratio_5_20, up_day_ratio_20). Once base quality is controlled for, distinct-1 should contribute zero marginal information; worse, enforcing distinct-1 as a portfolio constraint can force inclusion of inferior-base names to satisfy the 'distinctness' rule, diluting alpha.",
+  "evidence_for": [
+    "6 of 8 false_positive_ruin cases have null pullback_duration_weeks and null pullback_pct, indicating they never formed a proper corrective base — these are 'no-pullback extended' entries, not distinct-1 setups that failed on quality",
+    "Selected winners median pullback_pct is -15.9% vs -7.3% for false negatives (standardized delta +0.64), showing the surviving winners had substantially deeper, more corrective bases regardless of distinct-1 status",
+    "base_mbox_count median is 4.0 for false negatives vs 3.5 for selected winners — more choppy/wobbly bases correlate with skipping, suggesting base quality (not pattern distinctness) is the gatekeeper",
+    "Entity 6618d3e80c carries a dual label (false_positive_ruin|selected_winner) with vol_ratio_5_20=1.45 and px_vs_ma50=0.337 — the same setup produces both outcomes, implying base-quality thresholds (not distinctness) decide the label",
+    "The standardized deltas in numeric_contrasts rank up_day_ratio_20 (-1.19), vol_ratio_5_20 (-1.05), mom_20 (-1.00), px_vs_ma50 (-0.85) as top separators — none of these are 'distinct-1' attributes; they are all snapshot-quality descriptors",
+    "False negatives entity_de1c657364 (8-week pullback, -7.3%, big winner) and entity_535a1beed7 (no pullback, mom_20=0.028, large win) show that 'weak-base' snapshots occasionally produce large winners, undermining the implicit assumption that distinct-1 = base-quality"
+  ],
+  "evidence_against": [
+    "Sample is only n=27 with heavy missingness on pullback fields (≥8 nulls), too small to disentangle distinct-1 from base-quality via partial correlation",
+    "Selected winners are heterogeneous in pullback depth (entity_440e297253: -1.5% over 3 weeks vs entity_2c58cebc59: -25.1% over 6 weeks vs entity_3adc078f01: -42.3% over 9 weeks), so 'base quality' itself is multi-dimensional and not a single latent variable",
+    "Distinct-1 could still capture a real regime feature: stocks emerging from a first base after a long run often have different sector/market-cap exposure, providing genuine correlation reduction even after base-quality matching",
+    "The method_note defines false negatives relative to B0 selected medians, which embeds the distinct-1 / B0 selection logic into the outcome label itself — partial circularity that makes the 'confound' interpretation hard to refute from this evidence alone"
+  ],
+  "falsifiable_predictions": [
+    "In a hold-out of ≥200 breakout candidates, regressing W4 return on (base_depth_pct, base_duration_weeks, base_mbox_count, mom_20, vol_ratio_5_20, up_day_ratio_20) plus a distinct-1 dummy will yield a partial R² for the distinct-1 dummy below 0.005 and a t-stat below 1.0",
+    "Within base-quality deciles, the cross-sectional dispersion of forward returns will not be lower for portfolios constructed under a distinct-1 constraint than for unconstrained same-quality portfolios, and the ruin rate difference will be inside the 95% bootstrap CI",
+    "Pairwise return correlations between distinct-1 cohort members will be statistically indistinguishable from correlations between randomly chosen same-base-quality non-distinct-1 members, with |Δρ| < 0.05 over rolling 13-week windows",
+    "Replacing the distinct-1 rule with a 'longest-base-wins' tiebreaker will produce a higher information ratio (predicted Δ ≥ 0.15) on the same discovery/train sample, with the improvement concentrated in names that the distinct-1 rule forced in (mom_20 < 0.05 cluster)",
+    "Drawdown depth during broad market selloffs (e.g., >-7% SPX weeks) will be similar across distinct-1 and matched-quality non-distinct-1 baskets, falsifying the claim that distinct-1 provides independent tail-risk hedging"
+  ],
+  "policy_implications": [
+    "Drop distinct-1 as a portfolio-construction primitive; replace with an explicit base-quality score (depth + duration + mbox_count + rs slope) and diversify across base-quality deciles rather than across pattern distinctness",
+    "If the diagnostic above shows distinct-1 is null, the current 'diversification' label is masking a base-quality bet and misleading risk attribution — reclassify the strategy as concentrated base-quality exposure",
+    "Implement a paired test in the next live cycle: run two parallel sleeves (distinct-1 constrained vs base-quality constrained with same expected position count) and compare realized Sharpe, max DD, and ruin rate over ≥40 trades per sleeve",
+    "Re-examine the 'no-pullback' subset (null pullback fields) — this is where 6/8 false positives cluster and where base quality fails to discriminate; consider a separate 'extended-entry' sub-strategy with tighter stops rather than forcing it into the distinct-1 framework"
+  ]
+}

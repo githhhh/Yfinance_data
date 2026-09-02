@@ -1,0 +1,65 @@
+{
+  "strongest_counterclaim": "The proposed 'minimum-feature-floor' PIT composite is a post-hoc artifact of a 27-case sample that (a) was constructed using a leakage-laden cluster definition, (b) averages over a snapshot-stratified correlation structure that swamps the candidate-level signal, (c) is dominated by a single noisy feature (mom_20) while being dressed up as a multi-dimensional gate, and (d) is mathematically guaranteed to underperform a simple 'mom_20 > 0 AND up_day_ratio_20 > 0.5' heuristic because the min-z aggregation amplifies noise on already-correlated features. The 1/2/3 slot economics are not a feature-composite problem at all — they are dominated by snapshot-level regime exposure, intra-snapshot factor correlation (ρ ≈ 0.6–0.8 across the 6 features within snap_71486ed83c), and fixed transaction costs that the framework ignores entirely. The abstain/promote decision should be made by a single robust feature threshold on a regime-adjusted basis, not by a 6-feature min-floor.",
+  "attacks": [
+    {
+      "issue": "Cluster-definition leakage contaminates the FN centroid used to standardize the floor",
+      "why_it_matters": "The FN cluster is defined as 'W4 >= 8% AND >=5pp above B0 selected median' — both legs are forward-looking. Even if individual features are PIT, the CENTROID the floor is calibrated against is the median of a leakage-defined group. With only 7 FN cases (5 relative + 2 big_winner), the FN-cluster centroid has a sampling-error band that swallows the entire standardized delta vector. A 'min-z < 0' against this centroid is testing whether the candidate looks like a cluster that was carved out by future outcomes — the floor is itself quasi-leaky."
+    },
+    {
+      "issue": "entity_6618d3e80c carries both 'false_positive_ruin' and 'selected_winner' labels simultaneously",
+      "why_it_matters": "This contaminates both cluster medians (SW and FP_ruin) with each other's data points. The medians used in standardized_delta are no longer cleanly separated, so the entire contrast table is biased toward the null. Any floor statistic calibrated on these medians is calibrated on overlapping populations and inherits the contamination."
+    },
+    {
+      "issue": "Snapshot-level clustering (snap_71486ed83c = 8/27 = 30% of cases; snap_d0d57b1e40 = 5/27) is a hidden conditioning variable",
+      "why_it_matters": "If snapshot ≈ market regime, then within-snapshot candidates are exposed to the same factor shocks and have correlated residuals. The marginal slot #3 is NOT diversifying — it is adding correlated exposure. The '2-slot vs 3-slot Sharpe' argument assumes slot independence; with intra-snapshot ρ > 0.5 on the proposed 6 features, the marginal-Sharpe benefit of slot #3 is near zero or negative even when #3 has a positive standalone expected return. The entire position-count economic reasoning is invalid without explicit covariance adjustment."
+    },
+    {
+      "issue": "entity_2f86543bf6 is a lethal counterexample to the composite floor",
+      "why_it_matters": "SW with mom_20=-0.008, ma10_slope=0.0076, ma20_slope=-0.0078, up_day_ratio=20=0.35 — every one of the 6 features is at or below the FN-cluster median. Yet it produced large_win. The min-z would be deeply negative; the floor would have abstained; capital would have been wasted on a higher-slot pick instead. The 'weak PIT can still win' case (entity_8ad5cd4795 with mom_20=0.004, ma10_slope=-0.006) reinforces this — base structure (pullback duration, volume regime) carries information that the feature composite discards."
+    },
+    {
+      "issue": "entity_8f0df3d38e (FP_ruin) shares the SW feature signature",
+      "why_it_matters": "mom_20=0.176, ma10_slope=0.054, px_vs_ma50=0.088 — these are above the SW median on multiple features yet ruined. The floor cannot protect on the upside either. The proposed gate's positive predictive value for 'do not take this' is undermined by FP_ruin contamination of the high-z region, and its negative predictive value for 'do take this' is undermined by the SW-with-weak-PIT counterexample. Both directions of the gate are leaky."
+    },
+    {
+      "issue": "Feature redundancy: mom_20, ma10_slope_5, ma20_slope_5, px_vs_ma50, px_vs_ma20 are all momentum/trend proxies measured at overlapping windows",
+      "why_it_matters": "With cross-correlations likely > 0.6, the 'min-z' over 6 features collapses to roughly the min over 2 effective dimensions. The min-statistic of correlated Gaussians is not the protective floor it appears to be — it concentrates probability mass on whichever feature has the lowest signal-to-noise, which is the one with the smallest median delta (px_vs_ma20 at δ=-0.58). The composite adds complexity without adding information and will produce false abstentions on candidates whose weak-but-real momentum signal happens to round down on the noisiest scaled feature."
+    },
+    {
+      "issue": "pullback_pct has 20/27 null entries — the +0.64 standardized delta is computed on 7 non-null observations",
+      "why_it_matters": "Missingness is not at random: pullback_pct is null when no qualifying pullback occurred in the lookback. The 7 FN cases with pullback data have a -7.3 median, the SW with pullback have -15.9. But the SW cluster includes cases with NULL pullback, which the FN cluster (counterintuitively) might too. Comparing medians across different missingness strata is meaningless. Including or excluding pullback_pct swings the floor by enough to flip 10–15% of decisions in the 27-case set."
+    },
+    {
+      "issue": "The '1 slot when #1 is marginal' rule is asserted as 'logically implied' but never tested and is unfalsifiable within the evidence",
+      "why_it_matters": "This is hand-waving dressed as mechanism. If we cannot show a single case in the 27-set where the #1 pick would be abstained under the proposed floor, the 1-slot regime is a theoretical construct with no empirical support. The policy_implications section explicitly admits this ('an additional gate not explored in the 27-case set') — i.e., half of the 1/2/3 position-count logic has zero evidence base."
+    },
+    {
+      "issue": "Transaction costs, rebalance drag, and capital efficiency are entirely absent from the position-count economics",
+      "why_it_matters": "With 1 slot at 100% capital vs 3 slots at 33% each, the absolute dollar P&L of 1 slot is strictly larger whenever any single pick has positive expected return. Sharpe comparisons obscure that the investor has finite capital that earns a risk-free rate when not deployed. The '2-slot Sharpe frontier' claim ignores that 1/3 of capital in slot #3 earns zero when cash and pays bid-ask on entry/exit — net Sharpe can be dominated by capital efficiency, not feature selection."
+    },
+    {
+      "issue": "Standardized_delta with n=7–11 cannot support the precision claimed in the threshold τ",
+      "why_it_matters": "Median deltas have IQRs that scale as 1/sqrt(n). With n=7, the IQR on the FN-cluster median is on the order of 0.6σ — i.e., the entire standardized delta range of -1.2 to -0.6 is within one IQR of the null. The 'min-z < 0' gate is statistically indistinguishable from 'is this candidate in the lower half of the universe on any single noisy feature?' — a coin flip with extra steps."
+    },
+    {
+      "issue": "The FN cluster median used as the standardization anchor is SMALLER than the SW median on every feature — but the SW cluster itself is biased by FP_ruin contamination and snapshot selection",
+      "why_it_matters": "The researcher standardizes against the FN median on the grounds this avoids leakage, but in doing so assumes the FN cluster represents the 'avoid' state. In fact the 5 FN_relative cases include 2 small_win, 2 loss, and 1 large_win outcomes — they were not catastrophes, they were RELATIVE underperformers vs B0. Standardizing against a 'relative-underperformer' centroid and treating it as an absolute-avoidance gate misrepresents the loss function. A candidate with min-z ≈ -0.5 might still be a positive-EV pick in absolute terms; the floor would reject it on relative grounds."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A held-out snapshot (not in the 27-case set) where the #3 candidate clears the min-z > 0 floor yet produces a W4 outcome below the B0 cohort median by > 5pp — would show the floor's positive predictive value is no better than chance.",
+    "A case where two of the six features carry z > +1.0 and the other four carry z ≈ -0.5; under the min-floor it abstains, but a weighted-average or median-z aggregator would accept it — would show min-z is the wrong aggregation.",
+    "A snapshot containing 5+ candidates where the top-3 by raw momentum are all in the same sector — would show the framework's diversification argument for 3-slot is illusory within a regime.",
+    "A '1-slot regime' case (theoretically: where the #1 pick's min-z is below the floor and #2, #3 also fail) from an out-of-time window — if none exist in 5 years of data, the 1-slot branch is dead code.",
+    "A bootstrap of the 27 cases showing the FN-cluster median has a 95% CI that overlaps the SW-cluster median on at least 3 of the 6 features — would invalidate the standardization anchor entirely.",
+    "A case where pullback_pct is recorded for both an FN and an SW case with similar values but divergent outcomes — would show the +0.64 delta is artifactual."
+  ],
+  "what_would_change_my_mind": [
+    "A walk-forward test on at least 100 out-of-sample candidate-snapshot pairs showing the min-floor gate has AUC > 0.65 on predicting 'W4 below B0 cohort median' AND a calibrated cost-of-abstention that beats the cost-of-inclusion net of false-abstention.",
+    "Demonstration that the cross-sectional correlation among the 6 features, when conditioned on snapshot, drops below 0.4 — would justify treating them as independent floors rather than redundant proxies.",
+    "Evidence that the FN-cluster centroid is stable across regimes (i.e., not snapshot-specific) — would justify using a single global threshold τ rather than a regime-conditional one.",
+    "A case where the #3 candidate has min-z < 0 yet the 2-slot portfolio's Sharpe is materially LOWER than the 3-slot portfolio's Sharpe — would refute the 'abstain when min-z < 0' rule.",
+    "Inclusion of pullback_pct, base_duration_weeks, and base_depth_pct with full coverage (no nulls) showing they re-rank the floor in ways that flip 2-slot vs 3-slot decisions in < 10% of cases — would show the current feature set is approximately sufficient.",
+    "A transaction-cost-adjusted Sharpe comparison showing 2-slot beats 3-slot by > 0.1 Sharpe units net of round-trip costs on at least 50 candidate-snapshot pairs — would validate the marginal-efficiency-fronier claim that 2 slots is the economic optimum."
+  ]
+}

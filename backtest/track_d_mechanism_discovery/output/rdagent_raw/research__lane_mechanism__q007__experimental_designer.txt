@@ -1,0 +1,50 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_SCORE_BEFORE_LANE_quintile_lane_discrimination",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Pool mixed-week B0 candidates, bin into SCORE_BEFORE_LANE quintiles (q1..q5) using a transparent linear blend of mom_20, ma10_slope_5, px_vs_ma50 weighted by their numeric_contrast standardized_deltas. Within each quintile, compare W4 return median and ruin rate between the B0_LANE and LANE_NEUTRAL slots using a two-sided stratified test (minimum n>=15 per slot per quintile to avoid quintile-count artifacts).",
+      "success_criterion": "B0_LANE median minus LANE_NEUTRAL median >= +2pp AND B0_LANE ruin rate <= 25% vs LANE_NEUTRAL >= 35% in at least 3 of 4 non-singleton quintiles, with the gap surviving a leave-one-snapshot bootstrap (excluding any single snapshot still yields >= +1.5pp).",
+      "failure_criterion": "Median gap < +1pp pooled, OR gap appears only in the highest quintile (n<5), OR sign reverses in >=2 quintiles, OR leave-one-snapshot bootstrap destroys the gap (CI crosses 0)."
+    },
+    {
+      "name": "residualized_lane_coefficient_after_partialling_continuous_features",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "rv_20",
+        "atr_14_pct"
+      ],
+      "comparison": "Fit W4_return ~ mom_20 + ma10_slope_5 + px_vs_ma50 + vol_ratio_5_20 + up_day_ratio_20 (SCORE_BEFORE_LANE continuous components) on the full discovery-train mixed-week sample, then add a Lane_dummy (B0_LANE=+1, LANE_NEUTRAL=-1) and test its incremental coefficient. Include snapshot fixed effects (snap_d0d57b1e40, snap_71486ed83c, etc.) to neutralize the regulator/snapshot clustering the skeptic flagged.",
+      "success_criterion": "Lane_dummy coefficient p<0.05 with sign B0_LANE positive vs LANE_NEUTRAL negative, AND incremental R^2 >= 0.02 (roughly 2pp lift on residualized W4 return), AND residual B0_LANE ruin rate still <25%.",
+      "failure_criterion": "p>0.10, OR sign inconsistent across snapshots, OR incremental R^2 < 0.005, OR Lane_dummy flips sign when snapshot FEs are added (proxy/reverse-causation signature)."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm SCORE_BEFORE_LANE is computed strictly from features dated <= snapshot date (no look-ahead into W4 outcomes); drop any case where ibd_entry_close_vs_trigger_pct or pullback_duration_weeks spans the return window.",
+    "Confirm Lane assignment is frozen at B0 entry — exclude any case whose Lane slot flipped within the 4-week holding window; if flips exceed 10% of the sample, the Lane-stability assumption is violated and tests must be rerun on the stable subset only."
+  ],
+  "priority_order": [
+    "residualized_lane_coefficient_after_partialling_continuous_features",
+    "within_SCORE_BEFORE_LANE_quintile_lane_discrimination"
+  ],
+  "unresolved_note": "Treat the result as UNRESOLVED if either test fails or n<15 per Lane slot within the mixed-week stratum; the 27-case archaeology is insufficient to confirm independent Lane information, so a negative result is also a publishable finding (Lane is a noisy proxy for SCORE_BEFORE_LANE components)."
+}
+```

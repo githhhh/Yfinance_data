@@ -1,0 +1,27 @@
+{
+  "mechanism_claim": "False-positive B0 picks that 'ruin' exhibit short-term trend acceleration decoupled from longer-term momentum structure. At entry, the ma10_slope_5 / ma20_slope_5 ratio exceeds 1.5 (median ~2.5), indicating the short-term trend is running materially faster than the medium-term trend—a PIT-visible divergence pattern that precedes mean-reversion failure under sector concentration.",
+  "evidence_for": [
+    "False_positive_ruin cases show ma10_slope_5 / ma20_slope_5 ratios of 1.5x to 14x (entity_40ea0cfb3b: 13.9x, entity_ccc90a671f: 3.6x, entity_84824e6a20: 2.95x), while selected_winner cases show ratios below 1.2x or negative (entity_bec51a4227: 0.84x, entity_ead73f4390: 1.07x, entity_d2ca7853ba: 0.79x).",
+    "Ruin cases cluster in mom_20 range 0.07-0.24 with up_day_ratio_20 of 0.40-0.65—moderate bullishness without the strong participation (up_day_ratio >= 0.70) seen in many winners.",
+    "The vol_ratio_5_20 for ruin cases is elevated (1.21-1.63) but NOT extreme (no ruin case exceeds 1.77), whereas selected_winner cases span 1.01-1.77 with no clear ceiling—implying elevated volatility alone is not the ruin signal.",
+    "px_vs_ma20 for ruin cases occupies the moderate band (0.048-0.124), suggesting extended-but-not-explosive price position relative to the 20-week average.",
+    "The ibd_entry_close_vs_trigger_pct for ruin cases (0.029-0.074) shows stocks entering with tighter-than-average IBD triggers, consistent with transient momentum spikes rather than confirmed breakouts."
+  ],
+  "evidence_against": [
+    "Entity_6618d3e80c is labeled both false_positive_ruin and selected_winner, with a ma10/ma20 ratio of 3.75x (supporting the mechanism) yet achieved a large_win—this indicates the mechanism is probabilistic, not deterministic.",
+    "Entity_2f86543bf6 is a selected_winner with ma10_slope_5 / ma20_slope_5 = -1.0 (negative short-term slope), demonstrating that low or negative short-term momentum does not exclude positive outcomes.",
+    "Entity_8ad5cd4795 is a selected_winner with vol_ratio_5_20 = 0.996 (below 1.0) and up_day_ratio_20 = 0.70, showing that low volatility with strong participation can override the deceleration signal.",
+    "The numeric_contrasts table shows mom_20 standardized_delta = -1.0005 for false_negatives vs selected_winners, but the ruin cases have HIGHER mom_20 than many winners—suggesting momentum magnitude is not the differentiating variable."
+  ],
+  "falsifiable_predictions": [
+    "In rolling 27-case windows where B0 picks with ma10_slope_5 / ma20_slope_5 > 2.0 AND mom_20 between 0.05-0.25 AND vol_ratio_5_20 between 1.15-1.70 exceed 40% of the window's picks, the subsequent 4-week return bucket distribution will show ruin probability > 30% (vs. baseline of ~20% for the overall sample).",
+    "The slope_ratio = ma10_slope_5 / ma20_slope_5 will exhibit a bimodal distribution separating false_positive_ruin (ratio > 1.5) from selected_winner (ratio < 1.5) at the snapshot level, testable via a two-sample Kolmogorov-Smirnov test on independent snapshots.",
+    "If the mechanism is correct, sector concentration events (measurable as cross-pick correlation in px_vs_ma20 at snapshot time) will amplify ruin probability specifically for high-slope-ratio picks, but not for low-slope-ratio picks—prediction: interaction term slope_ratio × concentration is significant at p < 0.05 in a logistic regression on ruin outcome."
+  ],
+  "policy_implications": [
+    "B0 selection filter: reject or reduce weight for picks where ma10_slope_5 > 1.5 × ma20_slope_5, particularly when mom_20 is in the 0.05-0.25 band and vol_ratio_5_20 exceeds 1.15.",
+    "Risk sizing adjustment: for picks passing the slope_ratio filter, allocate smaller position sizes when ibd_entry_close_vs_trigger_pct > 0.05 (indicating tight entry), as this correlates with ruin outcomes in the moderate-momentum cohort.",
+    "Snapshot-level concentration check: before constructing a B0 portfolio, compute the median slope_ratio across selected picks—if the median exceeds 1.2, the portfolio contains an above-baseline proportion of the false-positive precursor pattern, suggesting a sector momentum trap environment.",
+    "Post-entry monitoring: the ma10_slope_5 decay rate in weeks 1-3 post-entry should be tracked; if ma10_slope_5 crosses below ma20_slope_5 within 2 weeks of entry for a high-ratio pick, the ruin probability should de-escalate (per entity_6618d3e80c mixed labeling)."
+  ]
+}

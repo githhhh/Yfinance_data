@@ -1,0 +1,89 @@
+{
+  "tests": [
+    {
+      "name": "collider_cohort_stratification",
+      "purpose": "Decide whether near-parity of SCORE_BEFORE_LANE between false_positive_ruin and selected_winner survives conditioning on the B0-pick decision (skeptic's collider) or collapses once lane decision is held fixed (researcher's residual-axis claim).",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "stratification_variable": "is_b0_pick",
+      "strata": [
+        "is_b0_pick=true",
+        "is_b0_pick=false"
+      ],
+      "comparison": "Within each is_b0_pick stratum, build a SCORE_BEFORE_LANE proxy as the equally-weighted z-sum of vol_ratio_5_20, mom_20, up_day_ratio_20, px_vs_ma50 (the four features with |standardized_delta| > 0.85 in the archaeology). Compute Slot1-vs-Slot3 standardized rank separation (Hodges-Lehmann delta / pooled sd) within each stratum, and compare to the unconditioned separation across strata.",
+      "slots": {
+        "slot_A_large_win": "w4_return_bucket == large_win",
+        "slot_B_small_win": "w4_return_bucket == small_win",
+        "slot_C_loss_or_ruin": "w4_return_bucket in {loss, ruin}"
+      },
+      "success_criterion": "Within is_b0_pick=true stratum, |SlotA_minus_SlotC standardized delta| on the proxy >= 0.30 AND within is_b0_pick=false stratum, |SlotA_minus_SlotC standardized delta| on the proxy >= 0.30. Researcher mechanism (residual-axis claim) wins because the score still carries discrimination once the collider is held constant.",
+      "failure_criterion": "Within both strata |SlotA_minus_SlotC standardized delta| < 0.15 while the unconditioned cross-stratum delta > 0.40. Skeptic mechanism wins because the apparent separation was entirely created by is_b0_pick truncation."
+    },
+    {
+      "name": "vol_quartile_residualization",
+      "purpose": "Test whether the researcher's vol-confirmed-momentum residual-axis mechanism actually exists: within fixed vol_ratio_5_20 bins, does a SCORE_BEFORE_LANE proxy stripped of vol_ratio_5_20 and mom_20 still separate SlotA from SlotC?",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "rv_20"
+      ],
+      "comparison": "Bin all 27 cases into vol_ratio_5_20 quartiles (bin boundaries set PIT using quartile medians of the 27 cases themselves to avoid outer-forward leakage). Within each bin, regress the SCORE_BEFORE_LANE proxy on mom_20 alone and compute the residual. Compare KS distance between SlotA and SlotC on (a) the raw proxy and (b) the vol+mom-stripped residual. Report per-bin and pooled-within-bin (weighted by sqrt(n_bin)) statistics.",
+      "slots": {
+        "slot_A_large_win": "w4_return_bucket == large_win",
+        "slot_B_small_win": "w4_return_bucket == small_win",
+        "slot_C_loss_or_ruin": "w4_return_bucket in {loss, ruin}"
+      },
+      "success_criterion": "Pooled-within-quartile KS distance on the vol+mom residual between SlotA and SlotC >= 0.25, while the raw-proxy KS distance pooled-within-quartile is < 0.15. Researcher mechanism wins: vol+mom are the dominant load and the residual contains orthogonal signal that pre-lane score can in principle carry.",
+      "failure_criterion": "Pooled-within-quartile KS distance on the residual is < 0.10 (i.e., no improvement over the raw-proxy KS < 0.15). Then vol+mom dominance is the entire story and the residual is empty noise within quartiles; this is the skeptic-adjacent null and weakens the researcher's mechanism without endorsing the collider claim."
+    },
+    {
+      "name": "snapshot_blocked_re_estimation",
+      "purpose": "Test whether the apparent near-parity is a snapshot-period regime artifact (both roles flagged snap_71486ed83c with 7/27 cases) by re-estimating the SlotA-vs-SlotC deltas within snapshot_anon blocks.",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "blocking_variable": "snapshot_anon",
+      "comparison": "Within each snapshot_anon block containing >= 3 cases and at least one SlotA and one SlotC outcome, compute the SlotA-vs-SlotC standardized delta on the SCORE_BEFORE_LANE proxy. Report (i) median block-level delta, (ii) sign consistency (fraction of blocks with same sign as the global delta), (iii) range of block deltas.",
+      "slots": {
+        "slot_A_large_win": "w4_return_bucket == large_win",
+        "slot_B_small_win": "w4_return_bucket == small_win",
+        "slot_C_loss_or_ruin": "w4_return_bucket in {loss, ruin}"
+      },
+      "success_criterion": "At least 2 of 3 snapshot_anon blocks with sufficient SlotA+SlotC coverage show |block delta| > 0.20 and sign agreement with global delta. Parity is regime-robust, not a snapshot artifact.",
+      "failure_criterion": "Block-level deltas are sign-inconsistent OR > 50% of blocks contain only one slot (insufficient within-block contrast). Outcome is UNRESOLVED on the snapshot-artifact question, with explicit caveat that small-n archaeology cannot distinguish mechanism from sampling."
+    }
+  ],
+  "leakage_checks": [
+    "snapshot_anon may be used ONLY for blocking / stratification. It must not enter the SCORE_BEFORE_LANE proxy or the residual. Using it as a feature would amount to calendar identity leakage.",
+    "is_b0_pick is a post-lane-decision label and may be used ONLY as a conditioning / stratification variable. It must not be used as a predictive feature inside the proxy.",
+    "entity_anon is a row identifier. It must not be used as a feature or as a cluster variable that implicitly carries forward-return information.",
+    "The SCORE_BEFORE_LANE proxy must be constructed exclusively from features that are point-in-time at the IBD entry snapshot (ma slopes, momentum, vol ratio, up_day_ratio, px_vs_ma). It must not include pullback_duration_weeks, pullback_pct, base_depth_pct, base_duration_weeks, or base_mbox_count, because those are the lane-residual features whose omission is exactly the mechanism under test.",
+    "w4_return_bucket is the only outcome slot and must be applied as a 3-level categorical (large_win / small_win / loss_or_ruin). Do NOT split loss and ruin into separate slots — n is too small and it double-counts the 'false_positive_ruin' label which is already encoded in the archaeology.",
+    "Quartile bin edges for vol_ratio_5_20 must be computed from the 27 archaeology cases themselves (PIT-safe for the archaeology); do not import external quartile boundaries which would inject outer-forward distributional information.",
+    "Pre-specify all thresholds (0.30 / 0.15 / 0.25 / 0.20) before looking at within-stratum results to avoid post-hoc threshold fishing.",
+    "Apply Holm correction across the 3 tests' success/failure decisions to keep family-wise error <= 0.10 given the small n."
+  ],
+  "priority_order": [
+    "collider_cohort_stratification",
+    "vol_quartile_residualization",
+    "snapshot_blocked_re_estimation"
+  ],
+  "notes_on_3_slot_accounting": "Each test uses the same fixed 3-slot W4 outcome partition (large_win / small_win / loss_or_ruin) so that slot membership is identical across tests and per-slot case counts can be cross-tabulated. The 3-slot structure is pre-registered; collapsing to 2 slots (win/non-win) would erase the small_win informative middle that currently distinguishes false_negative_relative from false_positive_ruin and is central to the contrast in the numeric_contrasts table.",
+  "outcome_if_all_tests_fail": "UNRESOLVED: the 27-case archaeology cannot separate a vol+mom residual-axis mechanism from a lane-decision collider artifact, and any parity claim about SCORE_BEFORE_LANE should be treated as descriptive rather than causal until either (a) within-stratum n >= 30 per slot per is_b0_pick cohort is collected, or (b) an unconditioned pre-lane candidate pool is exposed."
+}

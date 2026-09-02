@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__adversarial_review__q002__experimental_designer",
+  "prompt_hash": "a9c83c78d1dc1e4c989d3a5a1a32defae38b74474581ac728682257b2134d928",
+  "response_hash": "d47c2cb8c9d534254e48a7538f765d9988d93e9ba9c9f09153c5546c13340340",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 2,
+  "compact_json_retry": true
+}

@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "industry_beta_partial_out",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "For each of the 27 cases, compute the snapshot-defined industry peer-set median (PIT, pre-entry) of {mom_20, up_day_ratio_20, px_vs_ma50}. Regress selected-vs-rejected outcome label (w4_return_bucket collapsed to win/loss) on (stock_feature - peer_median_feature) and on peer_median_feature separately, then jointly. If the firm-residual coefficient is insignificant (p>0.10) while peer-median coefficient is significant, industry beta dominates. If both significant, both mechanisms operate.",
+      "success_criterion": "Stock-feature residual (after peer-median subtraction) shows significant marginal association with selected_winner vs false_positive_ruin (p<0.10) AND odds ratio >1.5 in same direction as raw feature — firm-skill hypothesis supported.",
+      "failure_criterion": "Peer-median feature retains significant association with outcome label after conditioning on stock-feature residual (p<0.10), and raw stock-feature significance collapses (p>0.10) — industry-beta hypothesis supported."
+    },
+    {
+      "name": "snapshot_regime_stratification",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "base_duration_weeks"
+      ],
+      "comparison": "Stratify the 27 cases into snapshot-regime bins using snapshot-aggregate pre-entry vol_ratio_5_20 (terciles) AND snapshot-aggregate base_duration_weeks (median split) as regime proxies. Within each bin, compute selected-vs-rejected hit rate. If selected outperforms rejected only in top-tercile vol_ratio bins (high-vol expansion regimes), the edge is regime-confounded, not firm-skill.",
+      "success_criterion": "Selected hit rate exceeds rejected hit rate by >=20pp within AT LEAST 2 of 3 vol_ratio_5_20 terciles (firm signal robust across regimes) — within-industry skill supported.",
+      "failure_criterion": "Selected-vs-rejected gap is concentrated (>2x larger) in a single vol_ratio_5_20 tercile AND is statistically indistinguishable from zero in the other two terciles — regime-confounded, firm-skill claim falsified for this sample."
+    },
+    {
+      "name": "pullback_signature_orthogonality",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "px_vs_ma50"
+      ],
+      "comparison": "Test whether the selected_winners' deeper/longer pullback signature (median pullback_pct=-15.9%, pullback_duration_weeks=5.5) is driven by industry-cycle phase or by name-specific basing. Compute partial correlation of pullback_pct with selected_winner indicator, controlling for peer-median px_vs_ma50. If pullback signature disappears once peer-trend strength is controlled, the model is selecting mid-pullback in a group uptrend (rotation entry), not identifying firm-specific bases.",
+      "success_criterion": "Pullback_pct retains significant association with selected_winner (p<0.10) after conditioning on peer-median px_vs_ma50 — firm-specific base timing is being captured.",
+      "failure_criterion": "Pullback_pct loses significance (p>0.10) once peer-median px_vs_ma50 is partialled out, and pullback_pct correlates >=0.5 with peer-median px_vs_ma50 — pullback signature is a group-trend proxy, not firm-skill evidence."
+    }
+  ],
+  "leakage_checks": [
+    "Peer-median features for tests 1 and 3 must be computed from anonymized peer-set snapshots dated <= the case snapshot date; no use of outcome_label or w4_return_bucket in any peer-aggregate construction.",
+    "Snapshot-regime bins in test 2 must be defined by pre-entry aggregates only (vol_ratio_5_20, base_duration_weeks computed at or before entry); vol_ratio_5_20 itself is a stock-relative ratio so snapshot-aggregate here means mean across all PIT-candidates at that snapshot, used only as a regime dummy, never as a name-level feature.",
+    "All three tests must be reproducible on the existing 27-case dataset without invoking W4 outcomes as inputs; if any test requires W4 of the peer set as input, it must be reframed using PIT peer momentum features instead (mom_60 as forward-direction proxy is forbidden)."
+  ],
+  "priority_order": [
+    "industry_beta_partial_out",
+    "snapshot_regime_stratification",
+    "pullback_signature_orthogonality"
+  ]
+}
+```

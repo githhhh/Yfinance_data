@@ -1,0 +1,27 @@
+{
+  "mechanism_claim": "B0 picks with weak pre-entry accumulation (up_day_ratio_20 ≤ 0.65) combined with mediocre momentum (0.05 < mom_20 < 0.25) are vulnerable to pullback-induced ruination because the stock lacks the institutional backing to recover from a moderate drawdown (≥10%) taken at full position size.",
+  "evidence_for": [
+    "False-positive ruin cases (entity_8f0df3d38e, entity_ccc90a671f, entity_84824e6a20) all exhibit up_day_ratio_20 in range 0.4–0.65 with mom_20 between 0.07–0.24",
+    "Selected winners (entity_ead73f4390, entity_2c58cebc59) show up_day_ratio_20 ≥ 0.6 paired with mom_20 ≥ 0.14",
+    "Numeric contrasts confirm false-negative median for up_day_ratio_20 is 0.5 versus selected_winner median of 0.625 (standardized delta = -1.19), the strongest PIT-observable separator in the feature set",
+    "Ruin-labeled entities (entity_4fdc3699fd, entity_b6bcccdf6a) have vol_ratio_5_20 in 1.31–1.38 range—elevated but not extreme—consistent with noisy accumulation rather than clean trend",
+    "entity_55c2da490e shows moderate up_day_ratio_20 (0.65) but negative ma20_slope_5 (-0.0049), indicating trend degradation at entry"
+  ],
+  "evidence_against": [
+    "entity_2f86543bf6 is a selected_winner despite up_day_ratio_20 = 0.35 (below false-negative median) and near-zero mom_20 = -0.008, suggesting low-participation but tight base structure can still succeed",
+    "entity_3adc078f01 is a selected_winner with pullback_pct = -42.3% (deepest in dataset) but up_day_ratio_20 = 0.65 and mom_20 = 0.172, indicating strong accumulation can survive extreme pullbacks",
+    "entity_8ad5cd4795 is a selected_winner with vol_ratio_5_20 = 0.996 (<1.0) and negative ma10_slope_5, showing below-average volume and declining short-term trend still produced large_win outcome",
+    "entity_6618d3e80c is labeled both false_positive_ruin and selected_winner, indicating outcome ambiguity that confounds clean binary classification"
+  ],
+  "falsifiable_predictions": [
+    "A B0 pick with up_day_ratio_20 > 0.75, vol_ratio_5_20 > 1.4, and mom_20 > 0.18 that subsequently experiences a pullback ≥15% within 8 weeks will NOT land in the ruin bucket if market-wide returns in that period are neutral-to-positive",
+    "A B0 pick with up_day_ratio_20 in 0.40–0.55, mom_20 in 0.10–0.20, and px_vs_ma20 > 0.12 (price extended from MA) will have ≥70% probability of ruin-label if pullback_duration_weeks reaches 7+",
+    "Finding a B0 pick satisfying all three conditions (up_day_ratio_20 ≥ 0.75, mom_20 ≥ 0.20, vol_ratio_5_20 ≥ 1.4) that still produces ruin outcome would invalidate the accumulation-vulnerability mechanism"
+  ],
+  "policy_implications": [
+    "Hard filter: reject B0 picks where up_day_ratio_20 < 0.60 AND mom_20 < 0.15, regardless of other entry signals",
+    "Soft filter: apply reduced initial position size (≤50% of standard) when up_day_ratio_20 is 0.60–0.70 with vol_ratio_5_20 < 1.25, allowing cost averaging if pullback materializes",
+    "Stop-loss trigger: if a B0 pick with up_day_ratio_20 ≤ 0.65 reaches -12% drawdown before week 4, exit fully rather than averaging—this prevents the 'ruin cascade' where moderate losses accumulate faster than expected recovery",
+    "Do not use post-snapshot pullback metrics (pullback_pct, pullback_duration_weeks) for entry filtering; these are outcome-correlated noise, not predictive signals"
+  ]
+}

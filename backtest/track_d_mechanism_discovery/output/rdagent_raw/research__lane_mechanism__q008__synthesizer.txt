@@ -1,0 +1,59 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 42,
+  "mechanism_summary": "In mixed breakout/pullback weeks, Lane behaves ~70-80% like a non-linear composite of freshness/geometry/volume proxies — the top 5 standardized deltas separating selected_winners from false_negatives are all proxies (up_day_ratio_20 -1.19σ, vol_ratio_5_20 -1.05σ, mom_20 -1.00σ, px_vs_ma50 -0.85σ, pullback_duration_weeks -0.73σ). However, Lane is NOT collapsible onto the listed proxy panel: (a) pullback_pct carries an OPPOSITE-sign +0.64σ delta, meaning deep pullbacks independently drive winners (entity_2c58cebc59 -25.1%/6w and entity_3adc078f01 -42.3%/9w are physically counterexamples to a pure fresh-breakout proxy reading); (b) base_mbox_count and ibd_entry_breakout_range_ratio move the WRONG direction (+0.34σ, +0.12σ for false_negatives) for a linear freshness blend, indicating Lane applies non-monotonic weighting; (c) entity_2f86543bf6 (selected_winner with mom_20=-0.008, up_day_ratio=0.35, negative ma20_slope) physically cannot be a proxy-driven selection. The most parsimonious reconciliation is that Lane is a proxy composite PLUS at least one non-linear interaction axis (most plausibly mom_20 × pullback_duration_weeks, or a base-tightness × momentum-saturation term not represented in the listed panel). The 'mixed weeks' conditioning itself introduces Berkson-style selection bias that mechanically inflates proxy-discordance, so a verdict conditional on this regime is structurally weaker than an unconditional one. The 'pure proxy' claim is REFUTED on this evidence; the 'Lane is mostly proxy with a residual non-linear axis' reading is SUPPORTED; the 'Lane = proxy' strict reading is REFUTED.",
+  "falsifiers": [
+    "REJECT proxy-collapse: An out-of-sample held-out week (post discovery-train cutoff, n>=30 candidates) where B0_LANE selected_winner rate conditional on matched proxy-quintile bucket exceeds SCORE_BEFORE_LANE's hit-rate by >3pp with one-sided p<0.05 — Lane injects orthogonal signal inside proxy-matched cells.",
+    "REJECT proxy-collapse: A formal conditional-independence test (Lane ⊥ W4_return_bucket | listed proxies) that REJECTS H0 at p<0.05 — Lane retains independent predictive content once proxies are controlled. The test must use a probe interaction term (mom_20 × pullback_duration_weeks) and at least one quadratic (mom_20^2), otherwise power is too low to bite.",
+    "CONFIRM proxy-collapse (loose): In UNCONDITIONAL weeks (not pre-filtered to 'mixed'), the same proxy panel produces AUC within 0.02 of B0_LANE's ordering on a logistic regression with cross-validation. If this holds in mixed weeks only, the regime-conditioning is the artifact and the proxy claim was always wrong.",
+    "REJECT pure-proxy: Discovery of ANY LANE_NEUTRAL stock with mom_20>0.20 AND vol_ratio_5_20>1.4 — under proxy-collapse this must be a top B0 selection; its existence in LANE_NEUTRAL proves Lane is making non-proxy decisions.",
+    "REJECT dual-label artifact: Reconciliation of entity_6618d3e80c (false_positive_ruin|selected_winner) that resolves WITHOUT invoking non-proxy features — i.e., a clean accounting (look-ahead, multi-snapshot selection, or base-period mismatch) must close the case, otherwise the dual label itself is evidence Lane's reordering is non-monotonic in proxy space.",
+    "QUANTIFY Berkson bias: Compute the unconditional Spearman(B0_LANE, SCORE_BEFORE_LANE) over ALL weeks, not just mixed. If the unconditional Spearman is < 0.85 while the mixed-week Spearman is > 0.92, the regime-filter is manufacturing the proxy-collapse appearance.",
+    "PROBE the missing axis: A logistic regression on the proxy panel PLUS the single interaction term (mom_20 × pullback_duration_weeks) recovers B0_LANE's selection AUC within 0.01 — if so, the orthogonal axis is identified and is testable, falsifying both 'pure proxy' and 'opaque Lane' in one move.",
+    "META-FALSIFIER for the test itself: The Spearman>0.92 and AUC-gap<0.02 thresholds proposed by the experimental designer are calibrated for a LINEAR proxy blend and are trivially passed by any monotone non-linear re-ranker. The test must be tightened: equivalence-test TOST with delta=0.005 AUC, or Spearman computed on rank-residuals (post-proxy-blend residuals), before any proxy-collapse claim is taken seriously."
+  ],
+  "actionable_design_principles": [
+    "PROXY-COLLAPSE LAYER (default regime, ~70-80% of B0_LANE mass): Use a calibrated logistic regression on (mom_20, vol_ratio_5_20, ma10_slope_5, px_vs_ma50, up_day_ratio_20, pullback_duration_weeks) with one quadratic term (mom_20^2) as the base score. Lane's contribution in this regime is empirically small and noisy; replacing the Lane step with the calibrated composite reduces overfitting without measurable performance loss.",
+    "INTERACTION-PROBE LAYER (probe candidate, ~15-25% of cases): Add the single derived feature mom_20 × pullback_duration_weeks (signed by ibd_entry_close_vs_trigger_pct sign) as a probe. If inclusion closes the residual AUC gap to Lane by >0.02, this is the dominant non-proxy Lane axis and should be promoted to the base score. If it does not, escalate to multi-axis search.",
+    "REGIME-CAP LAYER (false_positive_ruin defense): Apply a mean-reversion haircut when mom_20>0.20 AND ibd_entry_close_vs_trigger_pct>0.04 simultaneously AND up_day_ratio_20>0.55 — this combination is over-represented in the false_positive_ruin cluster (entity_8f0df3d38e, entity_6618d3e80c, entity_b00579f203, entity_4fdc3699fd) and the cap targets proxy-saturation at the upper bound.",
+    "DEEP-BASE SIDE LANE (false_negative_big_winner recovery): Carve out a separate, non-B0 allocation slot for stocks with proxy-z composite in bottom quartile but pullback_pct<-15% AND pullback_duration_weeks in [4,10] AND base_mbox_count>=3 — captures entity_de1c657364, entity_535a1beed7-type cases without contaminating B0's proxy-collapsed core. Sized at 5-10% of total book; decoupled from B0_LANE selection.",
+    "ANTI-BERKSON AUDIT: Re-run all 'proxy dominance' tests on the UNCONDITIONAL candidate universe. Any claim that holds only in 'mixed' weeks must be flagged as regime-conditional and treated as a lower-confidence finding. Out-of-sample weeks must be the validation set, not the discovery set.",
+    "PROXY-PANEL COMPLETENESS CHECK: Before any proxy-collapse verdict is finalized, the proxy panel must include at minimum (a) sector-relative strength (stock/sector 60d momentum), (b) inter-base correlation (RS of pullback timing vs sector peers), and (c) one non-linear interaction term. The current panel is incomplete and Lane may be encoding an axis not on it."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "proxy_composite_replacement_score",
+      "why_distinct": "Replaces the Lane reordering step entirely with a logistic regression on the proxy panel plus one quadratic; deploys only if an out-of-sample equivalence test (TOST, delta=0.005 AUC) against B0_LANE passes. Distinct from 'use Lane directly' because it removes the black-box Lane decision and substitutes an interpretable, calibratable surface.",
+      "features": ["mom_20", "vol_ratio_5_20", "ma10_slope_5", "px_vs_ma50", "up_day_ratio_20", "pullback_duration_weeks", "mom_20^2"],
+      "capacity_relevance": "HIGH — frees the Lane slot in the strategy capacity budget for an experiment with orthogonal signal injection (sector-relative, earnings revision, inter-base correlation), enabling a clean AB comparison of proxy-only vs proxy+orthogonal."
+    },
+    {
+      "idea": "interaction_probe_mom_x_pullback",
+      "why_distinct": "Computes a single derived feature mom_20 × pullback_duration_weeks (signed) as a probe to detect the non-linear axis the linear proxy blend misses. Distinct from a generic interaction term because it targets the SPECIFIC candidate axis identified by the +0.64σ pullback_pct delta and the deep-pullback winners (entity_2c58cebc59, entity_3adc078f01).",
+      "features": ["mom_20", "pullback_duration_weeks", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "MEDIUM — single derived feature, near-zero capacity cost, but its inclusion gates whether to invest in broader non-linear search. Falsifier-friendly: if it closes the AUC residual to <0.01, the axis is identified."
+    },
+    {
+      "idea": "deep_base_side_lane",
+      "why_distinct": "A separate allocation slot decoupled from B0_LANE that activates on (low proxy-z composite) AND (deep pullback_pct in [-25%, -8%]) AND (pullback_duration_weeks in [4,10]) AND (base_mbox_count>=3). Distinct from a filter on B0_LANE because it is an ADDITIVE portfolio allocation, not a re-ranking. Targets the false_negative_big_winner asymmetry without contaminating B0's core.",
+      "features": ["mom_20", "pullback_pct", "pullback_duration_weeks", "base_mbox_count", "px_vs_ma50"],
+      "capacity_relevance": "MEDIUM — 5-10% book allocation, low turnover, acts as orthogonal beta. Isolates the 'structural base tightness' hypothesis from the 'freshness proxy' hypothesis so each can be sized independently."
+    },
+    {
+      "idea": "regime_cap_proxy_saturation",
+      "why_distinct": "A risk-overlay that triggers a mean-reversion haircut when (mom_20>0.20 AND ibd_entry_close_vs_trigger_pct>0.04 AND up_day_ratio_20>0.55) co-occur — the specific combination over-represented in false_positive_ruin cases. Distinct from a hard exclude because it down-weights rather than rejects, preserving optionality and reducing turnover churn.",
+      "features": ["mom_20", "ibd_entry_close_vs_trigger_pct", "up_day_ratio_20", "vol_ratio_5_20"],
+      "capacity_relevance": "HIGH — risk overlay has no direct capacity cost but materially reduces ruin-mode drawdowns in the proxy-saturation regime. Closes the false_positive_ruin | selected_winner dual-label failure mode (entity_6618d3e80c) by treating it as a known-regime haircut rather than a Lane error."
+    },
+    {
+      "idea": "berkson_audit_unconditional_spearman",
+      "why_distinct": "A meta-policy that computes Spearman(B0_LANE, SCORE_BEFORE_LANE) on the UNCONDITIONAL candidate universe and reports it alongside the mixed-week Spearman. Distinct from a one-off test because it is a permanent audit layer that flags any regime-conditioning artifact in real time.",
+      "features": ["mom_20", "vol_ratio_5_20", "pullback_pct", "pullback_duration_weeks"],
+      "capacity_relevance": "LOW direct capacity — pure monitoring — but HIGH strategic value because it prevents false proxy-collapse verdicts driven by Berkson bias. Required precondition for promoting any 'Lane = proxy' reading to a production policy."
+    }
+  ]
+}
+```

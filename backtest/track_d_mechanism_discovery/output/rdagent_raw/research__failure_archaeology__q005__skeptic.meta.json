@@ -1,0 +1,11 @@
+{
+  "purpose_id": "research__failure_archaeology__q005__skeptic",
+  "prompt_hash": "3cf7200da0747b89ac328d73b0897a7a8f38aa5e122e28ae4e4b75cf44a0487b",
+  "response_hash": "ee7c672e9b9e50fd6d4928775d1d7ff3240bd5acd7fe6467c45ff30fe72fdd2c",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1
+}

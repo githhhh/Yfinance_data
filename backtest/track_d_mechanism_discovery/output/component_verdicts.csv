@@ -1,0 +1,9 @@
+component,confirmation_support_weeks,knockout_mean_spread,knockout_median_spread,knockout_cvar_delta,knockout_stop_delta_pct,positive_block_ratio,verdict
+lane,12,0.0788,-2.8251,0.0,5.55,0.25,HELPFUL
+dry_false_penalty,12,0.0,0.0,0.0,0.0,0.0,UNCERTAIN
+evidence_risk,12,-3.249,-2.9845,-0.7478,11.11,0.0,ESSENTIAL
+freshness,12,0.0254,0.0,-1.0231,-2.78,0.25,HELPFUL
+eps_preference,12,0.0723,0.0,0.0,0.0,0.25,UNCERTAIN
+weekly_volume,12,0.0,0.0,0.0,0.0,0.0,UNCERTAIN
+entry_volume,12,-0.0522,0.0,0.0,0.0,0.0,UNCERTAIN
+distinct1,12,0.5259,0.0,-2.3401,0.0,0.25,HELPFUL

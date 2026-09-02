@@ -1,0 +1,20 @@
+{
+  "strongest_counterclaim": "The apparent base_depth_pct–mom_20 interaction is probably a small-sample, correlated-variable artifact rather than a stable threshold. Elevated mom_20 partly remeasures MA10_slope_5, MA20_slope_5, px_vs_ma20, and low volatility; shallow-base status may merely identify mature or structurally different patterns. Label contamination and multiple outcome definitions further weaken the proposed ruination mechanism.",
+  "attacks": [
+    {
+      "issue": "Proxy and conditioning effects",
+      "why_it_matters": "The proposed cutoff treats mom_20 as locally authoritative, but false-negative cases differ most clearly from winners in up_day_ratio_20, vol_ratio_5_20, and moving-average slope. If these variables explain outcomes after controlling for the threshold, adding mom_20 or base_depth_pct should produce little incremental gain. Estimated predictions such as >50% ruin or <20% ruin are unsupported and are probably statistically unstable at this sample size."
+    },
+    {
+      "issue": "Selection, censoring, and label ambiguity",
+      "why_it_matters": "The archaeology is not an independent cohort of B0 candidates: labels are defined relative to other B0 picks, and null pullback fields indicate informative censoring. One entity has both false_positive_ruin and selected_winner labels, directly violating a clean binary separation. Thus threshold validation must use pre-specified prospective B0 cohorts, not these discovery-selected errors."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 names with mom_20>0.15 and base_depth_pct>-25% that are selected winners despite weak MA slopes or low volume; these would show the rule rejects recoverable extensions rather than only parabolic ruinations.",
+    "Deep-base B0 names (base_depth_pct<-30%) with high mom_20 and slope, volume, or volatility profiles matching shallow-base ruinations; these would indicate base depth is an unreliable moderator."
+  ],
+  "what_would_change_my_mind": [
+    "A temporally held-out, universe-fixed B0 sample showing incremental improvement from a prespecified deep-vs-shallow threshold after including MA slopes, breadth, and volatility, with confidence intervals excluding zero and stable cutoffs across splits."
+  ]
+}

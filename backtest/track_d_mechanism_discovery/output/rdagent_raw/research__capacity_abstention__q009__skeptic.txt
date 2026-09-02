@@ -1,0 +1,56 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The adaptive 0/1/2/3 capacity rule's core mechanism is unfalsifiable in this evidence base: with N=27 cases, one snapshot (snap_71486ed83c) driving ≥30% of observations, and ruin/winner labels defined on a W4 window that partially overlaps with the crowding-formation window, no variance-ratio or Sharpe-increment test has the statistical power to distinguish 'leverage on a single bet' from 'true diversification'. The rule is also circular: the crowding detector uses the same features (vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) that the base selection rule uses, so 'crowding' is just a re-labeling of 'strong signal', and the policy reduces to 'when signals are strong, take fewer of them' — which is mechanically just de-leveraging, not crowding-aware diversification.",
+  "attacks": [
+    {
+      "issue": "Snapshot-dominance artifact invalidates the variance-ratio falsifier",
+      "why_it_matters": "snap_71486ed83c contributes 8 of 27 cases; the rule's predictions about capacity-1 vs capacity-3 variance scaling inside crowded snapshots are driven by ~3 independent windows, not 27 independent bets. A within-snapshot bootstrap will have confidence intervals so wide that the predicted <2.0 ratio and the falsifying ≥2.5 ratio overlap on essentially every snapshot. The researcher concedes this with 'snapshot clustering' but proceeds as if it does not destroy the test."
+    },
+    {
+      "issue": "Crowding detector is a proxy for signal strength, not industry co-movement",
+      "why_it_matters": "The features that distinguish 'crowded' from 'dispersed' (vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, up_day_ratio_20) are also the strongest separators of selected_winners vs false_negatives (standardized deltas −1.19, −0.85, −1.05). So the rule is not detecting industry-level correlation structure; it is detecting 'these names look like the same trade', which is a tautology when the base filter already prefers high-extension names. Any 'diversification benefit' the rule claims is double-counting selection alpha."
+    },
+    {
+      "issue": "Capacity=0 (cash) is not a Sharpe-comparable alternative to capacity=3 because the opportunity cost is regime-dependent",
+      "why_it_matters": "The researcher proposes capacity=0 dominance in crowded regimes with t≥2.0. But 'cash' return depends on the rate environment and on whether the rule is long-only equity (so cash is the alternative asset) or whether the alternative is short-term Treasuries. In a bull market window (which the B0 momentum signal biases toward), cash systematically underperforms, biasing the test toward rejecting the rule even when it is correct. The claim that capacity=0 produces higher Sharpe than capacity=3 is mechanically a 'sell in May' style claim dressed up as crowding logic."
+    },
+    {
+      "issue": "Entity 2f86543bf6 falsifies the premise that crowded names move together",
+      "why_it_matters": "Selected_winner with negative ma20_slope_5 (−0.0078), negative mom_20 (−0.008), up_day_ratio_20=0.35, all while sharing the same snapshot pool as crowd-extension names. If a winner with anti-crowding features can coexist in the same snapshot as a crowd, then the rule's binary crowding/non-crowding partition is wrong — some winners come from the opposite side of the same dispersion, and abstention costs more than the rule assumes."
+    },
+    {
+      "issue": "The 'slots are leverage on the same bet' claim presupposes equal slot sizing",
+      "why_it_matters": "If slots 1/2/3 are sized at 1/N of capital (true equal-weight), capacity=3 in a crowded industry gives variance scaling of (1 + 2ρ)/3, which for ρ=0.5 is exactly 0.67 — i.e., capacity=3 has LOWER variance than capacity=1, not higher. The researcher's claim that 'capacity=3 behaves like ~1 effective position' requires ρ→1, which is empirically rare even within a GICS sub-industry (typical ρ ≈ 0.4-0.6). The mechanism claim is directionally wrong for plausible correlation values."
+    },
+    {
+      "issue": "Ruin-rate framing ignores base rates and selection asymmetry",
+      "why_it_matters": "8 ruin cases / 27 total ≈ 30% ruin rate is not statistically distinguishable from the unconditional tail probability of momentum strategies, and 11 winners vs 8 ruins means winners outnumber ruins in this evidence. A rule that defaults to capacity ≤1 in crowded regimes would forfeit 11 winners to avoid 8 ruins — net negative expected count, before even considering magnitude. The '67% ruin rate among B0 picks' cited in policy is not actually 67% (it's ~42%, 8/19 B0 picks), and is partly an artifact of how 'ruin' is labeled."
+    },
+    {
+      "issue": "The 'false_positive_ruin|selected_winner' dual label (entity 6618d3e80c) is treated as evidence of crowding, but is more likely label leakage",
+      "why_it_matters": "A position labeled both ruin AND winner implies the W4 return distribution straddled the ruin threshold in some accounting dimension. If the rule cannot even classify a single position consistently, claims about how slot counts aggregate outcomes across positions are not well-defined. The dual label corrupts both the numerator (winners) and denominator (ruins) of the variance-ratio test."
+    },
+    {
+      "issue": "Opportunity-cost falsifier is asymmetric and unfalsifiable in the favorable direction",
+      "why_it_matters": "The rule predicts 'capacity=3 Sharpe > capacity=1 Sharpe by ≥0.3 in low-crowding snapshots' as falsification. But if this fails (capacity=1 dominates), the researcher can retreat to 'then the slot framework itself is wrong' — which is a get-out clause. If the falsifier only bites in one direction, it is not a real test. A symmetric falsifier would specify: capacity=1 dominates ≥X% of dispersed snapshots AND capacity=0 dominates ≥Y% of crowded snapshots; otherwise the rule is rejected."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A crowded snapshot where 3 selected slots produce a realized variance ratio >2.5 relative to capacity=1 — directly refutes the leverage-not-diversification claim without needing distributional assumptions.",
+    "A dispersed snapshot where the marginal slot-2 Sharpe is <0.05 (the researcher's crowded-regime prediction applied to dispersed data) — would show the slot contribution is invariant to crowding, killing the mechanism.",
+    "A winner entity whose features score below the median on ALL the 'crowding proxies' (vol_ratio_5_20, px_vs_ma50, up_day_ratio_20) AND whose industry peers are simultaneously crowding — proves the rule forfeits genuine winners in crowded regimes.",
+    "An entity where IBD entry was PIT-classified as non-crowding (is_b0_pick=false) but the realized forward path was a ruin, demonstrating that the 'crowding detector' is not actually filtering risk — only filtering signal type.",
+    "Two entities in the same snapshot and same industry with |return correlation| < 0.3 over the entry formation window — directly disproves the within-snapshot correlation assumption that the leverage reframing depends on.",
+    "A historical regime (e.g., a rate-hiking cycle or a sector-rotation period) where capacity=3 in 'crowded' snapshots dominated capacity=0 by ≥2× in total return — the bear-market bias of the test is the most likely reason the researcher expects capacity=0 to win."
+  ],
+  "what_would_change_my_mind": [
+    "Independent identification of crowding that is NOT a restatement of base-signal strength — e.g., exogenous industry-ETF return correlation in the 60 days BEFORE entry, or a fund-flow / short-interest proxy that is uncorrelated with vol_ratio_5_20 and px_vs_ma50. If crowding and signal-strength become orthogonal, the circularity attack collapses and the falsifiable predictions become meaningful.",
+    "A within-snapshot matched-pairs design: for each crowded snapshot, compare capacity=1 (best slot) vs capacity=3 (all slots) using the SAME candidates and SAME sizing per slot, with permutation-based confidence intervals. If the variance ratio is reliably <2.0 in ≥70% of crowded snapshots AND ≥2.5 in ≥70% of dispersed snapshots, the mechanism claim survives.",
+    "A demonstration that the rule's capacity=0/1/2/3 assignments are stable under ±5% perturbation of the crowding metric on PIT features only. The researcher concedes this is required; without it, the rule is over-fit and any falsification outcome is artifactual.",
+    "A pre-registered, frozen rule (no peeking at W4 outcomes, no tuning on this 27-case set) that achieves the variance-ratio and Sharpe-increment predictions on a held-out window of ≥3 independent snapshots. The current evidence is all in-sample; out-of-sample performance is the only legitimate test.",
+    "Symmetric falsification criteria: the rule should be rejected if EITHER (a) capacity=3 variance ratio >2.5 in ≥50% of crowded snapshots OR (b) capacity=0 fails to dominate capacity=3 in ≥50% of crowded snapshots by ≥1 Sharpe point. Without symmetry, the rule is unfalsifiable in one direction and the policy implications are not actionable."
+  ]
+}
+```

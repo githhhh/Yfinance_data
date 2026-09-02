@@ -1,0 +1,32 @@
+{
+  "mechanism_claim": "Among B0-screened false-negative non-picks, those that subsequently become large winners exhibit a 5-day/20-day volume DRY-UP signature (vol_ratio_5_20 at or below ~1.15) layered on quietly basing price action: mildly positive but unspectacular ma10/ma20 slopes, modest mom_20, and mid-range up_day_ratio_20 (0.45–0.65). The dry-up acts as a post-rejection absorption signal — supply from the failed B0 breakout attempt has been consumed at low participation, so the next leg can run on light volume rather than requiring confirmation. Volume CONFIRMATION (vol_ratio_5_20 ≥ 1.4) in this false-negative bucket is associated with small_win or loss outcomes, suggesting that expansion into the rejection zone without breakout typically fails.",
+  "evidence_for": [
+    "False-negative big-winner entity_05b4c6b1f7: vol_ratio_5_20 = 0.964 (true dry-up, below 1.0) with positive ma20_slope_5 = 0.012 and mom_20 = 0.070 — textbook quiet base.",
+    "False-negative big-winner entity_535a1beed7: vol_ratio_5_20 = 1.174 (near baseline) with very low ma10_slope_5 = 0.004 and ma20_slope_5 = -0.005, mom_20 = 0.028 — absorption at the prior rejection level.",
+    "False-negative big-winner entity_de1c657364: vol_ratio_5_20 = 1.147, 8-week base with shallow -7.3% pullback, up_day_ratio_20 = 0.65 — long quiet accumulation, not a volume-confirmed breakout.",
+    "Contrast: false-negative small_winner entity_df5478102d has vol_ratio_5_20 = 1.405 (volume confirmation, not dry-up) and only a small_win — undermines the 'volume-confirmation-as-rescue' alternative.",
+    "Contrast: false-negative small_winner entity_d8e8e7b814 has vol_ratio_5_20 = 1.399 with small_win outcome — same elevated-volume pattern producing no big payoff.",
+    "Numeric contrast table confirms false-negative median vol_ratio_5_20 = 1.179 sits well below selected-winner median 1.424 (standardized delta -1.05), and the within-bucket split shows the lower tail of that distribution populating the large_win label.",
+    "Median ibd_entry_volume_ratio for false negatives (1.599) vs selected winners (1.813) corroborates that the failed-screen population as a whole is structurally lighter on entry volume — consistent with the dry-up-as-rescue framing rather than entry confirmation."
+  ],
+  "evidence_against": [
+    "False-negative entity_bfb308b24a has vol_ratio_5_20 = 1.187 (within the proposed dry-up band) yet produces a LOSS — showing dry-up is necessary but not sufficient; the ma10/ma20 slopes and up_day_ratio_20 (0.45) are weaker than the big-winner cases.",
+    "Selected winners also appear with dry-up vol_ratio_5_20: entity_8ad5cd4795 (0.996, large_win), entity_bec51a4227 (1.008, large_win), entity_d2ca7853ba (1.091, large_win). This means low vol_ratio_5_20 alone is not a unique identifier of the false-negative-to-large-winner path; selected winners can share the dry-up fingerprint.",
+    "False-negative entity_ad2bfdee3f (vol_ratio_5_20 = 1.179, small_win, negative ma10/ma20 slopes and negative mom_20) sits inside the proposed dry-up band but failed — slopes/momentum must co-occur, weakening any pure-volume rule.",
+    "Sample size is tiny (3 false-negative big_winners and 4 other false negatives across 27 total cases). The within-bucket n is too small to exclude randomness; claim must be provisional."
+  ],
+  "falsifiable_predictions": [
+    "Counterexample that would INVALIDATE the pattern: any future false-negative case with vol_ratio_5_20 ≥ 1.50 that resolves as w4_return_bucket = large_win. Such a case would show that volume confirmation (not dry-up) can rescue B0 rejections, eliminating the mechanism's specificity.",
+    "Counterexample that would PARTIALLY INVALIDATE: a false-negative with vol_ratio_5_20 ≤ 0.90 AND ma20_slope_5 ≤ -0.005 that becomes a large_win — would show dry-up works even on deteriorating trend, undermining the 'quiet basing' joint condition.",
+    "Volume-dry-up false-negatives should produce w4_return_bucket distribution skewed toward large_win / small_win and AWAY from 'loss'/'ruin' relative to volume-confirmed false-negatives.",
+    "Restricting the dry-up subset to ma10_slope_5 > 0 AND up_day_ratio_20 ≥ 0.50 should improve large_win precision on the false-negative pool versus using dry-up alone.",
+    "Across snapshots (snap_71486ed83c, snap_d0d57b1e40), the dry-up+base signature should be temporally stable — if it appears only in one snapshot, the pattern is regime-dependent rather than mechanistic."
+  ],
+  "policy_implications": [
+    "Operational: add a 'post-B0-rejection dry-up' watchlist filter — candidates must satisfy vol_ratio_5_20 ≤ ~1.15 AND ma10_slope_5 > 0 AND up_day_ratio_20 ≥ 0.50 before being re-scored as a second-chance entry. This is predictive mechanism, not portfolio sizing.",
+    "Risk management: because the false-negative-to-large-winner path depends on absorption rather than breakout confirmation, position sizing on these second-chance entries should be SMALLER than for native B0 winners — base-case sizing rules derived from selected_winners do not transfer.",
+    "Do NOT generalize the dry-up pattern to selected_winners (where it coexists with both large_win and other outcomes); treat the false-negative rescue path as a separate regime.",
+    "If the proposed counterexample (vol_ratio_5_20 ≥ 1.50 false-negative → large_win) materializes in the next forward sample, the rescue rule must be retired and not patched — the mechanistic specificity is the basis for its value, not the empirical hit rate.",
+    "The pattern is UNRESOLVED at n=3 big-winners; treat as a hypothesis to be stress-tested, not a deployed signal, until additional snapshots replicate the dry-up+base joint condition."
+  ]
+}

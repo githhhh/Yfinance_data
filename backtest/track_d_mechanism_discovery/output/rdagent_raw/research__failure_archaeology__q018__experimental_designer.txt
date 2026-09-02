@@ -1,0 +1,67 @@
+
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "compressed_geometry_vs_contrarian_mechanism",
+      "features": ["px_vs_ma50", "mom_20", "vol_ratio_5_20"],
+      "comparison": "Conditional effect decomposition: px_vs_ma50 < 0.06 WITH high mom_20 (>0.10) vs px_vs_ma50 < 0.06 WITH low mom_20 (<0.08)",
+      "success_criterion": "Compressed geometry entities with elevated momentum (mom_20 > 0.10) achieve large_win rate >= compressed geometry entities with suppressed momentum (mom_20 < 0.08). This would reject the contrarian mechanism as primary.",
+      "failure_criterion": "Compressed geometry entities with suppressed momentum (mom_20 < 0.08) achieve large_win rate >= compressed geometry entities with elevated momentum (mom_20 > 0.10). This would support contrarian mean-reversion over compressed geometry as the operative mechanism."
+    },
+    {
+      "name": "vol_ratio_independence_from_geometry",
+      "features": ["vol_ratio_5_20", "px_vs_ma50"],
+      "comparison": "Within px_vs_ma50 < 0.06 stratum: low vol_ratio_5_20 (< 1.2) vs elevated vol_ratio_5_20 (> 1.5)",
+      "success_criterion": "Low vol_ratio (<1.2) compressed-geometry entities have large_win rate >= elevated vol_ratio (>1.5) compressed-geometry entities by >=15pp. This would confirm vol_ratio as independent discriminating factor.",
+      "failure_criterion": "Elevated vol_ratio (>1.5) compressed-geometry entities achieve large_win rate >= low vol_ratio compressed-geometry entities. This would falsify the vol_ratio threshold as a mechanism component."
+    },
+    {
+      "name": "fn_selection_bias_test",
+      "features": ["px_vs_ma50", "mom_20", "up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "Within-FN comparison: FN-large_win (n=2: entity_535a1beed7, entity_de1c657364) vs FN-small_win/loss (n=5: entity_df5478102d, entity_d8e8e7b814, entity_bfb308b24a, entity_ad2bfdee3f, entity_05b4c6b1f7)",
+      "success_criterion": "FN-large_win and FN-small_win/loss have non-overlapping feature distributions across at least 2 snapshot features (px_vs_ma50, mom_20, vol_ratio_5_20, up_day_ratio_20). This would indicate the FN label captures genuine heterogeneity, not selection artifact.",
+      "failure_criterion": "FN-large_win and FN-small_win/loss have overlapping feature distributions within measurement uncertainty. This would indicate the compressed-geometry pattern is indistinguishable from noise given n=2."
+    },
+    {
+      "name": "compressed_geometry_baseline_rate",
+      "features": ["px_vs_ma50", "mom_20", "vol_ratio_5_20"],
+      "comparison": "All non-B0-pick entities meeting compressed-geometry criteria (px_vs_ma50 < 0.06 AND mom_20 < 0.08) against all non-B0-pick entities NOT meeting criteria",
+      "success_criterion": "Compressed-geometry non-picks achieve large_win rate >= 2x the large_win rate of non-compressed-geometry non-picks. This would indicate the pattern has predictive value beyond FN label artifact.",
+      "failure_criterion": "Compressed-geometry non-picks achieve large_win rate not significantly different from non-compressed-geometry non-picks (within 95% CI overlap). This would indicate the pattern is a selection artifact of the FN definition."
+    },
+    {
+      "name": "sufficiency_test_shallow_pullback",
+      "features": ["pullback_pct", "px_vs_ma50", "mom_20"],
+      "comparison": "Among entities with pullback_pct >= -10 (shallower than FN median of -7.3) and px_vs_ma50 < 0.08: outcome distribution across w4_return_bucket",
+      "success_criterion": "Shallower pullback entities have >=40% large_win rate. This would support the claim that shallow compression precedes large_win outcomes.",
+      "failure_criterion": "Shallower pullback entities have <20% large_win rate (equivalent to or below base rate). This would indicate shallow pullback is not sufficient for large_win."
+    },
+    {
+      "name": "extended_geometry_control",
+      "features": ["px_vs_ma50", "mom_20"],
+      "comparison": "Entities with px_vs_ma50 > 0.15 AND mom_20 > 0.15 (extended geometry) vs compressed geometry entities (px_vs_ma50 < 0.06 AND mom_20 < 0.08)",
+      "success_criterion": "Extended geometry non-picks have large_win rate < compressed geometry non-picks by >=15pp. This would indicate compressed geometry is specifically predictive, not just that 'low metrics predict winners' generically.",
+      "failure_criterion": "Extended geometry non-picks have large_win rate >= compressed geometry non-picks. This would indicate the predictive signal is generic low-metric effect, not geometry-specific."
+    }
+  ],
+  "leakage_checks": [
+    "w4_return_bucket is outcome variable only—cannot appear as predictor or selection criterion in any test",
+    "snapshot_anon is temporal identifier—cannot be used as predictive feature; only legitimate for temporal split coordination",
+    "is_b0_pick is contemporaneous selection indicator—can appear in feature list but not as outcome; ensure comparisons are within-pick-status strata or explicitly compare across strata",
+    "All feature thresholds (px_vs_ma50 < 0.06, mom_20 < 0.08, vol_ratio_5_20 < 1.2) must be pre-specified using researcher proposals, not optimized on current FN-large_win sample",
+    "FN label construction uses future W4 returns—tests must either (a) use only snapshot-time features or (b) compare FN subsets (large_win vs small_win) to control for selection bias",
+    "Pullback metrics (pullback_pct, pullback_duration_weeks) are contemporaneous at snapshot—legitimate for prediction; verify no look-ahead in their calculation"
+  ],
+  "priority_order": [
+    "fn_selection_bias_test",
+    "compressed_geometry_baseline_rate",
+    "compressed_geometry_vs_contrarian_mechanism",
+    "vol_ratio_independence_from_geometry",
+    "extended_geometry_control",
+    "sufficiency_test_shallow_pullback"
+  ]
+}
+```

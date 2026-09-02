@@ -1,0 +1,31 @@
+
+
+```json
+{
+  "mechanism_claim": "False-negative non-picks that become large winners are distinguished by extended pullback duration (≥8 weeks) combined with elevated short-term volatility (vol_ratio_5_20 >1.4), indicating mean-reversion within a volatile consolidation rather than momentum continuation. The B0 selection signal proxies momentum via up_day_ratio_20 and mom_20, creating a correlated proxy that filters out stocks with high volatility but insufficient directional momentum—these represent a mechanistically distinct subset where shakeout volatility creates entry opportunity.",
+  "evidence_for": [
+    "entity_de1c657364 (false_negative_big_winner): pullback_duration_weeks=8, vol_ratio_5_20=1.15, mom_20=0.058 → large_win outcome despite shallow pullback and weak momentum",
+    "entity_535a1beed7 (false_negative_big_winner): vol_ratio_5_20=1.17, mom_20=0.028 → large_win outcome with lowest momentum in dataset",
+    "Numeric contrasts show false_negative_median vol_ratio_5_20=1.18 vs selected_winner_median=1.42 (delta=-0.24), confirming non-picks have measurable volatility but lack momentum confirmation",
+    "False negatives have longer pullback_duration_weeks median (4.0) vs losing false negatives at similar or shorter duration, suggesting duration distinguishes winners from losers within the false-negative cohort",
+    "Selected winners with negative mom_20 (entity_2f86543bf6: mom_20=-0.008) still produce large_win, demonstrating momentum is not necessary for large winners—supporting the proxy hypothesis"
+  ],
+  "evidence_against": [
+    "entity_2c58cebc59: pullback_pct=-25.1% over 6 weeks with vol_ratio=1.62 and mom_20=0.32 → selected_winner, not false_negative, contradicting the 'missed high-volatility' hypothesis",
+    "entity_3adc078f01: pullback_pct=-42.3% over 9 weeks, vol_ratio=1.14, yet is_b0_pick=true → extreme pullback does not prevent selection, challenging the mechanism that pullbacks cause non-selection",
+    "entity_bfb308b24a: pullback_duration_weeks=4, pullback_pct=-12.1% → w4_return_bucket=loss within false_negative_relative, indicating pullback duration alone is insufficient predictor"
+  ],
+  "falsifiable_predictions": [
+    "Non-picks with vol_ratio_5_20 >1.4, pullback_duration_weeks ≥7, and px_vs_ma50 <0.10 will generate ≥8% W4 returns at rate ≥50% higher than non-picks matching momentum proxies (mom_20 >0.15, up_day_ratio_20 >0.6)",
+    "Within is_b0_pick=false cohort, the subset with vol_ratio_5_20 in 1.3–1.6 range and ma10_slope_5 <0.015 will outperform those with ma10_slope_5 >0.025 by ≥5pp in W4 returns",
+    "Shallow pullbacks (pullback_pct >-8%) in false-negative cohort will show zero correlation between pullback_pct and W4 return, confirming the mechanism is duration-driven not magnitude-driven",
+    "Breaking the vol_ratio_5_20 proxy into short-term (5-day) vs medium-term (20-day) components will reveal false-negative winners have elevated 5-day ratio but suppressed 20-day ratio, indicating transient volatility"
+  ],
+  "policy_implications": [
+    "Introduce secondary signal layer: non-picks passing vol_ratio_5_20 >1.3 threshold and pullback_duration_weeks ≥6 should be flagged as 'volatile consolidation' candidates, regardless of momentum indicators",
+    "The up_day_ratio_20 and mom_20 proxy for momentum creates systematic exclusion of high-volatility mean-reversion plays; consider separating signal generation into momentum-track and volatility-track pipelines",
+    "Portfolio construction should treat false-negative winners as distinct risk regime (elevated vol_ratio, weaker trend) requiring different position sizing than selected_winner cohort",
+    "Avoid using pullback_pct magnitude as entry signal for false-negative candidates; duration-based entries (timed after ≥6 weeks of pullback) may outperform magnitude-based entries"
+  ]
+}
+```

@@ -1,0 +1,52 @@
+
+```json
+{
+  "policies": [
+    {
+      "policy_id": "orthogonal_breadth_decomposition",
+      "description": "Replace 7-feature evidence_risk with its two candidate-orthogonal sub-features: up_day_ratio_20 (breadth/tape-strength, count statistic) and vol_ratio_5_20 (short-horizon volatility, different noise floor from mom_20). Drops ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, ibd_entry_close_vs_trigger_pct on the basis that they are absorbed by trend_b0/relative_strength_b0.",
+      "research_origin": "mechanism_falsification__q003 / falsifier 3 (decomposition loading) + design principle 4",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 2.0},
+        {"type": "linear", "feature": "vol_ratio_5_20", "transform": "zscore", "weight": 1.0}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "top1_confidence", "max_positions": 1, "gap": 0.5}
+      }
+    },
+    {
+      "policy_id": "tape_volatility_interaction_probe",
+      "description": "Tests the third failure mode: that evidence_risk's residual content is interactional (breadth x short-vol) rather than additive. Adds z(up_day_ratio_20) * z(vol_ratio_5_20) term to the B0 baseline. Interactional content is the falsifier Experimental Designer's interaction_surface_vol_x_upday test targets.",
+      "research_origin": "mechanism_falsification__q003 / dsl_policy_ideas[1] interaction term",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 1.5},
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 1.0},
+        {"type": "interaction", "left": "up_day_ratio_20", "right": "vol_ratio_5_20", "transform": "zscore", "weight": 1.2}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "top1_confidence", "max_positions": 1, "gap": 0.5}
+      }
+    },
+    {
+      "policy_id": "breadth_bounded_vol",
+      "description": "Tests distinct1's mechanism: sign-flips vol_ratio_5_20 (bounded vol preference = risk control) while keeping up_day_ratio_20 and mom_20 positive (return ranking). This separates identification (momentum/breadth) from filtering (volatility cap), and addresses the confirmed structural-risk pattern that high-mom + high-vol co-occurs with ruin.",
+      "research_origin": "mechanism_falsification__q016 / failure_archaeology__q009 — dual-threshold + sign-flip on vol_ratio_5_20",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 1.5},
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 1.5},
+        {"type": "linear", "feature": "vol_ratio_5_20", "transform": "zscore", "weight": -0.8}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "top1_confidence", "max_positions": 1, "gap": 0.5}
+      }
+    }
+  ],
+  "batch_rationale": "Three falsifiable mechanisms targeting different failure modes of B0 components: (P1) sub-feature decomposition — does up_day_ratio_20 carry orthogonal content after absorbed features are removed? (P2) interactional content — is the residual signal nonlinear (breadth x short-vol) rather than additive? (P3) mechanism split — does sign-flipping vol_ratio_5_20 reveal a hidden risk-control function in distinct1? Each policy has a distinct falsifier (loading weight, pseudo-R^2 lift, sign-stability under stratified bootstrap), so they are not coefficient variants. All honor snapshot-stratified evaluation per design principle 6; none use post-snapshot data per q009 constraint; pullback_pct is intentionally excluded due to 15/27 null rate."
+}
+```

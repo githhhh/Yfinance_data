@@ -1,0 +1,52 @@
+
+
+```json
+{
+  "strongest_counterclaim": "ibd_entry_volume_ratio is not an independent B0 signal — it is mechanically and statistically a downstream artifact of (a) the prevailing volume regime captured by vol_ratio_5_20, and (b) the magnitude of the breakout event itself captured by ibd_entry_breakout_range_ratio and ibd_entry_close_position. Once either neighbor is conditioned on, entry_volume contributes no incremental information and should be retired or replaced with a regime-normalized thrust metric.",
+  "attacks": [
+    {
+      "issue": "Mechanical/definitional overlap with volume_ratio",
+      "why_it_matters": "ibd_entry_volume_ratio is computed as entry-day volume divided by a multi-week baseline that almost certainly overlaps with the window used to construct general volume_ratio. By construction these two features share variance — they are not 'neighboring' independent terms, they are algebraically related. The sign disagreement the prior researcher flagged (-0.5013 vs +0.229) is therefore not evidence of distinctness but of denominator/definition mismatch across lookback windows. This alone invalidates any independence claim."
+    },
+    {
+      "issue": "Snapshot-level clustering of false negatives (4 of 5 from snap_71486ed83c)",
+      "why_it_matters": "The entire false-negative cohort is not a random sample — it is dominated by a single snapshot whose B0-selection criterion, sector exposure, and macro context are constant across all four cases. Any observed feature delta between false_negatives and selected_winners is therefore confounded with a snapshot-fixed effect (regime, sector, screening thresholds), not with entry_volume. The standardized delta of -0.5013 has effective n≈2 once snapshot is fixed, making the 'evidence' statistically indistinguishable from noise."
+    },
+    {
+      "issue": "Sign asymmetry across volume-related features is a red flag, not confirmation",
+      "why_it_matters": "The prior reads opposite-signed deltas as evidence entry_volume is 'event-anchored.' But if entry_volume were a clean event-conviction signal, we would expect it to correlate positively with mom_20 and breakout_range_ratio across the same cohort. Instead mom_20 (-1.0005) and breakout_range_ratio (+0.1186) show heterogeneous signs versus entry_volume's neighbors. The combination of +0.1186 (breakout_range_ratio) and -0.5013 (entry_volume) means in winners, breakout is bigger but entry_volume is only modestly higher — i.e. event magnitude moves while event-volume stays roughly flat, undermining the 'demand conviction' narrative."
+    },
+    {
+      "issue": "No falsification of the breakout-magnitude confound",
+      "why_it_matters": "Entry-day volume on a stock breaking out is mechanically larger for larger-range breakouts (more shares change hands). Without conditioning on ibd_entry_breakout_range_ratio, every apparent entry_volume effect can be re-expressed as a breakout-magnitude effect. The prior's predicted test #5 (rank correlation < 0.5) was not actually run; the contrast that WAS run shows breakout_range_ratio with a positive delta and entry_volume with a negative delta in false negatives, which is the opposite pattern one would expect if they captured the same construct — suggesting they are noisy and partially overlapping, not cleanly decomposable."
+    },
+    {
+      "issue": "Sample artifact: B0 picks are not the relevant population for testing entry_volume independence",
+      "why_it_matters": "All B0 candidates were pre-selected on a composite that may itself contain volume. The labels 'selected_winner' vs 'false_positive_ruin' are defined relative to a B0-gated process, so any feature surviving in that contrast is partly redundant with the gating logic. The only valid falsification sample is the full pre-screened candidate pool with known outcomes — which is not what failure_archaeology provides. The -0.5013 delta is therefore a circular measurement of how well the existing composite works, not a test of marginal contribution."
+    },
+    {
+      "issue": "Case-level inspection contradicts a clean entry_volume mechanism",
+      "why_it_matters": "entity_6618d3e80c (large_win with vol_ratio_5_20=1.45 but only middling entry-day conditions) and entity_40ea0cfb3b (false_positive_ruin with vol_ratio_5_20=0.91, the lowest regime volume among B0 picks) show that winners and losers are well-explained by vol_ratio_5_20 regime alone, with entry_volume adding nothing observable. Meanwhile entity_8ad5cd4795 won (large_win) with vol_ratio_5_20=0.996 — i.e. a regime-vol-neutralized case where entry_volume would have to carry the signal, yet mom_20 and slope terms alone seem to suffice."
+    },
+    {
+      "issue": "Modest effect size (-0.5013) ranks 11th in the contrast table, behind 10 other features",
+      "why_it_matters": "If entry_volume were the genuinely distinct event-anchored signal the claim requires, it should dominate the contrast ranking — not sit in the middle of the table. Its standardized delta is below up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50, pullback_duration_weeks, ibd_entry_close_vs_trigger_pct, ma10_slope_5, pullback_pct, ma20_slope_5, and px_vs_ma20. A 'special' mechanism with the 11th-strongest univariate association is more parsimoniously explained as a noisy linear combination of the top-10 features."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with ibd_entry_volume_ratio in the bottom decile that nevertheless produced large_win outcomes — if entry_volume is necessary, such cases should be rare; if it is not, they should be common.",
+    "Cases where ibd_entry_breakout_range_ratio is held within a tight band (e.g. 0.50–0.55) and ibd_entry_volume_ratio varies across the full observed range; in such a conditional slice, the entry_volume effect should vanish if it is purely a magnitude artifact.",
+    "Within-snapshot comparisons of B0 picks (e.g. all picks from snap_71486ed83c) where one win and one ruin have similar vol_ratio_5_20 but differ sharply in entry_volume; if entry_volume is causal, the wins should cluster on the higher entry_volume side.",
+    "Time-shifted counterfactual: compute ibd_entry_volume_ratio using a window ENDING one day before the actual entry (i.e. remove the entry day). If this 'pre-entry volume' proxy has a similar or stronger delta than the true entry_volume, then the 'entry-anchored' mechanism is a measurement artifact of the window definition.",
+    "Stocks that triggered IBD entry but on the lowest-volume day of their base — if entry_volume is essential, the B0 model should systematically reject these; if not, they should be present in the winner set at base rate.",
+    "False negatives from snapshots OTHER than snap_71486ed83c — currently we have only one such case; the entire feature delta could be a single-snapshot artifact."
+  ],
+  "what_would_change_my_mind": [
+    "A conditional partial-correlation test on at least 200 pre-screened B0 candidates (not just failure-archaeology), holding vol_ratio_5_20, ibd_entry_breakout_range_ratio, and ibd_entry_close_position fixed, showing ibd_entry_volume_ratio's marginal contribution is statistically significant (p < 0.01) and partial R² ≥ 0.01. Anything weaker leaves the null of 'redundant' unrejected.",
+    "An ablation study in which ibd_entry_volume_ratio is recomputed with entry-day excluded from the numerator (i.e. pre-event volume thrust); if the re-engineered feature carries the same or larger effect, it confirms the mechanism is regime-driven and the entry-anchoring is incidental. If the re-engineered feature loses ALL signal, then the entry day is genuinely special — but this test has not been performed.",
+    "A within-snapshot fixed-effects regression on snap_71486ed83c (which provides the bulk of the false-negative signal) showing that, after removing snapshot fixed effects, the entry_volume coefficient is indistinguishable from zero. If it survives, the snapshot-clustering concern is mitigated.",
+    "An out-of-time test on a later cohort: a delta of similar magnitude (-0.5 standardized) with the SAME sign direction. Given the prior's noted sign instability across neighboring volume features, sign-flipping in a fresh sample would be strong evidence the mechanism is unstable noise.",
+    "Demonstration that removing ibd_entry_volume_ratio from B0 and re-weighting the remaining components produces equal or better realized W4 hit-rate on a held-out sample of ≥300 B0 candidates. Equivalence here would mean entry_volume's contribution is zero net of its neighbors, retiring it cleanly."
+  ]
+}
+```

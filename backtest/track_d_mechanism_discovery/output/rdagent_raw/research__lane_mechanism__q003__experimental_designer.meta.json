@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__lane_mechanism__q003__experimental_designer",
+  "prompt_hash": "3f9a990b23de12d6e5555277ba4a1f44a1da0c17ddd6d1d5954f3b9e21217317",
+  "response_hash": "330daa5e655e6db448d5394078bc19fcea3ffcc04921202a888ab9eefaf26814",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

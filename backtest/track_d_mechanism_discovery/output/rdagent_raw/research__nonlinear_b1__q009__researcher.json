@@ -1,0 +1,19 @@
+{
+  "mechanism_claim": "Within the B0 universe, base_depth_pct sets structural risk capacity and mom_20 sets directional capacity; their interaction is non-monotonic because shallow bases (base_depth_pct near -10 to -15) combined with elevated mom_20 (>~0.17) identify late-stage breakouts that revert, while deep bases (>~-30) with moderate mom_20 (0.05-0.16) sustain continuation. Adaptive capacity = scale B0 rank position by a penalty that activates when mom_20/base_depth_pct ratio exceeds a threshold, shrinking but not eliminating exposure so the B0 membership set is unchanged.",
+  "evidence_for": [
+    "8 false_positive_ruin cases cluster at mom_20 in 0.07-0.24 with px_vs_ma50 in 0.05-0.34 and up_day_ratio_20 often 0.5-0.65 (e.g., entity_8f0df3d38e mom_20=0.176 pullback -16.2%, entity_ccc90a671f mom_20=0.074 pullback -14.4%, entity_6618d3e80c mom_20=0.251 with px_vs_ma50=0.337 marked both ruin and winner) — shallow-base/high-mom shows 5-7 week -12% to -42% reversals.",
+    "numeric_contrasts show mom_20 has the largest standardized separation between false_negatives (0.058) and selected_winners (0.163), with base_depth_pct near zero standardized delta (-0.19), confirming mom_20 is the discriminating axis and base_depth_pct is the regime modifier, not an independent filter."
+  ],
+  "evidence_against": [
+    "entity_ead73f4390 (selected_winner) has mom_20=0.320 with px_vs_ma20=0.194 — a high-momentum deep-base case that did NOT ruin, showing the penalty must be soft, not a hard cutoff, or it will deselect legitimate leaders.",
+    "entity_3adc078f01 (selected_winner, large_win despite pullback -42.3% over 9 weeks) had moderate mom_20=0.172 with deep base, indicating deep bases can absorb drawdowns that ruin shallow-base analogs."
+  ],
+  "falsifiable_predictions": [
+    "Within B0, bucketing picks by mom_20 quintile × base_depth_pct tertile should show the worst 4-week forward return in the high-mom_20/shallow-base cell and the best in mid-mom_20/deep-base cell; ranking purely on base_rank or purely on mom_20 will underperform the interaction score out-of-sample.",
+    "Applying a multiplicative shrinkage factor = clip(1 - alpha*(mom_20 - threshold)*exp(-k*|base_depth_pct|), floor, 1) to B0 position sizes should reduce false_positive_ruin count by >=30% without reducing selected_winner count by more than ~10%, holding B0 membership fixed."
+  ],
+  "policy_implications": [
+    "Encode as a post-B0 capacity multiplier rather than a pre-filter, so the eligible universe stays exactly B0; the gate uses only PIT-observable fields (mom_20, base_depth_pct) and operates on rank score or weight, not on inclusion.",
+    "Monitor a 'capacity utilization' diagnostic = fraction of B0 names hitting the penalty zone; sustained >50% utilization signals regime shift toward late-cycle momentum and should trigger tightening of the alpha coefficient or a switch to base-depth-weighted sizing."
+  ]
+}

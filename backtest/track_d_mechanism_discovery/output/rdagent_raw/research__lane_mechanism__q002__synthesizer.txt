@@ -1,0 +1,31 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 35,
+  "mechanism_summary": "The pure-proxy hypothesis (Lane = freshness + geometry + volume) is methodologically untestable in this evidence base. Three independent blockers: (1) Lane is never operationally defined, so any test is partially vacuous; (2) the false_negative sample is constructed by selecting on future W4 returns, contaminating the proxy-triple deltas that motivate the hypothesis; (3) N=27 with three-feature matching yields near-empty cells, so mean-gap thresholds of 1-2pp are unfalsifiable in either direction. The EVIDENCE does not support a pure-proxy reading: 8 false_positive_ruin cases show proxy readings indistinguishable from selected_winners (e.g., entity_8f0df3d38e mom_20=0.176, up_day_ratio_20=0.65, vol_ratio_5_20=1.24 = ruin; entity_b00579f203 mom_20=0.230, up_day_ratio_20=0.70, vol_ratio_5_20=1.58 = winner), and entity_6618d3e80c is dual-labeled winner+ruin despite top-decile proxies. This means the proxy composite fails at the binding constraint (left-tail ruin), not at mean W4 return — which is exactly where Lane plausibly operates if it has any real effect.",
+  "falsifiers": [
+    "PROXY_HOLDS if: within snap_71486ed83c quintile-pairs matched on full proxy block, B0_LANE vs LANE_NEUTRAL ruin-rate gap <1pp in EVERY pair AND SCORE_BEFORE_LANE explains >=90% of SCORE_AFTER_LANE W4-return cross-sectional R^2. If both hold, retire Lane.",
+    "PROXY_REFUTED if: entity_6618d3e80c analogues (proxy-confident LANE_NEUTRAL ruins) exceed entity_8f0df3d38e analogues (proxy-confident B0_LANE wins) by >=3pp in ruin rate within the matched quintile-pair test, OR if proxy-weak-but-Lane-favorable rescues (low up_day_ratio_20, low vol_ratio_5_20, modest mom_20, B0_LANE) outperform proxy-strong-but-Lane-neutral rows on large_win frequency by >=3pp."
+  ],
+  "actionable_design_principles": [
+    "Run the Within-Snapshot Within-Proxy-Quintile Ablation test on snap_71486ed83c first; it is the single most discriminating test because it holds regime constant and stratifies by proxy confidence, isolating any orthogonal Lane contribution to either mean return or ruin rate.",
+    "Separate distributional (ruin-rate) tests from mean-return tests before drawing conclusions; a Lane effect that operates purely through left-tail suppression is invisible to mean-gap tests at N=27 and is the pattern most consistent with the eight false_positive_ruin cases where proxies look like winners."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Lane-conditioned proxy guard: when up_day_ratio_20 + mom_20 + vol_ratio_5_20 composite is in top tercile BUT Lane bin is LANE_NEUTRAL, treat as proxy-overconfident_ruin candidate and apply a haircut to position size or require a second confirming feature (ibd_entry_close_position > 0.7, distribution_day_count <= 1).",
+      "why_distinct": "Encodes the rescue-and-rejection asymmetry the skeptic flagged: the proxy composite is necessary but not sufficient, and the failure mode of the proxy is concentrated in LANE_NEUTRAL rows at high proxy confidence — exactly the entity_6618d3e80c pattern.",
+      "features": ["up_day_ratio_20", "mom_20", "vol_ratio_5_20", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio", "lane_bin"],
+      "capacity_relevance": "Directly targets the binding constraint (ruin rate in proxy-confident LANE_NEUTRAL) identified in the failure archaeology rather than chasing mean-return improvement where evidence is uninformative at N=27."
+    },
+    {
+      "idea": "Two-axis score decomposition: compute SCORE_BEFORE_LANE from the FULL PIT proxy block (not just the triple) and require incremental R^2 of Lane component on W4 return >=0.02 AND ruin-rate marginal effect <= -1pp within top proxy tercile before retaining Lane as a separate axis; otherwise fold Lane into the proxy composite.",
+      "why_distinct": "Forces the proxy hypothesis to be tested against ALL 17+ non-trivial-delta features in the contrast table, not just the cherry-picked triple the researcher elevated, and uses ruin rate (not mean return) as the binding criterion — addressing both the cherry-pick and the distributional-shape critiques simultaneously.",
+      "features": ["up_day_ratio_20", "mom_20", "vol_ratio_5_20", "px_vs_ma20", "px_vs_ma50", "ma20_slope_5", "ma10_slope_5", "ibd_entry_close_vs_trigger_pct", "ibd_entry_volume_ratio", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio", "atr_14_pct", "rv_20", "base_mbox_count", "base_duration_weeks", "base_depth_pct", "lane_bin"],
+      "capacity_relevance": "Operationalizes the score-decomposition R^2 test from the experimental designer while closing the operational-definition gap the skeptic identified; Lane only earns a separate axis if it survives a full-block partialing test."
+    }
+  ]
+}
+```

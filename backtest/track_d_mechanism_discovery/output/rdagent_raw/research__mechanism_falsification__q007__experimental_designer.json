@@ -1,0 +1,63 @@
+{
+  "tests": [
+    {
+      "name": "within_snapshot_volratio_conditioned_isolation",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "snapshot_anon"
+      ],
+      "comparison": "Restrict the archaeology set to snapshots contributing at least 4 B0 candidates. Within each surviving snapshot, cross-tab candidates into (vol_ratio_5_20 quintile × ibd_entry_volume_ratio quintile). For every vol_ratio_5_20 quintile, compute the high-minus-low ibd_entry_volume_ratio win-rate spread across a fixed, pre-specified W4 win definition (large_win or small_win pooled). The mechanism claim requires that within a single, fixed vol_ratio_5_20 quintile the entry_volume spread remains positive in at least 3 of 5 quintile slices, and that this pattern holds in 2+ snapshots independently.",
+      "success_criterion": "Sign of (high − low entry_volume) win-rate is positive in ≥3/5 vol_ratio_5_20 quintiles AND the same sign recurs in ≥2 independent snapshots, with Fisher-combined one-sided p < 0.05 across snapshot-specific 2x2 tables.",
+      "failure_criterion": "Sign agreement ≤2/5 quintile slices, OR only one snapshot supports the direction, OR combined p ≥ 0.10. Failure means entry_volume contributes nothing once the prevailing volume regime is fixed, and the slot is redundant."
+    },
+    {
+      "name": "magnitude_partialed_event_residual_decile",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "ibd_entry_breakout_range_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Refit, on the full archaeology sample only, the pre-registered OLS ibd_entry_volume_ratio ~ ibd_entry_breakout_range_ratio + ibd_entry_close_position + ibd_entry_close_vs_trigger_pct. Compute the residual r_i for each B0 candidate. Re-evaluate the false_negative vs selected_winner standardized delta on r_i. Compare against the raw ibd_entry_volume_ratio delta reported in the archaeology contrast table.",
+      "success_criterion": "|standardized_delta(r)| ≥ 0.70 × |standardized_delta(ibd_entry_volume_ratio)| AND |standardized_delta(r)| ≥ 0.40 AND selected_winner median r exceeds false_negative median r. A residual that survives magnitude-partialing is consistent with genuine event-anchored demand.",
+      "failure_criterion": "|standardized_delta(r)| < 0.40 OR sign inversion. Failure means entry_volume is a near-redundant linear re-encoding of breakout magnitude and the slot should be retired or fused with breakout features."
+    },
+    {
+      "name": "slot_swap_thrust_normalization_decision",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Pre-specify a regime-normalized thrust t_i = ibd_entry_volume_ratio_i / max(vol_ratio_5_20_i, q05(vol_ratio_5_20)), where q05 is the within-archaeology 5th percentile floor. Recompute the false_negative vs selected_winner standardized delta on t_i. Treat the slot as a budgeted B0 seat: decide which definition earns the seat based on the magnitude test below. This directly addresses the 3-slot accounting question by testing whether the slot should hold raw event volume or its regime-normalized form.",
+      "success_criterion": "|standardized_delta(t)| ≥ |standardized_delta(ibd_entry_volume_ratio)| + 0.10 AND direction preserved. If thrust wins, retire raw ibd_entry_volume_ratio from B0 and substitute t_i in its slot.",
+      "failure_criterion": "|standardized_delta(t)| < |standardized_delta(ibd_entry_volume_ratio)| − 0.10 OR sign inversion. Failure means regime normalization destroys signal: raw entry_volume is the correct slot occupant, but the mechanistic claim still requires the partial-residual test (Test 2) to pass before the slot is endorsed."
+    },
+    {
+      "name": "placebo_preentry_window_deflation",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Construct a placebo entry-volume proxy v_placebo using only pre-entry days (volume averaged over days t-2 and t-1 relative to the IBD entry trigger, divided by the same multi-week baseline used for ibd_entry_volume_ratio). Re-run the false_negative vs selected_winner standardized delta on v_placebo. The entry-anchoring mechanism is genuinely special only if the actual entry-day feature carries materially more signal than this strictly-pre-entry placebo.",
+      "success_criterion": "|standardized_delta(ibd_entry_volume_ratio)| ≥ 1.40 × |standardized_delta(v_placebo)| AND same sign. A sizeable gap confirms the entry day itself is the information source.",
+      "failure_criterion": "|standardized_delta(v_placebo)| ≥ 0.70 × |standardized_delta(ibd_entry_volume_ratio)|. Failure means the slot is mis-named — the underlying information is pre-event thrust, not entry-anchored conviction — and the B0 component should be relabeled and re-defined using a pre-entry window before any production re-weighting."
+    }
+  ],
+  "leakage_checks": [
+    "ibd_entry_volume_ratio, vol_ratio_5_20, ibd_entry_breakout_range_ratio, ibd_entry_close_position, ibd_entry_close_vs_trigger_pct, and up_day_ratio_20 must all be PIT-resolved: their computation windows must terminate on or before the snapshot_anon date and must not overlap with the W4 outcome measurement window. Verify by cross-tabulating each feature's timestamp metadata against snapshot_anon and the w4_return_bucket boundary.",
+    "snapshot_anon is permitted strictly as a stratification/blocking variable (e.g. for the within-snapshot fixed-effect logic in Test 1). It must never be one-hot encoded and supplied to a predictive model, since it acts as a calendar-ish batch identifier that could absorb training-time leakage when reused across cycles.",
+    "Test 2's magnitude-partialing regression must be fit on a sample disjoint from the false_negative/selected_winner label set used to score the residual; otherwise r_i is contaminated by the very labels it is being scored against. Pre-specify a leave-one-snapshot-out scheme for the OLS fit so residual scoring uses out-of-fold coefficients.",
+    "Test 3's denominator floor q05(vol_ratio_5_20) must be computed on the archaeology set alone and frozen before any delta comparison; recomputing the floor after seeing the headline delta would be a form of post-hoc tuning.",
+    "Test 4's placebo v_placebo must use only strictly pre-entry day windows (t-2 and t-1). Any inadvertent inclusion of the entry day's own volume collapses the placebo into a noised clone of ibd_entry_volume_ratio and the comparison becomes uninformative.",
+    "None of the four tests may consume outcome_label, w4_return_bucket, or pullback_pct/pullback_duration_weeks as input features; these are downstream outcomes. The only permissible label-side statistic is the false_negative vs selected_winner contrast used in the success/failure criteria."
+  ],
+  "priority_order": [
+    "within_snapshot_volratio_conditioned_isolation",
+    "magnitude_partialed_event_residual_decile",
+    "slot_swap_thrust_normalization_decision",
+    "placebo_preentry_window_deflation"
+  ]
+}

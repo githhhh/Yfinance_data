@@ -1,0 +1,45 @@
+
+
+{
+  "strongest_counterclaim": "The compressed-geometry pattern is an artifact of outcome-biased case selection: false-negative big winners were defined by future W4 returns, then their snapshot features were inspected for commonality. This creates guaranteed correlation between features and outcome, not predictive signal. The true test requires forward-looking validation on pre-selected snapshot-time entities, not post-hoc analysis of entities chosen for their future success.",
+  "attacks": [
+    {
+      "issue": "Definition-dependency of the false-negative label introduces look-ahead bias that invalidates all subsequent feature analysis.",
+      "why_it_matters": "The method note explicitly states false negatives require 'future W4 >=8% and >=5pp above B0 selected median.' This means entities entered the FN set ONLY because they became winners. The 7 FN cases are not a random sample of compressed-geometry stocks—they are a curated set of stocks that worked. Any shared feature (low px_vs_ma50, low mom_20) is then trivially correlated with the outcome by construction, not because it causes or predicts it. The research design cannot distinguish 'this feature identifies winners' from 'we selected winners and noticed they had this feature.'"
+    },
+    {
+      "issue": "The two supporting large_win FN cases (entity_535a1beed7, entity_de1c657364) are insufficient for pattern claims with n=2.",
+      "why_it_matters": "The entire compressed-geometry theory rests on two entities. With n=2, any shared values are indistinguishable from random co-occurrence. The medians reported in numeric contrasts (FN median px_vs_ma50=0.056 vs SW median=0.127) pool across 7 FN cases, but only 2 are large_win. The pattern that 'compressed geometry → large_win' within the FN subset uses n=2 for the signal and n=5 for the contrast. This sample size cannot support sigma-level claims or falsifiable predictions."
+    },
+    {
+      "issue": "Contradictory cases within the same dataset falsify the necessity claim: winners do NOT require compressed geometry.",
+      "why_it_matters": "entity_ead73f4390 (selected_winner, large_win) has px_vs_ma50=0.185, mom_20=0.320—8-10x above the proposed thresholds. entity_b00579f203 similarly shows px_vs_ma50=0.230, mom_20=0.230. Both are large_win winners WITHOUT compressed geometry, directly refuting the claim that compression is a causal or even common feature of winners. If extended geometry produces winners, compressed geometry is not necessary for the outcome."
+    },
+    {
+      "issue": "Contradictory cases falsify the sufficiency claim: compressed geometry does NOT produce winners.",
+      "why_it_matters": "entity_8f0df3d38e has px_vs_ma50=0.048 (below 0.06 threshold), mom_20=0.176, and outcome=failure. entity_4fdc3699fd has px_vs_ma50=0.086 (slightly above), mom_20=0.185, outcome=ruin. entity_8472243e0c has px_vs_ma50=0.075, mom_20=0.242, outcome=ruin. These false-positive ruins share compressed features but produce catastrophic losses, indicating the features are not sufficient to predict winners."
+    },
+    {
+      "issue": "The mechanism conflates correlation with causation and ignores alternative explanations.",
+      "why_it_matters": "Low px_vs_ma50 (<6%) and low mom_20 (<8%) are proxies for 'stock has gone sideways or down recently.' This is a classic contrarian/value signal, not a technical geometry effect. The actual mechanism may be mean-reversion or institutional underweighting of neglected stocks, not the tight consolidation thesis. If the mechanism is wrong, the policy prescriptions (relaxing B0 thresholds, adjusting stop-losses) are baseless."
+    },
+    {
+      "issue": "The vol_ratio_5_20 < 1.2 threshold appears post-hoc without statistical justification.",
+      "why_it_matters": "The threshold of 1.2 for vol_ratio_5_20 is not derived from theory or cross-validation; it is inferred from the two FN large_win cases having vol_ratios of 1.174 and 1.147. Post-hoc threshold optimization on n=2 guarantees in-sample fit and zero out-of-sample validity. The proposed prediction that this threshold 'distinguishes FN large_win from FN small_win' cannot be tested with the current sample."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Entities at snapshot time with px_vs_ma50 < 0.06, mom_20 < 0.08, vol_ratio_5_20 < 1.2 that subsequently produce w4_return_bucket = 'ruin' or 'loss'",
+    "Entities at snapshot time with px_vs_ma50 < 0.06, mom_20 < 0.08 that were subsequently picked by B0 (demonstrating B0 CAN capture compressed geometry when fundamentals align)",
+    "A time-period hold-out sample: apply the compressed-geometry filter to snapshots from a different time period not represented in the discovery sample, measure actual forward win rates",
+    "Entities with low px_vs_ma50 and low mom_20 but HIGH vol_ratio_5_20 (>1.5): if vol_ratio is the true signal (stealth accumulation), high-volume compressed geometry should outperform low-volume",
+    "Sectors or market-cap strata where compressed geometry does not predict winners, indicating sector or liquidity confounding in the pattern"
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered forward test: define compressed geometry criteria on training data, apply to a separate hold-out sample with no outcome-based selection, and observe large_win rates significantly above base rate for non-picks",
+    "Replication in an independent dataset (different snapshot dates, different entity universe) showing the same feature-outcome correlation",
+    "A causal mechanism with supporting evidence: e.g., institutional trading data showing accumulation occurred specifically in the compressed-geometry FN cases, or options flow data showing informed buying",
+    "Demonstration that the false-negative definition does NOT introduce look-ahead bias (e.g., by defining FN status based on contemporaneous B0 selection criteria rather than future returns)",
+    "A control showing that among B0-selected winners, compressed geometry does NOT predict superior outcomes, isolating the FN-specific effect from a general compressed-geometry effect"
+  ]
+}

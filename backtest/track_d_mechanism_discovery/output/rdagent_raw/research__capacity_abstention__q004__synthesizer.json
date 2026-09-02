@@ -1,0 +1,89 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 42,
+  "mechanism_summary": "Under a fixed 3-slot equal-weight capital structure, cash dominates a third position only when the marginal candidate's PIT feature vector intersects the false_negative_region (up_day_ratio_20 ≤ ~0.55, mom_20 ≤ ~0.08, vol_ratio_5_20 ≤ ~1.25, weak ma10/ma20 slopes) AND the within-snapshot regime does not concentrate ruin disproportionately. Economic meaning of position counts under fixed 3-slot capital: 1-position = high-conviction concentration with ~67% cash drag, lowest diversification but tightest dispersion if conviction is calibrated; 2-position = top-2 quality plus 1/3 cash, expected best risk-adjusted when third is weak, trades opportunity cost for ruin protection; 3-position equal-weight = only justified when all three clear composite threshold, otherwise the weakest link is an asymmetric-tail bet (ruin magnitude plausibly exceeds winner magnitude per bimodal w4 buckets) compounded by forced 1/3 weight. The cash-dominance claim is conditional, not categorical — it requires the construction artifact (equal weight) to be intrinsic rather than incidental, the FN-region feature signature to generalize beyond a label-leakage-conditioned set, and the snapshot regime to support candidate-level rather than regime-level inference. None of these preconditions is yet verified.",
+  "falsifiers": [
+    "Snapshot_concentration_bound: if any single snapshot contributes ≥60% of ruin cases OR effective n_eff < 3, the candidate-level ruin probability claim collapses to a regime proxy.",
+    "Within_snapshot_feature_discrimination: if ruin and large_win within-snapshot z-score distributions are statistically indistinguishable (p>0.30) on all 7 features, the candidate-level mechanism is unsupported regardless of cross-sectional differences.",
+    "Counterfactual_portfolio_construction: if mean portfolio score for 3-position ≥ 2-position by ≥0.1 ordinal units on snapshots with ≥3 candidates, cash does not dominate the third slot at the portfolio level (effective N may be small; caveat).",
+    "Magnitude_asymmetry_via_bucket_anchoring: if winner pullback depth does not exceed loser pullback depth by ≥3pp on features computable without the bucket label, the asymmetric-tail justification for cash fails and equal-weight becomes defensible.",
+    "Rank_procedure_invariance: if mean Jaccard across ranker pairs is <0.30, the 'weak third' tier is ranker-induced and the cash-vs-fill question must be reframed as 'which ranker do we trust' rather than 'is this candidate weak'.",
+    "Composite_orthogonality: if first PC explains ≥75% of variance across the 7 features OR ≥3 pairs have |ρ|>0.70, any multi-feature composite collapses to a momentum re-label and the threshold-based rule is not robust.",
+    "Label leakage audit: if rerunning the FN-region rule with the w4 outcome-conditioning step removed still produces the same ruin-rate separation, the mechanism claim survives the leakage attack; if not, the directional evidence is artifact.",
+    "Conviction-weighted alternative: if a 50/30/20 allocation on the same archaeology set produces higher risk-adjusted score than either 3-position equal-weight or 2-position + cash, the 'cash vs fill third' framing is dominated by a construction-alternative solution and the candidate-quality question becomes secondary."
+  ],
+  "actionable_design_principles": [
+    "Separate candidate-quality identification (a feature signature question) from portfolio-construction effects (an allocation question); the weak-third claim conflates these and should be partitioned in any policy specification.",
+    "Treat 'weak third' as a tier, not a binary: a candidate triggers soft veto when composite score falls below the false_negative_region median on ≥3 of 5 features, with the veto defaulting to cash unless conviction-weighting rules apply.",
+    "Reframe position counts under fixed 3-slot as a conviction surface, not a count: 1-position means capital allocated 100% to highest-composite name (cash elsewhere is reserve, not lost opportunity); 2-position means top-2 with the remaining 1/3 conditional on composite threshold; 3-position means all three cleared a shared composite gate.",
+    "Use within-snapshot z-scores (snapshot-demeaned features) as the operational weak-third signal, not cross-sectional ranks, until snapshot_concentration_bound confirms regime independence; cross-sectional ranking will systematically overweight snapshot-level ruin concentration.",
+    "Track a 'weak-third rejection counter' and a 'weak-third composite distribution' as real-time policy variables; if rejection rate exceeds ~50% of decision weeks, the slot-filling rule is structurally biased and needs recalibration rather than tighter thresholds.",
+    "Model ruin-vs-win magnitude explicitly even if uncertain: the bimodal w4 bucket distribution (ruin vs large_win, no overlap) suggests Kelly-style reduction of the marginal third position below equal weight is appropriate as a default, not an aggressive bet on cash.",
+    "Do not commit to a single fixed threshold until the experimental_designer tests (especially within_snapshot_feature_discrimination and snapshot_concentration_bound) have been executed; current evidence supports directional belief, not calibrated threshold.",
+    "Expand the evidence base on the opportunity-cost side (false_negative_big_winner sample is n=2 in archaeology) before firm policy commitment; the cash-vs-fill trade is only well-posed when ruin and missed-large-winner samples are both adequately powered.",
+    "Operationalize capacity-abstention as a three-state decision per slot: FILL (composite above gate), CASH (composite below weak-third threshold), and SHRINK (composite between thresholds, apply sub-equal-weight conviction sizing); this dissolves the 1/2/3-position framing into a continuous policy."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Weak-third soft veto with composite gate: declare weak-third when snapshot-demeaned composite of {up_day_ratio_20, mom_20, vol_ratio_5_20, px_vs_ma50, ma10_slope_5} falls below the false_negative_region median on ≥3 of 5 features; veto defaults to cash with a 1/3 reserve.",
+      "why_distinct": "Differs from researcher policy by using snapshot-demeaned inputs and a soft 3-of-5 veto rather than a hard OR rule (up_day_ratio_20 ≤ 0.55 OR mom_20 ≤ 0.08); also incorporates ma10_slope_5 which the researcher's proposal omitted.",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Direct capacity-abstention: defines when the marginal candidate's profile triggers non-deployment of the third slot, preserving 1/3 capital as cash reserve against asymmetric ruin tail."
+    },
+    {
+      "idea": "Conviction-weighted 3-slot allocation: replace equal-weight with allocation proportional to composite percentile rank (e.g., 50th-percentile weight scaled by score), so a weak third receives a smaller position rather than forced equal weight or full cash.",
+      "why_distinct": "Rejects the binary cash-vs-fill framing of the research question and offers a continuous alternative; this is the 'construction-alternative solution' that the skeptic's analysis implies but does not formalize.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "capacity_relevance": "Capacity-abstention at the margin: position size itself becomes the abstention variable; a weak-third gets partial deployment (e.g., 10-15%) rather than full 33% or full 0%."
+    },
+    {
+      "idea": "Bimodal Kelly sizing on the third slot: condition position size on the empirical ruin-vs-large_win bucket probability conditional on composite score, using magnitude estimates from pullback_pct and dist_to_52w_high_pct as Kelly inputs.",
+      "why_distinct": "Differs from conviction-weighting by being magnitude-aware rather than score-rank-aware; explicitly models the asymmetric tail rather than treating composite as a proxy for expected return.",
+      "features": [
+        "pullback_pct",
+        "dist_to_52w_high_pct",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Capacity-abstention calibrated to tail risk: when conditional ruin probability × ruin magnitude exceeds win probability × win magnitude, Kelly fraction falls below equal-weight and may fall to zero, generating cash."
+    },
+    {
+      "idea": "Ranker-ensemble weak-third identification: compute weak-third label under three independent rankers (pure mom_20, equal-weight 6-feature composite, px_vs_ma50-only) and require ≥2-of-3 agreement before declaring a weak-third veto; this bounds ranker-induced fragility.",
+      "why_distinct": "Operationalizes the rank_procedure_invariance_of_weak_third test as a policy rather than a falsification step; if rankers disagree, the candidate is in a 'contested weak' zone and defaults to cash rather than triggering veto.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Capacity-abstention as consensus failure — disagreement among conviction sources is itself a veto trigger, framing weak-third identification as an epistemic rather than purely feature-based call."
+    },
+    {
+      "idea": "Regime-conditional weak-third threshold: scale the weak-third composite threshold by snapshot-level ruin concentration; when within-snapshot historical ruin rate exceeds a calibration value, raise the composite gate (more vetoes, more cash) rather than relying on the same threshold across regimes.",
+      "why_distinct": "Directly addresses the snapshot_concentration_bound concern by making the threshold regime-conditional rather than universal; if ruin is regime-driven, the gate should react to regime rather than be fixed.",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Capacity-abstention that tracks regime risk: in high-ruin regimes, abstain more aggressively; in low-ruin regimes, the third slot fills more readily, making the cash decision regime-adaptive."
+    }
+  ]
+}

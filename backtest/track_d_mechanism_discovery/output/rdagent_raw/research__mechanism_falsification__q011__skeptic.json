@@ -1,0 +1,62 @@
+{
+  "strongest_counterclaim": "The researcher's conclusion is a category error compounded by label-contamination: B0's 'evidence_risk' is almost certainly a relative-strength-preservation risk filter — a legitimate, well-documented form of downside-risk control — and the very feature asymmetries cited as 'proof of momentum ranking' (low up_day_ratio, low mom_20, low vol_ratio_5_20, shallow pullback) are the textbook signatures of RS breakdown that a risk filter is SUPPOSED to reject. The distinction between 'ranking on strength' and 'controlling downside risk via RS preservation' is invisible in the data the researcher used.",
+  "attacks": [
+    {
+      "issue": "Label contamination: false-negative construction uses forward 4-week returns >=8% AND >=5pp above B0 selected median — by construction, FNs are 'names that were weak at entry but became strong after.' Any feature asymmetry is tautological, not diagnostic.",
+      "why_it_matters": "The entire numeric_contrasts table is contaminated by the labeling rule. The finding that FN < SW on mom_20/up_day_ratio is a mathematical necessity of defining FN as 'future momentum winners,' not evidence about the component. Without a label built on PIT-safe proxies (subsequent base break, vol regime shift, distribution-day count), every contrast is circular."
+    },
+    {
+      "issue": "Category error: 'relative-strength preservation' is itself a downside-risk filter, not a ranking signal — O'Shaughnessy, Faber, and momentum-crash literature all show RS-based screens reduce left-tail drawdowns. The researcher treats RS-proxy features as exclusive proof of ranking.",
+      "why_it_matters": "If evidence_risk encodes 'avoid names with deteriorating RS, distribution days, contracting bases,' then low up_day_ratio + low mom_20 + flat ma10_slope IS the risk signature. Calling it 'momentum ranking' ignores that RS preservation is a PIT-safe proxy for asymmetric downside that has outperformed pure trend-following in crash regimes since 2007-2009, 2018-Q4, 2020-Q1."
+    },
+    {
+      "issue": "The 'selected winners came out of deeper pullbacks' finding is inverted by the researcher — deep pullbacks followed by a base that holds IS the canonical risk-managed entry, while shallow pullbacks + high momentum are overextended (the 6618d3e80c archetype at +33.7% from MA50).",
+      "why_it_matters": "If anything, this SUPPORTS risk-control logic: the component rewards structural resets (deep, slow bases) and penalizes blow-off tops. The researcher reads the same pattern as evidence of ranking, but base-quality discrimination is a textbook risk feature."
+    },
+    {
+      "issue": "No causal counterfactual was estimated. The researcher never computed the evidence_risk score itself, ran a logistic regression of is_b0_pick on the features holding the score constant, or simulated an alternative risk layer — all arguments are associational.",
+      "why_it_matters": "An association between features and labels says nothing about whether the component's WEIGHTING is risk-tilted or momentum-tilted. Without score-level analysis (deciles of actual component output, partial correlations, Shapley attribution), the conclusion is narrative, not statistical."
+    },
+    {
+      "issue": "Component isolation is impossible from 27 cases. B0 is a multi-component composite; evidence_risk is one slice. A single slice showing momentum-like feature correlations could be the joint effect of other components dominating the selection.",
+      "why_it_matters": "If a separate 'base_quality' or 'distribution_filter' component handles true downside control, evidence_risk can legitimately be a relative-strength ratchet without contradicting a risk-control policy. The researcher attributes a single component's marginal behavior to the whole risk layer."
+    },
+    {
+      "issue": "The 27-case sample has ~8 ruin cases; a decile analysis of ruin rate by component score would have <1 case per cell. The 'flat or U-shaped ruin rate across deciles' prediction is statistically uninformative and would not falsify anything regardless of outcome.",
+      "why_it_matters": "Invoking decile-based ruin-rate monotonicity as a falsifier when the cell counts are too small for a chi-squared test is a rhetorical move, not a testable prediction. A skeptic should reject the falsifier itself."
+    },
+    {
+      "issue": "The proposed replacement ('downside-specific composite' with lower-shadow ratio, distribution-day ratio, etc.) is underspecified and unverified as PIT-available, and the researcher offers no proof such a composite would beat the existing one — only an assertion.",
+      "why_it_matters": "Recommending replacement of a component without (a) defining the new score, (b) showing the inputs exist PIT, (c) running an out-of-sample test is policy advocacy, not analysis. The replacement recommendation should not be accepted on the current evidence base."
+    },
+    {
+      "issue": "Cross-sectional-only evidence ignores regime dependence. A risk filter can be flat in cross-section but vital in time-series: it down-weights in vol-expansion regimes and up-weights in mean-reverting regimes. The researcher never checks regime-conditional behavior.",
+      "why_it_matters": "If evidence_risk's score drifts with VIX or with the cross-sectional dispersion of returns, it could be doing genuine risk control that pure cross-sectional median comparison cannot detect. The analysis framework itself is blind to this."
+    },
+    {
+      "issue": "The 'high momentum profiles did not prevent ruin' argument confuses entry signal with position management. Several ruin cases (entity_4fdc3699fd, entity_6618d3e80c) had strong entries; whether they ruined depends on stop-loss, sizing, and exit discipline — a separate policy layer.",
+      "why_it_matters": "Attributing ruin to a poor entry signal when position-management failure is at least equally likely is a misallocation of blame. Risk control at the entry layer cannot guarantee survival without exit-layer discipline; the researcher treats the entry component as the sole locus of ruin causation."
+    },
+    {
+      "issue": "The researcher concedes 'this means the FN asymmetry could partly reflect look-ahead leakage in label construction' but proceeds to use the same labels as the primary evidence — a logical inconsistency that contaminates every quantitative claim that follows.",
+      "why_it_matters": "If labels are leaky, then the standardized deltas, the median contrasts, and the falsifiable predictions built on them are all tainted. The conclusion cannot stand on evidence the researcher themselves flagged as suspect."
+    }
+  ],
+  "counterexamples_to seek": [
+    "Compute evidence_risk's actual score (not just its input features) and plot its decile-by-decile ruin rate on the full B0 history, not the 27-case archaeology subset, with proper confidence intervals — if even one decile shows monotonic improvement, the risk-control narrative is supported.",
+    "Find a B0 reject with low evidence_risk score in a vol-expansion regime (VIX > 25 or sector vol_ratio_5_20 in top quartile) that subsequently broke down — confirms risk control. Conversely, find a B0 pick with high evidence_risk score that survived a 2018-Q4 / 2020-Q1 / 2022 bear market — confirms downside resilience.",
+    "Reconstruct the FN labels using PIT-only proxies (subsequent base-break count, distribution-day accumulation in the 4 weeks after, vol-regime shift) and rerun the numeric_contrasts — if the asymmetry persists, the researcher is vindicated; if it collapses, the original conclusion was an artifact.",
+    "Look for cases where evidence_risk score DISAGREES with mom_20 — i.e., names with high mom_20 but low evidence_risk score (likely distribution candidates). If the component flags these and mom_20 does not, evidence_risk is genuinely adding information beyond ranking.",
+    "Test evidence_risk's score autocorrelation and its correlation with forward 4-week MAX DRAWDOWN (not return) — a risk-control component should show stronger correlation with drawdown than with return; a ranking component should show the opposite.",
+    "Compare evidence_risk score distribution across bull (SPX > 200DMA and rising) vs bear (SPX < 200DMA and falling) regimes — a risk filter should compress toward 'defensive' in bear regimes; a ranking component should not shift.",
+    "Identify a specific PIT-safe alternative risk score (e.g., a published RSI-divergence or distribution-day index) and run a head-to-head counterfactual: equal-breadth baskets, same entry triggers, compare ruin rates. Until this is done, the replacement claim is unsubstantiated."
+  ],
+  "what_would_change_my_mind": [
+    "A held-out out-of-sample test (post-discovery period, e.g., 2023-2025 data the researcher did not see) where evidence_risk deciles show NO relationship with forward max drawdown or ruin, while mom_20 deciles DO — this would falsify risk-control and confirm ranking-only behavior.",
+    "A Shapley or partial-dependence analysis on the actual B0 composite showing that evidence_risk's contribution to the is_b0_pick decision is statistically indistinguishable from a pure mom_20×vol_ratio_5_20 ranking term — i.e., zero residual predictive content once ranking features are partialled out.",
+    "A PIT-safe reconstruction of FN/FW labels (using only information available at the decision date) that reproduces the same asymmetry the researcher found — if the asymmetry disappears, the original finding is a label artifact and the risk-control verdict flips back to 'plausible.'",
+    "An empirical demonstration that a specific downside-asymmetric alternative score (must be defined, must be PIT-computable, must show >0.05 AUC improvement over evidence_risk on a held-out ruin prediction task) exists and is deployable — only then does the replacement recommendation earn credibility.",
+    "Evidence that evidence_risk score does NOT co-move with realized volatility regime (VIX, sector vol, term-structure shifts) in the direction a risk filter should — i.e., it stays high in vol-expansion environments where prudent risk control should down-weight — would confirm it is not risk-aware.",
+    "A Monte Carlo simulation: generate 10,000 synthetic names with known mom_20, vol_ratio_5_20, and true downside risk, run evidence_risk's score formula on them, and show the score's rank correlation with true downside risk is <0.1 while its rank correlation with momentum is >0.5. Until this is done, the claim that the score 'fails as risk control' is unsubstantiated."
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__capacity_abstention__q008__experimental_designer",
+  "prompt_hash": "51f36d3bb3ab13e44002fc2937b35746c345892b391fb5043af1061ad7e416a3",
+  "response_hash": "c7a044c9ea1da3764a5ee98c4a2a653be7366e287d629ccb4f7766d1847d42e9",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

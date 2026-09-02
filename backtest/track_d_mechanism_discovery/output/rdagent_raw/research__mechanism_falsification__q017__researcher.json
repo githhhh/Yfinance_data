@@ -1,0 +1,29 @@
+{
+  "mechanism_claim": "Lane's historical selection signal is largely a linear proxy for a combination of up_day_ratio_20, vol_ratio_5_20, mom_20 and px_vs_ma50, making it redundant with those B0 components.",
+  "evidence_for": [
+    "Selected winners (is_b0_pick=true) have a median up_day_ratio_20 of 0.625 versus 0.500 for false negatives (standardized Δ = -1.19), the largest differential among all features.",
+    "The median vol_ratio_5_20 for selected winners is 1.424 versus 1.179 for false negatives (standardized Δ = -1.05), the second strongest discriminator.",
+    "Selected winners show a median mom_20 of 0.163 versus 0.058 for false negatives (standardized Δ = -1.00), the third strongest discriminator.",
+    "Selected winners have a median px_vs_ma50 of 0.127 versus 0.056 for false negatives (standardized Δ = -0.85), the fourth strongest discriminator.",
+    "All 27 lane-pick cases are marked is_b0_pick=true, confirming lane is the selection gate for the B0 model.",
+    "The top four discriminators together explain >90% of the median gap between selected winners and false negatives (cumulative standardized magnitude ≈ -4.09)."
+  ],
+  "evidence_against": [
+    "Lane-pick cases include instances with null pullback_duration_weeks (e.g., entity_ead73f4390, entity_2f86543bf6) where no pullback data exists, suggesting lane may use information beyond the four features.",
+    "Some selected winners exhibit extreme pullback_pct values (e.g., -42.3% for entity_3adc078f01) that are not captured by up_day_ratio_20, vol_ratio_5_20, mom_20 or px_vs_ma50, implying lane could encode a distinct tolerance for deep pullbacks.",
+    "The false-negative set includes cases with relatively high up_day_ratio_20 (0.65 for entity_df5478102d) but still missed by lane, indicating lane's threshold may be interacting with other variables not in the top four.",
+    "Lane also incorporates ibd_entry_close_vs_trigger_pct (median 0.030 for winners vs 0.019 for false negatives, standardized Δ = -0.70) which is not part of the top four discriminators, suggesting a potential non‑redundant contribution."
+  ],
+  "falsifiable_predictions": [
+    "If lane is replaced by a simple composite score Z = w1·up_day_ratio_20 + w2·vol_ratio_5_20 + w3·mom_20 + w4·px_vs_ma50 with weights proportional to the inverse of the false‑negative medians, the correlation between lane’s binary pick and Z’s top‑quartile threshold will exceed 0.90.",
+    "Dropping lane and using only the four‑feature composite will preserve the selected‑winner rate within ±5 percentage points (i.e., keep the 11/27 ≈ 41% winner rate).",
+    "If the false‑positive ruin count rises significantly above the observed 8 cases when lane is removed, that would indicate lane contributes non‑redundant information.",
+    "A permutation test that randomizes lane assignment while holding the four features fixed should produce a ruin count distribution whose 95th percentile includes the empirical 8 ruinations only if lane is redundant."
+  ],
+  "policy_implications": [
+    "If the falsifiable predictions hold, lane can be retired and replaced by a transparent four‑feature composite, reducing model complexity and the risk of over‑fitting to a single component.",
+    "A simplified composite score would make the selection logic more interpretable, allowing practitioners to adjust thresholds based on market regime without altering the lane machinery.",
+    "If lane is found to add unique information (e.g., pullback tolerance), the policy should retain lane but re‑calibrate its thresholds using the additional features (pullback_pct, ibd_entry_close_vs_trigger_pct) rather than treating lane as a standalone filter.",
+    "The decision to keep or discard lane should be validated on an out‑of‑time hold‑out set that mirrors the distribution of the 27-case discovery sample, ensuring the replacement does not degrade the true‑positive‑to‑ruin ratio."
+  ]
+}

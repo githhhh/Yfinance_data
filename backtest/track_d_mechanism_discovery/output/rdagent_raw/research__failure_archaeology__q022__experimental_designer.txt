@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "FN_big_winner_signature_coherence_3d",
+      "features": ["ma10_slope_5", "mom_20", "vol_ratio_5_20"],
+      "comparison": "Compute standardized 3-D Euclidean distance between the two false_negative_big_winner entities (entity_535a1beed7, entity_de1c657364) versus the median pairwise distance among the 11 selected_winner entities on the same three features. Standardization uses the selected_winner median and MAD.",
+      "success_criterion": "FN-vs-FN standardized distance is at most 0.75× the median selected_winner-vs-selected_winner distance, indicating a tighter coherent signature than the winners themselves.",
+      "failure_criterion": "FN-vs-FN distance exceeds the 75th percentile of winner-vs-winner pairwise distances — the two FNs disagree on key claimed features by more than is typical within the winner class, falsifying 'coherent signature'."
+    },
+    {
+      "name": "composite_ruin_contamination_count",
+      "features": ["mom_20", "vol_ratio_5_20", "up_day_ratio_20"],
+      "comparison": "Apply the joint constraint mom_20<0.06 AND vol_ratio_5_20<1.20 AND 0.45<=up_day_ratio_20<=0.70 to the 8 false_positive_ruin entities and to the false_negative_big_winner entities; report capture rate per group.",
+      "success_criterion": "Zero of 8 false_positive_ruin entities satisfy the joint constraint while both false_negative_big_winner entities satisfy it — composite perfectly discriminates.",
+      "failure_criterion": "Two or more false_positive_ruin entities satisfy the joint constraint — composite cannot distinguish latent winners from latent ruins at the signal level, regardless of how it performs on winners."
+    },
+    {
+      "name": "pullback_structure_separation_non_null_only",
+      "features": ["pullback_duration_weeks", "base_mbox_count", "base_depth_pct"],
+      "comparison": "Restrict to entities with non-null pullback fields: false_negative entities with non-null pullback (entity_df5478102d, entity_bfb308b24a, entity_de1c657364; n=3) versus selected_winner entities with non-null pullback (entity_8f0df3d38e, entity_8ad5cd4795, entity_2c58cebc59, entity_3adc078f01, entity_ccc90a671f, entity_55c2da490e; n=6). Compute medians per group.",
+      "success_criterion": "FN median pullback_duration_weeks exceeds winner median by at least 2 weeks AND FN median base_mbox_count >= winner median AND |FN median base_depth_pct| < |winner median base_depth_pct| — i.e. longer, denser, shallower bases.",
+      "failure_criterion": "Either the duration gap is <2 weeks OR the FN median base_mbox_count is below the winner median OR |FN base_depth_pct| is not smaller than |winner base_depth_pct|. A failure on any leg falsifies the 'extended shallow base' substrate claim as a necessary feature."
+    },
+    {
+      "name": "entry_footprint_separation_fn_vs_ruin",
+      "features": ["ibd_entry_close_position", "ibd_entry_volume_ratio", "ibd_entry_breakout_range_ratio"],
+      "comparison": "Compare false_negative_big_winner entities (n=2) versus false_positive_ruin entities (n=8) on the three entry-context features. Predicted by the mechanism: FNs should have a quieter entry footprint (lower volume ratio, close nearer day midpoint, tighter breakout range).",
+      "success_criterion": "FN median ibd_entry_volume_ratio is at least 0.30 below ruin median AND FN median ibd_entry_close_position is at least 0.05 below ruin median — entry footprint alone separates latent winners from latent ruins.",
+      "failure_criterion": "FN median ibd_entry_volume_ratio is within 0.10 of ruin median, OR FN median ibd_entry_close_position exceeds ruin median — ruins share the FN entry profile, so the entry-footprint angle cannot substitute for the composite."
+    },
+    {
+      "name": "within_snapshot_winner_vs_fn_incoherence",
+      "features": ["mom_20", "vol_ratio_5_20", "px_vs_ma50"],
+      "comparison": "Within snap_71486ed83c, compute standardized 3-D distance between the selected_winner entity_2c58cebc59 (mom_20=0.320, vol_ratio_5_20=1.619, px_vs_ma50=0.170) and each of the two false_negative_big_winner entities in the same snapshot. Then compute the distance between the two FNs themselves. Compare ratios.",
+      "success_criterion": "Distance from selected_winner to either FN is at least 1.5× the FN-to-FN distance — within-snapshot winners and FNs are more different from each other than FNs are from each other, supporting the skeptic's claim that the snapshot does not host a homogeneous regime.",
+      "failure_criterion": "Selected_winner-to-FN distance is within 1.2× of FN-to-FN distance — the picked winner and the missed winners in the same snapshot share a recognizable profile, consistent with a shared regime that the B0 filter only partially captured."
+    }
+  ],
+  "leakage_checks": [
+    "outcome_label and w4_return_bucket appear only as grouping/target variables; they must never enter the feature list of any test.",
+    "is_b0_pick is a downstream decision output, not a PIT input feature; it must not be used as a feature in any test or as a grouping variable that conditions the test population beyond the pre-specified entity selection.",
+    "snapshot_anon may be used only as a grouping key for population restriction; it must not be treated as a feature and no snapshot-identifying string may be encoded numerically as a feature.",
+    "entity_anon is identity and must not be used as a feature; entity selection within groups must be pre-specified by outcome_label membership, not by ad-hoc inspection.",
+    "Pullback fields with null values must remain null in every aggregation; no imputation to zero, no exclusion of null entities without explicit pre-specification of the non-null subset.",
+    "All momentum features (mom_20, mom_60, ma10_slope_5, ma20_slope_5, ma50_slope_10) and base features (base_mbox_count, base_duration_weeks, base_depth_pct) must be verified to be computed from data dated at or before snapshot_anon; any feature that references post-snapshot returns invalidates the test.",
+    "ibd_entry_* features reference entry-day data only and must not incorporate post-entry price action; if any entry feature is undefined for a given entity it must be flagged before inclusion.",
+    "Standardization (median, MAD) for any distance-based test must be computed on the comparison group specified in the test, not on a pooled sample that includes the units being measured."
+  ],
+  "priority_order": [
+    "composite_ruin_contamination_count",
+    "FN_big_winner_signature_coherence_3d",
+    "within_snapshot_winner_vs_fn_incoherence",
+    "entry_footprint_separation_fn_vs_ruin",
+    "pullback_structure_separation_non_null_only"
+  ]
+}
+```

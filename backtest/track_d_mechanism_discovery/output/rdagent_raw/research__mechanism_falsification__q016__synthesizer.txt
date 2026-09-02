@@ -1,0 +1,47 @@
+
+
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "The 'distinct1' component's value derives primarily from return-ranking (elevated momentum, volatility expansion, consistent-up-day frequency), but the evidence is insufficient to conclude it lacks downside-risk intent. The researcher correctly identifies that selected_winner cases exhibit higher mom_20 (delta=-1.00) and vol_ratio_5_20 (delta=-1.05) than false negatives, with up_day_ratio_20 as the strongest discriminator (delta=-1.19). However, the skeptic raises valid concerns: (1) the vol_ratio_5_20 false_positive_ruin median is not reported, making it impossible to determine whether high volatility predicts ruin within B0 picks; (2) the pullback_pct null mechanism (15/27 cases) cannot be assumed to mean 'no drawdown occurred'; (3) failure archaeology samples from a biased distribution that over-represents errors. The experimental designer's tests are well-specified but require data not yet available (vol_ratio_5_20 by false_positive_ruin, pullback_null outcome rates, downstream component verification). The structural risk is confirmed: high-momentum + elevated-volatility co-occurs with ruin outcomes, but whether this reflects component design, missing downstream risk controls, or fundamental momentum-risk correlation remains ambiguous.",
+  "falsifiers": [
+    "If false_positive_ruin cases show LOW vol_ratio_5_20 (< 1.2) while still being selected, vol_ratio_5_20 cannot be a return amplifier for ruin cases specifically—this would indicate ruin occurs through non-volatility mechanisms and the component is not selecting high-volatility as a return signal for the ruin subset",
+    "If pullback_pct-null cases in failure archaeology have subsequent external-data-documented drawdowns >10%, the null-as-no-drawdown assumption is false, and the researcher has systematically analyzed only the extreme-drawdown subset",
+    "If B0 has a downstream 'ruin guard' component that applies drawdown filters post-distinct1, then distinct1's lack of downside-risk logic is a deliberate division of labor, not a design defect",
+    "If cross-snapshot analysis shows the same entity selected in one snapshot but not another with only minor vol_ratio_5_20 changes, this would indicate conditional logic that is not captured in single-snapshot archaeology",
+    "If restricting to pullback_pct >= -15% (as the researcher proposes) eliminates <3 of 8 ruin false positives, the drawdown signal is not sufficiently discriminative in the frozen evidence to support the risk-control replacement hypothesis"
+  ],
+  "actionable_design_principles": [
+    "Do not attribute ruin outcomes solely to distinct1 without first establishing downstream pipeline behavior—ruin responsibility may be distributed across components",
+    "The vol_ratio_5_20 feature requires explicit conditional logic if used: high volatility should be gated by drawdown depth, not used as an unqualified return amplifier",
+    "up_day_ratio_20 (delta=-1.19) is the strongest discriminator but should be tested for regime sensitivity before treating it as a stable return ranker",
+    "pullback_pct null handling requires a documented missing-data policy before conclusions about drawdown-insensitivity can be drawn",
+    "Any replacement design must separate the momentum-identification function (where distinct1 appears to add value) from the risk-control function (where value addition is unconfirmed)"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Dual-threshold distinct1 replacement: momentum floor (mom_20 >= 0.10) combined with a volatility cap (vol_ratio_5_20 <= 1.35) for return-ranking, and a separate downside-risk gate (pullback_pct <= -20% OR pullback_duration_weeks > 6) applied as a post-filter",
+      "why_distinct": "Preserves the confirmed return-ranking value while adding structural risk control that the current evidence cannot rule out; separates identification from filtering concerns",
+      "features": ["mom_20", "vol_ratio_5_20", "pullback_pct", "pullback_duration_weeks"],
+      "capacity_relevance": "Volatility cap requires testing in experimental designer framework before deployment; gate threshold requires pullback_pct null handling policy"
+    },
+    {
+      "idea": "Risk-adjusted up_day_ratio: up_day_ratio_20 * (1 - normalized_pullback_penalty) where normalized_pullback_penalty = min(|pullback_pct| / 50, 0.5) for non-null cases, with null cases receiving a conservative penalty (0.15) pending missing-data resolution",
+      "why_distinct": "Uses the empirically strongest discriminator (up_day_ratio_20) while incorporating drawdown sensitivity without requiring pullback_pct to be non-null for all cases; avoids the extremes seen in entity_3adc078f01 (-42.3% pullback yet selected_winner)",
+      "features": ["up_day_ratio_20", "pullback_pct"],
+      "capacity_relevance": "Requires validation that the conservative null penalty does not introduce systematic bias toward null-pullback cases; the experimental designer's pullback_null_outcome_differential test is a prerequisite"
+    },
+    {
+      "idea": "Volatility-momentum interaction conditional: select on mom_20 >= 0.15 AND vol_ratio_5_20 >= 1.3 only when pullback_pct is null OR > -10%; otherwise fall back to mom_20 >= 0.10 AND vol_ratio_5_20 <= 1.3 (low-volatility momentum)",
+      "why_distinct": "Directly addresses the confirmed high-risk pattern (high mom + high vol + ruin outcomes) by requiring drawdown data quality before allowing aggressive selection; respects missing data without ignoring it",
+      "features": ["mom_20", "vol_ratio_5_20", "pullback_pct"],
+      "capacity_relevance": "The experimental designer's vol_mom_interaction_ruin_predictor test (targeting >40% ruin rate in this interaction) should be run on frozen evidence before deploying this conditional logic"
+    },
+    {
+      "idea": "Downstream position-sizing inference: do not modify distinct1 until downstream B1/B2 components are documented—apply a temporary position-size reduction for high-vol_ratio_5_20 picks (>= 1.5) as a compensating control",
+      "why_distinct": "Acknowledges the skeptic's counterclaim that distinct1 may be intentionally momentum-only in a two-stage pipeline; adds a risk compensating control that does not require re-specifying distinct1's mechanism",
+      "features": ["vol_ratio_5_20"],
+      "capacity_relevance": "The experimental designer's downstream_position_size_inference test should validate whether such a control is warranted before deployment"
+    }
+  ]
+}

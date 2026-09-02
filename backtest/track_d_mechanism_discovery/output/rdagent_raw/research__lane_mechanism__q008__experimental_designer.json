@@ -1,0 +1,54 @@
+{
+  "tests": [
+    {
+      "name": "proxy_bucket_residual_rank_agreement",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within matched proxy-quintile cells (joint binning on the listed features), compare the Spearman rank correlation between B0_LANE and SCORE_BEFORE_LANE. The pure-proxy-collapse theory predicts the post-Lane rerank is near-identity inside each cell.",
+      "success_criterion": "Pooled within-bucket Spearman(B0_LANE, SCORE_BEFORE_LANE) > 0.90 AND at least 80% of populated buckets have Spearman > 0.85 — Lane adds nothing beyond the proxy composite.",
+      "failure_criterion": "Pooled within-bucket Spearman < 0.75 OR >40% of populated buckets have Spearman < 0.65 — Lane injects orthogonal information inside proxy-matched cells."
+    },
+    {
+      "name": "lane_neutral_proxy_conflict_concentration",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "ma20_slope_5"
+      ],
+      "comparison": "Standardize each feature cross-sectionally; flag a candidate as 'proxy_conflict' if sign(z_mom_20) != sign(z_ma10_slope_5) OR sign(z_vol_ratio) != sign(z_up_day_ratio). Compare LANE_NEUTRAL assignment rate in conflict cells vs aligned cells. Under proxy-collapse, neutral assignments track zero-crossings of the proxy z-blend.",
+      "success_criterion": "LANE_NEUTRAL rate in conflict cells is >= 2.0x the rate in aligned cells (chi-squared p<0.01) — Lane reports proxy discordance.",
+      "failure_criterion": "Conflict/aligned ratio < 1.5 with p>0.10 — LANE_NEUTRAL is defined by a non-proxy state, not by proxy sign-conflict."
+    },
+    {
+      "name": "proxy_only_b0_selection_auc",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma20_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Fit a logistic regression of B0_LANE assignment (1=selected, 0=not) on the listed proxies using only PIT values; include one quadratic term (mom_20^2) to capture non-linear saturation noted in the proxy extremes. Compute AUC and 5-fold cross-validated AUC. The pure-proxy theory predicts the model recovers Lane's selection surface.",
+      "success_criterion": "CV-AUC > 0.88 AND Brier score < 0.18 — Lane selection is reproducible from proxies.",
+      "failure_criterion": "CV-AUC < 0.72 OR Brier > 0.22 — Lane selection encodes a state not in the proxy panel."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm mom_20/vol_ratio_5_20/up_day_ratio_20/ma_slope features use only data available as of the IBD entry close, not forward-filled with post-entry prints; reject any row where the lookback window straddles the entry date inconsistently across features.",
+    "Verify pullback_duration_weeks and base_duration_weeks are computed from completed bases PRIOR to the current breakout trigger; exclude rows where the pullback window overlaps the entry bar (avoid forward-window leakage for these are pullback features)."
+  ],
+  "priority_order": [
+    "proxy_bucket_residual_rank_agreement",
+    "proxy_only_b0_selection_auc",
+    "lane_neutral_proxy_conflict_concentration"
+  ]
+}

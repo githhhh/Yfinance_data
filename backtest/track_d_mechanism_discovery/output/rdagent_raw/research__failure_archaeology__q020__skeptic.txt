@@ -1,0 +1,55 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The 'dry-up' accumulation signal is a label-conditioned artifact. The two 'big_winner' cases are defined entirely by their outcome (W4 >= 8%), and their shared low-vol_ratio_5_20 trait is dominated by snapshot clustering and proxy contamination from is_b0_pick=false, not an independent coiled-spring mechanism. Adding a 0.9-1.2 vol_ratio_5_20 tier will introduce more entity_40ea0cfb3b-style ruins than it captures winners because low short-term volume is at least as diagnostic of neglect/illiquidity/falling-knife continuation as it is of accumulation.",
+  "attacks": [
+    {
+      "issue": "Severe selection-on-the-outcome in the false_negative label definition",
+      "why_it_matters": "The 'false_negative_big_winner' class is constructed from stocks that (a) were rejected and (b) subsequently produced W4 >= 8%. Any 'pattern' observed within this class is a property of winners-once-rejected, not of rejected-stocks-in-general. Comparing medians of winners to medians of winners is circular; the only valid comparison is rejected-stocks-with-future-W4<8% vs. rejected-stocks-with-future-W4>=8%, which the method note does not show."
+    },
+    {
+      "issue": "Snapshot cluster confounder: >=4 of the 7 false-negatives and 2 of the 2 big-winner cases come from the single snapshot snap_71486ed83c",
+      "why_it_matters": "When one snapshot contributes >50% of the cases in a class of 7, the within-class feature distribution reflects market conditions on that one date (a quiet tape, a sector rotation, a holiday-thin session) rather than stock-level accumulation. The 'dry-up profile' is partially a same-day artifact, not a repeatable per-stock signal. Reproducing it out-of-sample requires multiple snapshots, not just more cases."
+    },
+    {
+      "issue": "Proxy contamination: vol_ratio_5_20, up_day_ratio_20, and pullback_pct are mechanically coupled through the recent price path",
+      "why_it_matters": "A 20-day window that just produced only -5% pullback with mom_20 = +0.06 mechanically produces low realized volatility, low short-term volume bursts, and a middling up-day ratio. These three features are not three independent signals; they are one signal (recent realized variance) measured three ways. Splitting them and calling each a separate 'gate' overcounts evidence and inflates the apparent standardized deltas."
+    },
+    {
+      "issue": "Counter-examples from the same snapshot prove the dry-up tier is unsafe",
+      "why_it_matters": "entity_40ea0cfb3b (snap_b8420124eb, vol_ratio_5_20=0.906, in the proposed 0.9-1.2 band, mom_20=0.024>0) is a B0-selected stock that RUINED. entity_ad2bfdee3f (snap_d0d57b1e40, vol_ratio_5_20=1.179, mom_20=-0.045) is a false-negative that produced only a small_win, not a large_win. These show the low-vol band is populated by both quiet accumulators and quiet deteriorations; the proposed up_day_ratio_20>=0.55 gate fails to separate them (entity_40ea0cfb3b has up_day_ratio_20=0.5, just below, but the proposed tier has no mechanism to keep it out at the next snapshot)."
+    },
+    {
+      "issue": "Standardized deltas are computed on n=2 and n=7 with no confidence intervals; the headline numbers (-1.05, -1.19) are not statistically distinguishable from zero",
+      "why_it_matters": "For n=7 the standard error of a median is approximately 1.25*IQR/sqrt(n). With IQRs around 0.2-0.4 on these scales, deltas of ~0.1-0.2 are within sampling noise. The claim 'standardized_delta = -1.19 is meaningful' requires bootstrap CIs the researcher did not provide; reporting only point estimates masquerades as evidence."
+    },
+    {
+      "issue": "The 'reduced pullback depth' of false-negatives is a mechanical consequence of weaker momentum, not a tight base",
+      "why_it_matters": "false-negative median pullback_pct = -7.3% vs. selected_winner = -15.9%. The winners had DEEPER pullbacks (-25.1% for entity_2c58cebc59, -42.3% for entity_3adc078f01). A shallower pullback simply means the stock did not have a marked prior high to correct from. Calling this 'tighter base' reverses the IBD-style pattern where deep bases precede the strongest breakouts; it is post-hoc rationalization of the data."
+    },
+    {
+      "issue": "is_b0_pick=false carries information that is not captured by the auxiliary variables the researcher proposes adding back",
+      "why_it_matters": "Stocks can be excluded from B0 for reasons beyond the few features in this dataset (sector exposure, earnings proximity, share-price liquidity, chart pattern type, news flow). The 'missed' signal could live in any of those unmeasured dimensions. Re-adding candidates via a 4-5 feature filter re-introduces all the original exclusions except the ones that happened to be captured by these proxies — a leaky sieve."
+    },
+    {
+      "issue": "The proposed mechanism ('supply absorption', 'coiled spring') is unfalsifiable within the snapshot",
+      "why_it_matters": "Accumulation and quiet distribution are observationally identical at a snapshot. Without order-flow, dark-pool, or short-interest data, the same feature vector (low vol, positive mom, shallow pullback) can be narrated as either. A mechanism that explains any data is a mechanism that explains nothing; the empirical claim must stand on predictive lift, not on a story."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "All snap_71486ed83c cases removed: do the remaining false-negatives still cluster in the 0.9-1.2 vol_ratio_5_20 band? If the dry-up profile disappears when the dominant snapshot is dropped, the claim is a same-day artifact.",
+    "Stocks with vol_ratio_5_20 in [0.9, 1.2] and up_day_ratio_20 >= 0.55 that DID NOT become big winners (failed dry-up candidates). Their frequency vs. the big-winner frequency in the same band is the only honest base-rate check. Specifically: how many such stocks ruined or had negative W4 in the discovery window?",
+    "Pairs matched on is_b0_pick=false, sector, and snapshot but differing in vol_ratio_5_20 (0.9 vs 1.6). If outcomes are uncorrelated with vol_ratio_5_20 within these pairs, vol_ratio_5_20 is not the signal.",
+    "Pre-period stability: do the same feature thresholds (vol_ratio_5_20 in [0.9,1.2], up_day_ratio_20 >= 0.55, mom_20 > 0) predict winners in the prior year? If not, the pattern is regime-specific and should not be deployed.",
+    "Look at entity_8ad5cd4795 specifically: a SELECTED winner (large_win) with vol_ratio_5_20=0.996 and ma20_slope_5=-0.0034. By the proposed dry-up logic this should have been a false-negative, but it was selected. Its presence in the winner column argues the existing filter is not systematically rejecting dry-up names — it accepted one already."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample backtest on >=200 stocks outside the discovery window where the proposed dry-up tier achieves a large-win precision at least 1.5x the current B0-only baseline, with destroyed precision-on-ruin not statistically worse, and with the lift holding when snap_71486ed83c is excluded.",
+    "A within-snapshot matched analysis: conditioning on snapshot, sector, and is_b0_pick=false, the residual vol_ratio_5_20 band [0.9,1.2] predicts W4>=8% with odds ratio > 2 and p < 0.01 via logistic regression with appropriate multiple-testing correction.",
+    "Demonstration that the same feature set does NOT identify quiet-distribution names: i.e., vol_ratio_5_20 in [0.9,1.2] combined with negative mom_60 or negative ma50_slope_10 must NOT also predict wins, otherwise the 'signal' is just low-volatility drift in general.",
+    "Independent confirmation that the apparent standardized deltas on mom_20, vol_ratio_5_20, and up_day_ratio_20 persist with non-overlapping bootstrap 95% CIs when recomputed on the same 7-vs-11 medians via permutation.",
+    "Any feature beyond those already in the table that the B0 filter uses and that, when added to the model, removes the marginal value of the proposed dry-up tier — i.e., showing the tier was reverse-engineered from winners rather than from the rejection logic."
+  ]
+}
+```

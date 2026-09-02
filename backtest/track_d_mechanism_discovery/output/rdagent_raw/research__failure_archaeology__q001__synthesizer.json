@@ -1,0 +1,72 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The core pattern (high vol_ratio_5_20 + borderline up_day_ratio_20 → ruin under pullback) is directionally present in the 27-case discovery set but rests on insufficient evidence. The experimental designer's collinearity test is critical: if VIF >= 5 for up_day_ratio_20 after accounting for mom_20, the primary predictor is redundant—not independent. The volatility-normalized pullback test addresses the skeptic's strongest attack (trivial mean-reversion); if false_positive_ruin normalized depth is NOT shallower than selected_winner, the entire mechanism collapses to a distributional artifact. With N=27 and only 8 ruin events, threshold derivation is unstable; the 0.60/1.40 values could shift substantially with modest sample changes. Snapshot heterogeneity remains unresolved: if false_positive_ruin cases concentrate in 2-3 snapshots while selected_winners distribute across 6+, the pooled pattern may reflect regime timing rather than a filterable precursor. The proxy-redundancy attack is partially validated by the numeric contrasts (up_day_ratio_20 standardized_delta -1.1882 vs mom_20 -1.0005), suggesting these metrics capture overlapping variance. The mechanism is plausible but not demonstrated as robust, independent, or prospectively validated.",
+  "falsifiers": [
+    "VIF for up_day_ratio_20 >= 5 in a multivariate model containing mom_20 and up_day_ratio_20 → mechanism collapses to momentum proxy with no independent signal",
+    "Within-snapshot consistency test fails (effect direction reverses in >50% of snapshots) → pooled pattern is regime artifact, not generalizable filter rule",
+    "Volatility-normalized pullback depth shows NO significant difference between false_positive_ruin and selected_winner (Mann-Whitney p >= 0.10) → shallow pullbacks are trivial consequence of high-volatility baseline, not a distinct failure mode",
+    "Threshold sensitivity bootstrap: ruin rate difference between cells < 5 percentage points when thresholds shift ±0.05 → current thresholds are overfitted to N=27, not stable across sampling variation",
+    "Prospective holdout validation: applying proposed filters (up_day_ratio_20 >= 0.60, vol_ratio_5_20 <= 1.40) to held-out snapshot(s) shows ruin rate reduction < 5 percentage points vs baseline → mechanism does not generalize to unseen data",
+    "Counterexample found: B0 pick with up_day_ratio_20 >= 0.65 AND vol_ratio_5_20 > 1.50 that subsequently ruined → protective effect of consistent up-day ratio does not hold under high churn conditions",
+    "Counterexample found: B0 pick with vol_ratio_5_20 > 1.60 that recovered from pullback exceeding -20% without ruin → vol_ratio dissociation from shallow-pullback-failure mechanism",
+    "Interaction test fails: vol_ratio_5_20 predicts ruin regardless of mom_20 level, or mom_20 fully mediates vol_ratio_5_20 effect → vol_ratio is not an independent mechanism but rather re-expresses momentum state"
+  ],
+  "actionable_design_principles": [
+    "Run collinearity_vif_test BEFORE any threshold derivation—the result determines whether up_day_ratio_20 survives as an independent predictor or must be dropped in favor of mom_20 alone",
+    "Prioritize volatility_normalized_pullback_test in the validation sequence—it is the binary split between a real mechanism vs a statistical artifact, and all downstream policy depends on its outcome",
+    "Use within_snapshot_consistency_test to identify which snapshots drive the pooled effect; if effect is snapshot-specific, the mechanism claim must be scoped to those regimes rather than applied universally",
+    "Threshold sensitivity bootstrap must use leave-one-snapshot-out (not leave-one-case-out) cross-validation to prevent snapshot-level leakage in threshold selection",
+    "Do not operationalize pullback_pct or pullback_duration_weeks as entry filters—they are post-snapshot measurements; any filter rule must use only snapshot-time features (up_day_ratio_20, vol_ratio_5_20, mom_20, MA slopes)",
+    "Distinguish predictive mechanism from position-sizing effect: the claim that borderline candidates warrant 50% position size is a separate hypothesis requiring distinct validation (e.g., differential win-rate or risk-adjusted return across size conditions)",
+    "Require prospective validation with minimum N=50 held-out B0 picks before implementing any filter rule in live allocation—this is a discovery-train sample, not a validation sample",
+    "The 'selected_winner' comparison class includes survivorship bias by definition; for a cleaner counterfactual, include false_negative_relative cases in the comparison to avoid comparing documented failures only to documented successes"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage filter with conditional momentum override: stage 1 rejects B0 candidates with up_day_ratio_20 < 0.55 OR vol_ratio_5_20 > 1.50; stage 2 for borderline candidates (0.50 <= up_day_ratio_20 <= 0.60, 1.30 <= vol_ratio_5_20 <= 1.50) applies mom_20 > 0.20 as override criterion",
+      "why_distinct": "This structure separates the clear-reject zone from the ambiguous zone, avoiding binary threshold brittleness; the conditional override acknowledges the mechanism's prediction that high momentum can compensate for borderline internals",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "HIGH—directly addresses the primary mechanism claim; capacity to reduce ruin exposure on the ~25% of borderline B0 picks that currently generate disproportionate loss"
+    },
+    {
+      "idea": "Volatility-adjusted position sizing: scale position size inversely with vol_ratio_5_20 for B0 picks where up_day_ratio_20 is borderline (0.50-0.60), rather than rejecting outright; full size only when up_day_ratio_20 >= 0.65 AND vol_ratio_5_20 <= 1.30",
+      "why_distinct": "This translates the mechanism into a risk-management response (position geometry) rather than a hard filter, preserving upside optionality on cases where the mechanism is uncertain while reducing ruin exposure via geometric exposure management",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "MEDIUM—operationalizes the mechanism's risk gradient rather than binary accept/reject; capacity depends on whether the vol_ratio sizing factor meaningfully differentiates ex-post outcomes"
+    },
+    {
+      "idea": "Momentum decomposition check: require up_day_ratio_20 >= 0.60 AND mom_20 >= 0.15 to confirm consistency (both metrics should agree on directional persistence); flag cases where they diverge (e.g., mom_20 >= 0.20 but up_day_ratio_20 < 0.50) for manual review",
+      "why_distinct": "This directly addresses the proxy-redundancy attack by using the agreement/disagreement between metrics as a diagnostic signal; divergence may indicate measurement noise or regime-specific distortions that warrant human adjudication",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "MEDIUM—reduces false positives by catching cases where momentum is concentrated in a few large up days rather than distributed; less aggressive than hard filter, more diagnostic than raw threshold"
+    },
+    {
+      "idea": "Snapshot-regime conditional application: apply filter rules only when snapshot's median vol_ratio_5_20 >= 1.30 (high-churn regime); in low-churn snapshots (median vol_ratio_5_20 < 1.20), the mechanism may not apply and filters should be relaxed",
+      "why_distinct": "This scopes the mechanism to the regime where it is hypothesized to operate, avoiding cross-regime generalization that the within-snapshot consistency test would flag as inappropriate; prevents over-filtering in low-volatility environments where the mechanism may be inactive",
+      "features": [
+        "vol_ratio_5_20",
+        "snapshot-level median vol_ratio_5_20"
+      ],
+      "capacity_relevance": "LOW-MEDIUM—conditional application limits capacity utilization to high-churn snapshots; may miss opportunities in low-churn regimes if the mechanism actually generalizes there"
+    },
+    {
+      "idea": "Hold implementation until collinearity and within-snapshot tests pass with pre-registered thresholds; use interim period to accumulate prospective validation cases for power analysis",
+      "why_distinct": "This is a meta-policy rather than a filter rule—acknowledges that current evidence is insufficient for live deployment and prioritizes test execution over premature policy deployment; preserves capital during the validation gap",
+      "features": [
+        "none (meta-policy)"
+      ],
+      "capacity_relevance": "HIGH—to the extent that capacity is preserved from avoiding false-positive filters; no capacity consumed during validation period"
+    }
+  ]
+}

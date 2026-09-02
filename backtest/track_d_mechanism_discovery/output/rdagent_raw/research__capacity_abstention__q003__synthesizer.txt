@@ -1,0 +1,67 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 47,
+  "mechanism_summary": "Under large Top1-Top2 quality gaps, the adaptive capacity rule hypothesizes that the marginal PIT-observable alpha of slots 2 and 3 is negative-expectancy because (i) false-negative pools show systematic decay on the same features that identify Top1 success (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50; standardized deltas −0.6 to −1.2 σ), (ii) ruin probability compounds multiplicatively with slot count under independent ruin (3× surface for 3 slots vs 1× for 1 slot), and (iii) base-duration and pullback-depth decay signals suggest structural rather than transient weakness. However, the contrast is a downstream cohort signature (false_negative_minus_selected_winner), not a direct Top1-vs-Top2 measurement at decision time; the rule therefore stands or falls on whether the gap is PIT-constructible AND monotone in the same cohort signal under symmetric labeling. The architecture must separate predictive mechanism (gap estimation) from portfolio-construction effect (slot count × sizing × ruin-cluster correlation), because concentration to 1 slot and dilution to 3 slots trade off in a regime-conditional way that is not currently identifiable from n=27 with n=2 false-negative big-winners and snapshot-level ruin clustering on only 3 snapshots.",
+  "falsifiers": [
+    "PRIMARY FALSIFIER — PIT_computable_gap_score_construction (Experimental Designer test 4): if the decision-time-computable gap (z-score difference on the 4-feature composite) is undefined for >20% of Top1×Top2 pairs OR its tercile partition fails to reproduce the false_negative-vs-selected_winner cohort separation with ≥0.5 σ on any single composite feature, the rule has no operational anchor at decision time and must be rejected. This is the load-bearing test because the entire adaptive logic depends on a measurable, pre-entry gap.",
+    "SECONDARY FALSIFIER — symmetric_labeling_contrast_retest (test 5): if recomputing the 10 PIT-feature standardized deltas under symmetric B0-vs-non-B0 labeling restricted to w4_return_bucket=='large_win' compresses the deltas to the [−0.3, +0.3] band on ≥7 of 10 features, the apparent quality gradient is a tautological artifact of the asymmetric outcome-based cohort construction, not an empirical signal.",
+    "TERTIARY FALSIFIER — top1_ruin_tail_capacity1_falsifier (test 9): if Top1 ruin rate in the high-gap stratum is ≥35% OR loss+ruin rate is ≥60%, then concentrating to 1 slot under high-gap conditions amplifies a tail that is itself ruin-prone; the 'Top1 conviction' premise of capacity=1 collapses and the rule must instead throttle to 0 (full abstain) or apply sizing haircuts.",
+    "QUATERNARY FALSIFIER — snapshot_ruin_clustering_independence_test (test 3): if observed co-ruin rate among snapshot-co-occurring entities is ≥2× the independence null P_ruin^2, then diversification across slots within a hostile snapshot provides little variance reduction; the diversification benefit that could justify capacity=2 or 3 disappears, and capacity must become a regime throttle (0 or 1) rather than a conviction expression.",
+    "INTERACTION-TERM FALSIFIER: if a regression of realized W4 return on (slot_count × gap_bucket) restricted to the high-gap bucket produces a non-negative or statistically insignificant coefficient on slot_count, the gap-conditional concentration hypothesis fails empirically and the adaptive rule is no better than a fixed-capacity baseline.",
+    "MNAR FALSIFIER — test 8: if pullback_pct delta collapses to <+2pp or reverses sign after median-imputation of the 11/27 null pullback cases stratified by is_b0_pick and snapshot_anon, the 'deep-base = winner' mechanism is selection-biased by missingness and cannot anchor the gap definition."
+  ],
+  "actionable_design_principles": [
+    "Separate the predictive mechanism (PIT-computable Top1−Top2 gap) from the portfolio-construction effect (slot count × per-slot weight × ruin-cluster correlation). The rule must be expressible as gap(g) → capacity(c) → sizing(w), and each step must be independently falsifiable.",
+    "Distinguish capacity (number of slots) from sizing (per-slot weight). Capacity=1 with 100% allocation is economically different from capacity=1 with 60% allocation + 40% cash; capacity=2 equal-weight is different from capacity=2 with 60/40 Top1-heavy. The archaeology supports slot-count analysis but does not yet justify any specific weight scheme.",
+    "The adaptive rule must encode a 0-slot fallback. The evidence that B0 itself ruins in 8/27 cases (≈30% ruin rate on the selected cohort) and that ruin clusters within snapshots (snap_71486ed83c, snap_b8420124eb, snap_d0d57b1e40) means even Top1 conviction is not a sufficient condition for deployment; the rule must allow full abstain when both Top1 ruin-tail probability AND snapshot-cluster ruin probability are simultaneously elevated.",
+    "Treat the false-negative cost (missed big winners like entity_535a1beed7 and entity_de1c657364) as an explicit calibration ceiling. With n=2 false-negative big-winners under the strict ≥8% W4 AND ≥5pp-above-median bar, the cost-of-concentration is empirically small; the rule must not over-weight it relative to the n=8 false-positive-ruin cost.",
+    "The rule should be expressed as a tiered regime: (a) high-gap + low-snapshot-ruin-cluster → capacity=1, full weight; (b) high-gap + high-snapshot-ruin-cluster → capacity=0; (c) low-gap → capacity=2 or 3 with equal weight. This separates regime throttling from conviction expression.",
+    "Any deployment of the adaptive rule must include a holdout validation step on the symmetric-labeling retest before live use. The tautology risk is the dominant epistemic threat and must be closed before the rule is trusted."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "regime_gap_capacity_policy",
+      "why_distinct": "Encodes the gap-thresholded capacity logic with explicit separation of gap estimation, capacity selection, and sizing; allows 0-slot abstain as a first-class state rather than treating it as a corner case.",
+      "features": [
+        "pit_gap_score = abs(z_composite(Top1) - z_composite(Top2)) computed on {mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50} via cross-sectional z-scoring within snapshot_anon",
+        "snapshot_ruin_cluster_rate = count(w4_return_bucket=='ruin') / count(co-occurring entities in same snapshot_anon)",
+        "top1_ruin_tail_prob = empirical ruin rate of Top1 conditioned on pit_gap_score tercile == 'high'"
+      ],
+      "capacity_relevance": "Outputs capacity ∈ {0, 1, 2, 3} via piecewise rule: capacity=0 if snapshot_ruin_cluster_rate ≥ 0.4 OR top1_ruin_tail_prob ≥ 0.35; capacity=1 if pit_gap_score ≥ τ_high; capacity=2 if τ_low ≤ pit_gap_score < τ_high; capacity=3 if pit_gap_score < τ_low. Sizing is then applied within the chosen capacity (equal-weight within slot count by default)."
+    },
+    {
+      "idea": "capacity_with_sizing_haircut_policy",
+      "why_distinct": "Holds slot count at the adaptive output but applies a per-slot weight haircut proportional to ruin-tail probability; this is the test-2 (position_sizing_adjusted_ruin_per_dollar) operationalization and lets the rule express 'capacity=1 with conviction' vs 'capacity=1 with reduced exposure' as distinct economic choices.",
+      "features": [
+        "slot_weight = clip(1 - ruin_per_dollar_estimate, 0.4, 1.0)",
+        "ruin_per_dollar_estimate = empirical ruin rate × ruin magnitude (ruin = -1.0) conditioned on gap tercile and snapshot cluster",
+        "capacity_cash_residual = 1.0 - sum(slot_weights)"
+      ],
+      "capacity_relevance": "When the adaptive capacity rule outputs capacity=1 but ruin_per_dollar_estimate is elevated (e.g., 0.5), the effective deployment becomes 50% Top1 + 50% cash; this is economically distinct from capacity=1 with full weight and should be tracked as a separate outcome class in any backtest."
+    },
+    {
+      "idea": "snapshot_regime_throttle_policy",
+      "why_distinct": "A pure regime throttle that ignores the Top1-Top2 gap and instead conditions capacity on snapshot-level ruin clustering alone; this is the test-7 (ruin_cluster_snapshot_throttle_test) operationalization and serves as a falsification benchmark — if this throttle alone outperforms the gap-based rule, the gap component adds no value.",
+      "features": [
+        "snapshot_ruin_count = count(w4_return_bucket in {'ruin', 'loss'} for entities in snapshot_anon)",
+        "snapshot_size = count(entities in snapshot_anon)",
+        "snapshot_hostility = snapshot_ruin_count / snapshot_size"
+      ],
+      "capacity_relevance": "capacity=0 if snapshot_hostility ≥ 0.5; capacity=1 if 0.25 ≤ snapshot_hostility < 0.5; capacity=3 otherwise. This policy is intentionally gap-blind and is the cleanest comparison benchmark for the gap-conditional rule."
+    },
+    {
+      "idea": "adaptive_capacity_with_concentration_premium",
+      "why_distinct": "Augments the gap-conditional capacity rule with an explicit concentration-premium adjustment: when capacity=1 in a high-gap regime, the policy adds a conviction-multiplier to the slot weight (e.g., 1.0–1.3×) financed by reducing future capacity in adjacent regimes; this operationalizes the economic meaning that 1-position deployment under high gap is 'full Top1 conviction' rather than 'default minimum'.",
+      "features": [
+        "concentration_premium = 1.0 + α × pit_gap_score where α is calibrated against historical Top1 hit rate in high-gap regime",
+        "slot_weight_top1 = clip(concentration_premium × base_weight, 0.0, 1.0)",
+        "cash_residual = 1.0 - slot_weight_top1"
+      ],
+      "capacity_relevance": "Makes capacity=1 economically meaningful as concentrated conviction (not just undiversified default) by encoding that the high-gap signal is itself the rationale for both reducing slot count AND increasing per-slot conviction — the two effects are coupled rather than independent."
+    }
+  ]
+}
+```

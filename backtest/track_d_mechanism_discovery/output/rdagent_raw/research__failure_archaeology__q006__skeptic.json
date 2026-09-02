@@ -1,0 +1,41 @@
+{
+  "strongest_counterclaim": "The up_day_ratio_20 mechanism is a proxy for market-wide momentum regime rather than stock-specific accumulation quality. B0 ruination in the observed sample is driven by adverse market conditions during the holding period, not by pre-entry weakness in institutional backing. The correlation between low up_day_ratio_20 and ruin is spurious—both are downstream of the same market regime variable that the study does not control for.",
+  "attacks": [
+    {
+      "issue": "up_day_ratio_20 is confounded with market-wide directional bias",
+      "why_it_matters": "up_day_ratio_20 measures the fraction of up days over 20 trading sessions—a stock-relative metric that is mechanically lower when the broad market is choppy or declining. If the researcher observes ruin cases with low up_day_ratio_20, this could simply reflect that those B0 picks were made during unfavorable market regimes, not that the stocks lacked institutional backing. The mechanism conflates stock-level accumulation with market-level trend quality. Controlling for S&P 500 or sector index return during the same 20-day window is required before attributing ruination to accumulation failure."
+    },
+    {
+      "issue": "Selection-on-dependent-variables bias in snapshot composition",
+      "why_it_matters": "The 27 cases are drawn from multiple snapshots (snap_724342c280, snap_71486ed83c, snap_d0d57b1e40, etc.) that are themselves time-stamped market conditions. snap_71486ed83c contributes 8 entities including multiple false_negatives and false_positive_ruin. If that snapshot corresponds to a market-wide distribution day failure or sector rotation event, all B0 picks from that snapshot inherit the adverse conditions regardless of their pre-entry accumulation metrics. The apparent predictive power of up_day_ratio_20 may be an artifact of which snapshot a case belongs to, not a stock-picking signal."
+    },
+    {
+      "issue": "The policy filter using up_day_ratio_20 < 0.60 AND mom_20 < 0.15 would have rejected entity_2f86543bf6 and entity_90a828939a, both large_win outcomes",
+      "why_it_matters": "entity_2f86543bf6: up_day_ratio_20 = 0.35, mom_20 = -0.008, ma20_slope_5 = -0.0078 (near-zero or negative on all trend metrics) yet landed in large_win. entity_90a828939a: up_day_ratio_20 = 0.45, mom_20 = 0.036, px_vs_ma20 = 0.018 (tight consolidation, weak momentum) yet also large_win. These are not edge cases—they violate both conjunctive conditions of the hard filter. If the hard filter had been applied historically, it would have eliminated at least 2 of 11 selected_winners, demonstrating that the filter is not just imprecise but actively destructive to the winning subset."
+    },
+    {
+      "issue": "Pullback_pct and pullback_duration_weeks are used to label outcomes but are not distinguished from causal drivers",
+      "why_it_matters": "The mechanism claims weak accumulation causes pullback-induced ruination. But in the data, pullback_pct is an outcome variable (used to construct the outcome_label). The researcher cannot use the same variable as both cause and effect. The true causal chain is: entry conditions → (unobserved) market response → pullback observed → outcome labeled. The mechanism skips the market-response step and attributes it entirely to accumulation quality. If a market-wide -8% event occurs 4 weeks post-entry, every B0 pick from that regime shows a pullback regardless of pre-entry accumulation—this is not a stock-picking failure."
+    },
+    {
+      "issue": "The vol_ratio_5_20 separator for ruin cases (1.31–1.38 range) overlaps completely with selected_winners",
+      "why_it_matters": "Selected winners entity_8f0df3d38e (1.24), entity_ead73f4390 (1.77), entity_2c58cebc59 (1.62), entity_3adc078f01 (1.14), entity_55c2da490e (1.27) span the same 1.1–1.8 range as the ruin cases. vol_ratio_5_20 cannot discriminate winners from ruins. The researcher identifies the 1.31–1.38 range as 'elevated but not extreme—consistent with noisy accumulation' but provides no statistical test for the separation, no p-value, and no holdout validation. This is pattern-matching on a sample of 8 ruin cases."
+    },
+    {
+      "issue": "The stop-loss rule at -12% drawdown is informationally impossible to execute",
+      "why_it_matters": "The policy states: 'if a B0 pick with up_day_ratio_20 ≤ 0.65 reaches -12% drawdown before week 4, exit fully.' The -12% drawdown is observable only after it occurs. The decision to exit must be made at the point when the drawdown reaches -12%, which means the stop is triggered at the bottom, not before it. This rule cannot prevent the 'ruin cascade'—it can only cap it after the damage is partially done. The rule is a post-hoc position management description, not a predictive filter."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with up_day_ratio_20 ≥ 0.75, mom_20 ≥ 0.20, and vol_ratio_5_20 ≥ 1.5 that experiences a -20%+ drawdown within 6 weeks and lands in the ruin bucket, where the drawdown is clearly sector-specific (sector ETF drops >10% in the same window) rather than stock-unique—this would confirm market regime as the driver, not accumulation quality.",
+    "A B0 pick from the same snapshot as a ruin case (e.g., snap_71486ed83c) that has up_day_ratio_20 in the 0.40–0.55 range and mom_20 in the 0.05–0.15 range but still produces a selected_winner outcome—this would directly falsify the hard filter claim.",
+    "Cross-snapshot analysis: for snapshots where the majority of B0 picks are false_positive_ruin (e.g., snap_d0d57b1e40 has entity_6618d3e80c as ruin|winner and entity_84824e6a20 as ruin), examine whether sector ETF returns in the subsequent 8 weeks were negative. If so, the ruin outcomes are market-driven.",
+    "A B0 pick with up_day_ratio_20 in 0.60–0.70, mom_20 in 0.10–0.20, vol_ratio_5_20 < 1.1 (low volume, below-average volatility) that still produces a large_win outcome—this would contradict the vol_ratio_5_20 > 1.25 soft-filter recommendation."
+  ],
+  "what_would_change_my_mind": [
+    "A controlled analysis matching B0 picks to market returns in the same sector/industry during the 4–8 week post-entry window. If the relationship between up_day_ratio_20 and ruin survives after residualizing on sector returns, then the accumulation mechanism has independent predictive value.",
+    "Out-of-sample validation on a separate set of B0 picks from snapshots not used in the discovery sample, showing that the up_day_ratio_20 < 0.60 AND mom_20 < 0.15 filter rejects at least 60% of eventual ruin cases while rejecting fewer than 30% of eventual selected_winners.",
+    "A fundamental data point: IBD relative strength rating or institutional sponsorship score at snapshot time. If ruin cases have systematically lower RS ratings than selected_winners with similar up_day_ratio_20, this would confirm that up_day_ratio_20 is a proxy for, but not the cause of, institutional backing.",
+    "Evidence that the mechanism generalizes across market regimes: the same up_day_ratio_20 thresholds produce the same ruin rates in both bull-market and bear-market periods, demonstrating that the signal is not regime-dependent."
+  ]
+}

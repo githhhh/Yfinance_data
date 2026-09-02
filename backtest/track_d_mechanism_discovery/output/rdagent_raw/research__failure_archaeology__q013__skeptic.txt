@@ -1,0 +1,50 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The entire 'stealth momentum' mechanism is a sample-composition artifact: the 27 cases are drawn exclusively from observed non-picks that became winners, with no denominator from the full population of non-picks. Any feature profile that characterizes this biased subset is not a predictor—it is a post-hoc description of stocks that succeeded despite being ignored. The proposed thresholds (up_day_ratio_20 ≤ 0.55, vol_ratio_5_20 < 1.30, mom_20 ~0.05-0.12) likely describe a large fraction of the entire non-pick universe, most of which do not become large winners.",
+  "attacks": [
+    {
+      "issue": "No non-pick failure denominator",
+      "why_it_matters": "The 27 cases are drawn from the universe of observed non-picks that became winners (or mixed outcomes). There is no data on how many non-picks with up_day_ratio_20 ≤ 0.55 and vol_ratio_5_20 < 1.30 did NOT become large winners. The numeric contrasts compare false negatives to B0-selected winners, not to non-picks that failed. A predictor requires P(win | features, non-pick) >> P(win | non-pick baseline). This baseline is absent."
+    },
+    {
+      "issue": "Proxy variable conflation: low features describe ignored stocks, not winning stocks",
+      "why_it_matters": "Low up_day_ratio_20, low vol_ratio_5_20, and tight ibd_entry_close_vs_trigger_pct are not causal drivers—they are descriptors of stocks that are not yet in favor. The researcher infers that these features predict accumulation and subsequent breakout, but the data only shows they describe resting-phase stocks. Most resting-phase stocks do not subsequently break out large; the analysis cannot distinguish the subset that will."
+    },
+    {
+      "issue": "Snapshot temporality confusion",
+      "why_it_matters": "The snapshot features (e.g., mom_20 = 0.058, vol_ratio_5_20 = 1.179) are measured at the non-pick decision point. The researcher treats these as leading indicators, but they may be contemporaneous descriptions of a base-building phase that has no directional implication. The stock's subsequent large win may be caused by post-snapshot accumulation, news, or sector rotation—not by the low-momentum profile visible at snapshot."
+    },
+    {
+      "issue": "NULL pullback is not equivalent to 'breakout path'",
+      "why_it_matters": "Three of the five false_negative_big_winner cases (entity_535a1beed7, entity_05b4c6b1f7) have null pullback_duration_weeks and null pullback_pct. The researcher treats this as evidence of a 'no-pullback breakout path.' However, null pullback fields may indicate: (a) data not recorded, (b) the stock had not yet entered a pullback phase at snapshot, or (c) the stock did not pull back in the measured window. Conflating null with 'breakout path' doubles the apparent support for the mechanism with data that is operationally undefined."
+    },
+    {
+      "issue": "Retroactive threshold tuning on a discovery sample",
+      "why_it_matters": "The proposed feature ranges (mom_20 0.05-0.12, pullback_pct -5% to -15%, ibd_entry_close_vs_trigger_pct <0.025) are derived from the same 27-case discovery set used to generate predictions. There is no holdout validation. Any set of features can be tuned to appear discriminating on a small, outcome-biased sample. The 60% hit-rate prediction and the vol_ratio_5_20 ≥1.40 threshold are post-hoc constructions, not out-of-sample hypotheses."
+    },
+    {
+      "issue": "Feature profiles overlap with confirmed false positives",
+      "why_it_matters": "entity_84824e6a20 (false_positive_ruin) has up_day_ratio_20 = 0.40, vol_ratio_5_20 = 1.625, mom_20 = 0.067, ibd_entry_close_vs_trigger_pct = 0.074. It violates the proposed thresholds on vol_ratio and IBD entry distance yet is a ruin outcome—not a large winner. This is not a rare outlier: several other false_positive_ruin cases have low up_day_ratio_20 (0.40-0.50) and low mom_20 (0.07-0.10), matching the 'stealth momentum' profile while producing catastrophic losses. The feature profile does not discriminate winners from ruin among non-picks."
+    },
+    {
+      "issue": "The is_b0_pick flag is endogenous to the features under study",
+      "why_it_matters": "B0 selection likely already incorporates (or inversely correlates with) these same features: stocks with low momentum, low volume, and tight IBD entry distances are precisely the stocks B0 is designed to exclude. Treating false negatives as an 'unjustly missed' subgroup while using features that B0 explicitly deweights is circular: B0's rejection of these stocks is the mechanism that defines the false-negative category. The proposed policy change (lowering the B0 threshold) would partially undo B0's filtering, likely increasing false positives proportionally."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A random sample of 100 non-picks with up_day_ratio_20 ≤ 0.55, vol_ratio_5_20 < 1.30, mom_20 between 0.05 and 0.12, and ibd_entry_close_vs_trigger_pct < 0.025 that did NOT become large winners (small win, loss, or ruin)—to establish the baseline hit rate without selection bias.",
+    "Non-picks with identical 'stealth momentum' profiles at different snapshot dates for the same entity, where one snapshot produced a large win and another produced a loss—testing whether the features are stable predictors or incidental state descriptors.",
+    "A time-matched control set: for each false-negative big winner, find 3-5 non-picks from the same snapshot window with similar feature profiles that did not become large winners, to test whether the profile is necessary or merely coincidental.",
+    "Stocks that were non-picks due to is_b0_pick = false with high vol_ratio_5_20 (>1.60) and high mom_20 (>0.20) that became large winners—showing that the 'anti-stealth' profile can also produce false-negative big winners, undermining the specificity of the mechanism."
+  ],
+  "what_would_change_my_mind": [
+    "A prospective validation study with a held-out set of non-picks from a time period after the discovery sample, showing that applying the stealth-momentum filter (up_day_ratio_20 ≤ 0.55, vol_ratio_5_20 < 1.30, mom_20 in [0.05, 0.12], pullback_pct in [-15%, -5%] or null) selects a subgroup with ≥55% large-win rate, significantly above the baseline large-win rate for all non-picks.",
+    "Evidence that the low-momentum profile at snapshot is orthogonal to B0's selection criteria—that B0 is not already filtering on these features in a way that makes their reintroduction redundant or counterproductive.",
+    "A mechanistic story that is not purely descriptive: evidence that low up_day_ratio_20 reflects deliberate institutional accumulation (e.g., correlated with off-exchange volume, dark pool activity, or options positioning at snapshot), not merely low retail interest.",
+    "A demonstration that stocks with NULL pullback fields are operationally equivalent to breakout-path stocks (e.g., confirmed no-pullback base by independent chart review), rather than data artifacts.",
+    "Replication of the numeric contrasts on a second, independent set of false negatives identified by the same methodology, showing consistent median deltas across features."
+  ]
+}
+```

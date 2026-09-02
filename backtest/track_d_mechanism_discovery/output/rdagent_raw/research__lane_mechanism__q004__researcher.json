@@ -1,0 +1,19 @@
+{
+  "mechanism_claim": "In constructive pullback weeks (pullback_duration_weeks 3-9, pullback_pct -5 to -25, ma10_slope_5>0, px_vs_ma20>0), Lane assignment carries limited INDEPENDENT predictive information beyond what ma10_slope_5, mom_20, up_day_ratio_20, and pullback geometry already encode. B0_LANE wins in this regime are largely a restatement of the technical constructive-pullback signature; SCORE_BEFORE_LANE should correlate tightly (>0.7) with the post-Lane composite, and LANE_NEUTRAL cases matched on those technicals should show non-trivially similar base win rates to B0_LANE.",
+  "evidence_for": [
+    "Constructive-pullback false positives (e.g., entity_8f0df3d38e: B0=true, 7wk/-16.2% pullback, ma10_slope=0.054, up_day_ratio=0.65 -> false_positive_ruin; entity_55c2da490e: B0=true, 7wk/-12.3%, slopes positive -> ruin) show Lane endorses setups whose technicals look constructive yet fail, indicating Lane does not filter out the failure mode in this regime.",
+    "Constructive-pullback false negative big winners (e.g., entity_de1c657364: NOT B0, 8wk/-7.3%, ma10_slope=0.030, mom_20=0.058, up_day_ratio=0.65 -> false_negative_big_winner) demonstrate Lane rejects technically healthy pullbacks that subsequently rip, consistent with Lane adding noise rather than signal when the structural inputs already qualify."
+  ],
+  "evidence_against": [
+    "Numeric contrasts show selected_winners separate from false_negatives on mom_20 (+0.10), vol_ratio_5_20 (+0.24), up_day_ratio_20 (+0.125), and px_vs_ma50 (+0.07) — directional leadership proxies that Lane *could* encode independently of raw slope/MA features, so a residual Lane effect cannot be ruled out without matched-cohort testing.",
+    "Mixed false_positive_ruin|selected_winner (entity_6618d3e80c) at high px_vs_ma50=0.337 shows Lane can resolve genuinely strong leadership even within constructive pullback context, hinting Lane may still discriminate on accumulation/relative-strength dimensions."
+  ],
+  "falsifiable_predictions": [
+    "In a cohort of constructive pullback weeks matched on ma10_slope_5 quintile, mom_20 quintile, and pullback_duration_weeks bucket, the B0_LANE vs LANE_NEUTRAL hit-rate gap on W4>=8% should be <3pp (indifference); a gap >6pp would falsify the redundancy claim.",
+    "Spearman(SCORE_BEFORE_LANE, post-Lane composite) within the constructive-pullback subsample should exceed 0.70; values <0.55 would imply Lane injects substantial independent information."
+  ],
+  "policy_implications": [
+    "De-weight or remove the Lane penalty/bonus specifically when the constructive-pullback gate fires (pullback 3-9wk, slopes positive, px_vs_ma20>0); let the technical composite drive ranking, which should reduce false_positive_ruin exposure (entity_8f0df3d38e, entity_55c2da490e archetypes) without losing the false_negative_big_winner cases Lane wrongly rejected (entity_de1c657364 archetype).",
+    "Reserve Lane as an override only in non-constructive regimes (deep bear pullbacks >-25%, flat/negative slopes, or post-breakout continuations) where the technical signature is ambiguous and Lane's leadership read provides the dominant signal."
+  ]
+}

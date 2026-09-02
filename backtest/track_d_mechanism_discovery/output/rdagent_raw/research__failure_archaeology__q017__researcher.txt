@@ -1,0 +1,31 @@
+
+
+```json
+{
+  "mechanism_claim": "False-negative non-picks become large winners when B0's geometric selection rejects entries that are technically close to the trigger line but structurally distinct: specifically, entities with lower momentum, volume expansion, and price-extension that nonetheless sustain up-day ratio ≥0.5 and exhibit compressed distance between price and MA20/MA50, enabling them to re-enter the buy-point zone post-selection. The false-negative mechanism is a signal-correlated-proxy: B0 uses MA-slope and momentum as proxy discriminators, but these same proxies covary with the wrong subset of the true causal geometry (distance-from-trigger normalized by volatility).",
+  "evidence_for": [
+    "False-negative medians on up_day_ratio_20 (0.5), vol_ratio_5_20 (1.179), and mom_20 (0.058) are uniformly below selected-winner medians (0.625, 1.424, 0.163), with standardized deltas exceeding -1.0 for the first two features, indicating the proxy discriminators successfully stratify momentum magnitude but incorrectly exclude the false-negative subgroup.",
+    "Entity 535a1beed7 (false_negative_big_winner) has the lowest vol_ratio_5_20 among all large_win cases (1.174), and entity_ad2bfdee3f (false_negative_relative) has negative mom_20 (-0.0455) and negative ma10/ma20 slopes, yet both achieved positive W4 returns, demonstrating that the proxy discriminators fire in the wrong direction.",
+    "False-negative median ibd_entry_close_vs_trigger_pct (0.019) is substantially lower than selected-winner median (0.030), indicating the trigger-distance geometry is compressed for non-picks—this is the PIT-observable proxy for the true buy-point geometry, not the geometry itself.",
+    "The case entity_2f86543bf6 with ma20_slope_5 = -0.0078 (negative) and mom_20 = -0.008 (slightly negative) still achieved large_win, showing that slope signs in the selected feature set are unreliable separators.",
+    "Selected winners with large pullback_pct (e.g., entity_3adc078f01 at -42.3%, entity_2c58cebc59 at -25.1%) generated large wins despite extreme drawdowns, confirming that pullback_pct is not a causal mechanism but a correlated outcome."
+  ],
+  "evidence_against": [
+    "False-negative entity_bfb308b24a had pullback_pct = -12.1% and up_day_ratio_20 = 0.45, yet produced a loss outcome (w4_return_bucket = loss), indicating that low up_day_ratio alone is insufficient to generate a false-negative winner—the mechanism requires the specific combination of compressed trigger-distance with moderate momentum continuity.",
+    "False-positive ruin cases (entity_4fdc3699fd, entity_3472243e0c) share high mom_20 (0.185, 0.242), high ma10_slope_5 (0.090, 0.030), and up_day_ratio_20 ≥ 0.6, indicating that the proxy discriminators do correctly identify high-momentum stocks but these high-proxy stocks can still ruin, suggesting the true causal factor (volatility-normalized trigger proximity) is orthogonal to the proxy.",
+    "Entity_6618d3e80c is labeled both false_positive_ruin|selected_winner, with high mom_20 (0.251), high px_vs_ma50 (0.337), and high vol_ratio_5_20 (1.446)—its dual outcome suggests the geometry was ambiguous at snapshot, consistent with the mechanism claim that boundary cases are misclassified by the proxy."
+  ],
+  "falsifiable_predictions": [
+    "Condition A: Non-pick entities where ibd_entry_close_vs_trigger_pct < 0.015, up_day_ratio_20 ≥ 0.45, and vol_ratio_5_20 < 1.25 will produce W4 returns ≥ 5% at a rate exceeding 60% when the underlying market bucket matches the snapshot's market regime.",
+    "Condition B: Adding ma20_slope_5 sign reversal (negative) to the above filter will increase the precision of detecting false-negative big winners by ≥15 percentage points relative to B0's base precision.",
+    "Condition C: The proxy `px_vs_ma50` will have zero incremental predictive power over `ibd_entry_close_vs_trigger_pct` for distinguishing false-negative big winners from selected winners when both are conditioned on the same vol_ratio_5_20 bucket.",
+    "Condition D: Simulating B0's selection with ibd_entry_close_vs_trigger_pct replaced by a volatility-normalized trigger-distance measure (close minus trigger normalized by ATR) will increase false-negative capture by ≥20% without increasing false-positive ruin rate."
+  ],
+  "policy_implications": [
+    "B0's screening pipeline should not use ma10_slope_5, ma20_slope_5, or mom_20 as independent selection gates when the primary geometry measure (trigger-distance) is near its own threshold—the proxy gates create correlated exclusions that remove geometrically valid entries.",
+    "A secondary filter using only up_day_ratio_20 ≥ 0.45 and vol_ratio_5_20 < 1.3 (without momentum or slope features) applied to the non-pick pool at each snapshot would capture false-negative winners while excluding the false-negative losses.",
+    "Portfolio construction should treat false-negative captures as a separate signal class with position sizing informed by the trigger-distance compression—the more compressed the geometry, the smaller the initial position due to reduced confidence in causal purity.",
+    "The policy should avoid using `pullback_pct` as a negative filter for non-pick re-entry decisions, since the evidence shows selected winners with pullbacks exceeding -25% still produced large wins, indicating pullback_pct is an outcome variable, not a causal predictor."
+  ]
+}
+```

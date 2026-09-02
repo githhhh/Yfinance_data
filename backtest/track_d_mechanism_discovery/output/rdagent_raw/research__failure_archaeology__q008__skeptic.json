@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "vol_ratio_5_20 does not mechanistically cause ruin; it is a correlated proxy for sector/market regime conditions, and the threshold-based predictions are artifacts of snapshot-specific base rate differences rather than causal structure.",
+  "attacks": [
+    {
+      "issue": "Threshold cutoffs (1.20, 1.40) have no theoretical derivation and are data-snooped from N=27",
+      "why_it_matters": "The median deltas reported are <1.05 standardized for vol_ratio. This is weak separation that could easily flip with minor sample perturbations. The researcher proposes binary thresholds at 1.20 and 1.40 with no mechanistic justification for why exactly these values separate accumulation from abandonment. Small changes to the training set would shift these cutoffs by ±0.15 and invert the policy implications entirely."
+    },
+    {
+      "issue": "False-positive ruin entity_ccc90a671f has vol_ratio=1.45, exceeding the proposed winner threshold",
+      "why_it_matters": "This case directly falsifies the mechanism. vol_ratio=1.45 > 1.40, up_day_ratio=0.50, mom_20=0.074. According to the researcher's own falsifiable prediction, this should achieve selected_winner with >70% probability. It did not. The failure is not marginal—it is on the opposite side of the proposed threshold. Any valid mechanism must explain why high volume confirmation fails to prevent ruin."
+    },
+    {
+      "issue": "False-positive ruin entity_84824e6a20 has vol_ratio=1.63, well above the proposed threshold",
+      "why_it_matters": "vol_ratio=1.63 with mom_20=0.067 contradicts both the ruin-prediction rule (vol_ratio < 1.20) and the winner-prediction rule (vol_ratio > 1.40). This entity has the highest vol_ratio in the ruin set yet still fails. The researcher would need to argue some additional interaction, but no interaction is specified in the mechanism. This is a clean counterexample."
+    },
+    {
+      "issue": "Snapshot contamination: snap_71486ed83c appears in both false_positive_ruin (entity_3472243e0c) and selected_winner (entity_2c58cebc59, entity_3adc078f01)",
+      "why_it_matters": "The same snapshot being shared across ruin and winner outcomes suggests the snapshot's base-rate characteristics (which are not observable in the frozen evidence) are driving outcomes, not the vol_ratio at entry. If the snapshot itself is a low-quality market environment, vol_ratio is just picking up that latent snapshot quality, not causal volume dynamics. The mechanism conflates snapshot-level effects with entity-level predictors."
+    },
+    {
+      "issue": "The method_note explicitly defines false_negative_relative using future W4 performance, making vol_ratio differences between false_negative and selected_winner potentially tautological",
+      "why_it_matters": "The median vol_ratio comparison uses outcome-defined groups. If vol_ratio is itself a predictor of W4 return, then comparing vol_ratio between groups that are defined by W4 return is circular. The direction of causality is unclear: does low vol_ratio cause missed opportunity, or does low vol_ratio simply co-occur with low W4 returns because both reflect weak underlying momentum?"
+    },
+    {
+      "issue": "up_day_ratio_20 and vol_ratio_5_20 are both computed from the same 20-day window, creating structural correlation",
+      "why_it_matters": "In high-volatility stocks, both up_day_ratio and vol_ratio will be elevated by the same market microstructure (elevated volume on up days vs down days). Using both as orthogonal predictors in a composite score double-counts the same underlying volatility regime. The 'orthogonal' claim in the policy_implications is likely false."
+    },
+    {
+      "issue": "Pullback_pct and pullback_duration_weeks are rejected as 'post-entry outcomes' but used indirectly in the mechanism claim",
+      "why_it_matters": "The researcher argues low vol_ratio entries 'fail the test more often' referring to mechanical pullback stress. But this implies pullback severity (which determines ruin vs survival) is already encoded in the vol_ratio measurement. If pullback severity is the true driver, then vol_ratio is merely a noisy proxy for something causally downstream. The mechanism conflates the measurement (vol_ratio at entry) with the causal variable (how deep the subsequent pullback will be)."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with vol_ratio_5_20 < 1.0 (sub-baseline volume) and mom_20 > 0.20 that achieves large_win outcome, demonstrating low volume is not deterministic of ruin even at extreme values",
+    "A snapshot where all B0 picks have vol_ratio > 1.40 but none achieve selected_winner, testing whether vol_ratio threshold is spurious when base rates are unfavorable",
+    "Entities within the same snapshot where high vol_ratio entity ruins and low vol_ratio entity survives, holding snapshot constant to isolate vol_ratio effect",
+    "Time periods where vol_ratio_5_20 distribution for false_positive_ruin overlaps completely with selected_winner, indicating the feature has zero within-period discriminative power",
+    "A mechanical test: simulate entries where vol_ratio is inverted (low becomes high, high becomes low) and show ruin/winner rates flip—without this symmetry test, the mechanism is unfalsified"
+  ],
+  "what_would_change_my_mind": [
+    "A controlled experiment holding snapshot fixed: within-snapshot vol_ratio rank-order correlates with w4_return_bucket monotonicity across at least 15 entities with a Spearman rho > 0.4",
+    "Mechanistic derivation of the 1.20/1.40 thresholds from first principles (e.g., bid-ask bounce dynamics, order flow toxicity metrics) rather than empirical fitting",
+    "Demonstration that false_positive_ruin cases with vol_ratio > 1.40 (entity_ccc90a671f, entity_84824e6a20) are explained by a second-order interaction (e.g., vol_ratio spike driven by one-off news event rather than sustained institutional participation) that is independently measurable at snapshot time",
+    "Out-of-sample test on a separate temporal partition where ruin rate does not simply reflect base-rate changes but vol_ratio explains incremental variance beyond snapshot fixed effects",
+    "Causal identification strategy (e.g., difference-in-differences around volume data reporting changes) that distinguishes vol_ratio as causal from vol_ratio as a proxy for unobserved fundamental deterioration"
+  ]
+}

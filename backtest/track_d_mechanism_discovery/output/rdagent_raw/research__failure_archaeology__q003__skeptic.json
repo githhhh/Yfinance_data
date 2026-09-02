@@ -1,0 +1,41 @@
+{
+  "strongest_counterclaim": "The observed ruin outcomes are artifacts of position-concentration risk and drawdown sequencing, not stock-level exhaustion signals. The 'false_positive_ruin' label conflates stocks that were structurally sound but destroyed by portfolio-level forced selling, with stocks that had genuine entry-quality deficits.",
+  "attacks": [
+    {
+      "issue": "5 of 8 false_positive_ruin cases have null pullback_pct and null pullback_duration_weeks",
+      "why_it_matters": "The researcher's mechanism explicitly requires a pullback to 'become ruin' versus 'a rest.' With 62.5% of ruin cases missing pullback data, the mechanism cannot be verified for the majority of its own target outcomes. These cases might represent outright catalyst failures (negative news, earnings collapse) with no relationship to the entry-quality features being studied. The claim is unfalsifiable as stated because the key causal pathway is unobserved in most cases."
+    },
+    {
+      "issue": "ibd_entry_close_vs_trigger_pct is a confounded proxy for distance-to-resistance",
+      "why_it_matters": "A high ibd_entry_close_vs_trigger_pct value (entry close to trigger) is operationally identical to 'stock already made most of its move before the signal fired.' This is not an exhaustion signal per se—it is a lagged-entry artifact. The stock may be extended simply because the trader entered late, not because the stock itself lacks continuation potential. Testing this: entity_2c58cebc59 has ibd_entry_close_vs_trigger_pct=0.034 (above the 0.025 threshold) yet achieves large_win with -25.1% pullback survival. The same proximity measure predicts ruin in some cases and survival in others—revealing it as a confounded, not causal, variable."
+    },
+    {
+      "issue": "The 27-case sample allows feature mining, not pattern discovery",
+      "why_it_matters": "With 8 ruin cases and 11 selected_winner cases across ~20 numeric features, the feature space is over-explored relative to sample size. The median deltas reported (e.g., mom_20 standardized_delta of -1.0005) likely reflect in-sample fit rather than stable predictive relationships. For n=27, a standardized delta of -1.0 on one feature is consistent with random sampling variation. The researcher has no out-of-sample validation for the proposed threshold combination (ibd_entry_close_vs_trigger_pct > 0.030 AND mom_20 < 0.10 AND up_day_ratio_20 < 0.50...)."
+    },
+    {
+      "issue": "up_day_ratio_20 is a likely market-regime proxy, not a stock-specific distribution signal",
+      "why_it_matters": "up_day_ratio_20 measures what fraction of the last 20 days were up days. In a broad market rally, nearly all stocks will have up_day_ratio_20 > 0.50. In a choppy or bearish regime, all stocks will score low regardless of their actual accumulation/distribution profile. If the data comes from mixed market periods, the researcher is measuring market beta rather than entry quality. This would explain why false_positive_ruin cases show low up_day_ratio_20 (market was weak when they were selected) rather than indicating distribution-specific weakness."
+    },
+    {
+      "issue": "Survival of deep pullbacks in selected_winner cases undermines the exhaustion mechanism's internal logic",
+      "why_it_matters": "entity_3adc078f01: mom_20=0.172, pullback_pct=-42.3%, survived to large_win. entity_2c58cebc59: mom_20=0.321, pullback_pct=-25.1%, survived. The researcher's own mechanism states 'weak prior momentum provides recovery buffer.' But these cases show that even moderate momentum (0.17-0.32) is sufficient to survive 25-42% drawdowns. If that's true, then the 'depleted momentum' threshold of mom_20 < 0.14 cannot be the operative mechanism—these stocks would need to have negative or near-zero momentum to match the 'ruin' prediction. Yet ruin cases like entity_84824e6a20 (mom_20=0.067) have modest but non-zero momentum. The mechanism requires a sharp momentum cutoff that the data does not support."
+    },
+    {
+      "issue": "Selection-on-dependent-variable: stocks that ruin under pullback may have been stopped out before completing the pullback, biasing pullback_pct toward smaller values in the ruin cohort",
+      "why_it_matters": "The researcher observes that ruin cases have 'smaller pullback_pct' than some winners. But this is expected under any exit-trigger mechanism: stocks stopped out at -12% are labeled 'ruin' and contribute pullback_pct=-12%, while stocks that survive to -40% are labeled 'large_win' and contribute -40%. The observed relationship between pullback_pct and outcome is tautological, not causal. The true counterfactual—'would this stock have ruined at -40%?'—is unobserved."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with ibd_entry_close_vs_trigger_pct > 0.035, mom_20 < 0.08, up_day_ratio_20 < 0.45, vol_ratio_5_20 > 1.40, px_vs_ma50 < 0.06 that achieves w4_return_bucket=large_win. This would falsify the composite threshold claim directly.",
+    "A B0 pick from the same snapshot_anon cohort that has all the 'winning' features (mom_20 > 0.16, up_day_ratio_20 > 0.65, wide ibd_entry) but still ruins. This would isolate whether the features predict ruin or whether ruin is driven by exogenous factors.",
+    "Cross-snapshot comparison: Do the same feature thresholds produce the same ruin rates at different market-regime snapshots? If snap_71486ed83c shows 40% ruin rate for tight-entry+low-momentum picks but snap_287267e812 shows 10%, regime is the dominant variable.",
+    "Time-to-event data: For cases with null pullback_pct, what was the time from entry to ruin event? If ruin cases resolve in <2 weeks versus 7+ weeks for observed pullbacks, the mechanism is not pullback-based at all."
+  ],
+  "what_would_change_my_mind": [
+    "Replication of the same feature thresholds (ibd_entry_close_vs_trigger_pct > 0.025, mom_20 < 0.14, up_day_ratio_20 < 0.55) on an independent sample of B0 picks with >50 ruin cases, showing significant ruin-rate elevation.",
+    "Time-series validation: Stocks identified by these thresholds in earlier time periods (before the study window) show elevated ruin rates in subsequent periods, demonstrating temporal stability.",
+    "Mechanism isolation: Showing that ibd_entry_close_vs_trigger_pct predicts ruin even after residualizing out px_vs_ma50 (distance-to-resistance) and market-regime-adjusted up_day_ratio_20. If the proxy is causal, it should survive deconfounding.",
+    "Experimental validation: Real-time application of the pre-filter rule (reject tight-entry + low-momentum picks) over a forward period, with ruin rate reduction as the outcome metric."
+  ]
+}

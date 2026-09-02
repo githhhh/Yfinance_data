@@ -1,0 +1,129 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_paired_mean_vs_ruin_decomposition",
+      "features": [
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "atr_14_pct",
+        "rv_20"
+      ],
+      "comparison": "Within each fresh-breakout snapshot-week, pair each B0_LANE name with the closest-by-euclidean-distance-on-features LANE_NEUTRAL name. Compute paired differences for (a) W4 mean return and (b) W4 ruin indicator (≤ -15% drawdown). Test H0a: mean difference = 0 vs H1a: |mean diff| ≤ 0.5pp with ruin diff ≥ 10pp. Use paired Wilcoxon for mean, McNemar for ruin.",
+      "success_criterion": "Across ≥15 snapshot-weeks with n≥10 B0_LANE pairs each: paired mean |Δ| < 0.5pp (Wilcoxon p>0.2) AND paired ruin rate Δ ≥ +10pp with McNemar p<0.05. Direction must be B0_LANE ruin ≥ LANE_NEUTRAL ruin; both must reject pure-mean and pure-tail alone.",
+      "failure_criterion": "If paired mean |Δ| ≥ 0.5pp OR ruin rate Δ < 10pp in same direction OR ruin Δ favors LANE_NEUTRAL, the 'risk-only-shift' framing is rejected. If ruin Δ ≥ 10pp co-occurs with mean Δ ≥ 1pp, mechanism becomes coupled-factor-loading, not risk-shift."
+    },
+    {
+      "name": "feature_residualized_dispersion_decomposition",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "atr_14_pct",
+        "rv_20"
+      ],
+      "comparison": "Per snapshot-week, regress W4 return on the feature vector separately for B0_LANE and LANE_NEUTRAL samples. Compare residual distributions: (i) variance ratio B0_LANE/LANE_NEUTRAL, (ii) excess kurtosis ratio. Mechanism predicts residual kurtosis ratio > 2.0 while residual variance ratio ≤ 1.3.",
+      "success_criterion": "Pooled across snapshot-weeks, B0_LANE excess kurtosis / LANE_NEUTRAL excess kurtosis ≥ 2.0 AND B0_LANE residual variance / LANE_NEUTRAL residual variance ∈ [0.8, 1.3]. Achieves the variance-vs-tail decomposition the skeptic flagged as untestable in archaeology data.",
+      "failure_criterion": "If kurtosis ratio < 1.5 OR variance ratio > 1.5, Lane is shifting overall dispersion (not isolating tail); mechanism must be relabeled as 'dispersion-shifter' rather than 'risk-shifter'."
+    },
+    {
+      "name": "persistence_low_quartile_ruin_conditional",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Slice fresh-breakout names into up_day_ratio_20 ≤ 0.45 (low-persistence) cells within each snapshot-week. Compare B0_LANE vs LANE_NEUTRAL ruin rates in this cell only. Researcher claimed Lane loads tail specifically here; skeptic claimed this is regime confounding.",
+      "success_criterion": "Within low-up_day_ratio_20 cells, B0_LANE ruin rate - LANE_NEUTRAL ruin rate ≥ +15pp (Fisher exact p<0.05) across pooled snapshot-weeks. Proves Lane loads tail within homogeneous feature regime, not just snapshot regime.",
+      "failure_criterion": "If conditional ruin gap < 5pp OR reverses sign in ≥40% of snapshot-weeks with n≥5, Lane is not tail-loading beyond what feature magnitude already implies."
+    },
+    {
+      "name": "magnitude_safe_ruin_search",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Identify B0_LANE names satisfying 'safe-magnitude' mask (mom_20 ≥ 0.20 AND up_day_ratio_20 ≥ 0.65 AND ma10_slope_5 ≥ 0.04) — the regime where researcher claims Lane should produce winners. Count ruin rate in this mask vs outside.",
+      "success_criterion": "B0_LANE safe-mask ruin rate ≤ 10pp AND B0_LANE outside-mask ruin rate ≥ 25pp with gap ≥ 15pp. Confirms Lane does NOT load tail in safe-magnitude names; risk is concentrated in slope-accepted/low-persistence subset.",
+      "failure_criterion": "If safe-mask ruin rate ≥ outside-mask ruin rate - 10pp, Lane's tail-loading is independent of feature magnitude — risk-shift claim collapses into factor-loading claim. Entity_6618d3e80c-style mixed-label cases should be clean-labeled here."
+    },
+    {
+      "name": "post_lane_residual_vs_pre_lane_score",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "rv_20",
+        "atr_14_pct"
+      ],
+      "comparison": "Reconstruct SCORE_BEFORE_LANE from feature-derived composite (e.g., weighted z-score on the 9 features using discovery-set medians/stds from archaeology). Rank names within snapshot-week; top-decile becomes B0_LANE analog, median-decile becomes LANE_NEUTRAL analog. Compare mean and ruin across reconstructed slots.",
+      "success_criterion": "Reconstructed B0_LANE ruin rate - LANE_NEUTRAL ruin rate ≥ +10pp AND mean |Δ| < 0.5pp. If both hold, the 'risk-shift' is reproducible from feature composite alone — Lane is mechanical tail-loading given features. If gap does NOT hold, Lane adds non-feature information that changes risk profile.",
+      "failure_criterion": "Reconstructed B0_LANE ruin rate ≈ LANE_NEUTRAL ruin rate (gap < 5pp): Lane contributes tail-loading beyond feature composite alone. Reconstructed MA gap ≥ 1pp: pre-Lane score already separates mean, Lane is filter not shifter."
+    },
+    {
+      "name": "portfolio_construction_isolation",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20"
+      ],
+      "comparison": "For each snapshot-week, hold pick identity constant but vary position-weighting between (a) equal-weight B0_LANE picks vs (b) inverse-ruin-probability-weighting of same picks. If Sharpe gap between equal-weight and ruin-weighted collapses, mechanism is selection not sizing; if it remains, Lane + construction both contribute.",
+      "success_criterion": "Equal-weight B0_LANE - Equal-weight LANE_NEUTRAL Sharpe gap ≥ +0.15 AND Inverse-ruin-weighted gap ≤ +0.05. Confirms the risk-shift is intrinsic to selection, not position-sizing artifact.",
+      "failure_criterion": "Sharpe gap under inverse-ruin-weighting remains ≥ +0.10: position sizing is propagating mechanism; original mean/ruin decomposition reflects construction, not Lane feature selection."
+    },
+    {
+      "name": "var_ratio_tail_isolation",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "atr_14_pct",
+        "rv_20"
+      ],
+      "comparison": "Compute within-snapshot-week Value-at-Risk at 80% (VaR80) and 95% (VaR95) confidence for B0_LANE and LANE_NEUTRAL return distributions. Mechanism predicts tail-specific risk: VaR95 ratio > VaR80 ratio (tail widens faster than body).",
+      "success_criterion": "B0_LANE VaR95 / LANE_NEUTRAL VaR95 ≥ 1.5 × (B0_LANE VaR80 / LANE_NEUTRAL VaR80). Confirms tail-specific (not uniform) dispersion increase. Aligned with ruin definition (≤-15%) which is ~95th percentile left-tail.",
+      "failure_criterion": "If VaR80 ratio ≈ VaR95 ratio (within 10%), Lane shifts entire dispersion proportionally — risk-shift reframes as generic vol-loading, not tail-loading. Returns UNRESOLVED on the tail-isolation question."
+    }
+  ],
+  "leakage_checks": [
+    "Verify all features used are PIT-only: ibd_entry_*, px_vs_ma*, ma*_slope_*, mom_*, up_day_ratio_20, vol_ratio_5_20, pullback_*, base_*, atr_*, rv_*, volume_ratio — none reference post-entry return, W4 outcome, or settlement date.",
+    "Snapshot identity used ONLY as fixed-effects block/grouping label for paired tests, never as predictive feature in any regression or distance computation.",
+    "Ticker/entity identity excluded from all tests; entity_anon appears only in archaeology reference, not in any test input.",
+    "Ruin indicator (≤-15% drawdown) must be computed from W4 cumulative return path that does NOT include any pre-entry data; confirm threshold definition matches archaeology 'false_positive_ruin' label rule (W4 ≤ -15% or ruin_bucket tag).",
+    "W4 mean return computed from same path as ruin indicator to ensure paired tests compare coherent distributions.",
+    "SCORE_BEFORE_LANE reconstruction must use ONLY the 9-feature composite; any attempt to include historical Lane decisions or feedback terms would leak post-Lane information.",
+    "Block bootstrap on snapshot-weeks (not observations) to preserve temporal clustering; standard errors clustered at snapshot level, not observation level, to avoid undercounting regime dependence.",
+    "Pre-specify ruin threshold (≤-15%) and mean-equivalence margin (0.5pp) BEFORE observing results; any post-hoc threshold adjustment invalidates the falsification."
+  ],
+  "priority_order": [
+    "within_snapshot_paired_mean_vs_ruin_decomposition",
+    "feature_residualized_dispersion_decomposition",
+    "persistence_low_quartile_ruin_conditional",
+    "post_lane_residual_vs_pre_lane_score",
+    "var_ratio_tail_isolation",
+    "magnitude_safe_ruin_search",
+    "portfolio_construction_isolation"
+  ]
+}
+```

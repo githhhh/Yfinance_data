@@ -1,0 +1,72 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The Researcher, Skeptic, and Experimental Designer outputs are not in flat contradiction; they describe DIFFERENT failure modes that have not yet been empirically separated. The Researcher's redundancy claim rests on unconditional co-monotonicity of confirmation features across outcome classes — which the Skeptic correctly notes is consistent with either (a) true redundancy absorbed by neighbors, (b) snapshot-regime confounding inflating cross-feature correlation, or (c) a common latent cause that all confirmation features tap without any one of them being uniquely informative. The Skeptic's mixed-outcome case (entity_6618d3e80c) is the strongest single piece of evidence in this cycle, but it cuts against the redundancy claim in a subtle way: the same feature vector producing both winner and ruin outcomes is the EXACT signature of an under-specified static aggregator, not an over-specified redundant one. Therefore the question 'does evidence_risk carry independent content?' cannot be answered by the current evidence: (i) we lack the B0 coefficient table / partial-correlation matrix the Researcher admits is missing; (ii) we lack the within-snapshot conditional tests the Experimental Designer proposes but has not executed; (iii) the standardized deltas on n=7–11 are too noisy to discriminate redundancy from common latent causation; (iv) the cross-feature correlation pattern is inflated by snapshot clustering (snap_71486ed83c alone carries 6 cases, snap_d0d57b1e40 carries 5). The honest verdict is that the question is undecided, with a slight lean toward CONTEXT_DEPENDENT — specifically, that ma-slope and px-vs-ma sub-features are plausibly redundant with trend_b0/relative_strength_b0 while up_day_ratio_20 plausibly carries orthogonal breadth/tape-strength content, and the right policy is to decompose rather than wholesale drop or wholesale retain.",
+  "falsifiers": [
+    "PRIMARY: Run the Experimental Designer's within_snapshot_conditional_discrimination test. If combined Fisher p < 0.10 with consistent sign across >=3 populated buckets, evidence_risk carries content orthogonal to neighbors after regime-equalization — REFUTING the wholesale-redundancy claim. If combined p >= 0.30 OR sign inconsistency across >=2 buckets, the Researcher's redundancy claim is SUPPORTED. The test has not been run; until it is, the verdict is UNRESOLVED by construction.",
+    "SECONDARY: Run the synthetic_redundant_aggregator_placebo test. If evidence_risk delta exceeds synthetic_redundant delta by >0.30σ with bootstrap p<0.05, evidence_risk contains orthogonal content not captured by uniform-weights neighbor aggregators — SUPPORTS retention. If the delta-difference is within [-0.15σ, +0.15σ], SUPPORTS redundancy. Equal-weights synthetic may itself be too generous; a tighter falsifier is whether ANY convex combination of mom_20, ma10_slope_5, px_vs_ma50, vol_ratio_5_20 can match evidence_risk's within-snapshot separation.",
+    "THIRD: Decomposition falsifier. Fit evidence_risk as a weighted sum of its sub-features (up_day_ratio_20, vol_ratio_5_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) and inspect the loadings. If up_day_ratio_20's loading weight is more than 2σ above its proportional share (1/7), up_day_ratio_20 is the orthogonal core and the rest are padding — this would SUPPORT a 'keep only up_day_ratio_20' policy that neither Researcher nor Skeptic explicitly proposed.",
+    "MIXED-OUTCOME RESOLUTION: Compute the within-snapshot Mahalanobis distance from entity_6618d3e80c to the false_positive_ruin centroid versus the selected_winner centroid in the 8-feature space. If the case sits closer to false_positive_ruin by >1.0 unit, evidence_risk DID predict the ruin side (consistent with redundancy producing shared fate across multiple snapshots rather than under-specification). If it sits in the ambiguity zone (<0.5 unit difference), under-specification is supported. This single test resolves the strongest Skeptic argument against the Researcher's redundancy claim.",
+    "PATH-DEPENDENCE PROBE: For all 27 cases, check whether the time-between-snapshot-and-W4-outcome is correlated with outcome class (selected_winner vs false_positive_ruin). If path-dependent timing matters but is NOT represented in any B0 feature, this is direct evidence of under-specification and falsifies the 'drop evidence_risk' policy recommendation.",
+    "BOOTSTRAP STABILITY: Resample the 27 cases 1000 times with snapshot stratification, recompute the standardized delta ordering, and check whether up_day_ratio_20 stably ranks #1. If it does, the Researcher's ranking claim survives and 'up_day_ratio_20 carries unique content' becomes more credible. If it doesn't, the Researcher's evidence-against section loses its strongest specific claim."
+  ],
+  "actionable_design_principles": [
+    "Do not conflate unconditional co-monotonicity across outcome classes with conditional redundancy. Two features can both separate winners from losers (showing common latent cause) without either being redundant with the other once the latent is fixed.",
+    "Snapshot clustering (snap_71486ed83c, snap_d0d57b1e40, snap_b8420124eb) acts as a free stratification axis that MUST be honored before computing any cross-feature correlation or contrast; pooling across snapshots inflates mutual correlation through shared regime factors.",
+    "The mixed-outcome case entity_6618d3e80c is the most information-dense observation in the archaeology and should anchor the analysis: a static feature vector producing both winner and ruin outcomes is the canonical signature of an under-specified (not over-specified) aggregator, and the policy implication flips from 'drop' to 'expand with path/regime dimensions.'",
+    "Sub-feature decomposition must precede any retention/drop decision: ma10_slope_5 and ma20_slope_5 are likely absorbed by trend_b0, px_vs_ma20 and px_vs_ma50 by relative_strength_b0, but up_day_ratio_20 (count statistic, distinct noise floor from mom_20's net-return statistic) plausibly carries orthogonal breadth/tape-strength content and vol_ratio_5_20 may carry orthogonal short-horizon volatility content.",
+    "The researcher's policy implication to drop evidence_risk entirely is NOT supported by the evidence available in this cycle. Both wholesale-drop and wholesale-retain are premature; the falsifier battery above must complete before either policy is locked in.",
+    "Bootstrap with snapshot stratification is the minimum credible test of any cross-feature claim on n=27 — uns stratified bootstrap standard errors on these contrasts will be 2-3× larger than naive bootstrap, which alone shifts the verdict toward UNRESOLVED.",
+    "Mixed-outcome cases are rare and should be preserved as diagnostic specimens rather than averaged into outcome-class statistics; they carry more information about under-specification than 10 single-outcome cases."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Decompose evidence_risk into a primary breadth component (up_day_ratio_20 with explicit anti-proxy guard: |corr(up_day_ratio_20, mom_20)| < 0.7 within snapshot) and a secondary confirmation component (vol_ratio_5_20), and drop the ma-slope and px-vs-ma sub-features that are demonstrably collinear with trend_b0 and relative_strength_b0.",
+      "why_distinct": "Neither Researcher's 'drop everything' nor Skeptic's 'expand everything' — this preserves the most defensible orthogonal sub-feature (up_day_ratio_20) while removing demonstrably redundant members. Directly addresses the sub-feature decomposition falsifier above.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Reduces evidence_risk dimensionality from 7+ features to 2, lowering condition-number contribution to the B0 score while preserving breadth signal that mom_20 cannot capture (different noise floor, different sensitivity to overnight gaps)."
+    },
+    {
+      "idea": "Add a regime-conditional interaction term evidence_x_regime = z(up_day_ratio_20) * z(vol_ratio_5_20) computed within snapshot, tested for nonzero coefficient in a logistic regression with the existing B0 neighbors as baseline.",
+      "why_distinct": "Captures the nonlinear tape-strength × short-volatility structure the Experimental Designer's interaction_surface_vol_x_upday test was designed to detect. If the interaction pseudo-R² lift >= 0.02, this is the constructive demonstration that evidence_risk's content is interactional rather than additive — a third failure mode distinct from both pure redundancy and pure under-specification.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Increases capacity for capturing tape-conditional volatility regimes that no linear B0 neighbor encodes; capacity gain is bounded by interaction depth (max order 2 to keep interpretation tractable)."
+    },
+    {
+      "idea": "Add a base-maturity component base_quality_score = z(pullback_duration_weeks) + z(-pullback_pct) (currently absent from B0 panel, identified by both Researcher and Skeptic as plausibly orthogonal), gated by the absence of a dedicated pullback_b0 neighbor.",
+      "why_distinct": "Pullback_b0 is not enumerated in the available B0 panel; if it is genuinely absent, then base_quality is genuinely orthogonal to all neighbors. The Researcher's 'replacement R1' candidate. If a pullback_b0 exists, the gate prevents double-counting.",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "capacity_relevance": "Fills a structural gap (base-maturity) that the current B0 panel leaves unaddressed; directly relevant to entity_6618d3e80c-type mixed-outcome cases where pullback structure may have been the under-captured dimension."
+    },
+    {
+      "idea": "Add a path-uncertainty penalty path_entropy_proxy = z(realized_volatility_residual) where the residual is the part of rv_20 unexplained by |mom_20|, computed within snapshot. Use this as a soft DOWN-weight on cases where the static feature panel cannot disambiguate (analogous to entity_6618d3e80c).",
+      "why_distinct": "Operationalizes the Skeptic's strongest point: when static features are insufficient to discriminate, the policy should be CAUTION (lower position size or skip) rather than DROPPING the score entirely. This converts 'evidence_risk is under-specified' from a verdict into an actionable risk-management signal.",
+      "features": [
+        "rv_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Increases risk-management capacity at the cost of a small additional feature computation; orthogonal to score-capacity since this gates position size rather than score value."
+    },
+    {
+      "idea": "Snapshot-stratified standardization gate: any new evidence-feature must satisfy the within-snapshot |correlation| < 0.5 with all existing B0 neighbor loadings BEFORE being admitted to the B0 panel.",
+      "why_distinct": "Operationalizes the Experimental Designer's clean_replacement_construction_test (criterion ii) as a permanent guardrail rather than a one-time test. Prevents future reintroduction of redundant features through model-iteration drift.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "rv_20"
+      ],
+      "capacity_relevance": "Reduces capacity wasted on collinear features; preserves capacity for genuinely orthogonal additions. The gate threshold (0.5) is a tunable policy parameter."
+    }
+  ]
+}

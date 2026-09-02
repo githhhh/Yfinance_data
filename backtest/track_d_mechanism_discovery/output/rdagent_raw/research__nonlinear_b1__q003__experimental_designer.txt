@@ -1,0 +1,82 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_isolation_test",
+      "features": [
+        "pullback_v_is_dry_proxy_via_vol_ratio_5_20_and_up_day_ratio_20",
+        "current_vs_ibd_candidate_pct",
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "comparison": "Within each regime-snapshot stratum (e.g., snap_d0d57b1e40, snap_b8420124eb), compute the conjunctive modifier s_mod = f(dry_pullback_score) × (1 - sigmoid((cvibd - mid)/band)) for every entity_rr. Pre-specify the dry_score as z(vol_ratio_5_20 inverse) + z(up_day_ratio_20) using only the within-snapshot distribution. Test whether s_mod flips the rank of FP_ruin entities (entity_84824e6a20, entity_40ea0cfb3b) BELOW their same-snapshot SW counterparts (entity_bec51a4227, entity_d2ca7853ba).",
+      "success_criterion": "Modifier flips ≥2 of the 3 same-snapshot FP/SW pairs in the discovery set (per skeptic's specified bar), with the flipped ordering reproducing on a held-out snapshot slice containing ≥6 FP_ruin and ≥6 SW within-snapshot pairs.",
+      "failure_criterion": "Modifier fails to flip ≥2 same-snapshot pairs, OR the direction of the flip is inconsistent across snapshots (e.g., up-ranks FP in one snapshot, down-ranks in another). Either outcome indicates the mechanism is regime-mean-reversion rather than a stable within-B0 signal."
+    },
+    {
+      "name": "partial_information_test_for_room_to_pivot",
+      "features": [
+        "current_vs_ibd_candidate_pct",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "dist_to_52w_high_pct"
+      ],
+      "comparison": "Run a pre-specified bivariate logistic regression of outcome_label (selected_winner=1 vs ruin=0) on current_vs_ibd_candidate_pct conditional on ibd_entry_close_vs_trigger_pct, ibd_entry_close_position, and dist_to_52w_high_pct. Compute the partial Spearman correlation between current_vs_ibd_candidate_pct and outcome after partialling out the three existing B0 proxies. Repeat holding out one snapshot at a time.",
+      "success_criterion": "Partial |Spearman| ≥ 0.15 with consistent sign across leave-one-snapshot-out folds, indicating current_vs_ibd_candidate_pct contributes information orthogonal to existing B0 features. Researcher-specified threshold band ~1.5–2.0x must fall inside the interquartile range of the held-out slice.",
+      "failure_criterion": "Partial |Spearman| < 0.05 or sign instability across folds means the 'room to pivot' axis is a redundant proxy for ibd_entry_close_vs_trigger_pct and the conjunctive modifier collapses to dry-pullback alone."
+    },
+    {
+      "name": "null_pullback_representation_invariance_test",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "base_depth_pct",
+        "base_duration_weeks",
+        "base_mbox_count"
+      ],
+      "comparison": "Restrict to the 10 rows where pullback_duration_weeks is null (entity_ead73f4390, entity_28a6ec4601, entity_b00579f203, and 7 others including FP_ruin and SW). Compute B0 score S_b0a using base proxies alone, then S_b0b using the proposed fallback (base_depth_pct + base_duration_weeks substitution into the dry_score). Test whether the rank correlation (Spearman) between S_b0a and S_b0b on this null subset is ≥0.85.",
+      "success_criterion": "Spearman(S_b0a, S_b0b) ≥ 0.85 on the null-pullback subset AND the cross-subset rank correlation between null-pullback SWs and non-null SWs is preserved (no systematic up- or down-shift). This proves the fallback is representation-invariant and does not silently expand eligibility.",
+      "failure_criterion": "Spearman < 0.70 OR the null-pullback SWs systematically receive different effective scores than their non-null counterparts — confirming the skeptic's claim that representation substitution is a covert expansion of the B0 scoring surface."
+    },
+    {
+      "name": "three_slot_adaptive_capacity_bucket_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "current_vs_ibd_candidate_pct"
+      ],
+      "comparison": "Encode adaptive capacity into exactly 3 slots using pre-specified thresholds from the SW empirical medians (vol_ratio_5_20 ≈ 1.42, up_day_ratio_20 ≈ 0.625, cvibd ≈ 1.98). Slot definitions: high_capacity = (up_day_ratio_20 ≥ 0.60 AND vol_ratio_5_20 ≤ 1.50 AND cvibd ≤ 2.20); low_capacity = (up_day_ratio_20 ≤ 0.45 AND vol_ratio_5_20 ≥ 1.45 AND cvibd ≥ 2.50); neutral = everything else. Apply slots as a rank modifier only (no eligibility change) and verify ruin_rate ordering: low_slot_ruin > neutral_ruin > high_slot_ruin within the B0 picked subset.",
+      "success_criterion": "Monotonic ruin_rate ordering low > neutral > high with ≥10pp spread between extreme slots AND hit_rate high_slot ≥ 0.55 (no degradation of the best bucket). Researcher-predicted ≥3pp ruin drop with ≤1pp hit drop must hold.",
+      "failure_criterion": "Non-monotonic ordering OR <5pp ruin spread between extreme slots OR high_slot hit_rate < neutral_slot hit_rate. Any of these fails the conjunctive-mechanism isolation requirement."
+    },
+    {
+      "name": "regime_dispersion_stress_test",
+      "features": [
+        "rv_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "current_vs_ibd_candidate_pct"
+      ],
+      "comparison": "Slice the discovery set by rv_20 quartile. Within the top quartile (highest realized vol, mimicking choppy regime), recompute the 3-slot modifier from scratch using only that quartile's empirical distribution (no peeking at full-set medians). Compare ruin_rate ordering to the bottom-quartile slice. Also test: when cvibd is universally inflated (>3.0) within a snapshot, the modifier's pivot-distance axis loses discriminative power — measure ruin_rate spread collapse.",
+      "success_criterion": "Top-quartile ruin ordering matches bottom-quartile direction (sign-consistent monotone) OR, if direction inverts, the inversion is explainable by a pre-specified regime flag (e.g., rv_20 > empirical_p75). The modifier must either generalize or fail-gracefully — it must not produce anti-signal silently.",
+      "failure_criterion": "Top-quartile ordering inverts without satisfying the regime-flag condition OR ruin spread collapses to <2pp in either quartile — indicating the conjunctive mechanism is a within-regime artifact rather than a portable signal."
+    }
+  ],
+  "leakage_checks": [
+    "Verify all 27 rows used in any test have snapshot_anon drawn from the discovery-train set only; explicitly exclude any outer-forward outcomes, ticker identity, or calendar identity. Cross-check that no test re-uses an entity_anon whose snapshot_anon differs from the in-sample distribution.",
+    "Confirm the 3-slot thresholds (1.42, 0.625, 1.98, 1.50, 0.45, 1.45, 2.50) are derived from the SW median contrasts in the supplied failure_archaeology JSON and not from any post-hoc tuning on FP_ruin labels. Re-derive medians using leave-one-snapshot-out to detect threshold overfitting.",
+    "For the null-pullback representation test, verify the 10 null-pullback rows are not a biased subset of SWs only — count FP_ruin/null and SW/null ratios; if null-pullback SWs dominate, the fallback stability test is itself selection-biased and must be down-weighted.",
+    "Ensure within-snapshot isolation test does not inadvertently use pullback features that are undefined (null) in either member of the pair; if either entity has null pullback fields, restrict the comparison to non-pullback features only or exclude the pair and pre-specify this exclusion.",
+    "Check that vol_ratio_5_20 and up_day_ratio_20 are measured at the SAME PIT timestamp as current_vs_ibd_candidate_pct; if they are computed over different lookback windows or end at different dates, the conjunctive interaction leaks forward information and must be re-synchronized before any test is run."
+  ],
+  "priority_order": [
+    "within_snapshot_isolation_test",
+    "partial_information_test_for_room_to_pivot",
+    "three_slot_adaptive_capacity_bucket_test",
+    "null_pullback_representation_invariance_test",
+    "regime_dispersion_stress_test"
+  ]
+}
+```

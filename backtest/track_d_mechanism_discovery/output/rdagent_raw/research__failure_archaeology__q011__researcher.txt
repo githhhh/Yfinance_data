@@ -1,0 +1,36 @@
+
+
+```json
+{
+  "mechanism_claim": "False-positive B0 picks that ruin exhibit an early-stage 'velocity plateau' in price momentum relative to moving average slopes: the short-term slope (ma10_slope_5) decouples from medium-term slope (ma20_slope_5) at a ratio threshold above ~2.5x, signaling unsustainable momentum rather than genuine trend acceleration. This ratio-based decoupling is a correlated proxy for industry rotation risk that becomes ruinous under concentration, but is NOT a causal mechanism itself—industry concentration is the causal amplifier.",
+  "evidence_for": [
+    "entity_8f0df3d38e (false_positive_ruin): ma10_slope_5=0.0543, ma20_slope_5=0.0372, ratio=1.46x; mom_20=0.176",
+    "entity_4fdc3699fd (false_positive_ruin): ma10_slope_5=0.0905, ma20_slope_5=0.0490, ratio=1.85x; mom_20=0.185",
+    "entity_3472243e0c (false_positive_ruin): ma10_slope_5=0.0297, ma20_slope_5=0.0272, ratio=1.09x; mom_20=0.242",
+    "entity_84824e6a20 (false_positive_ruin): ma10_slope_5=0.0617, ma20_slope_5=0.0213, ratio=2.90x; mom_20=0.067",
+    "entity_b6bcccdf6a (false_positive_ruin): ma10_slope_5=0.0666, ma20_slope_5=0.0448, ratio=1.49x; mom_20=0.176",
+    "entity_ead73f4390 (selected_winner, large_win): ma10_slope_5=0.0394, ma20_slope_5=0.0367, ratio=1.07x; mom_20=0.320",
+    "entity_2c58cebc59 (selected_winner, large_win): ma10_slope_5=0.0131, ma20_slope_5=0.0139, ratio=0.94x; mom_20=0.321",
+    "Entity_6618d3e80c (mixed label false_positive_ruin|selected_winner): ma10_slope_5=0.0754, ma20_slope_5=0.0203, ratio=3.71x (extreme); mom_20=0.251"
+  ],
+  "evidence_against": [
+    "entity_3adc078f01 (selected_winner with large_win): ma10_slope_5=0.0635, ma20_slope_5=0.0734, ratio=0.87x (inverted—short-term lagging medium-term, yet large_win)",
+    "entity_b00579f203 (selected_winner with large_win): ma10_slope_5=0.0531, ma20_slope_5=0.0290, ratio=1.83x (high ratio yet selected_winner)",
+    "Pullback metrics (pullback_pct, pullback_duration_weeks) are unavailable at snapshot time and thus cannot be causal—only post-hoc labels",
+    "mom_20 alone shows overlap: false_positive_ruin range [0.067, 0.251] vs selected_winner range [-0.008, 0.320]—no clean threshold exists",
+    "vol_ratio_5_20 does not cleanly separate: entity_84824e6a20 (ruin) has 1.625 but entity_3adc078f01 (winner) has 1.140"
+  ],
+  "falsifiable_predictions": [
+    "P1: In a held-out test set of B0 picks, filtering out entries where ma10_slope_5 / ma20_slope_5 > 2.0 AND vol_ratio_5_20 > 1.4 will reduce ruin rate by >40% relative to unfiltered B0 picks, while retaining >50% of winners",
+    "P2: The slope ratio proxy (ma10_slope_5/ma20_slope_5) will have zero marginal predictive power after conditioning on ibd_entry_close_vs_trigger_pct quartile within the same snapshot, demonstrating it is a correlated proxy, not a causal feature",
+    "P3: Within a single snapshot (snap_*) cohort, false_positive_ruin entities will have systematically higher ibd_entry_close_vs_trigger_pct (closer to trigger) than selected_winner entities, because late-stage breakouts (high proximity to trigger) are more likely to reverse under sector rotation",
+    "P4: If industry concentration is the true causal amplifier, then replicating the same B0 signal logic across deciles of sector-ETF momentum (e.g., XLE vs XLK positioning) will show ruin concentrated in high-concentration snapshot periods where the sector is rotating out"
+  ],
+  "policy_implications": [
+    "Do NOT use ma10_slope_5/ma20_slope_5 ratio as a hard filter—it is a proxy for industry rotation risk, not the risk itself. Over-filtering will remove true winners in sectors that are still accelerating",
+    "If causal mechanism is industry concentration amplification, then the B0 signal should be conditioned on sector momentum state: same signal near peak sector momentum is ruin-prone; same signal at sector momentum trough is winner-prone",
+    "Separate signal quality (true signal vs correlated proxy) from position sizing: ruin occurs when a 'good signal' is oversized under concentration. A proxy-identified risky pick could remain in the portfolio at reduced weight rather than eliminated",
+    "The ibd_entry_close_vs_trigger_pct feature is available at snapshot time and shows promise as a cleaner predictor (winners tend to enter earlier: median ~0.030 vs ruin tends to enter late: ~0.069)—investigate this before slope ratio proxies"
+  ]
+}
+```

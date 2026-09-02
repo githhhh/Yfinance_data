@@ -1,0 +1,38 @@
+
+
+```json
+{
+  "mechanism_claim": "B0's 'evidence_risk' component is functioning primarily as a return-ranking proxy (selecting on momentum, vol-expansion and extension above MAs) rather than as a genuine downside-risk control; the asymmetry between rejected winners (calmer, less-extended, lower momentum) and selected ruins (high-momentum profiles that still failed) is inconsistent with any risk-aversion interpretation.",
+  "evidence_for": [
+    "False-negative cases (entities rejected by B0 that were future winners) had median mom_20=0.058 vs selected_winner median 0.163 (Δ=-0.105, std=-1.00): rejection is driven by lower momentum, not by risk signatures.",
+    "False-negative cases had vol_ratio_5_20 median 1.179 vs selected_winner 1.424 (std=-1.05) and up_day_ratio_20 median 0.50 vs 0.625 (std=-1.19) — both are upside-tilted metrics, not downside-risk metrics, yet they dominate the reject decision.",
+    "pullback_pct is INVERTED vs a risk hypothesis: selected_winners came out of DEEPER pullbacks (median -15.9%) than false_negatives (-7.3%, Δ=+8.6pp); a downside-risk filter would penalize deeper drawdowns, not reward them.",
+    "False-positive-ruin cases frequently carry strong momentum: entity_4fdc3699fd (mom_20=0.185, ma10_slope_5=0.091), entity_3472243e0c (mom_20=0.242), entity_6618d3e80c (mom_20=0.251, px_vs_ma50=+33.7%) — high momentum profiles did NOT prevent ruin, falsifying any implicit 'strong = safe' mapping inside the component.",
+    "px_vs_ma50 contrast (FN 0.056 vs SW 0.127, std=-0.85) and ma10_slope_5 contrast (std=-0.68) show selection for extension and trend acceleration — textbook return-ranking inputs, not risk-control inputs.",
+    "Numeric_contrasts show NO feature that is HIGHER for false_negatives than selected_winners in a manner consistent with risk-aversion; the entire rejection vector points toward ranking on strength."
+  ],
+  "evidence_against": [
+    "A risk-control interpretation could argue that higher up_day_ratio (SW 0.625 > FN 0.50) reflects avoidance of choppy names, but up_day_ratio is not direction-asymmetric and is confounded with trend strength.",
+    "pullback_duration_weeks is shorter for FN (4.0 vs SW 5.5) — superficially a 'less time correcting = healthier' reading; but a true risk model should flag BOTH shallow pullbacks (no reset) AND deep ones (broken structure), and this component does not separate them.",
+    "ibd_entry_breakout_range_ratio is slightly higher for FN (+0.066) — could be misread as risk-aversion to tight breakouts, but the standardized delta is small (std=+0.12) and the dominant deltas are all momentum-side.",
+    "The hybrid 'false_positive_ruin|selected_winner' entity_6618d3e80c (large_win bucket despite ruin label) reached px_vs_ma50=+33.7% — if anything, the component let the most extended name through, again inconsistent with risk control.",
+    "Method note uses future W4 outcomes (>=8% and >=5pp above median) to define false negatives; this means the FN asymmetry could partly reflect look-ahead leakage in label construction rather than a true PIT-safe ranking bias — weakens the ranking conclusion marginally but does not overturn it."
+  ],
+  "falsifiable_predictions": [
+    "If 'evidence_risk' is really downside-risk control, then within the B0-picked universe the ruin rate should DECREASE monotonically across deciles of the component score; empirically we expect a flat or U-shaped ruin rate across deciles (falsifier).",
+    "If it is really risk control, a logistic regression of is_b0_pick on mom_20 + px_vs_ma50 + up_day_ratio_20 + vol_ratio_5_20 should yield low pseudo-R² (<0.10); we predict pseudo-R² ≥ 0.30, indicating the 'risk' decision is dominated by ranking features (falsifier of the risk-control narrative).",
+    "Within selected_winners, mom_20 should NOT be negatively correlated with subsequent 4w drawdown if the component is risk-controlling; we predict mom_20 is uncorrelated or POSITIVELY correlated with 4w max drawdown inside the B0-picked set, confirming the ranking-on-strength behavior (falsifier).",
+    "A counterfactual where 'evidence_risk' is replaced by a downside-specific composite (lower-shadow ratio, downside ATR ratio, distribution-day ratio) should produce equal-or better out-of-sample ruin rate at the same selection breadth — if it does not, the original component is doing something the downside composite cannot replicate, which would falsify the cleaner-replacement recommendation.",
+    "If 'evidence_risk' were risk-control, raising its threshold (more conservative) should reduce ruin rate WITHOUT materially changing the selected return distribution; we predict ruin rate stays roughly constant and selected median mom_20 falls, falsifying the risk framing."
+  ],
+  "policy_implications": [
+    "Re-label the component honestly: the current 'evidence_risk' signal is a momentum/extension screen and belongs in the ranking block, not the risk block.",
+    "Replace it with a calibrated conditional-drawdown estimator P(max_drawdown_4w > X | state) trained on PIT-safe features only, using inputs that are downside-asymmetric: downside ATR ratio, lower-shadow frequency, close-to-low ratio, distribution-day ratio, base-quality deterioration (e.g., contracting bases without volume expansion), earnings-revision slope if available PIT.",
+    "Orthogonalize: regress any 'risk' score on the ranking features (mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20) and use the residual as a pure-risk signal; this prevents double-counting between the ranking and risk layers.",
+    "Re-test the B0 selection policy with the new risk layer: expect either (i) similar selection set but lower ruin rate at the same breadth, or (ii) smaller selection set with materially lower ruin — if neither holds, the policy should keep the old composite but stop calling it 'risk'.",
+    "Add a hard veto for names whose vol_ratio_5_20 is high BUT mom_20 is flat or negative (vol expansion without price confirmation) — this is the failure archetype the current evidence_risk misses and would have flagged entity_55c2da490e (mom_20=0.036, pullback_pct=-12.3, ruin) and entity_40ea0cfb3b (mom_20=0.024, ruin).",
+    "Tighten label hygiene: the FN construction uses forward 4w return thresholds that can leak information about the ranking signal itself; rebuild false-negative labels with PIT-only proxies (e.g., subsequent base break, subsequent vol regime) before re-estimating the asymmetry.",
+    "Track ruin-rate by decile of the new risk component monthly; if ruin-rate dispersion across deciles stays <2pp, treat the component as low-information and rely instead on position-sizing and stop-loss discipline for downside control."
+  ]
+}
+```

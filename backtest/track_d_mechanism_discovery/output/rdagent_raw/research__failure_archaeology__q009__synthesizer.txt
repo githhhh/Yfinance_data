@@ -1,0 +1,57 @@
+
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 47,
+  "mechanism_summary": "Snapshot-level features (vol_ratio_5_20, ma10_slope_5, up_day_ratio_20) show group-level separation between false_positive_ruin and selected_winner outcomes. However, the specific causal mechanism—volume confirmation peaks at snapshot then contracts, causing failure—is not testable with frozen evidence. The proposed volume-dry-up narrative requires post-snapshot volume data that does not exist in this dataset. The ma10_slope_5/ma20_slope_5 ratio and vol_ratio_5_20 are computed from overlapping 5-day windows and lack statistical independence. Entity_3adc078f01 (selected_winner with vol_ratio_5_20=1.14 below proposed thresholds, sustaining -42.3% pullback) demonstrates the mechanism's predictive failure. The strongest observable signal is up_day_ratio_20 (standardized delta -1.1882), not volume ratio. Within-snapshot overlap between ruin and winner groups exists, making regime-conditional prediction unreliable without post-snapshot confirmation.",
+  "falsifiers": [
+    "Find a B0 pick with vol_ratio_5_20 < 0.9, ma10_slope_5 > 0.06, mom_20 > 0.12, up_day_ratio_20 > 0.6 that produces false_positive_ruin outcome—this would show volume contraction with strong breadth/momentum still leads to ruin",
+    "Demonstrate within a single snapshot_anon that B0 picks with identical vol_ratio_5_20 (±0.05) and up_day_ratio_20 (±0.05) split between false_positive_ruin and selected_winner—showing snapshot-level features cannot discriminate within regime",
+    "Show actual post-snapshot volume measurements (W1, W2, W3) demonstrating that volume contracted >30% for ruin cases while remaining elevated for selected_winner cases matched on snapshot features",
+    "Confirm entity_6618d3e80c's true single-label outcome via external price/volume data beyond W4 return bucket, resolving the dual-label contamination",
+    "Find B0 pick with vol_ratio_5_20 > 1.5, ma10_slope_5 > 0.05, up_day_ratio_20 > 0.65 that still produces ruin—this would invalidate the threshold-based filter proposed in policy"
+  ],
+  "actionable_design_principles": [
+    "Use up_day_ratio_20 as primary pre-snapshot discriminator (standardized delta -1.1882 strongest among available features), not volume ratio",
+    "Treat vol_ratio_5_20 and ma10_slope_5 as redundant co-measurements of the same 5-day window; do not apply both as independent filters",
+    "Accept that post-snapshot volume monitoring cannot be designed from this evidence base; policy must use only snapshot-time features or acknowledge UNRESOLVED status",
+    "Apply regime-stratified evaluation: pattern may hold in high-up_day_ratio_20 regimes (breadth thrust) but fail in low-breadth environments",
+    "Define clear single-outcome labeling rules; entity_6618d3e80c dual-label reveals labeling system insufficiency for binary pattern analysis",
+    "Require >0.125 gap in up_day_ratio_20 (median delta) between candidate and false_negative baseline as necessary condition for selection"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Breadth-gated entry: Accept B0 pick only if up_day_ratio_20 >= 0.6 AND vol_ratio_5_20 >= 1.2; otherwise flag for extended monitoring before entry",
+      "why_distinct": "Uses breadth (up_day_ratio_20) as primary gate rather than volume ratio alone, addressing skeptic's backward-looking critique by pairing with a forward-looking breadth signal",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20"],
+      "capacity_relevance": "Filters low-breadth B0 picks (up_day_ratio_20 < 0.6) which constitute majority of false_negative cases in the evidence base"
+    },
+    {
+      "idea": "Slope divergence alert: Flag B0 pick where ma10_slope_5 < 0.015 AND ma20_slope_5 > 0.025 (negative slope ratio) as elevated-risk despite acceptable volume",
+      "why_distinct": "Detects momentum deceleration without claiming volume causation; uses slope relationship as breadth/momentum divergence indicator rather than volume-dry-up mechanism",
+      "features": ["ma10_slope_5", "ma20_slope_5"],
+      "capacity_relevance": "Addresses researcher observation that slope ratio differs between groups while acknowledging skeptic's redundancy concern by not pairing with vol_ratio_5_20"
+    },
+    {
+      "idea": "Null-pullback exclusion rule: B0 picks with null pullback_duration_weeks AND null pullback_pct in evidence should not be used to train pullback-depth-based exit rules",
+      "why_distinct": "Implements skeptic's concern about post-snapshot observables by explicitly excluding undefined metrics from policy design; prevents false confidence in untestable mechanisms",
+      "features": ["pullback_duration_weeks", "pullback_pct"],
+      "capacity_relevance": "Prevents overfitting to 2 of 8 ruin cases that have pullback data; recognizes 75% of ruin cases lack testable pullback patterns"
+    },
+    {
+      "idea": "Within-regime validation requirement: Before deploying any B0 filter based on snapshot features, require demonstration of discrimination within at least one snapshot_anon containing mixed outcomes",
+      "why_distinct": "Directly addresses experimental designer's within_snapshot_regime_test and skeptic's counterexample about same-regime feature overlap; enforces falsifiability at regime level",
+      "features": ["snapshot_anon", "any snapshot-time feature used as filter"],
+      "capacity_relevance": "Ensures no filter passes that produces overlapping feature values for ruin vs winner within market regime"
+    },
+    {
+      "idea": "Momentum-volume independence check: Reject any policy rule that uses both vol_ratio_5_20 and ma10_slope_5 as separate independent conditions without documenting their 5-day window overlap",
+      "why_distinct": "Operationalizes skeptic's circularity concern; forces explicit acknowledgment of feature dependency before rule deployment",
+      "features": ["vol_ratio_5_20", "ma10_slope_5"],
+      "capacity_relevance": "Prevents spurious filtering from mechanically correlated features computed from identical time windows"
+    }
+  ]
+}
+```

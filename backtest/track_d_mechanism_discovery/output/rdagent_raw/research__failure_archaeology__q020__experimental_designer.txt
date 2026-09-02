@@ -1,0 +1,91 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "dry_up_tier_precision_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "comparison": "Among all is_b0_pick=false names, compare W4 large_win rate of the pre-specified dry-up band {vol_ratio_5_20 in [0.9, 1.2] AND up_day_ratio_20 >= 0.55 AND mom_20 > 0} versus the complementary is_b0_pick=false set outside that band, and versus the B0-selected set on the same snapshot.",
+      "success_criterion": "Dry-up band large_win precision >= 1.5x the complementary is_b0_pick=false base rate AND >= 0.75x the B0-selected precision, with ruin rate not more than 1.2x B0 ruin rate, AND bootstrap 95% CI on the lift excludes 1.0.",
+      "failure_criterion": "Dry-up band large_win rate <= complementary false-negative rate, OR ruin/loss rate exceeds 1.5x B0 ruin rate, OR CI on lift crosses 1.0 in a sample of at least 30 matched names across at least 5 distinct snapshots."
+    },
+    {
+      "name": "opposite_sign_mechanism_separation",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_60",
+        "ma50_slope_10"
+      ],
+      "comparison": "Among names with vol_ratio_5_20 in [0.9, 1.2], split by mom_60 sign and ma50_slope_10 sign. Compare W4 large_win rate of the {low vol, negative mom_60, negative ma50_slope_10} subgroup (the 'quiet distribution' cell) versus the {low vol, positive mom_60, positive ma50_slope_10} subgroup (the 'quiet accumulation' cell).",
+      "success_criterion": "Accumulation-cell large_win rate strictly exceeds distribution-cell large_win rate by at least 20 percentage points AND odds ratio > 3 with Fisher p < 0.05.",
+      "failure_criterion": "Distribution cell produces large_win rate >= accumulation cell, OR both cells produce statistically indistinguishable win rates — in which case the 'coiled spring' mechanism is indistinguishable from generic low-volatility drift and should be labeled UNRESOLVED."
+    },
+    {
+      "name": "proxy_independence_controlled_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "rv_20"
+      ],
+      "comparison": "Test whether vol_ratio_5_20 and up_day_ratio_20 retain independent predictive information for W4 large_win after stratifying on rv_20 quartile. Compute partial rank correlation of each feature with W4 large_win conditional on rv_20.",
+      "success_criterion": "Both vol_ratio_5_20 and up_day_ratio_20 show |partial correlation| > 0.15 with W4 large_win after controlling for rv_20, with non-overlapping 95% CIs versus the unconditional correlation.",
+      "failure_criterion": "Either feature's partial correlation collapses to within +/-0.05 of zero once rv_20 is controlled for, indicating the 'triple-gate' is triple-counting one underlying realized-variance signal."
+    },
+    {
+      "name": "within_snapshot_matched_discrimination",
+      "features": [
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "comparison": "Within each snapshot that contributes >=2 is_b0_pick=false names, compute the snapshot-conditional rank of vol_ratio_5_20, px_vs_ma50, and mom_20 for each is_b0_pick=false name and test whether higher snapshot-relative vol_ratio_5_20 (within [0.9, 1.2] absolute band) correlates with W4 large_win. Repeat for px_vs_ma50 and mom_20.",
+      "success_criterion": "Pooled within-snapshot rank correlation between vol_ratio_5_20 and W4 large_win is positive with p < 0.05 across at least 5 distinct snapshots; same-sign rank result holds for both px_vs_ma50 and mom_20.",
+      "failure_criterion": "After removing snap_71486ed83c from the pool, the dry-up signal disappears (i.e., rank correlation flips sign or loses significance), confirming the apparent pattern was a single-date artifact."
+    },
+    {
+      "name": "counterexample_ruin_base_rate_in_band",
+      "features": [
+        "vol_ratio_5_20",
+        "pullback_pct",
+        "px_vs_ma20"
+      ],
+      "comparison": "Among all discovery-window names with vol_ratio_5_20 in [0.9, 1.2], tabulate the joint distribution of pullback_pct (>=-10% vs <-10%) and px_vs_ma20 (>=0 vs <0). Compute ruin+loss rate per cell and compare to the cell {pullback_pct >=-10% AND px_vs_ma20 >= 0} that the dry-up tier would exclusively admit.",
+      "success_criterion": "The selected dry-up cell has ruin+loss rate < 25% and large_win rate >= 40%, with at least 8 qualifying observations.",
+      "failure_criterion": "Ruin+loss rate in the selected dry-up cell >= 35%, OR the cell contains fewer than 3 observations (insufficient evidence), OR entity_40ea0cfb3b-style cases (low vol, selected, ruined) accumulate in the same cell at a rate >= 1 per 5 candidates — in which case the dry-up tier is unsafe and the question is UNRESOLVED."
+    },
+    {
+      "name": "b0_filter_acceptance_of_low_vol_test",
+      "features": [
+        "vol_ratio_5_20",
+        "is_b0_pick",
+        "ma10_slope_5"
+      ],
+      "comparison": "Among is_b0_pick=true winners, count how many satisfy vol_ratio_5_20 in [0.9, 1.2] with ma10_slope_5 >= 0. Test whether the B0 filter already admits dry-up candidates at a non-trivial rate (entity_8ad5cd4795 case).",
+      "success_criterion": "Fraction of is_b0_pick=true winners with vol_ratio_5_20 in [0.9, 1.2] is < 10%, indicating the B0 filter systematically excludes the band and a new tier would add genuinely new candidates.",
+      "failure_criterion": "Fraction >= 20% — meaning the proposed dry-up tier mostly relabels already-selected names rather than recovering rejected winners, so the mechanism claim (that B0 is missing a class) is undermined."
+    }
+  ],
+  "leakage_checks": [
+    "Verify every feature listed is computable from price/volume history strictly prior to the snapshot date (ma10_slope_5, ma20_slope_5, mom_20, mom_60, ma50_slope_10, px_vs_ma20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20, rv_20, atr_14_pct, pullback_pct, pullback_duration_weeks, base_*, dist_to_52w_high_pct, ibd_entry_*, volume_ratio) — none may incorporate W4 outcome window.",
+    "Confirm is_b0_pick is used only as a stratification label, never as a predictive feature inside a model that generates the dry-up tier itself.",
+    "Confirm w4_return_bucket and outcome_label appear only as response variables, never as inputs.",
+    "Confirm no use of entity_anon, snapshot_anon, or any calendar identity as a feature; snapshot_anon may be used solely as a blocking variable for within-snapshot tests.",
+    "Confirm pullback_pct and pullback_duration_weeks reference the pre-snapshot correction phase, not the post-snapshot move; if either is defined using post-snapshot data it must be excluded.",
+    "Confirm base_depth_pct, base_duration_weeks, base_mbox_count are pre-snapshot base-formation measures (computed only from bars before snapshot), not retrospective window statistics that include the W4 window.",
+    "Confirm dist_to_52w_high_pct uses 52w_high computed at snapshot date, not in hindsight."
+  ],
+  "priority_order": [
+    "opposite_sign_mechanism_separation",
+    "within_snapshot_matched_discrimination",
+    "dry_up_tier_precision_test",
+    "counterexample_ruin_base_rate_in_band",
+    "proxy_independence_controlled_test",
+    "b0_filter_acceptance_of_low_vol_test"
+  ]
+}
+```

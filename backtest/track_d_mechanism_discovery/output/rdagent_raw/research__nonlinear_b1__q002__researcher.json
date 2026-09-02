@@ -1,0 +1,32 @@
+{
+  "mechanism_claim": "The interaction pullback_v_is_dry × current_vs_ibd_candidate_pct identifies the regime where a B0 candidate has already extended meaningfully above its original IBD pivot (high current_vs_ibd_candidate_pct) and is consolidating. When that consolidation occurs on dry volume (pullback_v_is_dry = 1), it reflects institutional accumulation/rotation and continuation is likely. When the consolidation occurs on elevated volume (pullback_v_is_dry = 0), it signals distribution into the B0 entry, which is the dominant false_positive_ruin failure regime. The interaction therefore separates 'extended-but-healthy' from 'extended-and-distributing' without needing to add new candidates.",
+  "evidence_for": [
+    "Numeric contrast: selected_winner median current_vs_ibd_candidate_pct = 1.98 vs false_negative_relative median = 1.69, indicating winners sit modestly above the IBD pivot (extended, not just basing).",
+    "False_positive_ruin cases cluster on stocks with null pullback fields OR pullback_pct of −12% to −16% with vol_ratio_5_20 in the 1.2–1.5 band (entity_8f0df3d38e, entity_ccc90a671f, entity_55c2da490e) — extended names whose consolidations are accompanied by elevated volume.",
+    "False_positive_ruin entity_3472243e0c has mom_20 = 0.242, vol_ratio_5_20 = 1.21, null pullback (already extended, no dry reset) — a textbook distribution pattern.",
+    "Selected winners with deep pullbacks (entity_3adc078f01: pullback_pct = −42.3% over 9 weeks, entity_2c58cebc59: pullback_pct = −25.1% over 6 weeks) coincide with large_win buckets, consistent with dry-volume shakeouts resetting the base before continuation.",
+    "false_negative_relative cases show a slight downward shift in current_vs_ibd_candidate_pct (1.69) and shorter pullback_duration_weeks (4 vs 5.5) — these are stocks that B0 is under-buying precisely because they look un-extended, but the interaction (if made permissive) could re-include them by recognizing their early-stage dry basing.",
+    "Among labeled cases with pullback data, the false_positive_ruin row entity_8ad5cd4795 is excluded (it's a selected_winner with vol_ratio_5_20 ≈ 1.0 and shallow pullback), confirming dry-volume consolidation is a positive signal."
+  ],
+  "evidence_against": [
+    "Small sample of 27 cases provides limited statistical power to confirm an interaction term distinct from the marginal effects of current_vs_ibd_candidate_pct (standardized_delta = −0.1984) or vol_ratio_5_20 (standardized_delta = −1.0455 for false negatives).",
+    "Selected winner entity_440e297253 has vol_ratio_5_20 = 1.59 with a shallow pullback (pullback_pct = −1.5%), contradicting a strict 'dry volume required for any pullback' rule.",
+    "Several false_positive_ruin cases (entity_4fdc3699fd, entity_b6bcccdf6a, entity_84824e6a20) have null pullback fields — these represent 'never pulled back at all' extended names where pullback_v_is_dry is undefined and must be treated as a separate, harder-to-classify failure mode.",
+    "pullback_duration_weeks is missing for many rows, so the interaction can only be evaluated on a subset of B0 candidates, reducing effective sample size further."
+  ],
+  "falsifiable_predictions": [
+    "If the interaction hypothesis is correct, restricting B0 picks to those with pullback_v_is_dry = 1 AND current_vs_ibd_candidate_pct in [0.5%, 4.0%] should reduce the ruin bucket proportion below the unconditional ~30% baseline observed in the 27-case archaeology, while preserving at least 60% of the original B0 eligible set.",
+    "Within B0 picks that already have current_vs_ibd_candidate_pct > 1.5%, the subset with pullback_v_is_dry = 1 should have a W4 mean return at least 1.5pp higher than the subset with pullback_v_is_dry = 0.",
+    "A multiplicative rank penalty of the form score *= (0.5 + 0.5*pullback_v_is_dry)*(1 + clamp(current_vs_ibd_candidate_pct/10, 0, 0.3)) should produce a higher realized hit rate on a holdout than either term alone.",
+    "Cases with pullback_v_is_dry = null (never consolidated) AND current_vs_ibd_candidate_pct > 2% should be the highest sub-regime ruin rate, validating that 'extended-with-no-reset' is the dominant failure mode.",
+    "If a candidate has pullback_v_is_dry = 1 but current_vs_ibd_candidate_pct < 0% (trading below IBD pivot), the interaction term should NOT improve ranking — the dry-pullback benefit requires the stock to already be trending."
+  ],
+  "policy_implications": [
+    "Encode the interaction as a two-step B0 refinement: (a) compute current_vs_ibd_candidate_pct at the snapshot; (b) derive pullback_v_is_dry from the volume profile of any pullback window vs trailing 20-day average. Apply as a soft rank modifier rather than a binary gate to avoid shrinking the eligible universe.",
+    "Specifically: B0_adjusted_score = B0_score * (1 + 0.15*pullback_v_is_dry) * (1 + 0.10*min(current_vs_ibd_candidate_pct/3, 1)) — the interaction emerges because pullback_v_is_dry gates whether the extension premium is rewarded (dry) or punished (non-dry).",
+    "Hard veto only for the extreme 'extended-without-dry-reset' quadrant: drop B0 candidates with current_vs_ibd_candidate_pct > 3.0% AND pullback_v_is_dry = 0 (or null), since this quadrant concentrates false_positive_ruin.",
+    "For names with pullback_v_is_dry = null (no meaningful pullback yet), do not apply the positive arm of the interaction; instead require an additional confirmation (e.g., vol_ratio_5_20 < 1.0) before allowing the B0 pick to stand.",
+    "This encoding keeps the B0 eligible universe intact — no new candidates are added; the interaction only reorders or filters within the existing B0 set, preserving the model's candidate-generation contract.",
+    "Backtest protocol: stratify W4 outcomes by the four-quadrant interaction (pullback_v_is_dry × current_vs_ibd_candidate_pct bucket), verify the ruin-rate ordering matches the falsifiable predictions, and measure whether the interaction term adds marginal Sharpe over a model with only current_vs_ibd_candidate_pct as a feature."
+  ]
+}

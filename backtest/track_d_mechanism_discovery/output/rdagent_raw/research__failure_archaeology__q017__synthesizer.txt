@@ -1,0 +1,44 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 28,
+  "mechanism_summary": "The 'false-negative non-pick becomes large winner under near-buy-point geometry' hypothesis has directional evidence (median contrasts showing lower momentum/volume proxies for false-negatives) but cannot be considered SUPPORTED due to three fatal methodological constraints: (1) the outcome-contingent labeling scheme (requiring W4 >= 8% and >= 5pp above B0 median) contaminates all feature contrasts with circular selection bias—this is not a testable mechanism but a post-hoc category; (2) the mechanistic distinction between 'true geometry' (ibd_entry_close_vs_trigger_pct) and 'correlated proxy' (MA slopes) is asserted without causal graph support—both are price-derived ratios with no demonstrated orthogonal validity; (3) sample size (27 total, ~7 false-negative subtypes) is structurally underpowered for the precision claims (15pp improvement, 60% hit-rate thresholds). The experimental designer has specified 8 falsification tests, but these remain unexecuted, leaving the core predictions (Conditions A-D) empirically untested. The skeptic's outcome-contingency attack is methodologically correct and cannot be dismissed without test execution.",
+  "falsifiers": [
+    "Execute trigger_distance_vs_price_extension_redundancy test: if conditional Spearman ρ(ibd_entry_close_vs_trigger_pct, px_vs_ma50 | vol_ratio_decile) >= 0.60, the 'true geometry vs. proxy' distinction collapses",
+    "Execute non_pick_momentum_reversal_within_snapshot test: if pooled OR for ma20_slope sign reversal <= 1.5, the proposed ma20_slope_5 condition in Condition B has no predictive basis",
+    "Execute pullback_pct_temporal_precedence test: if pullback_pct predicts subsequent ibd_entry_close_vs_trigger_pct (partial r >= 0.30), then pullback_pct contains forward-looking information and the researcher's 'outcome variable only' claim is false",
+    "Execute snapshot_regime_vol_ratio_confounding test: if ibd_entry_close_vs_trigger_pct effect becomes non-significant (p >= 0.15) after snapshot random effects, the mechanism is regime artifact not geometry",
+    "Find at least one counterexample where ibd_entry_close_vs_trigger_pct < 0.015, up_day_ratio_20 >= 0.45, vol_ratio_5_20 < 1.25 yet W4 return <= 0%—this directly falsifies Condition A",
+    "Execute selected_winner_compressed_trigger_ruin_test: if among B0 picks with ibd_entry_close_vs_trigger_pct < 0.025 the ruin/loss rate exceeds 50%, the mechanism claim that trigger-distance compression identifies valid entries is contradicted"
+  ],
+  "actionable_design_principles": [
+    "Do not use the current false-negative labels for any model training or feature selection—the category is outcome-contingent and creates circular validation",
+    "If re-labeling, define 'false-negative candidate' using only snapshot-time features (e.g., ibd_entry_close_vs_trigger_pct < threshold AND up_day_ratio_20 >= threshold) without reference to W4 outcome, then evaluate whether those snapshot-time criteria predict subsequent outperformance",
+    "Reduce Condition A's hit-rate threshold from 60% to 40% and require minimum 15 false-negative-candidate cases before making precision claims—current N=7 cannot support 15pp precision differentials",
+    "Treat vol_ratio_5_20 stratification as mandatory, not optional—cross-snapshot pooling without regime adjustment conflates time effects with geometry effects",
+    "Demand causal graph evidence before privileging one price-ratio as 'true geometry' versus another as 'correlated proxy'—the distinction must be structural, not post-hoc"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Redefine false-negative-candidate using only pre-specified snapshot-time thresholds (ibd_entry_close_vs_trigger_pct < 0.020, up_day_ratio_20 >= 0.45) without referencing future W4 performance; evaluate forward validity prospectively",
+      "why_distinct": "Breaks circular validation by using only contemporaneous geometry as the candidate definition; the outcome test is then genuinely predictive rather than confirmatory",
+      "features": ["ibd_entry_close_vs_trigger_pct", "up_day_ratio_20", "vol_ratio_5_20"],
+      "capacity_relevance": "Enables unbiased estimation of snapshot-geometry → W4 outcome relationship; current labels cannot support this"
+    },
+    {
+      "idea": "Implement dual-stratum analysis: stratum 1 = B0 selected picks (is_b0_pick=true) for ruination risk estimation; stratum 2 = non-pick candidates (is_b0_pick=false) for win-rate estimation; never pool across strata for mechanism claims",
+      "why_distinct": "The researcher's mechanism claim conflates two distinct decision contexts (B0's screening vs. non-pick re-entry eligibility); pooling obscures that the relevant question differs: for picks, compressed trigger-distance may indicate entry quality, but for non-picks it indicates a different entry type entirely",
+      "features": ["is_b0_pick", "ibd_entry_close_vs_trigger_pct", "mom_20", "up_day_ratio_20"],
+      "capacity_relevance": "Separates the mechanism question (does trigger-distance compression predict win-rate in non-pick stratum?) from the risk question (does it predict ruination in pick stratum?); conflating these produces policy contradictions"
+    },
+    {
+      "idea": "Add a temporal-holdout validation: train candidate-definition thresholds on snapshots 1 through N-2, test hit-rate on snapshot N-1 and N; require out-of-sample replication before policy deployment",
+      "why_distinct": "Current evidence is entirely in-sample; the skeptic's regime-heterogeneity concern means in-sample contrasts may not replicate. Out-of-sample validation across snapshot boundaries is the only defense against regime-contingent spurious correlations",
+      "features": ["ibd_entry_close_vs_trigger_pct", "up_day_ratio_20", "vol_ratio_5_20", "snapshot_anon"],
+      "capacity_relevance": "Addresses the experimental designer's snapshot_regime_vol_ratio_confounding concern before policy claims; current data cannot distinguish mechanism from regime artifact"
+    }
+  ]
+}
+```

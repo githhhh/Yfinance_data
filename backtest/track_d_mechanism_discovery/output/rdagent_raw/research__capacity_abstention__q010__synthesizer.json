@@ -1,0 +1,66 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The 'cash dominates the marginal slot in low-density regimes' thesis has partial empirical support but is not cleanly separable from confounders. Within the discovery-train archaeology (n=27), false_positive_ruin cases (8) cluster in a marginal feature band (up_day_ratio_20 ≈ 0.50–0.65, vol_ratio_5_20 ≈ 1.0–1.6, mom_20 ≈ 0.02–0.25, px_vs_ma50 ≈ 0.05–0.15) that also contains a non-trivial fraction of selected_winners (e.g., entity_90a828939a at up_day_ratio=0.45/mom_20=0.036 → large_win; entity_2f86543bf6 at mom_20=-0.008 → large_win). This means the candidate band is genuinely ambiguous: ruin probability is elevated versus the high-feature tail, but the absolute ruin rate is not 100% and the upside of marginal setups is non-zero. The economic meaning of 1 vs 2 vs 3 slots under fixed capital is therefore NOT a simple monotonic EV ordering. Slot 1 is plausibly positive-EV (concentrated highest-feature setup), but the slot 2/slot 3 distinction collapses once we accept the Skeptic's point that ruin events co-occur within snapshots (snap_71486ed83c has 4+ ruin/false_negative labels, snap_b8420124eb has 2 ruins + 1 winner) — implying regime-correlated draws that defeat variance-reduction arguments. The mechanism is best characterized as: marginal-band candidate EV is approximately zero with a left-tail dominated by asymmetric ruin risk, AND the marginal slot's ruin probability is partially correlated with other slots' ruin probability, so diversification gain across slots 2 and 3 is smaller than naive independence would predict. Cash therefore dominates a marginal slot only when (a) the slot's composite feature score falls in the ruin-cluster band AND (b) the snapshot's cross-slot feature homogeneity is high enough that diversification offers minimal variance reduction.",
+  "falsifiers": [
+    "T1 fails: the proposed gate {up_day_ratio≥0.60 AND vol_ratio_5_20≥1.40 AND mom_20≥0.15} cannot separate selected_winners from false_positive_ruin with median-direction agreement on mom_20/up_day_ratio/vol_ratio (i.e., ruin cases inside the gate are not reduced below ~50% of in-band cases).",
+    "T2 fails: a snapshot with cross-slot up_day_ratio_20 IQR ≤0.10 produces ≥3 slots sharing w4_return_bucket='ruin' — directly demonstrating that diversification across 3 slots does not reduce ruin incidence and cash-dominance over the marginal slot is undermined by the lack of independent ruin draws.",
+    "T4 fails: in low-density-proxy snapshots, the slot-3 (worst-feature) median w4 ordinal is ≥ slot-1 median ordinal, showing the within-snapshot feature ranking does not reliably identify which slot is 'marginal' and which is 'core', so 'cash should replace slot 3' becomes undefined.",
+    "Discovery of additional selected_winners in the marginal feature band (up_day_ratio<0.55 OR mom_20<0.10) at rates exceeding the false_positive_ruin rate inside the same band — entity_90a828939a and entity_2f86543bf6 are early warnings that the ruin band is not exclusive.",
+    "Out-of-sample (held-out fold) replication where the gate-passing cohort has W4 ruin rate ≥20% — falsifying the claim that the gates themselves reduce ruin probability.",
+    "Regime-variable (sector-relative strength, market breadth) explains more outcome variance than the candidate-level PIT features, in which case the cash-dominates-marginal-slot claim is true at the snapshot level but not the slot level, and the policy prescription changes from 'gate individual slots' to 'gate entire snapshots'."
+  ],
+  "actionable_design_principles": [
+    "Treat cash as a first-class position with explicit non-zero cost equal to (benchmark drift over holding window) × (probability of no replacement setup arriving within that window); never treat cash as free.",
+    "Use a composite PIT-feature quality score (z-scored combination of up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50, pullback_pct, ma10_slope_5) rather than binary thresholds; binary thresholds discard ordering information and force winners like entity_90a828939a out of the portfolio while admitting ruinations like entity_8f0df3d38e.",
+    "Distinguish 'slot N is filled' from 'slot N is filled with a qualifying candidate' — deployment is conditional on candidate quality, not on slot index. The number of deployed slots (1/2/3) is a derived quantity, not a policy input.",
+    "Stratify snapshots by within-snapshot feature homogeneity (IQR of up_day_ratio_20 across slots); when homogeneity is high (cross-slot features look similar), assume correlated draws and cap deployment at 1 slot even if 3 candidates nominally exist, because diversification gain is empirically small in that regime.",
+    "Log every abstention (cash-held slot) with the candidate's composite score and the ruin-band membership flag, so that quarterly archaeology can detect drift in the ruin band location without confusing it with sample-size noise.",
+    "Do not derive gates from the false_negative-vs-selected_winner contrast — that contrast is about candidate rejection, not deployment decision; the deployment-relevant contrast is selected_winner vs false_positive_ruin, which has much smaller median separation."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "slot_deployment_gate: returns max(0, min(3, count(slots where composite_score ≥ quality_threshold AND slot NOT in marginal_band))) where marginal_band = (up_day_ratio_20 ∈ [0.40, 0.65]) AND (vol_ratio_5_20 ∈ [1.0, 1.6]) AND (mom_20 ∈ [0.02, 0.25]).",
+      "why_distinct": "Combines a quality floor AND an explicit ruin-band exclusion; the band exclusion addresses the regime where marginal candidates pass the quality floor but have ruin-overlap features. Does NOT force 3-slot deployment when only 1–2 candidates clear both gates.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Maps directly to the 1/2/3 slot decision by counting qualifying candidates; the cap at 3 preserves the original portfolio constraint while letting cash fill the gap."
+    },
+    {
+      "idea": "within_snapshot_dispersion_filter: compute IQR(up_day_ratio_20 across slots) per snapshot; if IQR ≤ 0.10 then cap deployment at 1 slot regardless of candidate count, on the hypothesis that low-dispersion snapshots have regime-correlated draws.",
+      "why_distinct": "Operates at the snapshot level, not the candidate level; addresses the Skeptic's correlated-ruin objection directly by recognizing that diversification gain is conditional on cross-slot feature dispersion. Does not appear in the Researcher's policy list.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Reduces deployment count in homogeneous-snapshot regimes, so effective capacity (= number of deployed slots) becomes endogenously state-dependent rather than fixed at 3."
+    },
+    {
+      "idea": "cash_position_explicit_carry: log cash holdings with opportunity_cost = benchmark_return_window × (1 - setup_arrival_probability_window); surface this as a per-decision cost on the abstention side, so that the policy does not over-abstain when benchmark drift is steeply positive.",
+      "why_distinct": "Forces the abstention decision to be evaluated against an explicit alternative use of capital rather than zero; addresses the Researcher's own caveat that 'cash has no explicit yield modeled here' without requiring an outer-forward benchmark test. The capacity implication is that '1 slot deployed + 2 cash' carries an explicit carry cost.",
+      "features": [
+        "benchmark_window_return",
+        "setup_arrival_proxy"
+      ],
+      "capacity_relevance": "Couples deployment count to opportunity cost; in steep uptrend regimes, the policy may justify forcing slot 2 or 3 even with marginal features, raising effective capacity temporarily."
+    },
+    {
+      "idea": "marginal_band_ruin_flag: per-slot pre-trade flag = 1 if candidate's features fall in the ruin-cluster band AND the snapshot contains another slot already in the same band; flag triggers automatic abstention for the lower-quality slot (cash substitutes).",
+      "why_distinct": "Conditional abstinence based on portfolio-level ruin concentration rather than slot-level score alone; recognizes that ruin correlation within the marginal band amplifies left-tail risk. Operates as a tie-breaker when two slots are both in the marginal band.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Further reduces the 3rd slot probability when slots 1 and 2 are already in the ruin band, lowering effective capacity in the worst regime (homogeneous marginal)."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 43,
+  "mechanism_summary": "The px_vs_ma50/up_day_ratio_20 mechanism is empirically suggestive but causally underdetermined. False-positive ruin cases do cluster in the moderate-extension/weak-internal-strength quadrant (px_vs_ma50 < 0.10, up_day_ratio_20 ≤ 0.55), consistent with the researcher's unstable-equilibrium claim. However, the skeptic's circularity attack has not been falsified: px_vs_ma50 is causally downstream of prior momentum (mom_20, up_day_ratio_20), so attributing 'protective altitude' to it may conflate correlation with mechanism. The vol_ratio_5_20 standardized_delta of -1.0455 (3rd strongest) is dismissed without mediation analysis, leaving a genuine confound unresolved. The mechanism survives as a useful descriptive pattern for pre-trade filtering, but should not be treated as a proven causal architecture.",
+  "falsifiers": [
+    "residualized_altitude_predictive_power test fails: residualized px_vs_ma50 (orthogonal to mom_20, ma10_slope_5, ma20_slope_5, up_day_ratio_20) shows standardized_delta > -0.2 for ruin vs. selected_winner. This would confirm the skeptic's circularity claim that altitude is purely a momentum byproduct.",
+    "px_vs_ma50_conditional_independence test fails: within up_day_ratio_20 tertiles, px_vs_ma50 coefficient becomes non-significant (p > 0.10). This would indicate altitude has no independent protective value beyond accumulated momentum.",
+    "vol_ratio_mediation_path test succeeds unexpectedly: vol_ratio_5_20 adds ΔAIC > 2 when added to px_vs_ma50 + up_day_ratio_20 model, with >10% coefficient change. This would falsify the researcher's dismissal and require treating volatility as a genuine third factor.",
+    "up_day_ratio_magnitude_interaction test fails: up_day_ratio_20 loses predictive power in the high-momentum band (standardized_delta < 0.3), only active in low-momentum band. This would confirm the skeptic's attack that frequency alone is inadequate.",
+    "Snapshot boundary instability: the unstable-zone ruin pattern does not replicate across at least 3 of 4 unique snapshots (coefficient of variation > 1.0). This would support the sampling-artifact hypothesis over structural mechanism.",
+    "Counterexample emergence: any case with px_vs_ma50 > 0.15 AND up_day_ratio_20 < 0.55 but outcome = selected_winner (large_win) would falsify the claim that high altitude compensates for weak internal quality.",
+    "Counterexample emergence: any case with px_vs_ma50 < 0.08 AND up_day_ratio_20 > 0.65 but outcome = false_positive_ruin would falsify the claim that low extension is safe with strong internal quality."
+  ],
+  "actionable_design_principles": [
+    "Treat the two-factor pattern as a provisional pre-trade heuristic, not a proven causal mechanism. Use it for soft rejection (increased scrutiny, reduced sizing) rather than hard categorical exclusion.",
+    "Reject using vol_ratio_5_20 as an independent filter for this failure mode until the mediation path is resolved empirically. It may be a proxy for pullback magnitude, which is itself a post-entry label.",
+    "Never use pullback_duration_weeks, pullback_pct, or w4_return_bucket as predictors at snapshot time—these are post-entry labels that would introduce look-ahead bias.",
+    "Do not use entity identity or snapshot identity as features. Test on pooled entity-level observations with outcome labels derived at appropriate horizons.",
+    "The ibd_entry_close_vs_trigger_pct threshold of ~0.06-0.07 appears in multiple ruin cases and is orthogonal to the structural metrics. Treat it as a potential composite trigger but validate independently before treating as a filter.",
+    "Reserve judgment on the three-tier classification until conditional independence testing is complete. The 'unstable zone' may be a sampling artifact of when B0 signals fire, not a natural structural regime.",
+    "Monitor entity_6618d3e80c carefully: its dual-label status suggests either measurement error in outcome assignment or genuine label ambiguity that undermines group-comparison statistics for similar mixed cases."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Structural Loser Soft-Reject Filter: flag B0 picks where px_vs_ma50 < 0.08 OR up_day_ratio_20 < 0.55 for elevated scrutiny, position-size reduction, or confirmation requirement.",
+      "why_distinct": "Operates on pre-entry structural metrics that are observable at snapshot time, not on post-entry outcomes. Differs from hard exclusion by allowing human override with justification.",
+      "features": [
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Filters B0 candidate universe before position construction; reduces ruin-type false-positive rate at cost of potentially missing some winners."
+    },
+    {
+      "idea": "Unstable Zone Conditional Confirmation: require additional confirmation (e.g., volume spike, sector catalyst, relative strength rank check) when px_vs_ma50 ∈ [0.08, 0.15] AND up_day_ratio_20 ∈ [0.55, 0.65].",
+      "why_distinct": "Targets the specific quadrant where ruin and winner outcomes overlap most, without applying blanket restrictions to the full candidate set.",
+      "features": [
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "volume_confirmation_needed"
+      ],
+      "capacity_relevance": "Conditional gate that preserves optionality in the ambiguous middle zone while still filtering clear structural losers."
+    },
+    {
+      "idea": "Composite Entry Quality Score: combine px_vs_ma50, up_day_ratio_20, mom_20, and ibd_entry_close_vs_trigger_pct into a single ordinal score, with separate validation that the score predicts ruin at above-chance rates.",
+      "why_distinct": "Replaces binary accept/reject with graded confidence, allowing position sizing proportional to structural quality. Explicitly tests whether composite score outperforms individual features.",
+      "features": [
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "mom_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Enables portfolio construction to weight by structural confidence rather than equal-sizing across B0 picks."
+    },
+    {
+      "idea": "Volatility Proportional Stop Adjustment: do not filter on vol_ratio_5_20, but use it to scale stop-loss geometry when in the unstable zone (wider stops in high-vol, tighter in low-vol) to account for noise-driven stop violations.",
+      "why_distinct": "Treats vol_ratio as a position-construction parameter rather than a filter, avoiding the conflation issue while still using the information.",
+      "features": [
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Preserves optionality while managing post-entry risk through dynamic stop geometry."
+    }
+  ]
+}

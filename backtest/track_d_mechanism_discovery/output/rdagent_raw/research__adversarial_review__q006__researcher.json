@@ -1,0 +1,19 @@
+{
+  "mechanism_claim": "The 'adaptive-capacity' cluster (mom_20, px_vs_ma50, px_vs_ma20, ma10/20_slope_5, up_day_ratio_20, vol_ratio_5_20) is a single latent factor—extension above base— NOT independent capacity signals. Winners and ruins are drawn from the same high-extension bucket; false-negative wins come from the low-extension region. The model is identifying 'extended-state,' not capacity, and within the extended bucket it cannot separate winner from ruin.",
+  "evidence_for": [
+    "False positives (ruins) and selected_winners occupy overlapping high-extension space (mom_20 0.07–0.32, px_vs_ma50 0.05–0.34 fully overlap); entity_6618d3e80c carries a mixed selected_winner|false_positive_ruin label at extreme extension (px_vs_ma50=0.337), evidencing non-monotonicity.",
+    "False-negative winners are systematically LESS extended on every one of these proxies (mom_20 median 0.058 vs 0.163, px_vs_ma50 0.056 vs 0.127, up_day_ratio 0.50 vs 0.625, vol_ratio_5_20 1.18 vs 1.42) and shallower pullbacks (–7.3% vs –15.9%); their wins are mean-reversion from quiet bases, the opposite of capacity."
+  ],
+  "evidence_against": [
+    "Ten features show consistent median deltas in the same direction with standardized magnitudes 0.5–1.2σ, which is unusual for pure collinearity and could reflect a real multivariate capacity construct rather than a single extension axis.",
+    "Selected_winners have deeper prior pullbacks (–15.9%) than false_negatives (–7.3%), suggesting 'capacity' may proxy 'worked-off extension' (capacity = extension + prior correction) rather than extension alone."
+  ],
+  "falsifiable_predictions": [
+    "Restricting to entries with mom_20>0.15 AND px_vs_ma50>0.10, the within-bucket AUC for winner-vs-ruin using any monotonic composite of these features is ≤0.55 (vs the apparent cross-bucket AUC).",
+    "Replacing the extension cluster with a single 'pullback_pct ≤ –20% AND base_duration ≥ 40w' rule recovers ≥70% of the missing false-negative winners without raising within-bucket ruin rate above 30%."
+  ],
+  "policy_implications": [
+    "Collapse the capacity feature set to one composite (extension z-score) and stop allocating research budget to incremental slope/momentum variants; redirect capacity to base-quality and relative-strength features that discriminate inside the extended bucket.",
+    "If the within-bucket AUC test fails, retire the 'adaptive-capacity' framing in factor documents and re-label the strategy as 'extension-tilted breakout,' which has different sizing and stop-loss implications."
+  ]
+}

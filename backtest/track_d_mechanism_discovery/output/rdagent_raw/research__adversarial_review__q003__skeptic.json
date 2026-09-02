@@ -1,0 +1,21 @@
+{
+  "strongest_counterclaim": "The near-parity of SCORE_BEFORE_LANE is a selection-on-collider artifact, not a feature of the score itself: every false_negative in the archaeology has is_b0_pick=false (lane-rejected), every false_positive_ruin has is_b0_pick=true (lane-accepted), and selected_winners also have is_b0_pick=true. Because the cases are sampled AFTER lane-decision, the SCORE_BEFORE_LANE distributions being compared are truncated on a downstream variable that the score cannot read, so observing similar score medians across error types reveals nothing about the score's true discrimination in the untruncated candidate pool.",
+  "attacks": [
+    {
+      "issue": "Collider conditioning on is_b0_pick breaks the pre/post-lane separation the researcher assumes",
+      "why_it_matters": "The claim requires that SCORE_BEFORE_LANE comparisons are unconfounded, but 8/8 false_positive_ruins are is_b0_pick=true and 7/7 false_negatives are is_b0_pick=false. The score is computed pre-lane but sampled post-lane-decision; matching winners and ruins on opposite sides of that filter means the parity test is contaminated by the very lane the researcher claims is doing the work the score cannot."
+    },
+    {
+      "issue": "Case-level inversions contradict the vol-confirmed-momentum mechanism the researcher attributes the parity to",
+      "why_it_matters": "Entity_440e297253 (selected_winner, large_win) has mom_20=0.058 and vol_ratio_5_20=1.59, while entity_8f0df3d38e (false_positive_ruin) has mom_20=0.176 and vol_ratio_5_20=1.24 — the winner has lower momentum and higher vol; entity_2c58cebc59 wins despite pullback_pct=-25.1%; entity_6618d3e80c is dual-labeled false_positive_ruin|selected_winner. Median contrasts hide rank inversions that directly falsify the single-factor story."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within is_b0_pick=true (snap_d0d57b1e40 has 4 such cases mixing false_positive_ruin, selected_winner, and the dual-labeled entity), test whether SCORE_BEFORE_LANE still shows parity when the collider is held fixed — if separation emerges, the prior claim collapses.",
+    "Construct an unconditioned control set of candidates that satisfy SCORE_BEFORE_LANE thresholds but were never evaluated as B0 picks, and compare W4 outcome distributions to the lane-filtered set to test whether the score carries any pre-lane information."
+  ],
+  "what_would_change_my_mind": [
+    "Re-estimating the false_negative vs selected_winner standardized deltas after restricting both groups to is_b0_pick=true (or both to false) and finding |d|>0.3 persists on SCORE_BEFORE_LANE — that would defeat the collider explanation and support the vol-confirmed-momentum artifact story.",
+    "Showing that on the full pre-lane candidate pool the score's KS distance between winners and ruins is <0.15 with no conditioning, i.e., the parity is not created by the lane-truncation."
+  ]
+}

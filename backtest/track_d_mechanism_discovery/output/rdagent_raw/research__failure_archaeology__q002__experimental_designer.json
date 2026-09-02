@@ -1,0 +1,76 @@
+{
+  "tests": [
+    {
+      "name": "false_positive_ruin_vs_selected_winner_direct_contrast",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Median and interquartile range comparison between false_positive_ruin (n=8) and selected_winner (n=11) groups at PIT snapshot",
+      "success_criterion": "ibd_entry_close_vs_trigger_pct median differs between groups by >0.015 AND this delta is the largest standardized effect among all tested features; up_day_ratio_20 and mom_20 show negligible between-group separation",
+      "failure_criterion": "Any momentum feature (mom_20, ma10_slope_5, ma20_slope_5) shows larger standardized delta than ibd_entry_close_vs_trigger_pct; or up_day_ratio_20 separates groups as effectively as entry extension"
+    },
+    {
+      "name": "missing_pullback_pct_selection_artifact_check",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Compare PIT feature distributions between ruin cases WITH pullback_pct (n=3: entities 8f0df3d38e, ccc90a671f, 55c2da490e) versus ruin cases WITHOUT pullback_pct (n=5)",
+      "success_criterion": "No statistically significant difference (p>0.15) in any PIT feature between the two ruin subgroups; confirming missing pullback_pct is random with respect to snapshot observables",
+      "failure_criterion": "Missing pullback_pct ruin cases show systematically higher ibd_entry_close_vs_trigger_pct or px_vs_ma50 (p<0.10), confirming the researcher's 'extension marker' hypothesis rather than a stop-loss artifact"
+    },
+    {
+      "name": "entry_extension_holds_across_sector_regimes",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Within each snapshot_anon (clustering 2-6 B0 candidates per snapshot), test whether the candidate with highest ibd_entry_close_vs_trigger_pct is disproportionately the one that ruins, versus being randomly distributed across outcomes",
+      "success_criterion": "Within-snapshot relative ranking of ibd_entry_close_vs_trigger_pct predicts ruin vs win with >65% accuracy; this holds for snapshots with diverse sector exposures, controlling for cross-snapshot variation",
+      "failure_criterion": "Within-snapshot ibd_entry_close_vs_trigger_pct ranking shows <55% accuracy for ruin prediction; ruin is better predicted by snapshot-level aggregates (e.g., average mom_20 across snapshot candidates) than by relative within-snapshot ranking"
+    },
+    {
+      "name": "mediation_via_post_entry_drawdown_not_confirming",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Test if the ibd_entry_close_vs_trigger_pct→outcome relationship operates through pullback absorption capacity. Cases where ibd_entry_close_vs_trigger_pct>0.040 but w4_return_bucket=large_win should have either (a) lower px_vs_ma50 at snapshot OR (b) higher vol_ratio_5_20 indicating institutional sponsorship buffer",
+      "success_criterion": "Among high-ibd_entry_close_vs_trigger_pct cases (>0.040), large_win outcomes are associated with vol_ratio_5_20 in the top quartile (>1.40) OR px_vs_ma50 below the median (<0.08); confirming that entry extension is conditionally tolerable only when other PIT factors compensate",
+      "failure_criterion": "High-ibd_entry_close_vs_trigger_pct large_win cases show no distinguishable PIT feature profile from high-ibd_entry_close_vs_trigger_pct ruin cases; indicating ibd_entry_close_vs_trigger_pct is not independently predictive"
+    },
+    {
+      "name": "up_day_ratio_20_not_collider_confirmation",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Test whether up_day_ratio_20 and mom_20 are independent predictors of selected_winner when ibd_entry_close_vs_trigger_pct is held constant (within its tertiles). If both retain independent predictive power, they are not downstream colliders. If only ibd_entry_close_vs_trigger_pct survives, up_day_ratio_20 may be confounded",
+      "success_criterion": "up_day_ratio_20 retains significant predictive power (p<0.10) for selected_winner within ibd_entry_close_vs_trigger_pct tertiles; confirming up_day_ratio_20 is a pre-treatment covariate, not a collider",
+      "failure_criterion": "up_day_ratio_20 loses all predictive power when ibd_entry_close_vs_trigger_pct is conditioned on; confirming it is a downstream proxy and should be deprioritized as an independent signal feature"
+    }
+  ],
+  "leakage_checks": [
+    "pullback_duration_weeks and pullback_pct must not be used as test features; they are post-snapshot outcomes unavailable at PIT",
+    "w4_return_bucket and outcome_label must not be used as test features; they are forward-looking outcomes",
+    "Tests must not condition on entity_anon or snapshot_anon identity; these are lookup keys, not predictive features",
+    "Cross-snapshot comparisons must use snapshot-normalized feature values to avoid calendar leakage",
+    "Success criteria thresholds (e.g., >0.015 delta, >65% accuracy) must be pre-specified before seeing outcome distributions to avoid p-hacking on held evidence"
+  ],
+  "priority_order": [
+    "missing_pullback_pct_selection_artifact_check",
+    "false_positive_ruin_vs_selected_winner_direct_contrast",
+    "entry_extension_holds_across_sector_regimes",
+    "up_day_ratio_20_not_collider_confirmation",
+    "mediation_via_post_entry_drawdown_not_confirming"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "tests": [
+    {
+      "name": "outcome_independence_test",
+      "features": [
+        "mom_20",
+        "px_vs_ma20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Feature-outcome correlation conditional on label construction method",
+      "success_criterion": "At least one feature achieves p<0.10 (Fisher's exact) in predicting w4_return_bucket when tested across ALL 27 cases as continuous sample, not filtered by is_b0_pick. This establishes features predict outcome independent of the label taxonomy used to define failure modes.",
+      "failure_criterion": "No feature achieves p<0.15 in Fisher's exact test across full 27-case sample. This would suggest features are descriptive of labeled categories but not independently predictive of the underlying W4 return process."
+    },
+    {
+      "name": "proxy_versus_direct_measurement",
+      "features": [
+        "px_vs_ma20",
+        "base_depth_pct"
+      ],
+      "comparison": "px_vs_ma20 (positional proxy) vs base_depth_pct (structural measure) as predictors of ruin vs winner",
+      "success_criterion": "base_depth_pct achieves higher AUC or odds ratio than px_vs_ma20 in separating false_positive_ruin from selected_winner. This validates the researcher's mechanistic claim that position proxies underlying structure and that structural measurement is superior.",
+      "failure_criterion": "px_vs_ma20 matches or exceeds base_depth_pct in predictive power. This falsifies the proxy claim—position becomes the primary signal, not a proxy for base quality."
+    },
+    {
+      "name": "trigger_position_null_hypothesis",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Mechanical trigger position (ibd_entry_close_vs_trigger_pct) alone vs joint feature model",
+      "success_criterion": "ibd_entry_close_vs_trigger_pct achieves AUC >= 0.60 in separating ruin from winner, OR a model with ibd_entry_close_vs_trigger_pct plus any single momentum feature achieves AUC >= 0.75. This supports the skeptic's mechanical-top-capture hypothesis: trigger placement along trend curve is primary driver.",
+      "failure_criterion": "ibd_entry_close_vs_trigger_pct AUC < 0.55 AND feature-only model (mom_20, px_vs_ma20, up_day_ratio_20) achieves AUC >= 0.70. This falsifies mechanical trigger as primary mechanism and validates feature-based prediction."
+    },
+    {
+      "name": "mechanism_separation_test",
+      "features": [
+        "mom_20",
+        "px_vs_ma20",
+        "up_day_ratio_20",
+        "ma20_slope_5"
+      ],
+      "comparison": "Two proposed failure modes—(A) weak momentum + tight price vs (B) momentum divergence—form distinct clusters",
+      "success_criterion": "False-positive-ruin cases split into two subgroups with non-overlapping feature ranges: Group A with mom_20 < 0.08 AND px_vs_ma20 < 0.05; Group B with mom_20 > 0.15 AND up_day_ratio_20 > 0.60 AND ma20_slope_5 < 0.02. If both subgroups exist, the researcher has identified distinct mechanisms. If all ruin cases cluster in one region, only one mechanism is operative.",
+      "failure_criterion": "Ruin cases distribute across the full feature space without clustering into the two proposed subgroups, OR one proposed subgroup contains zero actual ruin cases. This falsifies the two-mechanism structural claim."
+    },
+    {
+      "name": "up_day_ratio_20_conditionality_test",
+      "features": [
+        "up_day_ratio_20",
+        "ma20_slope_5",
+        "mom_20"
+      ],
+      "comparison": "up_day_ratio_20 unconditional effect vs conditional on ma20_slope_5 and momentum architecture",
+      "success_criterion": "up_day_ratio_20 > 0.60 shows ruin association ONLY when ma20_slope_5 < 0.02 AND mom_20 > 0.15. Cases with up_day_ratio_20 > 0.60 but ma20_slope_5 >= 0.02 OR mom_20 <= 0.15 are predominantly winners (>=70%). This validates the researcher's conditional mechanism claim.",
+      "failure_criterion": "up_day_ratio_20 > 0.60 shows ruin association regardless of ma20_slope_5 and mom_20 values. This falsifies the conditional mechanism—up_day_ratio_20 becomes a standalone predictor, not a divergence signal conditional on trend architecture."
+    },
+    {
+      "name": "small_n_robustness_check",
+      "features": [
+        "mom_20",
+        "px_vs_ma20"
+      ],
+      "comparison": "Stability of proposed thresholds (mom_20 < 0.10, px_vs_ma20 < 0.05) under leave-one-out validation",
+      "success_criterion": "Leave-one-out removal of any single false_positive_ruin case does not shift the optimal mom_20 threshold by more than 30% (i.e., threshold remains between 0.07-0.13), AND does not shift px_vs_ma20 threshold by more than 30% (i.e., remains between 0.035-0.065). This establishes threshold stability despite N=8.",
+      "failure_criterion": "Removing a single ruin case shifts the optimal threshold by >50%, demonstrating that N=8 provides insufficient power to establish stable thresholds. Claims about >60% ruin rates would then be acknowledged as confidence-interval-in-name-only."
+    },
+    {
+      "name": "counterexample_targeted_search",
+      "features": [
+        "mom_20",
+        "px_vs_ma20",
+        "up_day_ratio_20",
+        "w4_return_bucket"
+      ],
+      "comparison": "Explicit search for the counterexamples the skeptic demands",
+      "success_criterion": "Find at least 1 case with mom_20 < 0.10 AND px_vs_ma20 < 0.05 that is selected_winner or large_win. This directly falsifies the primary failure-mode claim. Alternatively, find at least 1 case with up_day_ratio_20 > 0.60 AND ma20_slope_5 < 0.020 that is selected_winner—this falsifies the divergence condition as sufficient for ruin.",
+      "failure_criterion": "No counterexamples exist in current 27-case sample. This does not validate the claims—absence of evidence is not evidence of absence—but does establish that current data is consistent with (not proof of) the proposed mechanisms."
+    }
+  ],
+  "leakage_checks": [
+    "Ensure all tests use features available at snapshot time only (mom_20, px_vs_ma20, up_day_ratio_20, vol_ratio_5_20, ma20_slope_5, ma10_slope_5, ma50_slope_10, ibd_entry_close_vs_trigger_pct, ibd_entry_volume_ratio, ibd_entry_close_position, ibd_entry_breakout_range_ratio). Pullback metrics (pullback_duration_weeks, pullback_pct) are post-entry outcomes and must not be used as predictive inputs.",
+    "Verify w4_return_bucket is used as outcome variable only, never as a feature. The method_note indicates false negatives require future W4 performance—confirm no test inadvertently conditions on this construction rule.",
+    "Confirm snapshot_anon is treated as temporal identifier only, never as predictive feature (calendar identity prohibited by rules).",
+    "For outcome_independence_test: ensure the 27 cases are treated as a continuous sample rather than filtering by is_b0_pick, which would reintroduce the label-construction circularity by testing features only on cases already classified by the system.",
+    "For counterexample_targeted_search: acknowledge this test cannot establish absence—it can only confirm presence of counterexamples if they exist. A failure to find counterexamples requires prospective validation, not retrospective certainty."
+  ],
+  "priority_order": [
+    "trigger_position_null_hypothesis",
+    "outcome_independence_test",
+    "mechanism_separation_test",
+    "up_day_ratio_20_conditionality_test",
+    "proxy_versus_direct_measurement",
+    "counterexample_targeted_search",
+    "small_n_robustness_check"
+  ]
+}

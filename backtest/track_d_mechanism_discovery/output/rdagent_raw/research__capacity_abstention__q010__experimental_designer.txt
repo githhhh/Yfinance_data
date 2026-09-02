@@ -1,0 +1,116 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "T1_correct_reference_gate_discrimination",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Distinguishability of selected_winner (n=11) vs false_positive_ruin (n=8) cohorts under the researcher's proposed gate {up_day_ratio_20>=0.60 AND vol_ratio_5_20>=1.40 AND mom_20>=0.15}; contrast with the existing false_negative-vs-selected_winner contrast that originally motivated the threshold.",
+      "success_criterion": "On the selected_winner vs false_positive_ruin comparison (the deployment-decision-relevant pair), at least 0.50 of selected_winners fall inside the gate and at most 0.50 of false_positive_ruin cases fall inside it; plus a sign-rank/median separation of mom_20 or up_day_ratio_20 at standardized delta >=0.5 between the two cohorts.",
+      "failure_criterion": "Gate passes <=0.40 of selected_winners OR >=0.60 of false_positive_ruin cases; OR the median direction of mom_20/up_day_ratio_20/vol_ratio_5_20 between the two cohorts does not have the same sign as in the false_negative-vs-selected_winner contrast."
+    },
+    {
+      "name": "T2_within_snapshot_cross_slot_dependence",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "rv_20"
+      ],
+      "comparison": "Across all snapshots that contain >=2 slots (selected_winners AND/OR false_positive_ruin AND/OR false_negative labels): compute per-snapshot the cross-slot dispersion of up_day_ratio_20 and vol_ratio_5_20, and the cross-slot dispersion of W4 return bucket (encoded as ordinal); then test whether low feature dispersion predicts low return dispersion (independence) vs high feature dispersion predicting correlated ruin/winner clustering (regime dominance). This separates 'marginal-slot EV is intrinsically negative' (independence assumed) from 'regime hits slots simultaneously so diversification does not help' (dependence observed).",
+      "success_criterion": "Within snapshots where feature dispersion is small (e.g., IQR of up_day_ratio_20 across slots <=0.10), W4 outcomes across slots are uncorrelated (sign agreement <=60%); within snapshots where feature dispersion is large, ruin labels are NOT clustered on the same snapshot (at most 1 false_positive_ruin per snapshot when snapshot's mean up_day_ratio_20 >=0.60).",
+      "failure_criterion": "Two or more snapshots contain >=2 false_positive_ruin cases each despite homogeneous within-snapshot features; OR any snapshot shows >=3 slots sharing the same w4_return_bucket='ruin' with cross-slot feature IQR<=0.10."
+    },
+    {
+      "name": "T3_marginal_band_ruin_concentration",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Compute ruin/winner rate within the joint marginal feature band {up_day_ratio_20 in [0.40,0.65] AND vol_ratio_5_20 in [1.0,1.6] AND mom_20 in [0.02,0.25]} vs all slots outside this band. Separates 'this band is the ruin zone' from 'this band is just where most candidates fall regardless of density'.",
+      "success_criterion": "Slots inside the marginal band show false_positive_ruin rate >=2x the rate of slots outside the band; slots outside the band show selected_winner rate >=2x the rate of slots inside the band. Sample sizes inside vs outside must both be n>=3.",
+      "failure_criterion": "Inside-band ruin rate is not statistically distinct from outside-band ruin rate given the small samples (Fisher's exact p>0.20 OR deltas in opposite direction); OR ruin rate inside band <= outside band."
+    },
+    {
+      "name": "T4_density_proxy_stratification",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "pullback_pct",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Construct a per-snapshot density proxy from PIT features alone (not from snapshot_anon identity): specifically, the count of slots per snapshot whose up_day_ratio_20>=0.55 AND mom_20>=0.10. Stratify snapshots into 'low density' (0-1 qualifying) and 'high density' (>=3 qualifying) under this proxy and compare the slot-EV ordering (median w4_return_bucket ordinal, where ruin<loss<small_win<large_win) for slot 1 (best-feature), slot 2, slot 3 (worst-feature) within each density class.",
+      "success_criterion": "In the low-density proxy class, slot 1 median ordinal > slot 3 median ordinal by >=1 bucket rank (one-sided Wilcoxon or median test on >=3 snapshots each with at least 2 slots labeled). In the high-density class, slot 1 median ordinal is not significantly lower than slot 3 (diversification partially works).",
+      "failure_criterion": "In low-density proxy class, slot 3 median ordinal >= slot 1 median ordinal; OR the proxy fails to stratify (low- and high-density classes yield indistinguishable slot-EV orderings)."
+    },
+    {
+      "name": "T5_volatility_regime_vs_feature_gate",
+      "features": [
+        "rv_20",
+        "atr_14_pct",
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Test whether rv_20 (realized volatility) and atr_14_pct (price-range volatility) dominate the winner/ruin separation above and beyond up_day_ratio_20 and mom_20. Fit a simple ordinal regression (logit on ruin-vs-winner) with (a) up_day_ratio_20 + mom_20 only, (b) rv_20 + atr_14_pct only, (c) all four. This separates 'high-feature gates work' from 'ruin is actually a volatility-regime phenomenon that the proposed gate mislabels as marginal features'.",
+      "success_criterion": "(a) Model with up_day_ratio_20+mom_20 explains ruin/winner with pseudo-R^2 >=2x the (b) volatility-only model; OR adding vol features to (a) does not improve pseudo-R^2 by >0.05.",
+      "failure_criterion": "(b) Volatility-only model has pseudo-R^2 >= (a) feature-only model; OR adding rv_20/atr_14_pct to (a) improves pseudo-R^2 by >=0.10."
+    },
+    {
+      "name": "T6_slot_ordering_monotonicity_within_snapshot",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within each snapshot with >=2 slots, rank slots by composite feature score (e.g., equal-weighted z-score of up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) and check whether higher-ranked slots actually achieve better w4_return_bucket. Separates 'features predict slot EV monotonically' from 'feature ranking is unreliable within a snapshot, so slot ordering by features is meaningless even when marginal features predict ruin on aggregate'.",
+      "success_criterion": "Within-snapshot Spearman correlation between composite feature rank and w4_bucket rank (ruin<loss<small_win<large_win) is >=0.30 averaged across snapshots with n_slots>=3; at least 0.60 of within-snapshot comparisons show higher-feature slot >= lower-feature slot.",
+      "failure_criterion": "Within-snapshot Spearman is <=0.10 OR sign-flips across snapshots; OR >0.40 of within-snapshot rank-order comparisons contradict monotonicity (e.g., entity_6618d3e80c-style bifurcation where features are strong yet ruin AND winner appear)."
+    },
+    {
+      "name": "T7_counterfactual_cash_replacement_of_marginal_slots",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "For each snapshot in archaeology, identify the marginal (worst-feature) slot per the composite rank in T6. Compute a counterfactual w4_return of replacing that slot's outcome with the median outcome of the 'cash cohort' — operationally defined as the w4_return_bucket=null-valued or non-deployed outcomes pooled across snapshots. Compare the count of times cash-replacement strictly improves the snapshot's worst-outcome vs degrades it. This tests 'cash dominates the marginal slot' on the existing archaeological sample (no outer-forward required) without assuming zero cash return.",
+      "success_criterion": "Cash-replacement strictly improves the worst outcome in >=0.60 of multi-slot snapshots; aggregate w4_bucket ordinal sum across marginal slots drops (more ruin replaced) vs aggregate drops only when forced into a worse bucket.",
+      "failure_criterion": "Cash-replacement does not improve outcome in >=0.50 of multi-slot snapshots; OR the marginal slot's median w4_bucket ordinal is not significantly worse than the median of higher-feature slots (Wilcoxon p>0.30)."
+    }
+  ],
+  "leakage_checks": [
+    "snapshot_anon and entity_anon are hash IDs, NOT PIT features — exclude from any feature list; using them would be a de-anonymization/timestamp-proxy leak.",
+    "outcome_label and w4_return_bucket are labels, never features — confirm they appear only in the comparison/output side of each test, never on the input side.",
+    "ibd_entry_* features are PIT (point-in-time relative to entry) and acceptable; verify no ibd_entry_* feature describes post-entry information (e.g., peak-during-W4 attributes).",
+    "pullback_duration_weeks and pullback_pct: confirm these measure the pullback that preceded entry, not the drawdown during W4 holding period; flag for re-verification.",
+    "No calendar-derived features: exclude any feature that binarizes day-of-week, month, or relative-to-event-window without an explicitly PIT interpretation.",
+    "base_duration_weeks and base_mbox_count: confirm these are measured as of the snapshot date, not retrospectively after the W4 outcome window.",
+    "Sample composition: the archaeology is explicitly discovery-train-only per method_note — confirm T1-T7 do not introduce cross-fold or held-out claims that contradict the in-sample scope.",
+    "Feature subset audit: T5 uses rv_20 and atr_14_pct which appear only in the numeric_contrast metadata (not in every entity row); confirm these features are present for the comparison subsample before declaring the test runnable, otherwise mark UNRESOLVED rather than imputing."
+  ],
+  "priority_order": [
+    "T1_correct_reference_gate_discrimination",
+    "T2_within_snapshot_cross_slot_dependence",
+    "T3_marginal_band_ruin_concentration",
+    "T5_volatility_regime_vs_feature_gate",
+    "T6_slot_ordering_monotonicity_within_snapshot",
+    "T4_density_proxy_stratification",
+    "T7_counterfactual_cash_replacement_of_marginal_slots"
+  ]
+}
+```

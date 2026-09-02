@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "mechanism_claim": "The B0 'evidence_risk' component is an aggregator of confirmation-style features (up_day_ratio_20, vol_ratio_5_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, mom_20) whose historical value is almost entirely absorbed by neighboring B0 terms — specifically a momentum_b0, a trend_b0, and a volume_b0 — because its constituent features are already load-bearing inputs of those neighbors and load together in the same direction (selected_winner > false_negative across the board).",
+  "evidence_for": [
+    "Numeric contrasts rank the 'evidence-style' features as the top discriminators of false_negative vs selected_winner: up_day_ratio_20 (-1.19σ), vol_ratio_5_20 (-1.05σ), mom_20 (-1.00σ), px_vs_ma50 (-0.85σ), ma10_slope_5 (-0.68σ), ma20_slope_5 (-0.60σ), px_vs_ma20 (-0.58σ) — every one of these is a canonical input to a momentum, trend, or volume sub-score, none is unique to a 'risk' interpretation.",
+    "Directionality is monotone: selected_winners sit above false_negatives on all confirmation features simultaneously (e.g., mom_20 median 0.163 vs 0.058; vol_ratio_5_20 median 1.424 vs 1.179; up_day_ratio_20 median 0.625 vs 0.500). Co-monotone movement across these features is exactly the signature of latent common factor(s), not independent risk signal.",
+    "Case inspection: entity_440e297253 (selected_winner) has moderate mom_20 (0.058) and px_vs_ma50 (0.073) but wins because up_day_ratio_20 is only 0.50 and vol_ratio_5_20 is 1.59 — the win is driven by the same features a standalone momentum_b0 would already score. Conversely entity_535a1beed7 (false_negative_big_winner) is rejected despite vol_ratio_5_20 of 1.17 and mom_20 of 0.028 — confirming the rejection is the absence of the very evidence neighbors already encode.",
+    "Outcome classes selected_winner (n=11) and false_positive_ruin (n=8) are not cleanly separable on any single evidence feature (e.g., false_positive_ruin cases have mom_20 medians similar to winners and higher vol_ratio_5_20 than many winners), indicating evidence_risk conflates 'signal present' with 'signal quality' rather than isolating a distinct risk dimension."
+  ],
+  "evidence_against": [
+    "up_day_ratio_20 has the largest single standardized delta (-1.19σ) — larger than mom_20 itself — which is consistent with a binary/quantized variable carrying categorical information (broad up-day tape vs choppy tape) that a continuous momentum_b0 may smooth away. This is the strongest candidate for residual content.",
+    "pullback_duration_weeks (-0.73σ) and pullback_pct (+0.64σ) co-move with selected_winners in the archaeology; a true pullback_b0 may not be in the B0 panel, in which case evidence_risk would be a de facto proxy for base maturity — non-redundant by construction.",
+    "ibd_entry_close_vs_trigger_pct (-0.70σ) describes entry-execution quality relative to the trigger; this is structurally distinct from contemporaneous trend/momentum and could in principle carry execution-alpha information independent of neighbors.",
+    "Without the actual B0 coefficient table or partial-correlation matrix, the redundancy claim is inferred from feature overlap, not directly measured — the case for replacement must remain probabilistic."
+  ],
+  "falsifiable_predictions": [
+    "In a regression of W4 forward return on (momentum_b0, trend_b0, volume_b0, pullback_b0), adding evidence_risk should raise adjusted R² by less than 1% OOS; a gain >3% OOS would falsify the redundancy claim.",
+    "Partial-correlation |corr(evidence_risk, W4_ret | momentum_b0, trend_b0, volume_b0)| should be <0.03 on held-out discovery-train; if it exceeds 0.06, evidence_risk has independent predictive content and should be retained.",
+    "Factor loadings: the top 3 PCA components of {mom_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20} should explain >85% of variance; if they explain <70%, evidence_risk spans an orthogonal subspace and the claim collapses.",
+    "If evidence_risk is decomposed into sub-scores, the sub-score loadings should correlate >0.7 with neighboring B0 terms' loadings on identical features; lower cross-loadings would indicate evidence_risk captures genuine orthogonal risk content.",
+    "Decile-sort test: sorting the universe by evidence_risk alone should reproduce the same false_positive_ruin concentration (n=8 cases) seen in B0-pick archaeology; if it does not, evidence_risk is selecting a different population than its neighbors claim to."
+  ],
+  "policy_implications": [
+    "Drop evidence_risk from the B0 panel and re-estimate; expected effect is near-zero performance delta and reduced overfitting risk because redundant dimensions inflate condition-number without adding signal.",
+    "Replace evidence_risk with a narrow, orthogonal residual: either (a) data-quality/availability flags (snapshot completeness, price-history length, earnings-imminent flag) which carry no overlap with trend/momentum/volume neighbors; or (b) a regime-interaction term (evidence_risk × vol_regime) which is genuinely nonlinear and cannot be absorbed by linear neighbors; or (c) pullback_base_quality if pullback_b0 is currently absent.",
+    "If retained for governance/interpretability reasons, restrict evidence_risk to up_day_ratio_20 and pullback fields only — drop the ma-slope and px-vs-ma members since they are linearly dependent on trend_b0 and relative_strength_b0.",
+    "Monitor OOS decay: evidence_risk's IC half-life should match the slowest-decaying neighbor (momentum_b0 ~5 days); a meaningfully shorter half-life would indicate it is picking up noise rather than durable risk content."
+  ]
+}
+```

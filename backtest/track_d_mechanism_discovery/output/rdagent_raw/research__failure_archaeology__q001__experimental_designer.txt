@@ -1,0 +1,57 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "collinearity_vif_test",
+      "features": ["up_day_ratio_20", "mom_20"],
+      "comparison": "Variance Inflation Factor of up_day_ratio_20 in a multivariate model containing mom_20 and up_day_ratio_20 as predictors of ruin outcome",
+      "success_criterion": "VIF for up_day_ratio_20 < 5, confirming it captures non-redundant variance beyond mom_20",
+      "failure_criterion": "VIF for up_day_ratio_20 >= 5, indicating proxy redundancy and that the researcher's mechanism conflates momentum decomposition with independent signal"
+    },
+    {
+      "name": "volatility_normalized_pullback_test",
+      "features": ["vol_ratio_5_20", "pullback_pct"],
+      "comparison": "Normalized pullback depth (pullback_pct / vol_ratio_5_20) between false_positive_ruin and selected_winner cases",
+      "success_criterion": "False_positive_ruin normalized pullback depth is significantly shallower than selected_winner (Mann-Whitney p < 0.10), supporting mechanism claim that vol_ratio does not merely proxy baseline volatility",
+      "failure_criterion": "No significant difference in normalized pullback depth between groups, indicating the apparent failure pattern is a trivial artifact of heterogeneous volatility baselines"
+    },
+    {
+      "name": "moment_variance_interaction_test",
+      "features": ["mom_20", "vol_ratio_5_20"],
+      "comparison": "Ruin rate conditioned on mom_20 quartile and vol_ratio_5_20 threshold (1.40) cross-tabulation",
+      "success_criterion": "Within the lowest mom_20 half (<= 0.14), high vol_ratio_5_20 (>1.40) shows ruin rate >50% vs <20% for low vol_ratio_5_20; within the highest mom_20 half, vol_ratio_5_20 does not predict ruin (demonstrating interaction, not main effect)",
+      "failure_criterion": "Vol_ratio_5_20 predicts ruin regardless of mom_20 level, or mom_20 fully mediates vol_ratio_5_20 effect, indicating vol_ratio is not an independent mechanism"
+    },
+    {
+      "name": "within_snapshot_consistency_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "Outcome proportions for up_day_ratio_20 x vol_ratio_5_20 cell within each snapshot, then aggregated",
+      "success_criterion": "The up_day_ratio_20 x vol_ratio_5_20 effect direction is consistent across >=3 distinct snapshots (sign test p < 0.10), ruling out snapshot-concentration artifact",
+      "failure_criterion": "Effect direction reverses or disappears in >50% of snapshots, indicating the pooled pattern arises from snapshot heterogeneity rather than a stable predictor"
+    },
+    {
+      "name": "threshold_sensitivity_bootstrap_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "Ruin rate at researcher's proposed thresholds (0.60, 1.40) versus ±0.05 perturbations, evaluated via leave-one-out cross-validation across snapshots",
+      "success_criterion": "Ruin rate difference between cells remains >=10 percentage points when thresholds vary ±0.05 in any direction (robustness to threshold selection)",
+      "failure_criterion": "Ruin rate difference collapses to <5 percentage points when thresholds shift ±0.05, indicating the pattern is an artifact of threshold optimization on N=27"
+    }
+  ],
+  "leakage_checks": [
+    "pullback_pct and pullback_duration_weeks are excluded from all test feature sets—they are post-snapshot measurements that would introduce forward-looking bias if used to predict ruin",
+    "Feature computation for up_day_ratio_20, mom_20, vol_ratio_5_20, and MA slopes must be completed at snapshot time, not retroactively reconstructed from post-entry price series",
+    "Threshold derivation must be pre-specified before inspecting within-snapshot ruin counts to prevent threshold optimization on outcome-concentrated snapshots",
+    "Cross-snapshot validation uses outcome labels computed identically across all snapshots—snapshot identity must not influence how outcomes are classified",
+    "Interaction test uses only pre-snapshot features (mom_20, vol_ratio_5_20) to predict post-snapshot outcomes—no outcome information leaks into feature computation"
+  ],
+  "priority_order": [
+    "collinearity_vif_test",
+    "volatility_normalized_pullback_test",
+    "moment_variance_interaction_test",
+    "within_snapshot_consistency_test",
+    "threshold_sensitivity_bootstrap_test"
+  ]
+}
+```

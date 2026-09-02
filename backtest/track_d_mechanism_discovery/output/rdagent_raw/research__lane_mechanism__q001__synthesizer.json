@@ -1,0 +1,107 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "In fresh breakout weeks (ibd_entry_close_vs_trigger_pct ∈ [0.01, 0.07]), Lane's apparent predictive edge overlaps substantially with a high-quintile SCORE_BEFORE_LANE bucket on the momentum/RS/breadth axis (mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20). The candidate independent contribution is localized to a single higher-order interaction: a slope×breadth bull-trap suppression (high ma10_slope_5 ≥ 0.04 paired with thin up_day_ratio_20 ≤ 0.50), which raw SCORE primitives do not capture first-order. However, with effective sample size n_eff ≈ 12 after snapshot-cluster correction, 8 ruin events and 7 miss events, this interaction is (i) post-hoc on ~20 candidate interactions (no multiple-testing adjustment), (ii) underpowered by roughly an order of magnitude to detect a 2× ruin-rate lift at α=0.05/power=0.80, and (iii) not robust to a single counter-example (entity_6618d3e80c, compound-label, sat in the bull-trap quadrant yet produced large_win). LANE_NEUTRAL in fresh breakouts behaves as a wide, partially-informed variance bucket — empirically not equivalent to the bottom SCORE quintile (it has higher false_negative density) but also not a clean 'do-not-trade' state. The discriminating question is therefore not 'Lane yes/no' but 'Lane ≈ SCORE_BEFORE_LANE top quintile ± delta on the population mean AND does the slope×breadth interaction survive cross-snapshot validation.' Both questions are unresolved at the current sample scale. Verdict: UNRESOLVED with a weak prior toward 'partial, interaction-localized independent contribution,' explicitly gated on out-of-sample archaeology.",
+  "falsifiers": [
+    "Collider-free replication: in a held-out fresh-breakout sample where SCORE_BEFORE_LANE is computed ONLY on IBD-published names (not the full universe), |AUC(is_b0_pick) − AUC(SCORE_BEFORE_LANE top quintile)| < 0.025 AND DeLong p > 0.20 — falsifies any Lane-independent-information claim. If Lane carries no signal beyond SCORE, restricting SCORE to the same conditional set should drive AUCs to equivalence.",
+    "Out-of-sample slope×breadth interaction: in ≥3 fresh-breakout weeks not in the discovery set, ruin rate given (ma10_slope_5 > 0.04 AND up_day_ratio_20 ≤ 0.50) inside B0_LANE must be ≥ 1.8× unconditional B0_LANE ruin rate AND ≥ 1.5× the same cell's ruin rate within SCORE_BEFORE_LANE top quintile. Falsified by either cell ruin rate ≤ 1.2× unconditional OR ≤ 1.0× the SCORE-cell rate.",
+    "Snapshot-jackknife stability: leave-one-snapshot-out re-estimation of the Spearman(B0_LANE_rank, SCORE_BEFORE_LANE_top_quintile_rank) must remain in [0.50, 0.85] across ALL folds. If the jackknife range includes values < 0.40 in any fold, the apparent Lane–SCORE alignment is a single-regime artifact.",
+    "LANE_NEUTRAL baseline check: in fresh breakouts, LANE_NEUTRAL large_win rate (w4_return ≥ +8pp vs benchmark) must be ≤ bottom-three SCORE_BEFORE_LANE quintiles' large_win rate + 3pp. Falsified (Lane-needs-different-treatment) if LANE_NEUTRAL large_win rate ≥ bottom-quintile rate + 10pp — abstention is then measurably costly.",
+    "Pre-registered interaction enumeration: if the slope×breadth interaction is one of ≥20 candidate feature×feature interactions, the strongest interaction's standardized delta must exceed |1.5| on the discovery set AND exceed |1.0| in held-out validation. Falsified by a top interaction whose held-out standardized delta falls below |0.7| — confirms fishing-expedition status.",
+    "Conviction-tier monotonicity: if Lane's conviction tier (not collapsed into is_b0_pick) shows monotone edge across ≥4 tiers with top-tier − bottom-tier w4 return ≥ +5pp, the binary-flag-only analysis is provably lossy and any 'Lane ≈ SCORE' claim from a binary collapse is artifactual.",
+    "Base/pullback family isolation: AUC(base_pullback_only) ≥ AUC(SCORE_momentum_only) + 0.03 in fresh breakouts — falsifies the implicit assumption that Lane's information lives in momentum/breadth SCORE primitives. If true, it shows Lane's independent channel is in pullback/base morphology that was never isolated by the original SCORE lump.",
+    "Freshness-decay falsification: if B0_LANE hit rate in the narrow freshness band [0.02, 0.05] (NOT the full [0.01, 0.07]) is statistically indistinguishable from hit rate in [0.05, 0.07] at p < 0.10, then 'fresh breakout week' is not the discriminating scope and the hypothesis framing is wrong."
+  ],
+  "actionable_design_principles": [
+    "Encode slope×breadth explicitly as ma10_slope_5 × up_day_ratio_20 with a non-linear penalty when slope > 0.04 AND breadth ≤ 0.50; treat this as a FIRST-CLASS feature rather than relying on Lane to filter the interaction implicitly. This makes the candidate Lane-mechanism backtestable, falsifiable, and removable.",
+    "Compute SCORE_BEFORE_LANE on the same IBD-published universe as B0_LANE (collider correction). Never compare a flag defined on a conditional set against a continuous score defined on the full universe — this guarantees spurious Lane-edge or spurious SCORE-edge depending on conditioning direction.",
+    "Snapshot-clustered jackknife (leave-one-snapshot-out) is MANDATORY before reporting any standardized delta. Effective sample size ≈ number of distinct snapshots ≈ 12, not 27. All effect sizes and p-values must be jackknife-corrected; otherwise every reported contrast is over-stated by roughly √(27/12) ≈ 1.5×.",
+    "Power-gate interaction tests: at n_eff=12 and 8 ruin events, the minimum detectable odds ratio for an interaction at α=0.05/power=0.80 is ≈ 4–5× (not 2×). Either collect ≥50 fresh-breakout cases OR restrict interaction claims to OR ≥ 4. The current 'slope×breadth penalty' claim does not survive this gate.",
+    "Separate Lane's three semantic components before testing: (a) directional flag (is_b0_pick), (b) conviction tier (multi-level), (c) base/pullback substrate (Lane's most plausible independent feature family). Collapsing all three into is_b0_pick destroys information and biases the comparison toward 'Lane ≈ SCORE'.",
+    "Treat LANE_NEUTRAL as a sizing signal, not a blocking signal: empirical false_negative density inside LANE_NEUTRAL (entity_de1c657364, entity_535a1beed7, entity_05b4c6b1f7, entity_ad2bfdee3f) suggests 15–25% recoverable large_win rate, materially above bottom-quintile SCORE. Use LANE_NEUTRAL to scale position down by 30–50%, never to zero.",
+    "Freshness scope discipline: hypothesis tests must be stratified by ibd_entry_close_vs_trigger_pct bands ([0.01,0.03], [0.03,0.05], [0.05,0.07]). The 'fresh breakout week' scope is 3× wider than typical IBD timing precision; the discriminating signal, if any, likely lives in the tightest band only.",
+    "Multiple-testing correction: of the ~20 candidate feature interactions in the discovery archaeology, at least one will produce standardized delta near |0.7| by chance. Bonferroni-adjusted threshold at α=0.05/20 = 0.0025 corresponds to |z| > 3.0; current top interaction at |1.19| does NOT survive this. Pre-register interactions before examining w4 outcomes."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "fresh_breakout_slope_breadth_penalty",
+      "why_distinct": "Encodes the slope×breadth bull-trap interaction (ma10_slope_5 > 0.04 AND up_day_ratio_20 ≤ 0.50) as an explicit position-size penalty in fresh breakout weeks. Distinct from Lane's implicit binary because the penalty is continuous, regime-conditional, and removable; distinct from raw SCORE because no first-order momentum/RS feature captures this interaction.",
+      "features": [
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "is_fresh_breakout_window"
+      ],
+      "capacity_relevance": "Operates only in the freshness band where the interaction was observed; can be toggled or weighted independently of B0_LANE. Useful as a counterfactual probe to test whether the interaction's predictive lift survives without Lane conditioning."
+    },
+    {
+      "idea": "lane_vs_score_collider_aligned_score",
+      "why_distinct": "SCORE_BEFORE_LANE computed only on the IBD-published universe (collider-corrected) and ranked against B0_LANE flag. Distinct from raw SCORE because it conditions on the same publication event that defines is_b0_pick, eliminating the asymmetric conditioning that biases the prior analysis toward Lane-equals-SCORE or Lane-beats-SCORE artifacts.",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "pullback_pct",
+        "base_depth_pct",
+        "ibd_entry_volume_ratio",
+        "snapshot_id"
+      ],
+      "capacity_relevance": "Critical for any cross-comparison of Lane vs SCORE. Without this alignment, every Lane-vs-SCORE policy inherits the collider bias. With this alignment, the residual delta is interpretable as genuine independent information."
+    },
+    {
+      "idea": "lane_neutral_variance_sizer",
+      "why_distinct": "LANE_NEUTRAL in fresh breakouts is NOT a 'do-not-trade' bucket — it is a high-variance, partially-informed bucket with empirically non-trivial large_win density. This policy scales LANE_NEUTRAL positions to 30–50% of the B0_LANE notional, distinguished from a hard veto by allowing participation when SCORE_BEFORE_LANE rank is in the top tercile of the conditional distribution.",
+      "features": [
+        "is_lane_neutral",
+        "SCORE_BEFORE_LANE_rank_within_neutral",
+        "ibd_entry_close_vs_trigger_pct",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "capacity_relevance": "Allocates risk capital across the LANE_NEUTRAL bucket in proportion to expected variance-adjusted return rather than zeroing exposure. Resolves the researcher/skeptic tension on LANE_NEUTRAL by treating it as informative-but-noisy rather than informational-or-zero."
+    },
+    {
+      "idea": "conviction_tier_monotone_decay",
+      "why_distinct": "Treats Lane's conviction tier as an ordinal signal (≥4 tiers) rather than collapsing to is_b0_pick. Tests whether top-tier B0 picks earn ≥5pp w4 return over bottom-tier B0 picks. If monotone, every binary-flag analysis to date is provably lossy and the 'Lane ≈ SCORE' conclusion is artifactual.",
+      "features": [
+        "lane_conviction_tier",
+        "is_b0_pick",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Restores information discarded by the binary collapse. Allows position sizing to vary smoothly across conviction tiers rather than step-functioning at is_b0_pick. Particularly important because the compound-label case (entity_6618d3e80c) is plausibly a high-tier signal that the binary flag mangles."
+    },
+    {
+      "idea": "freshness_band_stratified_score",
+      "why_distinct": "Splits 'fresh breakout weeks' into three tightness bands ([0.01,0.03], [0.03,0.05], [0.05,0.07]) and scores Lane independently per band. Distinct from a pooled fresh-breakout analysis because if the discriminating Lane signal exists only in the tightest band, pooling dilutes it to noise.",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "is_b0_pick",
+        "mom_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "snapshot_id"
+      ],
+      "capacity_relevance": "Provides per-band AUC and ruin-rate estimates so deployment can be tuned to the tightness of the IBD trigger rather than the average. Also a power-recovery device: tighter bands have smaller n but larger per-case signal; wider bands have larger n but diluted signal."
+    },
+    {
+      "idea": "base_pullback_family_isolator",
+      "why_distinct": "Treats Lane's base/pullback/IBD-entry feature family (pullback_pct, pullback_duration_weeks, base_depth_pct, base_mbox_count, ibd_entry_volume_ratio, ibd_entry_close_position, ibd_entry_breakout_range_ratio, current_vs_ibd_candidate_pct) as a separate SCORE sub-family, not lumped with momentum/breadth primitives. Tests whether this family dominates momentum primitives in fresh breakouts.",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "base_depth_pct",
+        "base_mbox_count",
+        "base_duration_weeks",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+        "current_vs_ibd_candidate_pct"
+      ],
+      "capacity_relevance": "Skeptic's strongest attack — Lane's independent channel plausibly lives in base/pullback morphology that was never isolated by momentum/RS SCORE primitives. This isolator probes whether the lumped 'SCORE' comparison was circular. If this family alone outperforms is_b0_pick, Lane has clear independent information."
+    }
+  ]
+}

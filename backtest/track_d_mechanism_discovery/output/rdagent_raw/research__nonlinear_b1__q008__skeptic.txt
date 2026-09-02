@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The base_depth_pct x mom_20 interaction is largely spurious: mom_20, up_day_ratio_20, and vol_ratio_5_20 carry nearly all the predictive signal (standardized deltas -1.00, -1.19, -1.05 respectively), while base_depth_pct's own standardized delta is +0.19 — within the noise band of every other weak feature (mom_60, atr_14_pct, dist_to_52w_high_pct, ma50_slope_10, base_mbox_count) that the dataset itself flags as non-discriminating. The proposed multiplicative re-ranker would primarily re-weight mom_20 by a near-noise multiplier, while introducing rank churn that threatens to demote high-momentum asymmetric winners.",
+  "attacks": [
+    {
+      "issue": "Magnitude mismatch between claimed interaction effect and base_depth's marginal information: base_depth_pct standardized_delta = +0.19 vs mom_20 = -1.00, up_day_ratio_20 = -1.19, vol_ratio_5_20 = -1.05. Multiplying a weak feature by a strong one is mathematically equivalent to a soft threshold on the strong one.",
+      "why_it_matters": "If base_depth_pct carries <0.2 SD of information on the outcome conditional on mom_20, the 'interaction' is dominated by the mom_20 main effect. The researcher has not shown that P = mom_20 x base_depth outperforms mom_20 + base_depth additively, nor that it outperforms mom_20 alone with the other two PIT features as co-predictors. Without that ablation, the interaction claim is not falsifiably distinct from 'mom_20 already does the work'."
+    },
+    {
+      "issue": "Confounding with up_day_ratio_20 and vol_ratio_5_20 — the two strongest signals: the 'shallow-base high-momentum ruin' cluster (entity_b6bcccdf6a, entity_84824e6a20, entity_b00579f203's ruin component) ALL have up_day_ratio_20 ≤ 0.45 or vol_ratio_5_20 in the high-vol-spike band. The same cluster's base_depth could be coincidental.",
+      "why_it_matters": "The researcher's own narrative ('news-spike shallow-base subtype') names vol_ratio and up_day as suppressors, but the policy implementation (P = mom_20 x base_depth_shortfall) does NOT include them. If a high-momentum ruin has up_day_ratio=0.4 (entity_b6bcccdf6a, entity_84824e6a20), the proposed score will not demote it strongly because base_depth alone is not the binding constraint. The encoding ignores the very confounders the narrative invokes."
+    },
+    {
+      "issue": "Selection-on-B0 universe bias: the 27 cases are already filtered through IBD-style entry rules. We never observe the (base_depth_pct, mom_20) plane outside the B0 set, so the interaction coefficient is identified only within a pre-screened subpopulation. The thresholds the researcher proposes (>−25%, >0.15) describe B0-internal strata and have no validation against the broader eligible universe.",
+      "why_it_matters": "An interaction term estimated within a censored sample can produce arbitrary-looking quadrant boundaries (e.g., 'deep base + moderate mom wins' may simply be 'B0 picks that already passed trend filters'). Applying it back to B0 picks as a re-ranker double-counts filters the universe already passed, inflating apparent precision while shrinking the number of unique candidates."
+    },
+    {
+      "issue": "Post-hoc mechanism story ('institutional accumulation cushion', 'news-gap momentum chase'): base_depth_pct is a single summary statistic of past price action with no proven link to accumulation behavior, and the +3.7pp median delta between winners and FNs is smaller than the within-winner dispersion (winners span -1.5% to -42.3% pullback_pct).",
+      "why_it_matters": "A mechanism that cannot be tied to a specific microstructure (block trades, dark-pool prints, share-rotation, etc.) is a narrative, not a hypothesis. The 'institutional cushion' framing could equally explain why shallow-base breakouts work (fresher supply, less trapped longs) or why base depth is irrelevant. Mechanism plausibility is being used to compensate for weak effect size."
+    },
+    {
+      "issue": "Risk that the proposed re-ranker demotes asymmetric winners: entity_3adc078f01 has mom_20=0.172, ma20_slope_5=0.073, px_vs_ma20=0.136, pullback_pct=-42.3% and is a 'selected_winner' with large_win — exactly the kind of name the proposed score might demote because its extreme pullback (which feeds base_depth) interacts with momentum in an atypical pattern.",
+      "why_it_matters": "In a small-sample regime with one or two large wins, a single mis-demoted asymmetric winner can wipe out the ruin-prevention benefit of demoting four middling names. The proposed ≥25% ruin-count reduction target is plausible but not safety-checked against asymmetric-upside loss."
+    },
+    {
+      "issue": "Threshold arbitrariness (−25%, −30%, mom_20=0.15): these are not cross-validated; they are eyeballed from the empirical medians. The +5pp 'winners − median improvement' the falsifiable prediction claims is the same order as the standard error of the median on n=11 winners.",
+      "why_it_matters": "With 11 winners and ~7 false negatives, any median-difference claim has enormous uncertainty. The researcher treats −25% and −30% as if they were theoretically motivated breakpoints (e.g., Wyckoff accumulation depth), but they are sample-conditional quartiles. Out-of-sample, the optimal cut will move."
+    },
+    {
+      "issue": "Encoding assumes multiplicative interaction when the data is consistent with additive or no interaction: A1 winners (entity_2f86543bf6, entity_8ad5cd4795) have near-zero or negative mom_20 — meaning the interaction must be near-zero there. Winners with high mom_20 also tend to have positive px_vs_ma50 (extension), which is itself an outcome of momentum, not independent of base depth. Collinearity is unaddressed.",
+      "why_it_matters": "Re-ranking on mom_20 x base_depth is collinear with mom_20 x (px_vs_ma50) because px_vs_ma50 ≈ mom_20 weighted. The proposed score may be picking up an extension-cushion effect, not an independent base-depth effect, and could be replicated with a simpler 'cap mom_20 at the extension percentile' rule."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with base_depth_pct > −20% (shallow) AND mom_20 > 0.15 that turned out to be a 'large_win' or 'selected_winner' — to falsify the shallow-base ruin regime. None yet observed, but the case count is small.",
+    "A B0 pick with base_depth_pct < −35% (deep) AND mom_20 < 0.05 (low) that is 'false_positive_ruin' — to test whether deep bases rescue momentum-less breakouts. entity_2f86543bf6 (mom=−0.008, won) and entity_8ad5cd4795 (mom=0.004, won) suggest deep bases are not necessary for wins.",
+    "A non-B0 entity in the (shallow base, high mom_20) quadrant that became a 'false_negative_big_winner' — to test whether the interaction threshold shifts when leaving the B0 universe. entity_de1c657364 (base not shown but mom_20=0.058) and entity_535a1beed7 (mom_20=0.028) are low-momentum FNs, not the relevant cell.",
+    "A B0 pick with the proposed interaction score P in the top decile that is a 'large_win' — to test whether the re-ranker would demote real winners. entity_3adc078f01, entity_6618d3e80c, entity_b00579f203 likely sit in the high-P region and are winners or mixed.",
+    "An entity with up_day_ratio_20 ≤ 0.45 and high mom_20 where base_depth is deep but the outcome is 'false_positive_ruin' — to test whether up_day_ratio is the actual suppressor and base_depth is incidental."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample backtest (n ≥ 100 B0 picks, held out from this 27) where the interaction re-ranker shows W4 ruin-count reduction ≥25% AND does not reduce the mean W4 return of the surviving top-N by more than 50bp, after controlling for mom_20 + up_day_ratio_20 + vol_ratio_5_20 additively.",
+    "An ablation table comparing (i) mom_20 alone, (ii) mom_20 + base_depth_pct additive, (iii) mom_20 x base_depth_pct multiplicative, (iv) mom_20 + up_day_ratio + vol_ratio, showing that (iii) uniquely dominates (iv) on a stable cross-sectional IC metric. If (iv) ≥ (iii), the interaction is unnecessary.",
+    "A documented link between base_depth_pct and a microstructure proxy (e.g., block-trade share, short-interest residual, days-to-cover change) in the pre-entry window — converting the 'accumulation cushion' narrative into a measurable, PIT-feature. Until then the mechanism is unfalsifiable folklore.",
+    "Evidence that the proposed threshold cut-points (−25%, −30%, 0.15) are stable across multiple non-overlapping discovery-train splits. If the optimal cut moves by >5pp between splits, the thresholds are sample-specific and the re-ranker is overfit.",
+    "A demonstration that the B0 eligible universe can be held constant under the re-ranking (no change in selection count, no change in expected rank distribution beyond the targeted 1-slot demotions) AND that turnover costs of the re-rank are net positive after T+1 friction. The current proposal does not check that re-ranking does not induce forced sells of marginal positions."
+  ]
+}
+```

@@ -1,0 +1,55 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 45,
+  "mechanism_summary": "The base_depth_pct × mom_20 interaction encodes a 'thrust-without-cushion' failure regime: when 20-day momentum is elevated (>0.15) but the prior basing structure is shallow (>-25%), breakouts lack the supply-absorption history needed to sustain post-breakout thrust and are over-represented in W4 ruins (cluster includes entity_8f0df3d38e, entity_b6bcccdf6a, entity_3472243e0c, entity_84824e6a20, entity_ccc90a671f). However, base_depth_pct carries only ~0.19 standardized delta of marginal information vs ~1.0 for mom_20, up_day_ratio_20, and vol_ratio_5_20, and the shallow-high-mom ruin cluster is itself dominated by up_day_ratio ≤ 0.50 and elevated vol_ratio spikes — meaning the observed ruin enrichment is partially confounded with the two strongest PIT features. The mechanism is therefore real but weak, and its policy expression is only viable as a soft re-ranker conditionally gated on the dominant PIT controls.",
+  "falsifiers": [
+    "Out-of-sample: shallow-base/high-mom quadrant (base_depth_pct > -25% AND mom_20 > 0.15) ruin rate within B0 falls below 1.5x the complement quadrant — interaction fails to enrich the failure regime.",
+    "Rank-IC of P = mom_20 × max(0, base_depth_pct + 0.25) fails to exceed mom_20 alone by ≥0.02 AFTER partialing out up_day_ratio_20 and vol_ratio_5_20 — interaction is fully redundant with main effects.",
+    "Pairwise rank correlation |corr(base_depth_pct, px_vs_ma50)| > 0.4 in the discovery cohort — base_depth is a proxy for current extension and the multiplicative encoding collapses to 'cap mom_20 at extension percentile'.",
+    "Bootstrap split-stability (100 resamples, seed 42) of the optimal base_depth threshold yields std > 5pp OR median outside [-27%, -23%] — the -25% cut is sample-specific, not pre-specifiable.",
+    "Pre-registered rerank audit shows ≥3 large_wins (especially pullback_pct ≤ -30% archetypes such as entity_3adc078f01) demoted below the 50th-percentile slot — ruin-prevention gain is offset by asymmetric-upside loss.",
+    "Any ruin appears in the deep-base/low-mom cell (base_depth_pct ≤ -30% AND mom_20 < 0.05) with n ≥ 3 — falsifies the symmetric 'deep base rescues momentum-less breakouts' sub-claim (entity_2f86543bf6 and entity_8ad5cd4795 currently provide only n=2 supportive cases).",
+    "Re-ranker universe-size invariant check shows Jaccard(top-N before, top-N after, N=13) < 0.7 OR any pick shifts > 3 slots — the encoding is silently expanding the eligible universe."
+  ],
+  "actionable_design_principles": [
+    "Encode as a POST-B0 re-ranker only; never promote to an eligibility gate. The B0 eligible universe is the binding constraint and any interaction that expands or contracts it violates the universe-size invariant.",
+    "Make the interaction conditional on the dominant PIT controls (up_day_ratio_20 ≥ 0.55 AND vol_ratio_5_20 in [1.0, 1.8]). Without this conditional, the score demotes names whose ruin risk is already captured by the stronger features — false-positive precision at the cost of slot churn.",
+    "Bound slot churn: max ±3 rank slots, Jaccard(top-N) ≥ 0.8 at any N ≤ universe size. Encode this as a hard constraint in the policy so the re-ranker cannot functionally redefine B0.",
+    "Soft demote, never exclude. Asymmetric winners (extreme pullback_pct ≤ -30% with high mom_20) must survive the re-rank; one mis-demoted large_win can offset several prevented ruins on n < 30 cohorts.",
+    "Compute base_depth_pct on a PIT-frozen pre-entry window (≥ 30 weeks, ending at least 1 trading day before the IBD trigger). Mismatched windows with mom_20 cause post-trigger leakage into the score.",
+    "Prefer base_depth over px_vs_ma50 IF the collinearity audit confirms |rank_corr(base_depth_pct, px_vs_ma50)| < 0.4 AND |rank_corr(base_depth_pct, px_vs_ma20)| < 0.4. Otherwise substitute a residualized extension measure to preserve orthogonality.",
+    "Treat -25% and 0.15 as illustrative anchors, not load-bearing constants. Threshold monitoring should be continuous; per-cohort refit is permitted but bounded to ±3pp of the discovery anchor to prevent silent regime drift."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Conditional interaction re-ranker: P = mom_20 × max(0, base_depth_pct + 0.25) applied as a soft score ONLY when up_day_ratio_20 ≥ 0.55 AND vol_ratio_5_20 ∈ [1.0, 1.8]; cases failing the gate default to their existing B0 rank.",
+      "why_distinct": "Researcher's bare P ignores the dominant confounders the narrative invokes; gating on up_day + vol_ratio isolates the base_depth × mom interaction from the up_day-driven ruin cluster, and the multiplicative form (vs additive) concentrates penalty on the worst quadrant without a separate interaction-feature column.",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Operates entirely within the existing B0 eligible universe; does not add entities or expand slots. Net capacity effect = 0 entities, ~5-10% slot churn at top-N=13."
+    },
+    {
+      "idea": "Asymmetric-upside guardrail: any B0 pick with pullback_pct ≤ -30% AND large_win historical bucket membership (or equivalent PIT proxy: mom_60 > 0.10) is flagged and exempted from demotion beyond a single rank slot, regardless of P.",
+      "why_distinct": "Skeptic's primary failure mode is mis-demoting names like entity_3adc078f01 (pullback_pct = -42.3%, large_win). A guardrail that couples deep prior drawdown with sustained intermediate momentum isolates the 'recovered thrust' archetype from the 'shallow-momentum-chase' archetype, which a single interaction score cannot distinguish.",
+      "features": [
+        "pullback_pct",
+        "mom_60",
+        "mom_20"
+      ],
+      "capacity_relevance": "Universe size unchanged; flag is a slot-churn limiter (caps maximum demotion depth on a subset) rather than a new selection rule. No net capacity expansion."
+    },
+    {
+      "idea": "Threshold stability monitor: each re-rank cycle, record the empirical base_depth_pct cutoff that maximizes ruin-vs-complement separation at fixed mom_20 > 0.15 within the B0 cohort; emit a policy warning if the cutoff moves > 5pp from the discovery anchor (-25%) or if the cell sample size falls below 5.",
+      "why_distinct": "Researcher's -25% anchor is eyeballed from medians; on n=27 cohorts the optimal cut is noisy. A continuous stability monitor prevents the policy from silently over-fitting to a single snapshot and gives an explicit UNRESOLVED signal when evidence is insufficient — addressing the threshold-arbitrariness attack without requiring a redesign.",
+      "features": [
+        "base_depth_pct",
+        "mom_20"
+      ],
+      "capacity_relevance": "Diagnostic only; does not modify selection. Capacity effect = 0. Enables safe contraction (tightening anchor) or UNRESOLVED emission (expanding to wider band) without changing the universe."
+    }
+  ]
+}

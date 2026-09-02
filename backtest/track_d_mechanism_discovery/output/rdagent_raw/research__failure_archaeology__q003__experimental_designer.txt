@@ -1,0 +1,104 @@
+
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "pullback_mediation_test",
+      "features": [
+        "mom_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "pullback_pct",
+        "w4_return_bucket"
+      ],
+      "comparison": "Among B0 picks with non-null pullback_pct, decompose whether ruin prediction from mom_20, ibd_entry_close_vs_trigger_pct, and up_day_ratio_20 operates through pullback depth or independently",
+      "success_criterion": "mom_20 and ibd_entry_close_vs_trigger_pct remain significant predictors of ruin (false_positive_ruin vs selected_winner) after conditioning on pullback_pct, confirming exhaustion mechanism is not fully mediated by pullback observation",
+      "failure_criterion": "Ruin prediction from snapshot-time features is fully explained by pullback_pct; features lose significance when pullback_pct is conditioned on, indicating pullback is the causal variable and features are proxies"
+    },
+    {
+      "name": "null_pullback_structural_test",
+      "features": [
+        "mom_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "px_vs_ma20",
+        "outcome_label",
+        "pullback_pct"
+      ],
+      "comparison": "Compare snapshot-time feature distributions between ruin cases with null pullback_pct versus ruin cases with non-null pullback_pct",
+      "success_criterion": "No significant distributional difference on snapshot-time features between null-pullback ruin and non-null-pullback ruin, supporting unified mechanism",
+      "failure_criterion": "Null-pullback ruin cases systematically differ from non-null-pullback ruin cases on snapshot-time features (e.g., lower mom_20, different px_vs_ma50), indicating different causal pathways and invalidating single-mechanism claim"
+    },
+    {
+      "name": "up_day_ratio_regime_confound_test",
+      "features": [
+        "up_day_ratio_20",
+        "snapshot_anon",
+        "outcome_label",
+        "mom_20"
+      ],
+      "comparison": "Test whether up_day_ratio_20 ruin-predictive power persists within snapshot strata or is entirely cross-snapshot (regime-driven)",
+      "success_criterion": "Within each snapshot_anon, lower up_day_ratio_20 is associated with higher ruin rate among B0 picks, confirming stock-specific distribution signal",
+      "failure_criterion": "up_day_ratio_20 effect on ruin is entirely explained by snapshot membership; within-snapshot up_day_ratio_20 shows no ruin association, confirming it is a market-regime proxy"
+    },
+    {
+      "name": "tight_entry_confound_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "px_vs_ma50",
+        "px_vs_ma20",
+        "mom_20",
+        "w4_return_bucket"
+      ],
+      "comparison": "Test whether ibd_entry_close_vs_trigger_pct ruin-predictive power survives residualization against distance-to-resistance (px_vs_ma50) and momentum (mom_20)",
+      "success_criterion": "ibd_entry_close_vs_trigger_pct remains a significant ruin predictor after controlling for px_vs_ma50 and mom_20, confirming it captures exhaustion beyond lagged-entry and resistance distance",
+      "failure_criterion": "ibd_entry_close_vs_trigger_pct effect on ruin is fully explained by px_vs_ma50 (distance-to-resistance) or mom_20 (momentum), confirming it is a confounded proxy rather than a causal signal"
+    },
+    {
+      "name": "composite_threshold_counterexample_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "w4_return_bucket"
+      ],
+      "comparison": "Seek any B0 pick satisfying the researcher's tight-entry composite: ibd_entry_close_vs_trigger_pct > 0.030 AND mom_20 < 0.10 AND up_day_ratio_20 < 0.50 AND vol_ratio_5_20 > 1.30 AND px_vs_ma50 < 0.08 that achieves w4_return_bucket=large_win",
+      "success_criterion": "Zero cases in the sample satisfy the composite conditions AND achieve large_win, supporting the exhaustion-signal mechanism",
+      "failure_criterion": "At least one case satisfies all composite conditions AND achieves large_win, directly falsifying the exhaustion-signal mechanism"
+    },
+    {
+      "name": "ruin_clustering_test",
+      "features": [
+        "snapshot_anon",
+        "outcome_label",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Test whether ruin outcomes cluster at specific snapshot_anon values, indicating regime-driven destruction versus stock-specific entry-quality failure",
+      "success_criterion": "Ruin rate does not significantly vary across snapshot_anon values among B0 picks with matched feature profiles, confirming stock-specific rather than regime-driven ruin mechanism",
+      "failure_criterion": "Ruin rate significantly varies across snapshot_anon (e.g., >2x ruin rate at some snapshots), indicating portfolio-construction or market-regime factors dominate stock-level features"
+    }
+  ],
+  "leakage_checks": [
+    "w4_return_bucket is outcome variable, not a PIT feature; all tests must use snapshot-time features only",
+    "outcome_label is post-hoc classification; tests should not condition on specific label values that would require future knowledge",
+    "pullback_pct and pullback_duration_weeks are realized values, not snapshot-time features; tests using these must explicitly address the 62.5% null rate and potential selection bias",
+    "snapshot_anon is a grouping variable, not a predictor; it can be used to test cross-regime stability but not as a feature itself",
+    "Tests should not use entity_anon or any temporal identifier as a feature"
+  ],
+  "priority_order": [
+    "null_pullback_structural_test",
+    "composite_threshold_counterexample_test",
+    "up_day_ratio_regime_confound_test",
+    "tight_entry_confound_test",
+    "pullback_mediation_test",
+    "ruin_clustering_test"
+  ]
+}
+```

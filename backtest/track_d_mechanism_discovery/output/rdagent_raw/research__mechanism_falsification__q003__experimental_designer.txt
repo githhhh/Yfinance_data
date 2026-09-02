@@ -1,0 +1,100 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_conditional_discrimination",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Within each snapshot_anon bucket (snap_71486ed83c, snap_d0d57b1e40, snap_b8420124eb hold >=4 cases), compute the rank of evidence_risk among cases sharing that snapshot. Compare the rank distribution of is_b0_pick=true winners vs is_b0_pick=false false_negatives WITHIN the bucket using a one-sided Mann-Whitney on within-snapshot rank. Pool across all buckets with at least 2 outcome-class members using Fisher's combined p-value.",
+      "success_criterion": "Combined p < 0.10 with consistent directional sign across >=3 populated buckets (evidence_risk still orders outcomes even after neighbor-style features are equalized by snapshot regime)",
+      "failure_criterion": "Combined p >= 0.30 OR sign inconsistency across >=2 populated buckets (evidence_risk loses all separation once snapshot regime is held fixed; signal was a regime-confound artifact)"
+    },
+    {
+      "name": "synthetic_redundant_aggregator_placebo",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Construct synthetic_redundant = z(mom_20) + z(ma10_slope_5) + z(px_vs_ma50) + z(vol_ratio_5_20) using equal weights, where z() denotes within-snapshot rank standardization (this strips cross-snapshot regime confounding AND removes any idiosyncratic evidence_risk content). Compute the false_negative vs selected_winner standardized delta of synthetic_redundant and compare to evidence_risk's standardized delta in the same data. Bootstrap CI on the delta-difference with 1000 resamples stratified by snapshot_anon.",
+      "success_criterion": "evidence_risk delta - synthetic_redundant delta is within [-0.15σ, +0.15σ] (evidence_risk contributes no detectable content beyond what a uniform-weights neighbor aggregator already encodes)",
+      "failure_criterion": "evidence_risk delta exceeds synthetic_redundant delta by >0.30σ with bootstrap p<0.05 (evidence_risk carries at least one piece of orthogonal information not captured by a hand-built redundant aggregator)"
+    },
+    {
+      "name": "up_day_ratio_orthogonal_to_mom_20",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Restrict the 27 cases to the bucket where |mom_20| <= 0.05 (near-zero drift subset; pre-identify as mom_20 bucket B). Within bucket B, compute the false_negative vs (selected_winner ∪ false_positive_ruin) separation on up_day_ratio_20 alone using Mann-Whitney. If up_day_ratio_20 is a pure proxy for mom_20, this bucket should be empty of separation; if up_day_ratio_20 captures breadth/tape-strength independently of drift, it should still discriminate.",
+      "success_criterion": "Mann-Whitney p < 0.20 with separation in the SAME direction observed in the full-sample contrast (up_day_ratio_20 carries content orthogonal to mom_20 drift)",
+      "failure_criterion": "p >= 0.50 with separation <0.10 in either direction (up_day_ratio_20's apparent signal collapses once mom_20 is fixed — these two features are measuring the same latent quantity)"
+    },
+    {
+      "name": "mixed_outcome_feature_geometry",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "For entity_6618d3e80c (carries BOTH 'false_positive_ruin' AND 'selected_winner'), project its 8-feature vector onto the centroid of (a) all 8 false_positive_ruin cases and (b) all 11 selected_winner cases, using Mahalanobis distance computed on the within-snapshot rank-standardized features. If evidence_risk's feature panel is sufficient, the case should land in the overlap region of the two outcome-class density estimates; if evidence_risk is under-specified for path-dependent outcomes, the case should land unambiguously closer to ONE centroid despite the dual label.",
+      "success_criterion": "Mahalanobis distance to false_positive_ruin centroid within 0.5 units of distance to selected_winner centroid (case sits in ambiguity zone; evidence_risk feature set honestly signals this ambiguity — consistent with redundancy to neighbors)",
+      "failure_criterion": "Distance to one centroid exceeds the other by >1.5 units (evidence_risk's static feature vector predicts a single outcome with high confidence, but reality produced both → evidence_risk is missing a temporal/path-dependent dimension)"
+    },
+    {
+      "name": "interaction_surface_vol_x_upday",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Compute interaction = z(vol_ratio_5_20) * z(up_day_ratio_20) within each snapshot_anon bucket. Add this interaction to a base model of (mom_20 + px_vs_ma50 + vol_ratio_5_20 + up_day_ratio_20) and test whether the interaction coefficient is non-zero in a logistic regression on outcome (with is_b0_pick and selected_winner combined vs false_negative + false_positive_ruin as the binary target). Pre-specify the interaction must move pseudo-R^2 by >=0.02 to count as orthogonal content.",
+      "success_criterion": "Interaction term p < 0.10 AND pseudo-R^2 lift >= 0.02 (vol_ratio × up_day_ratio product carries information that no linear combination of constituents reproduces — strong evidence evidence_risk is encoding an interaction surface)",
+      "failure_criterion": "Interaction term p >= 0.30 AND pseudo-R^2 lift < 0.01 (the product term adds nothing; evidence_risk's information is purely linear and fully absorbed by individual neighbor components)"
+    },
+    {
+      "name": "clean_replacement_construction_test",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Construct two candidate replacement scores using ONLY PIT features NOT load-bearing on momentum/trend/volume neighbors: (R1) pullback_residual = z(pullback_duration_weeks) + z(-pullback_pct) (base-maturity proxy, currently absent from B0), and (R2) execution_quality = z(ibd_entry_close_vs_trigger_pct) + z(ibd_entry_close_position). Evaluate each on the false_negative vs selected_winner Mann-Whitney contrast and on the within-snapshot conditional discrimination test defined above. The cleaner replacement is the candidate that (i) achieves higher within-snapshot separation than evidence_risk and (ii) has zero cross-loading >0.50 with mom_20, px_vs_ma50, vol_ratio_5_20 in the 27-case snapshot-stratified correlation matrix.",
+      "success_criterion": "At least one candidate (R1 or R2) satisfies both (i) and (ii); that candidate becomes the prescribed replacement and falsifies the 'evidence_risk has no orthogonal role' claim by constructive demonstration",
+      "failure_criterion": "Neither R1 nor R2 satisfies (i) and (ii); this means ALL non-neighbor-overlapping PIT features also lack orthogonal content in this sample, supporting the redundancy claim by elimination"
+    }
+  ],
+  "leakage_checks": [
+    "Verify that pullback_duration_weeks and pullback_pct are computed at snapshot time t and reference only base-formation history prior to t (not post-entry drawdown). If either field was filled using post-snapshot data, exclude from replacement candidates R1/R2.",
+    "Verify ibd_entry_close_vs_trigger_pct is the gap between actual fill and the trigger price as observed at entry execution, not a forward-looking quality score; if it uses post-snapshot fill data it must be flagged and either dropped from the test panel or restricted to cases where entry occurred before snapshot.",
+    "Confirm snapshot_anon IDs are clustered by approximate calendar week (audit a sample of two snapshots to verify within-snapshot cases share a regime date) before treating within-snapshot pooling as a valid regime-equalization step; if snapshot IDs are arbitrary groupings, the within-snapshot tests lose their conditioning power.",
+    "Confirm none of the 27 archaeology cases were retroactively relabeled using information that postdates the snapshot; if a false_positive_ruin label was assigned using a close at t+W4 that became available AFTER the snapshot, the within-bucket tests would inherit a labeling-side leakage that biases toward 'evidence_risk is under-specified.' Pre-commit to using only labels timestamped <= snapshot t.",
+    "Audit is_b0_pick assignment for any case where evidence_risk was itself the selection criterion (circular selection bias); if evidence_risk features participated in B0 selection, the false_negative pool is selection-biased by construction and ALL redundancy tests in this cycle are uninterpretable — flag as UNRESOLVED rather than running tests."
+  ],
+  "priority_order": [
+    "within_snapshot_conditional_discrimination",
+    "synthetic_redundant_aggregator_placebo",
+    "up_day_ratio_orthogonal_to_mom_20",
+    "mixed_outcome_feature_geometry",
+    "interaction_surface_vol_x_upday",
+    "clean_replacement_construction_test"
+  ]
+}
+```

@@ -1,0 +1,29 @@
+
+
+```json
+{
+  "mechanism_claim": "The B0 'lane' component (operationalized as px_vs_ma20, the normalized deviation of price from its 20-day moving average at snapshot) does NOT contribute predictive information independent of its neighboring B0 terms mom_20, ma20_slope_5, and px_vs_ma50; its historical signal is mechanically a low-pass projection of the same raw return stream that already populates those neighbors.",
+  "evidence_for": [
+    "Mathematical coupling: px_vs_ma20 ≡ (P − SMA_20)/SMA_20, while mom_20 ≡ P/P_t-20 − 1 and ma20_slope_5 ≡ ΔSMA_20/SMA_20. All three are linear/computable transforms of the same overlapping 20-day return window, so 'lane' is not a new information channel but a smoothed re-encoding.",
+    "Numeric contrast hierarchy favors the upstream features: standardized deltas between false-negative and selected-winner cohorts are mom_20 = −1.0005, ma20_slope_5 = −0.6815, but px_vs_ma20 = −0.5842 — if 'lane' carried independent signal, its standardized contrast should be at least as large as its inputs after partialling; instead it is strictly smaller.",
+    "Case-level concordance: in entity_ead73f4390 (winner) and entity_3472243e0c (ruin) both have near-identical px_vs_ma20 (~0.09) and px_vs_ma50 (~0.07–0.08), yet their outcomes diverge completely, indicating lane-position by itself does not disambiguate risk once slope/momentum disagreement is accounted for.",
+    "Snapshot_71486ed83c shows four siblings with px_vs_ma20 in 0.026–0.057 range and mom_20 spanning 0.027–0.32; outcomes split across false_negative_big_winner, false_negative_relative, and selected_winner, confirming lane does not independently resolve the co-moving variables."
+  ],
+  "evidence_against": [
+    "Some B0 picks with mid-range lane (~0.05–0.09) plus steep slopes still produced large_wins (entity_28a6ec4601, entity_3adc078f01), leaving open that lane-bucket×slope regime could hold residual structure even if lane's main effect is degenerate.",
+    "Pullback-duration and pullback-pct deltas (standardized ~0.64–0.73) are not directly captured by slope or momentum, suggesting a true base-pattern channel that 'lane' could proxy; but this argues for a pullback feature, not for lane-as-defined."
+  ],
+  "falsifiable_predictions": [
+    "P1 — Orthogonalization test: regress px_vs_ma20 on mom_20, ma20_slope_5, ma10_slope_5, and px_vs_ma50 within the snapshot panel; the R² should exceed 0.85. If the residual lane component has |β| in a W4-return hurdle regression (controlling for the same four neighbors) whose 95% CI excludes zero in fewer than 5% of bootstraps, the 'lane' causal claim is falsified.",
+    "P2 — Ablation: removing the lane feature from the B0 score should change Spearman rank-correlation with W4_return_bucket by less than 0.02 on a held-out backtest; any larger swing implies lane was carrying non-redundant information.",
+    "P3 — Regime dependence: if lane were truly independent, bins of (mom_20 × slope × vol_ratio) should show monotone winners across lane levels within each cell; the empirical data shows crossings (winners and ru共存 across all bins), falsifying monotonic lane influence.",
+    "P4 — The cleaner replacement (px_vs_ma20 − α·mom_20 − β·ma20_slope_5), estimated per snapshot, when used as the sole feature should NOT improve AUC over mom_20 alone by more than ΔAUC = 0.005; meeting this bound confirms lane is a linear projection."
+  ],
+  "policy_implications": [
+    "Drop 'lane' from the B0 composite and reallocate its weight toward the higher-contrast neighbors (up_day_ratio_20, vol_ratio_5_20, mom_20) where the false-negative/selected-winner deltas are largest; this reduces parameter-count without sacrificing PIT-observable signal.",
+    "Replace lane with a 'lane-trap' binary: True only when px_vs_ma20 exceeds its 60-day realized 90th percentile AND ma20_slope_5 is negative — this orthogonalizes the channel and makes it regime-specific rather than a redundant smoother.",
+    "Re-run failure archaeology after replacement: expect the false_positive_ruin count (currently 8/27) to fall or hold steady, but the false_negative count (currently 7/27) should NOT deteriorate, since lane adds no incremental recall for missed winners.",
+    "Document that any future reintroduction of 'lane' must pass the orthogonalization R² > 0.85 falsifier first; otherwise treat it as a co-linear artifact rather than a mechanism."
+  ]
+}
+```

@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "The 'cash dominates slot 3 under single-industry crowding' claim is mostly an artifact of (a) comparing selected winners against a pool whose 'false negatives' are defined as ex-post winners (selection-on-outcome tautology), (b) attributing generic slot-rank decay to industry crowding when no industry correlation is actually measured, and (c) assuming slots 1 and 2 are exogenously forced into the same industry when slot 2's industry assignment is an endogenous choice that the framework never prices. The genuine empirical content — that the post-selection pool is feature-weaker — holds for ANY rank-order selection rule, not specifically for crowded industries.",
+  "attacks": [
+    {
+      "issue": "Selection-on-outcome in the FN vs SW comparison",
+      "why_it_matters": "The numeric contrasts compare 'false negatives' (defined as rejected candidates with W4 >=8% and >=5pp above B0 median) against 'selected winners' (positions that were actually entered and won). By construction, the FN bucket is ex-post sorted on performance; the SW bucket mixes survivors with the same definition. The standardized deltas therefore reflect what differentiates winning late-bloomers from already-known winners — not what differentiates good from bad pre-snapshot signals. The 'slot-3 pool is structurally weaker' conclusion cannot be drawn from this contrast without an ex-ante control group of rejected non-winners, which is absent."
+    },
+    {
+      "issue": "Mechanism conflation: feature decay ≠ industry-induced correlation",
+      "why_it_matters": "The researcher attributes slot-3 weakness to industry beta forcing correlation → 1, but none of the measured features (mom_20, vol_ratio_5_20, px_vs_ma50, pullback_pct) are industry-correlation proxies. A pure rank-ordering mechanism (best X go first, slot 3 is by construction lower-quality) would produce the same feature deltas without any industry effect. The 'single-industry crowding' framing adds zero explanatory power over a baseline 'third pick is weaker' model. The claim is therefore not specifically about crowding at all."
+    },
+    {
+      "issue": "The 78% ruin probability is not specific to crowding",
+      "why_it_matters": "The researcher computes ruin probability ≥ 1 - (1 - 0.40)^3 ≈ 78% under independence and claims that exceeding this threshold is 'the cost of crowding'. But this formula IS the independence case. For correlation > 0 the probability is higher; for correlation < 0 it is lower. The 78% figure is the floor, not the threshold that cash must beat. A 3-slot independent portfolio already 'cash dominates' in this accounting, so the entire mechanism reduces to: 'more positions in one industry aren't independent, which is true of any third position regardless of industry.'"
+    },
+    {
+      "issue": "Counterexample entity_3adc078f01: -42.3% pullback, large_win",
+      "why_it_matters": "This selected winner survived a 42.3% pullback to deliver a large W4 return, contradicting the policy implication that pullback_pct < -15.9% is a 'superior-feature' requirement for slot 3. If a single position with such an extreme drawdown base can be a winner, the argument that 'deeper pullback = safer' is undermined. The policy rule (require pullback_pct < -15.9%) would have explicitly rejected this winner from slot 1, suggesting the filter is overfit to the median contrast and brittle at the tails."
+    },
+    {
+      "issue": "Mixed label entity_6618d3e80c exposes ambiguous ruin definition",
+      "why_it_matters": "This entity is labeled 'false_positive_ruin|selected_winner' — i.e., simultaneously a ruin and a winner. If 'ruin' is portfolio-level (e.g., drawdown against cost basis) and 'selected_winner' is per-position, then the ruin rate of 8/20 is being counted on a different denominator than the win rate of 11/20, and the 40% ruin figure mixes per-position and portfolio-level events. The cash-dominance arithmetic depends on this P(ruin) and is therefore not comparable to a portfolio-level benchmark."
+    },
+    {
+      "issue": "Endogeneity of slot-2 industry assignment is ignored",
+      "why_it_matters": "The claim treats 'slots 1 and 2 share a GICS sub-industry' as an exogenous constraint. In practice, slot 2 is a choice: if the second-best candidate is in the same industry as slot 1, the operator can substitute the third-best cross-industry candidate. The framework therefore overstates the frequency of the crowded state and consequently overstates how often cash should dominate slot 3. A 3-slot same-industry portfolio requires the operator to reject a cross-industry alternative, which is itself an unmodeled opportunity cost."
+    },
+    {
+      "issue": "The 'option-cost' framing of slot 3 assumes slot 3 is sized like slots 1 and 2",
+      "why_it_matters": "If slot 3 is half-sized or smaller, its variance contribution is mechanically reduced and 'correlation → 1' matters less. The framework's strong cash-dominance conclusion depends on equal-weighting, which the data does not specify. Under any sensible fractional Kelly or vol-targeted sizing, the slot-3 ruin probability is closer to the slot-1 ruin probability scaled by position size, not the unconditional 40%."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A 3-slot same-industry portfolio where slot 3 is the dominant contributor to portfolio return (e.g., one position rugged 30%+ while the other two chopped) — would falsify 'slot 3 = option-cost-only addition' under crowding.",
+    "An industry-orthogonal 3-slot portfolio that nonetheless shows slot-3 feature decay relative to slots 1 and 2 — would falsify the industry-specific mechanism and support the generic rank-ordering alternative.",
+    "A backtest in which 3-slot same-industry deployment beat 1-slot + cash in 2019–2021 (low cash-yield regime) but lost in 2022–2024 (high cash-yield regime) — would show the result is driven by cash-yield opportunity cost, not by industry-crowding mechanics.",
+    "Pairwise return correlations of the 8 false_positive_ruin entities vs other selected positions: if these are all from different sub-industries yet co-ruined, the 'industry forces correlation → 1' claim is false.",
+    "A held-position history showing slot 2 industry is frequently switched within 4 weeks of entry — would show that 'single-industry crowding' is a transient snapshot artifact, not a structural state."
+  ],
+  "what_would_change_my_mind": [
+    "A backtest with N ≥ 500 three-slot portfolios, stratified by sub-industry overlap (0, 1, 2 shared), where the same-industry stratum shows slot-3 marginal contribution that is statistically indistinguishable from zero after controlling for slot-3 feature rank. Without this, the mechanism is unfalsifiable inference.",
+    "Direct measurement of intra-sub-industry pairwise return correlation across held positions showing the median correlation ≥ 0.6. The current dataset does not contain return series for held portfolios, only per-position snapshots.",
+    "An ex-ante rejection control: a matched set of rejected non-winners with the same feature distribution as the false negatives, used to estimate the false-positive rate of the proposed slot-3 eligibility score. Currently the score's precision is unmeasurable because the negative class is undefined.",
+    "Decomposition of the 40% per-position ruin rate into (a) signal-quality component and (b) market-regime component. If regime dominates, the cash-dominance rule is time-varying and not a structural property of slot 3.",
+    "Replication on an out-of-sample period with different industry-correlation regime (e.g., 2020 COVID where intra-tech correlation briefly approached 0.95). The current snapshot-only archaeology cannot speak to regime dependence."
+  ]
+}

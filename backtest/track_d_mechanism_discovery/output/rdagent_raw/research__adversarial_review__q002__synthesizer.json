@@ -1,0 +1,63 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 32,
+  "mechanism_summary": "The apparent within-industry stock-selection advantage is best characterized as a partially-identified edge in a heavily snapshot-clustered, small sample, where the discriminating features (mom_20, ma10/ma20 slopes, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20) are all common-momentum proxies that load on the same factor across peer names. The strongest alternative explanation is NOT exclusively industry-group beta (Researcher's frame) — it is a more general snapshot-regime / cross-sectional-cluster confounder that subsumes industry beta as a special case (Skeptic's frame). snap_71486ed83c and snap_d0d57b1e40 together hold ~41% of cases, the false_negative definition is right-tail-of-its-own-distribution (circular), and the unconditional 11W/8R/1mixed selected hit rate of 58% is not distinguishable from a regime-driven coin flip plus tail-selection artifact. The within-industry skill claim is therefore neither supported nor refuted by the current evidence; it is dominated by a sample-structure problem that any honest re-analysis must partial out before either the industry-beta or the firm-skill interpretation can be evaluated.",
+  "falsifiers": [
+    "Sequential nested-model test: regress W4 outcome on (a) firm features alone, (b) firm + snapshot fixed effects, (c) firm + snapshot FE + industry-peer-median features, (d) firm + snapshot FE + industry-peer-median + snapshot×industry interactions. If (b) wipes out the firm-feature coefficient (R² drop >50% in firm block) and (c) and (d) add nothing, snapshot regime is the dominant confounder and BOTH firm-skill and industry-beta reframe collapse. The firm-skill claim survives only if firm features retain p<0.10 conditional on snapshot FE.",
+    "Within-snapshot W4 hit-rate comparison: for each snapshot with >=3 candidates, compute the W4 hit rate of rejected candidates vs selected candidates. If rejected hit rate >= selected hit rate in >50% of multi-candidate snapshots, the edge is snapshot- and not name-driven. This is the cleanest test of the Skeptic's strongest counterclaim and is computable on the existing 27 cases plus the rejected-non-false-negative pool.",
+    "Peer-W1-PIT-conditional stratification: partition cases by industry-peer-median W1 return (PIT-observable at entry, computed from peer set dated <= snapshot). If the selected-vs-rejected hit-rate gap is concentrated in the top-tercile of peer-W1 and is statistically zero in the bottom two terciles, the edge is industry-timing, not firm-skill. If the gap is concentrated in a specific snapshot within each peer-W1 tercile, the edge is snapshot-regime.",
+    "Drop-tail robustness: rebuild the contrast by either (a) randomly sub-sampling 1 case per snapshot to balance snapshot exposure, or (b) re-defining false_negative as W4 >= 8% absolute (not relative to B0 selected median), then re-run the median-delta contrast table. If the standardized deltas of the top 5 separating features all shrink by >40%, the contrast was being driven by right-tail selection bias, not by a real feature-outcome relationship.",
+    "Idiosyncratic-residual construction: regress each candidate's mom_20, up_day_ratio_20, px_vs_ma50, vol_ratio_5_20 on snapshot FE + industry FE (using a PIT industry map) and use the residual as the firm-specific feature. The within-industry skill claim survives only if (firm-residual → selected_winner) odds ratio >2.0 with p<0.10. A null result on the residual with the raw feature still significant is the cleanest signature that the model is learning snapshot/industry, not the name.",
+    "Counterexample search: enumerate the snapshot × industry cells in the data. The firm-skill claim is supported if at least one cell contains both a selected winner and a rejected large_win with the rejected name having strictly weaker firm features (mom_20, up_day_ratio, vol_ratio) than the selected name. Absence of such a cell in the existing data, or a cell where the rejected name has stronger features but equal/better W4, would directly refute within-snapshot name discrimination."
+  ],
+  "actionable_design_principles": [
+    "Partial out snapshot fixed effects before evaluating ANY firm-level signal; snapshot identity is the highest-order confounder in this dataset and must be the first covariate entered, not the last.",
+    "Treat industry-peer-median features as a second-order control layered on top of snapshot FE; do not regress firm features on peer medians alone, as that conflates snapshot regime with industry regime.",
+    "Use only PIT-observable features (features computable from data dated <= snapshot date) in any diagnostic; mom_60 used as a 'forward-direction proxy' is forbidden per the experimental designer's leakage check and must not be smuggled in via a renaming.",
+    "Balance snapshot exposure in any re-analysis (one case per snapshot, or weighted by inverse snapshot frequency) before computing median-delta contrasts; the current contrast is over-weighted toward snap_71486ed83c and snap_d0d57b1e40.",
+    "Replace the right-tail-relative false_negative definition with an absolute-threshold definition (e.g., W4 >= 8% absolute return) for any cross-comparison; the current definition is circular with respect to the selected-pool W4 distribution and contaminates every downstream attribution.",
+    "Separate the mechanism question (does the firm-feature → outcome link exist at all?) from the portfolio-construction question (is the magnitude, after costs and capacity, large enough to monetize?) — they require different evidence and should not be conflated in policy recommendations.",
+    "Report the within-snapshot selected-vs-rejected hit-rate gap with bootstrap CIs as a primary statistic; the cross-snapshot pooled 58% win rate is not an adequate summary and is regime-confounded."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "snapshot_fe_first_residual_then_industry",
+      "why_distinct": "Inverts the researcher's proposed industry-partial-out by conditioning on snapshot first and industry second. This addresses the Skeptic's stronger counterclaim (snapshot > industry as a confounder) and prevents the industry-beta reframe from being mis-attributed when the real driver is snapshot regime. It is a nested-covariate ordering, not just another feature.",
+      "features": [
+        "snapshot_id (categorical, mandatory first covariate)",
+        "industry_peer_median_mom_20_PIT",
+        "industry_peer_median_px_vs_ma50_PIT",
+        "industry_peer_median_up_day_ratio_20_PIT",
+        "firm_mom_20_residual_after_snapshot_fe",
+        "firm_up_day_ratio_20_residual_after_snapshot_fe",
+        "firm_px_vs_ma50_residual_after_snapshot_fe"
+      ],
+      "capacity_relevance": "Capacity estimate must shrink by the R² attributable to snapshot FE; if snapshot FE alone explains >40% of the W4 variance, the strategy's scalable alpha is far smaller than the raw hit-rate gap suggests, and capacity should be benchmarked against a snapshot-regime-timed sleeve, not a market-neutral long-short."
+    },
+    {
+      "idea": "peer_w1_pit_conditional_filter",
+      "why_distinct": "Uses only PIT-observable peer W1 return (computable at entry from peer set dated <= snapshot, NOT future peer W4) as a hard regime gate. Distinct from the researcher's peer-W1 use as a stratification feature because it is implemented as a binary pre-filter that disables the signal when peer momentum is bottom-quartile. This is a policy-level commitment, not a diagnostic.",
+      "features": [
+        "industry_peer_median_w1_return_PIT",
+        "snapshot_aggregate_base_duration_weeks",
+        "snapshot_aggregate_vol_ratio_5_20",
+        "firm_mom_20",
+        "firm_px_vs_ma50"
+      ],
+      "capacity_relevance": "Restricts capacity to regimes where peer-W1 is top-tercile; in bottom-tercile regimes, the signal is shorted or ignored, which both reduces expected drawdown (as observed in the false_positive_ruin cluster, where peer breakdowns coexisted with strong firm signals) and concentrates capacity in the regime where the signal has the most evidence. Capacity is therefore regime-gated, not name-gated."
+    },
+    {
+      "idea": "snapshot_balanced_bootstrap_oos_test",
+      "why_distinct": "A re-sampling policy, not a feature. Rebalances the 27-case archaeology by drawing one case per snapshot with replacement, then re-computing the median-delta contrast and the firm-feature → outcome logistic regression. This directly tests whether the cross-feature separation observed in the researcher's contrast table survives snapshot-exposure equalization. Distinct from the researcher's falsifiable predictions because it does not require constructing a peer-W4 feature (which is forbidden by the leakage rule) and does not require re-running the model on a new dataset.",
+      "features": [
+        "snapshot_id (resampling stratum)",
+        "outcome_label (used only in held-out contrast)",
+        "firm_mom_20",
+        "firm_up_day_ratio_20",
+        "firm_px_vs_ma50",
+        "firm_vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Capacity decision is gated on bootstrap CI: if the 95% CI of the firm-residual odds ratio includes 1.0 after 1000 snapshot-balanced resamples, the strategy is not allocated alpha capacity. If the CI excludes 1.0 with lower bound >1.5, capacity can be sized at the magnitude the lower bound supports, not the raw hit-rate gap."
+    }
+  ]
+}

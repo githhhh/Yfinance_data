@@ -1,0 +1,65 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_partialled_lane_residual",
+      "features": ["px_vs_ma20", "mom_20", "ma20_slope_5"],
+      "comparison": "Within each snapshot_anon stratum with N>=3, fit lane = a + b1*mom_20 + b2*ma20_slope_5; extract residual. Pool snapshot-level Spearman correlations of residual vs w4_return_bucket (encoded as ordered factor: loss<small_win<large_win<ruin, with ruin treated as ordinal extreme) via Fisher-z. Repeat 500x snapshot-stratified bootstrap for 95% CI on pooled rho.",
+      "success_criterion": "Pooled |rho_residual| < 0.10 AND bootstrap CI straddles zero — confirms lane is a within-snapshot linear projection of mom_20 + ma20_slope_5.",
+      "failure_criterion": "Pooled |rho_residual| > 0.25 OR CI excludes zero in >=70% of bootstrap replicates — confirms lane retains snapshot-local information orthogonal to its named neighbors."
+    },
+    {
+      "name": "effective_sample_size_and_minimum_detectable_effect",
+      "features": ["px_vs_ma20", "mom_20", "ma20_slope_5"],
+      "comparison": "Treat snapshot_anon as the clustering unit (not entity). Compute effective N using the Kish formula N_eff = (sum w_i)^2 / sum w_i^2 with w_i = cluster size. Compute minimum detectable |Spearman rho| at 80% power, two-sided alpha=0.05, for: (a) raw lane vs w4 bucket, (b) lane-residual-from-mom-slope vs w4 bucket. Report MDD with bootstrap CI over 1000 cluster-resamples.",
+      "success_criterion": "MDD on lane-residual < 0.20 across bootstrap replicates — the study is adequately powered to falsify a non-trivial lane effect.",
+      "failure_criterion": "MDD > 0.40 OR effective N < 12 — declare UNRESOLVED on lane's independence; the case_count=27 with ~7 snapshots cannot distinguish a true zero from a small-but-real residual."
+    },
+    {
+      "name": "red_noise_ablation_against_lane",
+      "features": ["px_vs_ma20", "mom_20", "up_day_ratio_20"],
+      "comparison": "Train snapshot-stratified logistic regression for w4 bucket={ruin} vs {not-ruin}. Model A: mom_20 + up_day_ratio_20. Model B: mom_20 + up_day_ratio_20 + px_vs_ma20 (real lane). Model C: mom_20 + up_day_ratio_20 + lane_rednoise, where lane_rednoise is sampled within-snapshot to preserve marginal distribution of px_vs_ma20 but break temporal co-movement with mom_20. Compute AUC for each, averaged across 5-fold snapshot-blocked CV, repeated 50 times.",
+      "success_criterion": "AUC(B) - AUC(C) < 0.005 AND AUC(B) - AUC(A) < 0.005 in median across folds — real lane is information-equivalent to within-snapshot red noise and adds nothing.",
+      "failure_criterion": "AUC(B) - AUC(C) > 0.020 in median OR AUC(B) - AUC(A) > 0.015 in median — real lane contributes non-redundant information that red noise cannot replicate."
+    },
+    {
+      "name": "lane_monotonicity_within_neighbor_tied_strata",
+      "features": ["px_vs_ma20", "mom_20", "ma20_slope_5"],
+      "comparison": "Bin entities into (mom_20 quintile x ma20_slope_5 quintile) cells within the discovery-train sample. Within each cell with N>=3, split on lane median and compare w4 win-rate (large_win fraction) between high-lane and low-lane halves. Pool cell-level deltas with inverse-variance weighting; report sign-test p-value across cells.",
+      "success_criterion": "Weighted-mean |delta| < 0.05 AND sign-test p > 0.20 — lane is monotonically inert within tied neighbor strata.",
+      "failure_criterion": "Weighted-mean |delta| > 0.20 OR sign-test p < 0.05 — lane is conditionally monotone once mom/slope are tied, contradicting pure-redundancy."
+    },
+    {
+      "name": "lane_x_slope_sign_interaction",
+      "features": ["px_vs_ma20", "ma20_slope_5", "vol_ratio_5_20"],
+      "comparison": "Stratify by sign(ma20_slope_5) and vol_ratio_5_20 high/low (median split). Within each of 4 regime cells, compute Spearman(lane, w4_ordinal). Test for interaction via Fisher-z difference between positive-slope and negative-slope cells; report meta-analytic p across cells with Bonferroni correction over the 4 cells.",
+      "success_criterion": "Max cell |rho| < 0.20 AND between-cell Fisher-z difference < 1.0 — no lane x slope-sign interaction.",
+      "failure_criterion": "Any cell |rho| > 0.40 with p < 0.05 after correction, OR Fisher-z difference > 2.0 — lane is an interaction term whose contribution vanishes in the linear-additive framing."
+    },
+    {
+      "name": "ruin_cohort_specific_ablation",
+      "features": ["px_vs_ma20", "ma20_slope_5", "mom_20"],
+      "comparison": "Restrict sample to is_b0_pick=true with outcome in {false_positive_ruin, ruin} (n>=8 per failure_archaeology). Compute partial Spearman of px_vs_ma20 vs w4_ordinal controlling for mom_20 and ma20_slope_5 via within-cohort regression residualization. Repeat with lane permuted within snapshot (preserving marginal). Compare |partial rho| to permutation null distribution (1000 perms).",
+      "success_criterion": "Observed |partial rho| < 90th percentile of permutation null — lane provides no unique ruin-cohort information.",
+      "failure_criterion": "Observed |partial rho| > 95th percentile of permutation null — lane is doing cohort-specific work that pure linear partialling misses; researcher claim fails at the cohort level."
+    }
+  ],
+  "leakage_checks": [
+    "Verify every feature in tests[i].features has a defined construction timestamp <= snapshot_anon timestamp; reject any feature that requires data after the snapshot decision point (in particular confirm ibd_entry_* fields are pre-entry and not contemporaneous with the W4 evaluation window).",
+    "Confirm w4_return_bucket is used strictly as the response variable; ensure it never enters any model's feature matrix in tests, ablations, or bootstrap resampling.",
+    "Confirm snapshot_anon is treated only as a blocking/stratification variable (cluster ID for partialling, CV folds, bootstrap resampling) and is never encoded as an ordinal or categorical predictor — using snapshot identity as a feature would be a calendar-identity leak under the no-calendar-identity rule.",
+    "Confirm red_noise construction in test 3 permutes lane only WITHIN-snapshot, preserving the empirical marginal CDF of px_vs_ma20 but breaking any cross-feature temporal alignment; reject any red-noise procedure that pools across snapshots before shuffling.",
+    "Confirm all partialling regressions in tests 1, 4, 6 are fit WITHIN-snapshot, not on the pooled panel — pooled regression would mix market-regime covariance with feature relationship and inflate apparent partialling R-squared."
+  ],
+  "priority_order": [
+    "effective_sample_size_and_minimum_detectable_effect",
+    "within_snapshot_partialled_lane_residual",
+    "red_noise_ablation_against_lane",
+    "lane_monotonicity_within_neighbor_tied_strata",
+    "lane_x_slope_sign_interaction",
+    "ruin_cohort_specific_ablation"
+  ]
+}
+```

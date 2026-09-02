@@ -1,0 +1,91 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "Within-snapshot_ruin_isolation",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "snapshot_anon"
+      ],
+      "comparison": "Restrict to snapshots with n>=8 B0-eligible picks. Within each such snapshot, rank picks by a composite conviction score = zscore(close_position)+zscore(volume_ratio) computed strictly within the snapshot's B0 cross-section. Compare the top tercile (high-high) vs bottom tercile (low-low) ruin incidence (large_loss + ruin bucket frequency). Pooled-snapshot comparison is NOT used.",
+      "success_criterion": "Across at least three qualifying snapshots, the within-snapshot top-tercile has a ruin rate at least 30% lower than the within-snapshot bottom-tercile (relative reduction), AND this sign is consistent (no snapshot where bottom tercile outperforms top tercile by more than noise).",
+      "failure_criterion": "In >=2 of the qualifying snapshots, the top tercile ruin rate is equal to or higher than the bottom tercile, OR the effect reverses sign within snapshot (i.e., the joint signal is a cross-snapshot proxy rather than a within-regime discriminator). If snapshot-level sample sizes are insufficient, mark UNRESOLVED."
+    },
+    {
+      "name": "Extension_and_trend_stratified_premium",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "px_vs_ma50",
+        "ma20_slope_5"
+      ],
+      "comparison": "Bin B0 picks by px_vs_ma50 tercile (low/medium/high extension) AND by ma20_slope_5 tercile (weak/medium/strong trend) forming a 3x3 strata grid. Within each cell with n>=5, test whether high-high conviction (close_position > snapshot median AND volume_ratio > snapshot median) still earns a positive W4-return spread vs the low-low counterpart. Compare the size of this within-cell spread to the unconditional pooled spread.",
+      "success_criterion": "At least 4 of 9 cells with n>=5 show a positive high-high minus low-low W4 spread, AND the median within-cell spread is >=50% of the pooled spread (i.e., the joint signal retains meaningful information after stripping extension and trend).",
+      "failure_criterion": "In >=6 of 9 cells the within-cell spread is zero or negative, OR the within-cell median spread is <25% of the pooled spread. This indicates the joint signal is mostly a proxy for 'already-extended-momentum' and the encoding is anti-adaptive."
+    },
+    {
+      "name": "Convexity_diagnostic_ruin_vs_win_gradient",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "Rank all B0 picks by the composite conviction score into 5 quintiles. For each quintile compute (a) large_win hit rate, (b) ruin hit rate (ruin+large_loss). Plot ruin_rate(q) vs large_win_rate(q). Fit a Spearman rank correlation between quintile index and ruin rate, and separately between quintile index and large_win rate. The PAYOFF CONVEXITY criterion requires ruin rate to fall with quintile AT LEAST AS FAST as large_win rate falls (or rise).",
+      "success_criterion": "Spearman(quintile, ruin_rate) <= -0.5 AND Spearman(quintile, ruin_rate) <= Spearman(quintile, large_win_rate) (ruin declines at least as steeply as upside). The minimum between (large_win_rate Q5 - large_win_rate Q1) and (ruin_rate Q1 - ruin_rate Q5) must be positive and the ruin differential must be >=50% of the upside differential.",
+      "failure_criterion": "Spearman(quintile, ruin_rate) > 0 (ruin rate RISES with conviction), OR ruin_rate Q5 >= ruin_rate Q1, OR the ruin differential is <25% of the upside differential. Any of these means scaling UP the high-high bucket worsens aggregate ruin magnitude more than it gains upside — the policy is structurally anti-adaptive regardless of overall hit rate."
+    },
+    {
+      "name": "Three_slot_encoding_head_to_head",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "ma10_slope_5",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Implement three 3-slot sizing encodings on the same B0 universe and compare aggregate risk-adjusted outcomes WITHOUT changing eligibility: (Encoding A) Researcher's proposal — 0x / 0.5x / 1.0-1.25x slots keyed on the composite conviction score, gated by ma10_slope_5 and up_day_ratio_20 regime filter (clip to 1.0x when regime weak). (Encoding B) Pure binary — 0x for non-high-high, 1.0x for high-high (no continuous scaling). (Encoding C) Equal-weight 1.0x for all B0 picks (capacity-control baseline). Compute ruin-burden per unit of large-win upside for each.",
+      "success_criterion": "Encoding A produces a ruin-burden-per-upside ratio that is at least 15% lower than both Encoding B and Encoding C, while preserving >=85% of Encoding C's large-win capture. This demonstrates the continuous scaling genuinely adds convexity beyond a binary rule.",
+      "failure_criterion": "Encoding A's ruin-burden-per-upside is NOT meaningfully lower than Encoding C (equal-weight baseline), OR Encoding B (binary) is statistically indistinguishable from or superior to Encoding A. This means the 3-slot structure adds complexity without convexity improvement; collapse to the better of binary-or-equal."
+    },
+    {
+      "name": "Disagreement_leg_attribution",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "Within B0 picks, isolate the two disagreement quadrants: (Q2) high-close / low-volume and (Q3) low-close / high-volume, defined relative to within-snapshot medians. Compute ruin rate of Q2, Q3, and compare to (Q1) low-low and (Q4) high-high. Test whether one disagreement leg carries the ruin signal disproportionately.",
+      "success_criterion": "Exactly one disagreement quadrant (Q2 or Q3) has ruin rate materially elevated above Q1, AND the high-high quadrant has ruin rate <= both disagreement quadrants. This identifies which leg is the real discriminant and whether the joint rule is parsimonious.",
+      "failure_criterion": "BOTH disagreement quadrants have ruin rates >= Q1 (ruin distributed across all non-high-high picks, so the 0.5x slot is over-broad), OR Q4 ruin rate is >= either disagreement quadrant (high-high does not improve over disagreement, collapsing the 3-slot to a 2-slot rule)."
+    },
+    {
+      "name": "Regime_gate_effectiveness",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "up_day_ratio_20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Partition B0 picks by whether up_day_ratio_20 is below the in-snapshot median ('weak-tape' regime). Within the weak-tape regime, compare Encoding A (with the regime gate clipping capacity to 1.0x) vs Encoding A without the gate (unconditionally scaling). Measure ruin-burden-per-upside in the weak-tape subset.",
+      "success_criterion": "The regime-gated version reduces ruin-burden-per-upside in the weak-tape subset by >=20% relative to the un-gated version without reducing large-win capture by more than 10%. Demonstrates the gate prevents capacity amplification specifically where the joint signal is least reliable.",
+      "failure_criterion": "The gate provides <10% reduction in ruin-burden-per-upside, OR it costs >15% large-win capture, OR the weak-tape subset is too small (n<10) to support inference — in the latter case mark UNRESOLVED rather than confirming the gate."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm ibd_entry_close_position and ibd_entry_volume_ratio are computed using only data available at the IBD entry snapshot timestamp (intraday or close-of-day). Reject any test where the close_position uses post-entry window data.",
+    "Confirm pullback_pct, pullback_duration_weeks, base_depth_pct, base_duration_weeks, and base_mbox_count are NEVER used as predictive features — these are path/outcome descriptors and would constitute look-ahead even if pre-breakout in name.",
+    "Confirm snapshot_anon is used ONLY as a stratification/blocking variable, never as a direct predictive feature or proxy.",
+    "Confirm the composite conviction score (zscore close_position + zscore volume_ratio) is recomputed within the B0-eligible cross-section and within each snapshot for stratified tests — never pooled across regimes.",
+    "Confirm no outer-forward W4, W8, or beyond-snapshot-window outcomes enter the training signal. W4 from the archaeology snapshot is admissible only as an evaluation target, never as a feature.",
+    "Confirm 3-slot accounting is preserved exactly: tests may not introduce a 4th or 5th position-size bucket under any encoding, and the eligible B0 universe must remain identical across Encoding A, B, and C comparisons."
+  ],
+  "priority_order": [
+    "Convexity_diagnostic_ruin_vs_win_gradient",
+    "Within-snapshot_ruin_isolation",
+    "Three_slot_encoding_head_to_head",
+    "Extension_and_trend_stratified_premium",
+    "Disagreement_leg_attribution",
+    "Regime_gate_effectiveness"
+  ]
+}
+```
