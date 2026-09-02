@@ -41,6 +41,8 @@ from .walk_forward import (
 POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
 PRICE_CACHE = Path("results_pkl/stock_data_290826_1d.pkl")
 OUTPUT_DIR = Path("backtest/next_week_review_selection/output")
+MIN_4W_COMPLETE_COVERAGE = 0.50
+MIN_4W_COMPLETE_ROWS = 10
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -257,15 +259,21 @@ def build_weekend_event_panel(
 def mature_four_week_panel(
     panel: pd.DataFrame,
     *,
-    min_complete_coverage: float = 0.80,
+    min_complete_coverage: float = MIN_4W_COMPLETE_COVERAGE,
+    min_complete_rows: int = MIN_4W_COMPLETE_ROWS,
 ) -> pd.DataFrame:
-    """Use only snapshot weeks with broad 4W outcome coverage for optimization."""
+    """Keep weeks with enough complete 4W rows for a meaningful Top5 oracle."""
     if panel.empty:
         return panel.copy()
-    coverage = panel.groupby("snapshot_date")["forward_4w_censored"].apply(
-        lambda values: float(values.eq(False).mean())
+    stats = panel.groupby("snapshot_date")["forward_4w_censored"].agg(
+        total="size",
+        complete=lambda values: int(values.eq(False).sum()),
     )
-    mature_weeks = coverage[coverage >= min_complete_coverage].index.astype(str)
+    stats["coverage"] = stats["complete"] / stats["total"].clip(lower=1)
+    mature_weeks = stats[
+        stats["coverage"].ge(min_complete_coverage)
+        & stats["complete"].ge(min_complete_rows)
+    ].index.astype(str)
     return panel[
         panel["snapshot_date"].astype(str).isin(mature_weeks)
     ].copy()
@@ -424,6 +432,10 @@ def experiment_manifest(
         "first_snapshot": weeks[0] if weeks else "",
         "last_snapshot": weeks[-1] if weeks else "",
         "horizons": HORIZONS,
+        "mature_4w_gate": {
+            "min_complete_coverage": MIN_4W_COMPLETE_COVERAGE,
+            "min_complete_rows": MIN_4W_COMPLETE_ROWS,
+        },
         "primary_rule": rule_to_dict(primary_rule()),
         "search_rule_count": rule_count,
         "support_keys": SUPPORT_KEYS,
