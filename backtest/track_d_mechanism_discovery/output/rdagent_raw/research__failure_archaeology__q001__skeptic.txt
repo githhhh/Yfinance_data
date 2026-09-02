@@ -1,0 +1,47 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The claimed predictive mechanism conflates stock volatility regime with conditional outcome: high vol_ratio_5_20 at snapshot time is a stable property of volatile stocks, not a causal driver of ruin under pullback. The shallow-pullback pattern in false_positive_ruin cases is trivially explained by vol_mean_reversion (volatile stocks exhibit smaller percentage pullbacks because their baselines fluctuate more), and the up_day_ratio_20 distinction may be measuring momentum decomposition rather than a separate predictive signal. The entire pattern could be a distributional artifact of heterogeneous volatility regimes within the sample, not a filterable precursor.",
+  "attacks": [
+    {
+      "issue": "Proxy redundancy between up_day_ratio_20 and mom_20",
+      "why_it_matters": "Both metrics quantify directional persistence over 20 days. A stock with mom_20 > 0.15 will mechanically tend to have up_day_ratio_20 > 0.50 because positive cumulative returns require more up days than down days. The standardized_delta of -1.1882 for up_day_ratio_20 may simply be re-expressing the momentum contrast (mom_20 standardized_delta -1.0005). If up_day_ratio_20 is a monotonic function of mom_20 with added noise, it provides no independent information and the apparent predictive power disappears under proper collinearity handling."
+    },
+    {
+      "issue": "Snapshot-conditioned selection artifact",
+      "why_it_matters": "All false_positive_ruin cases appear concentrated in specific snapshots (snap_724342c280, snap_71486ed83c, snap_3fc4068e83). Snapshots represent different market regimes where vol_ratio_5_20 and up_day_ratio_20 distributions differ systematically. Comparing false_positive_ruin to selected_winner across snapshots without regime controls means the apparent feature differences reflect when the snapshot was taken, not what predicts ruin. The filter rule derived from pooled cross-snapshot analysis would have different operating characteristics if tested within individual snapshots."
+    },
+    {
+      "issue": "Trivial mean-reversion explanation for shallow pullbacks",
+      "why_it_matters": "A stock with vol_ratio_5_20 = 1.45 has inherently larger daily fluctuations than one with vol_ratio_5_20 = 1.10. When a volatile stock pulls back, the same percentage drop corresponds to a larger absolute price move, which may trigger mean-reversion sooner due to shorter absolute distance to support levels or overshoot detection. The shallow pullbacks (-12% to -16%) in false_positive_ruin cases may be the natural pullback depth for high-volatility stocks, not a pathological failure mode. This mechanism requires no difference in underlying quality—just different volatility baselines."
+    },
+    {
+      "issue": "Conditioning on the post-snapshot pullback event",
+      "why_it_matters": "The analysis selects cases labeled false_positive_ruin, meaning they experienced pullback that led to ruin. But vol_ratio_5_20 and up_day_ratio_20 are computed at snapshot time before the pullback. If pullback_pct is also a post-snapshot measurement, then comparing pre-snapshot internals to post-snapshot pullback depth creates a temporal mismatch: the features and outcomes come from different time windows. The mechanism claim requires that these pre-snapshot features predict post-snapshot events, but this directional assumption is not validated."
+    },
+    {
+      "issue": "Survivor inclusion bias in the comparison class",
+      "why_it_matters": "selected_winner cases by definition survived long enough to be classified as winners. This excludes volatile stocks with similar internals (high vol_ratio_5_20, moderate up_day_ratio_20) that also had shallow pullbacks but failed to recover—these would be labeled false_positive_ruin. The apparent protective effect of up_day_ratio_20 >= 0.60 may be an artifact of comparing survivors to documented failures while ignoring unclassified failures that share the same pre-snapshot profile."
+    },
+    {
+      "issue": "Cherry-picked threshold derivation from N=27",
+      "why_it_matters": "With only 8 false_positive_ruin cases, the proposed thresholds (up_day_ratio_20 >= 0.60, vol_ratio_5_20 <= 1.40) are optimized to separate the sample used to generate them. The 36% baseline ruin rate is computed from is_b0_pick cases in this sample, but the sample composition is not demonstrated to be exchangeable with future B0 pick populations. Multiple equivalent threshold combinations could fit this sample equally well, and the specific values selected reflect the researcher's labeling decisions, not statistical stability."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with up_day_ratio_20 >= 0.65 AND vol_ratio_5_20 > 1.50 that subsequently ruined—these would directly contradict the claimed protective effect of consistent up-day ratio even under high churn",
+    "B0 picks with vol_ratio_5_20 > 1.60 that recovered from pullbacks exceeding -20% without ruin—this would dissociate vol_ratio from the shallow-pullback-failure mechanism",
+    "Temporal holdout validation: apply the proposed filter rules to B0 picks from snapshots not represented in the discovery set and measure whether ruin rates differ as predicted",
+    "Within-snapshot validation: for each snapshot containing both false_positive_ruin and selected_winner cases, test whether the up_day_ratio_20 and vol_ratio_5_20 thresholds distinguish outcomes within the same regime",
+    "Synthetic counterfactual: construct cases where vol_ratio_5_20 and up_day_ratio_20 are perturbed to cross the proposed thresholds while holding other features constant, and verify the model output changes plausibly"
+  ],
+  "what_would_change_my_mind": [
+    "Prospective validation: the proposed filter rules (up_day_ratio_20 >= 0.60, vol_ratio_5_20 <= 1.40) applied to a held-out sample of B0 picks with >=50 cases showing ruin rate reduction from baseline at least as large as the in-sample effect with p < 0.05",
+    "Mechanistic evidence that vol_ratio_5_20 directly measures something other than baseline volatility—for example, showing that vol_ratio_5_20 correlates with post-entry news sentiment or analyst revision direction rather than merely with stock-specific churn amplitude",
+    "Demonstration that up_day_ratio_20 provides incremental predictive power over mom_20 in a proper multivariate model with variance inflation factors < 5, showing the combination captures non-overlapping variance",
+    "Replicated pattern in an independent dataset: same feature-outcome relationships observed in B0 picks from a different time period, different market regime, or different scanner criteria",
+    "Evidence that shallow pullbacks in false_positive_ruin cases are specifically caused by the high vol_ratio_5_20 (e.g., via intraday analysis showing failed breakout attempts with excessive volume spikes that deplete follow-through), not merely correlated with it via mean-reversion to a higher baseline"
+  ]
+}
+```

@@ -1,0 +1,64 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The researcher's claim that 'Lane is essentially isomorphic to a high-quintile SCORE bucket in fresh breakout weeks' is an artifact of three compounding analytical errors: (1) collapsing Lane into a single binary flag (is_b0_pick) while SCORE is treated as a multi-feature vector, producing a guaranteed asymmetry; (2) testing the hypothesis on a sample whose labels are constructed AROUND Lane's hardest cases (false_positive_ruin and false_negative_relative), so a null finding is over-determined by selection; and (3) omitting the Lane-specific feature families that were never tested (base/pullback morphology, IBD-entry timing ratios, conviction tier). When these are corrected, the most plausible reading of the archaeology is that Lane has MEANINGFUL independent information that the analysis is structurally unable to detect.",
+  "attacks": [
+    {
+      "issue": "Selection bias in the label construction: the 27 cases were explicitly chosen to be Lane's worst and most ambiguous outcomes, then used to test whether Lane adds value",
+      "why_it_matters": "If you sample the bottom of Lane's accuracy distribution and then ask 'does Lane add value?', a null answer is tautological. The false_positive_ruin (8) and false_negative_relative (7) labels exist precisely BECAUSE Lane failed there. Showing Lane ≈ SCORE on Lane's failure set cannot generalize to the broader population, and the researcher treats this failure-conditioned sample as representative."
+    },
+    {
+      "issue": "Category asymmetry: is_b0_pick is a single binary column, while SCORE is implicitly a continuous composite of ~25 features; comparing a flag to a distribution biases the conclusion toward 'Lane adds little'",
+      "why_it_matters": "A binary signal with a 65-70% hit rate in fresh breakouts would already carry independent information by virtue of being correct 2:1 over chance. The numeric_contrasts ranking shows selected_winner up_day_ratio_20 = 0.625 vs false_negative 0.500 — but is_b0_pick is the actual decision variable and the analysis never directly asks 'what is the AUC of is_b0_pick alone?'"
+    },
+    {
+      "issue": "Missing Lane-specific feature families in the SCORE primitives tested",
+      "why_it_matters": "The numeric_contrasts include pullback_duration_weeks, pullback_pct, base_duration_weeks, base_mbox_count, base_depth_pct, ibd_entry_volume_ratio, ibd_entry_close_position, ibd_entry_breakout_range_ratio, current_vs_ibd_candidate_pct, dist_to_52w_high_pct — none of which are standard momentum/breadth SCORE inputs. These are the features Lane is most plausibly using; lumping them into 'SCORE' and then concluding 'Lane ≈ SCORE' is circular if Lane's information is concentrated exactly there."
+    },
+    {
+      "issue": "Snapshot non-independence inflates apparent feature importance",
+      "why_it_matters": "Snap_71486ed83c alone contains 6 entities and snap_d0d57b1e40 contains 6 entities. With 27 cases spread across only ~12 snapshots, effective sample size for inference is roughly 12, not 27. The standardized deltas in numeric_contrasts are computed treating entities as independent when they share market-regime covariance, which inflates every reported effect size and creates spurious 'Lane ≈ SCORE' alignment within-regime."
+    },
+    {
+      "issue": "The slope×breadth interaction is a post-hoc rationalization from ~20 candidates on n=27",
+      "why_it_matters": "With 20 candidate interactions and 27 cases, at least one will produce a standardized delta near |0.7| by chance. The researcher presents 'ma10_slope_5 × up_day_ratio_20 ≤ 0.5' as THE Lane mechanism, but no multiple-testing correction, no held-out validation, and no pre-registration. The bull-trap filter claim is a single fishing expedition."
+    },
+    {
+      "issue": "Reverse conditioning: Lane only emits picks when IBD publishes, so 'fresh breakout weeks' is doubly conditioned on (a) IBD editorial timing and (b) Lane's binary flag",
+      "why_it_matters": "IBD's decision to publish a fresh-breakout trigger is itself an information event. SCORE_BEFORE_LANE applied to the same conditional set is also IBD-conditional, so the comparison Lane vs SCORE_BEFORE_LANE within this set is contaminated by a shared collider. The asymmetric conditioning means SCORE_BEFORE_LANE may have an unfair advantage because it can be computed on the full universe, while B0_LANE is restricted to IBD-published names."
+    },
+    {
+      "issue": "Entity_6618d3e80c (false_positive_ruin|selected_winner) is an in-sample refutation of the 'Lane filters the bull-trap' mechanism",
+      "why_it_matters": "This compound label means Lane flagged the name as a ruin candidate (likely post-entry weakness flag) but the name STILL produced a large_win within the window. The mechanism claim that 'Lane suppresses names with high slope + low breadth' predicts Lane would NOT produce winners from the bull-trap regime; entity_6618d3e80c has ma10_slope_5 = 0.075 (high) and up_day_ratio_20 = 0.55 (moderate) — Lane tagged it as ruinous yet it won. The slope×breadth filter did not fire when it should have, weakening the entire mechanistic story."
+    },
+    {
+      "issue": "The [-3pp, +5pp] delta window is too wide to falsify 'Lane ≈ SCORE' and is asymmetric (allows 5pp Lane edge but only 3pp Lane loss)",
+      "why_it_matters": "An 8pp acceptance band swallows any effect smaller than 8 percentage points. A real Lane edge of 6pp would pass this test as 'Lane ≈ SCORE.' The prediction is unfalsifiable in the direction that matters for deployment — the researcher chose a window that protects the null."
+    },
+    {
+      "issue": "Power collapse: 8 false_positive_ruin + 7 false_negative cases is far below the threshold to detect even a 2× interaction effect",
+      "why_it_matters": "Detecting a 2× ruin-rate multiplier in the (ma10_slope_5 > 0.04 AND up_day_ratio_20 ≤ 0.50) cell with α=0.05 and power=0.80 requires ~50 events in the conditioned cell. With 8 ruins total, the conditional test is underpowered by an order of magnitude. Reporting 'no significant interaction found' on this sample is uninformative, not evidence of absence."
+    },
+    {
+      "issue": "LANE_NEUTRAL destruction-of-alpha is ignored: false_negative cases (entity_de1c657364, entity_535a1beed7, entity_05b4c6b1f7, entity_ad2bfdee3f) suggest abstention cost ~15-20pp of large-win rate",
+      "why_it_matters": "If Lane abstained on 5-7 names that became large winners within the window, the policy implication is not 'LANE_NEUTRAL is high-variance' but 'Lane is leaving real alpha on the table.' The researcher frames abstention as informational; the data shows abstention as costly. These are contradictory policy framings of the same evidence."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Fresh-breakout B0_LANE picks where ma10_slope_5 ≤ 0.02 and up_day_ratio_20 ≥ 0.65 (low-slope, high-breadth regime the slope×breadth filter would not catch) that produced large_win — tests whether the proposed interaction is the ONLY Lane channel",
+    "Fresh breakout weeks where B0_LANE abstained (LANE_NEUTRAL) on a name with px_vs_ma50 ≥ 0.10 and ibd_entry_volume_ratio ≥ 2.0 that subsequently became a large winner — tests whether Lane's abstention mechanism is captured by SCORE",
+    "Held-out snapshots where multiple B0_LANE picks share the same IBD entry trigger week (true cross-section, not snapshot-dominated) — tests whether the 27-case analysis is a single-regime artifact",
+    "Cases where Lane's conviction tier (not captured in is_b0_pick) ranks stocks and lower-tier B0 picks underperform higher-tier ones by ≥5pp w4 — tests whether the binary collapse hides monotone edge",
+    "False_positive_ruin cases where the ruin occurred AFTER the w4 measurement window but BEFORE the typical holding period exit — tests whether the false_positive label is itself a look-ahead artifact",
+    "Snapshots where the base/pullback features (pullback_pct, base_depth_pct, base_mbox_count) cleanly separate selected_winner from false_positive_ruin but the SCORE momentum features do not — tests whether Lane's 'independent' signal lives in base morphology, which was never isolated"
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered out-of-sample test on ≥200 fresh breakout weeks with explicit isolation of Lane's base/pullback/IBD-entry feature families (not lumped into SCORE) AND a direct AUC comparison of (a) is_b0_pick alone, (b) SCORE primitives alone, (c) base/pullback features alone, (d) full feature set — if (c) or (d) does not dominate (a)+(b) by ≥0.05 AUC, the 'Lane ≈ SCORE' claim survives",
+    "Replicating the archaeology on data AFTER the discovery cutoff and finding the same slope×breadth interaction with p<0.01 after multiple-testing correction on ≥5 pre-specified interactions — this would convert the post-hoc fishing expedition into a real mechanism",
+    "Demonstrating that Lane's conviction tier (continuous, not binary) is redundant with SCORE_BEFORE_LANE quintile via a calibration plot showing <2pp hit-rate spread across conviction tiers within each SCORE quintile — this would support the 'Lane ≈ SCORE' reading",
+    "Showing that the 27 cases are i.i.d. with respect to snapshot by re-running the analysis with one case per snapshot and obtaining the same numeric_contrasts rankings — currently the snapshot non-independence is unaddressed",
+    "Evidence that IBD's publication timing has zero correlation with subsequent 4-week returns after controlling for the entry features, which would close the reverse-conditioning loophole"
+  ]
+}
+```

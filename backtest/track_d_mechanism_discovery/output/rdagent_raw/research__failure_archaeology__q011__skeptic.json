@@ -1,0 +1,42 @@
+{
+  "strongest_counterclaim": "The ma10_slope_5/ma20_slope_5 ratio is a confounded proxy for ibd_entry_close_vs_trigger_pct (entry proximity to trigger), and the apparent ruin-signal is entirely attributable to late-stage breakout mechanics rather than momentum velocity plateau. In the evidence, every false_positive_ruin case with a high slope ratio (entity_8f0df3d38e at 0.069, entity_84824e6a20 at 0.074, entity_ccc90a671f at 0.070) also has ibd_entry_close_vs_trigger_pct in the upper quartile (>0.065). Conversely, selected_winners with low slope ratios (entity_ead73f4390 at 0.0017, entity_2f86543bf6 at 0.025) have early entries. The slope ratio is epiphenomenal—late breakouts mechanically produce steeper short-term slopes because price is converging on the trigger level from a consolidation, not because momentum is 'unsustainable'.",
+  "attacks": [
+    {
+      "issue": "Slope ratio confounds with entry timing (ibd_entry_close_vs_trigger_pct)",
+      "why_it_matters": "A late-stage breakout that snaps toward the trigger level will mechanically produce ma10 > ma20 * k for any k>1, regardless of fundamental momentum quality. The ratio is a kinematic artifact of entry timing, not a discriminator of signal quality. The researcher notes the entry timing contrast (winners median 0.030 vs ruin 0.069) but then ignores this in favor of the slope ratio, which is backwards—the cleaner, more causal feature is being discarded in favor of its own derivative."
+    },
+    {
+      "issue": "N=27 is insufficient to support a threshold mechanism (2.0x, 2.5x)",
+      "why_it_matters": "With 8 ruin and 11 winner cases, any threshold between 1.0x and 3.0x could be cherry-picked. The 'approximately 2.5x' cutoff is post-hoc pattern-matching. A bootstrapped confidence interval on this threshold would be extremely wide, likely spanning 1.5x to >4.0x, making the claim unfalsifiable in practice."
+    },
+    {
+      "issue": "Snapshot pooling introduces unobserved regime heterogeneity",
+      "why_it_matters": "The data aggregates across 10+ different snapshots with no regime controls. Snapshots from different market conditions (e.g., snap_724342c280 vs snap_01d3e2483b) may have fundamentally different base rates of ruin. The slope ratio effect could be entirely confounded by snapshot-level market state—perhaps the ratio happens to be high in snapshots where concentration was elevated, but this cannot be distinguished from the individual-level predictors."
+    },
+    {
+      "issue": "The industry concentration mechanism is unfalsifiable with this data",
+      "why_it_matters": "No sector-ETF momentum data, no concentration index, and no cross-snapshot sector attribution is present. The researcher's P4 prediction (sector-ETF conditioning) cannot be tested with the frozen evidence. Claiming industry concentration as the 'causal amplifier' while providing no evidence for concentration levels is unfalsifiable storytelling—exactly the kind of narrative that survives in small-sample archaeology."
+    },
+    {
+      "issue": "Pullback metrics are post-hoc outcomes used as if causal",
+      "why_it_matters": "pullback_pct and pullback_duration_weeks are observed after the snapshot, yet the researcher uses them to characterize ruin vs winner patterns. These are the outcomes being predicted, not predictors. Any pattern involving pullback (e.g., 'winners have deeper pullbacks') is tautological when comparing selected_winner to ruin labels that were partially constructed using pullback information."
+    },
+    {
+      "issue": "The vol_ratio_5_20 contrast is non-replicable across cases",
+      "why_it_matters": "The researcher proposes filtering on vol_ratio_5_20 > 1.4, but entity_3adc078f01 (selected_winner, large_win) has vol_ratio = 1.14, below the threshold. Meanwhile, entity_bec51a4227 (selected_winner) has vol_ratio = 1.01. A filter on vol_ratio > 1.4 would eliminate true winners. The standardized delta for vol_ratio is only -1.0455, indicating weak separation at best."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A selected_winner case with ma10_slope_5/ma20_slope_5 > 3.0x AND ibd_entry_close_vs_trigger_pct < 0.020 (to isolate slope ratio from entry timing)",
+    "A false_positive_ruin case with slope ratio < 1.2x (to test whether slope ratio adds anything beyond entry timing)",
+    "A within-snapshot comparison holding ibd_entry_close_vs_trigger_pct constant: do slope ratios still separate ruin from winners?",
+    "A sector/market-regime breakdown of ruin vs winner base rates across snapshots to test whether snapshot-level heterogeneity explains the pattern",
+    "Replication data from a different time period or universe to test whether the 2.5x threshold holds or is sample-specific"
+  ],
+  "what_would_change_my_mind": [
+    "A held-out test set (not the 27-case discovery set) where conditioning on ibd_entry_close_vs_trigger_pct quartile leaves significant residual variance explained by ma10/ma20 slope ratio for ruin prediction",
+    "Sector-ETF momentum data showing that the same B0 signal in high-concentration snapshots (e.g., XLE peak vs trough) has differential ruin rates, confirming the concentration amplifier hypothesis independently of slope metrics",
+    "Bootstrap confidence intervals on the slope ratio threshold showing the 2.0x cutoff is stable across resamples (e.g., <0.3x standard error on the threshold estimate)",
+    "A theoretical justification for why 'velocity plateau' (short-term acceleration decoupled from medium-term) mechanically causes ruin under concentration, as opposed to simply being a correlate of late breakout that would fail regardless of market regime"
+  ]
+}

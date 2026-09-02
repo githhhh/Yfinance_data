@@ -1,0 +1,74 @@
+
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "null_pullback_falsification",
+      "features": ["pullback_pct", "pullback_duration_weeks", "mom_20", "up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "false_negative_big_winner cases with null pullback data vs non-null pullback false_negative_big_winner cases",
+      "success_criterion": "If the embedded-strength mechanism is valid, false_negative_big_winner cases with null pullback data must have null features across ALL entities (i.e., null represents 'no pullback observed' rather than 'pullback unobservable'). Additionally, null-pullback cases must have mom_20 and up_day_ratio_20 values within the interquartile range of non-null cases.",
+      "failure_criterion": "If any false_negative_big_winner has null pullback_pct/pullback_duration_weeks while having mom_20 > 0.10 OR up_day_ratio_20 > 0.60, the mechanism's pullback-consolidation premise is falsified because the entity achieved large_win without an observable pullback, implying an alternative pathway that the mechanism cannot explain using PIT features."
+    },
+    {
+      "name": "threshold_calibration_test",
+      "features": ["up_day_ratio_20", "mom_20", "vol_ratio_5_20", "pullback_pct", "pullback_duration_weeks"],
+      "comparison": "Distribution of feature values for false_negative_big_winner entities vs stated falsifiable prediction thresholds",
+      "success_criterion": "At least 2 of 2 false_negative_big_winner cases must meet at least 3 of 5 stated thresholds (up_day_ratio_20 >= 0.55, mom_20 >= 0.12, vol_ratio_5_20 >= 1.40, pullback_pct between -5% and -10%, pullback_duration_weeks >= 4) if the mechanism is to retain explanatory power.",
+      "failure_criterion": "If zero of 2 false_negative_big_winner cases meet the mom_20 >= 0.12 threshold (as currently observed), the stated thresholds are contradicted by the canonical evidence. The mechanism must either revise thresholds to match observed data or admit the mom_20 feature is not a causal mechanism for false-negative outcomes."
+    },
+    {
+      "name": "contradictory_profile_counterexample",
+      "features": ["pullback_pct", "pullback_duration_weeks", "up_day_ratio_20", "mom_20"],
+      "comparison": "entity_bfb308b24a (loss, pullback_pct=-12.1%, pullback_duration_weeks=4, up_day_ratio_20=0.45, mom_20=0.027) vs entity_df5478102d (small_win, pullback_pct=-5.0%, pullback_duration_weeks=4, up_day_ratio_20=0.60, mom_20=0.125)",
+      "success_criterion": "If the mechanism explains outcome magnitude via pullback depth and duration, then entity_df5478102d (shallower pullback, higher momentum, higher up_day_ratio_20) should produce equal-or-larger returns than entity_bfb308b24a. This would be consistent with the mechanism.",
+      "failure_criterion": "If entity_df5478102d (better features: shallower pullback, higher momentum) produces only small_win while entity_bfb308b24a produces loss, the mechanism fails to explain within-profile outcome variance. This constitutes a counterexample: the mechanism predicts entity_df5478102d should achieve large_win given superior feature values, but it does not. The mechanism is incomplete."
+    },
+    {
+      "name": "up_day_ratio_lagging_test",
+      "features": ["up_day_ratio_20", "mom_20", "mom_60"],
+      "comparison": "Correlation between up_day_ratio_20 and future mom_20 (5-week forward momentum) vs correlation with past mom_20 (lag-1 autocorrelation)",
+      "success_criterion": "If up_day_ratio_20 contains forward-looking information (as the mechanism claims), its correlation with future mom_20 must be positive and significant (p < 0.05) after controlling for current mom_20. If it is merely a lagging indicator, correlation with future mom_20 should be no better than correlation with past mom_20.",
+      "failure_criterion": "If up_day_ratio_20 has stronger correlation with past mom_20 than with future mom_20, or if correlation with future mom_20 is not statistically significant, then up_day_ratio_20 is a lagging indicator that proxies for recent trajectory rather than embedded strength. Any mechanism relying on up_day_ratio_20 as a predictive feature is falsified."
+    },
+    {
+      "name": "market_tailwind_proxy_test",
+      "features": ["mom_20", "up_day_ratio_20", "vol_ratio_5_20"],
+      "comparison": "Cross-snapshot_anon correlation: do false_negative_big_winner cases cluster within specific snapshots (indicating market-wide conditions) vs distributed across snapshots (indicating stock-specific embedded strength)?",
+      "success_criterion": "If false_negative_big_winner cases are distributed across at least 3 distinct snapshot_anon values with no single snapshot containing >50% of cases, the mechanism is not purely a market-tailwind proxy.",
+      "failure_criterion": "If all false_negative_big_winner cases share the same snapshot_anon (snap_71486ed83c contains entity_535a1beed7, entity_de1c657364, entity_05b4c6b1f7), this indicates the pattern is confounded by temporal market conditions rather than stock-specific embedded strength. The mechanism would be falsified as a proxy for market tailwind."
+    },
+    {
+      "name": "is_b0_pick_feature_inversion",
+      "features": ["is_b0_pick", "up_day_ratio_20", "mom_20", "vol_ratio_5_20", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Feature distributions for selected_winner (is_b0_pick=true) vs false_negative_relative (is_b0_pick=false)",
+      "success_criterion": "If B0 selector captures winners via the inverse of the false-negative mechanism (higher trigger proximity, stronger momentum), then selected_winner entities should have ibd_entry_close_vs_trigger_pct > 0.025, mom_20 > 0.10, and up_day_ratio_20 > 0.55 more frequently than false_negative_relative entities.",
+      "failure_criterion": "If selected_winner entities include cases with ibd_entry_close_vs_trigger_pct < 0.015, mom_20 < 0.05, and up_day_ratio_20 < 0.50 that still produce large_win, then B0 selection is not explained by the inverse of the false-negative mechanism. This would indicate the mechanism is incomplete: B0 captures some winners via different signals, and B0 misses some false negatives despite favorable embedded-strength features."
+    },
+    {
+      "name": "pre_specified_threshold_validation",
+      "features": ["up_day_ratio_20", "mom_20", "vol_ratio_5_20", "pullback_pct", "pullback_duration_weeks", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Apply pre-specified thresholds (up_day_ratio_20 >= 0.50, mom_20 >= 0.06, pullback_pct -5% to -10%, pullback_duration_weeks >= 4, ibd_entry_close_vs_trigger_pct < 0.02) to ALL non-picks (is_b0_pick=false) regardless of outcome label",
+      "success_criterion": "The threshold combination must identify a subset of non-picks where large_win rate is statistically significantly higher than the base rate for all non-picks (Fisher's exact test, p < 0.05).",
+      "failure_criterion": "If non-picks meeting the threshold combination have a large_win rate that is NOT statistically significantly different from non-picks not meeting the threshold, the mechanism's predictive validity is falsified. The apparent pattern would be a selection artifact."
+    }
+  ],
+  "leakage_checks": [
+    "Verify pullback_pct and pullback_duration_weeks are computed from data available at snapshot_anon timestamp, not from future price observations post-snapshot",
+    "Confirm ibd_entry_close_vs_trigger_pct is computed at entry time, not derived from subsequent price action",
+    "Ensure mom_20 and up_day_ratio_20 are rolling window features backward-looking from snapshot, not forward-looking",
+    "Check that w4_return_bucket labels are not used to reclassify entities after feature observation (no outcome-dependent feature engineering)",
+    "Validate that vol_ratio_5_20 uses historical volume ratios observable at snapshot time, not contemporaneous volume spikes post-snapshot"
+  ],
+  "priority_order": [
+    "null_pullback_falsification",
+    "threshold_calibration_test",
+    "contradictory_profile_counterexample",
+    "pre_specified_threshold_validation",
+    "up_day_ratio_lagging_test",
+    "market_tailwind_proxy_test",
+    "is_b0_pick_feature_inversion"
+  ]
+}
+```

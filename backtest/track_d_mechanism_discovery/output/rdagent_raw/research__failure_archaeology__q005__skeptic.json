@@ -1,0 +1,41 @@
+{
+  "strongest_counterclaim": "The entire classification of false_positive_ruin vs selected_winner is partially defined by post-snapshot W4 returns (method_note explicitly states false negatives require future W4 >=8%), making the snapshot features retroactively correlated with outcomes they did not predict. The researcher is identifying features that describe already-failed picks, not features that would have predicted failure at snapshot time.",
+  "attacks": [
+    {
+      "issue": "Circular outcome definition",
+      "why_it_matters": "The w4_return_bucket directly determines false_positive_ruin classification. A case labeled 'ruin' is ruin because W4 return was bad—not because of any intrinsic failure mode. Features correlated with W4 return are therefore definitionally correlated with the label, not mechanistically causing failure. The researcher never tests whether these features predict W4 return independently of the label construction."
+    },
+    {
+      "issue": "Proxy-squared problem",
+      "why_it_matters": "px_vs_ma20 is claimed to proxy base depth, but base_depth_pct is a separate feature in the numeric_contrasts with weak standardized_delta=0.1942. If base depth matters, use it directly. Conflating position (px_vs_ma20) with structure (base depth) creates a measurement proxy for a measurement proxy—amplifying noise without clear mechanism."
+    },
+    {
+      "issue": "up_day_ratio_20 classification inconsistency",
+      "why_it_matters": "entity_3adc078f01 has up_day_ratio_20=0.65 and is selected_winner, but entity_8f0df3d38e also has up_day_ratio_20=0.65 and is false_positive_ruin. The researcher explains this via 'momentum architecture' but provides no operationalized definition of what constitutes divergent vs coherent architecture beyond post-hoc case fitting."
+    },
+    {
+      "issue": "Small-N threshold instability",
+      "why_it_matters": "With only 8 false_positive_ruin cases, mom_20<0.10 and px_vs_ma20<0.05 thresholds lack power. A single additional case could shift thresholds by 30-50%. Predictions of >60% ruin rates from N=8 are confidence intervals in name only."
+    },
+    {
+      "issue": "Missing mechanism for why high up_day_ratio_20 causes accumulation exhaustion",
+      "why_it_matters": "The researcher claims up_day_ratio_20 divergence signals 'imminent distribution' but provides no model of order flow, market microstructure, or volume composition that would make this claim mechanistically plausible. It reads as narrative explanation for a statistical correlation."
+    },
+    {
+      "issue": "No test of the alternative: mechanical top-capture hypothesis",
+      "why_it_matters": "An equally plausible mechanism: B0 picks fire mechanically when price crosses trigger thresholds. Winners happen when that cross occurs during genuine trend continuation; false positives happen when it occurs at momentum exhaustion points. This mechanism requires NO feature-based prediction—only that the trigger itself is placed at varying positions along the trend curve. If true, snapshot features are epiphenomenal."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where mom_20<0.10 AND px_vs_ma20<0.05 but outcome was selected_winner—currently missing from evidence, would directly falsify the primary failure-mode claim",
+    "B0 picks with identical snapshot features but different market-regime tags (e.g., trending vs choppy) to test whether regime, not features, drives outcomes",
+    "Cases where up_day_ratio_20>0.60 AND ma20_slope_5<0.020 that were selected_winner—currently no clear counterexample exists but absence of search doesn't confirm impossibility",
+    "A temporal analysis: do false_positive_ruin cases cluster at specific points within their snapshot windows, suggesting entry-timing noise rather than feature-based prediction"
+  ],
+  "what_would_change_my_mind": [
+    "A controlled backtest showing that the proposed feature-based filter (mom_20<0.10 or up_day_ratio_20 divergence conditions) improves out-of-sample win rate by >10 percentage points vs unfiltered B0 picks across a minimum of 100 cases",
+    "Market microstructure evidence that up_day_ratio_20>0.60 corresponds to observable distribution signatures (e.g., closing-price weakness relative to intraday highs, volume imbalance shifts) at or before snapshot time, not just retrospective correlation",
+    "A formal separation test: if snapshot features truly predict outcomes, then splitting the 27 cases by median values of the top 3 features should produce statistically significant outcome differences (Fisher's exact test p<0.05) despite small N",
+    "Demonstration that base_depth_pct (the direct measure of base quality) outperforms px_vs_ma20 (the proxy) in predicting ruin outcomes, validating the mechanistic claim rather than accepting the proxy's correlation as evidence"
+  ]
+}

@@ -1,0 +1,35 @@
+
+
+```json
+{
+  "mechanism_claim": "In fresh breakout weeks (ibd_entry_close_vs_trigger_pct typically 0.01-0.07), Lane's apparent predictive edge is largely the reflection of a few base SCORE inputs (mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20). Lane's independent contribution is concentrated in a single interaction: it suppresses names where ma10_slope_5 is elevated but up_day_ratio_20 is low (≤0.5), a bull-trap regime that the raw SCORE permits. Outside that interaction, B0_LANE is essentially isomorphic to a high-quintile SCORE_BEFORE_LANE bucket; LANE_NEUTRAL is functionally a wider, noisier version of the same SCORE distribution.",
+  "evidence_for": [
+    "Selected_winner median up_day_ratio_20 = 0.625 vs false_negative_median = 0.500 (std delta -1.19) — Lane's winners share a breadth signature absent from non-picks.",
+    "Selected_winner median mom_20 = 0.163 vs false_negative_median = 0.058 (std delta -1.00) and px_vs_ma50 = 0.127 vs 0.056 (std delta -0.85) — Lane's winners cluster at the high-momentum/RS corner; SCORE captures the same corner.",
+    "Among is_b0_pick=true cases, false_positive_ruin entries (entity_8f0df3d38e up_day 0.65+ but ruin; entity_84824e6a20 ma10_slope 0.062 but up_day 0.4 → ruin; entity_b6bcccdf6a ma10_slope 0.067 but up_day 0.4 → loss) show Lane is fooled by momentum bursts when breadth is thin — i.e., Lane DOES add an interaction filter (slope × breadth) that raw SCORE does not.",
+    "Entity_6618d3e80c carries the rare compound label false_positive_ruin|selected_winner — a high-conviction Lane name (px_vs_ma50 0.337, ma10_slope 0.075) that produced a large_win within the ruin window, indicating Lane's strongest conviction tier does carry genuine edge.",
+    "False_negative_relative cases (entity_df5478102d, entity_d8e8e7b814, entity_bfb308b24a) all sit in the moderate-feature band (mom_20 0.027-0.124, up_day 0.45-0.60) — exactly the band Lane abstains on. These represent Lane's 'LANE_NEUTRAL' miss set and demonstrate Lane is conservative, not selective."
+  ],
+  "evidence_against": [
+    "The numeric_contrasts ranking is led by up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50 — all SCORE primitives. Lane's incremental column would have to appear as a higher-order interaction or a residual; the available contrasts do not isolate one.",
+    "Selected_winners and false_positives_ruin share nearly identical median ma10_slope_5 ranges (0.027 vs ~0.030-0.060) and overlapping px_vs_ma20 distributions — Lane cannot separate these classes with first-order features alone, weakening the claim of independent signal.",
+    "Entity_440e297253 is a selected_winner with up_day 0.50 (at the false_negative level) yet still produced large_win; entity_2f86543bf6 won with up_day 0.35 and negative ma20_slope — counter-examples to any deterministic Lane filter on breadth.",
+    "Sample is 27 cases with 8 false_positives_ruin and only 7 false_negatives; the power to detect a small but real Lane interaction is limited. No feature shows a standardized delta > |1.2|, the classic threshold for an independent signal in this archaeology."
+  ],
+  "falsifiable_predictions": [
+    "In a held-out fresh-breakout sample, the Spearman correlation between B0_LANE's rank and SCORE_BEFORE_LANE's top-quintile rank will exceed 0.70 — falsified if it falls below 0.50 (i.e., Lane is doing something uncorrelated and genuinely independent).",
+    "The hit rate (w4_return ≥ +5pp vs benchmark) of B0_LANE minus the hit rate of the top-quintile of SCORE_BEFORE_LANE in fresh breakout weeks will be in the range [-3pp, +5pp]. A delta > +8pp would falsify the 'Lane ≈ SCORE' claim; a delta < -5pp would falsify 'Lane adds value at all'.",
+    "Among fresh-breakout B0_LANE picks, the conditional ruin rate given (ma10_slope_5 > 0.04 AND up_day_ratio_20 ≤ 0.50) will exceed 55%. Falsified if the conditional ruin rate is statistically indistinguishable from the unconditional ruin rate (Lane is NOT filtering the bull-trap interaction).",
+    "LANE_NEUTRAL in fresh breakout weeks will have a bimodal forward-return distribution: probability of w4_return ≥ +8% will be ≥ 18% (matching selected_winner rates for moderate features) AND probability of w4_return ≤ -8% will be ≥ 22%. Falsified if LANE_NEUTRAL forward returns concentrate near zero (Lane's abstention carries no information).",
+    "A logistic model of w4 win/loss using only {mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20, ma10_slope_5, ma10_slope_5×up_day_ratio_20} will produce an AUC within ±0.03 of a model that adds a B0_LANE dummy in fresh breakout weeks — testing whether the slope×breadth interaction absorbs Lane's information.",
+    "In fresh breakout weeks, the false_negative_relative rate inside LANE_NEUTRAL will be ≥ 2× the false_negative_relative rate inside the bottom three SCORE_BEFORE_LANE quintiles, since Lane's abstention is more conservative than SCORE's bottom tail."
+  ],
+  "policy_implications": [
+    "If the predictions hold (Lane ≈ SCORE in fresh breakouts), portfolio construction should treat B0_LANE and top-quintile SCORE_BEFORE_LANE as substitutes in fresh breakout weeks and not double-count exposure. Lane's perceived alpha is largely a labeling artifact of the SCORE primitives.",
+    "The slope×breadth interaction is the actionable kernel: explicitly encode ma10_slope_5 × up_day_ratio_20 as a penalty/bonus rather than relying on Lane to filter implicitly. This makes the 'Lane' logic transparent and backtestable.",
+    "LANE_NEUTRAL in fresh breakouts is best treated as a HIGH-VARIANCE bucket, not as a 'do-not-trade' signal. The base SCORE should still rank LANE_NEUTRAL names; abstention should lower position size, not eliminate the trade.",
+    "Because the sample is thin (27 cases, 8 ruins, 7 misses) and no feature crosses |1.2| std delta, any deployment decision should be gated on a larger out-of-sample archaeology. Until then, mark the Lane-independent-information hypothesis as UNRESOLVED with a weak prior toward 'minimal independent contribution'.",
+    "Separate the 'directional filter' (Lane picks/not) from the 'sizing filter' (conviction tier). In fresh breakouts, sizing should be driven by SCORE_BEFORE_LANE magnitude, not by Lane conviction — Lane conviction adds at most a small tilt, per the predicted delta band of [-3pp, +5pp]."
+  ]
+}
+```

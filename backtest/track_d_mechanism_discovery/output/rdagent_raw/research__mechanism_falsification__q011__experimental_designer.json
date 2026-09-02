@@ -1,0 +1,54 @@
+{
+  "tests": [
+    {
+      "name": "vol_x_mom_interaction_signature",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Stratify the 27-case archaeology (and any held-out B0 history that surfaces the same PIT fields) into high-vol quartile (vol_ratio_5_20 >= 75th pct) and low-vol quartile (<= 25th pct). Within each vol quartile, split by mom_20 above/below its own median and compute is_b0_pick rate per cell plus 2x2 OR for high-mom vs low-mom. Compare the high-vol OR to the low-vol OR via interaction contrast: delta_logOR_highvol_minus_lowvol. Repeat with px_vs_ma50 substituted for mom_20 as a robustness check (extension proxy).",
+      "success_criterion": "delta_logOR > 0 AND high-vol-cell shows materially larger mom_20 gap than low-vol-cell (rank-biserial separation in high-vol stratum >= 0.30 while low-vol stratum <= 0.15). A risk-control component must penalize 'high vol without price confirmation' (distribution-day archetype), so the mom_20 differential should widen inside the high-vol regime; this is the signature of asymmetric risk awareness rather than additive strength ranking.",
+      "failure_criterion": "delta_logOR approximately 0 (|delta| < 0.20) AND mom_20 gap similar across vol strata (within 0.10 absolute). If vol simply amplifies the mom_20 effect additively, the component is treating vol and mom as co-directional ranking features, not as a diagnostic pair."
+    },
+    {
+      "name": "downside_feature_additivity_beyond_ranking",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "pullback_pct",
+        "base_depth_pct",
+        "atr_14_pct"
+      ],
+      "comparison": "Fit two nested logistic regressions of is_b0_pick on the discovery+archaeology sample (entity-disjoint from any deployment period): Model_R (ranking-only) = mom_20 + vol_ratio_5_20 + up_day_ratio_20; Model_RR (ranking + risk) = Model_R + pullback_pct + base_depth_pct + atr_14_pct. Compare via likelihood-ratio chi-square, delta-McFadden-pseudo-R^2, and delta-AUC. Also report standardized coefficients and their signs for the three added downside features. Re-run with pullback_pct and base_depth_pct sign-flipped so deeper drawdowns map to 'higher risk,' to ensure coefficient sign is interpretable.",
+      "success_criterion": "LRT p < 0.05 AND delta-pseudo-R^2 >= 0.05 AND delta-AUC >= 0.04 AND at least one downside feature carries a coefficient in the predicted risk-direction after sign alignment. Confirms the component encodes independent downside-asymmetric information not redundant with momentum/extension/vol-expansion.",
+      "failure_criterion": "LRT p >= 0.10 AND delta-pseudo-R^2 < 0.02 AND delta-AUC < 0.02. Downside features are statistically and economically redundant with the ranking block, consistent with the 'ranking dressed as risk' claim."
+    },
+    {
+      "name": "asymmetric_dispersion_compression_selected_vs_rejected",
+      "features": [
+        "pullback_pct",
+        "base_depth_pct",
+        "atr_14_pct",
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Construct two z-scored composites within each snapshot to remove snapshot-level drift: DOWN_comp = mean(z(pullback_pct), z(base_depth_pct), z(atr_14_pct)) with sign-flipped so higher = more downside-vulnerable; UP_comp = mean(z(mom_20), z(vol_ratio_5_20), z(up_day_ratio_20)). Compute the cross-sectional dispersion (MAD/median) of DOWN_comp and UP_comp separately within is_b0_pick=true and is_b0_pick=false subsets. Form the ratio DOWN_disp/UP_disp per subset and test whether the ratio differs between selected and rejected (e.g., bootstrap entity-level resamples within snapshot, n=10k).",
+      "success_criterion": "DOWN/UP dispersion ratio is at least 25% LOWER in the is_b0_pick=true subset than in the is_b0_pick=false subset (with bootstrap CI excluding zero). A genuine risk filter should compress the downside tail of its accept set while leaving upside dispersion freer; ranking would compress both or neither.",
+      "failure_criterion": "Ratio difference < 10% OR bootstrap CI straddles zero. The selected set shows comparable or greater downside dispersion than the rejected set, indicating symmetric (ranking) rather than asymmetric (risk) gating."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm none of the features in any test is constructed using post-decision-date information; audit each of pullback_pct, base_depth_pct, atr_14_pct, mom_20, mom_60, vol_ratio_5_20, up_day_ratio_20, px_vs_ma20, px_vs_ma50 against the PIT feature allowlist and reject the test if any derived feature requires a forward window.",
+    "Block on snapshot_anon: entity rows sharing a snapshot_anon are not independent; apply snapshot-clustered bootstrap (resample snapshots, not entities) for all inference in tests 1 and 3 to avoid underestimating uncertainty.",
+    "Outcome labels (false_positive_ruin, false_negative_*) are defined using forward 4w return thresholds per the method_note; this is look-ahead w.r.t. the decision date and must NOT be used as the response variable in tests 1-3. Use is_b0_pick as the response, and treat outcome_label only as a stratification variable for follow-up subgroup diagnostics, never as a target.",
+    "Exclude the hybrid entity_6618d3e80c (false_positive_ruin|selected_winner) from any 'ruin' subgroup analysis and run a sensitivity version of test 3 with it removed to confirm the asymmetric-dispersion result is not driven by a single mixed-label case.",
+    "For test 2, verify the downside-feature coefficient signs are economically sensible BEFORE interpreting the magnitude: a positive coefficient on raw pullback_pct paired with selection would mean the component rewards deeper drawdowns, which is the researcher's inverted-pullback observation and must be reconciled rather than averaged away."
+  ],
+  "priority_order": [
+    "downside_feature_additivity_beyond_ranking",
+    "vol_x_mom_interaction_signature",
+    "asymmetric_dispersion_compression_selected_vs_rejected"
+  ]
+}

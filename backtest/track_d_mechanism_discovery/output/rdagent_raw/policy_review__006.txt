@@ -1,0 +1,67 @@
+
+
+```json
+{
+  "reviews": [
+    {
+      "policy_id": "recent_momentum_ranking",
+      "concerns": [
+        "Feature cluster is essentially four collinear momentum proxies: mom_20, ma20_slope_5, and up_day_ratio_20 all encode near-identical recent-thrust information; only vol_ratio_5_20 is genuinely orthogonal. Effective dimensionality ≈1.5, not 4.",
+        "Linear z-score sum with positive-only weights and min_score=0.0 means the selector never abstains on score grounds — any abstention comes purely from top1_confidence gap threshold, which is underspecified (gap=0.5 in what units?).",
+        "top1_confidence mode with max_positions=3 and a 0.5 z-score-unit gap on correlated features will routinely fail the gap test and manufacture abstention when candidate scores cluster (which they will, given feature collinearity).",
+        "Falsification bar (quintile-5 minus quintile-1 <3pp with |z|<1.5) is not power-justified against expected holdout size for top-decile universe — likely set such that the policy trivially 'survives' even if the underlying signal is weak."
+      ],
+      "novelty_0_100": 28,
+      "mechanism_clarity_0_100": 72
+    },
+    {
+      "policy_id": "downside_distress_hard_gate",
+      "concerns": [
+        "Term label 'hard binary OR-gate' is contradicted by implementation: -10 additive penalty is not a gate (it never sets score to -∞ or excludes the candidate). Selector still ranks survivors — gate is functionally soft, not hard.",
+        "Four OR-triggered distress proxies are highly collinear: ma20_slope_5<0, dist_to_52w_high_pct<-25, and pullback_pct<-20 all encode 'price below recent reference.' A single trigger fires in near-lockstep with others, so OR logic adds no marginal coverage.",
+        "rv_20 is included under 'PIT-observable' label but rv_20 is a return-derived statistic whose lookback construction must be PIT-verified — no construction rule is given; proxy risk is high (look-ahead via centered or non-PIT windowing).",
+        "Compound falsification bar requires simultaneous (a) ≥10% reduction in false_positive_ruin AND (b) preservation of selected_winner median W4 return — this is a conjunction that is very hard to meet; if either side fails the policy is falsified, giving a sharply biased survival prior.",
+        "top1_confidence + max_positions=3 + min_score=0.0: when the gate removes the top-ranked candidate, the recovery rank may not satisfy gap=0.5, manufacturing abstention that is attributed to the selector rather than to the (intended) gate."
+      ],
+      "novelty_0_100": 38,
+      "mechanism_clarity_0_100": 42
+    },
+    {
+      "policy_id": "trigger_position_calibration",
+      "concerns": [
+        "Self-canceling structure: -3.0 penalty on ibd_entry_close_vs_trigger_pct>0.06 is offset by +2.5 conditional carve-out when mom_20>0.2, leaving a net -0.5 for the only scenario where the penalty was actually meant to bite. Mechanism therefore barely fires on its target population.",
+        "Description says 'reject picks' but spec is a score adjustment; this is a description-vs-implementation mismatch that will be tested on soft-additive semantics, not rejection semantics.",
+        "ibd_entry_close_vs_trigger_pct is referenced as a known failure feature with quoted entity-level W4 returns (0.074, 0.070 vs 0.025 winner) — the cutoff 0.06 is silent on which entity-derived distribution it corresponds to. If the cited pair averages 0.072, the 0.06 threshold catches only one of them, biasing the test toward the wrong half of the archaeology sample.",
+        "Conditional exception (mom_20>0.2) reintroduces the proxy momentum has been previously falsified as a failure mode elsewhere — risk of re-coding the very signal that archaeology found to be non-causal.",
+        "Capacity identical to P1 (top1_confidence, max=3, gap=0.5): any abstention in evaluation cannot be cleanly attributed to this policy's mechanics versus selector mechanics."
+      ],
+      "novelty_0_100": 58,
+      "mechanism_clarity_0_100": 32
+    },
+    {
+      "policy_id": "ruin_suppression_layer_v1",
+      "concerns": [
+        "Severe conceptual duplication within the spec itself: the linear up_day_ratio_20 term (+3.0), the up_day_ratio_20 × mom_20 interaction (-2.5), and the threshold penalty (-5 for low up_day_ratio_20 AND positive mom_20) all act on the same up_day_ratio_20 × mom_20 quadrant. Net effect is opaque; the marginal contribution of each layer is not separable on holdout.",
+        "px_vs_ma50 × vol_ratio_5_20 interaction (-2.0) is the only term not duplicated elsewhere in the term set, yet it shares vol_ratio_5_20 with the threshold band — feature reuse within a single policy inflates effective term count.",
+        "Capacity is fixed max_positions=2 with industry_mode=distinct_1 — this is the most aggressive abstention-manufacturing profile in the bundle. Any failure-to-fill in evaluation will be confounded with the policy's actual ruin-suppression mechanism, undermining falsifiability.",
+        "min_score not present (fixed mode bypasses it), but max_positions=2 + distinct_1 will produce many empty/underfilled portfolios by construction, not by signal — outcome metrics (e.g., median W4 return over selected_winners) will be estimated on tiny samples with wide CIs.",
+        "Eps_preference-disguise risk: px_vs_ma50 and up_day_ratio_20 jointly track 'is the stock in a confirmed uptrend' — this is functionally a quality/momentum filter, exactly the pattern previously flagged as a proxy for the rejected eps_preference baseline."
+      ],
+      "novelty_0_100": 45,
+      "mechanism_clarity_0_100": 28
+    },
+    {
+      "policy_id": "dual_mode_coil_candidate_v1",
+      "concerns": [
+        "Threshold band 0.9 < vol_ratio_5_20 < 1.0 is mechanically the noisiest region of the vol-ratio distribution (mean-reverting at unity), not what 'coil' usually denotes (low realized vol). The label 'coil' is misnamed; the penalty hits near-baseline regime, not compressing/consolidating setups.",
+        "Penalty band width (0.1 in vol_ratio units) means the -1.5 term will fire on a minority of candidates; most of the policy's behavior is driven by the linear + interaction terms, so the 'dual-mode' framing is largely cosmetic.",
+        "min_score=0.5 with max_positions=2 combines an above-median score gate with restricted capacity — both conditions must pass simultaneously, doubling the abstention surface relative to either alone. Eval will likely show systematic abstention misattributed to weak signal.",
+        "vol_ratio_5_20 × mom_20 interaction (+1.5) crosses a regime indicator with a momentum feature, but z-score-transformed both sides — interpretation of a zscore×zscore interaction is non-identifiable without anchoring to the original scale. Causal mechanism is underspecified.",
+        "Cross-policy duplication: this policy reuses mom_20, up_day_ratio_20, px_vs_ma50, and vol_ratio_5_20 already deployed in P1 and P4 — comparative falsification across the bundle collapses because policies aren't mechanistically orthogonal."
+      ],
+      "novelty_0_100": 62,
+      "mechanism_clarity_0_100": 22
+    }
+  ]
+}
+```

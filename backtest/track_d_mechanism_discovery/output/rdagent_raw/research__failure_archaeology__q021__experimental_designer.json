@@ -1,0 +1,92 @@
+{
+  "tests": [
+    {
+      "name": "Dry-up_rescue_symmetry_across_B0_status",
+      "features": [
+        "is_b0_pick",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Apply the identical dry-up definition (vol_ratio_5_20 <= 1.15 AND ma10_slope_5 > 0 AND up_day_ratio_20 >= 0.50) to two arms defined on PIT filter is_b0_pick only: (Arm 1) B0-rejected = is_b0_pick=false; (Arm 2) B0-selected = is_b0_pick=true. In each arm, compute the 3-slot W4 distribution (large_win, small_win, loss_or_ruin) for dry-up-qualifying vs non-qualifying cases.",
+      "success_criterion": "Dry-up produces a 3-slot shift toward large_win in Arm 1 AND the same dry-up definition produces a flat or weaker shift in Arm 2 (i.e., interaction term is_b0_pick:vol_ratio_5_20 has sign and magnitude consistent with rescue specificity). Quantitative bar: P(large_win | dry-up, B0-rejected) - P(large_win | not-dry-up, B0-rejected) > P(large_win | dry-up, B0-selected) - P(large_win | not-dry-up, B0-selected), with the gap holding across at least 3 distinct snapshot_anon strata.",
+      "failure_criterion": "Dry-up lifts large_win rate by a comparable amount in BOTH arms, or lifts only in Arm 2. Either outcome collapses 'rescue' into 'quiet-base generality'."
+    },
+    {
+      "name": "Vol_ratio_5_20_dose_response_within_false_negative_pool",
+      "features": [
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Restrict to is_b0_pick=false. Bin vol_ratio_5_20 into pre-specified tertiles using ONLY the false-negative pool's empirical distribution (lower third = dry, middle = baseline, upper third = volume-confirmed). For each tertile, compute the 3-slot W4 distribution. Prediction is monotonic: large_win rate should decrease as vol_ratio_5_20 increases if the absorption mechanism is real.",
+      "success_criterion": "Monotonic ordering of large_win rate across tertiles with dry > baseline > volume-confirmed, AND dry-tertile large_win rate exceeds the volume-confirmed tertile by >= 20 percentage points. Direction is pre-specified; magnitudes are NOT pre-specified beyond this floor.",
+      "failure_criterion": "Non-monotonic ordering, OR volume-confirmed tertile produces >= large_win rate as dry tertile (volume confirmation rescues as well or better than dry-up)."
+    },
+    {
+      "name": "Entry_baseline_matched_pair_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "snapshot_anon",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "comparison": "For each false-negative (is_b0_pick=false) with ibd_entry_close_vs_trigger_pct within +/- 0.005 of a selected-winner (is_b0_pick=true) from the SAME snapshot_anon, form a matched pair. Within matched pairs only, compare the 3-slot W4 distribution as a function of vol_ratio_5_20 (dry-up band <= 1.15 vs not). Pair-level sign test on which side of the pair won more often.",
+      "success_criterion": "In pairs where the false-negative side has the dry-up signature and the selected side does NOT, the false-negative side wins (large_win) at >= 60% pair-level rate. This isolates the dry-up rescue from the entry-trough bias by holding entry distance to IBD trigger approximately constant.",
+      "failure_criterion": "Pair win-rate for dry-up false-negative vs volume-confirmed selected is at or below 50% across >= 10 matched pairs, OR insufficient pairs can be formed (< 8), in which case the test is UNRESOLVED rather than failed."
+    },
+    {
+      "name": "Slope_necessity_decomposition",
+      "features": [
+        "ma10_slope_5",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within is_b0_pick=false AND vol_ratio_5_20 <= 1.15, split by sign of ma10_slope_5. Compute 3-slot W4 distribution for (slope>0) vs (slope<=0) subgroups. Same procedure using ma20_slope_5.",
+      "success_criterion": "Subgroup with positive slope shows higher large_win share than the non-positive subgroup within the same vol_ratio_5_20 band; effect must be visible in BOTH ma10_slope_5 and ma20_slope_5 stratifications to claim a 'trend' rather than 'single-window noise' dependency.",
+      "failure_criterion": "Non-positive-slope subgroup produces >= large_win rate as positive-slope subgroup, indicating dry-up alone (without trend) is sufficient and the 'joint condition' language overstates the mechanism."
+    },
+    {
+      "name": "Base_depth_quality_decomposition",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Within is_b0_pick=false, restrict to cases with non-null pullback_pct and pullback_duration_weeks. Stratify jointly by vol_ratio_5_20 band (<=1.15 vs >1.15) AND base depth (shallow: pullback_pct > -10% vs deep: pullback_pct <= -10%) AND up_day_ratio_20 (>=0.50 vs <0.50). Compute 3-slot distribution per cell. Pre-specify the four cells of interest: dry+shallow+highUDR, dry+deep+highUDR, dry+shallow+lowUDR, vol-confirmed+shallow+highUDR.",
+      "success_criterion": "Cell dry+shallow+highUDR shows the highest large_win share among the four; cell vol-confirmed+shallow+highUDR shows a materially lower large_win share (>= 15pp gap). This would establish the proposed joint condition is more than the sum of its parts AND that volume confirmation in shallow base is NOT an alternative rescue route.",
+      "failure_criterion": "vol-confirmed+shallow+highUDR matches or exceeds dry+shallow+highUDR on large_win rate, OR cell counts fall below n=2 making the test UNRESOLVED."
+    },
+    {
+      "name": "Threshold_contour_for_vol_ratio_5_20",
+      "features": [
+        "vol_ratio_5_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Pre-specify candidate cutoffs at 0.90, 1.00, 1.10, 1.15, 1.20, 1.30, 1.40, 1.50. Within is_b0_pick=false, evaluate 3-slot W4 distribution at each cutoff. Also report precision (large_win share among cases below cutoff) and lift over the false-negative pool baseline large_win share. Do NOT pick the cutoff post-hoc; report all eight.",
+      "success_criterion": "A single cutoff exists where (a) precision for large_win is >= 50% AND (b) lift over false-negative baseline is >= 15pp AND (c) the same cutoff does NOT produce comparable lift in the is_b0_pick=true pool (reuses symmetry criterion at the parameter level).",
+      "failure_criterion": "No cutoff satisfies all three conditions simultaneously, OR precision/lift curves are flat across the 0.90-1.50 range, indicating no specific dry-up threshold is mechanistic."
+    }
+  ],
+  "leakage_checks": [
+    "w4_return_bucket and outcome_label are post-snapshot evaluation targets only; they must not appear in any feature list, filter, or stratum definition. The class label 'false_negative_big_winner' is defined USING the outcome and therefore cannot be used to pre-select the test pool.",
+    "snapshot_anon is permitted only as a stratification/grouping variable (paired tests, within-snapshot strata). It is NOT a predictive feature and must not enter a model as a covariate without explicit snapshot-fixed-effects framing.",
+    "is_b0_pick is PIT-valid (decision is made at snapshot time) and may be used as a PIT filter, but ANY pool definition that references the forward outcome (large_win, false_negative_*) is circular and prohibited.",
+    "pullback_duration_weeks and pullback_pct have substantial null rates; tests using them must state the missing-data rule up front (complete-case analysis) and report cell n. Tests that would otherwise rely on null-imputation are rejected.",
+    "Numeric contrast table features (mom_60, atr_14_pct, ibd_entry_volume_ratio, ibd_entry_close_position, rv_20, base_duration_weeks, base_depth_pct, base_mbox_count, current_vs_ibd_candidate_pct, ibd_entry_breakout_range_ratio, ma50_slope_10, dist_to_52w_high_pct, volume_ratio) are PIT-eligible but must NOT be used to recreate the w4 outcome outside their pre-specified role; in particular, ibd_entry_volume_ratio must not be used as a near-duplicate proxy for the already-tested vol_ratio_5_20 in a way that smuggles in the same information twice.",
+    "No test may request, condition on, or stratify by outer-forward outcomes beyond w4_return_bucket. Any future return, multi-week forward window, or post-W4 label is out of scope at this stage.",
+    "Entity identity and calendar date are not features. snapshot_anon is the only temporal identifier permitted, and only for stratification."
+  ],
+  "priority_order": [
+    "Dry-up_rescue_symmetry_across_B0_status",
+    "Vol_ratio_5_20_dose_response_within_false_negative_pool",
+    "Entry_baseline_matched_pair_test",
+    "Slope_necessity_decomposition",
+    "Base_depth_quality_decomposition",
+    "Threshold_contour_for_vol_ratio_5_20"
+  ]
+}

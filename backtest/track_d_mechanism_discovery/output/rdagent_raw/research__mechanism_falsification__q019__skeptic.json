@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "The redundancy claim is unfalsifiable without knowing what evidence_risk actually computes. The researcher assumes evidence_risk ≈ f(vol_ratio_5_20, up_day_ratio_20, mom_20) based on the numeric contrasts, but this is circular: using the same 27 cases to both discover which features correlate with failure and to assert that evidence_risk duplicates those features proves nothing. The feature is a black box, and its redundancy cannot be tested without its definition.",
+  "attacks": [
+    {
+      "issue": "No construct definition for evidence_risk",
+      "why_it_matters": "The entire redundancy argument depends on evidence_risk being some function of the top three numeric-contrast features. But evidence_risk has no published formula in the provided data. Claiming it is redundant with vol_ratio_5_20, up_day_ratio_20, and mom_20 is an unfalsifiable assertion about an undefined object. The researcher cannot simultaneously use the numeric contrasts to diagnose evidence_risk's inputs AND claim that those same contrasts prove evidence_risk is unnecessary."
+    },
+    {
+      "issue": "In-sample accuracy on n=27 is not a falsification test",
+      "why_it_matters": "The claim that the replacement composite achieves ≥85% classification accuracy on the 27-case set is an in-sample fit statistic, not a falsification. With 27 observations and a composite derived from the same data, this is guaranteed to overstate performance. The true test requires applying the composite to held-out data with a pre-specified decision threshold, which the researcher never performed. The stated falsifiable prediction about Sharpe ±0.05 is a hypothetical out-of-sample claim with zero supporting evidence."
+    },
+    {
+      "issue": "Bootstrap threshold of p > 0.25 is suspiciously lenient",
+      "why_it_matters": "The researcher proposes that evidence_risk is redundant if adding it yields p > 0.25 in a bootstrap test. This is backwards: if evidence_risk has genuinely zero predictive power, the null distribution should produce p-values uniformly distributed under the null, yielding p > 0.25 approximately 75% of the time by definition. Using 0.25 as a threshold means three-quarters of truly useless features would be declared redundant. A meaningful test requires p < 0.10 to reject the alternative that evidence_risk contributes anything, not p > 0.25 to accept the redundancy null."
+    },
+    {
+      "issue": "The replacement composite is an untested, unvalidated alternative",
+      "why_it_matters": "The proposed replacement (vol_ratio_5_20 × (1 − up_day_ratio_20)) was derived post-hoc from the same failure archaeology data. It has never been backtested on any independent dataset, never evaluated for maximum drawdown performance, and never tested across different market regimes. Asserting it is a 'cleaner replacement' is policy advocacy without empirical support. The composite could systematically underweight tail-risk regimes or miss conditional interactions between volatility and momentum that evidence_risk captures through a different functional form."
+    },
+    {
+      "issue": "Collinearity masking vs. true redundancy is not distinguished",
+      "why_it_matters": "High correlation between evidence_risk and the three proposed features does not establish redundancy in a model sense. In a collinear predictor set, dropping one variable can shift the coefficients and effective degrees of freedom of the remaining variables, changing the decision boundary. The researcher conflates 'predicts similarly' with 'can be removed without consequence.' Even if evidence_risk is 0.9 correlated with the composite, the remaining 10% variance could anchor the model in extreme cases (e.g., high-vol/low-momentum regimes) where the composite and evidence_risk diverge."
+    },
+    {
+      "issue": "The numeric contrasts identify discriminators, not mechanisms",
+      "why_it_matters": "The top standardized deltas (up_day_ratio_20: -1.19, vol_ratio_5_20: -1.05, mom_20: -1.00) are statistical differences between false negatives and selected winners. They are not evidence that evidence_risk is constructed from these features, nor that evidence_risk operates through these channels. Any risk signal correlated with failure will appear as a top discriminator. The researcher has shown evidence_risk is associated with the same outcomes as these features, not that it is redundant with them mechanistically."
+    },
+    {
+      "issue": "Sample heterogeneity is unexamined",
+      "why_it_matters": "The 27 cases span multiple snapshots (snap_724342c280, snap_287267e812, snap_eb3d8128cc, etc.) from what appear to be different market conditions. The researcher never stratifies the analysis by snapshot or regime. An evidence_risk component that is redundant in low-volatility regimes may carry unique signal in high-volatility regimes, or vice versa. Treating 27 pooled cases as a single regime invalidates any generalization about redundancy across the full trading universe."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where evidence_risk fires (is_b0_pick = true) but vol_ratio_5_20 and up_day_ratio_20 are both near their false-negative medians — i.e., the composite would NOT predict risk, but evidence_risk does. These are the cases where evidence_risk would be provably non-redundant.",
+    "Snapshots where evidence_risk's B0 inclusion changes the final portfolio composition (e.g., a stock selected by B0 because of evidence_risk that would be excluded without it, and that stock's realized outcome contradicts the composite's prediction).",
+    "Periods where evidence_risk is consistently high but vol_ratio_5_20 and up_day_ratio_20 are both in the 'safe' range, to test whether evidence_risk captures a regime-level risk factor not present in the three-feature composite.",
+    "Cases where evidence_risk is low but the composite is high, to test whether the composite over-predicts risk relative to evidence_risk — indicating the composite is not equivalent.",
+    "An out-of-sample dataset of at least 200 cases where the composite and evidence_risk disagree on at least 30% of picks, with realized outcomes tracked, to test whether evidence_risk or the composite is a better risk predictor."
+  ],
+  "what_would_change_my_mind": [
+    "A published or observable definition of evidence_risk that shows it is literally computed as a function of vol_ratio_5_20, up_day_ratio_20, and mom_20 with no additional nonlinear terms, weighting, or conditioning.",
+    "An out-of-sample backtest (minimum 200 unseen cases) demonstrating that dropping evidence_risk and replacing it with the proposed composite produces identical or statistically indistinguishable Sharpe ratio (within 0.03), maximum drawdown (within 2pp), and win-rate distributions.",
+    "A bootstrap test on held-out data showing that adding evidence_risk to a model already containing the three proposed features yields a coefficient not significantly different from zero at α = 0.10 AND that the likelihood ratio test p-value exceeds 0.50 (not merely 0.25).",
+    "A formal variance decomposition (e.g., variance inflation factor analysis) demonstrating that evidence_risk accounts for less than 5% of unique variance in the B0 scoring function after accounting for vol_ratio_5_20, up_day_ratio_20, and mom_20.",
+    "Evidence that removing evidence_risk does not change the rank ordering of the top-20 B0 candidates by more than 5% in any held-out test set — demonstrating the signal is genuinely redundant for ranking purposes, not just correlated with outcomes."
+  ]
+}

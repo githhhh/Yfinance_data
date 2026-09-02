@@ -1,0 +1,70 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 55,
+  "mechanism_summary": "The B0 'freshness' component, AS IMPLEMENTED (up_day_ratio_20 + vol_ratio_5_20 + mom_20 cluster with ma10/20_slope_5 satellites), is empirically most consistent with a recent-momentum RETURN-RANKING signal. The three strongest false-negative-vs-winner standardized deltas (-1.19σ, -1.05σ, -1.00σ) all sit inside this cluster, while true downside-risk proxies (base_depth_pct, dist_to_52w_high_pct, atr_14_pct, rv_20) cluster near zero standardized delta (+0.19σ to -0.28σ). Within the observed B0-pick set, false_positive_ruin cases span nearly the entire freshness distribution (up_day_ratio from 0.40 to 0.65), providing no evidence of a floor-style downside gate. However, this verdict is bounded by two structural limits of the data — (1) the B0-conditioning (Berkson truncation) hides any pre-selection floor effect because we never observe the rejected tail, and (2) base_duration_weeks and base_mbox_count are absent from the current implementation despite being the literal IBD-style freshness features. The skeptic's attack #5 is load-bearing: 'freshness' as a label implies recency-of-base, but the implementation measures recent-thrust. These are not the same construct and should not be conflated. The data permits — but does not prove — three concurrent readings: (a) freshness is a ranking score and admits ruin cases by design, (b) a weak soft floor exists but is masked by intra-B0 selection overlap with other components, (c) the conceptual role (recency-of-base) was never operationalized correctly. The verdict is CONTEXT_DEPENDENT because freshness's historical value depends on whether one interprets 'freshness' as intent (recency-of-base) or as effect (momentum ranking), and the two are not interchangeable.",
+  "falsifiers": [
+    "FALSIFIER-1 (gate falsified): Pre-selection cohort analysis. Pool all names evaluated at snapshot t (selected AND rejected). If up_day_ratio_20 quintile Q1 (lowest) shows ruin rate statistically indistinguishable from Q4-Q5 within a frozen holdout (rank-sum |z| < 1.0 AND ruin-rate delta < 2pp), then any downside-floor claim is REFUTED. Conversely, if Q1 ruin rate exceeds Q5 by ≥10pp with rank-sum z ≤ -2.0, the floor-gate reading is SUPPORTED — but this test cannot be run on the current evidence because rejected names are not in failure_archaeology.",
+    "FALSIFIER-2 (ranking confirmed): If a frozen holdout shows that pure 20-day momentum rank (mom_20 + up_day_ratio_20 + vol_ratio_5_20 z-sum) yields Spearman > 0.5 with the current B0 freshness contribution AND that B0-pick freshness quintile Q5 produces median W4 return exceeding Q1 by >3pp with rank-sum z ≤ -1.5, the return-ranking interpretation is the dominant mechanism.",
+    "FALSIFIER-3 (specification mis-aligned): If base_duration_weeks + base_mbox_count + pullback_pct + pullback_duration_weeks z-sum (Proxy B in the designer's test 3) exceeds the current momentum z-sum (Proxy A) by ≥0.02 absolute pseudo-R² in a logistic on outcome_label, the current freshness is mis-specified — the conceptual role was recency-of-base and the implementation is a wrong proxy.",
+    "FALSIFIER-4 (matched-pair independence): Within snapshots, pairs matched on non-freshness B0 inputs (px_vs_ma20, px_vs_ma50, ma20_slope_5 within ±0.01) but differing on freshness z-sum by ≥1σ must show McNemar odds ratio ≥2.0 favoring high-freshness avoiding ruin. If |OR-1| < 0.5 OR p > 0.3, freshness is redundant with other B0 components and its observed effect is confounded.",
+    "FALSIFIER-5 (hard gate impact): A hard gate (reject if up_day_ratio_20 < 0.40 AND vol_ratio_5_20 < 1.0 OR ma20_slope_5 < 0 AND pullback_pct < -10%) applied to the B0-candidate pool must reduce false_positive_ruin count by ≥30% with non-inferiority on selected_winner median W4 return. If reduction is <10%, no gate mechanism is operating and the component has no downside-control effect, regardless of intent.",
+    "FALSIFIER-6 (anomaly resolution): entity_2f86543bf6 (up_day_ratio=0.35, ma20_slope_5<0, mom_20≈-0.008, w4=large_win) and entity_8ad5cd4795 (negative slopes, near-zero mom, large_win) jointly disprove ANY strict version of the freshness claim — whether ranking or gating. They are visible in the discovery set. Their existence alone caps the verdict at CONTEXT_DEPENDENT, not SUPPORTED."
+  ],
+  "actionable_design_principles": [
+    "PRINCIPLE-1 (orthogonal decomposition): Decouple three distinct mechanisms that the current single 'freshness' label conflates: (a) recency-of-base (literal freshness — base_duration_weeks, base_mbox_count, pullback_pct, pullback_duration_weeks), (b) recent-thrust (ranking proxy — up_day_ratio_20, vol_ratio_5_20, mom_20, ma10/20_slope_5), (c) downside-risk control (gate — composite of deteriorating slopes + deep pullback + high rv_20). Each must be tested independently because the data cannot refute them jointly.",
+    "PRINCIPLE-2 (rank vs gate asymmetry): Ranking signals should remain soft-additive and continuous; downside-risk control should be a HARD BINARY gate, not a continuous contribution. The current architecture blends them, which is the structural reason ruin cases with adequate freshness (entity_8f0df3d38e up_day=0.65) and ruin cases with inadequate freshness (entity_84824e6a20 up_day=0.40) both pass — the blending admits both, but only the latter should have been filtered.",
+    "PRINCIPLE-3 (snapshot-matched attribution): Every diagnostic must condition on snapshot_anon. Cross-snapshot averaging is the hidden confound behind why 'freshness correlates with winners' — it may be partly a regime effect. Within-snapshot matched pairs (skeptic's attack #2, designer's test 4) are the only causal-identifying design available with this evidence base.",
+    "PRINCIPLE-4 (pre-selection visibility requirement): The next research cycle MUST include the rejected-name universe, not only B0 picks. Until then, the floor-gate claim is structurally unfalsifiable from discovery data alone. A negative result on the pre-selection test would itself be informative — proving 'freshness has no gate whatsoever' rather than the current ambiguous 'we cannot see the gate from inside B0'.",
+    "PRINCIPLE-5 (PIT-only feature audit): All four candidate downside-risk features (base_depth_pct, dist_to_52w_high_pct, atr_14_pct, rv_20) are PIT-observable at snapshot t, confirming the gate can be constructed without forward leakage. Their current low discrimination (+0.19σ to -0.28σ) is therefore a real empirical finding, not a measurement artifact.",
+    "PRINCIPLE-6 (KPI bifurcation): Forward monitoring should report TWO separate metrics per B0 pick: (i) ranking value — quintile of freshness score vs cross-sectional median W4 return; (ii) gating value — ruin rate within the freshness quintile. A component that does (i) but not (ii) is correctly a ranking signal; a component that does (ii) but not (i) is a risk filter; the current freshness does neither cleanly, which is the failure mode."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "recency_momentum_score (soft-additive ranking)",
+      "why_distinct": "Replaces the ambiguous 'freshness' label with its empirically dominant mechanism — recent-momentum ranking. Lives in the cross-sectional ranking axis, explicitly NOT a risk control. This makes the false_positive_ruin cases with high recent_momentum (entity_8f0df3d38e, entity_4fdc3699fd, entity_3472243e0c) honest outcomes rather than failures of a filter that was never meant to filter.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "capacity_relevance": "HIGH — directly maps to the three strongest false-negative-vs-winner standardized deltas (-1.19σ, -1.05σ, -1.00σ). Empirically the strongest return-prediction signal in the current B0 cluster. Re-uses already-computed features with no new data dependency."
+    },
+    {
+      "idea": "downside_risk_gate (hard binary filter)",
+      "why_distinct": "Adds an explicit, separately weighted gate that the current 'freshness' label silently promised but did not deliver. Hard-binary prevents the soft-additive blending problem the researcher flagged (entity_84824e6a20 / entity_40ea0cfb3b passing due to other-component compensation). Lives on the risk-control axis, orthogonal to the ranking axis.",
+      "features": [
+        "ma20_slope_5",
+        "pullback_pct",
+        "rv_20",
+        "dist_to_52w_high_pct"
+      ],
+      "capacity_relevance": "MEDIUM-HIGH — all four features are PIT-observable and already in the data. Their current weak individual discrimination (+0.19σ to -0.28σ) suggests a composite OR-style threshold will be needed rather than a sum; this is consistent with the gate being a logical OR over distress signals, not a continuous contribution."
+    },
+    {
+      "idea": "recency_of_base_score (soft-additive, IBD-style freshness semantic)",
+      "why_distinct": "Resurrects the literal IBD-style 'freshness' meaning the component name implies but the implementation does not measure. base_duration_weeks and base_mbox_count are the canonical features and they ARE in the data with non-trivial discrimination (std_delta -0.42 and +0.34 respectively on base_duration/base_mbox). Without this third axis, the original conceptual role is permanently lost.",
+      "features": [
+        "base_duration_weeks",
+        "base_mbox_count",
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "capacity_relevance": "MEDIUM — features exist but base_duration has missing values for several B0 picks (pullback_duration_weeks null in 6/27 cases), so the score requires an imputation or fallback rule. Lower capacity than the other two ideas because of the missingness pattern, but higher semantic fidelity to the original label."
+    },
+    {
+      "idea": "freshness_quintile_ruin_KPI (diagnostic, not predictive)",
+      "why_distinct": "Forward-monitoring rule rather than a model component. Tracks ruin rate per freshness quintile stratified by snapshot_anon, exposing whether the historical within-B0 evidence generalizes or is an artifact of the discovery sample. Does not enter the model — its job is to falsify or support the historical claim going forward.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "w4_return_bucket",
+        "outcome_label",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "HIGH for falsification, LOW for prediction. This is the operationalization of PRINCIPLE-6 — the only diagnostic that directly tests whether the current 'freshness' component continues to do either ranking or gating, and which."
+    }
+  ]
+}

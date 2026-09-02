@@ -1,0 +1,47 @@
+
+{
+  "tests": [
+    {
+      "name": "piecewise_cross_confirmation_interaction",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "Within the fixed three-way accounting of dry pullback with high entry volume, dry pullback with low entry volume, and non-dry pullback, compare the held-out B0-eligible candidates. Treat high entry volume as ibd_entry_volume_ratio at or above 1.5 and low entry volume as below 1.5; do not alter the B0 universe.",
+      "success_criterion": "The dry-plus-high-volume group has a lower failure rate and a higher large-win rate than the dry-plus-low-volume group, and the interaction improvement is reproducible after accounting for the non-dry group.",
+      "failure_criterion": "The dry-plus-high-volume group fails to improve either metric by more than 5 percentage points over dry-plus-low-volume, or the apparent interaction disappears in a frozen holdout."
+    },
+    {
+      "name": "null_pullback_sensitivity",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "Replicate the piecewise test while treating null pullback_v_is_dry as a third fixed accounting slot rather than imputing it as dry or non-dry. Compare the null-pulled-back subgroup with the dry and non-dry slots using the same B0 population.",
+      "success_criterion": "The direction of the ibd_entry_volume_ratio effect is stable across null, dry, and non-dry slots, and including the null slot materially changes the ranking of candidates without changing the number of B0-eligible entities.",
+      "failure_criterion": "The null slot produces unstable or contradictory rank ordering, or any apparent benefit is caused only by null candidates being assigned to one of the other arms."
+    },
+    {
+      "name": "volume_ratio_only_baseline",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "Compare the three-slot piecewise rule with a two-level ibd_entry_volume_ratio-only rule, holding the candidate set, measurement timing, and all non-feature eligibility conditions fixed. This tests whether the pullback state contributes information beyond entry-volume ratio alone.",
+      "success_criterion": "The piecewise rule improves the B0 large-win rate or reduces ruin by more than 5 percentage points relative to the ibd_entry_volume_ratio-only baseline, with consistent direction across dry and non-dry candidates.",
+      "failure_criterion": "The piecewise rule does not outperform the volume-ratio-only baseline, or its gain is smaller than the prespecified 5-percentage-point threshold and is not supported across the relevant slots."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that both PIT features are measured at or before the B0 eligibility decision time and that no future W4, outcome, return, or survival information enters either feature.",
+    "Verify that threshold evaluation does not change the B0 eligible universe; all comparisons use the same frozen B0 candidate set.",
+    "Treat null pullback_v_is_dry as an explicit third accounting slot and report its prevalence, rather than silently assigning nulls to dry or non-dry states.",
+    "Audit snapshot and temporal concentration, and require replication on a frozen holdout from a different period before accepting the interaction.",
+    "Exclude ticker identity, calendar identity, and any feature derived from outer-forward outcomes from the tests."
+  ],
+  "priority_order": [
+    "piecewise_cross_confirmation_interaction",
+    "volume_ratio_only_baseline",
+    "null_pullback_sensitivity"
+  ]
+}

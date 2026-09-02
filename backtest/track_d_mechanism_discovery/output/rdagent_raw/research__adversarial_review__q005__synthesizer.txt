@@ -1,0 +1,87 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The distinct-1 benefit cannot be cleanly assigned to either 'base-maturity confound' (researcher) or 'regime indicator with independent information' (skeptic) from the available evidence, because the n=27 error-archaeology sample simultaneously satisfies three constraints that favor each interpretation and violates one critical assumption (base features rank only 11th-12th as separators, while snapshot-phase features rank top four). The null-pullback cluster (6/8 false_positive_ruin cases with null pullback fields) is the single strongest empirical regularity and is interpretable both ways: (a) it is exactly the regime distinct-1 was supposed to filter, so its failure rate is evidence the rule was not enforced strictly enough; (c) it represents a structurally different 'extended no-base' regime where base-quality controls cannot help and a distinct-1 gate is orthogonal. The selected-winners heterogeneity in pullback depth (-1.5% to -42.3%) is consistent with BOTH 'distinct-1 captures a regime that spans multiple base depths' (skeptic) and 'base quality is multi-dimensional and the single base_duration proxy is too coarse to capture it' (researcher). The survivorship asymmetry (only error archaeology visible) means a real but modest distinct-1 effect in the silent majority is invisible to the diagnostic. The causal direction (does mom_20 lead or lag base_duration_weeks?) is empirically resolvable but has not been tested. Net: distinct-1 is at minimum partially confounded with base-maturity, at maximum an independent regime label whose true effect is unestimable from errors alone.",
+  "falsifiers": [
+    "RESEARCHER WINS if, within base_duration_weeks tertiles, the mom_20 median gap between false_positive_ruin and selected_winner collapses to <0.03 in EVERY tertile (Test 1 success criterion) AND the partial Spearman between mom_60+ma20_slope_5 and base_duration_weeks controlling for the reverse direction is <0.20 (Test 3 ambiguity). Under that result, base-maturity fully mediates the snapshot separation and distinct-1 has zero marginal information.",
+    "SKEPTIC WINS if, within base_duration_weeks tertiles, mom_20 gap remains >=0.08 in at least one tertile (Test 1 failure criterion) AND the partial Spearman from mom_60+ma20_slope_5 to base_duration_weeks exceeds 0.30 (Test 3 success criterion). Under that result, snapshot features are causally antecedent and distinct-1 captures leading regime information not reducible to base proxies.",
+    "BOTH LOSE (mechanism becomes genuinely UNRESOLVED) if base-maturity strata show heterogeneous results across tertiles (gap collapses in one tertile, persists in another) AND causality direction is indeterminate with both partial rhos <0.20. This would imply the relationship is non-monotonic and base-maturity is not a sufficient statistic for the underlying latent variable.",
+    "RESEARCHER'S CONFOUND REVERSES if a matched-pairs analysis on n>=200 with exact matching on (base_duration_weeks +/-2w, base_depth_pct +/-2pp, base_mbox_count, sector, cap_bucket) shows distinct-1 vs non-distinct-1 W4 returns are statistically indistinguishable (p>0.5) AND ruin rates within bootstrap CI. This is the cleanest test but requires a sample roughly 7x the current one.",
+    "SKEPTIC'S REGIME CLAIM SOLIDIFIES if the distinct-1 cohort's rolling 13-week pairwise correlations with non-distinct-1 B0 cohort average below 0.70 AND cross-correlation with SPX is statistically different from the non-distinct-1 cohort's beta, during choppy-regime weeks. This would prove distinct-1 acts as a regime diversifier independent of base features.",
+    "EXPERIMENTAL DESIGNER'S NULL-PULLBACK DISSECTION is the single highest-value test: if the 6 null-pullback ruin cases have snapshot-composite median within 0.5 SD of selected_winner median, distinct-1 is NOT reducible to a snapshot gate (skeptic gains ground); if their composite is >=1.0 SD below, distinct-1 IS replaceable by snapshot gating (researcher gains ground)."
+  ],
+  "actionable_design_principles": [
+    "Do NOT adopt either narrative as policy. The 'distinct-1 = base-maturity confound' story cannot be confirmed because base features rank poorly (11th-12th) and the 'longest-base-wins' replacement proposed by the researcher is structurally biased against the fresh first-base population distinct-1 targets. The 'distinct-1 = regime indicator with silent-majority effects' story cannot be confirmed because only error archaeology is visible and n=27 cannot reject modest magnitudes in the bulk.",
+    "Run the experimental designer's three tests on the FULL candidate pool (not just the n=27 error set) before changing live policy. Until then, treat both readings as live hypotheses and avoid irreversible commitments to either sleeve design.",
+    "Decouple portfolio-construction effects from selection-quality effects. The question 'does distinct-1 diversify the portfolio?' is mechanically different from 'does distinct-1 select better names?' and the failure archaeology only speaks to the latter. A distinct-1 constraint can win or lose on correlation-reduction grounds even when it has zero selection alpha.",
+    "Treat the null-pullback cluster (currently 6/8 false positives) as a SEPARATE REGIME with its own risk model, not as evidence for or against distinct-1. These cases fail because they entered without a corrective base; neither a distinct-1 rule nor a base-duration gate reliably rescues them, but a regime-specific stop/tightening rule might.",
+    "Require any replacement rule to be expressed as a CAPACITY-NEUTRAL counterfactual: same expected position count, same sector/cap exposure, same turnover. The researcher's 'longest-base-wins' and the skeptic's 'silent-majority argument' both fail this test (one biases toward worn-out bases, the other relies on unobservable bulk).",
+    "Add an explicit snapshot-quality composite (z-scored mean of up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) as a PARALLEL gate that runs alongside distinct-1, not as a replacement. Coincident gating decisions (both agree to exclude) become high-confidence rejections; conflicting decisions (distinct-1 says keep, snapshot says skip, or vice versa) become the regime boundary where alpha lives.",
+    "Stop using outcome_label definitions that embed the distinct-1 / B0 selection logic into the label itself. The method_note creates partial circularity ('false negative relative to B0 selected median') that prevents any PIT feature from fully refuting the confound hypothesis. Reframe outcomes as forward returns and base-quality separately."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Within-base-maturity strata, conditional snapshot-quality veto: if mom_20 z-score (vs base_duration tertile median) is below -1.0 AND vol_ratio_5_20 z-score is below -0.5, exclude the candidate regardless of distinct-1 status. This operationalizes Test 1 directly: within-base strata, snapshot quality still separates ruin.",
+      "why_distinct": "Implements a within-strata conditional gate that the experimental designer specified but the researcher and skeptic both talked around. Crucially, it does NOT replace distinct-1; it adds an additional filter that activates only in the snapshot-poor, base-acceptable quadrant.",
+      "features": [
+        "base_duration_weeks",
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Neutral — fires only inside the within-base tertile where snapshot quality is depressed; expected to filter 10-20% of B0 candidates without changing portfolio count materially."
+    },
+    {
+      "idea": "Null-pullback separate regime flag: when pullback_duration_weeks IS NULL AND pullback_pct IS NULL, route the candidate to an extended-entry sub-strategy with a tighter trailing stop (e.g., -5% vs -8%) rather than either admitting it under distinct-1 or excluding it via base-quality gate. This removes the 6/8 false_positive_ruin cluster from being interpretable as distinct-1 evidence in either direction.",
+      "why_distinct": "Neutralizes the single most contested empirical observation in the failure archaeology. Without this routing, every analyst will continue to over-interpret the null-pullback cluster. With it, the cluster's ruin rate becomes a property of the extended-entry regime, not of distinct-1.",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "base_duration_weeks",
+        "base_depth_pct"
+      ],
+      "capacity_relevance": "Neutral-to-positive. Routes ruin-prone candidates to a regime where they may still contribute return with tighter risk controls; capacity impact depends on null-pullback frequency in the broader pool (currently 6/27 in error set, ~30%+)."
+    },
+    {
+      "idea": "Partial-Spearman causal ordering audit: compute partial rho between (mom_60 + ma20_slope_5) and base_duration_weeks, controlling for the reverse direction, on a rolling 26-week window. Publish the sign and magnitude as a regime indicator. If rho flips sign across windows, distinct-1's information content is regime-dependent and the policy should be regime-conditional.",
+      "why_distinct": "Directly operationalizes Test 3 (causality direction) and turns the abstract 'who leads whom' question into an observable, monitorable signal. A regime-conditional policy is more defensible than a static one and prevents overcommitting to either the researcher's or skeptic's causal story.",
+      "features": [
+        "mom_60",
+        "ma20_slope_5",
+        "base_duration_weeks",
+        "base_depth_pct"
+      ],
+      "capacity_relevance": "Informational only — does not alter position count but changes which sleeve receives incremental capital based on the rolling rho sign."
+    },
+    {
+      "idea": "Capacity-matched sleeve competition: run two parallel sub-portfolios for >=40 trades each — one with the current distinct-1 constraint, one with distinct-1 REPLACED by a base-quality composite (depth + duration + mbox_count, equal-weighted z-score). Keep expected position count and sector/cap exposure matched. Compare realized Sharpe, max DD, ruin rate, and rolling 13-week pairwise correlation with the parent portfolio.",
+      "why_distinct": "Forces a falsifiable, capacity-neutral comparison that resolves the central dispute without the circularity of the existing outcome_label definitions. If the base-quality sleeve wins on Sharpe with similar ruin rate, the researcher's replacement rule gains a real (not theoretical) footing. If the distinct-1 sleeve wins on correlation-reduction with similar Sharpe, the skeptic's regime story is empirically grounded.",
+      "features": [
+        "base_depth_pct",
+        "base_duration_weeks",
+        "base_mbox_count",
+        "distinct_1_flag",
+        "sector",
+        "market_cap_bucket"
+      ],
+      "capacity_relevance": "High relevance — this is the cleanest test of whether distinct-1's claimed benefit is a portfolio-construction effect or a selection effect, and it can run on the existing sample base if at least 40 trades per sleeve are available over the next live cycle."
+    },
+    {
+      "idea": "Snapshot-composite parallel gate: compute z-scored snapshot composite = mean(z(mom_20), z(vol_ratio_5_20), z(up_day_ratio_20), z(px_vs_ma50)) for every candidate. Require BOTH a distinct-1 distinctness check AND a snapshot-composite above the bottom decile to enter the portfolio. Coincident-fail exclusions become high-confidence rejections; distinct-1-pass-snapshot-fail and distinct-1-fail-snapshot-pass become flagged boundary cases for manual review.",
+      "why_distinct": "Implements Test 2's snapshot-composite comparison as a live policy rather than a post-hoc diagnostic. Crucially, it does NOT collapse distinct-1 into a snapshot gate (which is the researcher's strongest read of the data); it makes the two decisions visible side by side, so the policy can be re-tuned based on which quadrant produces the most ruination.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "distinct_1_flag"
+      ],
+      "capacity_relevance": "Moderate-to-neutral — adds a gate that should filter ~10% of B0 candidates and produces a structured boundary-case category (~5-15% of candidates) that requires review bandwidth."
+    }
+  ]
+}
+```

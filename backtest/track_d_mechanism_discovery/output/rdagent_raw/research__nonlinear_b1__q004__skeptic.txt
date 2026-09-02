@@ -1,0 +1,45 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The proposed piecewise threshold is not an independent 'cross-confirmation' signal — it is a redundant, unstable proxy for momentum/extension already captured (and better captured) by up_day_ratio_20 and mom_20. The dry-pullback arm is empirically non-essential: three selected_winners sit at sub-1.0 entry VR (entity_8ad5cd4795 VR=0.996, entity_bec51a4227 VR=1.007, entity_05b4c6b1f7 VR=0.964 — the latter a false_negative_big_winner), which directly falsifies 'VR must exceed ~1.5 for dry-pullback winners'. Meanwhile the no-pullback arm fails on its own terms: entity_84824e6a20 (VR=1.625, ruin) clears the proposed 1.6 floor yet ruins, and entity_b6bcccdf6a (VR=1.31, ruin) sits in a band the rule cannot pin down. The piecewise structure adds degrees of freedom on 14-of-27 null-pullback entities where the rule collapses to a single VR cut with no stable separation.",
+  "attacks": [
+    {
+      "issue": "Sub-confirmation winners inside the dry-pullback arm falsify the necessity of high VR",
+      "why_it_matters": "entity_8ad5cd4795 (pullback -6.7%/5wk, VR=0.996, large_win), entity_bec51a4227 (pullback=null, VR=1.007, large_win), and entity_05b4c6b1f7 (pullback=null, VR=0.964, false_negative_big_winner) all sit below the 1.5 'confirmation' floor. The mechanism claim ('VR must be high for the dry-pullback continuation') is contradicted by these cases — the dry-pullback arm does not require VR >= 1.5 to deliver large_wins."
+    },
+    {
+      "issue": "The no-pullback arm is empirically unfixed: VR=1.625 still ruins (entity_84824e6a20) while VR=1.31 ruins and VR=1.21 ruins (entity_3472243e0c)",
+      "why_it_matters": "If the non-dry / null arm needs a separate VR cut (~1.6), it must reject entity_84824e6a20 — but that case passes at 1.625. The threshold is calibrated to a different feature mix (mom_20, ma10_slope_5) than VR alone, so arm-conditioning on pullback_v_is_dry is doing no independent work."
+    },
+    {
+      "issue": "ibd_entry_volume_ratio is a proxy for momentum extension, not an independent confirmation signal",
+      "why_it_matters": "The strongest univariate separator in the numeric contrasts is up_day_ratio_20 (std_delta=-1.19), not VR (std_delta=-0.50). VR is correlated with mom_20/ma10_slope_5 (entity_b00579f203: VR=1.576, mom=0.230; entity_6618d3e80c: VR=1.445, mom=0.251). A univariate VR threshold plus an extension gate likely subsumes the piecewise structure with fewer parameters and less overfit risk."
+    },
+    {
+      "issue": "Asymmetric coverage: pullback_v_is_dry is undefined for 14 of 27 entities (pullback_duration_weeks=null)",
+      "why_it_matters": "When the conditioning feature is null, the 'piecewise' rule reduces to a single VR cut on the majority subset. With nulls driving the no-pullback arm, the arm-specific threshold is being tuned on a small, possibly non-representative remainder. entity_6618d3e80c's mixed ruin/winner label under null pullback shows the arm inherits label ambiguity without resolving it."
+    },
+    {
+      "issue": "Sample artifact: snapshot concentration (snap_71486ed83c, snap_d0d57b1e40) and small-N overfitting",
+      "why_it_matters": "Five of the 27 cases share snap_71486ed83c and four share snap_d0d57b1e40 — a single market regime may be driving the apparent VR/pullback interaction. With 27 cases and ~20 features, picking two arms and two thresholds (~1.5 / ~1.6) plus a slope condition is a multiple-comparisons hazard; the threshold values look data-tuned rather than theoretically anchored."
+    },
+    {
+      "issue": "The mechanism claim ('distribution vs accumulation') is unfalsifiable narrative on top of derived ratios",
+      "why_it_matters": "pullback_v_is_dry is itself a constructed ratio; the distribution/accumulation story cannot be observed directly. Both winners and ruins can be cast as accumulation-then-distribution or vice versa post-hoc. The mechanistic claim adds rhetorical force but no additional statistical content beyond what the ratios already encode."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Holdout cases with dry-pullback state AND ibd_entry_volume_ratio < 1.0 that still large_win (would replicate entity_8ad5cd4795, entity_05b4c6b1f7).",
+    "Holdout cases with pullback_v_is_dry=false AND ibd_entry_volume_ratio in [1.5, 1.7] that ruin (would replicate entity_84824e6a20).",
+    "Cases where mom_20 < 0.05 and up_day_ratio_20 < 0.5 with VR > 1.5 that are selected_winners — to test whether VR adds anything beyond the existing low-momentum gate.",
+    "Snapshot-matched controls: identical pullback depth/duration but VR varying widely — does the cross-confirmation effect persist when duration is held fixed?"
+  ],
+  "what_would_change_my_mind": [
+    "A frozen out-of-sample test where the piecewise gate improves B0 large_win rate by >5pp versus a univariate VR threshold AND versus a univariate up_day_ratio_20 threshold, with the improvement not collapsing when restricted to the null-pullback subset.",
+    "A demonstration that, conditional on (mom_20, up_day_ratio_20, ma10_slope_5) being matched, the pullback_v_is_dry × ibd_entry_volume_ratio interaction still carries an independent <5% p-value on ruin rate.",
+    "Evidence that pullback_v_is_dry is well-defined and stable across snapshots for the 14 currently-null entities, and that arm reclassification moves ruin rate materially in either direction.",
+    "A negative-result replication of entity_84824e6a20-style ruins clearing the 1.6 floor in a different market regime, to show the proposed threshold is not a snapshot artifact."
+  ]
+}
+```

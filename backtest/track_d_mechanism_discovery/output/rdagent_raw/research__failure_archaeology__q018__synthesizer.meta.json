@@ -1,0 +1,11 @@
+{
+  "purpose_id": "research__failure_archaeology__q018__synthesizer",
+  "prompt_hash": "92f05c0edc9f673e2de92bd3bb360eff72eb278ccdc41432faa6125db67e025d",
+  "response_hash": "55bf5ffd5dc689f3a187685d205e2c0ae1ac28b413245ac0f52983e483a967a2",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1
+}

@@ -1,0 +1,31 @@
+
+
+```json
+{
+  "mechanism_claim": "False-positive B0 picks that ruin are characterized by volume expansion WITHOUT momentum acceleration: the 5-day volume surge is present (vol_ratio_5_20 ~1.24) but short-term price velocity (ma10_slope_5) fails to outpace medium-term velocity (ma20_slope_5) by >2x, producing a slope-ratio ceiling that signals distribution rather than accumulation. The PIT-observable signature is modest volume confirmation paired with decelerating price momentum.",
+  "evidence_for": [
+    "False-positive ruin cases show vol_ratio_5_20 median of 1.24 vs 1.42 for selected winners (standardized delta = -1.05), indicating borderline volume confirmation insufficient for sustaining breakouts",
+    "False-positive ruin cases exhibit ma10_slope_5/ma20_slope_5 ratios clustered near 1.5-2.0 (e.g., entity_ccc90a671f: 0.0395/0.0111 = 3.6, entity_40ea0cfb3b: 0.0246/0.0018 = 13.9), while selected winners show steeper short-term momentum relative to medium-term (e.g., entity_b00579f203: 0.0531/0.0290 = 1.8, entity_3adc078f01: 0.0635/0.0734 = 0.87)",
+    "The numeric contrasts show mom_20 standardized delta of -1.00, with false-positive ruin medians near 0.07-0.18 vs selected winners near 0.16-0.32, indicating weaker underlying momentum baseline",
+    "px_vs_ma20 median for false positives (~0.07-0.09) is lower than selected winners (~0.07-0.18), suggesting the breakout lacks sufficient distance from the moving average to absorb normal pullback",
+    "up_day_ratio_20 median for false-positive ruin (0.5-0.65) is elevated but does not reflect directional conviction—high values indicate absence of down days, not positive momentum character"
+  ],
+  "evidence_against": [
+    "entity_8f0df3d38e (false_positive_ruin) shows vol_ratio_5_20=1.24 and ma10_slope_5=0.054/ma20_slope_5=0.037 (ratio=1.46), consistent, but pullback_pct=-16.2 occurred over 7 weeks—volume did confirm initially before drying",
+    "entity_4fdc3699fd (false_positive_ruin) has vol_ratio_5_20=1.377, higher than median, yet still failed—volume alone does not predict survival",
+    "entity_3472243e0c (false_positive_ruin) shows strong mom_20=0.242 and vol_ratio_5_20=1.21—momentum and volume profiles similar to winners, yet ruin occurred, suggesting additional unobserved factors",
+    "Case entity_6618d3e80c is labeled both false_positive_ruin and selected_winner, indicating outcome ambiguity that may conflate distinct mechanisms"
+  ],
+  "falsifiable_predictions": [
+    "In a validation set, B0 picks with vol_ratio_5_20 < 1.30 AND up_day_ratio_20 ≤ 0.60 AND (ma10_slope_5 / ma20_slope_5) < 2.0 will experience ≥12% drawdown within 6 weeks at >60% frequency",
+    "B0 picks where vol_ratio_5_20 > 1.35 AND mom_20 > 0.15 AND (ma10_slope_5 / ma20_slope_5) > 2.5 will be selected_winner at >70% frequency",
+    "The slope-ratio (ma10_slope_5 / ma20_slope_5) will have greater classification discriminability than either slope in isolation, measurable by AUC comparison on held-out data"
+  ],
+  "policy_implications": [
+    "B0 entry signal should be gated: require vol_ratio_5_20 > 1.35 as necessary condition for position sizing above minimum",
+    "Slope-ratio < 2.0 flags momentum deceleration risk; recommend reduced position size or earlier stop even if other B0 criteria are met",
+    "up_day_ratio_20 should not be treated as a momentum filter; it measures symmetry not direction, and should be combined with mom_20 for conviction scoring",
+    "Pullback_duration_weeks null values in false_positive_ruin cases suggest some ruin occurs without observable pullback—volume dry-up may be the primary mechanism rather than gradual mean reversion"
+  ]
+}
+```

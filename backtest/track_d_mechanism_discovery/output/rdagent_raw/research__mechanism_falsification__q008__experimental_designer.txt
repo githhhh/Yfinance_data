@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "Within-stratum partial rank test (separates redundancy from any-orthogonality)",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Stratify the discovery+replication sample into momentum-quintiles using a composite score (mean rank of the five listed features). Within each quintile, compute the Spearman rank correlation between distinct1_value and a numeric encoding of w4_return_bucket (ruin<loss<small_win<large_win, with tied handling). Average the within-stratum absolute correlations, weighted by stratum size, and report a bootstrap 95% CI over cases.",
+      "success_criterion": "Weighted-mean |rho| across momentum quintiles is > 0.20 with at least 4 of 5 strata showing the SAME sign and a bootstrap 95% CI lower bound above 0.10. This indicates distinct1 carries information not subsumed by the momentum cluster and falsifies the pure-redundancy claim.",
+      "failure_criterion": "Weighted-mean |rho| < 0.10 and no stratum shows |rho| > 0.25, OR signs flip across strata such that no consistent direction emerges. This pattern is the predicted signature of distinct1 being a near-duplicate of the momentum cluster; the redundancy hypothesis stands and the claim of independent information is falsified."
+    },
+    {
+      "name": "Residual-vs-orthogonal-feature probe (separates linear-redundancy from non-linear-transform)",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "base_mbox_count",
+        "base_duration_weeks"
+      ],
+      "comparison": "Compute distinct1_residual = distinct1_value − OLS(distinct1_value ~ mom_20 + px_vs_ma50 + ma10_slope_5). Separately compute distinct1_residual_orth = distinct1_value − OLS(distinct1_value ~ base_mbox_count + base_duration_weeks). Test two predictions in parallel: (i) |corr(distinct1_residual, w4_return_bucket)| vs. |corr(distinct1_value, w4_return_bucket)| — does momentum-orthogonalization wipe signal? (ii) |corr(distinct1_residual_orth, w4_return_bucket)| vs. |corr(distinct1_value, w4_return_bucket)| — does base-orthogonalization wipe signal? Compare magnitudes.",
+      "success_criterion": "If the residual after momentum-orthogonalization is near-zero in predictive content (|corr| drops by >70% relative to raw) AND the residual after base-orthogonalization retains >50% of raw predictive content, this supports Mechanism A (linear-redundancy with momentum) and falsifies Mechanism B as currently formulated. If EITHER orthogonalization retains >70% of raw predictive content, distinct1 is NOT a linear duplicate of either cluster.",
+      "failure_criterion": "If both orthogonalizations retain >70% of raw predictive content (i.e., raw predictive signal survives both projections), the linear-redundancy framing is wrong — distinct1's content is not in the linear span of either the momentum cluster OR the base-structure cluster, which is the predicted signature of either a non-linear transform (Mechanism B) or a regime/interaction term (Mechanism C). Redundancy claim is then specifically falsified as 'linear' redundancy, leaving non-linear forms open."
+    },
+    {
+      "name": "Override-direction case audit (separates regime-override from transform/duplicate)",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Identify cases where distinct1_value rank-decile disagrees with the momentum-cluster consensus rank-decile by ≥3 deciles in EITHER direction. Partition disagreements into (a) distinct1-HIGH / momentum-LOW and (b) distinct1-LOW / momentum-HIGH. Compute the empirical outcome distribution (proportion of large_win vs ruin) in each partition, with bootstrap CIs. Also compute the same partition on the archaeology set as a sanity check.",
+      "success_criterion": "If partition (a) — distinct1 endorsing against momentum — yields a large_win fraction ≥ 30 percentage points above the momentum-LOW baseline (i.e., distinct1 successfully upgraded otherwise-rejected names), this is direct positive evidence for Mechanism C (regime-aware override) and falsifies both pure-redundancy (A) and pure-transform (B) framings. Symmetric evidence from partition (b) — distinct1 suppressing high-momentum names that turned out to be ruins — would corroborate override behavior.",
+      "failure_criterion": "If BOTH partitions show outcome distributions statistically indistinguishable (overlapping bootstrap CIs) from their respective momentum-cluster baselines, distinct1 adds no detectable override behavior. Combined with a negative result on Test 1, this leaves Mechanism A (redundancy) as the best-supported explanation; combined with a positive Test 1 but negative Test 3, Mechanism B (non-linear transform without override) becomes the leading candidate."
+    }
+  ],
+  "leakage_checks": [
+    "Verify distinct1_value at snapshot_t is computed using only information with timestamp ≤ t (no rolling window that includes data after t, no future-return inputs, no label-conditional transforms). Reject the test if distinct1's construction references w4_return_bucket or any post-entry window.",
+    "Confirm that the momentum-cluster features (mom_20, px_vs_ma50, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20) are PIT-safe at the same snapshot boundary as distinct1, so the partial-correlation test is not contaminated by an asymmetric look-ahead window between the candidate feature and its neighbors.",
+    "Enforce entity-disjoint folds: cases belonging to the same entity_anon must not appear in both training and evaluation within any test, to avoid within-entity correlation inflating partial-correlation estimates. Report effective N after this filter.",
+    "Audit the w4_return_bucket label generation for look-back dependence (e.g., the bucket might use intra-window highs/lows not available at entry); confirm the bucket is assigned by the W4 close-on-close return only, matching the method_note definition.",
+    "Snapshot-disjoint audit: cases sharing a snapshot_anon must be split or down-weighted to prevent within-snapshot correlation (e.g., shared market regime) from being misread as distinct1-specific information. Report within-snapshot correlation of distinct1_value as a diagnostic.",
+    "Hold-out size floor: each test requires N ≥ 150 effective cases (after entity/snapshot deduplication) with at least 25 cases per outcome bucket; otherwise return UNRESOLVED rather than risk underpowered false-positive or false-negative conclusions."
+  ],
+  "priority_order": [
+    "Within-stratum partial rank test (separates redundancy from any-orthogonality)",
+    "Override-direction case audit (separates regime-override from transform/duplicate)",
+    "Residual-vs-orthogonal-feature probe (separates linear-redundancy from non-linear-transform)"
+  ]
+}
+```

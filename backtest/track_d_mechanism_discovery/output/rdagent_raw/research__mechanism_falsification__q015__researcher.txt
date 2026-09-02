@@ -1,0 +1,30 @@
+
+{
+  "mechanism_claim": "UNRESOLVED: the B0 entry-volume component may primarily encode return ranking or breakout confirmation rather than downside-risk control. The evidence is consistent with winners being selected after stronger entry volume, but it does not directly show that volume predicts smaller losses, lower ruin probability, or a better risk-adjusted return after controlling for momentum and price location.",
+  "evidence_for": [
+    "Among false negatives, median ibd_entry_volume_ratio is 1.598730 versus 1.813440 for selected winners, a 0.214710 lower value and a standardized difference of -0.5013. Thus, omission of weaker entry volume coincides with missed subsequent winners.",
+    "Selected winners generally combine elevated volume with stronger PIT-observable momentum: their median mom_20 is 0.162661, compared with 0.057932 for false negatives, a standardized difference of -1.0005.",
+    "Selected winners also have larger median px_vs_ma20 of 0.075796 versus 0.042286 and larger median px_vs_ma50 of 0.126927 versus 0.055802, so the volume signal may be acting as confirmation of an established advance rather than as an independent risk filter.",
+    "The PIT-observable contrast in vol_ratio_5_20 is larger than the contrast in entry volume: false negatives median 1.179218 versus selected winners 1.423928, a standardized difference of -1.0455. This weakens the claim that entry volume is the component specifically responsible for distinguishing outcomes.",
+    "Outcome labels such as selected_winner and false_negative_big_winner are retrospective and must not be treated as inputs available at entry; only volume, momentum, moving-average, and price-location measurements are PIT-observable."
+  ],
+  "evidence_against": [
+    "The entry-volume contrast has only moderate standardized magnitude (-0.5013) and is smaller than several direct return-ranking variables, especially mom_20, up_day_ratio_20, vol_ratio_5_20, and px_vs_ma50.",
+    "No frozen statistic directly relates ibd_entry_volume_ratio to a downside-risk control such as loss magnitude, maximum adverse excursion, stop distance, ruin probability, volatility, or drawdown.",
+    "Some false-positive ruins have high entry volume: examples include approximately 1.3774, 1.4494, 1.3122, and 1.6253. Elevated volume therefore does not prevent severe failure in these cases.",
+    "Some selected winners have relatively weak entry volume, including approximately 1.1876, 1.0076, and 1.0906. Volume alone cannot explain selection quality.",
+    "The evidence does not establish that volume adds incremental prediction after conditioning on mom_20, vol_ratio_5_20, px_vs_ma50, and entry close position, so the observed difference may be correlation with ranking or breakout strength."
+  ],
+  "falsifiable_predictions": [
+    "Under a downside-risk-control mechanism, holding momentum, price location, and recent volatility fixed, higher ibd_entry_volume_ratio should predict a material reduction in loss magnitude, maximum adverse excursion, or ruin probability. Failure to detect such a reduction after these controls would falsify the risk-control interpretation.",
+    "Under a return-ranking mechanism, volume should perform primarily at or above a validated ranking cutoff and should have little monotonic relationship with downside outcomes once momentum is included. If volume retains a smooth positive effect on forward returns but no distinct risk boundary, that favors ranking over downside control.",
+    "An interaction test should predict that volume is most useful when mom_20 and price location are already strong; a volume-only rule should fail to separate matched high-momentum candidates with similar vol_ratio_5_20 and close position.",
+    "Prospective temporal validation should reject a standalone volume component if its incremental hit rate, return contribution, calibration, and risk-adjusted performance are not stable after controlling for return-ranking variables across distinct snapshots."
+  ],
+  "policy_implications": [
+    "Do not interpret B0 entry volume as an independent downside-risk guarantee or use it to increase position size when downside controls are otherwise weak.",
+    "Test a conditional replacement such as volume-confirmed momentum: require an above-median entry-volume ratio only alongside positive mom_20, adequate price location, and a sufficiently strong recent-volatility signal.",
+    "Compare the current component against nested alternatives in the same out-of-sample sample: volume alone, volume plus momentum, and an explicit risk-control formulation including downside dispersion, stop distance, and maximum adverse excursion.",
+    "If incremental performance survives controls, label the mechanism return ranking or breakout confirmation and define volume as a confirmation feature; if risk reduction is not incremental, replace the component with a pre-specified composite using its observed thresholds rather than searching for an unconstrained optimum."
+  ]
+}

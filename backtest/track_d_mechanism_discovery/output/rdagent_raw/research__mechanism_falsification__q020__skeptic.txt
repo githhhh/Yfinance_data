@@ -1,0 +1,39 @@
+
+
+{
+  "strongest_counterclaim": "The researcher's 'redundancy' verdict conflates correlation with causal equivalence. The composite freshness_score may be a suboptimal proxy for a genuine causal mechanism—temporal distance from the last base formation event—that is NOT captured by simultaneous-moment momentum features. The proposed 'cleaner' replacement (trading_days_since_ibd_trigger_entry) would test a cleaner mechanism, NOT redundancy, because it operationalizes the same causal hypothesis with less measurement error.",
+  "attacks": [
+    {
+      "issue": "The PCA correlation threshold (r > 0.85 = redundancy confirmed) is an arbitrary stopping rule with no theoretical justification",
+      "why_it_matters": "If PC1 of momentum features explains 84% of freshness_score variance, the researcher calls it redundant. If it explains 86%, freshness is killed. This threshold is not derived from prediction theory, causal discovery criteria, or information-theoretic bounds on marginal contribution. The researcher is using a convenient cutoff to foreclose investigation rather than a principled boundary."
+    },
+    {
+      "issue": "The researcher treats base_duration_weeks as 'already partially captured by ma_slope features during the base period' — this is the very claim under test",
+      "why_it_matters": "ma10_slope_5 and ma20_slope_5 measure velocity DURING the base consolidation, not the temporal structure of the base itself. A 4-week base and a 12-week base can have identical MA slopes, yet differ fundamentally in how 'stale' vs. 'fresh' the subsequent breakout is. The numeric contrast for base_duration_weeks (standardized_delta=-0.4214) is dismissed with hand-waving rather than tested for independence conditional on momentum features."
+    },
+    {
+      "issue": "The 'days_since_ibd_entry_trigger' replacement metric does NOT test redundancy — it tests measurement fidelity",
+      "why_it_matters": "The researcher proposes a cleaner freshness signal as a replacement, but this is not a falsification of the freshness mechanism. It is a refinement. Redundancy requires showing that NO function of temporal distance from base formation improves predictions beyond simultaneous momentum features. The evidence provided does not test this causal boundary."
+    },
+    {
+      "issue": "The false_negative_median for pullback_pct (+0.6404) is interpreted as supporting 'time since pullback' as a freshness proxy, then immediately declared redundant with slope features",
+      "why_it_matters": "pullback_pct standardized_delta=+0.6404 means false negatives have less-deep pullbacks (closer to entry price). This is a temporal-recovery effect: entities that recover slowly are more likely to be missed by B0. This signal is NOT the same as ma10_slope_5 (which measures current velocity) — it measures RECOVERY behavior across a time interval. The researcher quietly concedes this signal exists, then ignores it when concluding redundancy."
+    },
+    {
+      "issue": "No conditional analysis: redundancy is tested in-sample on the full population, not conditional on momentum regime",
+      "why_it_matters": "Freshness may be redundant for high-momentum entities (mom_20 > 0.15) but add signal for moderate-momentum entities. The researcher provides no regime-stratified analysis. The case entity_2f86543bf6 (mom_20=-0.008, selected_winner) is cited as evidence for freshness's irrelevance, but this single case is equally consistent with freshness being critical for low-momentum breakouts and irrelevant for high-momentum ones."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Subset of selected_winner entities where mom_20, ma10_slope_5, up_day_ratio_20, AND ma20_slope_5 are all at or below false_negative medians, yet the entity is a selected_winner. Does such a set exist? If so, what other feature explains the selection — likely base_duration_weeks or days_since_trigger, supporting a non-redundant freshness mechanism.",
+    "Cross-snapshot stability test: for entities appearing in multiple snapshots, compute the correlation between freshness_score and PC1 of momentum features per snapshot. If correlation varies substantially (e.g., 0.55 to 0.92), freshness captures snapshot-specific temporal effects not reducible to a stable PC1.",
+    "Paired test: identify entity pairs matched on mom_20 (±0.01), up_day_ratio_20 (±0.05), ma10_slope_5 (±0.005), and ma20_slope_5 (±0.005) but with different base_duration_weeks (e.g., 20 weeks vs 60 weeks). If selected_winner rate differs significantly (chi-square test, p < 0.05), freshness is not redundant — it adds independent explanatory power.",
+    "Ruin-within-high-momentum cases: entity_6618d3e80c (mom_20=0.251, selected_winner|false_positive_ruin) and entity_3472243e0c (mom_20=0.242, false_positive_ruin). Both have high momentum. What distinguishes the selected_winner outcome from ruin in this momentum tier? If freshness_score or base_duration_weeks differs systematically, it is not redundant — it filters the high-momentum set."
+  ],
+  "what_would_change_my_mind": [
+    "A controlled experiment: holding mom_20, ma10_slope_5, up_day_ratio_20, ma20_slope_5 constant (bin-matched), add base_duration_weeks as a separate feature. If AUC improvement is less than 0.005 (not 0.03 — the researcher's threshold is too lenient for a claim of total redundancy), then freshness is effectively redundant.",
+    "Causal identification: if an instrumental variable for 'time since base formation' (e.g., natural variation in earnings cadence that systematically lengthens consolidation periods) shows no residual correlation with selected_winner outcome after controlling for momentum features, then the freshness mechanism is causally null — not just statistically correlated.",
+    "Information-theoretic test: compute mutual information I(selected_winner; freshness_score | mom_20, ma10_slope_5, up_day_ratio_20, ma20_slope_5). If I < 0.01 bits, freshness adds negligible conditional information and the redundancy claim holds. This is a principled test the researcher never performs.",
+    "Prospective validation: implement both the composite freshness_score and a pure 'trading_days_since_ibd_trigger_entry' on a holdout temporal window (not the discovery set). If the atomic variable outperforms the composite by any margin, the composite was suboptimal, not redundant — and the researcher's conclusion inverts: freshness is real but poorly measured."
+  ]
+}

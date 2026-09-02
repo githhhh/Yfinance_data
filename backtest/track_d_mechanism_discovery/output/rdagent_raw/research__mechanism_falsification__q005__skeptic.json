@@ -1,0 +1,54 @@
+{
+  "strongest_counterclaim": "eps_preference likely functions as a categorical gate (fundamental eligibility filter applied BEFORE technical ranking) and/or a leading indicator with a 60-90 day lead over price, neither of which is detectable in the failure archaeology's W4-label, continuous-coefficient, single-snapshot frame. The prior's redundancy claim is built on an artifact: eps_preference is UNMEASURED in the frozen evidence, so its absence from the numeric_contrasts array is a measurement gap dressed up as evidence of redundancy. Once you (a) treat it as a gate rather than a continuous weight, (b) use the correct outcome horizon for fundamental signals, and (c) stratify by regime, the redundancy story collapses.",
+  "attacks": [
+    {
+      "issue": "Measurement-gap artifact masquerading as evidence of redundancy",
+      "why_it_matters": "The numeric_contrasts table only reports standardized deltas for FEATURES THAT WERE MEASURED. eps_preference is not in the frozen feature set, so its delta is structurally forced to be 'unknown.' The prior correctly notes this absence but then inverts it into a positive claim of redundancy — that is the logical fallacy of argument from silence. A feature being unobserved in the contrast table proves nothing about its relationship to momentum terms; it proves only that this archaeology cannot test it."
+    },
+    {
+      "issue": "Outcome-horizon mismatch — W4 label is wrong for testing a fundamental signal",
+      "why_it_matters": "EPS preferences operate through post-earnings drift and estimate-reversion channels with typical half-lives of 60-90 trading days. The 'selected_winner' / 'false_negative_relative' labels are scored on W4 returns (~20 trading days). Any eps_preference effect at the W4 horizon is heavily attenuated; a feature can be the dominant fundamental signal and still look redundant in a W4 horse-race because its information content hasn't materialized yet. The prior's P1 (logistic regression on W4 outcome) is a textbook horizon-mismatched test."
+    },
+    {
+      "issue": "Gate vs. continuous-weight model misspecification",
+      "why_it_matters": "IBD/Can-Slim-style models apply EPS rank as a hard eligibility filter FIRST (e.g., EPS rank >= 80 required to even enter the technical ranking). If eps_preference is a gate that excludes ~50-70% of candidates before momentum scoring, its variance is concentrated in the survival indicator, not in a continuous partial β. The prior's P1 (test |β| on a continuous term) and P4 (correlate revisions continuously) both assume linearity; gate effects produce near-zero main-effect coefficients while doing massive work via the selection step. The prior's own counterexample (entity_05b4c6b1f7, modest mom_20=0.070 yet large_win) is actually evidence FOR a gate, not against it — if eps_preference filtered this name out at entry, the 'large_win' is correctly excluded by the model, and the prior's interpretation inverts the causal direction."
+    },
+    {
+      "issue": "Hindsight bias in 'false_positive_ruin' interpretation",
+      "why_it_matters": "The prior reads positive-mom_20 false_positive_ruin cases (entity_3472243e0c, entity_b6bcccdf6a, entity_4fdc3699fd) as evidence that 'whatever fundamental screening eps_preference performs was insufficient.' But these names failed AFTER entry, often weeks later. If eps_preference was correctly HIGH at entry (fundamentals were strong at the time of the snapshot), then the ruin reflects a regime change AFTER entry — not a failure of eps_preference. The prior conflates 'eps_preference was strong at T' with 'eps_preference should have predicted ruin at T+30,' which is the very lead-lag relationship it claims doesn't exist."
+    },
+    {
+      "issue": "Cross-sectional vs. time-series predictive-power confusion",
+      "why_it_matters": "Redundancy in a cross-sectional correlation (P2: |r|>0.55 between eps_preference and mom_20) does NOT imply redundancy in predictive power for forward returns. Two features can have |r|=0.85 and still have very different partial effects on y because each predicts a different component of y's variance. Conversely, eps_preference could have |r|=0.20 with mom_20 yet still dominate in a subset of names where fundamentals diverge from price. The prior collapses these two distinct senses of 'redundancy.'"
+    },
+    {
+      "issue": "Label-definition circularity reinforces the bias",
+      "why_it_matters": "'false_negative_relative' is defined as 'B0 didn't pick it AND it produced large_win.' If eps_preference was the reason B0 didn't pick entity_05b4c6b1f7 (e.g., low EPS rank because of a transient earnings dip), then this case is NOT evidence that B0 missed a winner — it's evidence that B0 correctly applied a fundamental filter, and the W4 'win' was either noise or a transient rebound the filter was designed to avoid. The prior treats this as a failure of eps_preference when it's actually a successful application of it."
+    },
+    {
+      "issue": "Regime heterogeneity is averaged out",
+      "why_it_matters": "27 cases pooled across multiple snapshots (snap_724342c280, snap_71486ed83c, snap_d0d57b1e40, etc.) span different market regimes. In growth-leading regimes eps_preference may be redundant; in value-rotating or earnings-revision regimes it may dominate. A pooled analysis with n=27 has zero power to detect regime-conditional effects. The prior's claim of 'generally redundant' is a no-power finding, not a positive finding."
+    },
+    {
+      "issue": "Prior's P3 prediction is self-defeating",
+      "why_it_matters": "P3 says: 'Among false_positive_ruin cases, median eps_preference should NOT be distinguishable from selected_winner median.' But if eps_preference is a leading indicator, the EXPECTED pattern is that ruin cases had HIGHER eps_preference at entry (fundamentals were strong at snapshot, deteriorated after) — which P3 itself notes would 'mandate the cleaner replacement.' The prior constructs a falsification test where a positive result for eps_preference (higher in ruins) is interpreted as evidence AGAINST eps_preference, when it is actually evidence of the correct lead-lag mechanism."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "In every false_negative_relative case, retrieve the eps_preference value at entry. If eps_preference is systematically LOW (e.g., below the B0 threshold), the model was RIGHT to filter these names — the 'missed winners' are false positives of the test, not the model. This would directly falsify the prior's framing of false_negatives as a problem for eps_preference.",
+    "For each false_positive_ruin case with positive mom_20 at entry, check whether eps_preference was ALSO positive at entry but then deteriorated before the ruin. If so, eps_preference was correctly signaling risk at snapshot; the issue is execution (re-checking fundamentals post-entry), not signal redundancy.",
+    "Re-split the 27 cases by snapshot date and compute eps_preference's relationship to outcome WITHIN each snapshot. If eps_preference shows opposite-signed effects in growth-leading vs. value-rotating snapshots, the prior's pooled-redundancy conclusion is wrong.",
+    "Run the 'partial-out' test properly: regress forward W13 (not W4) returns on mom_20 alone, then add eps_preference. If the R² increment is non-trivial at W13, the redundancy claim fails on the correct horizon.",
+    "Among B0 candidates where mom_20 and eps_preference DIVERGE (eps_preference positive, mom_20 negative, or vice versa), compare forward returns across the four quadrants. If the eps_preference-positive-but-mom_20-negative quadrant has negative expected returns, eps_preference is doing independent work as a NEGATIVE filter, not a redundant positive signal.",
+    "Test whether eps_preference acts as a categorical gate: bin eps_preference into [bottom quartile, top three quartiles] and see if bottom-quartile names are systematically absent from selected_winners regardless of mom_20. If the bottom-quartile exclusion rate exceeds 80% even at high mom_20, the gate mechanism is confirmed.",
+    "Check whether the 11 'selected_winners' include any names with eps_preference below the model's own threshold. If all 11 had eps_preference above threshold, the threshold itself (not the continuous value) is the operative parameter, and the prior's continuous-β test is misspecified."
+  ],
+  "what_would_change_my_mind": [
+    "Direct measurement of eps_preference across the 27 case entities AND ≥200 B0 candidates, with all four tests (P1-P4) re-run on the correct horizon (W13 and W26, not W4). If at W13 the partial |β| on eps_preference is <0.05 with p>0.5 after momentum controls, AND the gate test shows the bottom-quartile exclusion doesn't predict forward returns, AND the divergence-quadrant test shows no independent signal — only then do I accept the redundancy claim.",
+    "A threshold/gate analysis (e.g., CART or causal forest) showing that eps_preference adds zero incremental value as a categorical filter at any threshold. If a non-trivial threshold exists that improves selection even after momentum ranking, the gate mechanism is real and the prior is wrong.",
+    "Demonstration that the false_positive_ruin cases had LOW eps_preference at entry (not high), which would mean eps_preference was correctly absent as a warning AND the prior's hindsight reading was right. If instead the ruins had HIGH eps_preference at entry, eps_preference is a leading indicator and the prior's claim that 'price already impounded it' is falsified.",
+    "Out-of-sample evidence from a held-out period (post-discovery) showing that reweighting eps_preference to zero (or removing the gate) does not change hit rate but does increase drawdown. This would show the prior is right ONLY about hit rate (mechanistic redundancy) but wrong about risk-adjusted signal.",
+    "A regime-decomposition showing that eps_preference is redundant in EVERY regime (growth, value, sideways, high-vol). If it has regime-conditional value, the unconditional redundancy claim fails and the prior's conclusion needs to be scoped.",
+    "An honest null result on the partial-out test (eps_preference residuals after controlling for momentum do NOT predict W4 returns even when eps_preference is measured correctly) AND on the gate test (bottom-quartile exclusion has no predictive value) AND on the horizon test (W13/W26 also show no effect). All three nulls are required to overturn the gate/leading-indicator hypothesis."
+  ]
+}

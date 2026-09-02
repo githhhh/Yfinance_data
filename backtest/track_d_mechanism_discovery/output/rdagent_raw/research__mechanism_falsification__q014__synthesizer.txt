@@ -1,0 +1,59 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "The archaeology is consistent with vol_ratio_5_20 acting as a participation/quality proxy that correlates with return ranking (selected_winner median 1.42 vs false_negative median 1.18), but it does NOT separate selected_winners from false_positive_ruins (ruin band 0.91–1.63 overlaps winner band 1.00–1.77). The downside-risk-control reading is therefore weakly falsified by the band overlap. However, the return-ranking reading is itself undermined by collinearity with up_day_ratio_20 (std delta -1.19) and mom_20 (std delta -1.00), snapshot-level clustering of failures (snap_71486ed83c alone holds 4/7 false_negatives; snap_b8420124eb holds 3/8 false_positive_ruins), and a likely direction-reversal between vol_ratio_5_20 and the longer-window volume_ratio. With n=27 (8 ruins) and no within-snapshot partial-correlation evidence, the strongest defensible claim is that weekly_volume contributes marginal ranking information within regimes where participation is the dominant latent factor, and zero independent downside-risk information. Whether it should be retained, shrunk, or zeroed is a regularization decision, not a mechanism decision.",
+  "falsifiers": [
+    "Partial-correlation falsifier: across held-out snapshots, if Spearman(vol_ratio_5_20, W4-return-bucket-ordinal | up_day_ratio_20, mom_20, px_vs_ma20, ma10_slope_5) has |rho| < 0.05 in >= 4 of 5 snapshots, the independent-ranking claim is falsified and the feature should be shrunk toward zero.",
+    "Risk-control falsifier: if a within-snapshot two-sample test (Wilcoxon or KS) of vol_ratio_5_20 between ruin and winner sub-cohorts yields p > 0.30 in every snapshot that contains >= 3 cases of each outcome, the downside-risk-control claim is falsified at the snapshot-stratified level.",
+    "Threshold-enforcement falsifier: audit production logs to determine the empirical CDF of vol_ratio_5_20 at entry among is_b0_pick == true. If < 5% of accepted entries have vol_ratio_5_20 < 0.9 OR > 2.5, the feature is acting as a hard gate (consistent with risk-control claim); if the empirical CDF is approximately uniform over [0.7, 2.0], the feature is window-dressing only and neither claim holds.",
+    "Coefficient-sign falsifier: inspect the actual fitted B0 coefficient on the operationalized weekly_volume input (which may be a blend, log, or z-score). If the production coefficient sign contradicts the direction implied by the archaeology (e.g., positive when ruins cluster at low ratios would predict negative), the operationalization has drifted from the published mechanism and the archaeology-based inference is invalid.",
+    "Temporal-horizon falsifier: if the rank-correlation between vol_ratio_5_20 at entry and forward returns drops from |rho| >= 0.15 at W1 to |rho| < 0.05 by W3-W4, the feature is entry-time-only and any 'risk control during holding' framing is incoherent.",
+    "Regime-conditional falsifier: estimate snapshot-specific vol_ratio_5_20 coefficients in a hierarchical model with snapshot random effects; if the cross-snapshot standard deviation of the coefficient exceeds the cross-snapshot mean, the feature's effect is regime-driven rather than entity-driven, and its mechanism is not portable across snapshots.",
+    "Redundancy-zeroing falsifier: re-run the B0 score with the vol_ratio_5_20 coefficient set to exactly zero on the held-out cohort; if W4 win-rate and ruin-rate both shift by < 1 percentage point with 90% CI bracketing zero, the feature contributes no operational value and should be removed regardless of which mechanism claim is correct."
+  ],
+  "actionable_design_principles": [
+    "Re-label weekly_volume internally from 'risk control' to 'participation/quality proxy' and explicitly document that it does not prevent post-entry ruin. This prevents portfolio managers from over-relying on it during drawdown periods and avoids attribution errors when a position is held into a distribution week.",
+    "Pre-retention feature audit: any B0 input must clear a partial-correlation gate against all other B0 inputs (max |partial rho| >= 0.08 on a held-out window) before being retained as a non-zero coefficient. This catches the vol_ratio_5_20 / up_day_ratio_20 / mom_20 collinearity collapse at admission time.",
+    "Decompose production volume inputs: if B0 consumes a blended volume feature, decompose into short-window (5d) and long-window (50d/60d) components and estimate their separate contributions. Direction-reversal between these windows in the archaeology (std delta -1.05 vs +0.23) is a structural red flag that must be resolved before any mechanism claim is sustainable.",
+    "Time-varying post-entry monitor: replace the static entry-time volume ratio with a rolling price-volume divergence signal computed weekly during the holding period. This addresses the horizon mismatch (pre-entry feature vs post-entry ruin) that the archaeology cannot resolve.",
+    "Counterfactual ruin tracking: maintain a weekly log of entities that eventually ruin (W4 bucket in {ruin, loss}) along with their entry-time vol_ratio_5_20. If the ruin rate within any vol_ratio_5_20 quintile exceeds the unconditional ruin rate by less than 30% (relative), escalate the feature for replacement rather than re-tuning the coefficient.",
+    "Within-snapshot evaluation only: any feature whose cross-snapshot coefficient variance exceeds its cross-snapshot mean should be evaluated within snapshot strata; cross-snapshot pooled medians (e.g., the 1.18 vs 1.42 contrast) confound regime effects with feature effects and should not be used as primary evidence.",
+    "Two-axis conditional gate (vol_ratio_5_20 × sign of price_vs_ma20_change): high volume + price above rising MA = confirmation; high volume + price below weakening MA = distribution veto; low volume + flat momentum = liquidity veto. This is the cleanest replacement that addresses both the rank-confirmation and risk-control questions simultaneously."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Conditional vol_ratio gate keyed on price-vs-MA slope sign",
+      "why_distinct": "Goes beyond a single-threshold weekly_volume by making the gate regime-aware. Directly targets the two failure modes the archaeology reveals: low-volume-flat-momentum ruins (entity_40ea0cfb3b) and high-volume-distribution ruins (entity_84824e6a20, entity_8f0df3d38e). The Researcher's two-axis proposal is the closest analogue but this formulation explicitly ties the conditional to MA slope sign rather than raw px_vs_ma20, which is more numerically stable.",
+      "features": ["vol_ratio_5_20", "ma10_slope_5", "px_vs_ma20", "up_day_ratio_20"],
+      "capacity_relevance": "Operates at entry selection only; does not affect position sizing. Capacity-neutral because all features are pre-snapshot price/volume aggregates. Does not consume outer-forward outcomes."
+    },
+    {
+      "idea": "Within-snapshot partial-correlation filter with hierarchical shrinkage",
+      "why_distinct": "Operationalizes the Skeptic's within-snapshot concern. Computes partial Spearman of each candidate feature against outcome, residualized on all other B0 inputs, separately per snapshot_anon. Shrinks cross-snapshot estimates toward the pooled mean using empirical Bayes. A feature whose shrunk partial |rho| falls below 0.05 has its coefficient floored at zero regardless of univariate strength.",
+      "features": ["vol_ratio_5_20", "up_day_ratio_20", "mom_20", "px_vs_ma20", "ma10_slope_5", "ma20_slope_5"],
+      "capacity_relevance": "Pre-deployment feature-selection layer; no runtime capacity cost. Prevents redundant features from consuming score variance and indirectly improves capacity utilization by reducing overfitting-driven churn."
+    },
+    {
+      "idea": "Counterfactual ruin attribution ledger with pre-registered escalation",
+      "why_distinct": "Tracks each is_b0_pick entity forward to its eventual w4_return_bucket and records whether the pre-entry vol_ratio_5_20 would have caused rejection under alternative thresholds. Computes ruin-attribution rate = (ruins whose vol_ratio_5_20 was above the rejection threshold) / (total ruins). If this rate stays below 50% across N>=3 cycles, the feature is escalated for replacement under a pre-registered protocol, removing human discretion from the retune-vs-replace decision.",
+      "features": ["vol_ratio_5_20", "is_b0_pick", "w4_return_bucket", "snapshot_anon"],
+      "capacity_relevance": "Post-hoc diagnostic; zero runtime cost. Affects portfolio construction only by determining which features remain in B0, which indirectly stabilizes entry-decision throughput."
+    },
+    {
+      "idea": "Rolling price-volume divergence monitor during holding period",
+      "why_distinct": "Addresses the horizon mismatch identified by the Skeptic: a pre-entry volume ratio cannot detect distribution days that occur in W2 or W3. This monitor computes a weekly divergence score = corr(weekly_price_change, weekly_volume_change) over the prior 3 weeks of holding. Sustained negative correlation (price down on rising volume) triggers an early-exit signal that weekly_volume at entry never had a chance to emit.",
+      "features": ["weekly_price_change", "weekly_volume_change", "px_vs_ma20", "ma10_slope_5"],
+      "capacity_relevance": "Post-entry risk-control layer; directly affects position sizing and exit timing, not entry selection. Capacity-relevant because high-volatility regimes generate many correlated exit signals and may compress available entry capacity in trending regimes."
+    },
+    {
+      "idea": "Short-window vs long-window volume decomposition with separate coefficients",
+      "why_distinct": "Resolves the direction-reversal artifact (vol_ratio_5_20 std delta -1.05 vs volume_ratio std delta +0.23). Splits the aggregated weekly_volume input into its constituent short-window (5d/10d) and long-window (50d/60d) components and assigns each its own fitted coefficient. The aggregate coefficient is then the sum, and the architecture makes the blending auditable rather than implicit.",
+      "features": ["vol_ratio_5_20", "vol_ratio_10_20", "volume_ratio", "ibd_entry_volume_ratio"],
+      "capacity_relevance": "Pre-deployment refactor; no runtime capacity change. Improves interpretability and reduces hidden collinearity in the score, which indirectly improves signal-to-noise at entry."
+    }
+  ]
+}
+```

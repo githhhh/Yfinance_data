@@ -1,0 +1,112 @@
+{
+  "tests": [
+    {
+      "name": "within_snapshot_volume_partial_effect",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "snapshot_anon"
+      ],
+      "comparison": "Within each snapshot_anon, compute partial rank-correlation of ibd_entry_volume_ratio against outcome_ordinal after regressing out mom_20, vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, and ibd_entry_close_position. Pool within-snapshot correlations using Fisher Z-transform.",
+      "success_criterion": "Pooled partial correlation of ibd_entry_volume_ratio is significantly >0 (p<0.05) after controlling for all five pivot features, indicating an independent return-ranking contribution.",
+      "failure_criterion": "Pooled partial correlation is not significantly different from 0, or becomes non-positive after conditioning, indicating the component is downstream of the pivot and adds no independent information. This falsifies the return-ranking interpretation."
+    },
+    {
+      "name": "volume_threshold_qualifier_test",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "pullback_pct",
+        "w4_return_bucket",
+        "outcome_label"
+      ],
+      "comparison": "Bin ibd_entry_volume_ratio into three groups using its sample tertiles within each snapshot. Compute ruin/loss rate and median pullback_pct for each tertile group. Test for a non-linear (threshold) drop in ruin rate above the top tertile versus a smooth monotonic decrease.",
+      "success_criterion": "Ruins concentrated in the bottom tertile at rate ≥3× the top tertile, with a sharp discontinuity at the threshold. This supports a downside-risk-control mechanism where volume acts as a binary qualifier.",
+      "failure_criterion": "Ruin rate decreases smoothly and proportionally across tertiles with no threshold, or ruin rate in the top tertile exceeds 5%. This indicates volume is not a protective threshold and falsifies the downside-risk-control interpretation."
+    },
+    {
+      "name": "volume_ratio_internal_consistency",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "volume_ratio",
+        "snapshot_anon"
+      ],
+      "comparison": "Within each snapshot, compute Spearman correlation between ibd_entry_volume_ratio and volume_ratio. Also compute within-snapshot rank-difference: for each case, rank by each volume metric and compute rank-delta. Test whether the two metrics consistently agree on relative ranking within snapshots.",
+      "success_criterion": "Within-snapshot Spearman correlation between the two volume features is ≥0.6 AND mean absolute rank-delta <15th percentile of random permutation. This indicates the two features measure the same underlying construct.",
+      "failure_criterion": "Within-snapshot correlation is <0.3 OR mean absolute rank-delta >25th percentile. This indicates the features are incoherent measures of 'volume', falsifying any claim that ibd_entry_volume_ratio captures a general volume property."
+    },
+    {
+      "name": "high_volume_ruin_counterexample_tabulation",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "outcome_label",
+        "w4_return_bucket",
+        "pullback_pct"
+      ],
+      "comparison": "Identify all cases where ibd_entry_volume_ratio is in the top decile within their snapshot AND outcome_label contains 'ruin' OR w4_return_bucket is 'ruin' OR pullback_pct < -20%. Tabulate vol_ratio_5_20, mom_20, and px_vs_ma50 for these cases to confirm they are genuine high-volume pivot failures.",
+      "success_criterion": "Fewer than 2 such cases exist, and none have vol_ratio_5_20 >1.4 and mom_20 >0.15 simultaneously. This would indicate high volume genuinely filters out ruinous setups.",
+      "failure_criterion": "At least 3 cases exist with ibd_entry_volume_ratio in the top decile AND ruin outcome AND vol_ratio_5_20 >1.3 AND mom_20 >0.1. This directly falsifies any monotonic downside-risk-control interpretation."
+    },
+    {
+      "name": "low_volume_large_win_counterexample_tabulation",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "vol_ratio_5_20",
+        "outcome_label",
+        "w4_return_bucket"
+      ],
+      "comparison": "Identify all cases where ibd_entry_volume_ratio is in the bottom tertile within their snapshot AND outcome_label contains 'selected_winner' AND w4_return_bucket is 'large_win'. Test whether their pullback_pct (where available) differs materially from high-volume winners.",
+      "success_criterion": "Fewer than 2 such cases exist, confirming volume is necessary for large wins. OR low-volume winners have materially worse pullback_pct (≥5pp more negative on average), confirming volume provides downside protection even when upside is realized.",
+      "failure_criterion": "At least 3 such cases exist with ibd_entry_volume_ratio in the bottom tertile producing 'large_win' AND pullback_pct not materially worse than high-volume winners. This falsifies the claim that volume is required for quality outcomes."
+    },
+    {
+      "name": "snapshot_regime_stratified_contrast",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "vol_ratio_5_20",
+        "outcome_label",
+        "snapshot_anon"
+      ],
+      "comparison": "For each snapshot_anon with ≥3 cases, compute the median ibd_entry_volume_ratio separately for selected_winner vs false_negative_relative outcomes within that snapshot. Test whether the direction of the volume gap is consistent across snapshots.",
+      "success_criterion": "At least 5 snapshots have ≥3 cases, and ≥80% of them show higher median ibd_entry_volume_ratio for selected_winner versus false_negative_relative. This confirms the volume effect is not driven by a single bullish-regime snapshot.",
+      "failure_criterion": "The volume gap direction reverses in ≥30% of multi-case snapshots, OR the entire pooled gap is driven by a single snapshot contributing >40% of the volume-delta. This confirms the effect is a regime artifact and falsifies any stable signal claim."
+    },
+    {
+      "name": "volume_marginal_increment_test",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ibd_entry_close_position",
+        "outcome_label"
+      ],
+      "comparison": "Build a two-layer model: Layer 1 uses all PIT features except ibd_entry_volume_ratio; Layer 2 adds ibd_entry_volume_ratio. Compare Layer 1 vs Layer 2 predictive accuracy (ordinal C-statistic against outcome_ordinal) using leave-one-snapshot-out cross-validation. Compute the delta in predictive accuracy attributable to volume.",
+      "success_criterion": "Layer 2 has ≥0.05 higher C-statistic than Layer 1 AND the volume coefficient is significantly positive in a logistic/ordinal regression with 95% CI excluding zero. This confirms incremental predictive contribution.",
+      "failure_criterion": "Layer 2 C-statistic is within 0.02 of Layer 1, OR the volume coefficient's 95% CI includes zero. This indicates zero marginal increment and falsifies any independent role for the component."
+    }
+  ],
+  "leakage_checks": [
+    "All features must be computed from data available at the entry snapshot (PIT-observable only). outcome_label, w4_return_bucket, and pullback_pct are used only as dependent variables, never as inputs.",
+    "No calendar date, ticker identity, or forward-looking information may be used in computing features or stratifying cases.",
+    "The false_negative contrast was computed on discovery-train data; all tests must use the same frozen evidence set without access to outer-forward outcomes beyond what is already frozen in failure_archaeology.",
+    "Snapshot_anon is used only as a stratification variable to test regime stability, not as a predictive feature. The test design does not allow snapshot identity to enter the model as a regressor.",
+    "If ibd_entry_volume_ratio thresholds are derived from this sample, they must be pre-specified as tertiles or deciles of the marginal distribution rather than optimized to maximize outcome separation."
+  ],
+  "priority_order": [
+    "volume_ratio_internal_consistency",
+    "high_volume_ruin_counterexample_tabulation",
+    "low_volume_large_win_counterexample_tabulation",
+    "within_snapshot_volume_partial_effect",
+    "snapshot_regime_stratified_contrast",
+    "volume_threshold_qualifier_test",
+    "volume_marginal_increment_test"
+  ]
+}

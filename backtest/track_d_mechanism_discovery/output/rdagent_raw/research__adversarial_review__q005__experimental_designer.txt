@@ -1,0 +1,38 @@
+
+```json
+{
+  "tests": [
+    {
+      "name": "Within-base-maturity strata, do snapshot-phase features still predict outcome?",
+      "features": ["base_duration_weeks", "base_depth_pct", "mom_20"],
+      "comparison": "Stratify the 27 cases into base_duration_weeks tertiles. Within each tertile, compute median mom_20 for false_positive_ruin vs selected_winner. Researcher predicts mom_20 median gap collapses to <0.03 within every tertile. Skeptic predicts gap persists at >0.08 in at least one tertile.",
+      "success_criterion": "mom_20 median gap within every base_duration tertile is < 0.03 AND standardized gap < 0.3 (researcher wins: base-maturity fully explains the snapshot separation).",
+      "failure_criterion": "In any base_duration tertile, mom_20 gap remains >= 0.08 OR standardized gap >= 0.6 (skeptic wins: snapshot-phase info is independent of base maturity)."
+    },
+    {
+      "name": "Null-pullback cluster dissection: is the ruin-mode driven by snapshot quality or by lack of base?",
+      "features": ["mom_20", "vol_ratio_5_20", "up_day_ratio_20"],
+      "comparison": "Among is_b0_pick=true cases, compare the 8 false_positive_ruin cases against the 11 selected_winner cases on a composite snapshot score = mean of (mom_20, up_day_ratio_20, vol_ratio_5_20). Also split the 8 ruins into 6 with null pullback_pct vs 2 with non-null pullback_pct. Skeptic predicts snapshot composite separates ruin from winner within the null-pullback subset; researcher predicts it does not because the null-pullback group is structurally a different regime that no snapshot feature can rescue.",
+      "success_criterion": "Snapshot composite median for the 6 null-pullback ruins is within 0.5 SD of selected_winner median (i.e., the null-pullback ruins were not distinguishable by snapshot features, supporting the 'distinct-1 should have excluded them' reading).",
+      "failure_criterion": "Snapshot composite median for the 6 null-pullback ruins is >= 1.0 SD below selected_winner median (i.e., the ruins WERE low-snapshot-quality and a snapshot gate would have caught them, undermining the 'distinct-1 is needed' reading)."
+    },
+    {
+      "name": "Causality direction: does mom_20 at entry lead or lag base_duration_weeks?",
+      "features": ["base_duration_weeks", "mom_60", "ma20_slope_5"],
+      "comparison": "Test whether mom_60 + ma20_slope_5 jointly predict base_duration_weeks (researcher's direction: snapshot features -> base maturity) vs whether base_duration_weeks + base_depth_pct predict mom_20 (skeptic's direction: base maturity -> snapshot features). Use Spearman rank correlation on the 27 cases. Researcher predicts mom_60|ma20_slope_5 -> base_duration partial rho > 0.30. Skeptic predicts base_duration -> mom_20 partial rho > 0.30.",
+      "success_criterion": "Partial Spearman |rho| between mom_60 + ma20_slope_5 and base_duration_weeks (controlling for the other side) exceeds 0.30 in the direction mom_60 -> base_duration.",
+      "failure_criterion": "Reverse direction holds, OR both partial rhos are < 0.20 (i.e., no detectable causal ordering and the confound claim becomes unprovable from PIT features alone -> UNRESOLVED)."
+    }
+  ],
+  "leakage_checks": [
+    "Do not use is_b0_pick, w4_return_bucket, or outcome_label as a predictive feature; they are ground-truth labels and would leak the selection mechanism under test.",
+    "Do not use snapshot_anon or entity_anon as features; they are identity/cluster labels, not PIT market descriptors.",
+    "Do not use pullback_duration_weeks or pullback_pct as predictors in Test 2 (null-pullback cluster) — their nullness IS the regime being studied, so using them to predict inside the null subset would be circular."
+  ],
+  "priority_order": [
+    "Within-base-maturity strata, do snapshot-phase features still predict outcome?",
+    "Null-pullback cluster dissection: is the ruin-mode driven by snapshot quality or by lack of base?",
+    "Causality direction: does mom_20 at entry lead or lag base_duration_weeks?"
+  ]
+}
+```

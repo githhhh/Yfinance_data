@@ -1,0 +1,23 @@
+
+
+```json
+{
+  "mechanism_claim": "20-day momentum's predictive value is conditional on base depth: when base_depth_pct is shallow (>-25%) AND mom_20 is high (>0.15), the breakout lacks the institutional accumulation cushion needed to sustain thrust, creating a 'news-gap momentum chase' failure regime; conversely, deep bases (<-30%) with moderate-to-high mom_20 reflect proper accumulation followed by thrust confirmation and have structurally lower ruin risk.",
+  "evidence_for": [
+    "Numeric contrasts show selected winners have median base_depth_pct of -29.5% vs false-negative median of -25.8% (delta +3.7pp, deeper bases predict success), while mom_20 median gap is -10.5pp (winners ~0.163 vs FN ~0.058); the ruins cluster in the shallow-base/high-mom quadrant (entity_8f0df3d38e: mom_20=0.176, px_vs_ma20=0.048; entity_b6bcccdf6a: mom_20=0.176, px_vs_ma20=0.124; entity_3472243e0c: mom_20=0.242)",
+    "Winners that survived extreme momentum (entity_ead73f4390 mom=0.320, entity_2c58cebc59 mom=0.321, entity_b00579f203 mom=0.230) all show deep relative-to-base extension signals (px_vs_ma50 >=0.17), consistent with thrust emerging from a properly formed base rather than a shallow one"
+  ],
+  "evidence_against": [
+    "Some winners carry low/negative mom_20 (entity_2f86543bf6 mom=-0.008, entity_8ad5cd4795 mom=0.004, entity_90a828939a mom=0.036), meaning the interaction alone is insufficient and base_depth_pct must combine with other PIT signals (up_day_ratio, vol_ratio_5_20)",
+    "Sample n=27 limits statistical power; base_depth_pct standardized_delta is only +0.19 vs mom_20's -1.00, so the marginal information from base_depth is modest when momentum is already known; entity_6618d3e80c (mixed label, mom=0.251, px_vs_ma50=0.337) shows deep extension + high momentum can also fail, suggesting an upper-bound regime"
+  ],
+  "falsifiable_predictions": [
+    "Within current B0 picks, the subset with base_depth_pct > -25% AND mom_20 > 0.15 should exhibit W4 ruin rate >=40% and median W4 return <=0%, while base_depth_pct < -30% AND mom_20 in [0.05, 0.25] should show median W4 return >+5pp above the B0 overall median",
+    "If we apply a multiplicative penalty score P = mom_20 x max(0, base_depth_pct + 0.25) as a re-ranker (not eligibility filter) to existing B0 picks and demote the top-decile P by one rank, realized W4 ruin count in the test sample should drop by >=25% versus status quo without reducing selection count"
+  ],
+  "policy_implications": [
+    "Encode the interaction as a continuous re-ranking score (mom_20 x standardized base_depth_pct_shortfall) applied AFTER B0 eligibility is determined, so the eligible universe size is unchanged; use soft demotion (1-3 rank slots) rather than hard exclusion to avoid losing asymmetric upside",
+    "Compute base_depth_pct on a frozen 6-12 month pre-entry window with a minimum base_duration_weeks gate (~30 weeks) to prevent the score from being contaminated by post-base noise; combine with up_day_ratio_20 >= 0.55 and vol_ratio_5_20 in [1.0, 1.8] to suppress the 'news-spike shallow-base' subtype specifically observed in entity_b6bcccdf6a and entity_84824e6a20"
+  ]
+}
+```

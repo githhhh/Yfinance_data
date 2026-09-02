@@ -1,0 +1,42 @@
+
+
+
+```json
+{
+  "verdict": "REFUTED",
+  "confidence_0_100": 78,
+  "mechanism_summary": "The pullback-consolidation mechanism is directly falsified by the evidence. Both canonical false_negative_big_winner cases (entity_535a1beed7, entity_05b4c6b1f7) have null pullback data—meaning the mechanism's central premise ('missed by B0 due to low trigger proximity while in pullback consolidation') cannot be verified at snapshot time. The stated falsifiable thresholds (mom_20 >= 0.12, vol_ratio_5_20 >= 1.40) are met by zero of two false_negative_big_winner cases. The mechanism cannot explain within-profile variance: entity_df5478102d with superior features (mom_20=0.125, up_day_ratio_20=0.60) produces only small_win while entity_bfb308b24a (mom_20=0.027, up_day_ratio_20=0.45) produces loss. The pattern is an artifact of outcome-biased selection masquerading as a predictive mechanism.",
+  "falsifiers": [
+    "Find a false_negative_big_winner with null pullback data AND mom_20 >= 0.10 AND up_day_ratio_20 >= 0.55. Both canonical cases satisfy this: entity_535a1beed7 (mom_20=0.028, up_day_ratio_20=0.50) and entity_05b4c6b1f7 (mom_20=0.070, up_day_ratio_20=0.50). This is already satisfied by the evidence, falsifying the pullback-consolidation premise.",
+    "Find a non-pick meeting the stated prediction thresholds (up_day_ratio_20 >= 0.55, mom_20 >= 0.12, vol_ratio_5_20 >= 1.40) that produces loss or ruin. Zero of two false_negative_big_winner cases meet even one of these thresholds, let alone the falsifiable prediction. The mechanism cannot explain its own canonical evidence.",
+    "Find a non-pick with up_day_ratio_20 >= 0.60, mom_20 >= 0.12, vol_ratio_5_20 >= 1.50, but null pullback data, producing only small_win or loss. This would invalidate the claim that snapshot features (not pullback) drive the outcome—already suggested by the null-pullback winners."
+  ],
+  "actionable_design_principles": [
+    "Abandon pullback_pct and pullback_duration_weeks as causal features for this mechanism. Null values in both canonical cases mean these features are either unobservable at snapshot time or irrelevant to the outcome.",
+    "Do not use outcome labels to define the feature space post-hoc. The classification 'false_negative_big_winner' is defined by future W4 returns, then features are inspected to construct a post-hoc narrative. This creates a guaranteed-confirming pattern with no falsification path.",
+    "Any valid mechanism must predict without using the outcome variable in feature selection. Pre-specify features based on domain theory, not data-mined associations with known winners.",
+    "If up_day_ratio_20 is retained as a feature, validate that it contains forward-looking information independent of current momentum. The skeptic's attack that it is purely a lagging indicator (recent winners continuing to win) must be tested formally, not assumed away.",
+    "Threshold calibration must use the same data that defines the mechanism. Using one set of cases to build thresholds and another to validate is circular."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Invert the selection logic: instead of searching for features common to false_negative_big_winner cases, test whether non-picks with features opposite to selected_winner (lower trigger proximity, weaker momentum) have systematically different outcomes from selected winners when controlling for market conditions.",
+      "why_distinct": "The current mechanism searches for confirmatory evidence among winners. The inversion tests the falsification path: if non-picks with weak features (low trigger proximity, low momentum) still produce large_win at rates comparable to selected_winner, the B0 selector is adding no signal.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "mom_20", "up_day_ratio_20", "vol_ratio_5_20", "snapshot_anon (for market condition controls)"],
+      "capacity_relevance": "Tests whether B0 selection captures a genuine signal or is a selection artifact from the feature space definition."
+    },
+    {
+      "idea": "Test the 'embedded strength' claim by checking if false_negative_big_winner cases have superior ex-ante characteristics (pre-snapshot) vs false_negative_relative cases matched on pullback depth and duration. If no difference exists, the outcome difference is not explained by the mechanism.",
+      "why_distinct": "Separates the pullback mechanism from pure outcome variance. If matched false negatives with identical pullback profiles produce different outcomes, the mechanism is incomplete regardless of feature values.",
+      "features": ["pullback_pct", "pullback_duration_weeks", "mom_20", "up_day_ratio_20", "vol_ratio_5_20", "w4_return_bucket"],
+      "capacity_relevance": "Determines whether the mechanism explains outcome magnitude or merely describes post-hoc features of entities that happened to win."
+    },
+    {
+      "idea": "Validate up_day_ratio_20 as a forward-looking signal by testing if it predicts future momentum (mom_future_5) after partialling out current mom_20 and vol_ratio_5_20. If it does not add incremental predictive power beyond current momentum, it is a lagging indicator and must be excluded.",
+      "why_distinct": "Addresses the skeptic's specific attack that up_day_ratio_20 proxies recent price history without independent forward information. A proper predictive mechanism requires this test.",
+      "features": ["up_day_ratio_20", "mom_20", "mom_future_5", "vol_ratio_5_20", "snapshot_anon"],
+      "capacity_relevance": "Determines whether up_day_ratio_20 is a genuine predictive feature or an artifact of outcome-biased selection."
+    }
+  ]
+}
+```

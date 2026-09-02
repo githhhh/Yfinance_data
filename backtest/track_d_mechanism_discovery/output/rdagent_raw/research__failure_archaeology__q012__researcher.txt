@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "mechanism_claim": "B0 false positives that ruin exhibit a specific PIT-observable signature: moderate momentum (mom_20 0.024-0.242) paired with elevated recent volatility ratio (vol_ratio_5_20 > 1.2) and sub-maximum up_day_ratio_20 (0.4-0.65), indicating the stock is in a late-stage acceleration phase rather than fresh breakout momentum. This distinguishes them from selected winners (higher mom_20, vol_ratio_5_20 up_day_ratio_20) and false negatives (lower vol_ratio_5_20, lower mom_20).",
+  "evidence_for": [
+    "false_positive_ruin cases (entity_8f0df3d38e, entity_4fdc3699fd, entity_3472243e0c) show mom_20 in 0.17-0.24 range with vol_ratio_5_20 1.20-1.38 and up_day_ratio_20 0.6-0.65",
+    "selected_winner cases show higher mom_20 (mean ~0.20+) and higher vol_ratio_5_20 (mean ~1.45+), with up_day_ratio_20 often at extremes (0.7 or 0.35)",
+    "false_negative cases show distinctly lower vol_ratio_5_20 (median 1.179 vs 1.424 for winners) and lower mom_20 (median 0.058 vs 0.163 for winners)",
+    "numeric_contrasts confirm standardized_delta of -1.19 for up_day_ratio_20 and -1.05 for vol_ratio_5_20 comparing false_negatives to selected_winners, indicating false_positives occupy middle ground",
+    "pullback_pct contrast: false_positive_ruin shows pullback_pct median around -14 to -16% while selected_winners show deeper pullbacks (median -15.9%), suggesting winners undergo mean-reversion correction while ruins continue deteriorating"
+  ],
+  "evidence_against": [
+    "entity_6618d3e80c has outcome_label 'false_positive_ruin|selected_winner' with high mom_20 (0.251), high vol_ratio_5_20 (1.446), and large_win w4_return_bucket, contradicting the simple ruin signature",
+    "entity_3adc078f01 shows selected_winner with up_day_ratio_20=0.65, vol_ratio_5_20=1.14, mom_20=0.172 - nearly identical to ruin cases but turned into large_win",
+    "entity_b6bcccdf6a ruin case has low up_day_ratio_20 (0.4) but vol_ratio_5_20 only 1.31, overlapping with winner range",
+    "The pattern may not hold under industry concentration effects not captured by individual stock features"
+  ],
+  "falsifiable_predictions": [
+    "A B0 pick with up_day_ratio_20 >= 0.7 AND vol_ratio_5_20 >= 1.6 AND mom_20 >= 0.25 AND ibd_entry_close_vs_trigger_pct > 0.03 should NOT produce false_positive_ruin under concentrated industry conditions (predicted P(ruin) < 5%)",
+    "If a concentrated-industry B0 pick with px_vs_ma20 > 0.10 AND vol_ratio_5_20 > 1.5 still ruins within 7 weeks, the late-acceleration mechanism is invalidated",
+    "A ruin case where up_day_ratio_20 drops below 0.4 within 3 weeks post-entry, contradicting the moderate-up_day_ratio_20 signature, would invalidate the temporal stability assumption",
+    "If selected_winners and false_positive_ruin cases become indistinguishable on (up_day_ratio_20, vol_ratio_5_20, mom_20) triple within a future sample of n>=20 per category, the signature is noise"
+  ],
+  "policy_implications": [
+    "Add pre-entry filter: reject B0 candidates where up_day_ratio_20 <= 0.65 AND vol_ratio_5_20 >= 1.2 AND mom_20 between 0.02-0.25, pending concentration adjustment",
+    "For concentrated positions, require up_day_ratio_20 >= 0.7 OR vol_ratio_5_20 >= 1.6 to distinguish from false-positive late-acceleration signature",
+    "If industry concentration is high (not directly in PIT evidence), tighten exit: reduce holding period by 2 weeks for candidates with vol_ratio_5_20 > 1.3 and mom_20 < 0.20",
+    "The pullback_duration_weeks null pattern for ruin cases (5 of 8 have null) suggests ruins may not experience classic pullback correction - use this as secondary confirmation"
+  ]
+}
+```

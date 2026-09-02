@@ -1,0 +1,30 @@
+{
+  "mechanism_claim": "The B0 selection filter discards a class of candidates that are in a ‘dry‑up’ phase: they show low short‑term volume (vol_ratio_5_20 ≈ 0.9‑1.2) while price stays near the 20‑ and 50‑day moving averages, momentum is mildly positive (mom_20 > 0) and the recent pullback is shallow (pullback_pct > ‑10 %). This contraction reflects supply absorption and a coiled‑spring accumulation, not a lack of interest; when the price later breaks out these stocks become large winners. The variable vol_ratio_5_20 is being used as a proxy for ‘strong buying pressure’, but its low‑end tail carries an independent, accumulation signal that is currently filtered out.",
+  "evidence_for": [
+    "Median vol_ratio_5_20 for false‑negative cases is 1.179, 0.245 lower than selected winners (1.424); standardized delta = ‑1.05.",
+    "Median mom_20 for false‑negatives is 0.058, 0.105 below selected winners (0.163); standardized delta = ‑1.00.",
+    "Median up_day_ratio_20 for false‑negatives is 0.500, 0.125 below selected winners (0.625); standardized delta = ‑1.19.",
+    "Two false‑negative‑big‑winner cases (entity_535a1beed7 and entity_de1c657364) have vol_ratio_5_20 in the 1.1‑1.2 band, positive mom_20 (0.028‑0.058), up_day_ratio_20 ≥ 0.5 and shallow pullbacks (‑7.3 % for one, none for the other), matching the dry‑up profile.",
+    "False‑negatives have a less negative median pullback_pct (‑7.3 % vs ‑15.9 % for winners), indicating a tighter base before the eventual breakout.",
+    "All false‑negative examples have px_vs_ma50 between –0.033 and 0.12, showing price is not far from the long‑term trend, consistent with a coiled‑spring state."
+  ],
+  "evidence_against": [
+    "Not every low‑vol_ratio_5_20 case is a big winner: entity_ad2bfdee3f has vol_ratio_5_20 = 1.179 but mom_20 = ‑0.045 and outcome is only a small win.",
+    "Some false‑negatives have up_day_ratio_20 as low as 0.45 (entity_d8e8e7b814) and still produce only modest returns, indicating low volume can also reflect genuine neglect.",
+    "High‑volume, high‑momentum stocks (vol_ratio_5_20 > 1.5, mom_20 > 0.2) can be false‑positive ruins (e.g., entity_8f0df3d38e, entity_3472243e0c), showing the opposite extreme is also risky.",
+    "Only two false‑negative‑big‑winner observations exist, so the dry‑up hypothesis is under‑powered.",
+    "The vol_ratio_5_20 distribution of false‑negatives overlaps the selected‑winner range (e.g., entity_440e297253 has vol_ratio_5_20 = 1.588), indicating vol_ratio_5_20 alone does not cleanly separate winners from losers."
+  ],
+  "falsifiable_predictions": [
+    "In an out‑of‑sample test, stocks that satisfy 0.9 ≤ vol_ratio_5_20 ≤ 1.2, up_day_ratio_20 ≥ 0.55, pullback_pct > ‑8 %, mom_20 > 0, and px_vs_ma50 < 0.15, but are rejected by the current B0 thresholds (mom_20 > 0.15, vol_ratio_5_20 > 1.3), will achieve a W4 return ≥ 8 % in at least 40 % of cases, significantly above the base rate of rejected names.",
+    "Conversely, stocks that pass the B0 filter but have vol_ratio_5_20 > 1.5 and up_day_ratio_20 < 0.5 will underperform (W4 < 0 % or ruin) more often than the overall B0 hit rate.",
+    "Adding a dry‑up tier to the selection rule (allowing low‑vol_ratio_5_20 with the auxiliary conditions above) will increase the portfolio’s large‑win count without proportionally increasing the ruin count, as measured by a lift in the precision‑recall curve for the large‑win class."
+  ],
+  "policy_implications": [
+    "Introduce a secondary ‘dry‑up’ inclusion tier: accept candidates with vol_ratio_5_20 between 0.9 and 1.2 when up_day_ratio_20 ≥ 0.55, mom_20 > 0, and the recent pullback is shallower than ‑10 % (i.e., a tight base).",
+    "Apply a reduced position size for the dry‑up tier to account for lower liquidity and higher idiosyncratic risk, and use a tighter stop‑loss based on the 20‑day ATR.",
+    "Combine the dry‑up filter with the existing high‑momentum filter rather than replacing it; the two tiers capture complementary regimes (breakout vs. coiled‑spring).",
+    "Monitor up_day_ratio_20 and pullback_pct in the dry‑up tier to guard against including ‘neglected’ stocks that merely have low volume; a minimum up_day_ratio_20 of 0.55 helps separate accumulation from neglect.",
+    "Backtest the revised rule on a hold‑out period and require a statistically significant lift in large‑win frequency before full deployment."
+  ]
+}

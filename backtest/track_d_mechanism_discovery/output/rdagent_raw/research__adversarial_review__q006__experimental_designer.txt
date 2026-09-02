@@ -1,0 +1,81 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_capacity_discrimination",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within each snapshot_anon stratum that contains >=1 selected_winner and >=1 false_negative_relative, compute a 3-feature z-score composite of mom_20, px_vs_ma50, vol_ratio_5_20; average the per-snapshot AUC for selected_winner vs false_negative_relative across strata. Snapshot_anon is used only as a stratification identifier, never as a predictor.",
+      "success_criterion": "Stratified-average AUC ≥ 0.65 with at least 3 contributing strata (supports capacity as a within-regime latent factor).",
+      "failure_criterion": "Stratified-average AUC ≤ 0.55 OR fewer than 3 strata contain both outcome classes (capacity is between-snapshot regime noise; the 0.5–1.2σ deltas dissolve once regime is held constant)."
+    },
+    {
+      "name": "b0_filter_redundancy_decomposition",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Across the 27 discovery rows, regress the 3-feature cluster composite (z-scored) on is_b0_pick as a single binary regressor; report adjusted R² and the residual AUC of the composite for outcome_label after partialling out is_b0_pick.",
+      "success_criterion": "Adjusted R² < 0.30 AND residual AUC within 0.05 of unadjusted AUC (cluster carries information orthogonal to B0's pick decision).",
+      "failure_criterion": "Adjusted R² ≥ 0.50 OR residual AUC drops by ≥ 0.10 after partialling out is_b0_pick (the cluster is the B0 filter restated; capacity direction is empirically redundant with the existing model)."
+    },
+    {
+      "name": "within_extended_bucket_auc_researcher_pred1",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Restrict to rows with mom_20 > 0.15 AND px_vs_ma50 > 0.10 (the extended bucket); compute AUC for selected_winner vs false_positive_ruin using the 3-feature composite. Mirrors the researcher's falsifiable prediction #1 with explicit feature budget.",
+      "success_criterion": "Within-bucket AUC ≥ 0.60 (capacity discriminates winners from ruins inside the extended bucket).",
+      "failure_criterion": "Within-bucket AUC ≤ 0.55 (researcher's own threshold is breached; capacity direction collapses to extension-tilted breakout with no within-bucket discrimination)."
+    },
+    {
+      "name": "pullback_present_vs_depth_discrimination",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "base_depth_pct"
+      ],
+      "comparison": "Construct a derived pullback_present_indicator (= 1 if pullback_pct is non-null, else 0); compare (a) pullback_present_indicator alone predicting selected_winner vs false_negative_relative, (b) pullback_pct conditional on presence, (c) three null-imputation scenarios for pullback_pct: worst-case flat (0), hot-deck by base_depth_pct quartile, and multiple-imputation MAR using base_depth_pct + base_duration_weeks as predictors.",
+      "success_criterion": "Conditional pullback_pct AUC exceeds pullback_present_indicator AUC by ≥ 0.10 AND the 8.6pp median delta survives all three imputation scenarios within ±3pp.",
+      "failure_criterion": "pullback_present_indicator AUC ≥ 0.65 OR the median delta reverses sign under any imputation scenario (pullback depth is an MNAR proxy for 'having a recorded base stage,' not an independent capacity feature)."
+    },
+    {
+      "name": "mixed_label_entity_exclusion_sensitivity",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Recompute the within-extended-bucket AUC (researcher prediction #1) and the within-snapshot AUC (test 1) with and without entity_6618d3e80c (the snap_d0d57b1e40 row carrying the dual 'false_positive_ruin|selected_winner' label at the dataset-maximum px_vs_ma50 = 0.337). Report absolute AUC delta.",
+      "success_criterion": "|ΔAUC| < 0.03 in both tests (the mixed-label point is not load-bearing; high-extension tail finding is robust).",
+      "failure_criterion": "|ΔAUC| ≥ 0.08 in either test OR the high-extension tail AUC becomes undefined (the entire high-extension capacity claim rests on a structurally ambiguous label and must be re-derived from weekly sub-labels before any further use)."
+    }
+  ],
+  "leakage_checks": [
+    "snapshot_anon: permitted as a stratification variable only; must not appear as a predictor feature in any model trained on these 27 rows (it would absorb between-snapshot heterogeneity into the capacity score and inflate in-sample AUC).",
+    "w4_return_bucket and outcome_label: these are derived from the W4 forward window and MUST NOT appear in any test's feature list; verify by grep before each run.",
+    "entity_anon: identity leak; exclude from any feature matrix.",
+    "is_b0_pick: decision-time status, not a forward leak per se, but using it as a predictor for an outcome that is itself conditioned on is_b0_pick creates a label-construction circularity; allow only as a stratification or as the dependent variable in the redundancy test.",
+    "pullback_duration_weeks and pullback_pct: verify at audit that the snapshot date corresponds to the IBD entry trigger date; if pullback fields are populated using post-entry data, they are forward-leaking and must be removed from the feature matrix entirely (not just imputed).",
+    "ibd_entry_close_vs_trigger_pct: confirm it is computed at the IBD signal timestamp and not at a later anchor; a non-zero value is acceptable only if the trigger and entry close are contemporaneous.",
+    "base_depth_pct and base_duration_weeks: confirm these describe the base resolved BEFORE the IBD trigger, not the maximum drawdown observed across the entire W4 outcome window.",
+    "mom_60: confirm it uses only data available at the IBD trigger timestamp; rolling 60-day momentum ending after entry would be a forward leak.",
+    "Any feature with a name containing 'ibd_entry_*': re-validate PIT timestamp before inclusion; these are the highest-risk features for inadvertent forward-looking construction."
+  ],
+  "priority_order": [
+    "within_snapshot_capacity_discrimination",
+    "b0_filter_redundancy_decomposition",
+    "within_extended_bucket_auc_researcher_pred1",
+    "pullback_present_vs_depth_discrimination",
+    "mixed_label_entity_exclusion_sensitivity"
+  ]
+}
+```

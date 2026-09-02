@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The proposed 'adaptive capacity' is functionally a redundant mom_20 filter wrapped around a phantom base_depth_pct axis. The numeric_contrasts themselves show base_depth_pct has standardized delta = 0.19 with the WRONG SIGN (selected_winners are 3.7pp shallower than false_negatives, not deeper as the mechanism requires), so there is no statistical basis for base_depth_pct acting as a regime modifier. The interaction story is post-hoc narrative around a sample where mom_20 alone (standardized delta -1.00) and its colinear proxies (vol_ratio_5_20 = -1.05, up_day_ratio_20 = -1.19, px_vs_ma50 = -0.85) carry virtually all the lift. The claim should be reduced to 'shrink B0 exposure when mom_20 > some threshold' with base_depth_pct playing at most a tie-breaking role.",
+  "attacks": [
+    {
+      "issue": "base_depth_pct has near-zero and sign-reversed separation between false_negatives (-25.8) and selected_winners (-29.5) in the discovery sample; the mechanism claims deep bases sustain continuation, but winners are actually slightly shallower.",
+      "why_it_matters": "If the supposed 'capacity' axis does not separate outcomes and points the wrong way, the interaction term is fitting noise. Any penalty tied to exp(-k*|base_depth_pct|) is structurally unanchored and will be calibrated against a non-effect, producing spurious interaction signal that will not replicate."
+    },
+    {
+      "issue": "A threshold of mom_20 ≈ 0.17 captures only 5 of 8 false_positive_ruin cases (misses entity_ccc90a671f at 0.074, entity_55c2da490e at 0.036, entity_84824e6a20 at 0.067) while penalizing 4 of 11 selected_winners (entity_ead73f4390=0.320, entity_2c58cebc59=0.321, entity_3adc078f01=0.172, entity_b00579f203=0.230).",
+      "why_it_matters": "The mechanism's own prediction is violated by the sample: high-mom/shallow-base ruins and high-mom/deep-base winners co-exist in nearly equal numbers. Net selection damage is comparable to the ruin reduction claimed. The '≥30% ruin cut, ≤10% winner cut' falsifiable prediction in the prior output fails internally before any out-of-sample test."
+    },
+    {
+      "issue": "mom_20 is correlated with vol_ratio_5_20 (rho not shown but both have ~-1.0 standardized delta on FN vs winner), up_day_ratio_20, and px_vs_ma50 — all three of which independently separate FN from winner in the contrast table. The proposed mom_20 penalty is a proxy for late-stage exhaustion that vol_ratio or up_day_ratio would catch more directly.",
+      "why_it_matters": "Adding mom_20 on top of features that B0 likely already uses (or that are more proximate to the ruin mechanism: vol expansion, distribution days) double-counts the same signal and inflates apparent conditioning effect. The 'adaptive capacity' will look effective in-sample because it overweights an already-priced factor."
+    },
+    {
+      "issue": "Selected winners exist with NEGATIVE mom_20 and shallow bases (entity_2f86543bf6: mom_20=-0.008, px_vs_ma20=0.025, up_day_ratio_20=0.35, large_win) and with mom_20≈0 and weak slopes (entity_8ad5cd4795: mom_20=0.004, ma10_slope=-0.006, ma20_slope=-0.003, large_win with pullback -6.7%).",
+      "why_it_matters": "These are direct counterexamples to the monotonic-with-direction logic implicit in the 'capacity = base × momentum' formulation. If low-momentum shallow-base setups can be large winners, the proposed penalty must be very soft — soft enough that it barely changes sizing, which makes the whole intervention a no-op."
+    },
+    {
+      "issue": "27 cases with 8+11 split across an interaction of two continuous variables produces a quintile×tertile grid where most cells have 0-2 observations; the proposed non-monotonic surface is severely overfit and the 'capacity utilization diagnostic' will be uninformative.",
+      "why_it_matters": "With ~5 cells per quintile×tertile and most cells empty, the apparent 'worst cell at high-mom/shallow-base, best cell at mid-mom/deep-base' pattern is unstable. A single case reassignment flips the conclusion. The policy recommendation of triggering regime shifts at >50% capacity utilization is therefore unsupported."
+    },
+    {
+      "issue": "The proposed penalty formula 1 - alpha*(mom_20 - threshold)*exp(-k*|base_depth_pct|) introduces three free parameters (alpha, threshold, k) with no held-out estimation protocol disclosed, and the floor/ceiling are unconstrained.",
+      "why_it_matters": "With three knobs fit to 8 ruin cases, any apparent reduction in ruin rate is curve-fitting. Without nested cross-validation or a frozen test set, the falsifiable prediction (≥30% ruin reduction, ≤10% winner reduction) cannot be honestly evaluated; it is a target the formula will hit by construction."
+    },
+    {
+      "issue": "B0 selection itself almost certainly already incorporates momentum ranking (median mom_20 of selected_winners is 0.163 vs false_negatives 0.058). Adding a within-B0 mom_20 penalty is endogenously correlated with the existing filter, so the marginal information is overstated.",
+      "why_it_matters": "If B0 is partially defined by mom_20 quantile, then conditioning inside B0 on mom_20 is conditioning on a variable that is correlated with inclusion. The within-B0 mom_20 distribution is truncated, so the same threshold that discriminates between B0 and non-B0 has reduced variance and weaker signal inside B0 — this is regression-to-mean territory, not a stable late-stage marker."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with mom_20 > 0.20 and base_depth_pct < -30% that became large winners (e.g., entity_ead73f4390, entity_2c58cebc59) — count how often this signature produces winners vs ruins; if >50% winners, the high-mom/deep-base 'safe' zone in the proposed interaction is fictitious.",
+    "B0 picks with mom_20 < 0.08 and base_depth_pct > -20% that became ruins — entity_55c2da490e (mom_20=0.036, ruin), entity_ccc90a671f (0.074, ruin), entity_84824e6a20 (0.067, ruin) all qualify. Confirm whether these share a common sub-feature (vol_ratio, distribution days) that mom_20 alone does not capture.",
+    "Cases where is_b0_pick=false but mom_20 is in the upper tail of the selected_winner distribution (e.g., entity_df5478102d mom_20=0.125, false_negative_relative) — if B0 missed high-mom names, the proposed within-B0 momentum penalty has nothing to add.",
+    "Snapshots where the same entity appears with different outcomes — any snapshot showing entity_6618d3e80c carrying BOTH ruin and winner labels signals label noise that swamps the mom_20/base signal; the discovery sample's reliability is the limiting factor on conditional ranking claims.",
+    "Look for cases where vol_ratio_5_20 > 1.5 and up_day_ratio_20 < 0.5 within B0 (e.g., entity_84824e6a20 vol=1.63, up=0.4 → ruin) regardless of mom_20 — if this combination identifies ruins better than mom_20/base interaction, the proposed encoding captures a proxy, not the mechanism."
+  ],
+  "what_would_change_my_mind": [
+    "A held-out validation (not the same 27 cases) showing monotonic ruin probability across mom_20 quintiles within B0, with base_depth_pct tertiles shifting the curve in a statistically significant interaction (interaction p < 0.05 with stable cell counts ≥10).",
+    "Demonstration that the mom_20/base_depth_pct interaction adds incremental lift (e.g., +2pp hit rate or +0.1 Sharpe) after controlling for vol_ratio_5_20, up_day_ratio_20, and px_vs_ma50 in a multivariate model. If lift disappears when proxies are included, the interaction is a proxy artifact.",
+    "Evidence that the proposed soft penalty formula achieves the falsifiable prediction (≥30% ruin reduction, ≤10% winner reduction) out-of-sample with frozen alpha, threshold, k — not refit on the evaluation set.",
+    "Reconciling the sign-reversal: showing base_depth_pct has correct directional effect in a larger sample where selected_winners are DEEPER (more negative base_depth_pct) than false_negatives, not the 3.7pp shallower seen here.",
+    "A within-B0 stratified analysis confirming that the ruin mechanism is genuinely 'late-stage breakout exhaustion' (which requires specific micro-structure: climactic volume, distribution day counts) rather than generic over-extension — without micro-structure evidence, mom_20 is just a proxy for 'already up a lot.'"
+  ]
+}
+```

@@ -1,0 +1,87 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "T1_pre_specified_piecewise_ruin_rate_in_held_out_B0",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "is_b0_pick"
+      ],
+      "comparison": "Within a temporally held-out B0-eligible cohort (snap_03cf_split held fixed before archaeology), compute ruin rate (w4_return_bucket == 'ruin' or w4_return_bucket == 'loss') for the pre-specified reject set A = {mom_20 > 0.15 AND base_depth_pct > -25%} and the pre-specified accept set B = {mom_20 > 0.15 AND base_depth_pct < -30%}. Apply identical B0 slot accounting (top-3 by base ranking) before and after the filter; do not enlarge the candidate pool.",
+      "success_criterion": "Ruin rate(A) >= 0.50 AND ruin rate(B) <= 0.20, AND both rates differ by >= 0.30 absolute, AND accept-set B contains >= 50% of snapshot's w4_return_bucket == 'large_win' mass among the original B0 slot-3 candidates.",
+      "failure_criterion": "Either rate contrast < 0.20 absolute, OR ruin rate(B) >= 0.30, OR 'large_win' retention in B drops below 30% of original slot-3 'large_win' count."
+    },
+    {
+      "name": "T2_proxy_discrimination_vs_slopes_and_volatility",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Fit on discovery archaeology cases only (excluding held-out split from T1): fit a logistic regression (a) mom_20-only baseline, (b) slopes+volatility model using {ma10_slope_5, ma20_slope_5, vol_ratio_5_20, up_day_ratio_20}, (c) full model adding mom_20, base_depth_pct, and the pre-specified interaction I(mom_20>0.15 AND base_depth_pct>-25%). Compare AUC on the held-out split. Run bootstrap (B=200) within archaeology cases to estimate CI; pre-specify that adding the interaction must improve held-out AUC by >= 0.05 over the slopes+volatility model with CI lower bound > 0.",
+      "success_criterion": "AUC(full) - AUC(slopes+volatility) >= 0.05 with bootstrap 95% CI lower bound > 0; equivalently, the interaction term's coefficient in the full model has sign matching piecewise claim and p < 0.10 on the held-out split.",
+      "failure_criterion": "AUC improvement < 0.03, OR slopes+volatility model alone reaches within 0.02 AUC of full model, OR interaction coefficient flips sign across bootstrap resamples."
+    },
+    {
+      "name": "T3_pure_mom_20_additive_null_vs_interaction",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "is_b0_pick"
+      ],
+      "comparison": "Within archaeology + held-out B0 cohort combined, fit (a) mom_20-only logistic, (b) mom_20 + base_depth_pct additive linear logistic, (c) pre-specified interaction logistic. Use the same fixed cutoffs. Determine via likelihood-ratio test whether the interaction term significantly improves over additive. This isolates whether base_depth_pct acts as a moderator (interaction hypothesis) versus an independent linear effect (additive null).",
+      "success_criterion": "Interaction model AIC < additive model AIC by >= 2, AND interaction LR test p < 0.10; ruin rate response to mom_20 must be qualitatively different between base_depth_pct>-25% and base_depth_pct<-30% strata (e.g., ruin-vs-mom_20 slope sign-flip or magnitude ratio >= 2).",
+      "failure_criterion": "Additive model AIC within 1 of interaction model, OR ruin-vs-mom_20 slope signs match across base strata, OR coefficient on base_depth_pct is the dominant driver (|coef| > 2x interaction coefficient magnitude)."
+    },
+    {
+      "name": "T4_three_slot_accounting_invariance_check",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "is_b0_pick",
+        "w4_return_bucket"
+      ],
+      "comparison": "Within each snapshot in the held-out cohort, compute the original B0 top-3 by baseline rank; then apply the pre-specified re-ranking filter and recompute top-3. Tabulate the set-difference at slot level (which entities get swapped in/out) and attribute each swap to (i) parabolic-rejection removal, (ii) low-momentum shallow-base removal, (iii) deep-base pass-through. Count 'large_win' slots gained vs lost at the slot level (no expansion of universe, only reordering of the same 3 candidates per snapshot).",
+      "success_criterion": "Net change in 'large_win' slots per snapshot >= 0 in >= 60% of held-out snapshots; ruin slots in top-3 reduced by >= 40% relative to original; no snapshot loses a 'large_win' that the original B0 contained unless a 'ruin' replaces it.",
+      "failure_criterion": "In >= 40% of snapshots net 'large_win' slot count <= 0, OR any snapshot loses a 'large_win' that is replaced by a 'small_win'/'loss' (i.e., filter destroys more winners than it removes ruinations)."
+    },
+    {
+      "name": "T5_label_contamination_and_robustness_to_exclusions",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "is_b0_pick",
+        "outcome_label"
+      ],
+      "comparison": "Re-run T1 and T3 under three alternative label sets on the archaeology cases: (a) exclude entity_6618d3e80c (dual-labelled 'false_positive_ruin|selected_winner') entirely, (b) relabel dual-labelled cases as 'selected_winner' only, (c) relabel dual-labelled cases as 'false_positive_ruin' only. Also drop any case where pullback_pct or pullback_duration_weeks is null AND outcome requires pullback context. Re-estimate each model's claim (sign, magnitude, significance) under each relabeling.",
+      "success_criterion": "Direction and qualitative magnitude of ruin-rate contrast (A vs B from T1) hold across all three relabelings: sign-flip count = 0 and absolute contrast changes by < 0.15 in any relabeling.",
+      "failure_criterion": "Sign-flip in any relabeling, OR absolute ruin-rate contrast changes by >= 0.20 under any relabeling, OR interaction coefficient in T3 becomes insignificant in >= 2 of 3 relabelings."
+    }
+  ],
+  "leakage_checks": [
+    "All cutoffs (mom_20 = 0.15, 0.05; base_depth_pct = -25%, -30%) are taken from the researcher's prior policy_implications and frozen here; they must NOT be re-fit on the held-out B0 cohort or on archaeology cases.",
+    "Snapshot/case partitioning into archaeology (training) vs held-out must occur BEFORE any model fit; document the partition and reuse it identically across T1-T5 to prevent selection-driven leakage.",
+    "No use of w4_return_bucket, outcome_label, pullback_pct, or pullback_duration_weeks as inputs to the filter; these are evaluation-only.",
+    "Base ranking input used to order the 3 fixed B0 slots per snapshot must be computed from PIT features only (no W4 information); audit the ranker for any leakage of forward-looking fields.",
+    "Re-ranking in T4 must not introduce any candidate outside the original B0-eligible universe; verify universe cardinality before and after the filter is identical.",
+    "Bootstrap resamples in T2 must respect the architecture of the data (case-level resampling with cases as units, not feature-level sampling) to avoid optimistic variance estimates.",
+    "All feature transformations (e.g., indicator construction I(mom_20>0.15 AND base_depth_pct>-25%)) must use thresholds frozen in T1-T3; no threshold search inside the test loop.",
+    "Entity_6618d3e80c dual-label must be treated as defined in T5 BEFORE any other test runs, so that downstream tests are interpretable under a single documented label convention."
+  ],
+  "priority_order": [
+    "T1_pre_specified_piecewise_ruin_rate_in_held_out_B0",
+    "T2_proxy_discrimination_vs_slopes_and_volatility",
+    "T4_three_slot_accounting_invariance_check",
+    "T3_pure_mom_20_additive_null_vs_interaction",
+    "T5_label_contamination_and_robustness_to_exclusions"
+  ]
+}
+```

@@ -1,0 +1,29 @@
+{
+  "mechanism_claim": "B0 false-positive ruin occurs when volume confirmation peaks at or before the signal snapshot and subsequently contracts, indicating distribution rather than accumulation; the short-term momentum (MA10 slope) decelerates relative to longer-term trend (MA20 slope), creating divergence that predicts failure despite otherwise healthy entry geometry.",
+  "evidence_for": [
+    "false_positive_ruin cases show vol_ratio_5_20 median of 1.21-1.45 (high early confirmation) versus selected_winner median of 1.42-1.58, but this ratio subsequently collapses post-snapshot in ruin cases",
+    "ma10_slope_5 standardized delta is -0.6815 between false_negative and selected_winner, indicating short-term momentum decay is a distinguishing feature at snapshot",
+    "entity_8f0df3d38e (ruin): vol_ratio_5_20=1.24, ma10_slope_5=0.054, ma20_slope_5=0.037 (ratio=1.46), then pulls back -16.2% over 7 weeks",
+    "entity_40ea0cfb3b (ruin): vol_ratio_5_20=0.906 (below median), indicating volume already contracted at snapshot, with mom_20=0.024 (lowest in ruin set)",
+    "selected_winner entity_2c58cebc59 sustains vol_ratio_5_20=1.62 and ma10_slope_5=0.013 despite pullback of -25.1% (recovery occurred because volume stayed elevated)",
+    "px_vs_ma20 delta of -0.5842 standardized suggests false-positive ruin cases have weaker price proximity to moving averages, consistent with distribution pattern"
+  ],
+  "evidence_against": [
+    "entity_6618d3e80c labeled both false_positive_ruin and selected_winner with vol_ratio_5_20=1.45 and ma10_slope_5=0.075, showing mixed signal cannot resolve cleanly",
+    "entity_b00579f203 (selected_winner) has vol_ratio_5_20=1.58 but also high mom_20=0.23 and ma10_slope_5=0.053, suggesting high volume alone insufficient without momentum context",
+    "Pullback metrics are unavailable at snapshot time for 6 of 8 ruin cases, so the failure mechanism must be inferred from pre-snapshot features only",
+    "Two ruin cases (entity_4fdc3699fd, entity_84824e6a20) show up_day_ratio_20=0.6 and 0.4 respectively, indicating breadth deterioration is not a consistent predictor"
+  ],
+  "falsifiable_predictions": [
+    "A B0 pick with vol_ratio_5_20 > 1.4 AND ma10_slope_5 > 0.05 AND ma10_slope_5 / ma20_slope_5 ratio > 1.2 will NOT produce ruin outcome regardless of other features",
+    "A B0 pick with vol_ratio_5_20 < 1.0 at snapshot will produce ruin outcome in >80% of cases if other momentum features are weak (mom_20 < 0.08)",
+    "A B0 pick showing vol_ratio_5_20 > 1.5 but with ma10_slope_5 turning negative within 2 weeks post-snapshot will produce false-positive ruin despite early volume confirmation",
+    "Counterexample to invalidate: Find a B0 pick with vol_ratio_5_20=0.85 (volume dry-up) and ma10_slope_5=0.06 (strong short-term momentum) that becomes selected_winner with large_win bucket—this would falsify the claim that volume contraction + strong momentum predicts ruin"
+  ],
+  "policy_implications": [
+    "Add post-snapshot volume monitoring rule: if vol_ratio_5_20 declines by >30% within first 3 weeks after B0 signal, exit or reduce position regardless of price action",
+    "Filter B0 candidates with vol_ratio_5_20 < 1.0 out of fresh entries; allow existing positions only if ma10_slope_5 > 0.04 and mom_20 > 0.10",
+    "Use ma10_slope_5 / ma20_slope_5 ratio as entry quality gate: reject B0 picks where ratio < 1.0 even if absolute momentum values appear acceptable",
+    "Avoid increasing position size on B0 picks showing vol_ratio_5_20 > 1.4 at entry without confirming ma10_slope_5 acceleration in subsequent weeks"
+  ]
+}

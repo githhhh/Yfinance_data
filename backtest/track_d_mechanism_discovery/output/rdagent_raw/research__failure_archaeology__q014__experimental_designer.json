@@ -1,0 +1,88 @@
+{
+  "tests": [
+    {
+      "name": "snapshot_regime_test",
+      "features": [
+        "is_b0_pick",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "comparison": "Compute within-snapshot false_negative_large_win_rate versus across-snapshot pooled rate. For each snapshot with ≥3 false-negative cases, compute snapshot-level false_negative_large_win_rate. Then compare variance across snapshots vs. binomial sampling variance.",
+      "success_criterion": "Within-snapshot variance in false_negative_large_win_rate explains ≥40% of total variance (ICC ≥ 0.40), confirming snapshot-level regime drives outcomes rather than stock-specific features",
+      "failure_criterion": "Snapshot explains <25% of outcome variance (ICC < 0.25), confirming stock-specific features drive outcomes independent of temporal confounds"
+    },
+    {
+      "name": "vol_ratio_directionality_test",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Split is_b0_pick=false cohort at vol_ratio_5_20=1.25 (dataset 25th percentile). Within each vol_ratio stratum, test whether mom_20 OR up_day_ratio_20 predicts large_win vs. loss/ruin using logistic regression. This separates vol_ratio's independent effect from momentum proxy correlation.",
+      "success_criterion": "Among vol_ratio_5_20 <1.25 (low vol), mom_20 > 0.12 increases large_win probability by ≥20pp vs. mom_20 < 0.05. Among vol_ratio_5_20 ≥1.25, no momentum threshold significantly improves large_win probability, confirming vol_ratio operates via different mechanism.",
+      "failure_criterion": "Mom_20 predicts large_win equally within both vol_ratio strata (no interaction effect), indicating vol_ratio is a correlated proxy for momentum rather than independent mechanism"
+    },
+    {
+      "name": "pullback_magnitude_vs_duration_test",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "comparison": "Within is_b0_pick=false cohort, compute Pearson correlation between pullback_pct and W4_return_bucket (ordinal: ruin=1, loss=2, small_win=3, large_win=4). Then compute same for pullback_duration_weeks vs. W4_return_bucket. Compare absolute correlation coefficients.",
+      "success_criterion": "Pullback_duration_weeks correlation with outcome ordinal is ≥1.5x the magnitude of pullback_pct correlation, confirming duration is the operative mechanism over magnitude",
+      "failure_criterion": "Pullback_pct correlation with outcome is equal or greater magnitude than pullback_duration_weeks correlation, contradicting the duration-based mechanism"
+    },
+    {
+      "name": "negative_momentum_selected_winner_test",
+      "features": [
+        "is_b0_pick",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Examine is_b0_pick=true cases where mom_20 < 0.05 AND up_day_ratio_20 < 0.45. Compute their large_win rate vs. is_b0_pick=true cases with mom_20 > 0.10 AND up_day_ratio_20 > 0.55. If researcher mechanism is correct, the low-momentum selected cases should be rare or produce poor outcomes.",
+      "success_criterion": "Selected winners with negative/low momentum (mom_20 < 0.05, up_day_ratio_20 < 0.45) have large_win rate ≤15%, confirming B0 selection does not bypass momentum proxy filtering",
+      "failure_criterion": "Selected winners with negative/low momentum have large_win rate >30%, demonstrating B0 selection includes non-momentum signals that override mom_20/up_day_ratio_20"
+    },
+    {
+      "name": "pullback_depth_within_false_negative_winners_test",
+      "features": [
+        "pullback_pct",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Within is_b0_pick=false large_win cases, compare pullback_pct distributions for vol_ratio_5_20 < 1.20 vs. vol_ratio_5_20 ≥ 1.20. Researcher's mechanism predicts low-vol winners should have shallower pullbacks; skeptic predicts the opposite or no pattern.",
+      "success_criterion": "False-negative large_win cases with vol_ratio_5_20 < 1.20 have median pullback_pct > -8%, confirming the shallow-pullback-with-low-volatility pattern predicted by skeptic",
+      "failure_criterion": "False-negative large_win cases show no systematic relationship between vol_ratio and pullback_pct, indicating both features operate independently"
+    },
+    {
+      "name": "proxy_collapse_test",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Perform principal component analysis on mom_20, up_day_ratio_20, ma10_slope_5, ma20_slope_5 within is_b0_pick=false cohort. Identify whether PC1 explains ≥70% of variance (proxy collapse) or requires ≥3 components (distinct signals). Then test whether PC1 alone predicts large_win vs. higher-order PCs adding predictive power.",
+      "success_criterion": "PC1 explains ≥70% of momentum-feature variance AND PC1 alone predicts large_win with AUC ≥ 0.65, while adding PC2/PC3 does not improve AUC by >0.05, confirming mom_20 and up_day_ratio_20 are a single proxy rather than independent signals",
+      "failure_criterion": "Requires ≥3 components to explain ≥80% of variance, OR higher-order PCs improve AUC by >0.08 over PC1 alone, indicating these are distinct signals with different predictive content"
+    }
+  ],
+  "leakage_checks": [
+    "No feature in any test uses information unavailable at snapshot time (all features are trailing or contemporaneous)",
+    "Snapshot identity is used only as a grouping variable for regime testing, never as a predictive feature",
+    "Outcome labels (large_win, ruin) are computed from future W4 returns and cannot be used as input features",
+    "is_b0_pick is a contemporaneous signal, not a forward prediction, so using it to stratify cohorts is valid",
+    "pullback_pct and pullback_duration_weeks are computed from price history before snapshot, not from post-snapshot price action"
+  ],
+  "priority_order": [
+    "snapshot_regime_test",
+    "vol_ratio_directionality_test",
+    "pullback_magnitude_vs_duration_test",
+    "negative_momentum_selected_winner_test",
+    "pullback_depth_within_false_negative_winners_test",
+    "proxy_collapse_test"
+  ]
+}

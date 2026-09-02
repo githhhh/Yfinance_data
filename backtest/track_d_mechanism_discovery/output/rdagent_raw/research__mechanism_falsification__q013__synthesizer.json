@@ -1,0 +1,80 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 58,
+  "mechanism_summary": "The archaeology shows eps_preference is failing as a downside-risk gate in its current deployment: 8 of 16 B0-picks ended in ruin (50%), and the ruin cases carry the same high-mom_20 / high-up_day_ratio_20 / elevated-vol_ratio_5_20 signature as the 11 selected winners. This is incompatible with eps_preference acting as a monotone tail-loss suppressor. However, the data cannot cleanly adjudicate the researcher's claim that eps_preference is therefore 'purely' a return-ranking proxy, because Berkson-style upstream filtering means we never observe the names eps_preference (or the B0 gate it sits behind) rejected outright. The visible B0 cohort is a doubly-conditioned slice — IBD pullback qualification AND the eps_preference threshold — so the rank-correlation of eps_preference with mom_20 / up_day_ratio_20 is consistent with BOTH (a) eps_preference being a momentum repackaging and (b) eps_preference measuring earnings-revision persistence via features that themselves drift on earnings news (PEAD-confounded). The Skeptic's dual-labeling critique (entity_6618d3e80c being simultaneously ruin and winner) further destabilizes the binary outcome framing the whole argument rests on. Net: eps_preference is operationally broken as risk control; its historical value likely derives mostly from momentum/RS leadership co-loading, but the marginal-vs-rejected comparison needed to certify that is unavailable in this archaeology.",
+  "falsifiers": [
+    "Within-B0-pick ruin-vs-winner Mann-Whitney on eps_preference proxy score (using mom_20, up_day_ratio_20, vol_ratio_5_20 as the proxy as per the experimental designer's test 1): if ruin and winner B0 picks are statistically indistinguishable on the proxy (p > 0.30, |rank-diff| < 0.10), the risk-control interpretation is falsified. This is the single decisive test the researcher did NOT run.",
+    "Synthetic-reconstruction under a strict 3-slot budget (mom_20, up_day_ratio_20, vol_ratio_5_20): if Spearman(original B0 rank, reconstructed B0 rank) > 0.85 and median per-snapshot adjusted R^2 > 0.75, eps_preference is informationally redundant with the proxy trio and earns no independent slot.",
+    "Berkson-conditioning test: restrict to cases with documented pullback base (subset P) vs null-pullback cases (subset N) and recompute Spearman(proxy, outcome_rank). If |rho_P - rho_N| > 0.40, the lift is selection-artifact and eps_preference acted upstream of IBD base qualification rather than as an independent risk filter.",
+    "Cross-regime test on sector EPS-revision breadth: in snapshots where the broader EPS-revision breadth was negative, if eps_preference's high-score cohort STILL shows 50%+ ruin rate while low-score names did no worse, the risk-control claim is falsified. If eps_preference correctly turned defensive and ruin concentrated in low-score names, the residual-risk-filter interpretation survives.",
+    "Out-of-sample ablation (the only test that can escape Berkson): run B0 with eps_preference weight set to zero on a held-out period. If ruin rate among survivors drops by < 1pp AND median W4 return shifts by < 0.5pp, eps_preference is operationally inert and the slot should be retired. This is the experimental designer's redundancy test extended to true out-of-sample.",
+    "Dual-label robustness: re-run the entire analysis under both (i) duplicate-the-row and (ii) drop-entirely protocols for entity_6618d3e80c. The mechanism claim is valid only if both protocols agree on direction AND magnitude; disagreement flags UNRESOLVED rather than committing to a verdict.",
+    "Null-pullback imputation sensitivity: re-run the reconstruction and ranking tests under complete-case, null-as-distinct-category, and multiple-imputation protocols for pullback_pct / pullback_duration_weeks. Mechanism claim survives only if all three agree on the Spearman / R^2 thresholds."
+  ],
+  "actionable_design_principles": [
+    "Stop treating eps_preference as a downside-risk-management lever in B0; the visible archaeology (50% ruin among B0 picks with the same momentum signature as winners) directly contradicts that role regardless of the marginal-effect question.",
+    "Reframe the eps_preference component around an explicitly PIT-observable earnings-revision breadth measure (% analysts raising next-Q EPS over trailing 8 weeks, lagged to be PIT-clean), not an inferred score derived from price/volume features. This is the only way to break the PEAD-confound loop the Skeptic identified.",
+    "Separate two distinct questions the archaeology conflates: (a) is eps_preference risk-controlling? (answer is empirically NO given current outcomes) and (b) is eps_preference providing any incremental signal beyond mom_20/up_day_ratio_20/vol_ratio_5_20? (cannot be answered inside this Berkson-conditioned sample). The ablation/out-of-sample test above answers (b) and must be the gate for keeping the slot.",
+    "Build a probabilistic outcome model rather than binary ruin/winner labels, given that entity_6618d3e80c simultaneously carries both labels — the binary dichotomy is demonstrably unstable for individual names and inflates false precision in the contrast tables.",
+    "Add an explicit ruin-suppression layer keyed to features that DO separate ruin from winners in the archaeology (the conditional patterns: low up_day_ratio_20 paired with positive mom_20; high px_vs_ma50 paired with high vol_ratio_5_20). This is a true downside filter, not eps_preference in disguise.",
+    "Implement snapshot-blocked inference everywhere (per experimental designer's leakage_checks): resample at snapshot_anon level, never at case level, because snap_d0d57b1e40 and snap_71486ed83c each carry 6 cases and can dominate naive per-case p-values.",
+    "Cap the B0 slot budget: until the redundancy test passes, do not let eps_preference earn a 4th candidate feature in its proxy signal. If it cannot be reconstructed from the 3-slot trio, that itself is evidence of its informational distinctness and a separate decision must be made about whether the distinctness is genuine or overfitting.",
+    "Track contribution attribution quarterly: if removing eps_preference changes the B0 W4-return distribution by < 0.5pp median and ruin rate by < 1pp, retire the component for parsimony regardless of its documentation history."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "eps_revision_breadth_zscore",
+      "why_distinct": "Replaces the inferred eps_preference score with an explicit, PIT-observable measure (rolling 8-week % of analysts raising next-Q EPS, lagged one publication cycle and z-scored within sector). This breaks the PEAD confound the Skeptic flagged and gives a directly auditable signal rather than a derived composite.",
+      "features": [
+        "analyst_revision_breadth_8w",
+        "eps_revision_persistence_4w",
+        "sector_eps_revision_zscore"
+      ],
+      "capacity_relevance": "Occupies the slot currently held by an inferred composite; capacity-neutral but shifts the data dependency from price/volume to fundamental feeds, which carries its own data-availability and survivorship considerations."
+    },
+    {
+      "idea": "ruin_suppression_layer_v1",
+      "why_distinct": "Implements the conditional ruin patterns actually visible in the archaeology (low up_day_ratio_20 + positive mom_20; high px_vs_ma50 + high vol_ratio_5_20) as an explicit post-B0 veto layer. This is a TRUE downside-risk-control feature built from the diagnostic archaeology actually showed, rather than a renamed eps_preference.",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "px_vs_ma50",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Adds one slot; functions as a conditional gate rather than a continuous score, so its capacity cost is purely the additional conditioning rules not additional model parameters."
+    },
+    {
+      "idea": "ablation_test_policy",
+      "why_distinct": "Institutionalizes the experimental designer's redundancy test as a quarterly governance rule: for every B0 component, run a held-out ablation with that component's weight set to zero and compare ruin rate / W4-return distribution. If the change is below the thresholds above, the component is flagged for retirement. This is the only mechanism that escapes Berkson conditioning in the in-sample archaeology.",
+      "features": [
+        "component_id",
+        "weight_set_to_zero_outcome_diff",
+        "ruin_rate_delta_pp",
+        "w4_median_return_delta_pp"
+      ],
+      "capacity_relevance": "Capacity-neutral; purely a governance/policy layer on top of existing model capacity. Forces component retirement rather than indefinite slot retention."
+    },
+    {
+      "idea": "dual_label_resolution_protocol",
+      "why_distinct": "Standardizes handling of cases like entity_6618d3e80c (and any future dual-labeled case) by requiring both duplicate-the-row and drop-entirely analyses with a pre-registered agreement threshold. This neutralizes the Skeptic's instability-of-binary-outcome critique and prevents single dual-labeled cases from swinging contrast tables.",
+      "features": [
+        "outcome_label_set",
+        "protocol_id",
+        "spearman_under_duplicate",
+        "spearman_under_drop"
+      ],
+      "capacity_relevance": "Capacity-neutral; affects analysis pipeline only, no additional model slots."
+    },
+    {
+      "idea": "snapshot_blocked_inference_default",
+      "why_distinct": "Mandates block-bootstrap at snapshot_anon granularity for every significance test on this archaeology, with leave-one-snapshot-out sensitivity checks. Directly addresses the Skeptic's snapshot-clustering critique (snap_d0d57b1e40 / snap_71486ed83c each contribute 6 of 27 cases) and prevents within-snapshot correlation from inflating significance.",
+      "features": [
+        "snapshot_anon",
+        "block_size",
+        "n_bootstraps",
+        "loo_snapshot_id"
+      ],
+      "capacity_relevance": "Compute-cost increase (more bootstrap replications) but no model capacity change."
+    }
+  ]
+}

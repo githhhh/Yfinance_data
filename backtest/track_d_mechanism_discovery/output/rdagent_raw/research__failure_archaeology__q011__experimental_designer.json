@@ -1,0 +1,74 @@
+{
+  "tests": [
+    {
+      "name": "entry_timing_vs_slope_ratio_orthogonality",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within ibd_entry_close_vs_trigger_pct quartile (terciles), test whether ma10_slope_5/ma20_slope_5 ratio retains predictive power for false_positive_ruin vs selected_winner after conditioning out entry timing",
+      "success_criterion": "Slope ratio OR ma10_slope_5 residualized against ibd_entry_close_vs_trigger_pct has conditional AUC > 0.65 for distinguishing ruin from winner within at least 2 of 3 entry-timing terciles",
+      "failure_criterion": "Slope ratio becomes non-significant (p > 0.15) after conditioning on entry timing quartile; 95% CI on slope ratio coefficient includes zero within each entry tercile—confirms the skeptic's confounding claim"
+    },
+    {
+      "name": "vol_ratio_independence_from_entry_timing",
+      "features": [
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Partial correlation test: does vol_ratio_5_20 predict ruin conditional on ibd_entry_close_vs_trigger_pct and up_day_ratio_20? This separates whether vol_ratio captures genuine volatility regime vs late-breakout kinematics",
+      "success_criterion": "vol_ratio_5_20 partial correlation with ruin outcome remains significant (p < 0.10) after regressing out ibd_entry_close_vs_trigger_pct and up_day_ratio_20; standardized partial effect > 0.3",
+      "failure_criterion": "vol_ratio_5_20 is fully explained by entry timing and up_day_ratio_20; partial correlation CI includes zero—vol_ratio is a derived proxy with no independent signal"
+    },
+    {
+      "name": "snapshot_regime_heterogeneity_test",
+      "features": [
+        "snapshot_anon",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Test whether ruin base rate differs significantly across snapshots (Q-test for homogeneity). If snapshots are homogeneous, individual-level features are sufficient; if heterogeneous, snapshot-level (regime) features are needed to avoid omitted-variable bias in mechanism claims",
+      "success_criterion": "Cochran Q-test rejects homogeneity of ruin proportion across snapshots (p < 0.05); within-snapshot ruin rates range from <10% to >40%; confirms regime heterogeneity that could confound individual-level feature claims",
+      "failure_criterion": "Snapshots are homogeneous in ruin base rate (Q-test p > 0.30); ruin vs winner separation is entirely explained by within-snapshot individual features, not regime effects"
+    },
+    {
+      "name": "genuine_momentum_vs_late_breakout_separation",
+      "features": [
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Cluster the 27 cases into 'genuine momentum' (high mom_20, high up_day_ratio_20, moderate entry timing) vs 'late breakout' (high ibd_entry_close_vs_trigger_pct, high slope ratio, moderate mom_20). Test if outcome distribution differs across these clusters independently of the entry timing proxy",
+      "success_criterion": "Late-breakout cluster has ruin rate >60% and genuine-momentum cluster has ruin rate <20%; this separation holds even when comparing within similar entry-timing terciles, confirming a mechanism distinct from entry timing",
+      "failure_criterion": "Cluster assignment is redundant with entry timing; all genuine-momentum cases also have early entry timing, and all late-breakout cases have late entry timing—no separable mechanism exists"
+    },
+    {
+      "name": "skewed_up_day_ratio_as_independent_ruin_predictor",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Test whether up_day_ratio_20 < 0.50 (lower fraction of up days) predicts ruin after conditioning on mom_20 and ibd_entry_close_vs_trigger_pct. This tests if 'choppiness within momentum' is a distinct signal from 'momentum magnitude' and 'entry timing'",
+      "success_criterion": "up_day_ratio_20 < 0.50 has OR > 2.5 for ruin vs winner after adjusting for mom_20 quartile and entry timing tercile; confirms choppiness as independent negative signal",
+      "failure_criterion": "up_day_ratio_20 effect is fully explained by mom_20 and entry timing; low up_day_ratio_20 is merely a correlate of late-stage consolidation with no independent predictive value"
+    }
+  ],
+  "leakage_checks": [
+    "pullback_pct and pullback_duration_weeks are post-hoc outcomes, not snapshot-time features—must be excluded from all predictive tests or treated as outcomes only",
+    "w4_return_bucket is the outcome being predicted; cannot be used as a feature in any test",
+    "ma10_slope_5/ma20_slope_5 ratio is a derived feature; tests must verify it is not merely a linear transform of ibd_entry_close_vs_trigger_pct (correlation < 0.80 required to treat as candidate independent feature)",
+    "Snapshot-level aggregation must not use future information; tests requiring sector-ETF momentum or concentration indices cannot be executed with current frozen evidence and should be marked UNRESOLVED",
+    "Any threshold proposed (e.g., slope ratio > 2.0) must be pre-specified based on domain theory, not data-snooped from the 27-case sample; bootstrap validation required to confirm threshold stability"
+  ],
+  "priority_order": [
+    "entry_timing_vs_slope_ratio_orthogonality",
+    "snapshot_regime_heterogeneity_test",
+    "vol_ratio_independence_from_entry_timing",
+    "skewed_up_day_ratio_as_independent_ruin_predictor",
+    "genuine_momentum_vs_late_breakout_separation"
+  ]
+}

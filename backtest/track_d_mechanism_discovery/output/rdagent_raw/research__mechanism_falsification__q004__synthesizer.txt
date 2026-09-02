@@ -1,0 +1,90 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 28,
+  "mechanism_summary": "The B0 'freshness' component, as currently operationalized via pullback_duration_weeks and pullback_pct, does not display a directional pattern in the 27-case archaeology consistent with an independent corrective-recency mechanism. Selected winners exhibit longer and deeper pullbacks (median 5.5 weeks / -15.9%) than false negatives (4.0 weeks / -7.3%), which is the opposite of a depth-as-freshness hypothesis. However, the construct is not cleanly identifiable: (a) pullback fields are undefined for a non-trivial subset, producing missing-not-at-random truncation; (b) the temporally most local neighbor (ibd_entry_close_vs_trigger_pct, std delta -0.70) was excluded from the 'neighboring' control set; (c) vol_ratio_5_20 and entry-extension trio capture adjacent recency/regime information; (d) n=27 with one dual-labeled entity yields insufficient statistical power to reject any directional claim. The cleaner reading is that 'freshness' as pullback recency/depth is probably a redundant re-labeling of recent-strength or extension state already encoded by the neighbor block, but the evidence cannot prove that without a preregistered nested-model test on a larger held-out cohort.",
+  "falsifiers": [
+    "Out-of-sample incremental test: a preregistered freshness block added to a baseline of mom_20 + ma10_slope_5 + ma20_slope_5 + px_vs_ma20 + px_vs_ma50 + ibd_entry_close_vs_trigger_pct + vol_ratio_5_20 yields non-positive partial coefficient, likelihood-ratio p>0.5, or AUC delta <0.005 on a held-out discovery cohort — falsifies independent contribution.",
+    "Substitution test: vol_ratio_5_20 + up_day_ratio_20 + atr_14_pct replicates the freshness block's apparent W4 separation within AUC delta <0.02 AND partial correlation between vol_ratio_5_20 and any freshness proxy exceeds 0.5 — falsifies freshness as separable from volatility-regime state.",
+    "Substitution test: ibd_entry_close_vs_trigger_pct + current_vs_ibd_candidate_pct + ibd_entry_close_position reproduces freshness discrimination within AUC delta <0.02 and freshness contributes nothing once this entry-extension trio is added — falsifies freshness as separable from recency-of-trigger.",
+    "Within-stratum matched comparison (mom_20 quintile x vol_ratio_5_20 quintile x px_vs_ma20 quintile): across qualifying strata (n>=10), fresh vs. stale pullback candidates show <1pp median W4 return gap, or sign-rank test p>0.5, or fewer than 4 qualifying strata — falsifies freshness as a within-strength-bucket effect.",
+    "Missingness-pattern test: a model using only the null/non-null pullback indicator plus the baseline trio reaches AUC within 0.02 of a model adding pullback_duration_weeks and pullback_pct magnitudes on the non-null subset — falsifies the magnitude content of freshness.",
+    "Direction reversal: coefficient on pullback_duration_weeks flips sign across two independent time regimes, or the incremental AUC gain disappears under a 5pp transaction-cost haircut — falsifies portability and economic significance of the mechanism.",
+    "Label-reclassification sensitivity: reclassifying the one dual-labeled entity (false_positive_ruin|selected_winner) and two ambiguous null-pullback cases flips the apparent freshness sign in the 27-case archaeology — falsifies identifiability of the effect at this sample size."
+  ],
+  "actionable_design_principles": [
+    "Do not promote freshness to B0 production scoring until a nested-model incremental test on a larger held-out cohort with explicit entry-extension and vol-regime controls passes at p<0.10 and AUC delta >=0.01.",
+    "Reject any freshness specification that omits ibd_entry_close_vs_trigger_pct from its control set; this is the temporally most local neighbor and excluding it amounts to construct laundering.",
+    "Encode pullback-field missingness as an explicit neutral setup-status category (e.g., 'no_qualifying_pullback_detected') rather than zero-imputing it; treat the missingness indicator as a candidate feature on equal footing with the magnitudes.",
+    "Require point-in-time documentation for every freshness input: the detection algorithm, the window over which the pullback was identified, and the timestamp of the candidate event must be auditable from data through the snapshot date only.",
+    "Separate stock-level mechanism validation from portfolio-construction effects; freshness must demonstrate incremental conditional stock-level W4 discrimination before being folded into B0 composite scoring.",
+    "Cap any freshness coefficient's contribution to B0 score until the vol-regime substitution test and entry-extension substitution test are both run; redundancy at either step caps weight at the residual partial R-squared.",
+    "Mandate a minimum per-stratum cell size (n>=10) before drawing conclusions about freshness within matched mom_20 x vol_ratio_5_20 x px_vs_ma20 strata; pool or declare UNRESOLVED otherwise."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "two_part_setup_recency",
+      "why_distinct": "Replaces the single pullback-duration/depth construct with an explicit pair: (1) time_since_pivot — the elapsed weeks between a mechanically detected pivot (pullback trough or base breakout) and the snapshot date; (2) setup_state_indicator — a three-valued categorical {fresh_breakout, in_pullback, no_qualifying_setup}. This is distinct because it separates 'how recent' from 'what stage', neither of which the current pullback block encodes, and it treats the no-setup state as a first-class category instead of an implicit null.",
+      "features": [
+        "time_since_pivot_weeks",
+        "setup_state_indicator",
+        "pivot_detection_method_id",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Two-part encoding forces the model to allocate capacity between recency magnitude and stage identity, preventing the current collinear pullback-duration/depth interaction from saturating one weight; the stage indicator also captures the missingness-as-signal structure that current specifications waste."
+    },
+    {
+      "idea": "missingness_aware_freshness_status",
+      "why_distinct": "Introduces a dedicated freshness_status categorical with levels {detected_fresh, detected_stale, not_detected, ambiguous} that is consumed as a feature in its own right rather than as a column of nulls. Distinct because it makes the upstream detection filter an explicit input to the B0 score, so the filter's effect can be partialed out cleanly before testing any magnitude coefficient.",
+      "features": [
+        "freshness_status",
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "detection_rule_version",
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Carrying freshness_status as a categorical rather than letting missingness leak through silently prevents one column of nulls from being treated as either zero or as a numeric, and gives the B0 scorer a chance to learn the eligibility-filter effect separately from the magnitude effect."
+    },
+    {
+      "idea": "recency_residual_against_neighbor_trio",
+      "why_distinct": "Defines freshness as the residual of pullback recency after regressing out ibd_entry_close_vs_trigger_pct, current_vs_ibd_candidate_pct, and ibd_entry_close_position. Distinct because it operationalizes the skeptic's omitted-variable attack constructively: if the residual still predicts W4 incrementally, freshness carries information orthogonal to entry extension; if it does not, freshness is construct laundering and can be dropped.",
+      "features": [
+        "freshness_residual",
+        "ibd_entry_close_vs_trigger_pct",
+        "current_vs_ibd_candidate_pct",
+        "ibd_entry_close_position",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Residual-against-neighbor specification consumes a single feature slot for freshness while enforcing the independence criterion as part of the feature definition itself, so downstream models cannot accidentally reabsorb the omitted entry-extension signal."
+    },
+    {
+      "idea": "vol_regime_aware_recency_band",
+      "why_distinct": "Conditions any freshness contribution on a discrete vol_regime band derived from vol_ratio_5_20 quantiles, allowing the freshness coefficient to vary by regime rather than be pooled. Distinct because the 27-case archaeology shows false-negative vs. selected-winner separation is partly a regime phenomenon (vol_ratio_5_20 std delta -1.05), so a single global freshness weight likely conflates regimes; a banded weight isolates the freshness mechanism from the regime confound.",
+      "features": [
+        "vol_regime_band",
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "freshness_status",
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Banded coefficients cost more capacity than a pooled coefficient but prevent the regime-freshness confound from biasing a single weight toward zero (range restriction under a pooled fit)."
+    }
+  ]
+}
+```

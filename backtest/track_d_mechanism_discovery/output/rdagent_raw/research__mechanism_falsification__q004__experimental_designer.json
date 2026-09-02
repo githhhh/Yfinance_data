@@ -1,0 +1,88 @@
+{
+  "tests": [
+    {
+      "name": "freshness_block_vs_neighbor_trio_incremental",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Fit nested models on the 27-case archaeology (only cases with non-null pullback fields) and require estimation on a larger held-out discovery cohort. Compare (A) baseline trio (mom_20, ma10_slope_5, px_vs_ma20) versus (B) baseline trio + freshness block as the 4th-6th slot. W4 discrimination is the calibration metric.",
+      "success_criterion": "Adding the freshness block to the baseline trio yields a positive partial contribution (likelihood-ratio test p<0.10, or increment in Brier score >0) and a directionally stable coefficient on at least one of pullback_duration_weeks / pullback_pct across two independent time regimes, holding vol_ratio_5_20 and the baseline trio fixed.",
+      "failure_criterion": "Coefficient on pullback_duration_weeks or pullback_pct is non-positive in out-of-sample folds, OR the block contributes no measurable partial information once vol_ratio_5_20 is included, OR the coefficient sign flips across regimes. Any of these fails the test."
+    },
+    {
+      "name": "vol_regime_substitution_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "atr_14_pct"
+      ],
+      "comparison": "Hypothesis: 'freshness' is a re-labelled early-breakout / volatility-regime composite already encoded in vol_ratio_5_20. Substitute the vol-regime trio for any freshness specification and test whether W4 discrimination (Brier, ruin-rate at the B0 cut) is indistinguishable. Compare to the explicit pullback-recency block.",
+      "success_criterion": "The vol-regime trio replicates within tolerance (AUC delta < 0.02 absolute; ruin-rate delta < 2pp) the W4 discrimination attributed to the freshness block, and partial correlation between vol_ratio_5_20 and any freshness proxy exceeds 0.5.",
+      "failure_criterion": "Vol-regime trio fails to replicate the freshness block's discrimination (AUC delta > 0.05), OR partial correlation between vol_ratio_5_20 and the freshness specification is below 0.3, AND the freshness block retains incremental value after vol_ratio_5_20 is partialled out."
+    },
+    {
+      "name": "entry_extension_substitution_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "current_vs_ibd_candidate_pct",
+        "ibd_entry_close_position"
+      ],
+      "comparison": "Hypothesis: 'freshness' is a recency-of-trigger proxy already encoded by entry-extension trio. Replace freshness block with the entry-extension trio and compare W4 discrimination and ruin rate. The skeptic's omitted-variable attack lives here.",
+      "success_criterion": "Entry-extension trio reproduces the freshness block's W4 separation (AUC delta < 0.02) and the freshness block contributes nothing once the entry-extension trio is added (likelihood-ratio p>0.5).",
+      "failure_criterion": "Entry-extension trio fails to reproduce freshness discrimination (AUC delta > 0.05) AND the freshness block survives inclusion of the entry-extension trio at p<0.10."
+    },
+    {
+      "name": "within_stratum_matched_comparison",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20"
+      ],
+      "comparison": "Within strata defined by the three-slot triple (mom_20 quintile x vol_ratio_5_20 quintile x px_vs_ma20 quintile), compare W4 returns of fresh vs. stale pullback candidates. Minimum per-stratum n=10 for inclusion; otherwise stratum is pooled. This separates freshness from neighborhood by construction.",
+      "success_criterion": "Across matched strata, fresh-pullback candidates show a W4 median return at least 3pp higher than stale-pullback candidates, with the same direction in >=70% of qualifying strata and joint sign-rank test p<0.10.",
+      "failure_criterion": "No median W4 return gap >1pp across matched strata, OR the sign of the gap is inconsistent across qualifying strata (binomial sign-rank test p>0.5), OR fewer than 4 strata qualify at n>=10 (UNRESOLVED declared for power)."
+    },
+    {
+      "name": "missingness_pattern_status_test",
+      "features": [
+        "pullback_duration_weeks",
+        "mom_20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Split the cohort by null/non-null pullback_duration_weeks. Treat missingness as a neutral status category (not zero-imputed). Test whether the null/non-null split alone, plus the baseline trio, predicts W4 outcome independently of any pullback magnitude. Isolates whether freshness is partly an upstream-eligibility artifact.",
+      "success_criterion": "A model that uses only the missingness indicator plus baseline trio reaches AUC within 0.02 of a model that adds pullback_duration_weeks and pullback_pct magnitudes on the non-null subset; and the magnitude coefficients among non-null records are not significantly different from zero.",
+      "failure_criterion": "Adding pullback magnitudes strictly on the non-null subset improves out-of-sample AUC by >0.03 AND coefficient tests reject the null at p<0.10."
+    },
+    {
+      "name": "recency_composite_alt_spec",
+      "features": [
+        "pullback_duration_weeks",
+        "base_duration_weeks",
+        "base_depth_pct"
+      ],
+      "comparison": "Specification contest: pullback-only recency (duration, pct) versus a 'time-since-base-pivot' composite that uses base_duration_weeks and base_depth_pct to define recency more comprehensively. The cleaner replacement candidate is evaluated head-to-head against the pullback-only spec using identical W4 discrimination metrics.",
+      "success_criterion": "The recency-composite specification, when replacing pullback-only freshness, improves W4 Brier score and reduces ruin-rate by >=2pp at the B0 cut, and direction is stable across two independent time regimes.",
+      "failure_criterion": "Recency-composite AUC is no better than pullback-only (delta <0.01) or the gain disappears under transaction-cost haircut of 5pp. Either outcome means neither current freshness spec nor the composite alternative carries true mechanism value."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that ibd_entry_close_vs_trigger_pct, current_vs_ibd_candidate_pct, and ibd_entry_close_position are all computed at the decision snapshot using only prices and levels observable at or before that snapshot - no use of any W4 or later prices in the numerator or denominator.",
+    "Verify that the w4_return_bucket label is the 4-week forward return computed from the snapshot date plus 20 trading days; reject any test that uses returns beyond W4 or uses returns aggregated across non-overlapping horizons.",
+    "Verify the outcome_label categories (selected_winner, false_positive_ruin, false_negative_relative, false_negative_big_winner) are constructed from rules that do NOT themselves use the freshness candidate variable - i.e., labels are independent of the construct being tested.",
+    "Verify that pullback_duration_weeks and pullback_pct are computed from a pullback detection rule that precedes the decision snapshot and does not use forward prices; missingness on these fields must be encoded as a separate neutral category, never zero-imputed.",
+    "Verify that base_duration_weeks, base_mbox_count, and base_depth_pct are likewise PIT: derived from a base-detection algorithm applied to data through the snapshot date only.",
+    "Verify that no test feature is constructed using entity_id, calendar_date, snapshot_id, or any surrogate thereof as an input - reject calendar or identity features absolutely.",
+    "Verify that vol_ratio_5_20 and atr_14_pct are computed over rolling windows entirely contained in [snapshot_date - window, snapshot_date], with no look-ahead in normalization or clipping.",
+    "Confirm that the same fold-time partitions are used for baseline and treatment fits to prevent fold leakage; missingness indicator must be carried as a feature column, not silently imputed."
+  ],
+  "priority_order": [
+    "vol_regime_substitution_test",
+    "entry_extension_substitution_test",
+    "within_stratum_matched_comparison",
+    "missingness_pattern_status_test",
+    "freshness_block_vs_neighbor_trio_incremental",
+    "recency_composite_alt_spec"
+  ]
+}

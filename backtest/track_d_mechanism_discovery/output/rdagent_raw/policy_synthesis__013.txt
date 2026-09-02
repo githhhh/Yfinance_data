@@ -1,0 +1,58 @@
+
+
+```json
+{
+  "policies": [
+    {
+      "policy_id": "ruin_suppression_layer_v1",
+      "description": "Conditional ruin-suppression layer keyed to conditional ruin features actually visible in archaeology (low up_day_ratio_20 + positive mom_20; high px_vs_ma50 + high vol_ratio_5_20). TRUE downside filter, not eps_preference in disguise.",
+      "research_origin": "mechanism_falsification__q013 / failure_archaeology__q006",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 3.0},
+        {"type": "interaction", "left": "up_day_ratio_20", "right": "mom_20", "transform": "zscore", "weight": -2.5},
+        {"type": "interaction", "left": "px_vs_ma50", "right": "vol_ratio_5_20", "transform": "zscore", "weight": -2.0},
+        {"type": "threshold", "logic": "all", "conditions": [{"feature": "up_day_ratio_20", "op": "lt", "value": 0.55}, {"feature": "mom_20", "op": "gt", "value": 0.05}], "add": -5.0}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "fixed", "max_positions": 2, "min_score": -1.0}
+      }
+    },
+    {
+      "policy_id": "eps_revision_breadth_zscore",
+      "description": "Replaces inferred eps_preference with PIT-observable EPS-revision breadth (8w % analysts raising next-Q EPS, lagged one publication cycle, z-scored within sector). Breaks the PEAD-confound loop the Skeptic identified.",
+      "research_origin": "mechanism_falsification__q013",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "analyst_revision_breadth_8w", "transform": "zscore", "weight": 4.0},
+        {"type": "linear", "feature": "eps_revision_persistence_4w", "transform": "zscore", "weight": 2.5},
+        {"type": "linear", "feature": "sector_eps_revision_zscore", "transform": "identity", "weight": 1.5},
+        {"type": "threshold", "logic": "all", "conditions": [{"feature": "analyst_revision_breadth_8w", "op": "lt", "value": -0.5}], "add": -3.0}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "fixed", "max_positions": 2}
+      }
+    },
+    {
+      "policy_id": "dual_mode_coil_candidate_v1",
+      "description": "Dual-mode candidate encoding explosive vs coil buckets from vol_ratio_5_20 regime with pre-committed differential scoring (coil mode receives penalty reflecting lower observed precision in q019 archaeology).",
+      "research_origin": "failure_archaeology__q019",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 2.0},
+        {"type": "linear", "feature": "px_vs_ma50", "transform": "zscore", "weight": 1.5},
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 2.0},
+        {"type": "interaction", "left": "vol_ratio_5_20", "right": "mom_20", "transform": "zscore", "weight": 1.5},
+        {"type": "threshold", "logic": "all", "conditions": [{"feature": "vol_ratio_5_20", "op": "lt", "value": 1.0}, {"feature": "vol_ratio_5_20", "op": "gt", "value": 0.9}], "add": -1.5}
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {"mode": "min_score", "max_positions": 2, "min_score": 0.5}
+      }
+    }
+  ],
+  "batch_rationale": "Three non-overlapping falsifiable mechanisms: (1) ruin-suppression layer directly tests the q013/q006 conditional ruin patterns visible in entity_8f0df3d38e/entity_4fdc3699fd contrasts using PIT features only; (2) eps_revision_breadth_zscore operationalizes q013's cleanest replacement by replacing the inferred eps_preference with PIT-observable fundamental data that breaks the PEAD confound; (3) dual_mode_coil_candidate tests the q019 volume-regime-as-categorical hypothesis with a pre-committed coil-penalty rather than discretionary sizing. Each policy targets a distinct mechanism question with a distinct falsifier."
+}
+```

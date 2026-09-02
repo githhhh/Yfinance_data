@@ -1,0 +1,134 @@
+{
+  "tests": [
+    {
+      "name": "T1_min_z_floor_dual_leakage_stress_test",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within the frozen 27-case set, compute the minimum z-score across the six proposed separator features against the FN-cluster median. Count (a) SW cases whose min-z < 0 (false-abstention rate) and (b) FP_ruin cases whose min-z > 0 (false-inclusion rate on the ruin tail). Compare both rates to the naive base rate of picking the strongest feature alone (max-z).",
+      "success_criterion": "If the proposed min-z floor is genuinely informative, false-abstention rate on SW plus false-inclusion rate on FP_ruin must both be < 15% and strictly lower than the max-z single-feature baseline (Mechanism A: genuine multi-feature signal beats single-feature).",
+      "failure_criterion": "Either rate > 25% OR not lower than the max-z baseline: the min over correlated features concentrates on noise; the apparent gain from six features is an artifact of redundancy (Mechanism C)."
+    },
+    {
+      "name": "T2_within_snapshot_variance_decomposition",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Compute the share of total cross-sectional variance for each of the six features that is explained by snapshot identity (snap_*) vs by entity identity, using an ANOVA decomposition on the frozen 27 cases. Then compute the pairwise within-snapshot Spearman correlation among the six features and compare to cross-snapshot correlation.",
+      "success_criterion": "For the slot-independence assumption required by the 1/2/3 position-count economics to hold, within-snapshot variance share must be < 40% for at least 4 of 6 features AND average within-snapshot |ρ| must be < 0.5. If both conditions hold, three-slot diversification can be evaluated as roughly uncorrelated capital deployment.",
+      "failure_criterion": "Within-snapshot variance share ≥ 50% for a majority of features OR average within-snapshot |ρ| ≥ 0.55: snapshot ≈ regime and slot #3 is loading correlated factor exposure, invalidating Mechanism D's diversification claim regardless of any per-candidate PIT statistic. The position-count economic comparison must then be reformulated under a within-snapshot covariance penalty."
+    },
+    {
+      "name": "T3_FN_anchor_contamination_sensitivity",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Re-derive the FN-cluster median for each of the six features under three exclusion rules: (i) drop cases with multi-label contamination (entity_6618d3e80c type), (ii) drop any case where pullback_pct is null AND the comparator cluster median uses non-null subsamples only, (iii) the strictest intersection of (i) and (ii). Recompute the min-z statistic for each of the 27 entities under each rule and count how many entities flip from abstain to include or vice versa.",
+      "success_criterion": "Fewer than 3 entities (≤ 11%) flip decisions across the three anchors. The floor is robust to the cluster-definition leakage the skeptic flagged.",
+      "failure_criterion": "≥ 4 entities flip OR the sign of the median delta reverses on ≥ 2 features across the three anchors: the FN-cluster centroid is unstable in the n=5–7 regime and any min-z < 0 gate is a leakage artifact (Mechanism B dominates A). Standardization must be redone against a leakage-free anchor or the floor must be abandoned."
+    },
+    {
+      "name": "T4_pullback_pct_missingness_null_model",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "comparison": "The +0.64 standardized delta on pullback_pct was computed on n=7 non-null observations (5 SW + 2 FN). Draw 10,000 bootstrap samples of size 5 (SW non-null) and size 2 (FN non-null) from the empirical null where the null is 'pullback_pct median is exchangeable across clusters'. Compute the distribution of standardized delta under the null and locate the observed +0.64 in that distribution.",
+      "success_criterion": "Observed +0.64 standardized delta falls in the upper 5% tail of the null distribution (one-sided p < 0.05): the pullback_pct separation is unlikely to arise from missingness-driven subsample selection alone, justifying its inclusion in the composite.",
+      "failure_criterion": "Observed delta falls in the central 50% of the null distribution (p > 0.25, two-sided): the +0.64 figure is a small-sample artifact of differential missingness. Pullback_pct must be either (a) dropped from the composite or (b) paired with an explicit missingness indicator, and the composite recomputed without it."
+    },
+    {
+      "name": "T5_vector_negative_control_pairs",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within the frozen 27 cases, find all pairs of entities (i, j) such that the Euclidean distance in the 6-feature standardized space is below the 20th percentile of all pairwise distances. Among these near-neighbor pairs, count how many pairs have the SAME outcome label and how many have DIFFERENT labels.",
+      "success_criterion": "Same-label share ≥ 60% among near-neighbor pairs: the 6-feature space produces locally consistent outcome groupings, supporting the composite's representational validity.",
+      "failure_criterion": "Same-label share ≤ 40% (i.e., near-neighbors disagree more often than they agree): the 6-feature space is locally inconsistent about the W4 bucket. Entity_2f86543bf6-type and entity_8f0df3d38e-type micro-counterexamples dominate the surface. The min-z floor's apparent discrimination is averaging over a locally incoherent signal."
+    },
+    {
+      "name": "T6_position_count_within_snapshot_covariance_accounting",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "is_b0_pick"
+      ],
+      "comparison": "For each snapshot with ≥ 3 candidates, compute the empirical within-snapshot feature-correlation matrix among the six features. Then simulate the per-snapshot W4 variance of (a) 3-slot equal-weight portfolio, (b) 2-slot portfolio (drop the bottom by raw min-z), (c) 1-slot portfolio (top by raw max-z). Use the frozen W4 buckets as the realized return input — this is observation, not forward prediction. The test is structural, not predictive: it asks whether the variance ordering of slot-counts is determined by within-snapshot correlation rather than per-candidate PIT strength.",
+      "success_criterion": "Within-snapshot average |ρ| < 0.4 AND 3-slot variance ≤ 2-slot variance ≤ 1-slot variance: the diversification hierarchy is real and the PIT composite affects only the ranking, not the slot-count structure. Position-count economics reduces to a ranking problem.",
+      "failure_criterion": "Within-snapshot average |ρ| ≥ 0.55 OR 2-slot variance < 3-slot variance: the third slot adds correlated exposure rather than independent alpha, and the 1/2/3 economic comparison must be reformulated as a covariance-weighted marginal-alpha question, with τ potentially set even tighter to compensate for correlated residual risk."
+    },
+    {
+      "name": "T7_single_feature_baseline_AUC_inequality",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Compute the rank-AUC of each single feature (in isolation) for separating SW from FN using only PIT values. Then compute the rank-AUC of the min-z composite (six features, against FN median). Pre-specify the inequality that must hold for the multi-feature floor to be a justified addition over the simplest possible baseline.",
+      "success_criterion": "AUC(composite) ≥ AUC(best single feature) + 0.05 AND AUC(composite) > 0.6: the composite captures information not in any single feature, justifying the added complexity and the min-floor aggregation logic.",
+      "failure_criterion": "AUC(composite) ≤ AUC(best single feature): the multi-feature floor is parsimony-violating. The mechanism dissolves to a single dominant feature (likely mom_20). Recommend collapsing the policy to a single threshold on the best-feature direction with a calibration guardrail, not the six-feature min-z."
+    },
+    {
+      "name": "T8_abstention_asymmetric_payoff_evidence_check",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "is_b0_pick"
+      ],
+      "comparison": "Among is_b0_pick = false cases (the candidate pool for the #3 slot), compute the median W4 bucket position for those whose min-z < 0 (floor-abstained) vs min-z > 0 (floor-included). Then ask whether the abstention asymmetry Hypothesis E requires is observable in the data at all, given how few is_b0_pick = false cases exist (7 in the frozen set).",
+      "success_criterion": "The asymmetry is observed with the expected sign AND the magnitude exceeds the IQR of the bucket distribution: the abstain/promote economic argument has empirical backing at the candidate-pool level.",
+      "failure_criterion": "Direction is correct but magnitude is within IQR, OR direction is wrong, OR the is_b0_pick = false sample is too small (n=7) to support any direction claim. Mark Hypothesis E UNRESOLVED pending a larger candidate-pool sample; the position-count policy must default to the conservatism branch (1 or 2 slots) until evidence accumulates."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that no test requests W4 return magnitudes beyond the frozen snapshot_anon labels — every success_criterion references existing bucket labels or PIT-only statistics, never new forward inference.",
+    "Confirm that snapshot_anon and entity_anon are used only as group identifiers for variance decomposition and never as inputs to any predictive PIT feature.",
+    "Confirm that ibd_entry_close_vs_trigger_pct, despite being PIT, is treated as a soft composite input only and never as a hard veto (skeptic flagged FP_ruin contamination in entity_8f0df3d38e at 0.069).",
+    "Confirm pullback_pct is excluded from any composite until T4 resolves the missingness artifact, regardless of its standardized delta.",
+    "Confirm that the FN-cluster median used as the standardization anchor is the cluster that excludes entity_6618d3e80c (dual-label contamination) before T3 is run; report the pre-removal and post-removal anchors side by side.",
+    "Confirm no test uses ticker identity, calendar identity, day-of-week, month, or quarter as a feature.",
+    "Confirm the 3-slot accounting is fixed at the test level: equal-weight deployment of capital across the N filled slots is not a feature, and the test outcome does not depend on position sizing within the filled set.",
+    "Confirm that within-snapshot correlation in T2 and T6 is computed only on the frozen 27 cases; no cross-snapshot extrapolation is implied as predictive input."
+  ],
+  "priority_order": [
+    "T2_within_snapshot_variance_decomposition",
+    "T3_FN_anchor_contamination_sensitivity",
+    "T1_min_z_floor_dual_leakage_stress_test",
+    "T7_single_feature_baseline_AUC_inequality",
+    "T5_vector_negative_control_pairs",
+    "T6_position_count_within_snapshot_covariance_accounting",
+    "T4_pullback_pct_missingness_null_model",
+    "T8_abstention_asymmetric_payoff_evidence_check"
+  ]
+}

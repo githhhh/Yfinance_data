@@ -1,0 +1,85 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 32,
+  "mechanism_summary": "ibd_entry_close_position and ibd_entry_volume_ratio carry a modest median-level discriminant (FN medians trail selected-winner medians by z=-0.46 and z=-0.50), but the archaeology fails to confirm tail separation: three of the four highest close_position ruins sit at extreme high values (entity_84824e6a20 close=0.074 vol=1.63; entity_ccc90a671f close=0.070 vol=1.45; entity_8f0df3d38e close=0.069 vol=1.24) and entity_6618d3e80c is dual-labeled winner+ruin at close=0.051 vol=1.45. Both standardized deltas are markedly weaker than up_day_ratio_20 (-1.19), vol_ratio_5_20 (-1.05), and mom_20 (-1.00) — features already implicit in the regime context. The joint signal behaves as a partial proxy for 'breakout-on-strong-tape day' that splits the B0 mass around the median but does NOT identify the upper tail as safe; ruin and large_win rates both appear to rise with conviction (convex-in-both-directions), so scaling UP into the high-high bucket amplifies ruin magnitude at least as fast as upside. The defensible reading is: the joint signal is a DAMPER against low-low and disagreement-leg picks, not an AMPLIFIER into high-high. Regime/snapshot stratification is mandatory because most of the evidence clusters in 3 of the visible snapshots (snap_71486ed83c, snap_d0d57b1e40, snap_b8420124eb) and a snapshot-level cross-sectional rank pools climactic-accumulation with climactic-distribution regimes. Net: the proposed continuous encoding (0x/0.5x/1.0-1.25x) is not warranted by the evidence; a strictly bounded binary-ish sizing (0.5x or 1.0x, never above) is the most that the evidence supports, and only with a regime gate and an extension partial-out.",
+  "falsifiers": [
+    "Within snap_71486ed83c, snap_d0d57b1e40, or snap_b8420124eb, the within-snapshot top-tercile (z-close + z-vol, computed inside the snapshot's B0 cross-section) shows ruin rate >= bottom-tercile ruin rate OR sign reversal across two of three snapshots — refutes the within-regime discriminant and reduces the encoding to a snapshot-id proxy.",
+    "Spearman(quintile, ruin_rate) over composite-conviction quintiles is > 0 (ruin RISES with conviction), OR ruin_rate(Q5) >= ruin_rate(Q1), OR the ruin differential across quintiles is less than 25% of the upside differential — refutes any convexity claim and indicates scaling up amplifies ruin more than upside.",
+    "In the 3x3 px_vs_ma50 × ma20_slope_5 strata grid, fewer than 4 of 9 cells with n>=5 show positive high-high minus low-low W4 spread, OR median within-cell spread is <50% of the pooled spread — refutes the signal's informativeness after stripping the extension/trend confound.",
+    "Encoding A (researcher's 0/0.5/1.0-1.25x with regime gate) fails to achieve a ruin-burden-per-upside at least 15% lower than Encoding C (equal-weight 1.0x) while preserving >=85% of Encoding C's large-win capture; OR Encoding B (binary 0/1.0x) is statistically indistinguishable from or superior to Encoding A — refutes the value of continuous-vs-binary scaling and collapses the encoding to a simpler rule.",
+    "Among selected_winners with close_position > 0.85 AND volume_ratio > 1.5, pullback_pct worse than -15% occurs in >=50% of cases (entity_2c58cebc59 already qualifies at -25.1%) — refutes the 'high-high = reduced path risk' interpretation and supports a binary-or-skip conclusion.",
+    "After partialing out px_vs_ma50 and ma20_slope_5, the residual rank of close+volume no longer correlates with W4 bucket (Spearman |rho|<0.1 or ruin rate differential collapses to within noise) — confirms the joint signal is a proxy for extension/trend, not an independent conviction axis.",
+    "In the weak-tape subset (up_day_ratio_20 < in-snapshot median) the regime gate provides <10% reduction in ruin-burden-per-upside OR costs >15% large-win capture — weakens (does not necessarily refute) the gate, but if combined with weak-tape sample n<10, mark the gate UNRESOLVED."
+  ],
+  "actionable_design_principles": [
+    "Do not adopt the researcher's 1.0-1.25x upper slot. Cap adaptive capacity at 1.0x regardless of conviction. The continuous-up direction is contradicted by the upper-tail counterexamples (entity_84824e6a20, entity_ccc90a671f, entity_8f0df3d38e) where highest conviction co-occurs with ruin.",
+    "Read the joint signal as a DEFENSIVE damper (downscale disagreement and low-low picks toward 0.5x) rather than as an OFFENSIVE amplifier (upscale high-high picks above 1.0x). This is the only direction the evidence supports without overfitting on 27 cases.",
+    "Compute the conviction score strictly WITHIN each snapshot's B0-eligible cross-section (no pooling across snapshots). Pooling biases the rank toward snapshot-id because the visible evidence clusters in snap_71486ed83c, snap_d0d57b1e40, and snap_b8420124eb.",
+    "Require Encoding A, B, and C head-to-head comparison before adopting any scaling. Encoding C (equal-weight) is the explicit control — if it is statistically indistinguishable from A or B in ruin-burden-per-upside, the simplest rule wins (Occam).",
+    "Lock the eligible B0 universe across all three encodings. Adaptive capacity MUST come from within-universe re-weighting; the research question explicitly forbids eligibility expansion, and the contrast test mechanically enforces that.",
+    "Never use pullback_pct, pullback_duration_weeks, base_depth_pct, base_duration_weeks, base_mbox_count, snapshot_anon-as-feature, or forward W4/W8 outcomes as predictive inputs. They are path descriptors or evaluation targets and would constitute look-ahead leakage even if renamed.",
+    "Treat entity_6618d3e80c (dual selected_winner | false_positive_ruin at high conv+strong trend) as a structural reference case: it shows that even a confluence of close+volume+trend can produce BOTH outcomes, so the policy must not assume graded underlying quality at the top of the rank.",
+    "If the convexity diagnostic (Spearman quintile-ranks) returns rho(ruin) > 0 OR rho(ruin) > rho(large_win), DO NOT scale up — instead collapse the proposal to binary or equal-weight and document the failure mode."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Within-snapshot conviction damper (no upscale)",
+      "why_distinct": "Restricts the composite conviction score to B0 within each snapshot_anon and applies ONLY a downward damper (0.5x on disagreement, 1.0x elsewhere). Distinct from researcher's proposal because it caps the upper slot at 1.0x and removes the 1.0-1.25x band, which the upper-tail counterexamples make unjustifiable. Preserves the eligible universe and 3-slot structure without crossing the safety line.",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "Adaptive capacity DOWN only — reduces position size when the two conviction legs disagree, leaves exposure unchanged when they agree. Avoids amplifying ruin magnitude at the top of the conviction rank."
+    },
+    {
+      "idea": "Disagreement-leg explicit demotion with hard 0.5x floor",
+      "why_distinct": "Tags a pick as disagreement when close_position and volume_ratio are on opposite sides of the within-snapshot median, and forces capacity = 0.5x regardless of any other composite score. Distinct from a smooth z-sum because it makes the 'one leg fails' condition an explicit categorical event rather than a continuous penalty. Testable directly by the Disagreement_leg_attribution comparison.",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "Caps disagreement picks at half-size, isolating which leg carries the ruin signal. If ruin concentrates in only one disagreement quadrant, this rule alone may suffice and the continuous upscale can be dropped entirely."
+    },
+    {
+      "idea": "Regime-bounded scaling with 1.0x ceiling in weak tape",
+      "why_distinct": "Adds a regime filter keyed on up_day_ratio_20 and ma10_slope_5 medians. Distinct from unconditional scaling because any encoding that would yield >1.0x is clipped to 1.0x inside the weak-tape subset. Direct counterweight to the snapshot-level confound where close+volume may signal opposite things under different breadth conditions.",
+      "features": [
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio"
+      ],
+      "capacity_relevance": "Prevents adaptive capacity from compounding in deteriorating tape. Without this gate, the conditional cross-sectional scaling amplifies exposure exactly where it is least reliable."
+    },
+    {
+      "idea": "Extension partial-out conditioning before conviction scoring",
+      "why_distinct": "Regresses close_position and volume_ratio on px_vs_ma50 and ma20_slope_5 within snapshot, then computes conviction score from residuals. Distinct from raw z-sum because it strips the dominant trend/extension component that is already redundant with features the B0 filter and regime context already capture. Directly addresses the standardized-delta weakness (only -0.46/-0.50 vs -1.19/-1.05/-1.00 for the underlying trend features).",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "px_vs_ma50",
+        "ma20_slope_5",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "If the residual conviction still earns a convexity premium, the signal is genuinely incremental and scaling is justified; if the residual does nothing, the researcher is invited to drop the encoding entirely rather than persist with a redundant proxy."
+    },
+    {
+      "idea": "Ruin-burden-per-upside diagnostic as a guardrail metric",
+      "why_distinct": "Defines a composite metric ruin_burden_per_upside = (weighted_ruin_loss) / (large_win_capture) computed within-snapshot and pooled across snapshots with snapshot-as-random-effect. Encodes the policy-level question — does the encoding buy more upside than ruin? — directly into the DSL evaluation. Distinct from raw hit-rate metrics because it penalizes ruin magnitude, not just ruin frequency, and tracks the convexity-criterion that the standard hit-rate approach misses.",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "Provides the explicit objective function for evaluating any capacity scaling proposal. A policy that does not reduce ruin-burden-per-upside relative to Encoding C (equal-weight baseline) cannot be justified by hit-rate gains alone."
+    }
+  ]
+}
+```

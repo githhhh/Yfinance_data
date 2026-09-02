@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 32,
+  "mechanism_summary": "The hypothesized mechanism — that a high ibd_entry_close_position (close near top of trigger range) unaccompanied by proportional volume expansion flags thin late-day buying that mean-reverts, while the same close_position paired with confirmatory volume indicates genuine breakout continuation — is consistent with a subset of the archaeology (≈3 B0-pick ruins at close_vs_trigger ≥ 0.06 with vol_ratio_5_20 < 1.4) but fails its own asymmetric negative control (low-close-low-vol picks span ruin to large_win), is supported by only a single conjunct of evidence that does not survive snapshot demeaning, and conflates two distinct volume constructs (entry-day ibd_entry_volume_ratio vs short/medium-term vol_ratio_5_20). The composite multiplicative encoding compounds the modest marginal signal-to-noise rather than amplifying it, and the 'wait-for-pullback' override introduces an unobservable temporal rule. The mechanism is best characterized as a plausible but unproven conditional hypothesis whose operational signature (high close + low volume → ruin) is confounded with snapshot regime, momentum state, and the arbitrary choice of which volume measure populates the composite.",
+  "falsifiers": [
+    "Walk-forward OOS on ≥5 disjoint snapshots not present in the archaeology: the strict {close_vs_trigger > 0.05 AND vol_ratio_5_20 < 1.4} subset must show ruin+loss rate ≥55% AND the effect must survive within-snapshot demeaning (rank-preserving) on every snapshot, not pooled.",
+    "Volume-construct cross-check: the composite built on ibd_entry_volume_ratio (instead of vol_ratio_5_20) must produce a within-snapshot Spearman correlation ≥0.65 with the vol_ratio_5_20 version AND directional agreement on W4 rank in ≥70% of snapshots; otherwise the encoding is construct-ambiguous and the B0 penalty is arbitrary.",
+    "Conditional-on-momentum test: restricting to mom_20 > 0.15, the close × vol interaction must retain a signed coefficient (p < 0.10 in a snapshot-fixed-effects regression). If momentum absorbs the signal, the interaction is a momentum proxy rather than an independent chase-vs-conviction discriminator.",
+    "Symmetric-direction test: in the low-close-low-vol corner, ruin+loss rate must be ≤25% across at least 3 disjoint snapshots. If it is ≥40%, the mechanism is not asymmetric in the way the data currently suggest and the 'chase = toxic' framing collapses.",
+    "Snapshot-permutation audit: randomly permuting snapshot labels across the 27 cases and recomputing the standardized delta for ibd_entry_close_position must shift the delta by less than half its observed magnitude. If the delta collapses under permutation, the original signal is regime-driven rather than cross-sectional.",
+    "Threshold-sensitivity audit: under all adjacent breakpoint combinations in {0.04, 0.045, 0.05} × {1.3, 1.4, 1.5}, the strict-toxic-zone membership must change by <20%. If it shifts by ≥30%, the rule is overfit to the 3-case cluster and cannot be ported OOS.",
+    "Bootstrap IC comparison: 1000 bootstrap resamples of the composite f vs either marginal must show |IC(f)| > |IC(marginal_best)| in ≥80% of resamples. If the composite wins less than half the time, the multiplicative form is noise-degrading rather than signal-amplifying."
+  ],
+  "actionable_design_principles": [
+    "Snapshot-clustered validation is a precondition, not an optional check: any in-universe penalty derived from cross-sectional archaeology must be evaluated against within-snapshot rank persistence before deployment, because the current evidence is ≈56% concentrated in two snapshots and the regime-day effect dominates.",
+    "Demote, do not exclude: any composite should subtract from the B0 composite score rather than hard-filter, preserving eligible-universe size and avoiding the false-negative pool (which sits at low-to-moderate close_vs_trigger with mid-range volume and would be silently destroyed by exclusion).",
+    "Reconcile the volume construct before encoding: ibd_entry_volume_ratio and vol_ratio_5_20 measure different things (entry-day vs 5d/20d expansion). The DSL should expose both and require a construct-selection guardrail (e.g., agreement test) before a chase_score is committed.",
+    "Avoid hand-picked conjunctive thresholds on n≈3: a penalty whose operational region contains three cases is overfit by construction. Either collect more evidence or degrade the encoding to a continuous monotone penalty without hard thresholds.",
+    "Separate predictive signal from path/label issues: W4-return-bucket is not the same outcome as ruin protection. The DSL should expose W4 return, max drawdown, and pullback_pct as distinct outcome channels, and any 'chase' penalty should be evaluated on the path-relevant channel, not the W4 label.",
+    "No temporal overrides without outer-forward evidence: the 'wait one bar' idea is unfalsifiable inside the archaeology. Defer any temporal decision rule to a separate, forward-validated experiment; in the current cycle, encode only the static penalty.",
+    "Calibration guardrail: any chase_score should ship with a self-test that compares its within-snapshot rank IC against the B0 composite's IC and disables the penalty if the comparison fails over a rolling window.",
+    "Don't conflate interaction discovery with universe expansion: the mechanism claim, even if true, is an in-universe ranking refinement. The DSL must not silently promote this into a new eligibility filter."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "chase_score_demote: compute chase_score = max(0, ibd_entry_close_vs_trigger_pct - c1) * (c2 - min(vol_ratio_5_20, c2)) with c1, c2 calibrated by data-driven breakpoints (e.g., median + 1.5 IQR) rather than hand-picked constants, and subtract it from the B0 composite as a continuous soft penalty (not a hard filter).",
+      "why_distinct": "Unlike the researcher's proposed hard thresholds (0.045, 1.4) and the 'wait-for-pullback' override, this is a continuous demotion that preserves universe size, eliminates the n=3 overfitting risk by using data-driven breakpoints, and is reversible by adjusting c1/c2 rather than recoding rules.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "vol_ratio_5_20"],
+      "capacity_relevance": "Neutral to universe size: subtracts from score, does not gate eligibility. Preserves B0 capacity envelope."
+    },
+    {
+      "idea": "volume_construct_agreement_gate: before any chase_score is applied, compute chase_score_entry (using ibd_entry_volume_ratio) and chase_score_5_20 (using vol_ratio_5_20); apply the penalty only when both agree on direction (e.g., both above their respective 75th percentiles OR both below), and halve the penalty weight when they disagree.",
+      "why_distinct": "Addresses the feature-conflation critique directly. Rather than picking one volume measure, it uses agreement as a confidence-weighting mechanism, which is observable in the archaeology and degrades gracefully under construct ambiguity.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "ibd_entry_volume_ratio", "vol_ratio_5_20"],
+      "capacity_relevance": "Neutral; degrades to zero penalty on disagreement rather than excluding names, so capacity is preserved."
+    },
+    {
+      "idea": "snapshot_clustered_validation_wrapper: wrap any chase-derived feature in a per-snapshot rank-correlation audit; the feature is enabled only if its within-snapshot Spearman against W4_return_bucket has the expected sign in ≥70% of snapshots with n≥3 AND the pooled |rho| is not more than 1.5× the mean within-snapshot |rho|.",
+      "why_distinct": "Treats the snapshot-confounding problem as a first-class deployment gate rather than a post-hoc audit. Encodes the skeptic's WithinSnapshotRankPersistence test as a runtime guardrail, so a feature that fails OOS is automatically disabled.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "vol_ratio_5_20", "ibd_entry_volume_ratio"],
+      "capacity_relevance": "Neutral; the wrapper changes whether a penalty is applied, not which names are eligible."
+    },
+    {
+      "idea": "momentum_conditional_chase: condition chase_score application on mom_20 > 0 (or mom_20 > 0.10); suppress the penalty entirely for negative-momentum names because the chase mechanism is only plausible in already-trending regimes and is unlikely to discriminate in counter-trend setups.",
+      "why_distinct": "Targets the conditional-on-momentum falsifier directly. The researcher and designer identified that the false_positive_ruin cluster sits in high-mom regimes (mom_20 ≈ 0.15–0.23), so a momentum-conditional gate concentrates the penalty where the mechanism is most plausible and avoids penalizing names where the interaction may not exist.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "vol_ratio_5_20", "mom_20"],
+      "capacity_relevance": "Neutral; momentum gating narrows where the penalty applies, not what is eligible."
+    },
+    {
+      "idea": "outcome_channel_separated_eval: instead of a single W4-return-bucket target, evaluate any chase penalty on three separate outcome channels (w4_return, max_drawdown_to_w4, pullback_pct) and require the penalty to improve at least two of three before activation.",
+      "why_distinct": "Addresses the label-construction critique (W4 ≠ ruin protection) by making the multi-channel evaluation explicit. A penalty that helps W4 but hurts drawdown protection should not activate, and vice versa.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "vol_ratio_5_20", "mom_20", "pullback_pct"],
+      "capacity_relevance": "Neutral; changes evaluation, not eligibility."
+    }
+  ]
+}
+```

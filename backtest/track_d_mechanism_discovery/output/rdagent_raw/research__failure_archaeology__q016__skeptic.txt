@@ -1,0 +1,43 @@
+
+
+{
+  "strongest_counterclaim": "The 'near-buy-point geometry' precursor set defines away the very phenomenon it claims to explain. The thresholds (px_vs_ma20 < 0.07, vol_ratio <= 1.25, mom_20 < 0.10) are calibrated on outcome-selected cases; without the full non-pick population per snapshot, the distributional claim is vacuous—these features may simply describe average non-picks, not discriminative signals.",
+  "attacks": [
+    {
+      "issue": "Outcome selection conditioning the feature distribution",
+      "why_it_matters": "The 27-case sample was assembled using a post-hoc outcome criterion ('future W4 >=8% and >=5pp above B0 selected median'). This guarantees that any feature computed at the snapshot will appear 'lower' for false negatives vs. selected winners by construction, regardless of predictive validity. The standardized deltas (-1.19, -1.05, -1.00) reflect this selection bias, not a causal mechanism. Without the denominator (all non-picks at each snapshot, winners and losers), the numerator statistics are uninterpretable."
+    },
+    {
+      "issue": "Contradictory cases with near-identical precursor signatures produce divergent outcomes",
+      "why_it_matters": "Entity bfb308b24a has up_day_ratio=0.45, vol_ratio=1.187, mom_20=0.027, ibd_entry_close_vs_trigger_pct=0.039—dead-center in the claimed precursor cluster—yet produces a loss. Entity ad2bfdee3f has up_day_ratio=0.45, vol_ratio=1.179, mom_20=-0.046, px_vs_ma20=0.007—also cluster-conforming—yet produces only small_win. If the precursor pattern were genuinely predictive, these cases should yield large_win; their divergence shows the pattern is not sufficient and likely not necessary."
+    },
+    {
+      "issue": "Threshold incoherence: vol_ratio_5_20 <= 1.25 as a 'discriminator' contradicts the selected-winner median",
+      "why_it_matters": "The claim proposes vol_ratio <= 1.25 as a discriminating feature, yet the selected-winner median vol_ratio is 1.424—well above this threshold. Most selected winners exceed the proposed cutoff. This means low volume ratio is not what separates false negatives from winners; it separates low-volume stocks from high-volume stocks, a different axis entirely. The mechanism conflates two distinct phenomena."
+    },
+    {
+      "issue": "Pullback directionality contradicts the 'tight-base continuation' narrative",
+      "why_it_matters": "False negatives have median pullback_pct = -7.3% (shallower), while selected winners have -15.9% (deeper). The mechanism claims shallow bases indicate 'reduced upside exhaustion' and higher continuation potential. But technical analysis theory holds that deeper pullbacks produce better resets and more explosive moves. The data shows the opposite pattern the mechanism predicts, suggesting the observed correlation is spurious or confounded by a third variable (e.g., market conditions, sector strength)."
+    },
+    {
+      "issue": "Near-buy-point geometry is operationally self-contradictory",
+      "why_it_matters": "The claim requires ibd_entry_close_vs_trigger_pct <= 0.025 as a precursor. If the entry is 'near trigger' (within 2.5% of the trigger price), why did the non-pick not trigger? The non-pick status is unexplained and likely reflects an unmeasured variable (sector screening, fundamental filters, market-cap thresholds, or explicit exclusions). Attributing outcome differences to geometric features while ignoring the reason for non-selection introduces an omitted-variable bias."
+    },
+    {
+      "issue": "Selected winners share the same 'false-negative' feature cluster",
+      "why_it_matters": "Entity_28a6ec4601 (selected_winner, large_win) has up_day_ratio=0.60, vol_ratio=1.188, mom_20=0.143, px_vs_ma20=0.086. Entity_8ad5cd4795 (selected_winner, large_win) has up_day_ratio=0.70, vol_ratio=0.996, mom_20=0.004, px_vs_ma20=0.007. These overlap substantially with the false-negative cluster, demonstrating the precursor pattern is not exclusive to non-picks. The predictive power, if any, cannot distinguish picks from non-picks."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Non-picks with up_day_ratio <= 0.50, vol_ratio <= 1.25, mom_20 <= 0.10, px_vs_ma20 < 0.07, ibd_entry_close_vs_trigger_pct <= 0.025 that resulted in loss or small_win (not large_win) — these are absent from the current sample and would directly falsify the predictive claim",
+    "Snapshots where the full non-pick population (winners and losers) shows no significant feature difference between outcome groups — this would indicate the observed medians are sampling artifacts",
+    "B0 picks with identical 'tight-base' geometry that still produced ruin or loss — to test whether the mechanism applies asymmetrically or not at all",
+    "Cases where the reason for non-pick status is documented (e.g., sector exclusion, fundamental screen failure) — if outcomes are explained by these documented reasons rather than geometry, the precursor claim is a proxy variable"
+  ],
+  "what_would_change_my_mind": [
+    "A controlled study on held-out snapshots showing that the proposed feature set (up_day_ratio <= 0.5, vol_ratio <= 1.25, mom_20 <= 0.10, px_vs_ma20 < 0.07, ibd_entry_close_vs_trigger_pct <= 0.025) predicts large_win among non-picks with ≥ 60% precision and ≥ 1.5:1 odds ratio vs. the baseline non-pick win rate",
+    "Evidence that the non-pick status itself (sector, market-cap, fundamental exclusion) is orthogonal to the geometric features and does not explain the outcome variance",
+    "A mechanism that does not require post-hoc calibration on outcome-selected cases — e.g., a forward-looking measure of 'upside room' that is computable from snapshot data alone and independently validated",
+    "Replicated results across ≥ 3 independent snapshot cohorts (each with ≥ 20 false-negative candidates) showing consistent feature separation at p < 0.01"
+  ]
+}

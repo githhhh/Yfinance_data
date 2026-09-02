@@ -1,0 +1,128 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "Within-date capacity marginal contribution",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "For each B0 pick date, simulate three fixed-slot portfolios: capacity 1 (top-ranked slot only), capacity 2 (top two slots), capacity 3 (all three slots). Hold candidate identity and entry timing identical. Compute the incremental W4 risk-adjusted return (Sharpe, max drawdown, ruin probability) of slot 3 over the slot 1-2 baseline. Compare this incremental contribution across weak-third vs strong-third strata defined entry-time by the composite quality threshold.",
+      "success_criterion": "Slot 3's incremental risk-adjusted return is positive and statistically significant (after multiple-testing correction) only within the strong-third stratum, and negative or insignificant within the weak-third stratum. The gradient between strata is significantly negative.",
+      "failure_criterion": "Slot 3's incremental contribution is statistically indistinguishable between weak-third and strong-third strata, OR is negative in both strata (rule is anti-information)."
+    },
+    {
+      "name": "Rank-conditioned weak-quality threshold",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Apply the weak-quality composite threshold separately to candidates ranked #1, #2, #3 within each B0 snapshot. Compare mean W4 return, ruin probability, and max drawdown for threshold-pass vs threshold-fail cases at each rank. Test for an interaction between rank and threshold-pass status using a rank × weak-quality fixed-effects regression with cluster-robust standard errors at the snapshot level.",
+      "success_criterion": "Weak-quality threshold-fail at rank 3 produces significantly lower mean W4 return and higher ruin probability than weak-quality threshold-pass at rank 3, while weak-quality threshold-fail at rank 1 produces returns indistinguishable from threshold-pass at rank 1. The rank × weak-quality interaction term is significant.",
+      "failure_criterion": "Weak-quality threshold-fail produces similarly poor outcomes at rank 1 and rank 3 (no interaction), OR weak-quality threshold-fail at rank 3 produces no worse outcome than threshold-pass at rank 3 (threshold is non-discriminating at rank 3)."
+    },
+    {
+      "name": "Snapshot-cluster regime decomposition",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ma50_slope_10",
+        "atr_14_pct",
+        "rv_20"
+      ],
+      "comparison": "Group snapshots into clusters by entry-time realized volatility regime (rv_20 quantile × breadth regime defined by median up_day_ratio_20). Within each cluster, decompose false-positive-ruin cases by slot position (rank 1, 2, 3) and by weak-quality status. Test whether ruin attribution to rank 3 is concentrated in specific regimes or distributed uniformly.",
+      "success_criterion": "Within adverse-volatility or narrowing-breadth regimes, ruin is disproportionately concentrated at rank 3 and the weak-quality threshold predicts it. Within benign regimes, ruin does not concentrate at rank 3 and the threshold does not predict it. Regime × rank interaction is significant.",
+      "failure_criterion": "Ruins distribute evenly across slot positions within any single regime cluster, OR the weak-quality threshold predicts ruin uniformly across regimes (no regime interaction), indicating the rule captures regime rather than slot-position-specific candidate quality."
+    },
+    {
+      "name": "Monotonic capacity gradient under matched slot-1/2 quality",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Construct matched pairs of B0 pick dates where the top-two slot candidates have near-identical composite quality (within ±0.5σ). Within each pair, compare the W4 return distribution under capacity 1, capacity 2, and capacity 3 policies. Test for a monotone ordering: μ(capacity 1) ≥ μ(capacity 2) ≥ μ(capacity 3) on risk-adjusted return.",
+      "success_criterion": "The matched-pair differences satisfy capacity 1 ≥ capacity 2 ≥ capacity 3 in mean risk-adjusted return with non-significant reversals. The marginal cost of adding slot 3 is non-positive when slot 3 is weak.",
+      "failure_criterion": "Any reversal of monotonicity (e.g., capacity 2 > capacity 1, or capacity 3 > capacity 2) in more than 10% of matched pairs, OR no significant capacity ordering after matching."
+    },
+    {
+      "name": "Slot-3 replacement quality differential",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "comparison": "For each simulated capacity-0 case, identify the first B0-eligible candidate that would have filled slot 3 within a defined entry window (e.g., 1, 3, 5 trading days). Measure the replacement candidate's composite quality at its own entry time using only PIT features. Compare the paired (abstained quality, replacement quality) distribution.",
+      "success_criterion": "Replacement candidates exhibit systematically higher composite quality than the abstained weak-third candidates (paired t-test or Wilcoxon signed-rank with p < 0.05 after Bonferroni). The quality gap is largest when the abstained candidate is in the bottom quality quartile.",
+      "failure_criterion": "Replacement candidate quality is statistically indistinguishable from abstained quality, OR replacement quality is lower than abstained (capacity 0 destroys value)."
+    },
+    {
+      "name": "Capacity-0 optionality realization test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Among simulated capacity-0 paths, stratify by the realized replacement candidate's composite quality (top half vs bottom half). Compare W4 ruin probability, mean return, and max drawdown of the high-replacement-quality paths vs low-replacement-quality paths.",
+      "success_criterion": "High-replacement-quality paths achieve significantly lower ruin probability and higher mean W4 return than low-replacement-quality paths, demonstrating that capacity 0's economic content depends on the realized optionality distribution.",
+      "failure_criterion": "Replacement candidate quality has no significant relationship with subsequent portfolio performance, indicating capacity 0 is decision-noise rather than value-preserving."
+    },
+    {
+      "name": "Within-weak-stratum feature heterogeneity",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Restrict the sample to candidates classified as weak by the composite threshold. Within this stratum, fit single-feature logistic regressions of ruin (PIT-computable proxy only) on each component feature individually. Compare out-of-fold AUC of the composite threshold vs each single-feature threshold.",
+      "success_criterion": "No single feature within the composite predicts ruin significantly better than the composite itself (composite AUC > any single-feature AUC by at least 0.05, with DeLong test p < 0.05). The composite captures non-redundant information.",
+      "failure_criterion": "One single feature predicts ruin as well as or better than the composite (composite is over-specified), OR the composite AUC is statistically indistinguishable from random within the weak stratum (the threshold does not separate winners from losers even among 'weak' candidates)."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that 'weak third' thresholds are derived exclusively from entry-time PIT features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma20, px_vs_ma50, MA slopes) without reference to w4_return_bucket or outcome_label.",
+    "Confirm that 'false_negative' and 'false_positive_ruin' labels (which depend on future W4 returns) are used only as post-hoc analysis outputs and never as inputs to threshold construction or capacity assignment.",
+    "Block all cluster-robust inference at the snapshot level; do not treat multiple B0 picks within the same snapshot as independent observations because regime exposure is shared.",
+    "For the replacement-candidate test, measure replacement quality at the replacement candidate's own entry time using only that candidate's PIT features — do not use features measured retrospectively or smoothed across multiple dates.",
+    "Verify that capacity simulation uses identical entry timing, transaction-cost assumptions, and capital scaling across capacity 1/2/3 conditions within the same date (the only varying input is which slots are occupied).",
+    "Confirm that no test uses entity_anon, snapshot_anon, or any calendar-based identifier as a predictive feature; these are permitted only as blocking/clustering variables.",
+    "Exclude is_b0_pick from feature lists — it is a selection label, not a PIT measurement of the candidate's intrinsic quality.",
+    "For the matched-pairs monotonicity test, verify that the matching procedure is defined entry-time (e.g., composite quality at t=0) and not retroactively adjusted using W4 returns.",
+    "Confirm that the regime-decomposition test uses entry-time rv_20 and up_day_ratio_20 to define regimes, not realized forward volatility.",
+    "Apply Bonferroni or Benjamini-Hochberg correction across all within-test multiple comparisons to prevent false discovery from fishing across the seven proposed tests."
+  ],
+  "priority_order": [
+    "Within-date capacity marginal contribution",
+    "Rank-conditioned weak-quality threshold",
+    "Snapshot-cluster regime decomposition",
+    "Monotonic capacity gradient under matched slot-1/2 quality",
+    "Slot-3 replacement quality differential",
+    "Capacity-0 optionality realization test",
+    "Within-weak-stratum feature heterogeneity"
+  ]
+}
+```

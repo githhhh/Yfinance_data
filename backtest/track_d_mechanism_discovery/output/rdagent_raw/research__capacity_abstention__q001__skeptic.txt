@@ -1,0 +1,65 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The cash-dominates-marginal-slot rule is wrong because (a) the 30% ruin rate is conditional on already-failing archaeology cases and is therefore an inflated, selected subsample, not the unconditional ruin rate of B0 picks; (b) Top2 is by construction NOT drawn from the false_negative distribution — it passed the same selection screen as Top1 and is merely ranked second; and (c) the framework ignores variance reduction, regime clustering within snapshots, and the ruin rate of Top1 itself, which the archaeology shows is 8/19 ≈ 42%. Concentrating in a single Top1 with a 42% ruin rate is not 'alpha capture' — it is uncompensated tail risk. The correct policy is position-sizing (Top2 smaller than Top1) and regime-conditional deployment, not binary slot->cash.",
+  "attacks": [
+    {
+      "issue": "Selection bias in the 8/19 false_positive_ruin denominator: the archaeology sample was constructed to find failure modes, so the ruin rate is a posterior failure rate, not a prior per-trade ruin rate for a generic B0 trigger.",
+      "why_it_matters": "If the unconditional ruin rate of B0 picks is much lower (say 10-15%), then 'Top2 inherits ruin risk' overstates the marginal cost of slot 2. The gap-conditional policy would activate too often, leaving capital in cash when Top2 is in fact a positive-EV bet."
+    },
+    {
+      "issue": "Top2 candidates are not from the false_negative distribution by construction — they passed the same screen as Top1, just ranked lower. The mechanism claim that 'Top2 expected return collapses toward false_negative_relative' is a category error: rank #2 ≠ rejected-by-screen.",
+      "why_it_matters": "The entire analytical bridge between the gap metric and the cash recommendation depends on this conflation. If Top2 is just a slightly weaker Top1, its expected return is positive and concentrated capital in Top1 alone foregoes free convexity."
+    },
+    {
+      "issue": "W4 return buckets are an arbitrary truncation horizon. Many 'ruin' and 'loss' outcomes recover by W8-W12 (typical base duration is 44-52 weeks). Treating 4-week ruin as terminal inflates the apparent ruin rate and biases the conclusion toward cash.",
+      "why_it_matters": "Even if Top2 has a 30% W4 loss probability, its expected terminal return can be positive if the W4 drawdown is a normal base-building phase. A 4-week stop-loss is a policy choice, not a structural ruin rate."
+    },
+    {
+      "issue": "Portfolio construction effects are entirely absent from the mechanism: a 2-slot portfolio with low Top1-Top2 correlation has variance reduction independent of mean. Sharpe ratio can rise even when mean falls slightly. The 'cash dominates' rule treats N as if it only affects expected return, not variance.",
+      "why_it_matters": "If Top1 and Top2 share <0.3 correlation (different sectors, factor exposures), a 2-slot portfolio can have higher risk-adjusted return than a 1-slot portfolio even when Top2 mean is lower. The cash recommendation ignores this dimension entirely."
+    },
+    {
+      "issue": "Cash has its own 'ruin' rate: negative real return. In a 2-3% inflation regime, holding cash costs ~0.15-0.25% per 4 weeks. The opportunity cost of cash is non-zero and must be netted against Top2's expected return, which even if modestly positive dominates cash in real terms.",
+      "why_it_matters": "The 'cash dominates' claim implicitly assumes cash is a zero-cost option. It is not — cash is a losing real-return position. The break-even threshold for the policy is therefore not zero EV for Top2 but positive EV greater than the negative carry of cash."
+    },
+    {
+      "issue": "Post-hoc feature cherry-picking in the gap score: the researcher selects {mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, ma10_slope_5} because these show large standardized deltas in the archaeology. But base_duration_weeks, dist_to_52w_high, and base_depth_pct show smaller deltas — the 'right' gap metric is not uniquely defined, and the threshold (+0.5σ cluster) is tuned to fit the failure set.",
+      "why_it_matters": "A policy built on a post-hoc selected feature set with a fitted threshold will not generalize. The threshold is overfit to the archaeology snapshot set and likely to be either too aggressive (cash too often) or too lax (gap not actually predictive) on out-of-sample data."
+    },
+    {
+      "issue": "Top1 itself ruins 8/19 = 42% of the time in the archaeology. The 'concentrate in Top1' alternative is not a low-ruin regime — it is a high-variance bet with a known ruin tail. The abstention argument must reckon with the fact that abstaining from slot 2 does not save you from Top1's ruin.",
+      "why_it_matters": "If the goal is ruin avoidance, the lever is not slot 2 cash but Top1 selection quality or sizing. The cash policy creates an illusion of risk control while leaving the dominant ruin source (Top1) untouched."
+    },
+    {
+      "issue": "Snapshot clustering: multiple cases per snap_* ID implies a regime effect (market-wide beta) dominates individual name outcomes. In bear-regime snapshots, even Top1 ruins regardless of feature profile. Cash may dominate slot 2 in bear regimes for the wrong reason — the gap metric is acting as a regime proxy.",
+      "why_it_matters": "If the gap metric is actually capturing regime (e.g., vol_ratio_5_20 elevates in bear markets as flight-to-quality vol spikes), then the policy is regime-conditional deployment dressed up as quality-gap-conditional deployment. This conflation will fail when quality gap and regime diverge (e.g., bear regime where Top1 has narrow feature gap but Top2 still ruins)."
+    },
+    {
+      "issue": "The 'Top2 = small_win/loss filler' label maps onto 5 false_negative_relative cases that were all REJECTED by the B0 screen. These are not Top2 candidates — they are explicitly the model's misses. Using them as the distribution for 'what Top2 looks like' is double-counting the same selection error.",
+      "why_it_matters": "The researcher uses FN cases as a stand-in for Top2 because they share feature distributions. But FN by definition is what the model excluded. If Top2 looks like FN, the screen is broken and the fix is screen redesign, not abstention after the screen."
+    },
+    {
+      "issue": "The mechanism conflates 'large quality gap' (a relative concept between Top1 and Top2) with 'Top2 is bad in absolute terms.' A large gap can arise from an exceptional Top1 with a still-positive-EV Top2. The policy should be relative sizing, not binary abstention.",
+      "why_it_matters": "A continuous policy (Top2 size = f(gap)) dominates a binary policy (gap > threshold → cash). Binary abstention loses the convex benefit of partial deployment and produces higher turnover costs as the gap oscillates around the threshold."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Episodes where Top1-Top2 gap on {mom_20, vol_ratio_5_20, px_vs_ma50} exceeded 0.5σ but a 2-slot portfolio still outperformed a 1-slot portfolio on Sharpe due to variance reduction — would invalidate the binary cash rule and support continuous sizing.",
+    "Cases where Top1 itself ruined (matching the 8 false_positive_ruin profile) despite high gap score, demonstrating that 'concentrate in Top1' does not deliver the alpha capture the mechanism claims.",
+    "Regime-divergence episodes: bull-regime snapshots where gap metric is small (compressed Top1-Top2 features) but Top2 nonetheless has positive W4 return, showing that low gap ≠ negative EV.",
+    "Recovery trajectories: cases labeled 'ruin' at W4 that closed positive by W12, quantifying how much of the 42% ruin rate is horizon truncation rather than terminal loss.",
+    "Cross-correlation matrix of W4 returns for Top1 and Top2 candidates within the same snapshot — if correlation is <0.4, the variance-reduction benefit of slot 2 mechanically exceeds the mean-loss penalty in most realistic scenarios.",
+    "An episode where Top3 (third-ranked slot) had higher W4 return than Top2 despite a smaller 'gap' with Top2, breaking the monotonic ranking assumption implicit in 'gap-conditional abstention starts at slot 2.'"
+  ],
+  "what_would_change_my_mind": [
+    "A matched-pair backtest across all 27 archaeology snapshots showing that 1-slot portfolio W4 median return exceeds 2-slot portfolio W4 median return by >2pp in >65% of high-gap episodes (gap > 0.5σ on the researcher's triplet). Current evidence is inferential; this would be direct.",
+    "Demonstration that Top2 candidate expected W4 return, computed unconditionally across the B0-screened universe, is negative in real terms (i.e., worse than the cash carry cost). Until this is shown, the cash recommendation rests on a selected subsample.",
+    "Evidence that the Top1-Top2 correlation of W4 returns within snapshots is >0.7, eliminating the variance-reduction argument. If correlation is high, the concentration case strengthens; if low, the binary cash policy is dominated by a continuous sizing policy.",
+    "A regime decomposition showing that, conditional on the snapshot's regime (bull/base/bear), the gap metric does NOT act as a regime proxy — i.e., the policy actually identifies quality differences, not market state. Otherwise the cash rule is a regime filter in disguise.",
+    "An out-of-sample test where the policy's threshold is calibrated on a holdout set (not the 27 archaeology cases) and still delivers >60% accuracy on the 'cash > Top2' prediction at the 4-week horizon. The current threshold is in-sample tuned.",
+    "Quantification of the cash opportunity cost over a multi-quarter horizon showing that, even allowing for ruin-avoidance wins, the foregone Top2 alpha in low-gap episodes exceeds the ruin-cost savings in high-gap episodes at the portfolio level. Without this, partial deployment is at least as good as the binary rule."
+  ]
+}
+```

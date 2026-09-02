@@ -1,0 +1,70 @@
+{
+  "reviews": [
+    {
+      "policy_id": "orthogonal_breadth_decomposition",
+      "concerns": [
+        "Orthogonality claim is empirically weak: over 20-day windows, up_day_ratio_20 and mom_20 cross-sectionally correlate ~0.7-0.85; they are not candidate-orthogonal sub-features, they are largely the same signal with different normalizations.",
+        "vol_ratio_5_20 is described as having 'different noise floor from mom_20' but mom_20 is a return statistic while vol_ratio is a volatility statistic; calling the volatility term 'orthogonal' to the dropped slope/MA features ignores that B0 already loads vol_ratio_5_20 elsewhere.",
+        "Capacity rule max_positions=1 with gap=0.5 (in z-score units, half a standard deviation) is a structural abstention device: cross-sectional spreads of 0.5 z on a 2-feature linear score occur rarely, so the policy will spend most of its life in cash by construction — not by alpha.",
+        "Dropping px_vs_ma50 is asserted to be 'absorbed by trend_b0/relative_strength_b0' but neither B0 trend nor RS proxies the absolute 50-day price level; the residual content (long-term regime filter) is being discarded without falsification.",
+        "Weight scheme (2.0 vs 1.0) embeds a 2x prior on breadth over vol that has no clear economic justification beyond the description's narrative."
+      ],
+      "novelty_0_100": 38,
+      "mechanism_clarity_0_100": 52
+    },
+    {
+      "policy_id": "tape_volatility_interaction_probe",
+      "concerns": [
+        "Severe conceptual duplication with breadth_bounded_vol: both load mom_20 (1.5) and up_day_ratio_20 (1.0/1.5) additively; the only structural difference is swapping a -0.8 vol linear term for a +1.2 (breadth x vol) interaction. These two policies are near-twins in feature space and will produce near-identical rankings — they cannot independently falsify anything.",
+        "Interaction term z(up_day_ratio_20)*z(vol_ratio_5_20) with positive weight 1.2 rewards stocks that are simultaneously high-breadth AND high-short-vol. The description frames this as 'interactional content' but does not justify why joint elevation is a positive signal — historically high-vol breadth episodes (e.g., distribution days, bear-market rallies) precede ruin, the opposite of what a positive coefficient encodes.",
+        "Cross-term collinearity with the additive mom_20 and up_day_ratio_20 terms makes the interaction weight unidentifiable; OLS would not separate +1.2 interaction from a rescaling of the additive terms. The 'falsifier' test has low power.",
+        "Same max_positions=1 + gap=0.5 abstention trap as Policy 1; the probe is structurally biased toward cash.",
+        "vol_ratio_5_20 in this policy is a positive contribution (via interaction) while in breadth_bounded_vol it is sign-flipped negative — the two policies encode opposite vol-sign stories about the same data. This inconsistency is a red flag, not a falsifier design."
+      ],
+      "novelty_0_100": 25,
+      "mechanism_clarity_0_100": 35
+    },
+    {
+      "policy_id": "breadth_bounded_vol",
+      "concerns": [
+        "Vol-bounding via a single linear sign-flip with weight -0.8 is mechanically weak: a stock with mom_20 z=2 and vol_ratio_5_20 z=2 still scores +1.4 net; the 'bounded vol preference' claim does not actually bound anything in score space.",
+        "Direct feature overlap with tape_volatility_interaction_probe (same mom_20 weight 1.5, same up_day_ratio_20 weight 1.5 vs 1.0) — these are not independent falsifiers of the same hypothesis, they are the same hypothesis tested with a different sign on vol.",
+        "The 'confirmed' framing in the description that 'high-mom + high-vol co-occurs with ruin' is asserted, not demonstrated. Linear scoring with sign-flipped vol is a continuous proxy for what should be a hard threshold; the policy cannot structurally prevent the ruin pattern it claims to address.",
+        "max_positions=1 + gap=0.5 z forces abstention in any market regime where no asset has a 0.5σ lead — a structural rather than alpha-driven constraint.",
+        "Weight asymmetry (1.5/1.5/-0.8) means vol contributes at ~53% of the strongest leg; the 'filter' is barely a filter."
+      ],
+      "novelty_0_100": 42,
+      "mechanism_clarity_0_100": 62
+    },
+    {
+      "policy_id": "slope_ratio_entry_tightness_ruin_gate",
+      "concerns": [
+        "Description claims the spec tests slope_ratio = ma10_slope_5/ma20_slope_5, but the spec contains NO ratio term — only a linear ma10_slope_5 (weight 0.5) gated by a threshold on ma20_slope_5 > 0.01. The advertised mechanism is not implemented in the frozen spec.",
+        "The threshold term has add=0.0 with no other scoring effect: it gates nothing in score space. ma10_slope_5 is added linearly regardless of whether ma20_slope_5 passes the gate, so the 'ruin gate' is a no-op.",
+        "Divider instability (the q010 confounder hypothesis) is named in the research_origin but the spec does NOT divide by ma20_slope_5 — so the very artifact the policy claims to test for cannot manifest, and the test is unrunnable as designed.",
+        "Heavy linear-terms overfitting: 6 linear terms (ma10_slope_5, ibd_entry_close_vs_trigger_pct, mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50) plus 1 interaction. With z-scored inputs on cross-sectional rank data, this is essentially a B0 superset with a 'q010 narrative' bolted on.",
+        "ibd_entry_close_vs_trigger_pct with neg_abs transform: the feature is bounded near zero at trigger, so neg_abs is large-negative everywhere except very close to the trigger; this is a near-binary mask dressed as a continuous term, not a smooth signal.",
+        "Capacity is fixed mode max_positions=3 with no gap or min_score gate — this is the only policy without an abstention device, but the desc/spec mismatch undermines whatever signal it would otherwise produce."
+      ],
+      "novelty_0_100": 20,
+      "mechanism_clarity_0_100": 22
+    },
+    {
+      "policy_id": "gap_gated_continuous_slot_sizing",
+      "concerns": [
+        "Description promises 'continuous slot sizing' but the selector is purely discrete (top1_confidence with binary gap threshold and min_score cutoff). The name is a misnomer; the policy either fills slots 2/3 or doesn't, there is no continuous sizing.",
+        "gap=0.15 + min_score=0.3 + max_positions=3 is engineered to fill slot 1 and routinely cash slots 2/3. This is an abstention policy disguised as a sizing policy. The description admits this ('a large gap permits abstention on slot 2/3') so the policy is intentionally biased toward partial cash deployment, not toward producing falsifying performance.",
+        "Feature set (mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, ma10_slope_5, vol_ratio_5_20 x mom_20) is essentially a 5-way union of features that appear individually in the other four policies. It does not isolate a new causal mechanism — it is a kitchen-sink aggregation with an interaction that repeats the high-mom/high-vol ruin hypothesis from Policy 3.",
+        "vol_ratio_5_20 x mom_20 interaction with weight -0.4 means: penalize (high-vol AND high-mom) jointly — exactly the ruin pattern named in breadth_bounded_vol. Two policies testing the same joint hypothesis with opposite signs on the same interaction is a setup for one to 'falsify' the other by artifact, not by mechanism.",
+        "min_score=0.3 in unspecified units (raw score? z-units?) is opaque; this gate interacts non-trivially with the linear term magnitudes and could effectively zero out the policy in regimes where z-scores cluster."
+      ],
+      "novelty_0_100": 33,
+      "mechanism_clarity_0_100": 48
+    }
+  ],
+  "cross_policy_concerns": [
+    "Across the 5 policies, mom_20 appears in 5/5, vol_ratio_5_20 in 5/5, up_day_ratio_20 in 4/5. The 'falsifier' design pretends these are independent tests but they are heavily collinear in feature space — most policies share >60% of their linear term mass.",
+    "Four of five policies (1, 2, 3, 5) use top1_confidence with gap thresholds; the abstention rate is a function of the gap parameter, not of alpha. Any 'falsification' of one policy vs another will be dominated by gap choice, not by feature engineering.",
+    "Two policies (3 and 5) encode the high-mom + high-vol ruin hypothesis with opposite-signed interactions (Policy 3: implicit via sign-flip; Policy 5: explicit negative interaction). The Track D design does not adjudicate between them because both can be 'right' under different gap/abstention regimes."
+  ]
+}

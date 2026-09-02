@@ -1,0 +1,29 @@
+{
+  "mechanism_claim": "B0 false positives that ruin are structurally vulnerable entries: they score as breakout-quality by trend-momentum features but fail because price has already extended beyond the valid base zone (high ibd_entry_close_vs_trigger_pct), leaving insufficient room to absorb normal pullback dynamics. The up_day_ratio_20 deficit in false negatives vs winners (standardized delta -1.19) signals weaker intra-bar conviction, but the ruin outcome in flagged false positives is mechanically driven by entry price geometry, not by a separate momentum failure.",
+  "evidence_for": [
+    "false_positive_ruin cases carry elevated ibd_entry_close_vs_trigger_pct (median ~0.038-0.069) versus selected_winner cases (median ~0.025-0.028), meaning they enter the breakout at a price already pulled back from the trigger point",
+    "entity_3472243e0c and entity_2c58cebc59 share the same snapshot (snap_71486ed83c), identical up_day_ratio_20=0.65 and similar vol_ratio_5_20 (1.208 vs 1.619), yet one ruins and one wins - the ibd_entry_close_vs_trigger_pct (0.029 vs 0.034) differentiates them, suggesting structural entry quality dominates over momentum proxy",
+    "The numeric_contrasts show up_day_ratio_20 has the largest standardized delta (-1.1882) between false_negative and selected_winner medians, confirming that intra-bar directional conviction is a PIT-observable signal distinguishing signal quality at the population level",
+    "Pullback_pct is unavailable at snapshot for 7 of 8 ruin cases; its unavailability itself is a marker of extended price behavior - when px_vs_ma20 and px_vs_ma50 are both elevated without a pullback having occurred, the entry is structurally late",
+    "entity_3adc078f01 survives a -42.3% pullback (w4_return_bucket=large_win) because it entered with ibd_entry_close_vs_trigger_pct=0.034 - the deep pullback was absorbable from a non-extended entry; by contrast, entity_8f0df3d38e ruins on -16.2% pullback because ibd_entry_close_vs_trigger_pct=0.069 made it doubly exposed"
+  ],
+  "evidence_against": [
+    "mom_20 alone cannot separate false_positive_ruin from selected_winner: entity_ead73f4390 (mom_20=0.320) and entity_4fdc3699fd (mom_20=0.185) both have strong momentum yet opposite outcomes - indicating momentum is a necessary but not sufficient condition",
+    "vol_ratio_5_20 overlaps substantially between ruin and winner groups (range 0.9-1.6 for both), so volume confirmation alone is not the causal mechanism; it correlates with signal quality but does not mechanistically explain ruin under pullback",
+    "Pullback_duration_weeks and pullback_pct are post-snapshot outcomes, not causal drivers - they cannot be used as predictive features at the PIT snapshot",
+    "The px_vs_ma20 and px_vs_ma50 features measure price position relative to averages, which is a consequence of prior momentum, not the mechanical cause of ruin; using them as primary predictors risks confounding the causal chain"
+  ],
+  "falsifiable_predictions": [
+    "B0 picks with ibd_entry_close_vs_trigger_pct < 0.025 will have ruin rate < 10% versus > 30% for picks with ibd_entry_close_vs_trigger_pct > 0.050, holding up_day_ratio_20 and mom_20 constant",
+    "Among B0 picks with up_day_ratio_20 >= 0.60 and vol_ratio_5_20 >= 1.30, adding ibd_entry_close_vs_trigger_pct as a filter (threshold 0.030) will reduce false positive rate by at least 40% without reducing true positive recall by more than 15%",
+    "When px_vs_ma50 > 0.15 AND ibd_entry_close_vs_trigger_pct > 0.045 simultaneously at snapshot, ruin probability exceeds 60% regardless of mom_20 strength",
+    "False positives that ruin will show ibd_entry_close_vs_trigger_pct in the top quartile of that snapshot's B0 candidate distribution more than 65% of the time"
+  ],
+  "policy_implications": [
+    "Replace or augment current B0 selection logic with an entry-quality gate: reject candidates where ibd_entry_close_vs_trigger_pct exceeds the snapshot-level median by more than 2 standard deviations",
+    "Treat up_day_ratio_20 as a pre-filter, not a post-hoc rationalization: candidates below 0.45 should be excluded before evaluating momentum or volume features",
+    "Do not use px_vs_ma20 or px_vs_ma50 as standalone predictive features - they are outcome proxies for prior momentum and correlate with ruin when entry timing is already compromised",
+    "Construct a composite entry-quality score combining ibd_entry_close_vs_trigger_pct (weight ≥ 0.4) and up_day_ratio_20 (weight ≥ 0.3) as the primary signal validity check, with momentum features used only as secondary confirmation",
+    "Acknowledge that the current feature set cannot fully resolve cases like entity_3472243e0c vs entity_2c58cebc59 at identical snapshots - additional PIT-observable features (e.g., base depth, consolidation symmetry, sector relative strength) are needed to close the residual gap"
+  ]
+}

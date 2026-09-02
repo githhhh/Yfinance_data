@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__nonlinear_b1__q007__researcher",
+  "prompt_hash": "46e5134ac0d8bed6f69d3fc3ea46cef4d33862d8ef870465139ce5be2df9e034",
+  "response_hash": "88a8531a5d276473979d672925f8ec4bb3f3d4af45d964c9fc620ffcf2772048",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 2,
+  "compact_json_retry": true
+}

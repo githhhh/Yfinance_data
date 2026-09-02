@@ -1,0 +1,70 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The CCM (Composite Confidence Margin) framework is a circular restatement of the B0 selection model. The 'gap between Top1 and Top2' on mom_20/up_day_ratio_20/vol_ratio_5_20/px_vs_ma50 is not an independent confidence signal — it is, by construction, a function of the very features B0 used to pick Top1 in the first place. The 27-case error-archaeology contrast (selected_winner vs false_negative_relative) is therefore not measuring a PIT-safe conviction proxy; it is measuring how strongly the existing ranker separates the names it decided to deploy from the names it declined. The four-feature bundle was cherry-picked from 20+ candidates by post-hoc standardized delta, the threshold cuts (0.3, 1.0) are unanchored to any empirical quantile or cross-validated cutoff, and vol_ratio_5_20 is admitted by the proposer to be elevated (>1.2) across virtually every case — i.e., noise. The slot-count mapping (1 → 67% cash, 2 → 33% cash, 3 → 0% cash) further conflates two orthogonal decisions: how many positions to hold and how much of the 3-slot capital to deploy per position. A concentrated bet is not the same as deploying 1 of 3 slots; it is a position-sizing choice. The mechanism thus fails on three independent grounds: (a) the proxy is endogenously selected, (b) the threshold values are free parameters, and (c) the slot-to-cash identity ignores that 1-slot with full capital and 3-slot with full capital are both possible states.",
+  "attacks": [
+    {
+      "issue": "Endogeneity / circular contrast definition",
+      "why_it_matters": "Selected_winner requires is_b0_pick=true; false_negative_relative requires is_b0_pick=false. B0 is selected using exactly this feature family (momentum, relative-to-MA, volume ratio, up-day share). The CCM margin on these features between the B0-deployed and B0-skipped cohorts is therefore an identity, not a discovery. Any model that ranks via mom_20+px_vs_ma50+up_day_ratio will show a CCM-shaped gap for the same reason. The framework proves the ranker works, not that a new confidence proxy has been found."
+    },
+    {
+      "issue": "Post-hoc feature selection from 20+ candidates",
+      "why_it_matters": "The frozen evidence shows standardized deltas for ~23 features; the proposer picked the top 4 by |Δ|. With multiple-testing, the largest gap is expected to be ~1.2 by chance even when no feature carries signal. The 4-feature bundle is therefore a multiple-comparisons artifact; its components need pre-registration or holdout confirmation, neither of which is present."
+    },
+    {
+      "issue": "vol_ratio_5_20 is noise inside the bundle",
+      "why_it_matters": "The proposer concedes vol_ratio_5_20 > 1.2 for ~all cases. Substituting a near-constant feature for one dimension of a margin score cannot help discriminate; it at best shifts the z-scoring weights of the remaining 3 features. Including it gives a false sense of multi-factor robustness."
+    },
+    {
+      "issue": "Unanchored threshold values (0.3 and 1.0)",
+      "why_it_matters": "No quantile, no bootstrap, no train/test split produced 0.3 or 1.0. They read as round-number defaults. With 27 cases, even a stratified split would put ~5 cases per bucket — quintile monotonicity is unestimable. Any threshold picked on this sample inherits its variance."
+    },
+    {
+      "issue": "Exclusion of the actually most discriminative contrarian features",
+      "why_it_matters": "pullback_pct (+0.64 std Δ) and pullback_duration_weeks (-0.73) separate winners from false negatives in directions consistent with deep-base continuation. Ignoring these in the conviction bundle throws away the contrarian component. The claim that px_vs_ma50 'indirectly' captures this is unsubstantiated — a deep pullback can produce large px_vs_ma50 OR small, depending on when the snap was taken."
+    },
+    {
+      "issue": "Date-cluster confounds (snap_71486ed83c dominates false negatives)",
+      "why_it_matters": "Most false-negative cases come from a single snapshot. Within one snapshot's candidate set, all names have correlated features and small pairwise margins. The CCM is artificially small for the snapshot, not because confidence is low. Quoting snapshot-pooled CCM statistics mixes this regime effect with conviction."
+    },
+    {
+      "issue": "Conflation of slot count with cash allocation",
+      "why_it_matters": "'1 slot = 67% cash' presumes a fixed 3-slot budget where unfilled slots become cash. But 1 slot could carry 100% of capital (concentrated) or 33% (cautious); 3 slots could be 3×33%, 3×10%, or pyramid-sized. The economic meaning of slot count under a fixed capital budget is not what the proposer claims; the slot count is a portfolio-construction dial separate from sizing and from confidence."
+    },
+    {
+      "issue": "Self-contradicting labels (entity_6618d3e80c: selected_winner AND false_positive_ruin)",
+      "why_it_matters": "This case simultaneously won and ruined at different horizons/buckets. CCM cannot be assigned a single outcome, so thresholding on outcome labels is unstable. Any decision rule derived from such labels inherits an oscillation."
+    },
+    {
+      "issue": "'Top2 as information source about Top1' lacks mechanism",
+      "why_it_matters": "Top2 is a peer from the same universe scored by the same feature family. Its margin to Top1 reflects scoring noise and ranking ties, not regime. Modeling Top2 as a regime diagnostic requires a separate generative story the proposer does not supply."
+    },
+    {
+      "issue": "Sample labels embed future information",
+      "why_it_matters": "selected_winner and false_positive_ruin are W4 outcomes. While CCM itself is computed on pre-entry bars, the *thresholds* are calibrated on outcome-conditioned labels. The gap between 'Top1 deployed = won' and 'Top1 deployed = ruined' is forward-aware by construction; generalizing thresholds to live PIT data is a transfer-learning problem the proposer does not address."
+    },
+    {
+      "issue": "Internal contradiction — absolute floor alongside a relative-gap rule",
+      "why_it_matters": "Proposing an absolute-floor override (Top1 must clear 25th-percentile raw score) implicitly admits the relative CCM is insufficient. If a large gap from a weak Top1 is still invalid, then CCM alone is not the confidence statistic — and the slot-count mapping is no longer purely confidence-driven."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A snapshot where Top1 and Top2 share nearly identical vectors on the 4 CCM features (so margin ≈ 0) yet both subsequently deliver large positive W4 returns — CCM < 0.3 would force 3-slot deployment even though conviction is path-dependent, not gap-dependent.",
+    "A snapshot where the entire candidate pool has low up_day_ratio_20 and mom_20, making every candidate's CCM score uniformly depressed regardless of relative ordering. CCM predicts low confidence; live outcome may show the small-gaps regime is precisely where consensus matters more.",
+    "A Top1 with high CCM (large gap) coming from a thin-volatility regime where vol_ratio_5_20 ≈ 1 across all names — the apparent conviction is an artifact of vol_ratio contributing ~0 to every margin, so the std Δ on the *bundle* is engineered.",
+    "Selected winners with negative ma20_slope_5 (entity_8ad5cd4795, entity_2f86543bf6) where the CCM bundle ignores slope direction — these are wins the relative-gap framework would not specifically endorse and could 'accidentally' approve.",
+    "Cases where snap_71486ed83c had a high-CCM Top1 that subsequently failed — this would refute the bundle's claim that high gap = high conviction, demonstrating snapshot-cluster contamination.",
+    "Top2 candidates with higher absolute mom_20 than Top1 (legitimate ranking inversion at the snapshot) — current CCM correctly flags this as low margin; the framework has no fallback when both the ranker and the gap are wrong."
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered feature bundle (chosen before seeing the contrast table) plus a held-out snapshot sample of >100 cases showing monotonic quintile-level win-rate on Top1 by CCM — this would falsify the multiple-comparisons critique.",
+    "Demonstration that CCM margin carries incremental AUC beyond B0's raw score on a leave-one-snapshot-out CV — i.e., the gap is informative above and beyond the underlying feature magnitudes.",
+    "A causal/structural story for why vol_ratio_5_20 specifically should enter the bundle when its range is narrow across all cases — i.e., economic mechanism, not just 'it loaded in a PCA-like view'.",
+    "Empirical threshold selection (bootstrap percentile or constrained optimization on a separate sample) for the 0.3 and 1.0 cut-points, with sensitivity analyses showing the slot-count policy is stable across reasonable perturbations.",
+    "Evidence that the slot-count mapping (1, 2, 3) is truly confidence-conditional rather than a sizing dial — e.g., a controlled comparison where 1 slot with 100% capital outperforms 1 slot with 33% capital at high CCM, and 3 slots with 100% capital outperforms 3 slots with 33% at low CCM.",
+    "Inclusion of pullback_pct and pullback_duration_weeks in the bundle improves out-of-sample hit-rate over the 4-feature CCM, confirming the contrarian information component is captured rather than ignored.",
+    "Demonstration that false_positive_ruin rate conditional on high-CCM is below the unconditional ruin rate, ideally below 10% — currently the claim is unfalsified because the bundle was selected post-hoc on the very sample it must outperform."
+  ]
+}
+```

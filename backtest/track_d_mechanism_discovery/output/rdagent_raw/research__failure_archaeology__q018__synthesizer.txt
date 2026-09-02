@@ -1,0 +1,44 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 28,
+  "mechanism_summary": "The compressed-geometry false-negative pattern (px_vs_ma50 < 0.06, mom_20 < 0.08, vol_ratio_5_20 < 1.2) is present in n=2 FN-large_win cases but cannot be distinguished from outcome-biased selection artifact given the FN definition's reliance on future W4 returns. Selected winners with extended geometry (px_vs_ma50 up to 0.230) demonstrate the pattern is not necessary; false-positive ruins with compressed geometry (entity_8f0df3d38e, mom_20=0.176) demonstrate it is not sufficient. The FN-large_win vs FN-small_win/loss feature comparison (n=2 vs n=5) has insufficient discriminative power. The proposed vol_ratio threshold of 1.2 is post-hoc on n=2 with no validation. A non-FN benchmark test (compressed_geometry_baseline_rate) is needed to establish whether the pattern has predictive value independent of the FN label's construction.",
+  "falsifiers": [
+    "A pre-registered hold-out test where entities with px_vs_ma50 < 0.06 AND mom_20 < 0.08 AND vol_ratio_5_20 < 1.2 achieve large_win rate < 2x the non-compressed-geometry non-pick baseline would refute predictive value",
+    "Finding a single non-B0 entity at snapshot with compressed-geometry features (all three metrics) that subsequently produces w4_return_bucket = 'ruin' would falsify sufficiency",
+    "Finding a B0-selected entity with the same compressed-geometry features that produces large_win would show B0 can capture the pattern when fundamentals align, invalidating the 'systematic rejection' claim",
+    "Demonstration that FN-large_win and FN-small_win/loss have statistically indistinguishable feature distributions across px_vs_ma50, mom_20, vol_ratio_5_20, and up_day_ratio_20 would confirm the pattern is noise given current sample size",
+    "A forward validation (pre-registered criteria applied to future snapshot) showing compressed-geometry entities have large_win rate equal to base rate would refute the mechanism"
+  ],
+  "actionable_design_principles": [
+    "Prioritize the compressed_geometry_baseline_rate test using ALL non-B0 entities (not FN subset) to determine if the pattern exists independent of outcome-biased selection",
+    "Do not construct vol_ratio_5_20 thresholds from n=2 FN-large_win cases; any threshold requires forward validation on pre-selected sample",
+    "Treat compressed geometry as potentially sufficient (not necessary) condition: winners exist without it, but the subset of compressed-geometry non-picks may have elevated win rates",
+    "Distinguish contrarian mechanism (mean-reversion on neglected stocks) from geometric consolidation mechanism; the evidence does not currently adjudicate this",
+    "Acknowledge within-FN heterogeneity: entity_05b4c6b1f7 and entity_de1c657364 are FN-large_win despite different pullback depths and up_day_ratios, suggesting the mechanism is not uniform",
+    "The policy implication about relaxing B0 px_vs_ma50 thresholds is premature without establishing the compressed-geometry pattern has genuine predictive value in pre-registered validation"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Run compressed_geometry_baseline_rate as the primary validation test before any policy derivation",
+      "why_distinct": "This test uses non-FN non-picks as control, avoiding the outcome-biased selection that undermines FN-subset analysis",
+      "features": ["px_vs_ma50", "mom_20", "vol_ratio_5_20"],
+      "capacity_relevance": "Determines whether compressed geometry has selection-independent predictive value; if baseline test fails, no downstream policy is justified"
+    },
+    {
+      "idea": "Segment the non-B0 population by vol_ratio_5_20 (< 1.2 vs > 1.5) within compressed geometry to test vol_ratio independence",
+      "why_distinct": "Separates vol_ratio as potential confounding variable from pure geometry effect; both FN-large_win cases have low vol_ratio, but this may be coincidence at n=2",
+      "features": ["vol_ratio_5_20", "px_vs_ma50", "mom_20"],
+      "capacity_relevance": "If elevated vol_ratio compressed-geometry non-picks match low vol_ratio large_win rates, the vol_ratio threshold is not a mechanism component"
+    },
+    {
+      "idea": "Construct a mean-reversion control: entities with px_vs_ma50 < 0 AND mom_20 < 0 (below both MAs) vs compressed geometry (px_vs_ma50 < 0.06, mom_20 < 0.08, both positive)",
+      "why_distinct": "Tests whether FN-large_win outcomes are due to contrarian mean-reversion from oversold conditions rather than tight consolidation geometry",
+      "features": ["px_vs_ma50", "mom_20", "px_vs_ma20"],
+      "capacity_relevance": "If mean-reversion entities (entity_ad2bfdee3f) achieve similar large_win rates, the geometry-specific mechanism claim is weakened"
+    }
+  ]
+}
+```

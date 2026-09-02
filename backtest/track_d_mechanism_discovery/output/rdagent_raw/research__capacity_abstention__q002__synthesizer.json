@@ -1,0 +1,87 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 32,
+  "mechanism_summary": "The Researcher's CCM proposal — z-scored Top1-minus-Top2 margin on {up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50} — captures a real and PIT-safe question ('is Top1 an outlier or the best of a tight pack?'), but it cannot stand alone as a confidence statistic for three converging reasons: (i) the bundle was selected from a ~23-feature contrast conditioned on outcome labels that the B0 ranker itself uses, so the gap is partially a tautology with the ranker rather than an independent check; (ii) within a 27-case discovery sample the standardized deltas and CCM thresholds (0.3, 1.0) are not pre-registered and lack bootstrap support; (iii) the slot-count mapping conflates position concentration with confidence — under fixed 3-slot capital, going from 3 slots to 1 slot quadruples per-position weight and quintuples idiosyncratic exposure, so fewer slots is the HIGHEST-risk state for any given conviction, not the safest. The mechanism therefore survives only as a relative gap indicator that must be paired with an absolute conviction floor, a regime overlay not in the bundle, and an explicit recognition that 'cash held' is itself a position whose contribution to risk-adjusted return is positive in the 1-slot state. The Experimental Designer's seven tests are appropriate but most will require an out-of-sample snapshot set larger than the 27 discovery cases to deliver adjudicating power; on the current evidence base they cannot confirm or refute the mechanism, only bound where it could fail.",
+  "falsifiers": [
+    "On a held-out snapshot set of >=200 candidates drawn from a period disjoint from snap_71486ed83c and snap_d0d57b1e40, the within-snapshot CCM margin fails to correlate (Spearman rho < 0.15) with the actual 4-week forward Top1-minus-Top2 return spread — falsifying that the gap statistic is informative about realized conviction differential.",
+    "The counterfactual_bundle_indistinguishability_test (4 of 5 random 4-feature bundles producing KS-indistinguishable margin distributions from CCM) passes — falsifying the claim that the specific feature choice carries non-generic structural content and showing CCM is just a z-score artifact dressed in a familiar feature set.",
+    "Quintile-bucketed CCM on held-out data fails to be monotonically related to Top1 win rate (a non-monotonicity, e.g., highest CCM quintile with win rate below the median quintile) — falsifying the calibration claim that higher gap implies higher conviction.",
+    "vol_ratio_5_20 contribution to CCM margin falls below 15% of per-feature mean contribution in >75% of held-out snapshots AND its CV across snapshots is <0.15 — confirming the feature is structural noise and that CCM effectively reduces to a 3-feature weighted margin.",
+    "Adding pullback-based margin (residualized pullback_pct + pullback_duration_weeks) to CCM margin raises out-of-sample R^2 for the Top1-vs-Top2 return spread by >0.10 in >50% of snapshots — confirming the bundle silently discards non-redundant base-structure information.",
+    "Under live transaction costs, the 1-slot allocation in the CCM>1 regime does NOT dominate the 3-slot allocation by Sharpe after the cash-drag penalty is subtracted — falsifying the slot-count-as-confidence-dial claim and showing concentration premium is illusory.",
+    "False_positive_ruin rate in the CCM>1 quintile exceeds 10% on held-out data — falsifying the implicit regime-invariance assumption baked into the bundle and showing CCM is blind to the same event/regime risk that already produced entity_6618d3e80c.",
+    "The absolute_floor_gap_orthogonality_test shows rank correlation between Top1 absolute level and CCM margin <0.2 AND the {low level, high gap} cell holds >25% of snapshots — falsifying CCM as a usable standalone proxy and confirming the Researcher's own absolute-floor override is structurally mandatory, not optional.",
+    "Permutation test: randomly reassigning is_b0_pick labels within each snapshot destroys the contrast between selected_winner and false_negative cohorts on the 4 CCM features (standardized delta collapses to |Δ|<0.3 for all four) — falsifying the discovery itself as a selection-on-feature artifact."
+  ],
+  "actionable_design_principles": [
+    "Treat CCM strictly as a RELATIVE gap diagnostic, never as a confidence proxy in isolation. Any deployment decision must require THREE independent confirmations: (a) CCM above its regime-specific threshold, (b) Top1 absolute z-score on the bundle above a pre-registered floor, and (c) a regime/sector filter (e.g., market breadth or sector-relative momentum) outside the bundle. Single-criterion deployment is forbidden.",
+    "Pre-register the CCM feature bundle, the z-scoring reference window, and the slot-count thresholds BEFORE the next out-of-sample window opens. Any re-selection of features or thresholds on observed failure rates constitutes re-introducing the same endogeneity the framework is meant to eliminate.",
+    "Recognize that under fixed 3-slot capital, 'fewer slots' means HIGHER per-position risk, not lower. The 1-slot regime is the most concentrated exposure state; cash held is not zero-risk but earns the risk-free rate plus optionality. Risk attribution must decompose PnL into alpha, diversification discount, and cash yield as three separate legs.",
+    "Decouple slot count from sizing. The Researcher's mapping leaves per-position weight under-specified — a 2-slot allocation with equal weights (50% each) is economically different from a 2-slot allocation with conviction-proportional weights (e.g., 67%/33%). Confidence bands should fix BOTH slot count AND per-position sizing rule, with the rule chosen from a pre-registered menu.",
+    "Use the false_positive_ruin label as a separate evaluation cohort from false_negative_relative. The 27-case sample splits 8 ruin / 7 false-negative / 11 winner / 1 mixed; the ruin cohort is small enough that any rule claiming to filter ruins needs a confirmation set, not just discovery contrast.",
+    "Estimate CCM thresholds via bootstrap on the discovery cases with explicit confidence intervals; report the threshold as a band [0.3±δ, 1.0±δ] not as a point. Any point threshold reported without CI is methodologically incomplete.",
+    "Run the Experimental Designer's seven tests in the stated priority order; do not promote CCM to production until at least the first three (within-snapshot compression, absolute floor orthogonality, counterfactual bundle indistinguishability) produce decisive results on held-out snapshots.",
+    "Cap CCM's role at FILTERING, not at RANKING. Top1 and Top2 identity must continue to come from the underlying conviction bundle, not from CCM. CCM answers 'should we deploy at all, and how concentrated?' — not 'which candidate wins?'"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Define a three-leg position policy DSL with explicit legs {alpha_leg, diversification_leg, cash_leg}, where each leg carries its own expected return, volatility, and contribution to total risk. Slot count and per-position weights are outputs of leg-allocation rules, not inputs. CCM gates the alpha_leg size; the cash_leg size is derived from (1 - alpha_leg_weight - diversification_leg_weight); the diversification_leg is populated only when CCM < threshold AND an independent diversification-value check passes.",
+      "why_distinct": "Prior roles implicitly treated slot count as a 1D dial for confidence. This DSL makes the three legs first-class, forces explicit attribution of return, and prevents the conflation that 'fewer slots = safer' that the Researcher accepted without challenge.",
+      "features": [
+        "alpha_leg_weight",
+        "diversification_leg_weight",
+        "cash_leg_weight",
+        "ccm_margin",
+        "absolute_floor_z"
+      ],
+      "capacity_relevance": "DIRECTLY addresses capacity abstention: the cash_leg weight is the abstention magnitude, and its computation requires CCM AND absolute floor AND diversification-value check before any slot is deployed. Without any of the three, the policy defaults to full cash (3-slot abstention)."
+    },
+    {
+      "idea": "Introduce a 'regime-conditional CCM' that recomputes the z-scoring reference window and the feature bundle based on the current market breadth proxy (e.g., % of universe above 50-day MA). A high-CCM reading in a deteriorating breadth regime is downgraded by a multiplicative regime factor; a high-CCM reading in a strengthening regime is upgraded. Regime factor is NOT in the candidate-feature bundle — it is an external scaler.",
+      "why_distinct": "The Skeptic's core attack on the bundle was that it is blind to regime/event risk (entity_6618d3e80c-style ruins with strong feature profile). The Researcher's proposed regime filter was mentioned as a 'must be added if high-CCM ruins persist' but not formalized. This DSL makes the regime scaler a first-class operator that sits between CCM computation and slot allocation, satisfying the separation-of-mechanism requirement.",
+      "features": [
+        "market_breadth_pct",
+        "sector_relative_momentum",
+        "regime_indicator",
+        "ccm_margin_raw",
+        "regime_scaled_ccm"
+      ],
+      "capacity_relevance": "Addresses the failure mode where CCM signals full deployment right before a regime shift that produces ruin in otherwise strong-feature candidates. Capacity abstention becomes regime-aware: abstain not because of weak candidates but because of a hostile macro envelope."
+    },
+    {
+      "idea": "Define an 'abstention-as-position' DSL primitive: when the policy abstains (0 slots deployed or all-cash state), it must declare (a) the cash_leg return assumption (e.g., short-rate + X bps for optionality value), (b) the re-entry trigger condition (which snapshot statistic, at which threshold, would re-enable deployment), and (c) the maximum abstention duration before mandatory re-evaluation. Abstention is not a null state — it is an active position with explicit entry/exit logic.",
+      "why_distinct": "Neither the Researcher, Skeptic, nor Experimental Designer treated abstention as a state with its own lifecycle. The Researcher's policy treats 1-slot and 2-slot states as having a 'cash held' leg but does not specify when cash becomes a position vs. a residual. This DSL makes abstention an explicit state machine, which is the only way to evaluate whether abstention is capacity-driven (insufficient high-CCM candidates) versus regime-driven (hostile environment) versus discovery-driven (insufficient evidence).",
+      "features": [
+        "cash_leg_yield_assumption",
+        "re_entry_trigger_threshold",
+        "max_abstention_duration_bars",
+        "abstention_reason_code"
+      ],
+      "capacity_relevance": "This is the core capacity-abstention primitive: it separates 'cannot deploy' from 'choose not to deploy' from 'do not yet know if we can deploy'. Each reason code triggers a different recovery path, preventing the conflation of evidence-absence with evidence-of-absence."
+    },
+    {
+      "idea": "Define a 'bundle-indistinguishability guard' DSL operator that, given any candidate confidence statistic, automatically tests it against K=5 counterfactual bundles sampled from a pre-registered feature allowlist. If more than 2 of 5 counterfactuals produce statistically indistinguishable margin distributions, the candidate statistic is flagged as 'non-mechanism-specific' and downgraded to informational status (logged but not policy-binding). This codifies the Experimental Designer's counterfactual_bundle_indistinguishability_test as a mandatory pre-deployment check.",
+      "why_distinct": "The Skeptic's strongest attack was multiple-comparisons / non-specificity of the bundle. The Researcher's proposed bundle is just one of many 4-feature subsets that would produce a CCM-like statistic. This DSL operator turns the 'any bundle could have produced this' critique into an automatic gate, rather than a one-time philosophical objection.",
+      "features": [
+        "candidate_statistic",
+        "counterfactual_bundle_distributions",
+        "ks_statistic",
+        "mann_whitney_p",
+        "non_specificity_flag"
+      ],
+      "capacity_relevance": "Prevents the system from over-committing capital to a confidence proxy that is actually a generic z-score margin. Capacity abstention becomes the safe default whenever the guard fires: if the statistic is non-specific, do not let it gate capital, default to cash or to the most conservative rule in the pre-registered menu."
+    },
+    {
+      "idea": "Define a 'concentration-cost DSL' that, given a target slot count n in {1,2,3}, a sizing rule S in {equal, conviction_proportional, kelly_capped}, and a fixed capital C, computes the realized per-position risk contribution including cross-position correlation from the snapshot's own candidate covariance. The output is the policy's actual risk budget, not its nominal slot count. The DSL rejects any (n, S) pair whose realized risk exceeds a pre-registered ceiling, regardless of CCM signal.",
+      "why_distinct": "The Researcher's mapping {CCM>1 → 1 slot, ...} implicitly assumed slot count equals confidence equals risk. This DSL makes risk explicit and rejectable. It also surfaces the case where CCM says '1 slot' but the candidate pool has correlated Top1/Top2 such that 1 slot carries 80% of the pool variance — a configuration where the policy should downgrade to 2 slots despite the high-CCM signal.",
+      "features": [
+        "slot_count_n",
+        "sizing_rule_S",
+        "candidate_covariance_matrix",
+        "realized_per_position_risk_contribution",
+        "risk_ceiling_flag"
+      ],
+      "capacity_relevance": "Concentration risk is the primary mechanism by which 'high confidence' becomes 'high ruin' (as seen in the false_positive_ruin cohort where B0_pick=true implied full concentration). This DSL prevents CCM from forcing concentration in configurations where concentration is structurally dangerous, which is the operational form of capacity-aware abstention."
+    }
+  ]
+}

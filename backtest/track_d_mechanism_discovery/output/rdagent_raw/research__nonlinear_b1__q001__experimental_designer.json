@@ -1,0 +1,75 @@
+{
+  "tests": [
+    {
+      "name": "Proxy Validity: NULL/non-NULL vs directly-measured basing",
+      "features": [
+        "base_duration_weeks",
+        "base_mbox_count",
+        "pullback_pct"
+      ],
+      "comparison": "Among B0 candidates with non-NULL pullback fields (i.e., the subset where pullback_v_is_dry could even be defined), compare (a) the NULL/non-NULL dichotomy of pullback fields against (b) a directly-measured base-quality cluster defined by {base_duration_weeks in [3,6] AND base_mbox_count >= 3 AND pullback_pct <= -8}. If (b) reproduces the winner/FP_ruin separation the regime claims, the NULL proxy is replaceable; if (b) is null but (a) separates, the proxy is tautological with 'was a base tagged at all.'",
+      "success_criterion": "Directly-measured base cluster (b) shows >= 0.40 standardized delta on winner-vs-ruin within B0 (i.e., the regime's claim is reproducible with honest measurement).",
+      "failure_criterion": "Directly-measured cluster (b) shows standardized delta < 0.15 AND NULL/non-NULL proxy (a) retains > 0.30 standardized delta, confirming the regime is a missingness artifact, not a volume-during-base measurement."
+    },
+    {
+      "name": "Lower Boundary Audit: the 1.69 contradiction",
+      "features": [
+        "current_vs_ibd_candidate_pct",
+        "mom_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Partition B0 candidates into four non-overlapping bands of current_vs_ibd_candidate_pct: <1.30, [1.30, 1.69), [1.69, 2.50), and >=2.50. Compute large-win rate and ruin rate in each band. The Researcher's claim requires monotone ordering: <1.30 should hold the most false_negatives, [1.69, 2.50) should hold the most selected_winners, and >=2.50 should hold the most FP_ruin. The Skeptic's attack predicts the [1.69, 2.50) sub-band will NOT dominate winners because the FN median sits inside it.",
+      "success_criterion": "large_win_rate([1.69, 2.50)) > large_win_rate([1.30, 1.69)) AND ruin_rate(>=2.50) > ruin_rate([1.69, 2.50)) with each cell n >= 8; specifically, ruin_rate(>=2.50) - ruin_rate([1.69, 2.50)) >= 15 percentage points.",
+      "failure_criterion": "Either large_win_rate([1.69, 2.50)) <= large_win_rate([1.30, 1.69)) OR ruin_rate does not monotonically increase with current_vs_ibd_candidate_pct across the four bands (i.e., the 1.5 lower bound the Researcher proposes is bracketed by the false-negative cluster it claims to exclude)."
+    },
+    {
+      "name": "Confound Independence: regime vs the strong-3",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Block B0 candidates into quartiles of (mom_20, vol_ratio_5_20, up_day_ratio_20) jointly — i.e., narrow momentum/quality bins. Within each bin, compute the ruin rate for the proposed regime sweet spot [1.5, 2.5] vs. outside it. If the regime's signal survives this within-bin stratification, the current_vs_ibd_candidate_pct band carries information orthogonal to momentum; if it collapses, the band is a re-encoding of the existing strong-3 features.",
+      "success_criterion": "Within at least 3 of 4 joint-momentum quartiles, ruin_rate(sweet_spot) < ruin_rate(outside) with n >= 10 per cell, and the median within-bin standardized delta on winner-vs-ruin for the band remains >= 0.20.",
+      "failure_criterion": "Within-bin direction flips sign in >= 2 quartiles, OR the median within-bin standardized delta drops below 0.10, indicating the regime is a redundant momentum proxy."
+    },
+    {
+      "name": "Snapshot Stability: cluster contamination audit",
+      "features": [
+        "current_vs_ibd_candidate_pct",
+        "pullback_pct",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Repeat the lower-bound audit (Test 2) WITHIN each snapshot that contributes >= 4 B0 cases, instead of pooling across snapshots. Pool the within-snapshot direction-of-effect estimates (win-rate ordering across the four bands) using a sign test. The Researcher's regime is snapshot-independent if at least 75% of within-snapshot tests show the same band ordering; the Skeptic's contamination claim predicts within-snapshot effects will be noisy or direction-inconsistent because the sample is dominated by 2-3 date clusters.",
+      "success_criterion": "Sign test on within-snapshot win-rate ordering across the four bands yields p < 0.10 (one-sided) with >= 75% of snapshots agreeing on band direction, AND at least one snapshot is NOT in {snap_71486ed83c, snap_d0d57b1e40} contributing independent evidence.",
+      "failure_criterion": "Within-snapshot direction-of-effect is inconsistent (sign test p >= 0.20) OR all 'confirming' snapshots come from the two contaminated clusters with n < 4 elsewhere, demonstrating the regime is a single-cluster artifact."
+    },
+    {
+      "name": "Direct Replacement: base_duration + base_mbox vs the regime",
+      "features": [
+        "base_duration_weeks",
+        "base_mbox_count",
+        "current_vs_ibd_candidate_pct"
+      ],
+      "comparison": "Construct two predictive rules within B0 and compare standardized winner-vs-ruin separation: (Rule R1) base_duration_weeks in [3,7] AND base_mbox_count >= 3 AND current_vs_ibd_candidate_pct in [1.5, 2.5]; (Rule R2) pullback_v_is_dry=True AND current_vs_ibd_candidate_pct in [1.5, 2.5] (the Researcher's regime). Compute the standardized delta on selected_winner vs FP_ruin for each. R1 tests whether the regime's mechanism (quality basing) is better captured by directly-measured variables; R2 is the reference rule.",
+      "success_criterion": "R1 achieves standardized delta >= 0.35 on winner-vs-ruin AND R1's delta exceeds R2's delta by at least 0.10, indicating the Researcher's claim of 'quality basing' is real but the proxy encoding is suboptimal.",
+      "failure_criterion": "Either R1's delta < 0.20 OR R2 ties or beats R1, indicating the proxy mechanism is not actually capturing what it claims and directly-measured features add nothing incremental."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm base_duration_weeks, base_mbox_count, and pullback_pct are computed PIT at the B0 evaluation date and do not use forward-looking base-end detection (screener often anchors bases to breakout, which can leak).",
+    "Confirm pullback fields (NULL vs non-NULL) are determined before B0 selection, not retroactively tagged by the B0 screener after the fact — if the B0 filter assigns pullback_v_is_dry post-hoc, the proxy is tautological with B0 membership.",
+    "Verify current_vs_ibd_candidate_pct is computed against the IBD candidate pivot as of the snapshot date (not the eventual pivot the stock breaks out to).",
+    "Snapshot id (snap_*) must not enter as a predictive feature in any model — using it would memorize date clusters and inflate the apparent regime signal.",
+    "is_b0_pick must be used only as a sampling-frame filter (=true to define the B0 universe), never as a model feature, since it is the eligibility indicator whose boundaries the regime is not supposed to expand.",
+    "outcome_label and w4_return_bucket must remain as labels only; any feature that is a deterministic function of these (e.g., bucketed W4 return) is a label leak.",
+    "For Test 4 (Snapshot Stability), ensure the within-snapshot estimates are NOT pooled across snapshots before computing the sign test — pooling first would re-introduce cluster contamination and defeat the test's purpose."
+  ],
+  "priority_order": [
+    "Lower Boundary Audit: the 1.69 contradiction",
+    "Confound Independence: regime vs the strong-3",
+    "Proxy Validity: NULL/non-NULL vs directly-measured basing",
+    "Direct Replacement: base_duration + base_mbox vs the regime",
+    "Snapshot Stability: cluster contamination audit"
+  ]
+}

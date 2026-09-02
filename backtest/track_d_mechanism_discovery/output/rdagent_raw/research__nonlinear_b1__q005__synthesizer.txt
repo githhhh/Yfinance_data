@@ -1,0 +1,63 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 35,
+  "mechanism_summary": "The interaction proposes that pullback_v_is_dry is a conditional regime flag whose sign reverses with ibd_entry_volume_ratio: dry-pullback coincident with expanding entry volume implies genuine accumulation resolving into continuation, whereas dry-pullback coincident with flat or shrinking entry volume implies quiet distribution (the 'calm' reflects supply being absorbed off-exchange), so the B0 entry resolves into the ruin regime rather than a continuation base. The likely failure regime is the dry×low-volume quadrant, but this regime is empirically fragile in the discovery archaeology because (a) ibd_entry_volume_ratio is only present as a marginal contrast (delta -0.50, the weakest of the top-tier numeric signals) and not at the case level in the shown data — the per-case examples instead carry vol_ratio_5_20, which is a different axis — and (b) ≥50% of false_positive_ruin cases have null pullback fields, meaning 'dry' is undefined for them and the interaction cannot mechanistically explain those ruins. Net: the interaction is a plausible within-B0 precision lever for a narrow subpopulation, not a general B0 modifier.",
+  "falsifiers": [
+    "On ≥2 holdout snapshots not in the discovery 27, the 3x3 (dry × volume tertile) grid must show ruin_rate monotonic in ibd_entry_volume_ratio within dry=true AND |max-min| ruin_rate ≤ 5pp within dry=false; either failure collapses the conditional-mechanism claim back to additive marginals.",
+    "NaN-handling sensitivity: ruin_rate(mid|high) within the NaN pullback stratum must NOT equal ruin_rate(mid|high) within the True stratum — if pooling NaN into dry=false reproduces the same gradient, the signal is the NaN-handling rule, not a true dry×volume interaction.",
+    "Spearman(ibd_entry_volume_ratio, vol_ratio_5_20) ≥ 0.70 within B0 picks would prove the named feature is a proxy for the volume axis already in the stack and the interaction is a relabeled version of an existing rule.",
+    "Partialling-out test: ruin-rate monotonicity under ibd_entry_volume_ratio tertiles must preserve sign within each vol_ratio_5_20 tertile stratum; sign-flip in any stratum means the interaction is fully explained by the confounded variable.",
+    "Replication of the winners-vs-false_negatives ibd_entry_volume_ratio median gap (1.813 vs 1.599) on an out-of-discovery cohort where pullback_v_is_dry is fully populated (not null), with a bootstrap CI excluding parity — otherwise the marginal signal is in-sample noise.",
+    "Ablation: a B0 baseline that already includes ibd_entry_volume_ratio as a marginal scoring feature must NOT regain the precision improvement when the interaction term is added; if it does, the interaction adds overfitting surface without new signal.",
+    "Entity_3adc078f01-class counterexample replication: any out-of-sample B0 pick satisfying dry=true AND ibd_entry_volume_ratio<1.3 that ends as large_win caps the rule's precision below 100% and forces the encoding to be soft, not hard."
+  ],
+  "actionable_design_principles": [
+    "Encode ONLY as a within-B0 rank penalty, never as a hard veto, because (i) the within-B0 ceiling is a demote-only channel and a hard veto can starve the universe if the dry-true subpopulation is small, and (ii) the n=27 discovery sample does not support threshold certainty for a hard cutoff.",
+    "Treat null pullback fields as a third explicit stratum, not as 'dry=false' or 'dry=true'. The NaN handling rule is the single largest modeling decision in this feature, and silently pooling NaN into either bucket is what the falsifier #2 is designed to catch.",
+    "Stamp both features at snapshot t using only data observable at t (no W4 leakage in pullback_duration_weeks or pullback_pct), and freeze ibd_entry_volume_ratio tertile cut points on discovery data only before touching holdout.",
+    "Disambiguate ibd_entry_volume_ratio from vol_ratio_5_20 at the schema level: ibd_entry_volume_ratio is a single entry-day normalized print, vol_ratio_5_20 is a smoothed 5/20-day ratio. They must be computed from disjoint inputs and labeled differently, because the discovery archaeology case-level data shows vol_ratio_5_20, not ibd_entry_volume_ratio, and conflating them is the strongest single point of failure.",
+    "Gate activation behind pre-registered monotonic-dose evidence: do not ship the interaction policy until both Experimental Designer tests pass on ≥2 holdout snapshots; in the interim, log the predicted-demote set as a parallel channel without acting on it.",
+    "Capacity check before enabling: if the dry=true subpopulation within B0 is <5% of the eligible universe, the policy has near-zero effect on outcomes even if correct — confirm the subpopulation size is large enough to move ruin rate by a detectable amount.",
+    "Re-test per regime window: because the discovery 27 cases span ≥14 snapshots, run the 3x3 grid per snapshot and report the interaction coefficient's dispersion; a snapshot-concentrated effect is regime noise, not a structural B0 modifier.",
+    "Add an ablation row that scores B0 with ibd_entry_volume_ratio marginal only (no interaction); if marginal-only already captures the precision improvement, the interaction is redundant and should be removed to reduce overfitting surface on a thin sample."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "soft_demote_dry_low_volume_within_b0",
+      "why_distinct": "Encodes the interaction as a multiplicative rank penalty inside B0, never as a hard veto and never as a new gate. The penalty is applied only when both pullback_v_is_dry=True AND ibd_entry_volume_ratio is below an adaptive cutoff (default: 25th percentile of recent B0 winners, recomputed per snapshot). Null pullback is an explicit no-op (no penalty, no boost) so the NaN-handling rule is visible in the DSL rather than embedded in a preprocessor.",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio",
+        "is_b0_pick",
+        "pullback_pct_is_null"
+      ],
+      "capacity_relevance": "Low capacity cost: the modifier operates on an already-filtered subset, so the score volume is unchanged. A soft rank penalty preserves the ability to recover in case of falsification, whereas a hard veto would require feature removal and re-backtest."
+    },
+    {
+      "idea": "dry_volume_stratified_score_audit",
+      "why_distinct": "A read-only DSL audit that materializes the 3x3 grid (pullback_v_is_dry in {True, False, NaN} × ibd_entry_volume_ratio tertile) per snapshot and emits ruin_rate, win_rate, and selection_count for each cell. The audit is the pre-registration harness — the policy that ships is a function of the audit's output, not the other way around.",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio",
+        "snapshot_id",
+        "outcome_label",
+        "w4_return_bucket"
+      ],
+      "capacity_relevance": "Zero portfolio impact (audit only); primary capacity is engineering — must compute and freeze ibd_entry_volume_ratio tertile cut points on discovery data only, then propagate to holdout without re-fitting."
+    },
+    {
+      "idea": "volume_axis_disambiguation_guard",
+      "why_distinct": "A schema-level DSL guard that rejects any rule where ibd_entry_volume_ratio and vol_ratio_5_20 are co-featured in the same scoring expression without an explicit partialling-out term, because the discovery data conflates them and the strongest single confound in this interaction is feature-identity ambiguity. The guard forces the policy author to declare whether the rule acts on entry-day volume or short/long smoothed volume — and rejects the rule if the declaration is inconsistent with feature provenance.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "feature_provenance_tag"
+      ],
+      "capacity_relevance": "Static-analysis capacity only: zero runtime cost, but it blocks the highest-risk encoding pattern (re-using a feature under a new name without re-testing the mechanism)."
+    }
+  ]
+}
+```

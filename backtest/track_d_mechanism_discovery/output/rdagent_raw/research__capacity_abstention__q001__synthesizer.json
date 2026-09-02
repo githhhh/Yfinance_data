@@ -1,0 +1,77 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 45,
+  "mechanism_summary": "The researcher's claim is too strong in its current form but not refuted. The core intuition — that concentrated alpha in Top1 plus a non-trivial ruin tail makes marginal slot-filling conditionally negative-EV — is plausible, but the bridge connecting 'large Top1-Top2 gap' to 'Top2 expected return collapses toward the false_negative_relative distribution' is a category error (Top2 ≠ FN by construction; both passed the screen, only rank differs) compounded by an archaeology-sampling artifact (the 8/19 ruin rate is a posterior failure-mining rate, not a per-trade prior for new B0 entries). Independently, the marginal ruin cost of adding slot 2 is approximately the ruin rate of Top2 itself, not the unconditional 8/19 figure cited for B0 picks; the researcher conflates unconditional and marginal ruin contributions. Cash carry over a 4-week window is small (~-0.2% real, ≈-2.6% annualized) but non-zero, so a Top2 EV positive by even a small margin can dominate cash on carry alone. The genuine economic meaning of N=1, N=2, N=3 under fixed 3-slot capital is therefore: N=1 maximizes per-slot alpha concentration and variance; N=3 minimizes variance but forces inclusion of low-EV fillers; the optimal N is gap-conditional AND regime-conditional AND position-size-conditional. Continuous sizing strictly dominates the discrete N∈{1,2,3} choice set, so any binary 'cash vs fill' policy is suboptimal by construction — the genuine policy is gap-gated continuous weight with a floor that maps to N=1, N=2, or N=3 only as integer-rounded outputs.",
+  "falsifiers": [
+    "If in the experimental_designer's top2_feature_overlap_with_fn_distribution test, Top2-to-FN median standardized distance is ≥ Top1-to-FN median distance on ≥5 of 7 features, the researcher's conflation is refuted and the mechanism collapses to 'gap is a regime proxy, not a quality discriminator'.",
+    "If the concentration_ruin_leak_test shows Top1 W4 ruin rate in the top feature quintile still ≥25%, the ruin-tail argument does not uniquely justify concentration — Top1 itself carries substantial ruin risk that gap-conditional abstention does not eliminate.",
+    "If binary-cash (N=1) portfolio median W4 exceeds continuous-sizing (Top1 with weight 1/(1+gap)) by >1pp in >60% of cases, the abstention framing beats even the smaller continuous-size alternative, validating a binary rule.",
+    "If Top2 implied median W4 EV > cash-carry-cost proxy in >60% of archaeology cases, cash is dominated even before the diversification benefit enters and the policy must be reformulated.",
+    "If within-snapshot variance reduction from N=1 to N=2 is ≤0.7× of N=1 variance across ≥60% of multi-case snapshots, the skeptic's diversification channel is operative and weakens the case for concentration regardless of mean.",
+    "If 3rd-ranked W4 bucket beats 2nd-ranked W4 bucket in ≥40% of matched multi-snapshot cases, the monotonic rank→quality assumption breaks and slot-2-as-abstention-trigger is the wrong trigger; slot-3 or cumulative-gap rules should replace it."
+  ],
+  "actionable_design_principles": [
+    "Separate the two decisions the researcher collapsed: (a) is the marginal slot's EV positive at any sizing? (b) if yes, what continuous weight maximizes risk-adjusted return? Binary N∈{0,1,2,3} is a derived integer output of (a)+(b), not a primitive choice.",
+    "Compute the marginal ruin cost of adding slot k as the ruin rate of slot k minus the ruin rate already present in slots 1..k-1, NOT as the unconditional B0-pick ruin rate. The 8/19 figure is a single-slot posterior, not an additive marginal.",
+    "The Top1-Top2 gap is a necessary but not sufficient condition for abstention: it must be combined with a regime proxy (vol_ratio_5_20, rv_20, ma50_slope_10) to avoid activating during benign-regime gap events.",
+    "Continuous sizing (e.g., slot weight = clip(gap_normalized, 0, 1)) strictly dominates binary cash-or-fill because it captures partial information in the gap magnitude without forcing a discrete cliff.",
+    "Cash carry over a 4-week window is small (~-0.2% real) but not negligible; any marginal-slot policy must explicitly model it rather than treating cash as a free default.",
+    "The 42% ruin rate among the 19 B0 archaeology cases is an upper bound on per-trade ruin for B0-style triggers, not a point estimate; new-entry ruin rate is materially lower and must be re-estimated on a forward, non-archaeology sample before the gap-conditional rule is committed.",
+    "Mixed-outcome cases (ruin|winner co-occurrence) imply the portfolio layer must be evaluated on path-dependent metrics (max drawdown, recovery time) not just W4 bucket means; abstention rules based solely on mean expectancy will understate the variance cost of forced fills.",
+    "The 3-slot capital constraint itself is exogenous to the question; if N=1 is optimal under a regime, the correct response is to acknowledge cash deployment rather than to spread across 3 names."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "gap_gated_continuous_sizing: weight_of_slot_k = clip(alpha_k * (1 - beta * gap_normalized_to_baseline), w_min, w_max), where gap_normalized_to_baseline is the standardized Top1-Top2 distance on {mom_20, vol_ratio_5_20, px_vs_ma50, up_day_ratio_20, ma10_slope_5}. Slots below w_min collapse to cash (binary abstention floor); above w_min, sizing is continuous.",
+      "why_distinct": "Researcher proposed binary N∈{1,2,3}; skeptic argued continuous sizing dominates. This idea enforces a continuous policy but rounds to integer N as a downstream accounting artifact, not a decision variable. The w_min floor preserves the researcher's abstention intuition without forcing it on every high-gap case.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Directly governs how 3-slot capital is allocated; allows N=1 (one w_max slot + two cash), N=2, or N=3 as continuous-weight roundings."
+    },
+    {
+      "idea": "regime_conditional_abstention: abstention rule fires only when (gap > threshold) AND (regime_proxy = high_vol_or_low_trend). Regime proxy = composite of {vol_ratio_5_20, rv_20, atr_14_pct, ma50_slope_10, mom_60}. The composite is z-scored; high_vol_or_low_trend = regime_composite < -0.5 OR > +0.5 (two-sided: gap matters in calm trends AND in chaos).",
+      "why_distinct": "Researcher's rule fires on gap alone. Experimental designer's test 3 (gap_metric_regime_proxy_discriminator) implies the gap may be a regime proxy in disguise. This idea makes that explicit: the abstention is a joint gate, so a large gap in a benign regime does not trigger cash; a small gap in a hostile regime does not trigger deployment.",
+      "features": [
+        "vol_ratio_5_20",
+        "rv_20",
+        "atr_14_pct",
+        "ma50_slope_10",
+        "mom_60",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Filters which slot configurations are even admissible; under high-vol or low-trend regimes, capacity utilization drops, leaving slots as cash."
+    },
+    {
+      "idea": "marginal_ruin_adjusted_size: for slot k, expected_loss_k = P(ruin_k) * ruin_magnitude_proxy + P(loss_k) * loss_magnitude. Marginal expected loss of adding slot k = expected_loss_k - expected_loss_(k-1)_portfolio. Position size inversely scaled by marginal expected loss: weight_k ∝ 1 / (1 + gamma * marginal_expected_loss_k).",
+      "why_distinct": "Addresses the synthesis insight that unconditional ruin rate ≠ marginal ruin contribution. The 8/19 figure cited by the researcher is unconditional; this idea uses only the marginal increment. This corrects both the researcher's over-statement and the skeptic's under-statement.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Drives the per-slot weight; slots with high marginal ruin contribution are shrunk toward w_min (cash-equivalent) even if their mean EV is positive."
+    },
+    {
+      "idea": "cumulative_gap_deployment_curve: rather than triggering at Top1-Top2 gap, compute cumulative_gap = sum of consecutive rank-pair gaps (Top1-Top2, Top2-Top3, ...) for the active candidate list. Cash fraction = clip(cumulative_gap / baseline_cumulative_gap, 0, 1 - 1/N_max).",
+      "why_distinct": "Experimental designer's slot3_monotonicity_breaker test implies slot-2-as-trigger may be wrong. This idea replaces the discrete slot-2 trigger with a cumulative metric that responds to rank-order breaks anywhere in the candidate list, making the policy robust to violations of the monotonic rank→quality assumption.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Directly maps to N (number of deployed slots): if cumulative_gap is large, only Top1 deploys (N=1); if moderate, N=2; if small, full N=3 deployment."
+    }
+  ]
+}

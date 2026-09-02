@@ -1,0 +1,59 @@
+{
+  "tests": [
+    {
+      "name": "partial_independence_audit_vol_ratio_5_20",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "mom_20",
+        "px_vs_ma20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Within each snapshot independently, compute the partial Spearman correlation between vol_ratio_5_20 and a binary outcome proxy (w4_return_bucket in {ruin,loss} vs {large_win,small_win}) AFTER residualizing vol_ratio_5_20 on up_day_ratio_20, mom_20, px_vs_ma20, and ma10_slope_5. Pool partial-rho estimates across snapshots using inverse-variance weighting (each snapshot is a stratum, not a unit of observation). Compare the pooled partial-rho to a pre-registered null of 0.00 (two-sided). Independently, fit a logistic regression of ruin vs winner using ONLY up_day_ratio_20, mom_20, px_vs_ma20, ma10_slope_5, then add vol_ratio_5_20 and test the likelihood-ratio chi-square against df=1 with pre-registered alpha=0.05.",
+      "success_criterion": "Pooled partial Spearman |rho| >= 0.10 AND likelihood-ratio chi-square p < 0.05 in >= 4 of 5 snapshots. This would establish vol_ratio_5_20 as a real ranking axis independent of the participation latent factor and falsify the redundancy claim.",
+      "failure_criterion": "Pooled partial Spearman |rho| < 0.05 AND likelihood-ratio chi-square p > 0.20 in >= 4 of 5 snapshots. This would confirm weekly_volume is a collinear proxy of up_day_ratio_20/mom_20 and falsify BOTH the ranking claim and the risk-control claim, supporting a 'shrink coefficient toward zero' redesign."
+    },
+    {
+      "name": "within_snapshot_regime_controlled_separation",
+      "features": [
+        "vol_ratio_5_20",
+        "volume_ratio",
+        "up_day_ratio_20",
+        "snapshot_anon"
+      ],
+      "comparison": "Stratify by snapshot_anon (each snapshot is a regime bucket). Within each snapshot containing >= 3 cases of each outcome class (ruin AND winner), run (a) a two-sample Wilcoxon rank-sum test of vol_ratio_5_20 between ruin and winner subcohorts, and (b) a within-snapshot Spearman correlation between vol_ratio_5_20 and a continuous W4 return proxy derived from w4_return_bucket ordinal coding {ruin=-1, loss=-0.5, small_win=+0.25, large_win=+1}. Meta-analyze the within-snapshot Wilcoxon p-values and Spearman rhos using Stouffer's method across snapshots that meet the n>=3 threshold. Independently, compare the SHORT-window vol_ratio_5_20 to the LONG-window volume_ratio within each snapshot and check whether the rank-ordering of cases FLIPS between the two windows — a flip rate > 30% falsifies any monotonic interpretation of weekly_volume.",
+      "success_criterion": "Meta-analytic Stouffer Z for vol_ratio_5_20 vs ruin/winner has p < 0.05 AND the vol_ratio_5_20 vs volume_ratio rank-flip rate is < 15% across snapshots. This would confirm weekly_volume has a stable, regime-robust return-ranking interpretation.",
+      "failure_criterion": "Stouffer Z p > 0.20 for ruin/winner separation AND/OR rank-flip rate > 40% between vol_ratio_5_20 and volume_ratio. This would confirm the skeptic's regime-artifact and direction-reversal concerns and force re-operationalization of weekly_volume before any mechanism claim can be sustained."
+    },
+    {
+      "name": "asymmetric_tail_filter_counterfactual",
+      "features": [
+        "vol_ratio_5_20",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_close_vs_trigger_pct",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20"
+      ],
+      "comparison": "Among cases flagged is_b0_pick == true (the population the feature actually gates), apply a pre-registered monotone tightening of the weekly_volume threshold in three steps: relax to vol_ratio_5_20 >= 0.8 (baseline-like), then tighten to >= 1.0, then tighten to >= 1.3. At each threshold, compute (i) the count of cases that would be filtered OUT, (ii) the breakdown of those filtered cases by w4_return_bucket ordinal, and (iii) the asymmetric removal ratio defined as (ruins+losses filtered out) / (large_wins filtered out). Repeat the procedure using a CONJUNCTIVE gate: vol_ratio_5_20 >= 1.2 AND ibd_entry_close_position >= 0.85 (mimicking the prior researcher's two-axis proposal) and recompute the asymmetric removal ratio. Pre-register that an effective downside-risk control must show asymmetric removal ratio >= 2.0, while an effective return-ranking filter must show asymmetric removal ratio between 0.8 and 1.5 (i.e., it removes winners and losers proportionally), and a redundant feature must show ratio statistically indistinguishable from 1.0 with wide confidence intervals.",
+      "success_criterion": "Tightening to vol_ratio_5_20 >= 1.3 yields asymmetric removal ratio >= 2.0 (with 90% CI lower bound > 1.5) — this would confirm downside-risk-control interpretation. OR the conjunctive two-axis gate yields ratio >= 2.5 AND removes < 15% of large_winners from the is_b0_pick population — this would confirm a viable cleaner replacement exists.",
+      "failure_criterion": "All three monotone thresholds yield asymmetric removal ratio whose 90% CI brackets 1.0, AND the conjunctive two-axis gate fails to remove any ruin that the baseline did not already remove (i.e., it only subtracts winners). This would falsify BOTH the risk-control AND the independent-ranking interpretations, and confirm the skeptic's strongest counterclaim that weekly_volume is regime window-dressing that should be zeroed out rather than reinterpreted."
+    }
+  ],
+  "leakage_checks": [
+    "Verify pullback_duration_weeks and pullback_pct are reconstructed strictly from pre-snapshot price history (no peeking past the snapshot date). If reconstruction requires current-vs-past data spanning the snapshot boundary, drop these features from all three tests.",
+    "Verify w4_return_bucket and outcome_label are NEVER included as inputs in any of the three tests; they appear ONLY on the response side for label construction. Confirm the snapshot_anon used for stratification is a regime bucket computed from pre-snapshot market data only (e.g., pre-snapshot SPY breadth or VIX), not from post-outcome information.",
+    "Audit the direction-reversal artifact: if volume_ratio (long-window) is constructed using ANY rolling window that includes the W4 outcome window, replace it with a strictly pre-snapshot long-window volume baseline (e.g., 50-day avg volume measured at snapshot-1 day). Re-run Test 2 with the corrected long-window baseline before drawing the rank-flip conclusion.",
+    "Confirm ibd_entry_close_vs_trigger_pct is measured at the IBD pivot day, not at any later re-entry date. If multiple re-entries are possible, restrict the feature to the FIRST IBD-style pivot within the snapshot window and drop re-entry duplicates.",
+    "Verify that no entity appearing in more than one snapshot is double-counted in Test 2's within-snapshot Wilcoxon; if duplicates exist, use the EARLIEST snapshot only and rerun, then compare the Stouffer Z across the two definitions as a sensitivity check.",
+    "Block any test feature that, by construction, uses rolling windows whose lookback length exceeds the available pre-snapshot history for any case in the archaeology — those cases must be excluded, and if exclusion changes the n>=3 threshold for a snapshot stratum, that snapshot is dropped from the meta-analysis."
+  ],
+  "priority_order": [
+    "asymmetric_tail_filter_counterfactual",
+    "partial_independence_audit_vol_ratio_5_20",
+    "within_snapshot_regime_controlled_separation"
+  ]
+}

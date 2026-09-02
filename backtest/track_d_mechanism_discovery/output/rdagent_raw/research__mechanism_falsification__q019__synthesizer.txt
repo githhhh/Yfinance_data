@@ -1,0 +1,46 @@
+
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The redundancy claim is plausible but unproven. The numeric contrasts show vol_ratio_5_20, up_day_ratio_20, and mom_20 are strong outcome discriminators, which is consistent with evidence_risk encoding some combination of these signals. However, the claim cannot be definitively evaluated because: (1) evidence_risk's functional form is unobserved, making the redundancy hypothesis unfalsifiable in its current form; (2) the proposed replacement composite was derived from the same 27-case discovery set, creating circular validation; (3) case examples like entity_2c58cebc59 (high vol_ratio_5_20 = 1.619, outcome = selected_winner) show the composite's simple interaction does not fully capture outcome variance. The three pre-registered tests are methodologically sound but their diagnostic power is constrained by the absence of an evidence_risk definition and the n=27 sample size. Evidence_risk likely captures at least partial redundancy with volatility and trend-quality signals, but the 10-20% of variance not explained by the composite could be structurally important in tail-risk regimes.",
+  "falsifiers": [
+    "Discovery of an explicit formula for evidence_risk showing it contains terms (e.g., conditional logic, regime thresholds, additional feature interactions) not present in vol_ratio_5_20 × (1 − up_day_ratio_20) × mom_20",
+    "Out-of-sample test (n ≥ 50 held-out cases) showing composite and evidence_risk disagree on >20% of B0 picks, with evidence_risk's selections achieving materially better Sharpe or lower max drawdown",
+    "Within-snapshot analysis showing evidence_risk and composite diverge on ≥1 pick per snapshot, where the evidence_risk pick outperforms the composite's alternative",
+    "VIF analysis showing evidence_risk accounts for >5% unique variance after regressing out vol_ratio_5_20, up_day_ratio_20, and mom_20",
+    "A regime-stratified test showing evidence_risk has significant predictive power in at least one volatility/momentum regime where the composite does not",
+    "Bootstrap test on held-out data with p < 0.10 for evidence_risk coefficient, contradicting the redundancy null"
+  ],
+  "actionable_design_principles": [
+    "Never test redundancy by deriving the replacement from the same cases used to diagnose the original feature; use a two-stage procedure (derive composite on subset A, test on subset B)",
+    "Require an observable or inferable construct definition before claiming feature-level redundancy; without this, the hypothesis is about correlation structure, not mechanism",
+    "Prefer composite alternatives that are explicitly defined (e.g., 'vol_ratio_5_20 × (1 − up_day_ratio_20)') rather than implicit combinations, to enable direct comparison",
+    "Stratify all redundancy tests by market regime (snapshot) before claiming uniform equivalence; a component can be redundant in low-vol regimes and essential in high-vol regimes",
+    "Use a bootstrap threshold of p > 0.50 (not 0.25) for the LRT to avoid declaring 75% of noise features redundant by construction",
+    "Test composite equivalence via rank-order concordance, not classification accuracy on discovery data, to avoid in-sample overfitting"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Decompose evidence_risk into an explicit two-tier signal: a first-tier composite (vol_ratio_5_20 × (1 − up_day_ratio_20)) for routine risk screening, and a second-tier residual flag for cases where vol_ratio or up_day_ratio diverge from the composite prediction",
+      "why_distinct": "This separates the likely redundant component (first-tier) from the potentially unique signal (second-tier residual), enabling targeted ablation testing without discarding all risk information",
+      "features": ["vol_ratio_5_20", "up_day_ratio_20", "mom_20"],
+      "capacity_relevance": "Reduces model dimensionality in routine regimes while preserving capacity to detect non-linear risk interactions in edge cases"
+    },
+    {
+      "idea": "Replace evidence_risk with a conditional risk score: if vol_ratio_5_20 > 1.5 AND mom_20 < 0.10 then flag as high-risk else use vol_ratio_5_20 × (1 − up_day_ratio_20) as continuous score",
+      "why_distinct": "This explicitly encodes the regime-conditional logic the researcher suspects evidence_risk captures, making the replacement testable and the difference from a simple composite measurable",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "capacity_relevance": "Captures the high-vol/low-momentum regime interactions that a pure multiplicative composite may smooth over"
+    },
+    {
+      "idea": "Introduce an explicit 'evidence_weight' hyperparameter (0 ≤ w ≤ 1) that interpolates between pure composite scoring and evidence_risk-influenced scoring, with w tuned on out-of-sample performance rather than fixed at 0 or 1",
+      "why_distinct": "This reframes the redundancy question as a continuous weighting problem rather than a binary keep/drop decision, allowing the model to capture partial redundancy rather than assuming complete equivalence or complete uniqueness",
+      "features": ["vol_ratio_5_20", "up_day_ratio_20", "evidence_risk"],
+      "capacity_relevance": "Preserves model flexibility during regime transitions where evidence_risk may contribute at different magnitudes across market conditions"
+    }
+  ]
+}
+```

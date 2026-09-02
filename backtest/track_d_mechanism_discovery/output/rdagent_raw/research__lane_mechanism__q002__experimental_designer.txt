@@ -1,0 +1,126 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "Orthogonal residual test: Lane effect after partialing out proxy triple",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma20_slope_5",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+        "atr_14_pct",
+        "rv_20"
+      ],
+      "comparison": "Within fresh-breakout-week cases, residualize B0_LANE indicator and SCORE_BEFORE_LANE on the FULL PIT proxy block (not just three features) via OLS. Compare (i) raw W4 return gap between B0_LANE and LANE_NEUTRAL slots, and (ii) W4 return gap after projecting both onto the proxy-residual axis. If Lane is purely a proxy, the residual-on-residual gap should be statistically indistinguishable from zero.",
+      "success_criterion": "Residualized B0_LANE vs LANE_NEUTRAL mean W4 return gap < 0.8pp AND ruin-rate gap < 1pp AND the t-statistic on Lane-residual coefficient < 1.0 in a W4-return regression that already contains the full proxy block.",
+      "failure_criterion": "Residualized mean gap >= 2.0pp OR ruin-rate gap >= 2pp OR Lane-residual coefficient |t| >= 2.0 in the full-proxy regression."
+    },
+    {
+      "name": "Tail-shape separation test: Lane as ruin-suppressor vs proxy-overconfident ruin",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "base_duration_weeks",
+        "base_depth_pct",
+        "base_mbox_count"
+      ],
+      "comparison": "Within fresh-breakout-week triples matched on quantile-rank of {up_day_ratio_20, mom_20, vol_ratio_5_20} (joint rank, not three independent thresholds), compute left-tail metrics: (a) ruin/loss rate among B0_LANE, (b) ruin/loss rate among LANE_NEUTRAL, (c) ruin/loss rate among proxy-confident-but-Lane-neutral (top tercile on proxy composite but LANE_NEUTRAL), and (d) ruin/loss rate among proxy-weak-but-Lane-favorable (bottom tercile on proxy composite but B0_LANE). A pure-proxy mechanism predicts (a)=(b)=(c)=(d) within noise; a ruin-suppression mechanism predicts (c)>>(a) and (d)<<(b).",
+      "success_criterion": "Paired ruin-rate differences |(a)-(b)|, |(c)-(a)|, |(d)-(b)| each < 1.0pp AND Fisher exact p-value for ruin~Lane table > 0.20.",
+      "failure_criterion": "Any paired ruin-rate difference >= 2.5pp with the sign predicted by the ruin-suppression hypothesis, OR Fisher exact p-value < 0.05 in the ruin~Lane contingency."
+    },
+    {
+      "name": "Score decomposition R^2 test: SCORE_BEFORE_LANE saturation",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ma50_slope_10",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+        "atr_14_pct",
+        "rv_20",
+        "current_vs_ibd_candidate_pct",
+        "dist_to_52w_high_pct",
+        "volume_ratio"
+      ],
+      "comparison": "Construct SCORE_BEFORE_LANE = linear combination of the FULL PIT proxy block (no Lane input) fit on a frozen training window. Regress SCORE_AFTER_LANE on SCORE_BEFORE_LANE within fresh-breakout-week cases. If Lane is purely a proxy recoding, the R^2 should be very high and the residuals should be uncorrelated with any PIT feature not already in the proxy block. Additionally, regress W4 return on SCORE_BEFORE_LANE vs SCORE_AFTER_LANE; the incremental R^2 and incremental coefficient significance is the test.",
+      "success_criterion": "R^2(SCORE_AFTER_LANE ~ SCORE_BEFORE_LANE) >= 0.90 AND incremental R^2 of Lane component on W4 return < 0.02 AND Lane-residual in the second-stage regression is statistically zero (|t| < 1.0).",
+      "failure_criterion": "R^2(SCORE_AFTER_LANE ~ SCORE_BEFORE_LANE) < 0.70 OR incremental R^2 on W4 return >= 0.05 OR Lane-residual |t| >= 2.0 in second-stage regression OR SCORE_AFTER_LANE residuals correlate (|r|>=0.3) with PIT features {ibd_entry_close_position, ibd_entry_breakout_range_ratio, base_mbox_count, base_duration_weeks, base_depth_pct}."
+    },
+    {
+      "name": "Within-snapshot within-proxy-quintile ablation: Lane bin stability under proxy perturbation",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_breakout_range_ratio",
+        "base_mbox_count",
+        "base_duration_weeks"
+      ],
+      "comparison": "Within the snap_71486ed83c cluster (the densest fresh-breakout-week snapshot in the archaeology, holding market regime constant), isolate quintile-pairs on the proxy composite z(up_day_ratio_20) + z(mom_20) + z(vol_ratio_5_20). Within each quintile-pair, contrast (i) B0_LANE W4 distribution vs (ii) LANE_NEUTRAL W4 distribution. A pure-proxy mechanism predicts no within-quintile divergence; an orthogonal-axis mechanism predicts divergence concentrated in middle quintiles (where proxy signal is ambiguous).",
+      "success_criterion": "Across quintile-pairs, B0_LANE vs LANE_NEUTRAL W4 mean gap < 1.0pp in EVERY quintile pair AND Kolmogorov-Smirnov two-sample p-value > 0.20 in every quintile pair.",
+      "failure_criterion": "Mean gap >= 2.0pp in ANY quintile pair OR KS p-value < 0.05 in ANY quintile pair OR ruin-rate gap >= 3pp in middle quintile (Q2-Q3) where proxy signal is weakest."
+    },
+    {
+      "name": "Rescue-and-rejection asymmetry test: orthogonal Lane contribution via 2x2 contingency",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma20_slope_5",
+        "ibd_entry_close_position",
+        "ibd_entry_breakout_range_ratio",
+        "base_mbox_count",
+        "base_duration_weeks",
+        "base_depth_pct"
+      ],
+      "comparison": "Construct a 2x2 within fresh-breakout-week cases: rows = {B0_LANE, LANE_NEUTRAL}, columns = {large_win outcome, ruin/loss outcome} (using the existing w4_return_bucket labels, which are within the in-sample observation window — NOT outer-forward). A pure-proxy mechanism predicts the ruin rate conditional on Lane is independent of the proxy composite level. Test for interaction: does Lane-neutral ruin risk INCREASE with proxy confidence (proxy-overconfident ruin) AND does Lane-favorable win rate INCREASE with proxy weakness (proxy-weak rescue)? The interaction term tests whether Lane modulates proxy confidence asymmetrically.",
+      "success_criterion": "In a logistic regression of ruin indicator on (proxy composite rank) × (Lane indicator), the interaction coefficient is statistically zero (|z| < 1.0) AND the marginal Lane effect within top-proxy-tercile is < 1pp ruin rate.",
+      "failure_criterion": "Interaction coefficient |z| >= 1.96 OR marginal Lane effect within top-proxy-tercile changes ruin rate by >= 2pp OR in the proxy-weak-but-Lane-favorable cell, large_win rate exceeds the proxy-confident-and-Lane-favorable cell by >= 3pp (the rescue signal)."
+    }
+  ],
+  "leakage_checks": [
+    "Verify all features in the allowlist are computed at or before the IBD entry snapshot timestamp (no peeking into post-entry W4 window for feature construction). The frozen evidence's method_note already flags false_negatives as requiring future W4 >=8%, so all feature rows must be confirmed PIT and the label generation procedure must not contaminate feature selection.",
+    "Block any test from conditioning on outcome_label or w4_return_bucket during feature engineering — these are post-entry and would re-introduce the selection-on-dependent-variable bias the skeptic identified.",
+    "For the within-snapshot test on snap_71486ed83c, confirm snapshot identity is used ONLY as a stratification/blocking factor (not as a predictive feature) and that all cases in that snapshot share the same observation window so cross-sectional comparison is not confounded by regime differences.",
+    "Confirm that SCORE_BEFORE_LANE and SCORE_AFTER_LANE are both constructed from the same PIT feature allowlist and the same training window — the only difference permitted is the inclusion/exclusion of the Lane input. Any drift in feature set or window invalidates the decomposition R^2 test.",
+    "For the 2x2 contingency test, restrict to cases where the w4_return_bucket label is deterministically derivable from within-sample (not outer-forward) data. If any cell requires forward data beyond the in-sample observation window, that test is invalid and must be downgraded to UNRESOLVED.",
+    "Verify that the proxy composite z(up_day_ratio_20) + z(mom_20) + z(vol_ratio_5_20) is computed within-snapshot to avoid cross-regime z-score contamination, particularly for the snap_71486ed83c-dense and snap_d0d57b1e40 sub-clusters.",
+    "Confirm that base_duration_weeks, base_depth_pct, base_mbox_count are treated as geometry proxies only when their values are available PIT (non-null in the frozen evidence) and are NOT imputed using post-entry information."
+  ],
+  "priority_order": [
+    "Tail-shape separation test: Lane as ruin-suppressor vs proxy-overconfident ruin",
+    "Orthogonal residual test: Lane effect after partialing out proxy triple",
+    "Score decomposition R^2 test: SCORE_BEFORE_LANE saturation",
+    "Rescue-and-rejection asymmetry test: orthogonal Lane contribution via 2x2 contingency",
+    "Within-snapshot within-proxy-quintile ablation: Lane bin stability under proxy perturbation"
+  ]
+}
+```

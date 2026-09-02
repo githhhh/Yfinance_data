@@ -1,0 +1,42 @@
+{
+  "strongest_counterclaim": "The 'false-positive ruin signature' is a post-hoc artifact of outcome conditioning rather than a causal mechanism. The three signature features (mom_20, vol_ratio_5_20, up_day_ratio_20) are collinear measures of the same phenomenon—recent price acceleration—extracted from identical lookback windows. When you condition on future ruin labels to define the signature, you necessarily create features that appear discriminative in-sample but lack structural validity. The mechanism claim of 'late-stage acceleration' is a narrative fitted to correlated noise, not an independent causal channel.",
+  "attacks": [
+    {
+      "issue": "Outcome-conditioned feature construction",
+      "why_it_matters": "The ruin/selected_winner labels are assigned based on W4 returns. Computing features from the same snapshot period and then claiming those features 'predict' the label creates a tautological loop. The features are not exogenous predictors—they are derived from the same price history that generated the outcome. Any observed discrimination is sampling variance around this mechanical relationship, not a generalizable signal."
+    },
+    {
+      "issue": "Collinear feature bundle",
+      "why_it_matters": "mom_20 (20-day return), vol_ratio_5_20 (5-day vs 20-day volatility), and up_day_ratio_20 (% up days) all capture variations of recent price trend and dispersion. When three correlated features are jointly used to define a signature, the apparent specificity is inflated by overfitting. entity_3adc078f01 is a selected_winner with up_day_ratio_20=0.65, vol_ratio_5_20=1.14, mom_20=0.172—firmly inside the claimed ruin range yet produced a large_win outcome."
+    },
+    {
+      "issue": "Null-valued pullback fields are non-random",
+      "why_it_matters": "5 of 8 false_positive_ruin cases have null pullback_duration_weeks versus 6 of 11 selected_winners. This differential missingness suggests ruin cases may have been assigned before a pullback could occur (immediate collapse), or the pullback tracking logic was terminated upon ruin detection. The researcher uses this as 'secondary confirmation' but it reflects outcome-dependent data availability, not an independent filter."
+    },
+    {
+      "issue": "No adjustment for industry concentration",
+      "why_it_matters": "The question explicitly frames this as 'under industry concentration,' yet no snapshot feature encodes industry concentration, sector beta, or peer-group correlation. If concentration risk drives ruin (e.g., sector rotation triggers cascading stops), the individual stock features are proxies for sector exposure rather than stock-specific signals. The signature may be capturing concentration beta, not late-stage acceleration."
+    },
+    {
+      "issue": "Sample heterogeneity within snapshots",
+      "why_it_matters": "Cases span 15 distinct snapshot_anon values across different market regimes. The 'ruin signature' extracted from snap_724342c280 may not generalize to snap_ad495b6705 or snap_d0d57b1e40. With only 8 ruin cases distributed across 15 snapshots, there is insufficient nesting to distinguish snapshot-specific noise from a stable signature."
+    },
+    {
+      "issue": "Pullback depth reversal contradicts mechanism",
+      "why_it_matters": "The numeric_contrasts show pullback_pct median of -7.3 for false_negatives versus -15.9 for selected_winners (standardized_delta +0.64). This indicates winners experience deeper pullbacks. If ruin cases represent 'late-stage acceleration,' they should show shallower or absent pullbacks—which they do. But this makes the pullback nulls and the pullback_pct contrast indistinguishable from 'no correction opportunity due to immediate collapse.' The mechanism is unfalsifiable with current data."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with mom_20 0.15-0.25, vol_ratio_5_20 1.2-1.4, up_day_ratio_20 0.5-0.65 that shows selected_winner or false_negative_big_winner outcome AND has industry_concentration_high = True at snapshot time—this would show concentration alone does not explain ruin",
+    "A ruin case where vol_ratio_5_20 < 1.1 AND mom_20 < 0.10, showing low-volatility, low-momentum stocks can also ruin—invalidating the acceleration-based signature",
+    "A selected_winner with up_day_ratio_20 >= 0.7 AND vol_ratio_5_20 >= 1.5 AND mom_20 >= 0.25 AND ibd_entry_close_vs_trigger_pct > 0.03 that STILL ruins within 4 weeks—direct contradiction of falsifiable prediction",
+    "A snapshot where B0 picks with signature features perform comparably to non-signature picks on a forward basis, demonstrating the signature has zero incremental predictive power beyond base rate",
+    "Cross-snapshot replication: if the ruin signature is applied to snapshots not in the discovery set, the discrimination must hold with n>=20 per category to avoid small-sample artifact"
+  ],
+  "what_would_change_my_mind": [
+    "Replication on a held-out snapshot set where ruin cases (n>=15) are correctly classified at >70% precision using only snapshot-time features, with industry concentration explicitly controlled or randomized",
+    "Demonstration that the signature features cause ruin via a proposed mechanism (e.g., late-stage acceleration predicts lower subsequent earnings surprise, or higher future volatility that triggers stop-losses), where the mechanism variable is measured independently of the outcome",
+    "A temporal stability test: applying the signature cutoffs derived from snap_X to predict outcomes from snap_Y with comparable accuracy—currently the signature is entirely in-sample",
+    "Experimental evidence that filtering on the signature improves out-of-sample Sharpe or win-rate in a portfolio construction that holds multiple B0 picks simultaneously, rather than single-stock case studies"
+  ]
+}

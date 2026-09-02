@@ -1,0 +1,53 @@
+{
+  "strongest_counterclaim": "The 'cash dominates the weak third slot' claim is probably wrong because the conditioning set is circular, the ruin label is sample-clustered rather than candidate-driven, and the opportunity-cost side is under-powered to within statistical noise. The 27-case discovery-train archaeology cannot distinguish a feature-based ruin probability from a snapshot-regime artifact, and the proposed 1/2/3-slot ranking is an unverified counterfactual against a construction rule (equal-weight 3-slot) that may not exist in the live system.",
+  "attacks": [
+    {
+      "issue": "Label leakage in the false_negative_relative conditioning set: cases are defined as 'false negatives' BECAUSE they subsequently produced W4 >= 8% return AND >=5pp above B0 median. Conditioning ruin probability on a feature signature drawn from this selection-on-outcome set is circular — the 'weak third' threshold is calibrated on the very rejections that won, so any rule derived from it is overfit by construction.",
+      "why_it_matters": "The researcher's central mechanism (marginal ruin probability exceeds marginal winner probability given the false_negative region) is built on a sample whose definition depends on future returns. The conditional probabilities cannot be interpreted as forward-looking expectations."
+    },
+    {
+      "issue": "Snapshot clustering confounds candidate-level inference: at least 6 of 27 cases share snapshot snap_71486ed83c, and most ruin cases concentrate in 3-4 snapshot ids. If macro regime (vol regime, sector rotation, breadth) drove those outcomes, candidate features are proxies for snapshot id, not independent ruin signals.",
+      "why_it_matters": "Treating 8 ruin observations as 8 independent candidate-level events inflates apparent ruin precision. The effective sample size for candidate-conditioned ruin probability may be 3-4, not 8, making the 'ruin rate' claim unestimable."
+    },
+    {
+      "issue": "Proxy variable contamination across up_day_ratio_20, vol_ratio_5_20, mom_20, and px_vs_ma50: all four are jointly driven by short-horizon return autocorrelation, so the 'multi-feature' composite score that distinguishes weak from strong is mostly one latent factor. Median deltas (z-scores -1.19 to -0.85) suggest collinear signals, not orthogonal evidence.",
+      "why_it_matters": "If features collapse to one momentum factor, the 'cash dominates when multiple weak features coincide' rule is equivalent to 'cash dominates when momentum is low' — and momentum is known to be regime-dependent and mean-reverting at the extremes. The composite rule is no more robust than a single-feature momentum filter."
+    },
+    {
+      "issue": "Counterfactual construction is unverified: the claim that a 2-position (top-2 + cash) portfolio beats a 3-position portfolio requires comparing realized PnL on the same discovery-train set under both constructions. The archaeology shows only single-name outcomes, not slot-aggregated portfolio returns. With only 2 false_negative_big_winner cases, the 'missed large winner' cost cannot be quantified against the 8 ruin cases.",
+      "why_it_matters": "The headline policy recommendation (cash > weak third) is an unevaluated counterfactual. The researcher offers a falsifiable prediction ('Sharpe of 2-slot > 3-slot') but has not run it. The claim rests on aggregating single-name outcomes without addressing position-correlation within a portfolio, nor the cash drag of holding 1/3 of capital idle for extended periods."
+    },
+    {
+      "issue": "Bucket boundary artifact in the 'bimodal' ruin-vs-large_win claim: 'ruin' and 'large_win' are categorical outcomes, and the apparent absence of middle buckets is partly a function of how thresholds were set. entity_bfb308b24a is 'loss' (not 'ruin') with -12.1% pullback but small-win bucket; this case sits at the boundary. Without the threshold values, the magnitude asymmetry claim (ruin > winner) cannot be checked.",
+      "why_it_matters": "If 'ruin' is defined as W4 < -10% and 'large_win' is W4 > +8%, the apparent asymmetry could be entirely a thresholding choice. The economic meaning of the slot comparison depends on actual return magnitudes, which are hidden inside bucketed labels."
+    },
+    {
+      "issue": "Endogeneity of the 'weak third' tier: the very existence of a weak-third candidate presupposes a ranking procedure. If we replaced that ranking with a different one (e.g., mean-reversion-aware scoring), the candidate currently labeled 'weak third' could become 'strong second'. The claim is conditional on a specific scoring function that itself may be misspecified.",
+      "why_it_matters": "Attributing ruin to the candidate's intrinsic quality, rather than to the ranking procedure that placed it third, conflates two distinct failure modes. The same stock could be 'avoid' under one ranking and 'must-buy' under another, so the cash-vs-fill decision is a property of the ranker, not the slot."
+    },
+    {
+      "issue": "Contradictory cases are not explained: entity_2f86543bf6 won large with negative mom_20, negative ma20_slope, no pullback base; entity_6618d3e80c carried an identical strong-momentum profile to entity_84824e6a20 yet diverged in terminal outcome (large_win vs ruin). The researcher cites these as 'exceptions' but does not account for why features failed to discriminate within the same snapshot/momentum regime.",
+      "why_it_matters": "Two cases of identical feature signature, opposite terminal outcomes, suggest an unmodeled factor (idiosyncratic event, intraday path, news flow) dominates candidate features. If so, the conditional ruin probability given features is far from deterministic and the slot-decision rule will misclassify frequently."
+    },
+    {
+      "issue": "Fixed 3-slot equal-weight rule may be a strawman: the prior literature the researcher cites ('replace fixed 3-slot equal-weight with conviction-weighted') implies the live system may already be conviction-weighted, in which case the entire 'cash vs fill the third slot' question is moot because the third slot already receives less than 1/3 capital.",
+      "why_it_matters": "If the construction rule is already 50/30/20, the marginal ruin exposure of the third slot is 20% of capital, not 33%. The cash-vs-fill trade-off changes qualitatively, and the headline recommendation (avoid the third slot) becomes a position-sizing tweak rather than a slot abandonment."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where a 'weak third' profile (low up_day_ratio_20 + low mom_20 + low vol_ratio_5_20) produced 'large_win' in a snapshot NOT dominated by macro drift (i.e., outside snap_71486ed83c and similar clustered snapshots). If such cases exist in test data, the conditional ruin probability claim fails out-of-sample.",
+    "Snapshots in the test set where the 2-position (top-2 + cash) portfolio underperformed the 3-position portfolio by more than the ruin-tail would predict. Specifically: snapshots containing 2+ winners among the rejected names, with no ruin among accepted names.",
+    "Sector-decomposed ruin rates: if ruin cases concentrate in one or two sectors within a snapshot, the candidate-feature model is incomplete and a sector-controlled ruin rate is the right comparator.",
+    "Regime split: bull-vol vs bear-vol vs chop snapshots, with ruin rate recomputed per regime. If ruin is concentrated in one regime, the 'weak third' rule is essentially a regime filter, not a candidate feature.",
+    "Time-decay of the false_negative signal: if the false_negative_relative region only predicted winners in the first 2 weeks of W4 but not later (W8-W12), the forward-window claim is unstable and the opportunity cost of cash is deferred rather than avoided.",
+    "The 'strong but ruined' counterpart: cases with high up_day_ratio_20, high mom_20, high vol_ratio_5_20 that STILL ruined (entity_84824e6a20, entity_b6bcccdf6a, entity_3472243e0c). Their frequency relative to weak-but-ruined cases bounds the maximum precision of any candidate-feature rule."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample test on at least 100 test snapshots, with the candidate-feature composite score computed on the train-set false_negative_relative median, showing ruin rate in the bottom-quintile composite exceeds 35% and winner rate in the same quintile is below 15%, with confidence intervals that exclude the null of equal ruin/win probabilities.",
+    "A regime-stratified analysis showing that, conditional on snapshot macro factors (VIX regime, breadth, sector dispersion), candidate features still contribute marginal explanatory power for ruin beyond what snapshot id alone provides.",
+    "A direct A/B comparison of 3-position equal-weight vs 2-position + cash vs 1-position + 2/3 cash portfolios on the same out-of-sample set, with Sharpe ratios and maximum drawdown reported. If 2-position + cash does NOT beat 3-position with statistical significance, the core claim is falsified.",
+    "Resolution of the bucket-boundary ambiguity: showing actual W4 returns (not categorical buckets) for ruin cases vs large_win cases. If average ruin magnitude is not materially larger than average large_win magnitude, the 'asymmetric tail' mechanism dissolves.",
+    "A re-scored archaeology with snapshot-fixed effects removed, so candidate-level features are evaluated against within-snapshot variation only. If the candidate-feature signal vanishes under within-snapshot scoring, the rule is a regime proxy.",
+    "Evidence that the live portfolio construction rule is in fact fixed equal-weight 3-slot (not conviction-weighted), so the policy recommendation is addressing a real rule rather than a hypothetical one."
+  ]
+}

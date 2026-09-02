@@ -1,0 +1,33 @@
+
+
+{
+  "mechanism_claim": "False‑negative non‑picks that become large winners are distinguished by a tight, shallow base: price is less extended from the 20‑day and 50‑day MAs (px_vs_ma20 < 0.07, px_vs_ma50 < 0.10), recent momentum is modest (mom_20 < 0.10), up‑day ratio is low (<=0.5), volume is near or below its 20‑day norm (vol_ratio_5_20 <= 1.25), and the entry is very close to the trigger point (ibd_entry_close_vs_trigger_pct <= 0.025). This combination indicates reduced upside exhaustion and higher continuation potential relative to more extended B0 picks, allowing the non‑pick to accelerate after the snapshot.",
+  "evidence_for": [
+    "Median up_day_ratio_20 for false negatives (0.50) is 0.125 lower than for selected winners (0.625), the largest standardized delta (-1.19).",
+    "Median vol_ratio_5_20 for false negatives (1.179) is 0.245 lower than for selected winners (1.424), standardized delta -1.05.",
+    "Median mom_20 for false negatives (0.058) is 0.105 lower than for selected winners (0.163), standardized delta -1.00.",
+    "Median ibd_entry_close_vs_trigger_pct for false negatives (0.0195) is 0.0105 lower than for selected winners (0.030), indicating a tighter entry proximity.",
+    "Median px_vs_ma20 (0.042) and px_vs_ma50 (0.056) for false negatives are roughly half those of selected winners (0.076 and 0.127), showing less price extension.",
+    "Median pullback_pct for false negatives (-7.3%) is less deep than for selected winners (-15.9%), consistent with a shallower base.",
+    "Case example entity_535a1beed7 (false_negative_big_winner|false_negative_relative) has up_day_ratio_20=0.50, vol_ratio_5_20=1.174, mom_20=0.028, ibd_entry_close_vs_trigger_pct=0.009, px_vs_ma20=0.032 – all near the low‑feature cluster and lands in the large_win bucket.",
+    "Case example entity_df5478102d (false_negative_relative) exhibits the same low‑feature pattern (up_day_ratio=0.60, vol_ratio=1.405, mom_20=0.125, ibd_entry_close_vs_trigger_pct=0.034) and achieves a small_win outcome, illustrating the precursor signature."
+  ],
+  "evidence_against": [
+    "Entity bfb308b24a (false_negative_relative, loss) has low up_day_ratio (0.45), low vol_ratio (1.187), low mom_20 (0.027), and near‑trigger ibd_entry_close_vs_trigger_pct (0.039) – yet it does not become a winner, showing the low‑feature pattern alone does not guarantee success.",
+    "Entity ad2bfdee3f (false_negative_relative, small_win) displays negative momentum (mom_20 = -0.046) and very low price extension (px_vs_ma20 = 0.007), yet the outcome is only a small_win, not large_win, indicating additional factors beyond the identified precursors.",
+    "Selected winners such as entity_28a6ec4601 (selected_winner, large_win) have up_day_ratio=0.60, vol_ratio=1.188, mom_20=0.143, and ibd_entry_close_vs_trigger_pct=0.026, overlapping with the false‑negative cluster, so low‑extension alone is not exclusive to non‑picks.",
+    "The median pullback_pct for false negatives is less deep (-7.3%) than for selected winners (-15.9%), yet some false negatives (e.g., entity_de1c657364 with pullback_pct=-7.3%) still become large winners, while others with similar pullbacks become losses, indicating context dependence."
+  ],
+  "falsifiable_predictions": [
+    "In a hold‑out sample, non‑pick entities with up_day_ratio_20 ≤ 0.50, vol_ratio_5_20 ≤ 1.25, mom_20 ≤ 0.10, and ibd_entry_close_vs_trigger_pct ≤ 0.025 will produce a large_win rate at least 2× higher than the overall non‑pick population.",
+    "A classification model trained on snapshot features (up_day_ratio, vol_ratio, mom_20, px_vs_ma20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) will predict false‑negative winners vs. losers with ≥ 65% accuracy on out‑of‑time data.",
+    "The ratio of large_win outcomes among non‑picks with px_vs_ma20 < 0.07 and pullback_pct > -10% will be significantly higher (p < 0.05) than among non‑picks lacking this combination.",
+    "When the median ibd_entry_close_vs_trigger_pct for a snapshot’s non‑picks is ≤ 0.020, the snapshot will contain ≥ 30% false‑negative winners (large_win) in the frozen evidence, a relationship testable on future snapshots."
+  ],
+  "policy_implications": [
+    "Selection logic could incorporate a secondary “tight‑base” filter that flags non‑picks with low price extension, modest momentum, low up‑day ratio, and near‑trigger entry distance, potentially capturing hidden winners currently missed by the B0 criteria.",
+    "Back‑testing the proposed feature set (up_day_ratio ≤ 0.5, vol_ratio ≤ 1.25, mom_20 ≤ 0.10, ibd_entry_close_vs_trigger_pct ≤ 0.025) may reveal a statistically significant edge, justifying an additive score or weight in the ranking model.",
+    "Risk controls should account for the observation that low‑extension non‑picks can still produce losses (e.g., entity bfb308b24a), so position sizing or stop‑loss rules should not rely solely on these precursors without additional confirmation.",
+    "Future research could explore interactions between the identified precursors and broader market regime variables (e.g., sector momentum) to refine the mechanism and improve predictive precision."
+  ]
+}

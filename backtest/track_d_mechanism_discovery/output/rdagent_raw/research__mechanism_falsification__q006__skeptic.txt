@@ -1,0 +1,62 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The 'weekly_volume' B0 component (vol_ratio_5_20 / ibd_entry_volume_ratio) is NOT redundant with neighboring price/tempo B0 terms; it encodes a distinct SHORT-HORIZON VOLUME ACCELERATION (5d vs 20d ratio) that momentum averages and 20-day up_day_ratio are mechanically incapable of reproducing. The prior's 'redundancy' verdict is a sample-conditioned artifact of post-hoc archaeology on a small (n=27) selected-failure cohort where within-feature collinearity has been conflated with between-feature substitutability, and where the proposed sector-relative replacement is an untested refactor of the feature that carries the #2 largest contrast in the available data.",
+  "attacks": [
+    {
+      "issue": "Internal contradiction in the prior argument: vol_ratio_5_20 is simultaneously ranked #2 in standardized contrast (evidence_for) AND claimed redundant with up_day_ratio_20/mom_20 (evidence_against). A feature cannot be both the 2nd-strongest discriminator and a redundant re-encoding of the 1st-strongest discriminator — at most one of these can hold.",
+      "why_it_matters": "The redundancy verdict inherits weight from the magnitude of the contrast, but the magnitude argument cuts the opposite direction. The Skeptic position is that the prior collapses two inconsistent positions into one conclusion without reconciling them."
+    },
+    {
+      "issue": "Selection on the dependent variable: the contrast table is computed on a 'failure archaeology' cohort (n=27) chosen specifically because B0 outcomes diverged from realized W4 returns. Range-restricting on an outcome variable inflates observed correlations among predictors by shrinking within-stratum variance, so the apparent vol_ratio ↔ mom_20 co-movement may be a sampling artifact rather than a structural relationship.",
+      "why_it_matters": "Without an unconditional sample to compare against, every independence claim is conditional on 'cases where B0 was wrong' — which is precisely the population least informative about whether the features substitute for one another in cases where B0 was right."
+    },
+    {
+      "issue": "Counter-case entity_8ad5cd4795 (vol_ratio_5_20 = 0.996, mom_20 = 0.0037, selected_winner, large_win): a winner realized with sub-1.0 volume AND negligible momentum. The 'winners need rising volume confirmation' rule is violated here, but volume was clearly not load-bearing either — which means the prior's redundancy claim is silent on what actually drove the win, leaving the mechanism under-specified.",
+      "why_it_matters": "If volume is redundant, this winner should have been driven by another axis (slope? pullback? up_day_ratio at 0.70?). The prior doesn't explain this case; it simply averages it into the median."
+    },
+    {
+      "issue": "Counter-case entity_2f86543bf6 (vol_ratio_5_20 = 1.558, mom_20 = -0.008, selected_winner, large_win): high short-window volume contradicts near-zero / slightly negative 20-day momentum. If vol_ratio_5_20 were a clean re-encoding of mom_20, it should track mom_20's sign — it does not. This is exactly the divergence pattern an independent volume signal would produce.",
+      "why_it_matters": "A single high-volume + negative-momentum winner is more damaging to the redundancy thesis than ten low-volume + high-momentum winners are to it, because divergence is rarer than co-movement in the joint distribution."
+    },
+    {
+      "issue": "The 'mechanical co-monotonicity' claim between vol_ratio_5_20 and up_day_ratio_20 overstates the structural link: vol_ratio_5_20 is built from raw share-volume windows, up_day_ratio_20 is built from sign-of-return windows. They share a denominator horizon (20d) but not a numerator horizon (5d volume vs 20d direction count), and they decouple when 5d volume surges on mixed-direction days (churn/distribution patterns that momentum cannot see).",
+      "why_it_matters": "If the two features co-moved mechanically, partial correlations in any reasonable window would be > 0.85; the prior's own Falsification Test #1 admits this has not been run."
+    },
+    {
+      "issue": "Label asymmetry: false_positive_ruin uses 'ruin' and 'loss' buckets (directional losses); false_negative uses +8%/+5pp thresholds (directional gains). The contrast table mixes asymmetric outcome definitions on either side of the comparison, and the 'redundancy' verdict inherits this asymmetry without correction.",
+      "why_it_matters": "A volume feature could legitimately discriminate ruin outcomes (where it is showing blowoff-top behavior) while showing no signal on winner outcomes (where momentum already carries the signal). Pooling them under a single 'redundancy' label hides this asymmetry."
+    },
+    {
+      "issue": "Counter-case entity_40ea0cfb3b (vol_ratio_5_20 = 0.906 — the lowest in the sample, mom_20 = 0.024, false_positive_ruin): the lowest-volume pick was a ruin. If volume were a confirmation filter, sub-1.0 readings should be DEFENSIVE, not ruinous. The case demonstrates that low volume is not protective and therefore not a simple gating signal.",
+      "why_it_matters": "The prior's policy recommendation to cap vol_ratio_5_20 at 1.5 addresses only the high-volume ruin tail (entity_84824e6a20, etc.) and ignores the low-volume ruin tail. A genuine redundancy claim would have to explain both tails."
+    },
+    {
+      "issue": "The proposed 'sector-relative volume z-score over 13 weeks' is an untested refactor recommended as policy. There is no evidence in the frozen dataset that sector-relative volume is computable for IBD-style entries, no backtest showing it outperforms absolute vol_ratio_5_20, and no ablation isolating its contribution. Recommending it without these tests is speculation dressed as mechanism.",
+      "why_it_matters": "If the proposed replacement is itself unverified, then the 'cleaner replacement' the question asks for is not actually identified — only hypothesized. The skeptic verdict must therefore be UNRESOLVED rather than 'replace weekly_volume with sector-relative volume'."
+    },
+    {
+      "issue": "Snapshot heterogeneity: the 27 cases span at least 9 distinct snapshot IDs (snap_724342c280, snap_287267e812, snap_eb3d8128cc, …). Each snapshot may encode a different market regime (post-COVID rally, 2022 bear, 2023 chop). Pooling without regime conditioning produces a 'redundancy' finding that may invert in any single sub-period — the prior's own Falsification Test #4 anticipates this but reports no result.",
+      "why_it_matters": "A regime-conditional analysis is the natural disconfirmation path. Without it, the redundancy verdict is a regime-averaged pseudo-fact, not a structural claim."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Selected-winner cases with mom_20 > 0.15 AND vol_ratio_5_20 < 1.0: if volume is redundant with momentum, B0 should reject these; if B0 still selects them, volume is not load-bearing for rejection.",
+    "Selected-winner cases with vol_ratio_5_20 > 1.5 AND mom_20 < 0.05: these are the divergence tail — cases where volume and momentum disagree — and they test whether volume adds orthogonal information when momentum is silent.",
+    "False-positive-ruin cases with vol_ratio_5_20 > 1.5 in tech/consumer sectors but < 1.2 in industrial/utility sectors at the same snapshot: tests whether volume is sector-conditional and therefore cannot be a uniform B0 input.",
+    "Within each momentum quintile (mom_20 binned), does vol_ratio_5_20 still rank-order winners from losers? A positive answer falsifies redundancy at the conditional level; a negative answer confirms it.",
+    "Cases where weekly_volume and ibd_entry_volume_ratio DIVERGE (one > 1.5, the other < 0.9): which one predicts the outcome? This isolates whether ibd_entry_volume_ratio deserves its own B0 term or is also redundant.",
+    "Pre-2020 bull-market subset: do selected_winners and false_positive_ruins show different vol_ratio_5_20 medians than the 2022 bear subset? Sign-inversion would falsify the 'volume as confirmation' narrative.",
+    "Snapshot snap_d0d57b1e40 contains both entity_6618d3e80c (vol_ratio=1.446, ruin|winner hybrid) and entity_ad2bfdee3f (vol_ratio=1.179, false_negative). At matched snapshot regime, does volume still discriminate, or is regime the dominant factor?"
+  ],
+  "what_would_change_my_mind": [
+    "An R² > 0.55 from regressing vol_ratio_5_20 on {mom_20, up_day_ratio_20, ma10_slope_5, px_vs_ma20} on an UNCONDITIONAL (non-archaeology) sample — would convert the redundancy hypothesis from unfalsified theory into finding.",
+    "An AUC < 0.62 from a weekly_volume-only classifier on a held-out test set with at least 100 picks — would confirm marginal information is below the threshold of practical relevance.",
+    "An ablation in which dropping weekly_volume from B0 changes selected_winner rate by < 2pp on the full pick set (not just the 27 archaeology cases) — would confirm the feature is replaceable.",
+    "A documented sign-inversion of the vol_ratio_5_20 contrast across a clean regime split (e.g., pre-2020 vs 2022-2023), where in one regime high volume predicts wins and in the other it predicts losses — would refute the 'institutional accumulation' mechanism entirely.",
+    "A successful backtest of sector-relative volume z-score beating absolute vol_ratio_5_20 by ≥ 0.04 AUC on a frozen out-of-sample window — would convert the proposed replacement from speculation into evidence.",
+    "Demonstration that entity_8ad5cd4795 (low volume, low momentum, selected_winner) and entity_2f86543bf6 (high volume, negative momentum, selected_winner) were selected via a non-volume pathway (e.g., pullback depth or base count) and that the volume value was ignored by the scoring rule — would remove the orthogonal-signal evidence and strengthen the redundancy verdict."
+  ]
+}
+```

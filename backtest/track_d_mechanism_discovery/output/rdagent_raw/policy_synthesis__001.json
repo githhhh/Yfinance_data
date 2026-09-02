@@ -1,0 +1,124 @@
+{
+  "policies": [
+    {
+      "policy_id": "lane_x_slope_sign_probe",
+      "description": "Tests whether px_vs_ma20 (lane) is a redundant smoother or carries information invisible to B0's linear-additive framing via interaction with MA20 slope sign. If AUC gain over B0 exceeds 0.01 in snapshot-blocked CV, lane is an interaction operator, not degenerate.",
+      "research_origin": "mechanism_falsification__q001",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "interaction",
+          "left": "px_vs_ma20",
+          "right": "ma20_slope_5",
+          "transform": "zscore",
+          "weight": 1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 2,
+          "min_score": 0.5
+        }
+      }
+    },
+    {
+      "policy_id": "vol_ratio_regime_gate",
+      "description": "Tests whether vol_ratio_5_20 is a ranking proxy or downside-risk control by conditioning on MA10 slope sign. Low vol + negative slope = liquidity veto; tests the two-axis conditional gate that resolves the researcher's two failure modes (low-vol-flat ruins and high-vol-distribution ruins).",
+      "research_origin": "mechanism_falsification__q014",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": 1.0
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": 0.8
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lt",
+              "value": 0.9
+            },
+            {
+              "feature": "ma10_slope_5",
+              "op": "lt",
+              "value": 0.0
+            }
+          ],
+          "add": -2.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 2
+        }
+      }
+    },
+    {
+      "policy_id": "volume_dryup_filter",
+      "description": "Tests the volume-dryup ruin mechanism: penalize low-vol entries (dryup) and high-vol-with-low-momentum (distribution). Pre-registered cross-snapshot hold-out required before production deployment per the archaeology's regime-conditionality finding.",
+      "research_origin": "failure_archaeology__q007",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": 0.6
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lt",
+              "value": 1.3
+            }
+          ],
+          "add": -1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.4
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.1
+            }
+          ],
+          "add": -1.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 2,
+          "gap": 0.3
+        }
+      }
+    }
+  ],
+  "batch_rationale": "Three falsifiable probes, each answering a distinct research question: (1) lane_x_slope_sign_probe tests whether lane is non-linear interaction vs redundant projection [q001]; (2) vol_ratio_regime_gate tests whether weekly_volume is ranking proxy vs risk-control with explicit regime conditioning [q014]; (3) volume_dryup_filter operationalizes the specific ruin-precursor signature from the failure archaeology [q007]. None are coefficient-only variants: they differ in mechanism, feature geometry, and the falsifier they invite."
+}

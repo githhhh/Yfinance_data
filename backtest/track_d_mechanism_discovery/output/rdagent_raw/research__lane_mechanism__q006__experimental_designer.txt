@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "right_tail_truncation_vs_left_tail_compression",
+      "features": ["mom_20", "vol_ratio_5_20", "up_day_ratio_20", "pullback_duration_weeks", "pullback_pct"],
+      "comparison": "Within pullback-only cohort (pullback_pct <0, pullback_duration_weeks 3-9w, n>=15), compare B0_LANE vs LANE_NEUTRAL on (a) 95th-percentile W4 return and (b) 5th-percentile W4 return. Use SCORE_BEFORE_LANE rank-correlation between the two portfolios as orthogonality check.",
+      "success_criterion": "Lane-pure-risk: |95th-pct delta| < 0.5pp AND |5th-pct delta| > 1.3pp (Lane compresses left, preserves right). SCORE_BEFORE_LANE rank correlation between B0_LANE and LANE_NEUTRAL > 0.90.",
+      "failure_criterion": "Lane-destroys-alpha: 95th-pct of B0_LANE < LANE_NEUTRAL by >=1.0pp (right tail truncated) OR rank correlation < 0.75 (Lane acts on orthogonal return channel)."
+    },
+    {
+      "name": "conditional_rejection_asymmetry_residualized",
+      "features": ["mom_20", "vol_ratio_5_20", "up_day_ratio_20", "ma10_slope_5", "ma20_slope_5", "px_vs_ma50", "pullback_duration_weeks"],
+      "comparison": "In pullback cohort, compute Lane-rejection indicator (1 if B0_LANE excludes but SCORE_BEFORE_LANE ranks in top-half). Test whether rejection rate differs between (high-mom_20>=0.15 AND low-vol_ratio_5_20<1.2) vs (low-mom_20<0.10 AND high-vol_ratio_5_20>=1.2) corners after residualizing on pullback_duration and base-maturity controls.",
+      "success_criterion": "Lane-pure-risk: rejection rate difference between corners < 5pp after residualization (Lane acts on risk proxies orthogonal to return).",
+      "failure_criterion": "Lane-destroys-alpha: rejection rate in high-mom_20/low-vol_ratio corner exceeds low-mom_20/high-vol_ratio corner by >=15pp (Lane systematically rejects high-conditional-return setups), OR two false_negative_big_winner analogues reappear in >=10% of cohort."
+    }
+  ],
+  "leakage_checks": [
+    "All features must be PIT at snapshot_anon timestamp; verify mom_20/vol_ratio_5_20 use only bars at or before entry close (no future bars in lookback window).",
+    "pullback_pct and pullback_duration_weeks must be measured from pre-entry high, not post-entry trough (post-hoc drawdown would leak outcome).",
+    "Outcome labels (W4 return buckets) must remain unseen during Lane-decision evaluation; only pre-entry feature snapshots may inform Lane simulation.",
+    "No outer-forward outcomes beyond the pre-specified W4 window used in archaeology; reject any test requiring data after the snapshot anchor."
+  ],
+  "priority_order": [
+    "right_tail_truncation_vs_left_tail_compression",
+    "conditional_rejection_asymmetry_residualized"
+  ]
+}
+```

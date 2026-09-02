@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "In fresh breakout weeks, Lane plausibly loads left-tail risk without proportional mean uplift, but the available archaeology cannot separate this from a coupled factor-loading story where the same magnitude features (mom_20, ma10_slope_5, px_vs_ma50) jointly drive both higher conditional mean and fatter ruin tail. The 50% B0 ruin share is conditioning-on-pick contaminated, and false_negatives vs winners diverge on the SAME feature set that Lane already loads on, making mean/tail decomposition underidentified without within-snapshot fixed-effects and dispersion (kurtosis vs variance) decomposition tests. Net: mechanism is testable and not yet refuted, but current evidence is consistent with three competing stories — pure risk-shift, coupled factor-loading, and snapshot-regime confound — at indistinguishable likelihoods.",
+  "falsifiers": [
+    "Within-snapshot paired test: if paired |mean Δ| < 0.5pp AND ruin Δ ≥ +10pp with McNemar p<0.05 across ≥15 snapshot-weeks (n≥10 pairs each), pure risk-shift is supported; if ruin Δ ≥ +10pp co-occurs with mean Δ ≥ +1pp, mechanism reclassifies as coupled factor-loading.",
+    "Residual kurtosis/variance decomposition: if pooled B0_LANE excess-kurtosis / LANE_NEUTRAL excess-kurtosis ≥ 2.0 while residual-variance ratio stays in [0.8, 1.3], tail-specific loading is isolated; if kurtosis ratio < 1.5 OR variance ratio > 1.5, Lane is generic dispersion-shifter, not tail-shifter.",
+    "SCORE_BEFORE_LANE reconstruction: if reconstructed B0-equivalent ruin gap to LANE_NEUTRAL-equivalent is ≥ +10pp AND mean |Δ| < 0.5pp, risk-shift is mechanical from feature composite alone (Lane adds nothing); if reconstruction gap collapses (<5pp), Lane adds non-feature tail information."
+  ],
+  "actionable_design_principles": [
+    "Any fresh-breakout B0 allocation must pair with snapshot-week fixed effects and explicit dispersion decomposition (variance vs kurtosis) before claiming risk-shift vs alpha-shift; do not act on raw ruin-rate deltas.",
+    "Treat Lane's breakout-week output as a candidate distribution, not a commitment: hard-cap position size proportional to (1 - up_day_ratio_20) in the accepted batch, and require reconstructed SCORE_BEFORE_LANE to sit strictly between B0 and LANE_NEUTRAL on ruin rate before trusting Lane as a risk overlay."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Define a DSL construct `lane_tail_isolated` that activates only when within-snapshot paired test yields ruin Δ ≥ +10pp AND mean |Δ| < 0.5pp AND kurtosis ratio ≥ 2.0 with variance ratio in [0.8, 1.3]; otherwise falls back to `lane_coupled_factor` (treat Lane as magnitude filter, not risk overlay).",
+      "why_distinct": "Current Lane usage assumes risk-shift by default; this makes the regime conditional on empirical decomposition so the same policy cannot silently switch between risk-overlay and factor-loading interpretations.",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ma10_slope_5", "ma20_slope_5", "px_vs_ma20", "px_vs_ma50", "atr_14_pct", "rv_20"],
+      "capacity_relevance": "Forces explicit acceptance criteria before Lane sizing is enabled, preventing silent tail-loading when Lane is actually a magnitude filter."
+    },
+    {
+      "idea": "Define `score_before_lane_baseline` that reconstructs a feature-only composite rank each snapshot and requires its ruin rate to land strictly between B0_LANE and LANE_NEUTRAL; if ordering violates, emit a warning that Lane is non-informative for tail in that snapshot and down-weight B0 allocation by a pre-specified fraction.",
+      "why_distinct": "Adds a falsification-aware guardrail rather than treating Lane as authoritative; converts the SCORE_BEFORE_LANE test into live policy enforcement.",
+      "features": ["mom_20", "up_day_ratio_20", "vol_ratio_5_20", "ma10_slope_5", "ma20_slope_5", "px_vs_ma20", "px_vs_ma50", "rv_20", "atr_14_pct"],
+      "capacity_relevance": "Lets the system auto-detect when Lane stops contributing tail information beyond feature composite, which is the core ambiguity the skeptic raised."
+    }
+  ]
+}
+```

@@ -1,0 +1,19 @@
+{
+  "mechanism_claim": "The near-parity of SCORE_BEFORE_LANE is an artifact of the score being dominated by a single vol-confirmed-momentum factor (vol_ratio_5_20 and mom_20 carry the load), so that downstream lanes (base/pullback filters) operate on a residual that the pre-lane score cannot resolve; the score's apparent equality across outcomes is structural truncation, not informational content.",
+  "evidence_for": [
+    "Numeric contrasts show the largest standardized deltas between false_negatives and selected_winners are exactly the vol/momentum cluster: up_day_ratio_20 (-1.19), vol_ratio_5_20 (-1.05), mom_20 (-1.00), px_vs_ma50 (-0.85); pre-lane scores built from these features will therefore produce near-parity between a ruin like entity_8f0df3d38e (vol_ratio 1.24, mom 0.18) and a winner like entity_440e297253 (vol_ratio 1.59, mom 0.06) only because a heavier feature (pullback_pct median -15.9 vs -7.3) is excluded from the pre-lane score.",
+    "Base/pullback structural features show opposite-signed deltas (pullback_duration_weeks +0.73, base_depth_pct +0.19, base_duration_weeks +0.42), confirming a residual axis the score cannot read; 8/8 false_positive_ruins and all 5 false_negatives occur in samples where pullback_duration_weeks or pullback_pct is null or shallow (>= -7.3%), so the lane does real work the score ignores."
+  ],
+  "evidence_against": [
+    "Entity_6618d3e80c (false_positive_ruin|selected_winner) and entity_2c58cebc59 (selected_winner with pullback_pct -25.1%) show that high pre-lane-style features can co-occur with both ruin and win, so a pure vol+momentum score is necessary but not sufficient explanation.",
+    "Counter-sample size is small (n=27) and snapshots cluster (snap_71486ed83c contributes 7 cases), so the parity could partially reflect snapshot-period regime rather than score construction."
+  ],
+  "falsifiable_predictions": [
+    "Within-quartile bins of vol_ratio_5_20, the W4 outcome distribution across SCORE_BEFORE_LANE deciles should remain near-parity (Kolmogorov-Smirnov D < 0.15) while pullback-adjusted residual deciles should show monotonic separation (D > 0.25); if separation holds within quartiles, the score-dominance claim is wrong.",
+    "Replacing SCORE_BEFORE_LANE with a residual = score - beta*vol_ratio_5_20 - gamma*mom_20 should flip the near-parity: winners and ruins should separate by >=0.4 standardized delta on this residual, whereas the raw score shows <=0.2."
+  ],
+  "policy_implications": [
+    "Stop relying on SCORE_BEFORE_LANE as a marginal gate; treat it as a coarse vol-confirmed-momentum filter and route base/pullback information into a separate post-lane residual score to avoid double-counting or canceling signal.",
+    "Run the within-vol-quartile KS diagnostic on the next 50 B0 picks before trusting any parity-based lane equivalence claim."
+  ]
+}

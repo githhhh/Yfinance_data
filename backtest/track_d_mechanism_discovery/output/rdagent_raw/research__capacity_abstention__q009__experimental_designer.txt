@@ -1,0 +1,44 @@
+
+
+{
+  "tests": [
+    {
+      "name": "crowding_detector_orthogonality_test",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "atr_14_pct",
+        "rv_20",
+        "base_duration_weeks",
+        "base_depth_pct",
+        "ma50_slope_10"
+      ],
+      "comparison": "Within each snapshot, compute two scores per candidate: (a) base-signal-strength = mean of z-scored {vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, up_day_ratio_20} and (b) orthogonal-crowding-score = mean of z-scored {pullback_pct, pullback_duration_weeks, atr_14_pct, rv_20, base_duration_weeks, base_depth_pct, ma50_slope_10}. The adaptive rule's crowding input must be reconstructed using only the orthogonal-crowding features; if the resulting capacity assignments are correlated |ρ|≥0.5 with base-signal-strength, the rule is restating signal strength as 'crowding' (circularity) and its slot-count recommendations reduce to de-leveraging rather than crowding-aware diversification.",
+      "success_criterion": "Spearman |ρ(capacity_assignment, base_signal_strength)| ≤ 0.30 across the 27-case evidence when capacity is driven by orthogonal features alone; rule's capacity assignments remain stable across ±5% perturbation of orthogonal-crowding-score weights.",
+      "failure_criterion": "|ρ| ≥ 0.50 with p < 0.05, OR capacity assignment flips on ≥30% of cases when any single orthogonal feature is perturbed by ±5%, OR orthogonal-crowding-score cannot reproduce the rule's original capacity assignments within ±1 slot on ≥60% of cases."
+    },
+    {
+      "name": "within_snapshot_pairwise_dispersion_crowding_proxy_test",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "For every snapshot with ≥2 candidates, compute pairwise absolute differences: Δ_mom = mean|mom_20_i − mom_20_j|, Δ_vol = mean|vol_ratio_5_20_i − vol_ratio_5_20_j|, Δ_ma = mean|px_vs_ma50_i − px_vs_ma50_j|. Aggregate into a single within-snapshot dispersion score D. The rule must map D → capacity monotonically (high D → capacity=3, low D → capacity≤1). Separately, for each pair compute ρ̂_proxy = (sign_agreement_mom + sign_agreement_vol + sign_agreement_ma)/3 as a PIT-only correlation proxy. Predicted variance ratio var(N=3)/var(N=1) under equal-weight = (1+2ρ̂_proxy)/3; under leverage hypothesis ρ̂_proxy→1.",
+      "success_criterion": "Rank-correlation(D, capacity_assignment) ≥ 0.40 across snapshots with ≥2 candidates; AND median ρ̂_proxy across crowded snapshots ≤ 0.55, so the equal-weight true-diversification variance reduction (factor ≈1/(1+2ρ̂)) is empirically ≥1.5×, falsifying the leverage-on-same-bet mechanism.",
+      "failure_criterion": "Rank-correlation(D, capacity) ≤ 0.20, OR median ρ̂_proxy ≥ 0.75 in crowded snapshots (leverage mechanism holds and slot-3 is not genuine diversification), OR capacity assignment is invariant to D."
+    }
+  ],
+  "leakage_checks": [
+    "Exclude all w4_return_bucket, outcome_label, and any forward-return-derived fields from feature allowlist — these are post-entry outcomes, not PIT.",
+    "Snapshot identity is PIT-allowed (evaluation window anchor), but entity identity and any ticker-like strings must be hashed/removed before input.",
+    "Verify pullback_duration_weeks and pullback_pct are measured at entry snapshot only (no look-ahead into the W4 holding window); ibd_entry_* features are entry-day only.",
+    "Run orthogonality test twice: once on the full 27-case set, once leaving snap_71486ed83c out — if conclusions flip, the test is snapshot-dominance-driven, not mechanism-driven."
+  ],
+  "priority_order": [
+    "crowding_detector_orthogonality_test",
+    "within_snapshot_pairwise_dispersion_crowding_proxy_test"
+  ]
+}

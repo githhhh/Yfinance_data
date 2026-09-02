@@ -1,0 +1,107 @@
+{
+  "tests": [
+    {
+      "name": "within_snapshot_margin_compression_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Distribution of CCM (Top1-Top2 z-scored margin on the 4-feature bundle) computed once across the pooled candidate pool versus once within each individual snapshot. Compare within-snapshot variance to across-snapshot variance and to the pooled variance.",
+      "success_criterion": "Within-snapshot CCM variance is within 50% of the pooled variance, AND the rank order of (Top1, Top2, Top3) by absolute conviction is stable across within-snapshot and pooled scoring. This would indicate the gap statistic is not a pooling artifact.",
+      "failure_criterion": "Within-snapshot CCM variance is less than 30% of the pooled variance, OR the within-snapshot Top1 differs from pooled Top1 in more than 25% of snapshots. Failure shows that low-CCM readings partly arise from same-snapshot candidate similarity, not from genuine low conviction."
+    },
+    {
+      "name": "counterfactual_bundle_indistinguishability_test",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "atr_14_pct",
+        "dist_to_52w_high_pct",
+        "mom_60",
+        "ma50_slope_10"
+      ],
+      "comparison": "Construct K=5 alternative 4-feature bundles sampled from the PIT allowlist excluding the proposed CCM features. For each, compute within-snapshot CCM-style margin. Test whether the empirical distribution of (Top1-Top2) margins is statistically indistinguishable from the proposed CCM bundle's distribution (e.g., Kolmogorov-Smirnov on the absolute margins, and Mann-Whitney on the signed margins).",
+      "success_criterion": "At least 4 of 5 counterfactual bundles produce margin distributions that are significantly different from the CCM bundle's (two-sided KS p<0.05). This would indicate the CCM feature choice carries non-generic structural content.",
+      "failure_criterion": "More than 2 of 5 counterfactual bundles produce indistinguishable margin distributions. Failure demonstrates that any 4-feature z-score margin has the same shape — meaning CCM is a generic statistic dressed in a specific feature set, not a mechanism-specific signal."
+    },
+    {
+      "name": "vol_ratio_contribution_bound_test",
+      "features": [
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within each snapshot, compute the coefficient of variation (CV) of vol_ratio_5_20 across candidates. Then compute the marginal contribution of the vol_ratio_5_20 dimension to the CCM margin as: |z-score(Top1) - z-score(Top2)| * (1/sqrt(K)) where K=4 features. Compare this contribution's expected magnitude to the contributions of the other three features.",
+      "success_criterion": "Across snapshots, the vol_ratio_5_20 contribution to the CCM margin exceeds 25% of the average per-feature contribution in more than 50% of snapshots. This would indicate vol_ratio is doing real discrimination work, contradicting the noise critique.",
+      "failure_criterion": "Vol_ratio contribution falls below 15% of average per-feature contribution in at least 75% of snapshots, OR its CV across snapshots is below 0.15 in more than 70% of snapshots. Failure confirms the feature is structurally near-constant and contributes only via z-scoring arithmetic, not via signal."
+    },
+    {
+      "name": "top2_dominance_inventory_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "For each snapshot, count on how many of the 4 CCM features Top2 strictly exceeds Top1. Bucket snapshots into {Top2 wins 0/4, 1/4, 2/4, 3/4, 4/4}. Test whether the CCM margin correlates negatively with the count of features where Top2 dominates (gap shrinks when Top2 wins features).",
+      "success_criterion": "In at least 60% of snapshots, Top2 wins on at most 1 of 4 features, and the CCM margin shows positive correlation (rho > 0.3) with Top2's loss-margin (i.e., margin tracks the bundle's joint configuration). This supports CCM as a meaningful joint statistic.",
+      "failure_criterion": "Top2 wins on 2+ features in more than 40% of snapshots, AND the CCM margin fails to correlate with bundle-joint configuration (|rho| < 0.2). Failure shows the gap is mechanically dominated by single-feature outliers rather than joint conviction — undermining the multi-factor framing."
+    },
+    {
+      "name": "absolute_floor_gap_orthogonality_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Compute two PIT statistics per snapshot: (a) Top1 absolute conviction = mean z-score of Top1 on the 4 features, (b) CCM margin = z-score differential between Top1 and Top2. Tabulate the joint distribution across snapshots. Test rank correlation between (a) and (b), and identify the four quadrants {high level, high gap}, {high level, low gap}, {low level, high gap}, {low level, low gap}.",
+      "success_criterion": "Rank correlation between Top1 absolute level and CCM margin exceeds 0.4 within snapshots, indicating they carry overlapping (not independent) information. The {high level, low gap} and {low level, high gap} cells should be sparsely populated (combined <30%).",
+      "failure_criterion": "Rank correlation falls below 0.2, OR the {low level, high gap} cell holds more than 25% of snapshots (the entity_440e297253-like scenario dominating). Failure shows the gap and the level are decoupled, which means CCM cannot stand alone as a confidence statistic and the Researcher's own absolute-floor override is structurally required, not optional."
+    },
+    {
+      "name": "contrarian_feature_redundancy_test",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within each snapshot, compute partial correlation: residualize pullback_pct and pullback_duration_weeks against the 4 CCM features (using all candidates in the snapshot), then test whether the (Top1-Top2) margin on pullback residuals adds variance beyond the CCM margin. Use the increase in R^2 when adding pullback-based margin to CCM margin as the test statistic.",
+      "success_criterion": "Adding pullback-based margin to CCM margin raises R^2 by less than 0.05 across snapshots (i.e., pullback information is already redundant with the 4-feature bundle). This supports the Researcher's claim that px_vs_ma50 indirectly captures deep-base structure.",
+      "failure_criterion": "Adding pullback-based margin raises R^2 by more than 0.10 in more than 50% of snapshots. Failure shows the contrarian features carry non-redundant information that the proposed bundle silently discards, supporting the Skeptic's claim that an incomplete bundle biases the gap statistic."
+    },
+    {
+      "name": "slot_count_sizing_decomposition_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Enumerate the 3-slot budget under all combinations of (slot count) x (sizing rule). For slot count in {1,2,3}, define sizing rule S_uniform (equal weight across deployed slots) and S_proportional (slot weight = bundle z-score). For each (slot_count, sizing) combination, compute: (i) total capital deployed, (ii) cash fraction, (iii) per-position weight, (v) within-snapshot dispersion of per-position weights. Test whether the Researcher's stated mapping {CCM>1 → 1 slot + 67% cash; 0.3<CCM<1 → 2 slots + 33% cash; CCM<0.3 → 3 slots + 0% cash} corresponds to one unique point on this matrix or to a curve of possibilities.",
+      "success_criterion": "The mapping uniquely determines both slot count AND sizing, such that fixing CCM fixes a single point in (slot_count, per-position-weight) space — i.e., the 67% cash / 33% cash / 0% cash outputs are inseparable from the 1-slot / 2-slot / 3-slot counts. This would confirm slot count IS a confidence dial in this accounting.",
+      "failure_criterion": "Multiple (slot_count, sizing) pairs yield the same cash fraction and per-position weights, OR the mapping leaves per-position weight under-specified. This refutes the claim that slot count alone determines confidence under a fixed capital budget, since the same slot count can be paired with different sizing rules without changing deployed capital."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that every feature listed is computable from the snapshot bar and prior history only; reject any feature whose definition requires the bar at, after, or beyond the IBD entry trigger.",
+    "Verify that vol_ratio_5_20, up_day_ratio_20, mom_20, and px_vs_ma50 are defined using only bars strictly before the snapshot timestamp — no lookahead into the breakout or post-entry window.",
+    "Verify that pullback_pct and pullback_duration_weeks, when used, are measured from the most recent completed base, not from the entry or post-entry period.",
+    "Confirm that no test outcome depends on W4 return buckets, w4_return_bucket, outcome_label, or any outer-forward label — all evaluations must be structural (distributional, correlational, geometric) rather than outcome-conditioned.",
+    "Confirm that no test uses snapshot_anon, entity_anon, or is_b0_pick as a feature or stratum — these encode forward-conditioned labels or sampling structure that would re-introduce the selection bias the framework is meant to avoid.",
+    "Confirm that 'within-snapshot' computations exclude the snapshot identity itself (snap_71486ed83c-style cluster effects must not become features) — use candidate identity only.",
+    "Confirm that the counterfactual bundle test does not draw features already in the proposed bundle and then claim independence; rejection of overlap is part of the design."
+  ],
+  "priority_order": [
+    "within_snapshot_margin_compression_test",
+    "absolute_floor_gap_orthogonality_test",
+    "counterfactual_bundle_indistinguishability_test",
+    "contrarian_feature_redundancy_test",
+    "top2_dominance_inventory_test",
+    "slot_count_sizing_decomposition_test",
+    "vol_ratio_contribution_bound_test"
+  ]
+}

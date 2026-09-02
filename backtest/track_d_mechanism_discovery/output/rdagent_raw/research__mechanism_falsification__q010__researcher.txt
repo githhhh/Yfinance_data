@@ -1,0 +1,39 @@
+
+
+```json
+{
+  "mechanism_claim": "dry_false_penalty's historical value derives primarily from return RANKING (preferring candidates with broad-based daily participation), not from downside-risk control. The penalty conflates 'dry daily breadth' (low up_day_ratio_20) with 'ruin risk', but ruin cases span a wide up_day_ratio band (0.40-0.65) and several large-winners were rejected precisely because they looked 'dry' PIT.",
+  "evidence_for": [
+    "Selected_winner median up_day_ratio_20 = 0.625 vs false_negative median = 0.50 (Δ = -0.125, std -1.19) — the penalty correlates with winner/non-winner separation.",
+    "Selected_winner median vol_ratio_5_20 = 1.424 vs false_negative 1.179 (Δ = -0.245, std -1.05) — winners also exhibit elevated short-horizon vol, so 'dry+dry' filtering cedes positive information.",
+    "Selected_winner median mom_20 = 0.163 vs false_negative 0.058 (Δ = -0.105, std -1.00) — momentum gap reinforces that the penalty is really an 'everything-strong' filter.",
+    "Within B0 picks, the 'large_win' bucket contains entries with up_day_ratio_20 of 0.35-0.50 (entity_2f86543bf6, entity_90a828939a), proving that the penalty's threshold excludes recoverable winners.",
+    "Selected_winners exhibit mean px_vs_ma20 / px_vs_ma50 of +0.075 / +0.127, indicating the penalty effectively scores trend-extension, not tail protection."
+  ],
+  "evidence_against": [
+    "False_positive_ruin cases have up_day_ratio_20 = 0.40 (entity_84824e6a20, entity_b6bcccdf6a), 0.50 (entity_40ea0cfb3b, entity_ccc90a671f), AND 0.65 (entity_3472243e0c, entity_55c2da490e) — ruin is NOT confined to 'dry' names.",
+    "entity_3472243e0c is a B0 pick with up_day_ratio_20=0.65, strong mom_20=0.242, AND a 6-week/-25.1% prior pullback that still ruined — penalty did not catch this high-breadth breakdown.",
+    "entity_6618d3e80c has the highest px_vs_ma50 (0.337) and 2nd-highest mom_20 in the set but is labelled both 'false_positive_ruin' AND 'selected_winner' — extreme strength was not protective.",
+    "False-negative large_winners (entity_535a1beed7 mom_20=0.028 up_day_ratio=0.50; entity_de1c657364 mom_20=0.058 up_day_ratio=0.65) prove the penalty's threshold is mis-specified: a 0.65-breadth setup with mild 60-day weakness was discarded despite being a large_winner.",
+    "Ruins (entity_4fdc3699fd, entity_84824e6a20, entity_b6bcccdf6a) show vol_ratio_5_20 = 1.31-1.63 with px_vs_ma20 = +0.06 to +0.12 — typical 'normal' B0 state, so the penalty was inactive on the very cases that mattered.",
+    "Selected_winner entity_3adc078f01 had a prior -42.3% pullback yet won large — distribution-tail pullback alone is not ruin-inducing, weakening any 'risk-control' narrative tied to dry filters."
+  ],
+  "falsifiable_predictions": [
+    "F1 (downside-control falsification): If dry_false_penalty truly controlled downside, then among the subset of cases where it is currently TRIGGERED, the posterior ruin rate must be < 50% of the unfiltered universe's ruin rate. Data already shows ruin cases at up_day_ratio 0.60-0.65 (e.g., entity_55c2da490e), so the conditional ruin rate among triggered cases is likely not significantly lower — falsifying the risk-control claim.",
+    "F2 (return-ranking falsification): If dry_false_penalty were only a ranking tool, removing it would NOT change ruin rate by more than ±5pp but would increase large_win recall. We predict the OPPOSITE here: removing it will drop ruin rate (because some 'dry' candidates weren't ruin-prone) — this falsifies the ranking-only claim.",
+    "F3 (cleaner replacement test): Replacing the binary penalty with a continuous, sector-relative up_day_ratio_20 percentile combined with rv_20-scaled position size will, on the same train sample, reduce ruin count from 9 to ≤6 AND raise large_win count from 11 to ≥14 simultaneously. Failure to achieve BOTH within 3pp each falsifies the proposed replacement.",
+    "F4 (decoupling test): Holding dry_false_penalty constant but adding an ATR-relative max-adverse-excursion stop on rv_20 alone reduces ruin count ≥30% without changing selection count — proving downside control is achievable WITHOUT the dry filter, falsifying any necessity claim for the penalty.",
+    "F5 (interaction test): The interaction term up_day_ratio_20 × vol_ratio_5_20 is NOT a significant predictor of ruin in a logistic regression on these 27 cases (|β|<0.5, p>0.3), falsifying the 'dry + volatile = danger' implicit hypothesis of the penalty.",
+    "F6 (regime test): In high-volatility regimes (vol_ratio_5_20 > 1.5), the penalty's discrimination collapses: ruin-vs-winner up_day_ratio medians converge to within 0.05 — falsifying unconditional application."
+  ],
+  "policy_implications": [
+    "Decouple the two functions: use continuous, sector-relative up_day_ratio_20 percentile (rank, not threshold) inside the RANKING model; use ATR-relative stops + rv_20-scaled position sizing for DOWNSIDE control. The current single penalty does both jobs poorly.",
+    "Replace the binary dry_false_penalty with a 2-D score: breadth_score = percentile(up_day_ratio_20 within sector) and participation_score = percentile(vol_ratio_5_20 within sector). Require BOTH ≥ 40th percentile (instead of penalizing dryness).",
+    "Add an explicit max-adverse-excursion gate based on rv_20 and atr_14_pct that fires post-entry — this addresses the ruin cases the penalty missed (entity_4fdc3699fd, entity_84824e6a20, entity_b6bcccdf6a, entity_3472243e0c) without rejecting pre-entry dry-but-winning setups.",
+    "Re-introduce entity_535a1beed7, entity_de1c657364, entity_05b4c6b1f7 (false-negative large_winners) into the candidate pool under the cleaner rule, since their up_day_ratio ≥ 0.50 was incorrectly punished.",
+    "Add a regime-conditioning flag: in vol_ratio_5_20 > 1.5 environments, halve the breadth penalty weight — evidence (entity_6618d3e80c, entity_b00579f203) shows high-vol breadth does NOT guarantee safety and high-vol dryness does NOT guarantee ruin.",
+    "Track penalty-trigger frequency vs base rate: if >40% of candidates are penalized, the threshold is set for ranking comfort, not risk control, and should be widened with a separate risk overlay.",
+    "If UNRESOLVED on a stricter test: leave dry_false_penalty in place but cap its weight at 25% of B0 score and require rv_20-adjusted position sizing to compensate — interim measure pending cleaner replacement validation."
+  ]
+}
+```

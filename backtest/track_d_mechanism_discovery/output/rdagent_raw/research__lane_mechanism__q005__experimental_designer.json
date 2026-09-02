@@ -1,0 +1,47 @@
+{
+  "tests": [
+    {
+      "name": "proxy_reconstruction_audit",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "mom_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "comparison": "5-fold CV (clustered by snapshot_anon, ridge-regularized logistic regression) predicting B0_LANE vs LANE_NEUTRAL vs SCORE_BEFORE_LANE 3-slot label from the 9-feature proxy basket. Baseline = synthetic-Lane = deterministic percentile-rank of the proxy composite. Report macro-AUC and per-slot one-vs-rest AUC.",
+      "success_criterion": "Macro-AUC >= 0.92 AND synthetic-Lane macro-AUC within +/-0.03 of real-Lane macro-AUC (Lane is a relabeling of the proxy composite; proxy hypothesis stands)",
+      "failure_criterion": "Macro-AUC < 0.78 OR synthetic-Lane macro-AUC exceeds real-Lane macro-AUC by >=0.05 (Lane carries information not in the proxies; orthogonal-mechanism claim survives)"
+    },
+    {
+      "name": "matched_proxy_decile_lane_entropy",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "mom_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Bin cases into deciles of the standardized proxy composite. Within each decile compute Shannon entropy (nats, base e) of the 3-slot label distribution. Report mean within-decile entropy and the share of top-decile cases assigned to LANE_NEUTRAL or SCORE_BEFORE_LANE.",
+      "success_criterion": "Mean within-decile entropy <= 0.30 nats AND top-decile Lane-misassignment rate <= 5% (proxy hypothesis confirmed: Lane slot is monotone in proxy composite)",
+      "failure_criterion": "Mean within-decile entropy >= 0.80 nats OR top-decile Lane-misassignment rate >= 15% (Lane slot is not a deterministic function of proxies within matched geometry)"
+    }
+  ],
+  "leakage_checks": [
+    "Cluster every CV split and decile bin by snapshot_anon so that pseudo-replicated market-week observations cannot leak across folds; effective N ~10-12 snapshots, not 27 cases",
+    "Refit the reconstruction audit with snapshot fixed effects absorbed; confirm AUC change is <0.04 so the result is not regime-clustering artifact",
+    "Reverse-causality audit: verify none of the 9 proxy features is itself an explicit input to the Lane-assignment rule by checking that removing any single proxy degrades macro-AUC by <0.08 (if one feature dominates, Lane is that feature by another name)"
+  ],
+  "priority_order": [
+    "proxy_reconstruction_audit",
+    "matched_proxy_decile_lane_entropy"
+  ]
+}

@@ -1,0 +1,46 @@
+
+
+{
+  "strongest_counterclaim": "The researcher's conclusion that distinct1 is purely return-ranking ignores the possibility that vol_ratio_5_20 functions as a risk proxy rather than a return amplifier. In many quantitative frameworks, elevated short-term volatility relative to medium-term volatility signals mean-reversion risk, not opportunity. If the component uses high vol_ratio_5_20 to identify stocks that are 'running hot' and may require position-size reduction or exit triggers downstream, then the component IS performing a downside-risk function—just at the portfolio-construction layer rather than the selection layer. The researcher conflates 'failing to filter ruin outcomes at selection' with 'failing to perform risk control,' which are distinct mechanism responsibilities.",
+  "attacks": [
+    {
+      "issue": "Missing data mechanism for pullback_pct is unexamined",
+      "why_it_matters": "15 of 27 cases have null pullback_pct, yet the researcher treats this as evidence that the component lacks drawdown sensitivity. However, null pullback_pct is not equivalent to 'no pullback occurred.' Missingness could be systematic: pullback data may not be collected when pullbacks are below a threshold, when recovery was fast, or when the snapshot time window excludes the relevant period. If nulls correlate with smaller or absent drawdowns, the researcher is selectively analyzing cases where drawdown data exists—which may be the subset where drawdowns were extreme enough to warrant recording. This inverts the inference: instead of proving the component ignores drawdowns, the evidence may simply show that ruin cases (with recorded drawdowns) are over-represented in the non-null subset."
+    },
+    {
+      "issue": "The failure archaeology sample is adversarially constructed",
+      "why_it_matters": "The 27 cases come from 'failure archaeology'—a dataset designed to surface errors. This creates a selection-bias trap: the researcher documents an apparent 30% ruin false-positive rate, but this is conditioned on having already identified failure cases. The true base rate of ruin among all B0 selections (including unproblematic cases that never cratered) is unobserved. If 10x more selected_winner cases exist that never showed up in failure archaeology, the ruin rate could be 3% rather than 30%. The researcher cannot distinguish 'the component tolerates ruin' from 'ruin is rare but the sample is enriched for it.'"
+    },
+    {
+      "issue": "Momentum and downside-risk are structurally correlated, making attribution ambiguous",
+      "why_it_matters": "High mom_20 stocks tend to exhibit smaller pullbacks during their trending phase—the very phenomenon that produces the momentum signal. A component that correctly identifies trending stocks with low recent drawdowns will naturally select stocks that subsequently crash if the trend breaks. This is not a failure of risk control but a fundamental ambiguity: the component cannot distinguish 'stock is trending because it avoids drawdowns' from 'stock is trending because it ignores pending downside.' The researcher assumes the latter and concludes the component lacks risk sensitivity, but the former is equally consistent with the data."
+    },
+    {
+      "issue": "The researcher's own numeric_contrasts show vol_ratio_5_20 discrimination is strongest for false_negatives, not false_positives",
+      "why_it_matters": "The standardized delta for vol_ratio_5_20 is -1.045, which compares selected_winner (median 1.42) versus false_negative (median 1.18). Notably, the researcher does NOT provide the false_positive_ruin median for vol_ratio_5_20. If false_positive_ruin cases also have elevated vol_ratio_5_20, then the component may be selecting high-volatility stocks as a form of risk-hypothesis generation: high-volatility picks are more likely to be watched closely or sized smaller. The absence of this comparison in the researcher's evidence suggests the data may not support the claim that vol_ratio_5_20 is purely a return amplifier."
+    },
+    {
+      "issue": "The component may operate in a two-stage pipeline where distinct1 is only responsible for momentum identification",
+      "why_it_matters": "The researcher assumes distinct1 should independently implement both return-ranking and risk filtering. But if B0 has a downstream 'ruin guard' component that applies drawdown filters post-selection, then distinct1's lack of downside-risk logic is not a defect—it is a deliberate division of labor. The researcher's policy_implications repeatedly propose adding risk filters to distinct1 itself, but this may be solving the wrong problem: the issue could be that downstream filters are absent or insufficient, not that distinct1 is mis-specified."
+    },
+    {
+      "issue": "Selected_winner includes cases with negative pullback_pct up to -42.3%, yet the researcher claims 'return ranking dominates' without addressing why extreme drawdowns are tolerated",
+      "why_it_matters": "entity_3adc078f01 has pullback_pct=-42.3% yet is labeled selected_winner. This single case does not fit the researcher's narrative of 'pure momentum screening ignores risk.' If the component truly ignored downside risk, why would a -42% drawdown not disqualify the entity? The most parsimonious explanation is that the selected_winner label is evaluated over a longer horizon than the drawdown measurement window—the pullback occurred but was recovered, making it a 'selected winner' despite the interim drawdown. This undermines the claim that the component lacks risk awareness: it may have a longer-horizon risk tolerance that the researcher is measuring with a mismatched time horizon."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where vol_ratio_5_20 > 1.5 AND mom_20 > 0.15 but the entity was NOT selected by B0, indicating the component has conditional logic that excludes high-volatility momentum plays in some contexts",
+    "Non-failure archaeology data: 100 random B0 selections without regard to outcome, to establish whether the 30% ruin rate is representative or artifact of failure-case sampling",
+    "Downstream B1/B2 components that explicitly filter on drawdown metrics, to test whether distinct1 is intentionally a 'momentum-only' first-pass filter in a two-stage system",
+    "Cases where pullback_pct is null but the entity subsequently experienced documented drawdowns in external price data, to determine whether null pullback_pct means 'no drawdown' or 'drawdown not recorded'",
+    "Cross-snapshot analysis: do the same entities appear in multiple snapshots with varying b0_pick status? If so, what changes between picks and non-picks, and does vol_ratio_5_20 or mom_20 toggle explain the flip?",
+    "False_positive_ruin cases with low vol_ratio_5_20 (< 1.2) to test whether high volatility is truly required for ruin false-positives, or whether ruin can occur through low-volatility mean-reversion"
+  ],
+  "what_would_change_my_mind": [
+    "If I find that the underlying B0 code or documentation explicitly defines distinct1 as a return-ranking component with no risk-filtering intent, then attributing the ruin false-positives to a design flaw is incorrect—I would be judging the component against a requirement it was never meant to satisfy.",
+    "If pullback_pct nulls are demonstrably from a different data-collection regime (e.g., a different snapshot batch or time period) than non-nulls, then the missingness is not random and the researcher's inference about risk insensitivity is invalid. I would need to reweight the evidence or exclude null cases entirely.",
+    "If the false_positive_ruin cases have a vol_ratio_5_20 distribution indistinguishable from the full selected set (not enriched for high volatility), then the researcher's claim that vol_ratio_5_20 drives return amplification becomes uncertain, and I would need to consider whether mom_20 alone is sufficient to explain the selection pattern.",
+    "If I observe that selected_winner cases with extreme negative pullback_pct (-40% or worse) have corresponding large_win outcomes (>50% W4 returns), this would suggest the component tolerates interim drawdowns because it correctly identifies high-conviction momentum plays that recover. This would support a 'long-horizon risk tolerance' interpretation rather than 'no risk awareness.'",
+    "If a cleaner test comparing two sub-portfolios—(a) all B0 picks with vol_ratio_5_20 in top quartile, (b) all B0 picks with vol_ratio_5_20 in bottom quartile—shows equivalent ruin rates (e.g., both 8-10%), then vol_ratio_5_20 is not driving ruin outcomes and the researcher's inference about return amplification is falsified."
+  ]
+}
