@@ -1,0 +1,12 @@
+{
+  "total_snapshots": 42,
+  "selection_changed_weeks": 19,
+  "target_standard_over_fresh_weeks": 0,
+  "target_mature_weeks": 0,
+  "target_mean_pair_delta_w4": null,
+  "target_median_pair_delta_w4": null,
+  "target_positive_pair_ratio": null,
+  "changed_week_mean_portfolio_spread_w4": -1.7665,
+  "post_track_d_mature_weeks": 0,
+  "post_track_d_changed_weeks": 0
+}
