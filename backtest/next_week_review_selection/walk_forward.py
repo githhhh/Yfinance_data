@@ -178,6 +178,8 @@ def choose_retrospective_champion(
     if stability.empty:
         return None
     best = stability.iloc[0]
+    if int(best.get("folds", 0)) < 3:
+        return None
     required = [
         best["stability_floor"],
         best["mean_opportunity_delta"],
