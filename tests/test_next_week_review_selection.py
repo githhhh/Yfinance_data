@@ -1,252 +1,135 @@
 import pandas as pd
 
-from backtest.next_week_review_selection.labels import add_next_week_labels
+from backtest.next_week_review_selection.labels import add_forward_labels
+from backtest.next_week_review_selection.oracle import add_weekly_oracle_flags
+from backtest.next_week_review_selection.search_space import generate_candidate_rules
 from backtest.next_week_review_selection.selectors import (
     ReviewRule,
-    review_rules,
-    select_attention_matched,
-    select_b0_actionable,
+    primary_rule,
     select_review_variant,
     support_count,
 )
 
 
-def test_b0_reproduces_actionable_only_review_eligibility():
-    pool = pd.DataFrame(
-        [
-            _row("ACT", "ACTIONABLE", 2.0),
-            _row("UNC", "UNCONFIRMED", -1.0),
-            _row("EXT", "EXTENDED", 7.0),
-        ]
-    )
-
-    selected = select_b0_actionable(pool)
-
+def test_actionable_rows_are_never_refiltered_by_research_rule():
+    pool = pd.DataFrame([
+        _row("ACT", "ACTIONABLE", 3.0, entry_volume=None, weekly_volume=0.8,
+             eps=None, dist=-20, close_position=0.50)
+    ])
+    selected = select_review_variant(pool, primary_rule())
     assert selected["code"].tolist() == ["ACT"]
+    assert selected["selection_source"].tolist() == ["ACTIONABLE_BASELINE"]
 
 
-def test_r1_path_allows_near_non_actionable_states_but_rejects_out_of_path_and_clear_failure():
-    pool = pd.DataFrame(
-        [
-            _row("ACT", "ACTIONABLE", 2.0),
-            _row("UNC", "UNCONFIRMED", -2.0),
-            _row("BEL", "BELOW_TRIGGER", -4.0),
-            _row("EXT", "EXTENDED", 8.0),
-            _row("FARLOW", "UNCONFIRMED", -6.0),
-            _row("FAREXT", "EXTENDED", 12.0),
-            _row("FAIL", "UNCONFIRMED", -1.0, close_position=0.60),
-        ]
-    )
-
-    selected = select_review_variant(pool, review_rules()["R1_PATH"])
-
-    assert set(selected["code"]) == {"ACT", "UNC", "BEL", "EXT"}
+def test_near_unconfirmed_with_one_positive_evidence_is_supplemented():
+    pool = pd.DataFrame([
+        _row("ACT", "ACTIONABLE", 2.0),
+        _row("UNC", "UNCONFIRMED", -2.0, entry_volume=None,
+             weekly_volume=1.4, eps=None, dist=-10),
+    ])
+    selected = select_review_variant(pool, primary_rule())
+    assert set(selected["code"]) == {"ACT", "UNC"}
+    assert selected.loc[selected["code"].eq("UNC"), "selection_source"].item() == "SUPPLEMENTAL"
 
 
-def test_missing_geometry_is_unknown_not_failure():
-    pool = pd.DataFrame(
-        [
-            _row(
-                "UNC",
-                "UNCONFIRMED",
-                -1.0,
-                close_position=None,
-                range_ratio=None,
-                weekly_volume=1.4,
-            )
-        ]
-    )
+def test_false_or_missing_positive_evidence_is_neutral_not_negative():
+    false_dry = pd.Series(_row(
+        "A", "UNCONFIRMED", -1.0, rule="pivot", dry=False,
+        entry_volume=None, weekly_volume=1.4, eps=None, dist=-10
+    ))
+    missing_dry = pd.Series(_row(
+        "B", "UNCONFIRMED", -1.0, rule="pivot", dry=None,
+        entry_volume=None, weekly_volume=1.4, eps=None, dist=-10
+    ))
+    assert support_count(false_dry) == 1
+    assert support_count(missing_dry) == 1
 
-    selected = select_review_variant(pool, review_rules()["R2_BALANCED"])
 
+def test_extended_is_not_in_core_selector():
+    pool = pd.DataFrame([
+        _row("EXT", "EXTENDED", 6.0, weekly_volume=2.0),
+        _row("UNC", "UNCONFIRMED", -1.0, weekly_volume=2.0),
+    ])
+    selected = select_review_variant(pool, primary_rule())
     assert selected["code"].tolist() == ["UNC"]
 
 
-def test_pullback_not_dry_is_neutral_not_negative_support():
-    dry_false = pd.Series(
-        _row(
-            "FALSE",
-            "UNCONFIRMED",
-            -1.0,
-            rule="pivot",
-            dry=False,
-            entry_volume=None,
-            weekly_volume=1.4,
-            eps=None,
-            dist=-10.0,
-        )
-    )
-    dry_missing = pd.Series(
-        _row(
-            "MISS",
-            "UNCONFIRMED",
-            -1.0,
-            rule="pivot",
-            dry=None,
-            entry_volume=None,
-            weekly_volume=1.4,
-            eps=None,
-            dist=-10.0,
-        )
-    )
-
-    assert support_count(dry_false) == 1
-    assert support_count(dry_missing) == 1
+def test_below_trigger_near_buy_point_can_be_supplemented():
+    pool = pd.DataFrame([
+        _row("BEL", "BELOW_TRIGGER", -4.0, entry_volume=None,
+             weekly_volume=1.5, eps=None, dist=-10)
+    ])
+    assert select_review_variant(pool, primary_rule())["code"].tolist() == ["BEL"]
 
 
-def test_r2_requires_one_positive_support_and_r3_requires_two():
-    pool = pd.DataFrame(
-        [
-            _row(
-                "ONE",
-                "UNCONFIRMED",
-                -1.0,
-                entry_volume=None,
-                weekly_volume=1.4,
-                eps=None,
-                dist=-10.0,
-            ),
-            _row(
-                "TWO",
-                "UNCONFIRMED",
-                -2.0,
-                entry_volume=None,
-                weekly_volume=1.4,
-                eps=30.0,
-                dist=-10.0,
-            ),
-            _row(
-                "ZERO",
-                "UNCONFIRMED",
-                -0.5,
-                entry_volume=None,
-                weekly_volume=1.0,
-                eps=None,
-                dist=-10.0,
-            ),
-        ]
-    )
-
-    r2 = select_review_variant(pool, review_rules()["R2_BALANCED"])
-    r3 = select_review_variant(pool, review_rules()["R3_STRICT"])
-
-    assert set(r2["code"]) == {"ONE", "TWO"}
-    assert r3["code"].tolist() == ["TWO"]
+def test_clear_geometry_failure_only_blocks_supplemental_when_enabled():
+    pool = pd.DataFrame([
+        _row("FAIL", "UNCONFIRMED", -1.0, weekly_volume=1.5, close_position=0.60)
+    ])
+    assert select_review_variant(pool, primary_rule()).empty
+    allow = ReviewRule(name="ALLOW", exclude_clear_geometry_failure=False)
+    assert select_review_variant(pool, allow)["code"].tolist() == ["FAIL"]
 
 
-def test_c_rank_cannot_change_capped_review_selection():
-    pool_a = pd.DataFrame(
-        [
-            _row("AAA", "UNCONFIRMED", -1.0, c_rank=999),
-            _row("BBB", "UNCONFIRMED", -1.0, c_rank=1),
-        ]
-    )
-    pool_b = pool_a.copy()
-    pool_b.loc[pool_b["code"].eq("AAA"), "rank_C_continuous"] = 1
-    pool_b.loc[pool_b["code"].eq("BBB"), "rank_C_continuous"] = 999
-
-    picked_a = select_review_variant(pool_a, review_rules()["R2_BALANCED"], cap=1)
-    picked_b = select_review_variant(pool_b, review_rules()["R2_BALANCED"], cap=1)
-
-    assert picked_a["code"].tolist() == ["AAA"]
-    assert picked_b["code"].tolist() == ["AAA"]
+def test_c_rank_never_changes_selection():
+    pool = pd.DataFrame([
+        _row("A", "UNCONFIRMED", -1.0, c_rank=999),
+        _row("B", "UNCONFIRMED", -6.0, c_rank=1),
+    ])
+    before = select_review_variant(pool, primary_rule())["code"].tolist()
+    pool["rank_C_continuous"] = [1, 999]
+    after = select_review_variant(pool, primary_rule())["code"].tolist()
+    assert before == after == ["A"]
 
 
-def test_attention_matched_has_same_count_as_b0_but_can_choose_non_actionable():
-    pool = pd.DataFrame(
-        [
-            _row("ACT1", "ACTIONABLE", 4.5, weekly_volume=1.0, eps=None, dist=-10.0),
-            _row("ACT2", "ACTIONABLE", 4.0, weekly_volume=1.4),
-            _row("UNC1", "UNCONFIRMED", -0.5, weekly_volume=1.8),
-            _row("UNC2", "UNCONFIRMED", -1.0, weekly_volume=1.7),
-        ]
-    )
-
-    baseline = select_b0_actionable(pool)
-    matched = select_attention_matched(pool, review_rules()["R2_BALANCED"])
-
-    assert len(matched) == len(baseline) == 2
-    assert set(matched["code"]) == {"UNC1", "UNC2"}
-
-
-def test_next_week_label_marks_unconfirmed_entering_frozen_buy_zone():
-    events = pd.DataFrame(
-        [
-            _row("UNC", "UNCONFIRMED", -2.0, pivot=100.0),
-        ]
-    )
-    prices = {
-        "UNC": _bars(
-            closes=[99.0, 100.5, 102.0, 106.0, 104.0],
-            opens=[99.0, 99.5, 101.0, 103.0, 105.0],
-            highs=[100.0, 102.0, 103.0, 107.0, 106.0],
-            lows=[98.0, 99.0, 100.0, 102.0, 103.0],
-        )
-    }
-
-    labeled = add_next_week_labels(events, prices).iloc[0]
-
-    assert labeled["label_available"] == True
-    assert labeled["review_opportunity_5d"] == True
-    assert labeled["opportunity_type"] == "UNCONFIRMED_TO_ZONE"
-    assert labeled["first_zone_date"] == "2026-09-01"
+def test_forward_labels_cover_1w_to_4w():
+    events = pd.DataFrame([_row("A", "UNCONFIRMED", -2.0, pivot=100.0)])
+    dates = pd.bdate_range("2026-08-31", periods=20)
+    bars = pd.DataFrame({
+        "Open": [99.0 + i * 0.2 for i in range(20)],
+        "High": [100.0 + i * 0.2 for i in range(20)],
+        "Low": [98.0 + i * 0.2 for i in range(20)],
+        "Close": [99.0, 100.5] + [101.0 + i * 0.2 for i in range(18)],
+    }, index=dates)
+    labeled = add_forward_labels(events, {"A": bars}).iloc[0]
+    assert labeled["review_opportunity_1w"] == True
+    assert labeled["forward_1w_censored"] == False
+    assert labeled["forward_2w_censored"] == False
+    assert labeled["forward_3w_censored"] == False
+    assert labeled["forward_4w_censored"] == False
 
 
-def test_extended_can_become_retest_review_opportunity_without_being_reclassified_actionable():
-    events = pd.DataFrame(
-        [
-            _row("EXT", "EXTENDED", 8.0, pivot=100.0),
-        ]
-    )
-    prices = {
-        "EXT": _bars(
-            closes=[108.0, 106.0, 104.0, 103.0, 102.0],
-            opens=[109.0, 108.0, 106.0, 104.0, 103.0],
-            highs=[110.0, 109.0, 107.0, 105.0, 104.0],
-            lows=[107.0, 105.0, 103.0, 102.0, 101.0],
-        )
-    }
-
-    labeled = add_next_week_labels(events, prices).iloc[0]
-
-    assert labeled["review_opportunity_5d"] == True
-    assert labeled["opportunity_type"] == "EXTENDED_RETEST_TO_ZONE"
-    assert events.iloc[0]["ibd_entry_status"] == "EXTENDED"
+def test_oracle_marks_weekly_big_winner_and_loser():
+    rows = []
+    for i in range(6):
+        row = _row(f"T{i}", "UNCONFIRMED", -1.0)
+        row.update({
+            "forward_1w_censored": False,
+            "forward_1w_return_pct": float(i),
+            "mfe_1w_pct": float(i + 1),
+            "mae_1w_pct": float(-i),
+            "forward_2w_censored": True,
+            "forward_3w_censored": True,
+            "forward_4w_censored": True,
+        })
+        rows.append(row)
+    panel = add_weekly_oracle_flags(pd.DataFrame(rows))
+    assert panel["winner_return_top5_1w"].sum() == 5
+    assert panel["loser_return_bottom5_1w"].sum() == 5
+    assert panel.loc[panel["code"].eq("T5"), "winner_return_top5_1w"].item() == True
 
 
-def test_incomplete_forward_window_is_censored_and_not_counted_as_opportunity():
-    events = pd.DataFrame([_row("ACT", "ACTIONABLE", 1.0, pivot=100.0)])
-    full = _bars(
-        closes=[101.0, 102.0, 103.0, 104.0, 105.0],
-        opens=[101.0, 102.0, 103.0, 104.0, 105.0],
-        highs=[102.0, 103.0, 104.0, 105.0, 106.0],
-        lows=[100.0, 101.0, 102.0, 103.0, 104.0],
-    )
-    prices = {"ACT": full.head(3)}
-
-    labeled = add_next_week_labels(events, prices).iloc[0]
-
-    assert labeled["forward_5d_censored"] == True
-    assert labeled["label_available"] == False
-    assert labeled["review_opportunity_5d"] == False
+def test_search_space_is_small_and_deterministic():
+    rules = generate_candidate_rules()
+    assert len(rules) == 144
+    assert len({rule.name for rule in rules}) == 144
 
 
 def _row(
-    code: str,
-    status: str,
-    current_vs_buy: float,
-    *,
-    rule: str = "ceiling",
-    pivot: float = 100.0,
-    entry_volume: float | None = 1.6,
-    weekly_volume: float = 1.4,
-    eps: float | None = 30.0,
-    dist: float = -1.0,
-    dry: bool | None = None,
-    close_position: float | None = 0.90,
-    range_ratio: float | None = 0.70,
-    c_rank: int = 10,
-) -> dict[str, object]:
+    code, status, vs_buy, *, rule="ceiling", pivot=100.0,
+    entry_volume=1.6, weekly_volume=1.4, eps=30.0, dist=-1.0,
+    dry=None, close_position=0.9, range_ratio=0.7, c_rank=10,
+):
     return {
         "snapshot_date": "2026-08-28",
         "code": code,
@@ -255,7 +138,7 @@ def _row(
         "ibd_candidate_price": pivot,
         "ibd_trigger_price": pivot,
         "ibd_entry_status": status,
-        "current_vs_ibd_candidate_pct": current_vs_buy,
+        "current_vs_ibd_candidate_pct": vs_buy,
         "ibd_entry_volume_ratio": entry_volume,
         "ibd_entry_close_position": close_position,
         "ibd_entry_breakout_range_ratio": range_ratio,
@@ -267,16 +150,3 @@ def _row(
         "rank_C_continuous": c_rank,
         "C_continuous": float(c_rank),
     }
-
-
-def _bars(*, closes, opens, highs, lows) -> pd.DataFrame:
-    dates = pd.bdate_range("2026-08-31", periods=len(closes))
-    return pd.DataFrame(
-        {
-            "Open": opens,
-            "High": highs,
-            "Low": lows,
-            "Close": closes,
-        },
-        index=dates,
-    )
