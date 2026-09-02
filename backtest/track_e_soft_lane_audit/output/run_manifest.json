@@ -1,37 +1,46 @@
 {
   "experiment": "track_e_soft_lane_audit",
-  "source_git_sha": "fd32461bdd03ec00d34b732b7adf96e9b7b25422",
+  "protocol_version": "track_e_v3_pairwise_top3_replacement",
+  "source_git_sha": "bf67423f104511957862e2c059304a42ea8c14e1",
   "panel_hash": "d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5",
   "production_b0_hash": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477",
   "panel_snapshot_count": 42,
   "track_d_historical_end": "2026-07-24",
   "historical_snapshots": 40,
   "hypothesis_status": "post-Track-D hypothesis; <=2026-07-24 evidence is retrospective and must not be presented as untouched OOS",
-  "baseline": {
+  "primary_control": {
+    "policy_id": "B0_DRY_NEUTRAL_HARD_LANE",
+    "dry": "True reward / False neutral",
     "lane": "hard B0_LANE",
+    "selector": "distinct_1",
+    "reason": "dry=False penalty was independently null in Track D; using the dry-neutral hard-Lane control isolates the Lane intervention"
+  },
+  "production_reference": {
+    "policy_id": "B0_ORIGINAL",
     "dry": "symmetric True reward / False penalty",
+    "lane": "hard B0_LANE",
     "selector": "distinct_1"
   },
   "challenger": {
-    "dry": "True reward / False neutral",
-    "active_lane_order": "active guard -> status -> evidence/risk -> lane prior -> remaining B0 tie-breaks",
-    "active_lanes": [
-      "fresh_demand_alpha",
-      "constructive_pullback",
-      "standard_breakout"
+    "policy_id": "B0_1_PAIRWISE_STANDARD_CHALLENGES_FRESH",
+    "intervention": "start from dry-neutral hard-Lane Top3; preserve every non-fresh selected slot; allow only an unselected standard_breakout to replace a selected fresh_demand_alpha when the standard Pareto-dominates on risk_count, exact buy-point distance, and entry volume; preserve distinct_1",
+    "lane_defining_followthrough_excluded_from_dominance": [
+      "eps_acceleration_support",
+      "weekly_volume_follow_through"
     ],
-    "downgraded_lanes": [
-      "incomplete_evidence",
-      "tail_risk"
-    ],
-    "selector": "distinct_1"
+    "dominance_axes": [
+      "risk_count (lower/equal)",
+      "abs(current_vs_ibd_candidate_pct) (lower/equal)",
+      "ibd_entry_volume_ratio (higher/equal)",
+      "at least one strict improvement"
+    ]
   },
   "artifacts": {
-    "comparison_summary_csv": "fc8c7c8376a9480407386280d92f2ae7d386c352b97e8c0fc3163dacd055f776",
-    "comparison_summary_json": "4d22c9ba15e007f3b9d7398fd8fffaa92941e35965cda6bee5fc7d3ed7adc280",
-    "selection_events_csv": "ef6ab0264b9f628b1339334b1c2ce244b7ea4fcde9d99363da59ecc6900a845d",
-    "selection_events_json": "a24bdc94a1f1932a5e6410f5b1604276e5a6deddc190446a4fd1dc82f55a9be4",
-    "event_summary": "6809440234ac3207a3c368707c5d1208a5fafb5cd1b1880aa73fb4b29209d2af",
-    "report": "4438dcf18b0175ceb4628f9de06bd925d6fe38bdc32700dd54366a98bc61341b"
+    "comparison_summary_csv": "b8f2e9f1ec799e7a8f66012b02034c4c2e92dd8f1ac185ffe894240b050d3879",
+    "comparison_summary_json": "0bc3ec00847c0f026c58b120d4a259d459968f248f8f2f5bd0dbbb5363f2c56c",
+    "selection_events_csv": "9c0dbbfeb646b58aff94afa3a38b8129ca737a1ef2cab681b533d72dcbcfdfc9",
+    "selection_events_json": "ba6080e33f92317c7a15bcd19d26ed946b4c9f73ea79aeecbddd3e4864e65fd7",
+    "event_summary": "fe337e265e31f09aa6ca685055891e9abf9c34582a6162d7c1134eb8f5ee13f2",
+    "report": "bfd995349d5fefd56195d71f7d140bf55c0e9bd44f6deffc2874053a2fe3d6d1"
   }
 }

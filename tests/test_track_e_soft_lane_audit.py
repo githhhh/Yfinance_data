@@ -2,149 +2,120 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dashboard.skill_industry_eps_known import SkillCandidate, select_skill_industry_eps_known
-from backtest.track_c_ranking_discovery.b0_ablation_grid import reasoned_item_variant
+from dashboard.skill_industry_eps_known import select_skill_industry_eps_known
 from backtest.track_c_ranking_discovery.config import PANEL_SOURCE
 
-from backtest.track_e_soft_lane_audit.config import TARGET_SOFT_LANES
 from backtest.track_e_soft_lane_audit.experiment import (
-    _rank_crossover_codes,
     build_event_summary,
     build_segments,
+    collect_selection_events,
     load_panel,
 )
 from backtest.track_e_soft_lane_audit.policy import (
-    PairwiseSoftLaneChallenger,
+    PairwiseFreshStandardChallenger,
     baseline_policy,
-    reorder_target_lanes,
+    production_reference_policy,
+    strictly_stronger_standard,
 )
 
 
-def _item(code: str, lane: str, sort_key: tuple) -> SkillCandidate:
-    return SkillCandidate(
-        code=code,
-        raw_rank=0,
-        entry_status="ACTIONABLE",
-        lane=lane,
-        industry=f"Industry {code}",
-        sort_key=sort_key,
-        reason_codes=[],
-        risk_codes=[],
-        feature_values={"effective_eps_yoy_growth": 30.0},
-    )
-
-
-def test_pairwise_soft_lane_reorders_only_fresh_standard_slots():
-    fresh = _item(
-        "FRESH",
-        "fresh_demand_alpha",
-        (0, 0, 0, -3, 1, 0, 0, 0, -1.5, "FRESH", 0),
-    )
-    constructive = _item(
-        "PULL",
-        "constructive_pullback",
-        (0, 1, 0, -3, 0, 0, 0, 0, -1.6, "PULL", 1),
-    )
-    standard = _item(
-        "STD",
-        "standard_breakout",
-        (0, 2, 0, -4, 0, 0, 0, 0, -1.7, "STD", 2),
-    )
-    incomplete = _item(
-        "INC",
-        "incomplete_evidence",
-        (0, 3, 0, -8, 0, 0, 0, 0, -2.0, "INC", 3),
-    )
-
-    reordered = reorder_target_lanes([fresh, constructive, standard, incomplete])
-
-    assert [x.code for x in reordered] == ["STD", "PULL", "FRESH", "INC"]
-    # Non-target absolute positions are frozen.
-    assert reordered[1].code == "PULL"
-    assert reordered[3].code == "INC"
-
-
-def test_constructive_is_not_a_soft_target():
-    assert set(TARGET_SOFT_LANES) == {"fresh_demand_alpha", "standard_breakout"}
-    assert "constructive_pullback" not in TARGET_SOFT_LANES
-
-
-def test_dry_false_is_neutral_but_true_keeps_positive_evidence():
-    base = {
-        "code": "TEST",
-        "signal": True,
-        "industry": "Industry A",
-        "ibd_entry_status": "ACTIONABLE",
-        "ibd_candidate_rule": "pivot",
-        "current_vs_ibd_candidate_pct": 1.0,
-        "ibd_entry_volume_ratio": 1.6,
-        "volume_ratio": 1.2,
-        "eps_yoy_growth": 30.0,
-        "dist_to_52w_high_pct": -2.0,
-        "ibd_entry_close_position": 0.85,
-        "ibd_entry_breakout_range_ratio": 0.60,
+def _row(
+    code: str,
+    lane: str,
+    rank: int,
+    industry: str,
+    *,
+    risk: int,
+    cur: float,
+    entry_vol: float,
+) -> dict:
+    return {
+        "code": code,
+        "industry": industry,
+        "industry_key": industry.lower(),
+        "lane": lane,
+        "raw_rank": rank,
+        "sort_key": str((rank,)),
+        "evidence_count": 0,
+        "risk_count": risk,
+        "current_vs_ibd_candidate_pct": cur,
+        "ibd_entry_volume_ratio": entry_vol,
+        "reason_codes": "",
+        "risk_codes": "",
+        "is_actionable": 1,
+        "has_geom_failure": 0,
+        "below_buy_point": 0,
+        "has_known_eps": 1,
+        "has_valid_industry": 1,
     }
 
-    false_item = reasoned_item_variant(
-        pd.Series({**base, "pullback_v_is_dry": False}),
-        0,
-        dry_policy="reward_only",
-        lane_policy="B0_LANE",
+
+def test_pareto_dominance_requires_no_worse_and_one_strict_improvement():
+    fresh = _row(
+        "FRESH", "fresh_demand_alpha", 1, "A",
+        risk=0, cur=2.0, entry_vol=1.6,
     )
-    true_item = reasoned_item_variant(
-        pd.Series({**base, "pullback_v_is_dry": True}),
-        0,
-        dry_policy="reward_only",
-        lane_policy="B0_LANE",
+    stronger = _row(
+        "STD", "standard_breakout", 4, "D",
+        risk=0, cur=1.0, entry_vol=2.0,
+    )
+    volume_tradeoff = _row(
+        "STD2", "standard_breakout", 5, "E",
+        risk=0, cur=1.0, entry_vol=1.5,
+    )
+    equal = _row(
+        "STD3", "standard_breakout", 6, "F",
+        risk=0, cur=2.0, entry_vol=1.6,
     )
 
-    assert "pullback_not_dry" not in false_item.risk_codes
-    assert "dry_pullback" not in false_item.reason_codes
-    assert "dry_pullback" in true_item.reason_codes
+    assert strictly_stronger_standard(stronger, fresh) is True
+    assert strictly_stronger_standard(volume_tradeoff, fresh) is False
+    assert strictly_stronger_standard(equal, fresh) is False
 
 
-def test_rank_crossover_detects_standard_moving_above_fresh():
-    scored = pd.DataFrame({
-        "code": ["STD", "PULL", "FRESH"],
-        "lane": ["standard_breakout", "constructive_pullback", "fresh_demand_alpha"],
-        "skeleton_rank": [3, 2, 1],
-        "raw_rank": [1, 2, 3],
-    })
-    standards, fresh = _rank_crossover_codes(scored)
-    assert standards == ["STD"]
-    assert fresh == ["FRESH"]
-
-
-def test_event_summary_distinguishes_order_change_from_membership_change():
-    events = pd.DataFrame([
-        {
-            "order_changed": True,
-            "membership_changed": False,
-            "target_selection_swap": False,
-            "target_rank_crossover": True,
-            "selection_pair_delta_w4": None,
-            "rank_pair_delta_w4": 2.0,
-            "portfolio_spread_w4": 0.0,
-            "segment": "confirmation",
-            "w4_mature": True,
-        },
-        {
-            "order_changed": True,
-            "membership_changed": True,
-            "target_selection_swap": True,
-            "target_rank_crossover": True,
-            "selection_pair_delta_w4": 3.0,
-            "rank_pair_delta_w4": 3.0,
-            "portfolio_spread_w4": 1.0,
-            "segment": "confirmation",
-            "w4_mature": True,
-        },
+def test_pairwise_challenger_replaces_only_selected_fresh_slot():
+    scored = pd.DataFrame([
+        _row("FRESH", "fresh_demand_alpha", 1, "A", risk=0, cur=2.0, entry_vol=1.6),
+        _row("PULL", "constructive_pullback", 2, "B", risk=0, cur=1.0, entry_vol=2.0),
+        _row("FRESH2", "fresh_demand_alpha", 3, "C", risk=0, cur=0.5, entry_vol=2.5),
+        _row("STD", "standard_breakout", 4, "D", risk=0, cur=1.0, entry_vol=2.0),
     ])
-    summary = build_event_summary(events)
-    assert summary["order_changed_weeks"] == 2
-    assert summary["membership_changed_weeks"] == 1
-    assert summary["target_rank_crossover_weeks"] == 2
-    assert summary["target_selection_swap_weeks"] == 1
+    challenger = PairwiseFreshStandardChallenger()
+    quotas = {x: 1 for x in scored["industry_key"]}
+
+    picks = challenger.pick_stocks(scored, quotas)
+
+    assert picks == ["STD", "PULL", "FRESH2"]
+
+
+def test_pairwise_challenger_does_not_replace_when_standard_has_tradeoff():
+    scored = pd.DataFrame([
+        _row("FRESH", "fresh_demand_alpha", 1, "A", risk=0, cur=2.0, entry_vol=1.8),
+        _row("PULL", "constructive_pullback", 2, "B", risk=0, cur=1.0, entry_vol=2.0),
+        _row("FRESH2", "fresh_demand_alpha", 3, "C", risk=0, cur=0.5, entry_vol=2.5),
+        _row("STD", "standard_breakout", 4, "D", risk=0, cur=1.0, entry_vol=1.7),
+    ])
+    challenger = PairwiseFreshStandardChallenger()
+    quotas = {x: 1 for x in scored["industry_key"]}
+
+    picks = challenger.pick_stocks(scored, quotas)
+
+    assert picks == ["FRESH", "PULL", "FRESH2"]
+
+
+def test_pairwise_challenger_preserves_distinct1_on_replacement():
+    scored = pd.DataFrame([
+        _row("FRESH", "fresh_demand_alpha", 1, "A", risk=0, cur=2.0, entry_vol=1.6),
+        _row("PULL", "constructive_pullback", 2, "B", risk=0, cur=1.0, entry_vol=2.0),
+        _row("FRESH2", "fresh_demand_alpha", 3, "C", risk=0, cur=0.5, entry_vol=2.5),
+        _row("STD", "standard_breakout", 4, "B", risk=0, cur=1.0, entry_vol=2.0),
+    ])
+    challenger = PairwiseFreshStandardChallenger()
+    quotas = {"a": 1, "b": 1, "c": 1}
+
+    picks = challenger.pick_stocks(scored, quotas)
+
+    assert picks == ["FRESH", "PULL", "FRESH2"]
 
 
 def test_track_e_segment_accounting_matches_track_d_40_snapshot_design():
@@ -160,38 +131,87 @@ def test_track_e_segment_accounting_matches_track_d_40_snapshot_design():
     assert len(segments["retrospective_all_40"]) == 40
 
 
-def test_pairwise_challenger_preserves_non_target_skeleton_positions():
+def test_production_reference_anchor_matches_production_selector():
     panel = pd.read_parquet(PANEL_SOURCE)
-    challenger = PairwiseSoftLaneChallenger()
+    production = production_reference_policy()
     snaps = sorted(panel["snapshot_date"].astype(str).unique().tolist())[:8]
 
     for snap in snaps:
         s_df = panel[panel["snapshot_date"].astype(str) == snap].copy()
-        scored = challenger.score_candidates(s_df)
-        non_target = scored[~scored["lane"].isin(TARGET_SOFT_LANES)]
-        assert (
-            non_target["raw_rank"].astype(int).to_numpy()
-            == non_target["skeleton_rank"].astype(int).to_numpy()
-        ).all()
-
-
-def test_b0_anchor_still_matches_production_and_b01_stays_in_common_universe():
-    panel = pd.read_parquet(PANEL_SOURCE)
-    snaps = sorted(panel["snapshot_date"].astype(str).unique().tolist())[:8]
-    baseline = baseline_policy()
-    challenger = PairwiseSoftLaneChallenger()
-
-    for snap in snaps:
-        s_df = panel[panel["snapshot_date"].astype(str) == snap].copy()
-
         prod_codes = [x.code for x in select_skill_industry_eps_known(s_df, limit=3)]
-        b0_scored = baseline.score_candidates(s_df)
-        b0_codes = baseline.pick_stocks(b0_scored, baseline.allocate_industries(b0_scored))
-        assert b0_codes == prod_codes
+        scored = production.score_candidates(s_df)
+        codes = production.pick_stocks(scored, production.allocate_industries(scored))
+        assert codes == prod_codes
 
-        b1_scored = challenger.score_candidates(s_df)
-        b1_codes = challenger.pick_stocks(b1_scored, challenger.allocate_industries(b1_scored))
+
+def test_dry_neutral_control_and_challenger_stay_in_common_b0_universe():
+    panel = pd.read_parquet(PANEL_SOURCE)
+    control = baseline_policy()
+    challenger = PairwiseFreshStandardChallenger()
+    snaps = sorted(panel["snapshot_date"].astype(str).unique().tolist())[:8]
+
+    for snap in snaps:
+        s_df = panel[panel["snapshot_date"].astype(str) == snap].copy()
         eligible = set(
             s_df[s_df["b0_eligible"].fillna(False).astype(bool)]["code"].astype(str)
         )
-        assert set(b1_codes).issubset(eligible)
+
+        for policy in (control, challenger):
+            scored = policy.score_candidates(s_df)
+            picks = policy.pick_stocks(scored, policy.allocate_industries(scored))
+            assert set(picks).issubset(eligible)
+
+
+def test_real_panel_event_collection_enforces_only_fresh_to_standard_changes():
+    panel = load_panel()
+    _, split = build_segments(panel)
+    events = collect_selection_events(panel, split)
+
+    changed = events[events["membership_changed_vs_control"] == True]
+    for raw in changed["swap_pairs_json"].tolist():
+        pairs = __import__("json").loads(raw)
+        assert pairs
+        for pair in pairs:
+            assert pair["fresh_code"]
+            assert pair["standard_code"]
+
+
+def test_event_summary_counts_opportunities_and_actual_swaps_separately():
+    events = pd.DataFrame([
+        {
+            "pairwise_opportunity_count": 2,
+            "target_selection_swap": False,
+            "swap_count": 0,
+            "mean_swap_pair_delta_w4": None,
+            "swap_pairs_json": "[]",
+            "membership_changed_vs_control": False,
+            "portfolio_spread_vs_control_w4": 0.0,
+            "control_vs_production_order_changed": False,
+            "control_vs_production_membership_changed": False,
+            "segment": "confirmation",
+            "w4_mature_vs_control": True,
+        },
+        {
+            "pairwise_opportunity_count": 1,
+            "target_selection_swap": True,
+            "swap_count": 1,
+            "mean_swap_pair_delta_w4": 3.0,
+            "swap_pairs_json": (
+                '[{"fresh_code":"F","standard_code":"S","pair_delta_w4":3.0}]'
+            ),
+            "membership_changed_vs_control": True,
+            "portfolio_spread_vs_control_w4": 1.0,
+            "control_vs_production_order_changed": False,
+            "control_vs_production_membership_changed": False,
+            "segment": "confirmation",
+            "w4_mature_vs_control": True,
+        },
+    ])
+
+    summary = build_event_summary(events)
+
+    assert summary["opportunity_weeks"] == 2
+    assert summary["opportunity_pairs"] == 3
+    assert summary["actual_swap_weeks"] == 1
+    assert summary["actual_swap_pairs"] == 1
+    assert summary["swap_pair_mean_w4_delta"] == 3.0

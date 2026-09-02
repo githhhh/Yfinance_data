@@ -1,45 +1,61 @@
-# Track E v2 — Isolated Fresh-vs-Standard Lane Audit
+# Track E v3 — Pairwise Standard-vs-Fresh Top3 Replacement
 
-Track E v1 was over-broad: it softened fresh_demand_alpha, constructive_pullback, and
-standard_breakout together. In the materialized result every real Lane substitution was
-fresh_demand_alpha -> constructive_pullback, so the intended standard-vs-fresh question
-was not actually exercised.
+Track E v1/v2 were too broad because they changed global Lane ordering. V1 was dominated by
+fresh_demand_alpha -> constructive_pullback substitutions; v2 still allowed target identities
+to cross fixed non-target slots.
 
-Track E v2 fixes that design error.
+V3 isolates the actual question at the selected-slot level.
 
-## Single challenger
+## Primary control
 
-Production B0 is compared with one fixed B0.1 challenger:
+Hard B0 Lane with the already-supported dry semantic:
 
 - dry=True remains positive evidence;
 - dry=False is neutral;
-- build reward-only B0 ordering as a fixed rank skeleton;
-- constructive_pullback, incomplete_evidence, and tail_risk keep their exact skeleton positions;
-- only fresh_demand_alpha and standard_breakout are reordered among the rank slots those
-  two target lanes already occupy;
-- target ordering is status -> evidence/risk -> original lane -> remaining B0 tie-breaks;
-- distinct_1, eligibility, and 3-slot capital accounting are unchanged.
+- hard B0 Lane ordering remains unchanged;
+- distinct_1 remains unchanged.
 
-This is a controlled mechanism intervention: no other Lane receives soft scoring.
+Production B0 with the old symmetric dry penalty is retained as a secondary reference only.
 
-## Audit outputs
+## Single challenger
 
-comparison_summary.* contains paired B0 vs B0.1 portfolio metrics.
+Start from the dry-neutral hard-Lane Top3. Preserve every non-fresh selected slot.
 
-selection_events.* separately records:
+An unselected standard_breakout may replace a selected fresh_demand_alpha only when it
+Pareto-dominates the fresh candidate on independent entry-quality axes:
 
-- order_changed;
-- membership_changed;
-- target_rank_crossover (standard crossed a fresh candidate even if Top3 did not change);
-- target_selection_swap (standard entered Top3 while fresh exited);
-- W4 outcome deltas for both crossover levels.
+- risk_count <= fresh risk_count;
+- absolute current_vs_ibd_candidate_pct <= fresh distance;
+- ibd_entry_volume_ratio >= fresh entry volume;
+- at least one axis strictly better.
 
-run_manifest.json records the exact source SHA, panel hash, Production B0 hash, and v2 protocol.
+There are no fitted weights.
+
+EPS acceleration and weekly-volume follow-through are intentionally excluded from this
+pairwise dominance rule because they are the evidence that creates fresh_demand_alpha;
+using them would make fresh win by definition and make the experiment circular.
+
+## Outputs
+
+comparison_summary.* contains two comparator views per segment:
+
+1. challenger vs dry-neutral hard-Lane control — primary causal Lane comparison;
+2. challenger vs Production B0 — secondary net production reference.
+
+selection_events.* records:
+
+- raw Pareto-valid opportunity count;
+- actual standard-in / fresh-out Top3 replacements;
+- exact matched replacement pairs and W4 deltas;
+- portfolio spread vs the primary control and Production B0;
+- diagnostic control-vs-production differences.
+
+run_manifest.json seals protocol, source SHA, panel hash and Production B0 hash.
 
 ## Evidence boundary
 
-The hypothesis was formed after Track D, so <=2026-07-24 is retrospective mechanism
-evidence. Later mature W4 snapshots are reported separately as post_track_d_shadow.
+This is a post-Track-D hypothesis. <=2026-07-24 is retrospective mechanism evidence.
+Later mature W4 observations are reported separately as post_track_d_shadow.
 
 ## Gemini local run
 
@@ -52,5 +68,5 @@ Gemini must not modify source code.
 
     /Users/dev/.conda/envs/quant_env/bin/python -m backtest.track_e_soft_lane_audit.cli materialize
 
-Then run regression tests. If successful, commit only generated Track E output.
-If anything fails, return the exact error and do not patch source.
+Then run relevant regressions. If successful, commit only Track E output.
+If any step fails, return the exact error and do not patch source.
