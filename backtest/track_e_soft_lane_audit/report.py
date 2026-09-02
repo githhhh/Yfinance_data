@@ -31,95 +31,131 @@ def write_report(
     event_summary: dict[str, Any],
     manifest: dict[str, Any],
 ) -> None:
+    primary = summary[summary["comparator"] == "dry_neutral_hard_lane_control"].copy()
+    production = summary[summary["comparator"] == "production_b0_reference"].copy()
+
     lines = [
-        "# Track E v2 — Isolated Fresh-vs-Standard Lane Audit",
+        "# Track E v3 — Pairwise Standard-vs-Fresh Top3 Replacement",
         "",
-        "## Fixed question",
+        "## Research question",
         "",
-        "Can a stronger standard_breakout outrank a weaker fresh_demand_alpha when its "
-        "status/evidence/risk profile is better?",
+        "Should an otherwise eligible standard_breakout be allowed to replace an already-selected "
+        "fresh_demand_alpha when the standard candidate is unambiguously stronger on independent "
+        "entry-quality axes?",
         "",
-        "## Controlled intervention",
+        "## Controlled design",
         "",
-        "- pullback_v_is_dry=True remains positive evidence.",
-        "- pullback_v_is_dry=False is neutral.",
-        "- Build the reward-only B0 ranking skeleton first.",
-        "- Keep constructive_pullback, incomplete_evidence, and tail_risk at their exact skeleton positions.",
-        "- Reorder only fresh_demand_alpha and standard_breakout candidates among the slots those two lanes already occupy.",
-        "- Within those target slots compare status -> evidence/risk -> original Lane -> remaining B0 tie-breaks.",
-        "- distinct_1, eligibility, and 3-slot capital accounting remain unchanged.",
+        "- Primary control: hard B0 Lane with dry=True reward and dry=False neutral.",
+        "- Production B0 is reported separately as a reference, not used to attribute the Lane effect.",
+        "- Challenger starts from the primary-control Top3.",
+        "- constructive_pullback, incomplete_evidence, tail_risk, and every non-fresh selected slot are frozen.",
+        "- Only an unselected standard_breakout may challenge a selected fresh_demand_alpha slot.",
+        "- Replacement requires unweighted Pareto dominance:",
+        "  - no more risk flags;",
+        "  - no worse absolute distance to buy point;",
+        "  - no weaker entry-volume ratio;",
+        "  - at least one of those axes strictly better.",
+        "- EPS>=25 and weekly-volume follow-through are excluded from the dominance test because they "
+        "define fresh_demand_alpha itself; including them would make the test circular.",
+        "- distinct_1 and portfolio capacity are preserved.",
         "",
-        "This fixes Track E v1, where constructive_pullback was also softened and dominated every actual crossover.",
+        "This corrects Track E v1/v2, which altered global Lane ordering instead of isolating the "
+        "specific Top3 replacement question.",
         "",
         "## Evidence boundary",
         "",
-        "The hypothesis is post-Track-D. Evidence through "
+        "This is a post-Track-D hypothesis. Evidence through "
         f"{manifest['track_d_historical_end']} is retrospective mechanism evidence, not untouched OOS.",
         "",
-        "## Paired portfolio comparison vs Production B0",
+        "## Primary comparison — challenger vs dry-neutral hard-Lane control",
         "",
         "| Segment | Support | Mean Δ | Median Δ | CVaR Δ | Stop Δ pp | Ruin Δ pp | Jaccard | CI low | CI high |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
-    for _, row in summary.iterrows():
+
+    for _, row in primary.iterrows():
         lines.append(
             f"| {row['segment']} | {int(row['support_weeks'])} | "
             f"{_fmt(row['mean_spread'])} | {_fmt(row['median_spread'])} | "
             f"{_fmt(row['cvar_delta'])} | {_fmt(row['stop_delta_pct'], 2)} | "
-            f"{_fmt(row['one_pick_ruins_delta_pct'], 2)} | {_fmt(row['jaccard_vs_b0'])} | "
-            f"{_fmt(row['ci_low'])} | {_fmt(row['ci_high'])} |"
+            f"{_fmt(row['one_pick_ruins_delta_pct'], 2)} | "
+            f"{_fmt(row['jaccard_vs_comparator'])} | {_fmt(row['ci_low'])} | {_fmt(row['ci_high'])} |"
         )
 
     lines += [
         "",
-        "## Mechanism-trigger audit",
+        "## Mechanism support",
         "",
         f"- Total snapshots: **{event_summary['total_snapshots']}**",
-        f"- Order-changed weeks: **{event_summary['order_changed_weeks']}**",
-        f"- Top3 membership-changed weeks: **{event_summary['membership_changed_weeks']}**",
-        f"- Mature membership-changed weeks: **{event_summary['mature_membership_changed_weeks']}**",
-        f"- Fresh/standard rank-crossover weeks: **{event_summary['target_rank_crossover_weeks']}**",
-        f"- Mature rank-crossover weeks: **{event_summary['target_rank_crossover_mature_weeks']}**",
-        f"- Rank-crossover mean W4 pair Δ: **{_fmt(event_summary['target_rank_mean_pair_delta_w4'])} pp**",
-        f"- Rank-crossover median W4 pair Δ: **{_fmt(event_summary['target_rank_median_pair_delta_w4'])} pp**",
-        f"- Rank-crossover positive ratio: **{_fmt(event_summary['target_rank_positive_pair_ratio'])}**",
-        f"- Top3 standard-in / fresh-out weeks: **{event_summary['target_selection_swap_weeks']}**",
-        f"- Mature Top3 targeted swaps: **{event_summary['target_selection_swap_mature_weeks']}**",
-        f"- Top3 targeted mean W4 pair Δ: **{_fmt(event_summary['target_selection_mean_pair_delta_w4'])} pp**",
-        f"- Top3 targeted median W4 pair Δ: **{_fmt(event_summary['target_selection_median_pair_delta_w4'])} pp**",
-        f"- Top3 targeted positive ratio: **{_fmt(event_summary['target_selection_positive_pair_ratio'])}**",
-        f"- Mean portfolio W4 spread on membership-changed weeks: "
-        f"**{_fmt(event_summary['membership_changed_mean_portfolio_spread_w4'])} pp**",
+        f"- Weeks with at least one Pareto-valid standard-vs-fresh opportunity: "
+        f"**{event_summary['opportunity_weeks']}**",
+        f"- Pareto-valid candidate pairs: **{event_summary['opportunity_pairs']}**",
+        f"- Weeks with an actual Top3 replacement: **{event_summary['actual_swap_weeks']}**",
+        f"- Actual replacement pairs: **{event_summary['actual_swap_pairs']}**",
+        f"- Mature replacement weeks: **{event_summary['mature_swap_weeks']}**",
+        f"- Mature replacement pairs: **{event_summary['mature_swap_pairs']}**",
+        f"- Replacement-pair mean W4 Δ: **{_fmt(event_summary['swap_pair_mean_w4_delta'])} pp**",
+        f"- Replacement-pair median W4 Δ: **{_fmt(event_summary['swap_pair_median_w4_delta'])} pp**",
+        f"- Replacement-pair positive ratio: **{_fmt(event_summary['swap_pair_positive_ratio'])}**",
+        f"- Mean portfolio W4 Δ on membership-changed weeks: "
+        f"**{_fmt(event_summary['changed_week_mean_portfolio_spread_vs_control_w4'])} pp**",
         "",
-        "## Targeted selection swaps",
+        "## Dry-neutral control vs Production B0 diagnostic",
         "",
+        f"- Order-changed weeks: **{event_summary['dry_control_vs_production_order_changed_weeks']}**",
+        f"- Membership-changed weeks: **{event_summary['dry_control_vs_production_membership_changed_weeks']}**",
+        "",
+        "The production-reference comparison is retained to show the net B0.1 effect, but the "
+        "primary Lane conclusion must use the dry-neutral hard-Lane control above.",
+        "",
+        "## Production B0 reference",
+        "",
+        "| Segment | Support | Mean Δ | Median Δ | CVaR Δ | Stop Δ pp | Ruin Δ pp | Jaccard |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+
+    for _, row in production.iterrows():
+        lines.append(
+            f"| {row['segment']} | {int(row['support_weeks'])} | "
+            f"{_fmt(row['mean_spread'])} | {_fmt(row['median_spread'])} | "
+            f"{_fmt(row['cvar_delta'])} | {_fmt(row['stop_delta_pct'], 2)} | "
+            f"{_fmt(row['one_pick_ruins_delta_pct'], 2)} | "
+            f"{_fmt(row['jaccard_vs_comparator'])} |"
+        )
 
     target = events[
         (events["target_selection_swap"] == True)
-        & (events["selection_pair_delta_w4"].notna())
+        & (events["mean_swap_pair_delta_w4"].notna())
     ].copy()
+    lines += [
+        "",
+        "## Mature targeted swaps",
+        "",
+    ]
     if target.empty:
-        lines.append("No mature Top3 standard-in / fresh-out event occurred.")
+        lines.append(
+            "No mature targeted swap occurred. In that case the experiment is non-identifying for "
+            "outcome quality and should be reported as insufficient support rather than a win/loss."
+        )
     else:
         lines += [
-            "| Snapshot | Segment | Standard in | Fresh out | Pair W4 Δ | Portfolio W4 Δ |",
-            "| --- | --- | --- | --- | ---: | ---: |",
+            "| Snapshot | Segment | Swap pairs | Portfolio Δ vs control |",
+            "| --- | --- | --- | ---: |",
         ]
         for _, row in target.iterrows():
             lines.append(
                 f"| {row['snapshot_date']} | {row['segment']} | "
-                f"{row['incoming_standard_codes']} | {row['outgoing_fresh_codes']} | "
-                f"{_fmt(row['selection_pair_delta_w4'])} | {_fmt(row['portfolio_spread_w4'])} |"
+                f"{row['swap_pairs_json']} | {_fmt(row['portfolio_spread_vs_control_w4'])} |"
             )
 
     lines += [
         "",
         "## Interpretation rule",
         "",
-        "Track E v2 is a mechanism audit, not an automatic production promotion. The primary question is "
-        "first whether the intended fresh/standard crossover actually fires, then whether the resulting "
-        "rank/selection substitutions improve W4 outcome without degrading downside metrics.",
+        "The result is only informative if Pareto-valid opportunities and actual replacements exist. "
+        "If they do, judge the mechanism first on matched replacement-pair W4 deltas and then on "
+        "portfolio mean/median/CVaR/stop behavior. Historical evidence can justify a forward shadow, "
+        "but cannot by itself promote a production Lane change because the hypothesis was formed after Track D.",
         "",
         "Production B0 remains untouched.",
         "",

@@ -59,29 +59,32 @@ def materialize() -> None:
         encoding="utf-8",
     )
 
-    retro = summary[summary["segment"] == "retrospective_all_40"].iloc[0]
-    print("=== Track E v2 pairwise Lane audit complete ===")
+    retro = summary[
+        (summary["segment"] == "retrospective_all_40")
+        & (summary["comparator"] == "dry_neutral_hard_lane_control")
+    ].iloc[0]
+    print("=== Track E v3 pairwise replacement audit complete ===")
     print(f"source={manifest['source_git_sha']}")
     print(
-        "retrospective_all_40: "
+        "primary retrospective_all_40: "
         f"support={int(retro['support_weeks'])}, "
         f"mean_spread={retro['mean_spread']}, "
         f"median_spread={retro['median_spread']}, "
         f"cvar_delta={retro['cvar_delta']}"
     )
     print(
-        "fresh/standard rank crossovers: "
-        f"{event_summary['target_rank_crossover_mature_weeks']} mature / "
-        f"{event_summary['target_rank_crossover_weeks']} total; "
-        "Top3 swaps: "
-        f"{event_summary['target_selection_swap_mature_weeks']} mature / "
-        f"{event_summary['target_selection_swap_weeks']} total"
+        "opportunities/swaps: "
+        f"{event_summary['opportunity_weeks']} opportunity weeks, "
+        f"{event_summary['actual_swap_weeks']} swap weeks, "
+        f"{event_summary['mature_swap_pairs']} mature swap pairs"
     )
     print(f"report={REPORT}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Track E v2 isolated fresh-vs-standard Lane audit")
+    parser = argparse.ArgumentParser(
+        description="Track E v3 pairwise standard-vs-fresh Top3 replacement audit"
+    )
     parser.add_argument("command", choices=["materialize"])
     args = parser.parse_args()
     if args.command == "materialize":
