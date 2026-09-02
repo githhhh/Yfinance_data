@@ -10,13 +10,7 @@ from .utils import to_bool, to_float
 
 
 PULLBACK_RULES = {"ceiling_pullback", "pivot", "ma10_touch_confirm", "three_weeks_tight"}
-SUPPORT_KEYS = (
-    "entry_volume_confirmed",
-    "weekly_volume_follow_through",
-    "eps_support",
-    "near_52w_high",
-    "dry_pullback",
-)
+EVIDENCE_FAMILIES = ("volume", "eps", "rs_near_high", "supply_contraction")
 
 
 @dataclass(frozen=True)
@@ -24,18 +18,22 @@ class ReviewRule:
     """Rule for supplemental non-ACTIONABLE review candidates.
 
     ACTIONABLE rows are always retained unchanged. The rule only decides which
-    extra UNCONFIRMED / BELOW_TRIGGER rows are added to the review list.
+    extra UNCONFIRMED / BELOW_TRIGGER rows are added to the Review List.
     """
 
     name: str
     near_below_pct: float = 5.0
     supplemental_statuses: tuple[str, ...] = ("UNCONFIRMED", "BELOW_TRIGGER")
-    min_support_count: int = 1
-    exclude_clear_geometry_failure: bool = True
-    enabled_supports: tuple[str, ...] = SUPPORT_KEYS
+    min_evidence_families: int = 1
+    exclude_clear_geometry_failure: bool = False
+    enabled_evidence_families: tuple[str, ...] = EVIDENCE_FAMILIES
 
 
 def primary_rule() -> ReviewRule:
+    """Core R1: Near Buy Point + >=1 independent positive evidence family.
+
+    Geometry is deliberately NOT a hard reject in the core hypothesis.
+    """
     return ReviewRule(name="R1_NEAR_BUY_POINT_PLUS_EVIDENCE")
 
 
@@ -47,7 +45,7 @@ def is_review_universe(row: pd.Series) -> bool:
 
 
 def clear_geometry_failure(row: pd.Series) -> bool:
-    """Only explicit observed failure counts as failure; missing stays UNKNOWN."""
+    """Observed geometry failure only; missing geometry remains UNKNOWN."""
     rr = to_float(row.get("ibd_entry_breakout_range_ratio"))
     pos = to_float(row.get("ibd_entry_close_position"))
     if rr is not None and rr <= 0:
@@ -57,8 +55,8 @@ def clear_geometry_failure(row: pd.Series) -> bool:
     return False
 
 
-def support_flags(row: pd.Series) -> dict[str, bool]:
-    """Positive-only evidence. False/missing values are neutral."""
+def raw_positive_evidence(row: pd.Series) -> dict[str, bool]:
+    """Raw positive facts. False/missing is neutral, never negative."""
     entry_vol = to_float(row.get("ibd_entry_volume_ratio"))
     weekly_vol = to_float(row.get("volume_ratio"))
     eps_state = str(row.get("pit_eps_state", "") or "").strip().upper()
@@ -75,14 +73,32 @@ def support_flags(row: pd.Series) -> dict[str, bool]:
     }
 
 
-def support_count(row: pd.Series, enabled_supports: Iterable[str] = SUPPORT_KEYS) -> int:
-    enabled = set(enabled_supports)
-    flags = support_flags(row)
-    return sum(value for key, value in flags.items() if key in enabled)
+def evidence_family_flags(row: pd.Series) -> dict[str, bool]:
+    """Independent evidence families.
+
+    Entry-volume and weekly-volume are one Volume family, so two related volume
+    facts can never count as two independent pieces of evidence.
+    """
+    raw = raw_positive_evidence(row)
+    return {
+        "volume": raw["entry_volume_confirmed"] or raw["weekly_volume_follow_through"],
+        "eps": raw["eps_support"],
+        "rs_near_high": raw["near_52w_high"],
+        "supply_contraction": raw["dry_pullback"],
+    }
+
+
+def evidence_family_count(
+    row: pd.Series,
+    enabled_families: Iterable[str] = EVIDENCE_FAMILIES,
+) -> int:
+    enabled = set(enabled_families)
+    families = evidence_family_flags(row)
+    return sum(bool(value) for key, value in families.items() if key in enabled)
 
 
 def supplemental_path_eligible(row: pd.Series, rule: ReviewRule) -> bool:
-    """Core lane excludes EXTENDED; it is researched separately."""
+    """Near-Buy-Point path; EXTENDED remains outside the core selector."""
     status = str(row.get("ibd_entry_status", "") or "").strip().upper()
     if status not in rule.supplemental_statuses:
         return False
@@ -106,11 +122,25 @@ def enrich_review_features(pool: pd.DataFrame, rule: ReviewRule | None = None) -
     )
     frame["_vs_buy_point"] = frame["current_vs_ibd_candidate_pct"].map(to_float)
     frame["_geometry_failure"] = frame.apply(clear_geometry_failure, axis=1)
-    flags = frame.apply(support_flags, axis=1)
-    for key in SUPPORT_KEYS:
-        frame[f"_support_{key}"] = flags.map(lambda item, k=key: bool(item.get(k, False)))
-    frame["_support_count"] = frame.apply(
-        lambda row: support_count(row, rule.enabled_supports), axis=1
+
+    raw = frame.apply(raw_positive_evidence, axis=1)
+    for key in (
+        "entry_volume_confirmed",
+        "weekly_volume_follow_through",
+        "eps_support",
+        "near_52w_high",
+        "dry_pullback",
+    ):
+        frame[f"_positive_{key}"] = raw.map(lambda item, k=key: bool(item.get(k, False)))
+
+    families = frame.apply(evidence_family_flags, axis=1)
+    for family in EVIDENCE_FAMILIES:
+        frame[f"_evidence_{family}"] = families.map(
+            lambda item, key=family: bool(item.get(key, False))
+        )
+    frame["_evidence_family_count"] = frame.apply(
+        lambda row: evidence_family_count(row, rule.enabled_evidence_families),
+        axis=1,
     )
     return frame
 
@@ -128,9 +158,10 @@ def select_b0_actionable(pool: pd.DataFrame) -> pd.DataFrame:
 def select_supplemental(pool: pd.DataFrame, rule: ReviewRule) -> pd.DataFrame:
     frame = enrich_review_features(pool, rule)
     eligible = frame.apply(lambda row: supplemental_path_eligible(row, rule), axis=1)
-    eligible &= frame["_support_count"].ge(rule.min_support_count)
+    eligible &= frame["_evidence_family_count"].ge(rule.min_evidence_families)
     if rule.exclude_clear_geometry_failure:
         eligible &= ~frame["_geometry_failure"]
+
     selected = frame.loc[eligible].copy()
     selected["variant"] = rule.name
     selected["selection_source"] = "SUPPLEMENTAL"
@@ -163,33 +194,39 @@ def rule_to_dict(rule: ReviewRule) -> dict[str, object]:
 
 
 def rule_complexity(rule: ReviewRule) -> int:
-    disabled_supports = len(set(SUPPORT_KEYS) - set(rule.enabled_supports))
+    disabled_families = len(
+        set(EVIDENCE_FAMILIES) - set(rule.enabled_evidence_families)
+    )
     status_specialization = (
-        0 if set(rule.supplemental_statuses) == {"UNCONFIRMED", "BELOW_TRIGGER"} else 1
+        0
+        if set(rule.supplemental_statuses) == {"UNCONFIRMED", "BELOW_TRIGGER"}
+        else 1
     )
     threshold_specialization = 0 if rule.near_below_pct == 5.0 else 1
-    support_strictness = max(rule.min_support_count - 1, 0)
-    geometry_specialization = 0 if rule.exclude_clear_geometry_failure else 1
+    evidence_strictness = max(rule.min_evidence_families - 1, 0)
+    geometry_specialization = 1 if rule.exclude_clear_geometry_failure else 0
     return (
-        disabled_supports
+        disabled_families
         + status_specialization
         + threshold_specialization
-        + support_strictness
+        + evidence_strictness
         + geometry_specialization
     )
 
 
 def _supplemental_reason(row: pd.Series) -> str:
     status = str(row.get("_status", ""))
-    evidence = [
-        key for key in SUPPORT_KEYS if bool(row.get(f"_support_{key}", False))
+    families = [
+        family
+        for family in EVIDENCE_FAMILIES
+        if bool(row.get(f"_evidence_{family}", False))
     ]
     path = (
         "unconfirmed_near_buy_point"
         if status == "UNCONFIRMED"
         else "below_trigger_near_buy_point"
     )
-    return "|".join([path, *evidence])
+    return "|".join([path, *families])
 
 
 def _stable_output(frame: pd.DataFrame) -> pd.DataFrame:

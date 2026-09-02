@@ -4,12 +4,8 @@ import numpy as np
 import pandas as pd
 
 from .metrics import compare_metrics, evaluate_selection
-from .selectors import (
-    ReviewRule,
-    rule_complexity,
-    select_b0_actionable,
-    select_review_variant,
-)
+from .search_space import generate_evidence_ablations
+from .selectors import ReviewRule, rule_complexity, select_b0_actionable, select_review_variant
 
 
 def select_all_weeks(panel: pd.DataFrame, rule: ReviewRule | None) -> pd.DataFrame:
@@ -32,15 +28,19 @@ def evaluate_rule_grid(
     panel: pd.DataFrame,
     rules: list[ReviewRule],
 ) -> pd.DataFrame:
-    baseline_selected = select_all_weeks(panel, None)
-    baseline_metrics = evaluate_selection(
-        panel, baseline_selected, variant="B0_ACTIONABLE_ONLY"
+    baseline = evaluate_selection(
+        panel,
+        select_all_weeks(panel, None),
+        variant="B0_ACTIONABLE_ONLY",
     )
     rows = []
     for rule in rules:
-        selected = select_all_weeks(panel, rule)
-        metrics = evaluate_selection(panel, selected, variant=rule.name)
-        row = compare_metrics(metrics, baseline_metrics)
+        candidate = evaluate_selection(
+            panel,
+            select_all_weeks(panel, rule),
+            variant=rule.name,
+        )
+        row = compare_metrics(candidate, baseline)
         row["rule_complexity"] = rule_complexity(rule)
         rows.append(row)
     return pd.DataFrame(rows)
@@ -52,6 +52,7 @@ def stability_table(
     *,
     blocks: int = 3,
 ) -> pd.DataFrame:
+    """Direction stability across chronological training blocks."""
     weeks = sorted(panel["snapshot_date"].astype(str).unique())
     if not weeks:
         return pd.DataFrame()
@@ -85,17 +86,21 @@ def stability_table(
             {
                 "variant": rule.name,
                 "stability_blocks": len(frame),
-                "opportunity_nonnegative_rate": _nonnegative_rate(
+                "opportunity_positive_rate": _positive_rate(
                     frame["opportunity_recall_1w_delta_vs_b0"]
                 ),
-                "winner_nonnegative_rate": _nonnegative_rate(
-                    frame["big_winner_recall_mean_2_4w_delta_vs_b0"]
+                "tradable_winner_lift_nonnegative_rate": _nonnegative_rate(
+                    frame[
+                        "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
-                "loser_exclusion_nonworse_rate": _nonnegative_rate(
-                    frame["big_loser_exclusion_mean_2_4w_delta_vs_b0"]
+                "tradable_loser_lift_nonworse_rate": _nonpositive_rate(
+                    frame[
+                        "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
-                "severe_exposure_nonworse_rate": _nonpositive_rate(
-                    frame["severe_loser_exposure_mean_2_4w_delta_vs_b0"]
+                "incremental_efficiency_positive_rate": _positive_rate(
+                    frame["incremental_opportunities_per_added_review"]
                 ),
             }
         )
@@ -103,57 +108,80 @@ def stability_table(
     if not out.empty:
         out["stability_floor"] = out[
             [
-                "opportunity_nonnegative_rate",
-                "winner_nonnegative_rate",
-                "loser_exclusion_nonworse_rate",
-                "severe_exposure_nonworse_rate",
+                "opportunity_positive_rate",
+                "tradable_winner_lift_nonnegative_rate",
+                "tradable_loser_lift_nonworse_rate",
+                "incremental_efficiency_positive_rate",
             ]
         ].min(axis=1)
     return out
 
 
+def two_stage_diagnostics(
+    panel: pd.DataFrame,
+    core_rules: list[ReviewRule],
+    *,
+    max_finalists: int = 4,
+) -> tuple[list[ReviewRule], pd.DataFrame, pd.DataFrame]:
+    core_diag = _diagnostic_frame(panel, core_rules)
+    finalists = _top_finalists(core_diag, core_rules, max_finalists=max_finalists)
+
+    expanded: dict[str, ReviewRule] = {}
+    for core_rule in finalists:
+        for rule in generate_evidence_ablations(core_rule):
+            expanded[rule.name] = rule
+    evidence_rules = list(expanded.values())
+    evidence_diag = (
+        _diagnostic_frame(panel, evidence_rules)
+        if evidence_rules
+        else pd.DataFrame()
+    )
+    return evidence_rules, core_diag, evidence_diag
+
+
 def choose_training_champion(
     panel: pd.DataFrame,
-    rules: list[ReviewRule],
+    core_rules: list[ReviewRule],
 ) -> tuple[ReviewRule | None, pd.DataFrame, pd.DataFrame]:
-    grid = evaluate_rule_grid(panel, rules)
-    stable = stability_table(panel, rules)
-    merged = grid.merge(stable, on="variant", how="left")
-    merged["pareto"] = pareto_mask(merged)
-    candidates = merged[merged["pareto"].eq(True)].copy()
-    if candidates.empty:
-        candidates = merged.copy()
-    candidates = candidates.sort_values(
-        [
-            "stability_floor",
-            "big_winner_recall_mean_2_4w_delta_vs_b0",
-            "opportunity_recall_1w_delta_vs_b0",
-            "big_loser_exclusion_mean_2_4w_delta_vs_b0",
-            "avg_watchlist_size_delta_vs_b0",
-            "rule_complexity",
-            "variant",
-        ],
-        ascending=[False, False, False, False, True, True, True],
-        kind="mergesort",
+    """Two-stage train-only selection; no test data is touched."""
+    evidence_rules, core_diag, evidence_diag = two_stage_diagnostics(
+        panel, core_rules
     )
-    if candidates.empty:
-        return None, merged, stable
+    if evidence_diag.empty:
+        return None, core_diag, evidence_diag
 
-    winner_row = candidates.iloc[0]
+    ranked = _rank_candidates(evidence_diag)
+    if ranked.empty:
+        return None, core_diag, evidence_diag
+
+    best = ranked.iloc[0]
+    required = [
+        best.get("stability_floor"),
+        best.get("opportunity_recall_1w_delta_vs_b0"),
+        best.get("tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"),
+        best.get("incremental_opportunities_per_added_review"),
+    ]
+    if not all(_finite(value) for value in required):
+        return None, core_diag, evidence_diag
+
     stable_enough = (
-        _finite(winner_row.get("stability_floor"))
-        and float(winner_row["stability_floor"]) >= (2.0 / 3.0)
-        and _finite(winner_row.get("opportunity_recall_1w_delta_vs_b0"))
-        and float(winner_row["opportunity_recall_1w_delta_vs_b0"]) > 0.0
-        and _finite(winner_row.get("big_winner_recall_mean_2_4w_delta_vs_b0"))
-        and float(winner_row["big_winner_recall_mean_2_4w_delta_vs_b0"]) >= 0.0
+        float(best["stability_floor"]) >= (2.0 / 3.0)
+        and float(best["opportunity_recall_1w_delta_vs_b0"]) > 0.0
+        and float(
+            best["tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"]
+        )
+        >= 0.0
+        and float(best["incremental_opportunities_per_added_review"]) > 0.0
     )
     if not stable_enough:
-        return None, merged, stable
+        return None, core_diag, evidence_diag
 
-    winner_name = str(winner_row["variant"])
-    rule = next((item for item in rules if item.name == winner_name), None)
-    return rule, merged, stable
+    name = str(best["variant"])
+    return (
+        next((rule for rule in evidence_rules if rule.name == name), None),
+        core_diag,
+        evidence_diag,
+    )
 
 
 def pareto_mask(frame: pd.DataFrame) -> pd.Series:
@@ -161,9 +189,9 @@ def pareto_mask(frame: pd.DataFrame) -> pd.Series:
         return pd.Series(dtype=bool)
     objectives = [
         ("opportunity_recall_1w_delta_vs_b0", True),
-        ("big_winner_recall_mean_2_4w_delta_vs_b0", True),
-        ("big_loser_exclusion_mean_2_4w_delta_vs_b0", True),
-        ("severe_loser_exposure_mean_2_4w_delta_vs_b0", False),
+        ("tradable_winner_capture_lift_mean_2_4w_delta_vs_b0", True),
+        ("tradable_loser_capture_lift_mean_2_4w_delta_vs_b0", False),
+        ("incremental_opportunities_per_added_review", True),
         ("avg_watchlist_size_delta_vs_b0", False),
     ]
     mask = pd.Series(True, index=frame.index)
@@ -194,6 +222,52 @@ def pareto_mask(frame: pd.DataFrame) -> pd.Series:
     return mask
 
 
+def _diagnostic_frame(
+    panel: pd.DataFrame,
+    rules: list[ReviewRule],
+) -> pd.DataFrame:
+    grid = evaluate_rule_grid(panel, rules)
+    stable = stability_table(panel, rules)
+    merged = grid.merge(stable, on="variant", how="left")
+    merged["pareto"] = pareto_mask(merged)
+    return merged
+
+
+def _top_finalists(
+    diag: pd.DataFrame,
+    rules: list[ReviewRule],
+    *,
+    max_finalists: int,
+) -> list[ReviewRule]:
+    if diag.empty:
+        return []
+    candidates = diag[diag["pareto"].eq(True)].copy()
+    if candidates.empty:
+        candidates = diag.copy()
+    candidates = _rank_candidates(candidates).head(max_finalists)
+    names = set(candidates["variant"].astype(str))
+    return [rule for rule in rules if rule.name in names]
+
+
+def _rank_candidates(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    return frame.sort_values(
+        [
+            "stability_floor",
+            "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0",
+            "opportunity_recall_1w_delta_vs_b0",
+            "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0",
+            "incremental_opportunities_per_added_review",
+            "avg_watchlist_size_delta_vs_b0",
+            "rule_complexity",
+            "variant",
+        ],
+        ascending=[False, False, False, True, False, True, True, True],
+        kind="mergesort",
+    )
+
+
 def _finite_value(value: object, maximize: bool) -> float:
     if _finite(value):
         return float(value)
@@ -205,6 +279,11 @@ def _finite(value: object) -> bool:
         return bool(np.isfinite(float(value)))
     except (TypeError, ValueError):
         return False
+
+
+def _positive_rate(values: pd.Series) -> float:
+    numeric = pd.to_numeric(values, errors="coerce").dropna()
+    return float((numeric > 0).mean()) if len(numeric) else 0.0
 
 
 def _nonnegative_rate(values: pd.Series) -> float:

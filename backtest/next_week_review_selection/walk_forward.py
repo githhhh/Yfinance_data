@@ -7,21 +7,26 @@ import pandas as pd
 
 from .metrics import compare_metrics, evaluate_selection
 from .optimizer import choose_training_champion, select_all_weeks
-from .selectors import ReviewRule, rule_complexity
+from .selectors import ReviewRule, primary_rule, rule_complexity
 
 
 def run_walk_forward(
     panel: pd.DataFrame,
-    rules: list[ReviewRule],
+    core_rules: list[ReviewRule],
     *,
     min_train_weeks: int = 20,
     test_weeks: int = 4,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Expanding-window walk-forward with frozen test blocks."""
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Expanding-window two-stage walk-forward.
+
+    Each fold chooses the structural finalist and evidence ablation on train only,
+    freezes it, then evaluates only that champion plus the primary R1 on test.
+    """
     weeks = sorted(panel["snapshot_date"].astype(str).unique())
     fold_rows = []
     champion_rows = []
-    train_grid_rows = []
+    core_train_rows = []
+    evidence_train_rows = []
 
     fold = 0
     train_end = min_train_weeks
@@ -40,13 +45,21 @@ def run_walk_forward(
             panel["snapshot_date"].astype(str).isin(test_block)
         ].copy()
 
-        champion, train_grid, _ = choose_training_champion(train, rules)
-        train_grid = train_grid.copy()
-        train_grid.insert(0, "fold", fold)
-        train_grid["train_end"] = train_weeks[-1]
-        train_grid["test_start"] = test_block[0]
-        train_grid["test_end"] = test_block[-1]
-        train_grid_rows.append(train_grid)
+        champion, core_diag, evidence_diag = choose_training_champion(
+            train, core_rules
+        )
+        for stage, diag, sink in (
+            ("core", core_diag, core_train_rows),
+            ("evidence_ablation", evidence_diag, evidence_train_rows),
+        ):
+            if not diag.empty:
+                tagged = diag.copy()
+                tagged.insert(0, "fold", fold)
+                tagged.insert(1, "stage", stage)
+                tagged["train_end"] = train_weeks[-1]
+                tagged["test_start"] = test_block[0]
+                tagged["test_end"] = test_block[-1]
+                sink.append(tagged)
 
         baseline_metrics = evaluate_selection(
             test,
@@ -54,27 +67,49 @@ def run_walk_forward(
             variant="B0_ACTIONABLE_ONLY",
         )
 
-        for rule in rules:
-            candidate_metrics = evaluate_selection(
+        primary = primary_rule()
+        primary_metrics = compare_metrics(
+            evaluate_selection(
                 test,
-                select_all_weeks(test, rule),
-                variant=rule.name,
+                select_all_weeks(test, primary),
+                variant=primary.name,
+            ),
+            baseline_metrics,
+        )
+        primary_metrics.update(
+            {
+                "fold": fold,
+                "evaluation_role": "PRIMARY_R1",
+                "train_start": train_weeks[0],
+                "train_end": train_weeks[-1],
+                "test_start": test_block[0],
+                "test_end": test_block[-1],
+                "rule_complexity": rule_complexity(primary),
+            }
+        )
+        fold_rows.append(primary_metrics)
+
+        if champion is not None:
+            champion_metrics = compare_metrics(
+                evaluate_selection(
+                    test,
+                    select_all_weeks(test, champion),
+                    variant=champion.name,
+                ),
+                baseline_metrics,
             )
-            row = compare_metrics(candidate_metrics, baseline_metrics)
-            row.update(
+            champion_metrics.update(
                 {
                     "fold": fold,
+                    "evaluation_role": "TRAIN_CHAMPION",
                     "train_start": train_weeks[0],
                     "train_end": train_weeks[-1],
                     "test_start": test_block[0],
                     "test_end": test_block[-1],
-                    "selected_by_train": (
-                        champion is not None and rule.name == champion.name
-                    ),
-                    "rule_complexity": rule_complexity(rule),
+                    "rule_complexity": rule_complexity(champion),
                 }
             )
-            fold_rows.append(row)
+            fold_rows.append(champion_metrics)
 
         champion_rows.append(
             {
@@ -99,8 +134,13 @@ def run_walk_forward(
         pd.DataFrame(fold_rows),
         pd.DataFrame(champion_rows),
         (
-            pd.concat(train_grid_rows, ignore_index=True)
-            if train_grid_rows
+            pd.concat(core_train_rows, ignore_index=True)
+            if core_train_rows
+            else pd.DataFrame()
+        ),
+        (
+            pd.concat(evidence_train_rows, ignore_index=True)
+            if evidence_train_rows
             else pd.DataFrame()
         ),
     )
@@ -110,35 +150,42 @@ def summarize_oos_stability(fold_results: pd.DataFrame) -> pd.DataFrame:
     if fold_results.empty:
         return pd.DataFrame()
     rows = []
-    for variant, group in fold_results.groupby("variant", sort=True):
+    for (role, variant), group in fold_results.groupby(
+        ["evaluation_role", "variant"], sort=True
+    ):
         rows.append(
             {
+                "evaluation_role": role,
                 "variant": variant,
                 "folds": int(group["fold"].nunique()),
-                "selected_by_train_count": int(group["selected_by_train"].sum()),
                 "opportunity_positive_rate": _positive_rate(
                     group["opportunity_recall_1w_delta_vs_b0"]
                 ),
-                "winner_nonnegative_rate": _nonnegative_rate(
-                    group["big_winner_recall_mean_2_4w_delta_vs_b0"]
+                "tradable_winner_lift_nonnegative_rate": _nonnegative_rate(
+                    group[
+                        "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
-                "loser_exclusion_nonworse_rate": _nonnegative_rate(
-                    group["big_loser_exclusion_mean_2_4w_delta_vs_b0"]
-                ),
-                "severe_exposure_nonworse_rate": _nonpositive_rate(
-                    group["severe_loser_exposure_mean_2_4w_delta_vs_b0"]
+                "tradable_loser_lift_nonworse_rate": _nonpositive_rate(
+                    group[
+                        "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
                 "mean_opportunity_delta": _mean(
                     group["opportunity_recall_1w_delta_vs_b0"]
                 ),
-                "mean_winner_delta_2_4w": _mean(
-                    group["big_winner_recall_mean_2_4w_delta_vs_b0"]
+                "mean_tradable_winner_lift_delta": _mean(
+                    group[
+                        "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
-                "mean_loser_exclusion_delta_2_4w": _mean(
-                    group["big_loser_exclusion_mean_2_4w_delta_vs_b0"]
+                "mean_tradable_loser_lift_delta": _mean(
+                    group[
+                        "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+                    ]
                 ),
-                "mean_severe_exposure_delta_2_4w": _mean(
-                    group["severe_loser_exposure_mean_2_4w_delta_vs_b0"]
+                "mean_incremental_opportunity_efficiency": _mean(
+                    group["incremental_opportunities_per_added_review"]
                 ),
                 "mean_attention_delta": _mean(
                     group["avg_watchlist_size_delta_vs_b0"]
@@ -150,51 +197,71 @@ def summarize_oos_stability(fold_results: pd.DataFrame) -> pd.DataFrame:
     out["stability_floor"] = out[
         [
             "opportunity_positive_rate",
-            "winner_nonnegative_rate",
-            "loser_exclusion_nonworse_rate",
-            "severe_exposure_nonworse_rate",
+            "tradable_winner_lift_nonnegative_rate",
+            "tradable_loser_lift_nonworse_rate",
         ]
     ].min(axis=1)
     return out.sort_values(
         [
+            "evaluation_role",
             "stability_floor",
-            "mean_winner_delta_2_4w",
+            "mean_tradable_winner_lift_delta",
             "mean_opportunity_delta",
-            "mean_loser_exclusion_delta_2_4w",
+            "mean_tradable_loser_lift_delta",
             "mean_attention_delta",
             "rule_complexity",
             "variant",
         ],
-        ascending=[False, False, False, False, True, True, True],
+        ascending=[True, False, False, False, True, True, True, True],
         kind="mergesort",
     ).reset_index(drop=True)
 
 
 def choose_retrospective_champion(
     stability: pd.DataFrame,
-    rules: list[ReviewRule],
+    fold_results: pd.DataFrame,
+    candidate_rules: list[ReviewRule],
 ) -> ReviewRule | None:
-    """Choose only a retrospective candidate, never a production rule."""
-    if stability.empty:
+    """Require the same train-chosen rule to survive >=3 truly OOS folds."""
+    if stability.empty or fold_results.empty:
         return None
-    best = stability.iloc[0]
-    if int(best.get("folds", 0)) < 3:
+    champions = stability[
+        stability["evaluation_role"].eq("TRAIN_CHAMPION")
+        & stability["folds"].ge(3)
+    ].copy()
+    if champions.empty:
         return None
-    required = [
+    champions = champions.sort_values(
+        [
+            "stability_floor",
+            "mean_tradable_winner_lift_delta",
+            "mean_opportunity_delta",
+            "mean_tradable_loser_lift_delta",
+            "mean_attention_delta",
+            "rule_complexity",
+            "variant",
+        ],
+        ascending=[False, False, False, True, True, True, True],
+        kind="mergesort",
+    )
+    best = champions.iloc[0]
+    required = (
         best["stability_floor"],
         best["mean_opportunity_delta"],
-        best["mean_winner_delta_2_4w"],
-    ]
+        best["mean_tradable_winner_lift_delta"],
+        best["mean_incremental_opportunity_efficiency"],
+    )
     if not all(np.isfinite(float(value)) for value in required):
         return None
     if (
         float(best["stability_floor"]) < 0.5
-        or float(best["mean_opportunity_delta"]) <= 0.0
-        or float(best["mean_winner_delta_2_4w"]) < 0.0
+        or float(best["mean_opportunity_delta"]) <= 0
+        or float(best["mean_tradable_winner_lift_delta"]) < 0
+        or float(best["mean_incremental_opportunity_efficiency"]) <= 0
     ):
         return None
     name = str(best["variant"])
-    return next((rule for rule in rules if rule.name == name), None)
+    return next((rule for rule in candidate_rules if rule.name == name), None)
 
 
 def _mean(values: pd.Series) -> float:

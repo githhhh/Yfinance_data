@@ -12,14 +12,17 @@ from .metrics import (
     compare_metrics,
     evaluate_selection,
     included_big_losers,
+    macro_average_summary,
     missed_big_winners,
+    moving_block_bootstrap_delta,
+    weekly_macro_table,
 )
-from .optimizer import evaluate_rule_grid, select_all_weeks
+from .optimizer import select_all_weeks, two_stage_diagnostics
 from .oracle import add_weekly_oracle_flags, oracle_projection
 from .report import render_report
-from .search_space import generate_candidate_rules
+from .search_space import generate_core_rules, generate_evidence_ablations
 from .selectors import (
-    SUPPORT_KEYS,
+    EVIDENCE_FAMILIES,
     primary_rule,
     rule_to_dict,
     select_review_variant,
@@ -88,31 +91,78 @@ def run_research(
     if evaluation_panel.empty:
         raise ValueError("No sufficiently mature 4W snapshot weeks for research evaluation")
 
-    core_rule = primary_rule()
+    core = primary_rule()
     b0_selected = select_all_weeks(evaluation_panel, None)
-    primary_selected = select_all_weeks(evaluation_panel, core_rule)
+    primary_selected = select_all_weeks(evaluation_panel, core)
+
     b0_metrics = evaluate_selection(
         evaluation_panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
     )
     primary_metrics = compare_metrics(
         evaluate_selection(
-            evaluation_panel, primary_selected, variant=core_rule.name
+            evaluation_panel, primary_selected, variant=core.name
         ),
         b0_metrics,
     )
     baseline_vs_primary = pd.DataFrame([b0_metrics, primary_metrics])
 
-    rules = generate_candidate_rules()
-    full_rule_grid = evaluate_rule_grid(evaluation_panel, rules)
-    fold_results, wf_champions, train_grid = run_walk_forward(
+    b0_weekly = weekly_macro_table(
+        evaluation_panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
+    )
+    primary_weekly = weekly_macro_table(
+        evaluation_panel, primary_selected, variant=core.name
+    )
+    weekly_macro = pd.concat([b0_weekly, primary_weekly], ignore_index=True)
+    macro_summary = macro_average_summary(weekly_macro)
+    bootstrap = moving_block_bootstrap_delta(
+        b0_weekly,
+        primary_weekly,
+        metrics=[
+            "opportunity_recall_1w",
+            "tradable_big_winner_recall_mean_2_4w",
+            "tradable_winner_capture_lift_mean_2_4w",
+            "tradable_loser_capture_lift_mean_2_4w",
+            "opp_severe_loser_exposure_mean_2_4w",
+            "avg_watchlist_size",
+        ],
+    )
+
+    core_rules = generate_core_rules()
+    full_evidence_rules, core_grid, evidence_grid = two_stage_diagnostics(
+        evaluation_panel, core_rules
+    )
+
+    (
+        fold_results,
+        wf_champions,
+        wf_core_train,
+        wf_evidence_train,
+    ) = run_walk_forward(
         evaluation_panel,
-        rules,
+        core_rules,
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
     )
     oos_stability = summarize_oos_stability(fold_results)
-    champion = choose_retrospective_champion(oos_stability, rules)
 
+    candidate_rules: dict[str, object] = {}
+    for rule in full_evidence_rules:
+        candidate_rules[rule.name] = rule
+    if not wf_evidence_train.empty:
+        finalist_core_names = {
+            str(name).split("_ALL")[0].split("_NO_")[0]
+            for name in wf_evidence_train["variant"].dropna().astype(str)
+        }
+        for core_rule in core_rules:
+            if core_rule.name in finalist_core_names:
+                for rule in generate_evidence_ablations(core_rule):
+                    candidate_rules[rule.name] = rule
+
+    champion = choose_retrospective_champion(
+        oos_stability,
+        fold_results,
+        list(candidate_rules.values()),
+    )
     champion_status = (
         "RETROSPECTIVE_CANDIDATE"
         if champion is not None
@@ -122,11 +172,11 @@ def run_research(
 
     missed_winners, included_losers = build_case_audits(
         evaluation_panel,
-        core_rule=core_rule,
+        core_rule=core,
         champion=champion,
     )
 
-    latest_review = latest_review_list(panel, core_rule)
+    latest_review = latest_review_list(panel, core)
     champion_latest = (
         latest_review_list(panel, champion)
         if champion is not None
@@ -140,7 +190,8 @@ def run_research(
         pool_root=pool_root,
         price_cache=price_cache,
         eps_path=eps_path,
-        rule_count=len(rules),
+        core_rule_count=len(core_rules),
+        evidence_rule_count=len(full_evidence_rules),
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
         champion_status=champion_status,
@@ -149,6 +200,8 @@ def run_research(
     data_audit = render_data_audit(panel, evaluation_panel, pools, eps)
     report = render_report(
         baseline_vs_primary=baseline_vs_primary,
+        macro_summary=macro_summary,
+        bootstrap=bootstrap,
         oos_stability=oos_stability,
         walk_forward_champions=wf_champions,
         champion_status=champion_status,
@@ -163,10 +216,15 @@ def run_research(
         "next_week_review_list.csv": output_dir / "next_week_review_list.csv",
         "champion_latest_review_list.csv": output_dir / "champion_latest_review_list.csv",
         "baseline_vs_primary.csv": output_dir / "baseline_vs_primary.csv",
-        "full_rule_grid.csv": output_dir / "full_rule_grid.csv",
+        "weekly_macro_metrics.csv": output_dir / "weekly_macro_metrics.csv",
+        "macro_summary.csv": output_dir / "macro_summary.csv",
+        "week_block_bootstrap.csv": output_dir / "week_block_bootstrap.csv",
+        "core_rule_grid.csv": output_dir / "core_rule_grid.csv",
+        "evidence_ablation_grid.csv": output_dir / "evidence_ablation_grid.csv",
         "fold_level_results.csv": output_dir / "fold_level_results.csv",
         "walk_forward_champions.csv": output_dir / "walk_forward_champions.csv",
-        "walk_forward_train_grid.csv": output_dir / "walk_forward_train_grid.csv",
+        "walk_forward_core_train.csv": output_dir / "walk_forward_core_train.csv",
+        "walk_forward_evidence_train.csv": output_dir / "walk_forward_evidence_train.csv",
         "rule_stability.csv": output_dir / "rule_stability.csv",
         "missed_big_winners.csv": output_dir / "missed_big_winners.csv",
         "included_big_losers.csv": output_dir / "included_big_losers.csv",
@@ -182,10 +240,15 @@ def run_research(
     latest_review.to_csv(outputs["next_week_review_list.csv"], index=False)
     champion_latest.to_csv(outputs["champion_latest_review_list.csv"], index=False)
     baseline_vs_primary.to_csv(outputs["baseline_vs_primary.csv"], index=False)
-    full_rule_grid.to_csv(outputs["full_rule_grid.csv"], index=False)
+    weekly_macro.to_csv(outputs["weekly_macro_metrics.csv"], index=False)
+    macro_summary.to_csv(outputs["macro_summary.csv"], index=False)
+    bootstrap.to_csv(outputs["week_block_bootstrap.csv"], index=False)
+    core_grid.to_csv(outputs["core_rule_grid.csv"], index=False)
+    evidence_grid.to_csv(outputs["evidence_ablation_grid.csv"], index=False)
     fold_results.to_csv(outputs["fold_level_results.csv"], index=False)
     wf_champions.to_csv(outputs["walk_forward_champions.csv"], index=False)
-    train_grid.to_csv(outputs["walk_forward_train_grid.csv"], index=False)
+    wf_core_train.to_csv(outputs["walk_forward_core_train.csv"], index=False)
+    wf_evidence_train.to_csv(outputs["walk_forward_evidence_train.csv"], index=False)
     oos_stability.to_csv(outputs["rule_stability.csv"], index=False)
     missed_winners.to_csv(outputs["missed_big_winners.csv"], index=False)
     included_losers.to_csv(outputs["included_big_losers.csv"], index=False)
@@ -259,7 +322,7 @@ def mature_four_week_panel(
     min_complete_coverage: float = MIN_4W_COMPLETE_COVERAGE,
     min_complete_rows: int = MIN_4W_COMPLETE_ROWS,
 ) -> pd.DataFrame:
-    """Keep weeks with enough complete 4W rows for a meaningful Top5 oracle."""
+    """Keep weeks with enough complete snapshot-clock 4W rows."""
     if panel.empty:
         return panel.copy()
     stats = panel.groupby("snapshot_date")["forward_4w_censored"].agg(
@@ -282,7 +345,6 @@ def build_case_audits(
     core_rule,
     champion,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Keep case-level B0, primary R1 and champion comparisons auditable."""
     variants = [
         ("B0_ACTIONABLE_ONLY", select_all_weeks(panel, None)),
         (core_rule.name, select_all_weeks(panel, core_rule)),
@@ -326,7 +388,7 @@ def latest_review_list(panel: pd.DataFrame, rule) -> pd.DataFrame:
         "ibd_candidate_rule",
         "ibd_candidate_price",
         "current_vs_ibd_candidate_pct",
-        "_support_count",
+        "_evidence_family_count",
         "review_reason",
         "pit_eps_yoy_growth",
         "volume_ratio",
@@ -370,16 +432,21 @@ def extended_exploratory_summary(panel: pd.DataFrame) -> pd.DataFrame:
                     if len(complete)
                     else np.nan
                 ),
-                "median_return_1w_pct": _median(
-                    complete, "forward_1w_return_pct"
-                ),
-                "median_return_4w_pct": _median(
+                "median_snapshot_return_4w_pct": _median(
                     group[group["forward_4w_censored"].eq(False)],
                     "forward_4w_return_pct",
                 ),
-                "median_mae_4w_pct": _median(
+                "median_snapshot_mae_4w_pct": _median(
                     group[group["forward_4w_censored"].eq(False)],
                     "mae_4w_pct",
+                ),
+                "median_post_retest_return_4w_pct": _median(
+                    group[group["opp_forward_4w_censored"].eq(False)],
+                    "opp_forward_4w_return_pct",
+                ),
+                "median_post_retest_mae_4w_pct": _median(
+                    group[group["opp_forward_4w_censored"].eq(False)],
+                    "opp_mae_4w_pct",
                 ),
             }
         )
@@ -415,16 +482,25 @@ def render_data_audit(
     ]
     for horizon in HORIZONS:
         complete = int(panel[f"forward_{horizon}_censored"].eq(False).sum())
-        lines.append(f"- complete {horizon} outcomes: {complete}/{len(panel)}")
+        opp_complete = int(
+            (
+                panel["review_opportunity_1w"].eq(True)
+                & panel[f"opp_forward_{horizon}_censored"].eq(False)
+            ).sum()
+        )
+        lines.append(f"- complete snapshot-clock {horizon}: {complete}/{len(panel)}")
+        lines.append(f"- complete opportunity-clock {horizon}: {opp_complete}")
     lines.extend(
         [
             "",
             "Guardrails:",
-            "- Weekend selector reads only frozen pool fields + verified PIT EPS.",
-            "- Forward returns/MFE/MAE/oracle flags are evaluation-only.",
-            "- ACTIONABLE baseline rows are never re-filtered by research variants.",
-            "- EXTENDED is excluded from the core selector.",
+            "- Primary R1 has no Geometry hard reject.",
+            "- Volume is one evidence family even if entry and weekly volume both confirm.",
             "- False/missing positive evidence is neutral.",
+            "- Snapshot and opportunity clocks are kept separate.",
+            "- Winner recall is capacity-normalized with selection coverage/capture lift.",
+            "- Rule evolution is two-stage, not one 144-rule sweep.",
+            "- Weekly macro metrics + paired moving-block bootstrap are reported.",
             "- C Rank and ATR are not used.",
             "",
         ]
@@ -439,7 +515,8 @@ def experiment_manifest(
     pool_root: Path,
     price_cache: Path,
     eps_path: Path,
-    rule_count: int,
+    core_rule_count: int,
+    evidence_rule_count: int,
     min_train_weeks: int,
     test_weeks: int,
     champion_status: str,
@@ -470,12 +547,17 @@ def experiment_manifest(
             "min_complete_rows": MIN_4W_COMPLETE_ROWS,
         },
         "primary_rule": rule_to_dict(primary_rule()),
-        "search_rule_count": rule_count,
-        "support_keys": SUPPORT_KEYS,
+        "evidence_families": EVIDENCE_FAMILIES,
+        "search": {
+            "stage_1_core_rule_count": core_rule_count,
+            "stage_2_full_sample_evidence_rule_count": evidence_rule_count,
+            "stage_2_policy": "leave_one_evidence_family_out_only_around_core_finalists",
+        },
         "walk_forward": {
             "min_train_weeks": min_train_weeks,
             "test_weeks": test_weeks,
             "expanding_window": True,
+            "test_used_for_selection": False,
         },
         "champion_status": champion_status,
         "champion_rule": (

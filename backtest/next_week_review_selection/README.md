@@ -1,34 +1,35 @@
 # Next Week Review Selection Research
 
-Research-only experiment on branch `research/next-week-review-selection`, based on
-`codex/clean-latest-quant-trade-replay-pools`.
+Branch: `research/next-week-review-selection`
 
-Core hypothesis:
+This research compares:
 
 `B0 ACTIONABLE-only`
+
 vs
-`B0 + Near-Buy-Point UNCONFIRMED/BELOW_TRIGGER with at least one positive quality evidence`.
 
-The experiment evaluates 1W/2W/3W/4W winner capture, loser exclusion, MFE/MAE,
-attention cost, and expanding-window walk-forward stability.
+`B0 + Near-Buy-Point UNCONFIRMED/BELOW_TRIGGER + >=1 independent positive evidence family`.
 
-Run:
+v0.3 changes:
+- Primary R1 has no Geometry hard reject.
+- Entry + weekly volume form one Volume evidence family.
+- Snapshot clock and post-opportunity clock are both measured.
+- Winner/loser recall is capacity-normalized with capture lift.
+- Rule evolution is two-stage: 24 structural rules, then evidence-family leave-one-out only around finalists.
+- Weekly macro metrics and paired moving-block bootstrap are produced.
 
-```bash
-conda run --no-capture-output -n quant_env \
-  python -m backtest.next_week_review_selection.run
-```
-
-Focused tests:
+Run tests:
 
 ```bash
 conda run --no-capture-output -n quant_env \
   python -m pytest tests/test_next_week_review_selection.py -q
 ```
 
-Important:
-- ACTIONABLE rows are never re-filtered by research variants.
-- EXTENDED is exploratory only.
-- False/missing positive evidence is neutral.
-- C Rank and ATR are excluded.
-- Outputs are retrospective research artifacts, not production authorization.
+Run research:
+
+```bash
+conda run --no-capture-output -n quant_env \
+  python -m backtest.next_week_review_selection.run
+```
+
+Do not modify parameters during the run. Outputs remain retrospective research artifacts, not production authorization.
