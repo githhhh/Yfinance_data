@@ -1,38 +1,49 @@
-# Track E — B0.1 Dry-Neutral + Soft Active-Lane Audit
+# Track E v2 — Isolated Fresh-vs-Standard Lane Audit
 
-This is a focused follow-up to Track D. It does **not** modify Production B0.
+Track E v1 was over-broad: it softened fresh_demand_alpha, constructive_pullback, and
+standard_breakout together. In the materialized result every real Lane substitution was
+fresh_demand_alpha -> constructive_pullback, so the intended standard-vs-fresh question
+was not actually exercised.
 
-## Fixed challenger
+Track E v2 fixes that design error.
 
-Only one challenger is evaluated:
+## Single challenger
 
-- pullback_v_is_dry=True keeps the positive dry_pullback evidence;
-- pullback_v_is_dry=False is neutral and no longer adds pullback_not_dry;
-- fresh_demand_alpha, constructive_pullback, and standard_breakout are softened:
-  status and evidence/risk are compared before the original lane priority;
-- incomplete_evidence and tail_risk remain structurally downgraded;
-- distinct_1, eligibility and 3-slot capital accounting are unchanged.
+Production B0 is compared with one fixed B0.1 challenger:
 
-The intended mechanism is explicit: a stronger standard_breakout may outrank a weaker
-fresh_demand_alpha, while incomplete/tail candidates cannot jump the active-lane guard.
+- dry=True remains positive evidence;
+- dry=False is neutral;
+- build reward-only B0 ordering as a fixed rank skeleton;
+- constructive_pullback, incomplete_evidence, and tail_risk keep their exact skeleton positions;
+- only fresh_demand_alpha and standard_breakout are reordered among the rank slots those
+  two target lanes already occupy;
+- target ordering is status -> evidence/risk -> original lane -> remaining B0 tie-breaks;
+- distinct_1, eligibility, and 3-slot capital accounting are unchanged.
+
+This is a controlled mechanism intervention: no other Lane receives soft scoring.
+
+## Audit outputs
+
+comparison_summary.* contains paired B0 vs B0.1 portfolio metrics.
+
+selection_events.* separately records:
+
+- order_changed;
+- membership_changed;
+- target_rank_crossover (standard crossed a fresh candidate even if Top3 did not change);
+- target_selection_swap (standard entered Top3 while fresh exited);
+- W4 outcome deltas for both crossover levels.
+
+run_manifest.json records the exact source SHA, panel hash, Production B0 hash, and v2 protocol.
 
 ## Evidence boundary
 
-This hypothesis was formed after reviewing Track D. Therefore the 40 snapshots through
-2026-07-24 are retrospective mechanism evidence, not untouched OOS. Any later mature W4
-snapshots are reported separately as post_track_d_shadow.
-
-## Outputs
-
-- comparison_summary.csv/json: paired B0 vs B0.1 metrics by Track-D segment.
-- selection_events.csv/json: every weekly Top3 comparison, including lane swaps and W4 outcomes.
-- event_summary.json: counts and targeted standard-in / fresh-out deltas.
-- TRACK_E_SOFT_LANE_REPORT.md: concise report.
-- run_manifest.json: source SHA and input/output hashes.
+The hypothesis was formed after Track D, so <=2026-07-24 is retrospective mechanism
+evidence. Later mature W4 snapshots are reported separately as post_track_d_shadow.
 
 ## Gemini local run
 
-Gemini must not edit source code. Run:
+Gemini must not modify source code.
 
     git checkout codex/clean-latest-quant-trade-replay-pools
     git pull --ff-only
@@ -41,10 +52,5 @@ Gemini must not edit source code. Run:
 
     /Users/dev/.conda/envs/quant_env/bin/python -m backtest.track_e_soft_lane_audit.cli materialize
 
-After success, run the relevant regression tests and commit only:
-
-    git add backtest/track_e_soft_lane_audit/output/
-    git commit -m "docs(track_e): materialize soft-lane audit artifacts"
-    git push origin codex/clean-latest-quant-trade-replay-pools
-
-If any test/materialization step fails, do not patch source locally; return the complete error.
+Then run regression tests. If successful, commit only generated Track E output.
+If anything fails, return the exact error and do not patch source.

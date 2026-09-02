@@ -13,15 +13,18 @@ PRIMARY_HORIZON = "W4"
 TRACK_D_HISTORICAL_END = "2026-07-24"
 TOP_N = 3
 
-ACTIVE_SOFT_LANES = (
+# Track E v2 isolates exactly one Lane question. Constructive/incomplete/tail
+# keep their reward-only-B0 skeleton positions; only fresh vs standard may reorder.
+TARGET_SOFT_LANES = (
     "fresh_demand_alpha",
-    "constructive_pullback",
     "standard_breakout",
 )
-DOWNGRADED_LANES = (
+FIXED_SKELETON_LANES = (
+    "constructive_pullback",
     "incomplete_evidence",
     "tail_risk",
 )
 
 BASELINE_POLICY_ID = "B0_ORIGINAL"
-CHALLENGER_POLICY_ID = "B0_1_DRY_REWARD_ONLY_SOFT_ACTIVE_LANE"
+CHALLENGER_POLICY_ID = "B0_1_DRY_REWARD_ONLY_PAIRWISE_FRESH_STANDARD"
+PROTOCOL_VERSION = "track_e_v2_pairwise_lane_isolation"

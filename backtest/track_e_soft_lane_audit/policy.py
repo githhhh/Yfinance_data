@@ -14,44 +14,49 @@ from backtest.track_c_ranking_discovery.b0_ablation_grid import (
     reasoned_item_variant,
 )
 
-from .config import ACTIVE_SOFT_LANES, CHALLENGER_POLICY_ID
+from .config import CHALLENGER_POLICY_ID, TARGET_SOFT_LANES
 
 
-def soft_active_lane_sort_key(item: SkillCandidate) -> tuple[Any, ...]:
-    """Soften only the three investable lanes while preserving downgrade semantics.
-
-    Production B0 orders lane before evidence/risk. B0.1 instead:
-      clear failure
-      -> active-vs-incomplete/tail guard
-      -> status
-      -> evidence/risk
-      -> original active-lane prior
-      -> remaining B0 tie-breaks
-
-    Therefore a stronger standard_breakout may outrank a weaker
-    fresh_demand_alpha, but incomplete_evidence remains below every active lane.
-    tail_risk remains protected by both clear-failure and lane guard.
-    """
+def target_pair_sort_key(item: SkillCandidate) -> tuple[Any, ...]:
+    """Evidence/risk-first comparator used only inside fresh/standard target slots."""
     base = item.sort_key
     if len(base) < 9:
         raise RuntimeError(f"Unexpected B0 sort key shape for {item.code}: {base}")
-
-    lane_guard = 0 if item.lane in ACTIVE_SOFT_LANES else (
-        1 if item.lane == "incomplete_evidence" else 2
-    )
     return (
-        base[0],          # clear_geometry_failure
-        lane_guard,       # active lanes always above incomplete/tail
         base[2],          # status
         base[3],          # -(evidence_count-risk_count)
         base[4],          # risk_count
-        base[1],          # original lane is now only a prior/tie-break
-        *base[5:],        # freshness/EPS/weekly vol/entry vol/code/row_idx
+        base[1],          # original Lane becomes only a tie-break
+        *base[5:],        # remaining B0 tie-breaks
     )
 
 
-class SoftActiveLaneChallenger(StructuralGridChallenger):
-    """Single B0.1 challenger: dry=False neutral + soft active-lane hierarchy."""
+def reorder_target_lanes(base_items: list[SkillCandidate]) -> list[SkillCandidate]:
+    """Keep the reward-only-B0 rank skeleton fixed except for fresh/standard slots.
+
+    Non-target items keep their exact absolute position. Only candidates occupying
+    fresh_demand_alpha or standard_breakout slots are permuted among those same
+    target slots according to target_pair_sort_key().
+    """
+    ordered = sorted(base_items, key=lambda x: x.sort_key)
+    target_positions = [
+        idx for idx, item in enumerate(ordered)
+        if item.lane in TARGET_SOFT_LANES
+    ]
+    if len(target_positions) <= 1:
+        return ordered
+
+    target_items = [ordered[idx] for idx in target_positions]
+    target_items.sort(key=target_pair_sort_key)
+
+    out = list(ordered)
+    for idx, item in zip(target_positions, target_items):
+        out[idx] = item
+    return out
+
+
+class PairwiseSoftLaneChallenger(StructuralGridChallenger):
+    """B0.1: dry=False neutral + isolated fresh-vs-standard soft ordering."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -60,17 +65,18 @@ class SoftActiveLaneChallenger(StructuralGridChallenger):
             selector_policy="distinct_1",
         )
         self.policy_id = CHALLENGER_POLICY_ID
-        self.family = "track_e_soft_lane"
+        self.family = "track_e_pairwise_soft_lane"
         self.spec_hash = (
             "dry_true_reward__dry_false_neutral__"
-            "active_lane_guard__evidence_risk_before_lane__distinct1"
+            "reward_only_b0_skeleton__fresh_standard_slots_only__"
+            "status_evidence_risk_before_lane__distinct1"
         )
 
     def score_candidates(self, snapshot_df: pd.DataFrame) -> pd.DataFrame:
         if snapshot_df.empty:
             return pd.DataFrame()
 
-        candidates: list[SkillCandidate] = []
+        base_items: list[SkillCandidate] = []
         for row_idx, (_, row) in enumerate(snapshot_df.iterrows()):
             if not is_review_universe(row):
                 continue
@@ -80,10 +86,12 @@ class SoftActiveLaneChallenger(StructuralGridChallenger):
                 dry_policy="reward_only",
                 lane_policy="B0_LANE",
             )
-            item.sort_key = soft_active_lane_sort_key(item)
-            candidates.append(item)
+            base_items.append(item)
 
-        candidates.sort(key=lambda x: x.sort_key)
+        skeleton = sorted(base_items, key=lambda x: x.sort_key)
+        skeleton_rank = {item.code: idx + 1 for idx, item in enumerate(skeleton)}
+        candidates = reorder_target_lanes(base_items)
+
         for rank, item in enumerate(candidates, 1):
             item.raw_rank = rank
 
@@ -120,6 +128,7 @@ class SoftActiveLaneChallenger(StructuralGridChallenger):
                 "industry_key": industry_key,
                 "lane": item.lane,
                 "raw_rank": item.raw_rank,
+                "skeleton_rank": int(skeleton_rank[item.code]),
                 "sort_key": str(item.sort_key),
                 "evidence_count": evidence_count,
                 "risk_count": risk_count,
@@ -133,6 +142,10 @@ class SoftActiveLaneChallenger(StructuralGridChallenger):
                 "has_valid_industry": int(bool(industry_key)),
             })
         return pd.DataFrame(rows)
+
+
+# Compatibility alias for earlier Track E imports; semantics are v2 pairwise isolation.
+SoftActiveLaneChallenger = PairwiseSoftLaneChallenger
 
 
 def baseline_policy() -> StructuralGridChallenger:
