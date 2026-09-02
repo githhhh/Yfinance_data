@@ -1,32 +1,42 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import asdict, dataclass
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
 
-from backtest.rd_agent_candidate_rule_audit.utils import to_bool, to_float
+from .utils import to_bool, to_float
 
 
 PULLBACK_RULES = {"ceiling_pullback", "pivot", "ma10_touch_confirm", "three_weeks_tight"}
+SUPPORT_KEYS = (
+    "entry_volume_confirmed",
+    "weekly_volume_follow_through",
+    "eps_support",
+    "near_52w_high",
+    "dry_pullback",
+)
 
 
 @dataclass(frozen=True)
 class ReviewRule:
+    """Rule for supplemental non-ACTIONABLE review candidates.
+
+    ACTIONABLE rows are always retained unchanged. The rule only decides which
+    extra UNCONFIRMED / BELOW_TRIGGER rows are added to the review list.
+    """
+
     name: str
     near_below_pct: float = 5.0
-    extended_above_pct: float = 10.0
-    min_support_count: int = 0
+    supplemental_statuses: tuple[str, ...] = ("UNCONFIRMED", "BELOW_TRIGGER")
+    min_support_count: int = 1
+    exclude_clear_geometry_failure: bool = True
+    enabled_supports: tuple[str, ...] = SUPPORT_KEYS
 
 
-def review_rules() -> dict[str, ReviewRule]:
-    """Pre-registered primary variants from the research protocol."""
-    return {
-        "R1_PATH": ReviewRule("R1_PATH", min_support_count=0),
-        "R2_BALANCED": ReviewRule("R2_BALANCED", min_support_count=1),
-        "R3_STRICT": ReviewRule("R3_STRICT", min_support_count=2),
-    }
+def primary_rule() -> ReviewRule:
+    return ReviewRule(name="R1_NEAR_BUY_POINT_PLUS_EVIDENCE")
 
 
 def is_review_universe(row: pd.Series) -> bool:
@@ -37,10 +47,7 @@ def is_review_universe(row: pd.Series) -> bool:
 
 
 def clear_geometry_failure(row: pd.Series) -> bool:
-    """Only explicit observed geometry failure is a hard structural reject.
-
-    Missing geometry remains UNKNOWN and is not converted to failure.
-    """
+    """Only explicit observed failure counts as failure; missing stays UNKNOWN."""
     rr = to_float(row.get("ibd_entry_breakout_range_ratio"))
     pos = to_float(row.get("ibd_entry_close_position"))
     if rr is not None and rr <= 0:
@@ -51,11 +58,7 @@ def clear_geometry_failure(row: pd.Series) -> bool:
 
 
 def support_flags(row: pd.Series) -> dict[str, bool]:
-    """Positive-only evidence cluster.
-
-    False or missing evidence is neutral. In particular, pullback_v_is_dry=False
-    is not a negative score and PIT EPS missing is not a failure.
-    """
+    """Positive-only evidence. False/missing values are neutral."""
     entry_vol = to_float(row.get("ibd_entry_volume_ratio"))
     weekly_vol = to_float(row.get("volume_ratio"))
     eps_state = str(row.get("pit_eps_state", "") or "").strip().upper()
@@ -63,7 +66,6 @@ def support_flags(row: pd.Series) -> dict[str, bool]:
     dist = to_float(row.get("dist_to_52w_high_pct"))
     rule = str(row.get("ibd_candidate_rule", "") or "").strip()
     dry = to_bool(row.get("pullback_v_is_dry"))
-
     return {
         "entry_volume_confirmed": entry_vol is not None and entry_vol >= 1.5,
         "weekly_volume_follow_through": weekly_vol is not None and weekly_vol >= 1.3,
@@ -73,128 +75,124 @@ def support_flags(row: pd.Series) -> dict[str, bool]:
     }
 
 
-def support_count(row: pd.Series) -> int:
-    return sum(support_flags(row).values())
+def support_count(row: pd.Series, enabled_supports: Iterable[str] = SUPPORT_KEYS) -> int:
+    enabled = set(enabled_supports)
+    flags = support_flags(row)
+    return sum(value for key, value in flags.items() if key in enabled)
 
 
-def path_eligible(row: pd.Series, rule: ReviewRule) -> bool:
+def supplemental_path_eligible(row: pd.Series, rule: ReviewRule) -> bool:
+    """Core lane excludes EXTENDED; it is researched separately."""
     status = str(row.get("ibd_entry_status", "") or "").strip().upper()
+    if status not in rule.supplemental_statuses:
+        return False
     cur = to_float(row.get("current_vs_ibd_candidate_pct"))
-
-    if status == "ACTIONABLE":
-        return True
     if cur is None:
         return False
     if status == "UNCONFIRMED":
         return -rule.near_below_pct <= cur <= 5.0
     if status == "BELOW_TRIGGER":
         return -rule.near_below_pct <= cur < 0.0
-    if status == "EXTENDED":
-        return 5.0 < cur <= rule.extended_above_pct
     return False
 
 
-def _enrich(pool: pd.DataFrame) -> pd.DataFrame:
+def enrich_review_features(pool: pd.DataFrame, rule: ReviewRule | None = None) -> pd.DataFrame:
+    rule = rule or primary_rule()
     frame = pool.copy()
     frame["_source_row_order"] = np.arange(len(frame))
-    mask = frame.apply(is_review_universe, axis=1)
-    frame = frame.loc[mask].copy()
-    frame["_geometry_failure"] = frame.apply(clear_geometry_failure, axis=1)
-    frame["_support_count"] = frame.apply(support_count, axis=1)
-    frame["_vs_buy_point"] = frame["current_vs_ibd_candidate_pct"].map(to_float)
-    frame["_abs_vs_buy_point"] = frame["_vs_buy_point"].map(
-        lambda value: abs(value) if value is not None else float("inf")
-    )
+    frame = frame.loc[frame.apply(is_review_universe, axis=1)].copy()
     frame["_status"] = (
         frame["ibd_entry_status"].fillna("").astype(str).str.strip().str.upper()
     )
-    frame["_code_sort"] = frame["code"].fillna("").astype(str).str.strip().str.upper()
+    frame["_vs_buy_point"] = frame["current_vs_ibd_candidate_pct"].map(to_float)
+    frame["_geometry_failure"] = frame.apply(clear_geometry_failure, axis=1)
+    flags = frame.apply(support_flags, axis=1)
+    for key in SUPPORT_KEYS:
+        frame[f"_support_{key}"] = flags.map(lambda item, k=key: bool(item.get(k, False)))
+    frame["_support_count"] = frame.apply(
+        lambda row: support_count(row, rule.enabled_supports), axis=1
+    )
     return frame
 
 
 def select_b0_actionable(pool: pd.DataFrame) -> pd.DataFrame:
-    """Actual weekend sync baseline: all active-signal ACTIONABLE rows."""
-    frame = _enrich(pool)
+    """Actual weekend baseline: every ACTIONABLE active signal."""
+    frame = enrich_review_features(pool)
     selected = frame.loc[frame["_status"].eq("ACTIONABLE")].copy()
     selected["variant"] = "B0_ACTIONABLE_ONLY"
+    selected["selection_source"] = "ACTIONABLE_BASELINE"
     selected["review_reason"] = "weekend_actionable"
     return _stable_output(selected)
 
 
-def select_review_variant(
-    pool: pd.DataFrame,
-    rule: ReviewRule,
-    *,
-    cap: int | None = None,
-) -> pd.DataFrame:
-    frame = _enrich(pool)
-    eligible = frame.apply(lambda row: path_eligible(row, rule), axis=1)
-    selected = frame.loc[
-        eligible
-        & ~frame["_geometry_failure"]
-        & frame["_support_count"].ge(rule.min_support_count)
-    ].copy()
+def select_supplemental(pool: pd.DataFrame, rule: ReviewRule) -> pd.DataFrame:
+    frame = enrich_review_features(pool, rule)
+    eligible = frame.apply(lambda row: supplemental_path_eligible(row, rule), axis=1)
+    eligible &= frame["_support_count"].ge(rule.min_support_count)
+    if rule.exclude_clear_geometry_failure:
+        eligible &= ~frame["_geometry_failure"]
+    selected = frame.loc[eligible].copy()
     selected["variant"] = rule.name
-    selected["review_reason"] = selected.apply(_review_reason, axis=1)
-    selected = _priority_sort(selected)
-    if cap is not None:
-        selected = selected.head(max(int(cap), 0)).copy()
+    selected["selection_source"] = "SUPPLEMENTAL"
+    selected["review_reason"] = selected.apply(_supplemental_reason, axis=1)
     return _stable_output(selected)
 
 
-def select_attention_matched(
-    pool: pd.DataFrame,
-    rule: ReviewRule,
-) -> pd.DataFrame:
-    """Select the same N as the B0 ACTIONABLE count for a fair attention control."""
-    n = len(select_b0_actionable(pool))
-    selected = select_review_variant(pool, rule, cap=n)
-    selected["variant"] = f"{rule.name}_ATTENTION_MATCHED"
-    return selected
-
-
-def _review_reason(row: pd.Series) -> str:
-    status = str(row.get("_status", ""))
-    cur = to_float(row.get("_vs_buy_point"))
-    if status == "ACTIONABLE":
-        return "current_actionable"
-    if status == "EXTENDED":
-        return "extended_retest_candidate"
-    if status == "BELOW_TRIGGER":
-        return "below_near_buy_point"
-    if status == "UNCONFIRMED" and cur is not None and cur < 0:
-        return "unconfirmed_pre_breakout"
-    if status == "UNCONFIRMED":
-        return "unconfirmed_in_buy_zone"
-    return "review_candidate"
-
-
-def _priority_sort(frame: pd.DataFrame) -> pd.DataFrame:
-    """Deterministic review priority without C Rank and without status-first sorting."""
-    if frame.empty:
-        return frame
-    return frame.sort_values(
-        ["_support_count", "_abs_vs_buy_point", "_code_sort", "_source_row_order"],
-        ascending=[False, True, True, True],
-        kind="mergesort",
+def select_review_variant(pool: pd.DataFrame, rule: ReviewRule) -> pd.DataFrame:
+    """B0 ACTIONABLE + supplemental candidates. No TopN and no ranking."""
+    baseline = select_b0_actionable(pool)
+    supplemental = select_supplemental(pool, rule)
+    if baseline.empty:
+        combined = supplemental.copy()
+    elif supplemental.empty:
+        combined = baseline.copy()
+    else:
+        combined = pd.concat([baseline, supplemental], ignore_index=True, sort=False)
+    if combined.empty:
+        return combined
+    combined["variant"] = rule.name
+    return (
+        combined.sort_values("_source_row_order", kind="mergesort")
+        .drop_duplicates(["snapshot_date", "code"], keep="first")
+        .reset_index(drop=True)
     )
+
+
+def rule_to_dict(rule: ReviewRule) -> dict[str, object]:
+    return asdict(rule)
+
+
+def rule_complexity(rule: ReviewRule) -> int:
+    disabled_supports = len(set(SUPPORT_KEYS) - set(rule.enabled_supports))
+    status_specialization = (
+        0 if set(rule.supplemental_statuses) == {"UNCONFIRMED", "BELOW_TRIGGER"} else 1
+    )
+    threshold_specialization = 0 if rule.near_below_pct == 5.0 else 1
+    support_strictness = max(rule.min_support_count - 1, 0)
+    geometry_specialization = 0 if rule.exclude_clear_geometry_failure else 1
+    return (
+        disabled_supports
+        + status_specialization
+        + threshold_specialization
+        + support_strictness
+        + geometry_specialization
+    )
+
+
+def _supplemental_reason(row: pd.Series) -> str:
+    status = str(row.get("_status", ""))
+    evidence = [
+        key for key in SUPPORT_KEYS if bool(row.get(f"_support_{key}", False))
+    ]
+    path = (
+        "unconfirmed_near_buy_point"
+        if status == "UNCONFIRMED"
+        else "below_trigger_near_buy_point"
+    )
+    return "|".join([path, *evidence])
 
 
 def _stable_output(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.reset_index(drop=True)
-    return frame.reset_index(drop=True)
-
-
-def variant_diagnostics(selected: pd.DataFrame) -> dict[str, Any]:
-    if selected.empty:
-        return {
-            "selected": 0,
-            "mean_support_count": np.nan,
-            "median_abs_vs_buy_point": np.nan,
-        }
-    return {
-        "selected": int(len(selected)),
-        "mean_support_count": float(selected["_support_count"].mean()),
-        "median_abs_vs_buy_point": float(selected["_abs_vs_buy_point"].median()),
-    }
+    return frame.sort_values("_source_row_order", kind="mergesort").reset_index(drop=True)
