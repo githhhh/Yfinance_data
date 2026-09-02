@@ -36,15 +36,9 @@ def materialize() -> None:
     manifest = build_manifest(panel, split)
 
     summary.to_csv(SUMMARY_CSV, index=False)
-    SUMMARY_JSON.write_text(
-        summary.to_json(orient="records", indent=2),
-        encoding="utf-8",
-    )
+    SUMMARY_JSON.write_text(summary.to_json(orient="records", indent=2), encoding="utf-8")
     events.to_csv(EVENTS_CSV, index=False)
-    EVENTS_JSON.write_text(
-        events.to_json(orient="records", indent=2),
-        encoding="utf-8",
-    )
+    EVENTS_JSON.write_text(events.to_json(orient="records", indent=2), encoding="utf-8")
     EVENT_SUMMARY.write_text(
         json.dumps(event_summary, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -66,7 +60,7 @@ def materialize() -> None:
     )
 
     retro = summary[summary["segment"] == "retrospective_all_40"].iloc[0]
-    print("=== Track E soft-Lane audit complete ===")
+    print("=== Track E v2 pairwise Lane audit complete ===")
     print(f"source={manifest['source_git_sha']}")
     print(
         "retrospective_all_40: "
@@ -76,16 +70,18 @@ def materialize() -> None:
         f"cvar_delta={retro['cvar_delta']}"
     )
     print(
-        "targeted standard>fresh swaps: "
-        f"{event_summary['target_mature_weeks']} mature / "
-        f"{event_summary['target_standard_over_fresh_weeks']} total, "
-        f"mean_pair_delta={event_summary['target_mean_pair_delta_w4']}"
+        "fresh/standard rank crossovers: "
+        f"{event_summary['target_rank_crossover_mature_weeks']} mature / "
+        f"{event_summary['target_rank_crossover_weeks']} total; "
+        "Top3 swaps: "
+        f"{event_summary['target_selection_swap_mature_weeks']} mature / "
+        f"{event_summary['target_selection_swap_weeks']} total"
     )
     print(f"report={REPORT}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Track E B0.1 soft active-Lane audit")
+    parser = argparse.ArgumentParser(description="Track E v2 isolated fresh-vs-standard Lane audit")
     parser.add_argument("command", choices=["materialize"])
     args = parser.parse_args()
     if args.command == "materialize":
