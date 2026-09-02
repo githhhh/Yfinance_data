@@ -1,5 +1,5 @@
 {
-  "protocol_version": "track_d_v1",
+  "protocol_version": "track_d_v1_focused",
   "objective": "Identify the minimal sufficient decision structure for BreakoutFollow Top-3 selection and synthesize a robust successor policy if one exists.",
   "forbidden_terminal_claim": "No B1 beats B0",
   "historical_window": {
@@ -28,14 +28,35 @@
       "experimental_designer",
       "synthesizer"
     ],
-    "unique_questions": 126,
-    "planned_provider_calls_before_retries": 552,
+    "unique_questions": 78,
+    "planned_provider_calls_before_retries": 335,
     "hard_provider_attempt_limit": 650,
     "max_tokens_per_call": 5000,
     "duplicate_successful_prompt_policy": "refuse_or_cache",
     "arbitrary_python_execution": false,
     "policy_language": "restricted declarative PIT-only DSL",
-    "agent_screening_shortlist": 6
+    "agent_screening_shortlist": 6,
+    "question_counts": {
+      "mechanism_falsification": 20,
+      "failure_archaeology": 22,
+      "capacity_abstention": 10,
+      "lane_mechanism": 8,
+      "nonlinear_b1": 12,
+      "adversarial_review": 6
+    },
+    "policy_synthesis_calls": 13,
+    "policy_review_calls": 6,
+    "final_interpretation_calls": 4,
+    "default_track_d_max_retry": 4,
+    "focused_migration": {
+      "allowed_from_source": "00770fb35b75248bfd197598887a83ee85cd042f",
+      "preserve": [
+        "request_budget_ledger",
+        "rdagent_raw",
+        "completed_research_cycles"
+      ],
+      "reuse_guard": "question fingerprint and cached prompt hash must match"
+    }
   },
   "fixed_mechanisms": [
     "lane",

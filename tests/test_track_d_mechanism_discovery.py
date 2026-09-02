@@ -47,7 +47,7 @@ def _historical_panel() -> pd.DataFrame:
 
 def test_deep_research_plan_is_unique_and_bounded():
     plan = build_question_plan()
-    assert len(plan) == 126
+    assert len(plan) == 78
     assert len({q.fingerprint for q in plan}) == len(plan)
     mechanism_text = " ".join(
         q.question for q in plan if q.direction == "mechanism_falsification"
@@ -59,8 +59,36 @@ def test_deep_research_plan_is_unique_and_bounded():
         + POLICY_REVIEW_CALLS
         + FINAL_INTERPRETATION_CALLS
     )
-    assert planned == 552
+    assert planned == 335
     assert planned < REQUEST_HARD_LIMIT
+
+
+def test_focused_question_budget_by_direction():
+    from collections import Counter
+
+    plan = build_question_plan()
+    counts = Counter(q.direction for q in plan)
+    assert counts == {
+        "mechanism_falsification": 20,
+        "failure_archaeology": 22,
+        "capacity_abstention": 10,
+        "lane_mechanism": 8,
+        "nonlinear_b1": 12,
+        "adversarial_review": 6,
+    }
+
+
+def test_track_d_default_retry_cap_is_four(monkeypatch):
+    from backtest.track_d_mechanism_discovery.llm_client import load_model_config
+
+    monkeypatch.setenv("TRACK_D_RDAGENT_MODEL", "deepseek/deepseek-v4-pro")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DEEPSEEK_API_BASE", "https://example.invalid/v1")
+    monkeypatch.setenv("MAX_RETRY", "15")
+    monkeypatch.delenv("TRACK_D_MAX_RETRY", raising=False)
+
+    cfg = load_model_config()
+    assert cfg["max_retry"] == 4
 
 
 def test_request_budget_counts_attempts_and_blocks_duplicate_success(tmp_path):

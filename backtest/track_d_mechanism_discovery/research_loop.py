@@ -186,7 +186,13 @@ def run_research_cycles(
     cycles=[]
     for q in plan:
         if q.question_id in existing and existing[q.question_id].get("complete") is True:
-            cycles.append(existing[q.question_id])
+            cached=existing[q.question_id]
+            if cached.get("fingerprint") != q.fingerprint:
+                raise RuntimeError(
+                    f"Track D cached research fingerprint mismatch for {q.question_id}; "
+                    "refusing to reuse a completed answer for a changed question."
+                )
+            cycles.append(cached)
             continue
 
         prior={}

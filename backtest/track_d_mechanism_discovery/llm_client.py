@@ -38,7 +38,13 @@ def load_model_config() -> dict[str, Any]:
         raise RuntimeError("Track D DeepSeek run requires DEEPSEEK_API_BASE in root .env")
 
     try:
-        max_retry = max(1, int(os.environ.get("MAX_RETRY", "15")))
+        global_retry = max(1, int(os.environ.get("MAX_RETRY", "15")))
+        track_retry_raw = os.environ.get("TRACK_D_MAX_RETRY", "").strip()
+        max_retry = (
+            max(1, min(8, int(track_retry_raw)))
+            if track_retry_raw
+            else min(global_retry, 4)
+        )
         retry_wait = max(0.0, float(os.environ.get("RETRY_WAIT_SECONDS", "15")))
         max_tokens = max(1000, int(os.environ.get("TRACK_D_MAX_TOKENS", str(MAX_TOKENS_PER_CALL))))
     except ValueError as exc:
@@ -124,12 +130,13 @@ class DeepSeekResearchClient:
         except Exception as exc:
             raise RuntimeError("LiteLLM is unavailable in the local RD-Agent environment") from exc
 
+        base_messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ]
         kwargs: dict[str, Any] = {
             "model": self.cfg["model"],
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
+            "messages": base_messages,
             "api_key": self.cfg["api_key"],
             "temperature": float(temperature),
             "max_tokens": int(self.cfg["max_tokens"]),
@@ -139,10 +146,25 @@ class DeepSeekResearchClient:
             kwargs["api_base"] = self.cfg["api_base"]
 
         last_exc: Exception | None = None
+        compact_json_retry = False
         for attempt in range(1, int(self.cfg["max_retry"]) + 1):
             self.ledger.reserve_attempt(purpose_id, prompt_hash, attempt)
             try:
-                response = completion(**kwargs)
+                attempt_kwargs = dict(kwargs)
+                if compact_json_retry:
+                    attempt_kwargs["messages"] = [
+                        *base_messages,
+                        {
+                            "role": "user",
+                            "content": (
+                                "Retry because the previous answer was empty, truncated, or invalid JSON. "
+                                "Return only compact valid JSON. Keep arrays short (normally <=2 items), "
+                                "remove prose outside JSON, and prioritize the highest-value tests/claims."
+                            ),
+                        },
+                    ]
+                    attempt_kwargs["temperature"] = min(float(temperature), 0.35)
+                response = completion(**attempt_kwargs)
                 content = response.choices[0].message.content
                 if not content:
                     raise RuntimeError("empty model response")
@@ -163,12 +185,15 @@ class DeepSeekResearchClient:
                     "reasoning_effort_configured": self.cfg["reasoning_effort_configured"],
                     "reasoning_effort_forwarded": False,
                     "attempt": attempt,
+                    "compact_json_retry": compact_json_retry,
                 }, indent=2), encoding="utf-8")
                 self.ledger.mark_success(purpose_id, prompt_hash, response_hash)
                 return parsed
             except Exception as exc:
                 last_exc = exc
                 self.ledger.mark_failure(purpose_id, prompt_hash, attempt, str(exc))
+                if isinstance(exc, json.JSONDecodeError) or "empty model response" in str(exc).lower():
+                    compact_json_retry = True
                 if attempt >= int(self.cfg["max_retry"]):
                     break
                 if self.ledger.remaining <= 0:

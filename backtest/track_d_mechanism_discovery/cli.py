@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import HISTORICAL_END, OUT, PANEL_SOURCE, REQUEST_HARD_LIMIT
+from .config import (
+    CACHE_MIGRATION_ALLOWED_FROM,
+    HISTORICAL_END,
+    OUT,
+    PANEL_SOURCE,
+    REQUEST_HARD_LIMIT,
+)
 from .failure_archaeology import build_failure_archaeology
 from .integrity import git_sha, hash_file, verify_phase0, write_or_verify_phase0
 from .llm_client import DeepSeekResearchClient
@@ -60,13 +66,59 @@ def _split()->dict:
     return json.loads(SPLIT.read_text(encoding="utf-8"))
 
 
+def _reset_for_source_change(old_source_sha:str,new_source_sha:str)->None:
+    """One-time focused-protocol migration that preserves already-paid research cache.
+
+    Only the explicitly allowlisted source revision can migrate. All deterministic
+    artifacts are rebuilt under the new source hash; raw successful responses,
+    request-attempt accounting, and completed research cycles are retained.
+    """
+    if old_source_sha not in set(CACHE_MIGRATION_ALLOWED_FROM):
+        shutil.rmtree(OUT)
+        return
+
+    preserve={"rdagent_raw","request_budget_ledger.json","research_ledger.json"}
+    for child in list(OUT.iterdir()):
+        if child.name in preserve:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+    completed_cycles=0
+    if RESEARCH_LEDGER.exists():
+        try:
+            old_research=json.loads(RESEARCH_LEDGER.read_text(encoding="utf-8"))
+            completed_cycles=sum(
+                1 for item in old_research.get("cycles",[])
+                if item.get("complete") is True
+            )
+        except Exception:
+            completed_cycles=0
+
+    migration={
+        "from_source_git_sha":old_source_sha,
+        "to_source_git_sha":new_source_sha,
+        "preserved_completed_cycles":completed_cycles,
+        "preserved_raw_meta_files":len(list((OUT/"rdagent_raw").glob("*.meta.json"))) if (OUT/"rdagent_raw").exists() else 0,
+        "request_budget_ledger_preserved":REQUEST_LEDGER.exists(),
+        "research_ledger_preserved":RESEARCH_LEDGER.exists(),
+        "reason":"focused_track_d_protocol_reuses_only_matching_question_fingerprints",
+    }
+    (OUT/"cache_migration.json").write_text(
+        json.dumps(migration,indent=2),
+        encoding="utf-8",
+    )
+
+
 def cmd_prepare(_:argparse.Namespace)->None:
-    # Resume is allowed only for the exact same source commit. A source change
-    # invalidates every cached LLM response and generated Track D artifact.
+    current_sha=git_sha()
     if PHASE0.exists():
         old=json.loads(PHASE0.read_text(encoding="utf-8"))
-        if old.get("source_git_sha") != git_sha():
-            shutil.rmtree(OUT)
+        old_sha=str(old.get("source_git_sha") or "")
+        if old_sha != current_sha:
+            _reset_for_source_change(old_sha,current_sha)
     OUT.mkdir(parents=True,exist_ok=True)
     df=_panel()
     snaps=sorted(df["snapshot_date"].astype(str).unique().tolist())

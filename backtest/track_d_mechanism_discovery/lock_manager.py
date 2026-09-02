@@ -41,7 +41,7 @@ def seal_policy_freeze(
             raise RuntimeError(f"Track D freeze artifact missing: {p}")
 
     manifest={
-        "protocol_version":"track_d_v1",
+        "protocol_version":"track_d_v1_focused",
         "run_id":phase0["run_id"],
         "source_git_sha":phase0["source_git_sha"],
         "phase0_hash":hash_file(phase0_path),
@@ -110,7 +110,7 @@ def seal_final_lock(
             raise RuntimeError(f"Track D final artifact missing: {name} -> {path}")
         artifacts[name]=hash_file(path)
     manifest={
-        "protocol_version":"track_d_v1",
+        "protocol_version":"track_d_v1_focused",
         "run_id":phase0["run_id"],
         "source_git_sha":phase0["source_git_sha"],
         "phase0_hash":hash_file(phase0_path),

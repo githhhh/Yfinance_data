@@ -116,7 +116,7 @@ def write_or_verify_phase0(manifest_path: Path, snapshots: list[str]) -> dict[st
         + deps["codebase_hash"][:8]
     )
     manifest = {
-        "protocol_version": "track_d_v1",
+        "protocol_version": "track_d_v1_focused",
         "run_id": run_id,
         "source_git_sha": current_sha,
         "snapshot_count": len(snapshots),

@@ -89,9 +89,11 @@ def _lane_questions() -> list[str]:
         "weak-volume weeks",
         "industry-crowded weeks",
     ]
+    # Regime-major ordering keeps all three competing lane hypotheses represented
+    # even when the focused protocol takes only the first subset.
     return [
         f"Test the hypothesis '{h}' specifically in {r}. Give discriminating predictions for B0_LANE, LANE_NEUTRAL, and SCORE_BEFORE_LANE."
-        for h in hypotheses for r in regimes
+        for r in regimes for h in hypotheses
     ]
 
 
@@ -129,9 +131,11 @@ def _adversarial_questions() -> list[str]:
         "identify a hidden conditioning or selection effect",
         "specify a falsification test that could reverse the current interpretation",
     ]
+    # Attack-major ordering ensures the focused six-question subset challenges
+    # every major conclusion once instead of exhausting all attacks on two topics.
     return [
         f"Adversarially attack {target}: {attack}. Prefer a concrete diagnostic over generic caution."
-        for target in targets for attack in attacks
+        for attack in attacks for target in targets
     ]
 
 

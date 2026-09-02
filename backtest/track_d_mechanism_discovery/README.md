@@ -22,19 +22,22 @@ verdicts. It is not permission to claim B0 is unbeatable.
 
 ## DeepSeek request budget
 
-The deep profile pre-registers 126 unique questions x 4 roles = 504 research calls, plus:
+The focused deep profile pre-registers 78 unique questions x 4 roles = 312 research calls, plus:
 
-- 30 executable-policy synthesis calls;
-- up to 12 pre-outcome adversarial policy reviews;
-- 6 post-evaluation interpretation calls.
+- 13 executable-policy synthesis calls;
+- up to 6 pre-outcome adversarial policy reviews;
+- 4 post-evaluation interpretation calls.
 
-Planned maximum before retries: 552 calls.
+Planned maximum before retries: 335 calls. The 20 mechanism-falsification and 22 failure-archaeology
+questions remain fully covered; later directions are deliberately pruned to representative, decision-changing questions.
 
 The hard Track D limit is 650 provider attempts including retries. The protocol was authored when the
 daily account meter was 202/1000, leaving substantial reserve. Do not raise the hard limit during a run.
 
 Successful calls are cached by purpose ID and prompt hash. Re-running on the same source commit resumes
-without re-spending those requests. A source-commit change invalidates Track D output/cache and starts a new run.
+without re-spending those requests. The one-time focused-protocol migration from source 00770fb... preserves
+the already-paid request ledger, raw responses, and completed cycles; every reused completed question must
+match its frozen fingerprint. Other source changes still invalidate Track D output/cache.
 
 ## Local execution contract for Gemini
 

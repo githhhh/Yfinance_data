@@ -33,18 +33,25 @@ MINIMAL_SCREENING_PER_REMOVAL_COUNT = 1
 # The hard 650-call cap includes retries and leaves meaningful daily headroom.
 REQUEST_HARD_LIMIT = 650
 MAX_TOKENS_PER_CALL = 5000
+# One-time migration source: retain already-paid DeepSeek cache/results when
+# moving from the original 126-question protocol to the focused 78-question plan.
+CACHE_MIGRATION_ALLOWED_FROM = (
+    "00770fb35b75248bfd197598887a83ee85cd042f",
+,)
 RESEARCH_ROLE_SEQUENCE = ("researcher", "skeptic", "experimental_designer", "synthesizer")
+# Focused deep protocol: preserve completed foundational work and spend remaining
+# calls only on directions that can still change B1/Minimal-B0 design.
 DIRECTION_QUESTION_COUNTS = {
     "mechanism_falsification": 20,
     "failure_archaeology": 22,
-    "capacity_abstention": 18,
-    "lane_mechanism": 18,
-    "nonlinear_b1": 30,
-    "adversarial_review": 18,
+    "capacity_abstention": 10,
+    "lane_mechanism": 8,
+    "nonlinear_b1": 12,
+    "adversarial_review": 6,
 }
-POLICY_SYNTHESIS_CALLS = 30
-POLICY_REVIEW_CALLS = 12
-FINAL_INTERPRETATION_CALLS = 6
+POLICY_SYNTHESIS_CALLS = 13
+POLICY_REVIEW_CALLS = 6
+FINAL_INTERPRETATION_CALLS = 4
 MAX_FROZEN_AGENT_POLICIES = 120
 
 # Minimal-B0 search is deterministic and pre-registered, not LLM-driven.
