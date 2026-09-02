@@ -120,14 +120,11 @@ def run_research(
     )
     champion_name = champion.name if champion is not None else ""
 
-    audit_rule = champion if champion is not None else core_rule
-    audit_selected = select_all_weeks(evaluation_panel, audit_rule)
-    missed_winners = missed_big_winners(evaluation_panel, audit_selected)
-    included_losers = included_big_losers(evaluation_panel, audit_selected)
-    if not missed_winners.empty:
-        missed_winners.insert(0, "audit_rule", audit_rule.name)
-    if not included_losers.empty:
-        included_losers.insert(0, "audit_rule", audit_rule.name)
+    missed_winners, included_losers = build_case_audits(
+        evaluation_panel,
+        core_rule=core_rule,
+        champion=champion,
+    )
 
     latest_review = latest_review_list(panel, core_rule)
     champion_latest = (
@@ -277,6 +274,42 @@ def mature_four_week_panel(
     return panel[
         panel["snapshot_date"].astype(str).isin(mature_weeks)
     ].copy()
+
+
+def build_case_audits(
+    panel: pd.DataFrame,
+    *,
+    core_rule,
+    champion,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep case-level B0, primary R1 and champion comparisons auditable."""
+    variants = [
+        ("B0_ACTIONABLE_ONLY", select_all_weeks(panel, None)),
+        (core_rule.name, select_all_weeks(panel, core_rule)),
+    ]
+    if champion is not None and champion.name != core_rule.name:
+        variants.append((champion.name, select_all_weeks(panel, champion)))
+
+    missed_parts = []
+    loser_parts = []
+    for name, selected in variants:
+        missed = missed_big_winners(panel, selected)
+        if not missed.empty:
+            missed.insert(0, "audit_rule", name)
+            missed_parts.append(missed)
+        losers = included_big_losers(panel, selected)
+        if not losers.empty:
+            losers.insert(0, "audit_rule", name)
+            loser_parts.append(losers)
+
+    return (
+        pd.concat(missed_parts, ignore_index=True)
+        if missed_parts
+        else pd.DataFrame(),
+        pd.concat(loser_parts, ignore_index=True)
+        if loser_parts
+        else pd.DataFrame(),
+    )
 
 
 def latest_review_list(panel: pd.DataFrame, rule) -> pd.DataFrame:
