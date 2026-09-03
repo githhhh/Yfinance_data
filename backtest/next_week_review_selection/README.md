@@ -1,26 +1,34 @@
 # Next Week Review Selection Research
 
-Branch: `research/next-week-review-selection`
+Latest controlled experiment: **v0.6 deterministic discriminative study**.
 
-v0.5 turns the experiment into a real optimizer OOS test:
+v0.6 deliberately does **not** use rd-agent or ML.
 
-- every formal fold must choose one train-only provisional champion;
-- training stability ranks candidates but cannot block OOS entry;
-- only full 4-week test blocks count formally;
-- the final partial block is `TAIL_EXPLORATORY`;
-- behaviorally identical rule parameterizations are de-duplicated by selection signature;
-- the main OOS object is the adaptive train-select-next-block policy;
-- exact/structural rule convergence is reported separately;
-- setup-balanced sensitivity checks whether apparent gains depend on uneven setup coverage.
+It fixes the v0.5 train-converged anchor:
 
-Run without changing parameters:
+`Near5 + UNCONFIRMED/BELOW_TRIGGER + >=2 evidence families + Geometry allow`
+
+and asks whether existing PIT fields can refine that supplemental cohort while keeping review attention <= **1.50x B0**.
+
+Important: the historical test weeks were already observed in v0.5, so v0.6 is a **retrospective reused-history confirmation**, not a new sealed holdout.
+
+Run tests:
 
 ```bash
 /Users/dev/.conda/envs/quant_env/bin/python \
-  -m pytest tests/test_next_week_review_selection.py -q
-
-/Users/dev/.conda/envs/quant_env/bin/python \
-  -m backtest.next_week_review_selection.run
+  -m pytest tests/test_next_week_review_selection.py \
+  tests/test_next_week_review_discriminative.py -q
 ```
 
-Generated outputs are retrospective research artifacts only.
+Run only v0.6:
+
+```bash
+/Users/dev/.conda/envs/quant_env/bin/python \
+  -m backtest.next_week_review_selection.run_discriminative
+```
+
+Outputs are written to:
+
+`backtest/next_week_review_selection/output_v06/`
+
+Do not change parameters during the formal run.
