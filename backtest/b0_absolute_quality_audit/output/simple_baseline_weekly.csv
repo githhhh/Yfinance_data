@@ -3,207 +3,207 @@ snapshot_date,baseline,feature,target_pick_count,pick_count,codes,raw_week_prima
 2025-10-10,entry_volume,ibd_entry_volume_ratio,3,3,"[""SANM"", ""MP"", ""ALM""]",True,True,True,True,-0.18301000000000003,66.66666666666666,True
 2025-10-10,eps,eps_yoy_growth,3,3,"[""RIOT"", ""CORZ"", ""TEM""]",True,True,True,True,-13.689273333333333,100.0,True
 2025-10-10,momentum_20,mom_20,3,3,"[""ASTS"", ""ALM"", ""RIOT""]",True,True,True,True,-17.66657066666667,100.0,True
-2025-10-10,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-10-10,rel_spy_20,rel_spy_20,3,3,"[""ASTS"", ""ALM"", ""RIOT""]",True,True,True,True,-17.66657066666667,100.0,True
 2025-10-24,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""ROST"", ""SEDG"", ""AVGO""]",True,True,True,True,-0.5060480000000002,66.66666666666666,True
 2025-10-24,entry_volume,ibd_entry_volume_ratio,3,3,"[""IBM"", ""RTX"", ""MMM""]",True,True,True,True,-1.1863650000000001,0.0,False
 2025-10-24,eps,eps_yoy_growth,3,3,"[""IBM"", ""AVGO"", ""RIOT""]",True,True,True,True,-11.224197666666667,66.66666666666666,True
 2025-10-24,momentum_20,mom_20,3,3,"[""SHOP"", ""RIOT"", ""GH""]",True,True,True,True,1.5399390000000015,66.66666666666666,True
-2025-10-24,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-10-24,rel_spy_20,rel_spy_20,3,3,"[""SHOP"", ""RIOT"", ""GH""]",True,True,True,True,1.5399390000000015,66.66666666666666,True
 2025-10-31,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SOFI"", ""WFC"", ""MS""]",False,True,True,False,-0.35501933333333335,33.33333333333333,True
 2025-10-31,entry_volume,ibd_entry_volume_ratio,3,3,"[""ROKU"", ""W"", ""MTSR""]",False,True,False,False,,,
 2025-10-31,eps,eps_yoy_growth,3,3,"[""SOFI"", ""CRDO"", ""ROKU""]",False,True,True,False,-8.169364333333334,100.0,True
 2025-10-31,momentum_20,mom_20,3,3,"[""CRDO"", ""WULF"", ""CAH""]",False,True,True,False,-2.399714999999999,66.66666666666666,True
-2025-10-31,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2025-10-31,rel_spy_20,rel_spy_20,3,3,"[""CRDO"", ""WULF"", ""CAH""]",False,True,True,False,-2.399714999999999,66.66666666666666,True
 2025-11-07,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""COLL"", ""JPM"", ""ARGX""]",True,True,True,True,6.281409666666666,0.0,False
 2025-11-07,entry_volume,ibd_entry_volume_ratio,3,3,"[""EXPE"", ""SEDG"", ""SANM""]",True,True,True,True,-11.075935666666666,100.0,True
 2025-11-07,eps,eps_yoy_growth,3,3,"[""FIGS"", ""VTR"", ""STX""]",True,True,True,True,12.080240333333334,33.33333333333333,True
 2025-11-07,momentum_20,mom_20,3,3,"[""GH"", ""SANM"", ""COLL""]",True,True,True,True,3.9980386666666674,33.33333333333333,True
-2025-11-07,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-11-07,rel_spy_20,rel_spy_20,3,3,"[""GH"", ""SANM"", ""COLL""]",True,True,True,True,3.9980386666666674,33.33333333333333,True
 2025-11-14,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""EA"", ""NTRA"", ""MS""]",False,True,False,False,,,
 2025-11-14,entry_volume,ibd_entry_volume_ratio,3,3,"[""LH"", ""LYFT"", ""ALL""]",False,True,True,False,-6.098831333333333,33.33333333333333,True
 2025-11-14,eps,eps_yoy_growth,3,3,"[""LLY"", ""LYFT"", ""ALL""]",False,True,True,False,-3.9458466666666676,33.33333333333333,True
 2025-11-14,momentum_20,mom_20,3,3,"[""COLL"", ""LLY"", ""NTRA""]",False,True,True,False,8.920719666666667,0.0,False
-2025-11-14,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2025-11-14,rel_spy_20,rel_spy_20,3,3,"[""COLL"", ""LLY"", ""NTRA""]",False,True,True,False,8.920719666666667,0.0,False
 2025-11-21,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""WMT"", ""BTSG"", ""ABBV""]",True,True,True,True,4.058366666666667,0.0,False
 2025-11-21,entry_volume,ibd_entry_volume_ratio,3,3,"[""ROST"", ""WMT"", ""GOOG""]",True,True,True,True,3.9040350000000004,0.0,False
 2025-11-21,eps,eps_yoy_growth,3,3,"[""BTSG"", ""WMT"", ""GOOG""]",True,True,True,True,5.256405,0.0,False
 2025-11-21,momentum_20,mom_20,3,3,"[""GOOG"", ""MNPR"", ""ROST""]",True,True,True,True,-6.357622,33.33333333333333,True
-2025-11-21,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-11-21,rel_spy_20,rel_spy_20,3,3,"[""GOOG"", ""MNPR"", ""ROST""]",True,True,True,True,-6.357622,33.33333333333333,True
 2025-11-28,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""BKR"", ""VCYT"", ""CASY""]",False,True,True,False,-6.232342666666665,66.66666666666666,True
 2025-11-28,entry_volume,ibd_entry_volume_ratio,3,3,"[""WWD"", ""AVGO"", ""VCYT""]",False,True,True,False,-5.629673333333334,66.66666666666666,True
 2025-11-28,eps,eps_yoy_growth,3,3,"[""COHR"", ""BTSG"", ""CRDO""]",False,True,True,False,2.511343,33.33333333333333,True
 2025-11-28,momentum_20,mom_20,3,3,"[""VCYT"", ""COHR"", ""WWD""]",False,True,True,False,4.096654,33.33333333333333,True
-2025-11-28,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2025-11-28,rel_spy_20,rel_spy_20,3,3,"[""VCYT"", ""COHR"", ""WWD""]",False,True,True,False,4.096654,33.33333333333333,True
 2025-12-05,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SHOP"", ""JPM"", ""WWD""]",False,True,True,False,4.921591666666667,0.0,False
 2025-12-05,entry_volume,ibd_entry_volume_ratio,3,3,"[""PATH"", ""DASH"", ""LSCC""]",False,True,True,False,-4.328876,66.66666666666666,True
 2025-12-05,eps,eps_yoy_growth,3,3,"[""LYFT"", ""WDC"", ""VRT""]",False,True,True,False,-4.426356333333334,66.66666666666666,True
 2025-12-05,momentum_20,mom_20,3,3,"[""CVNA"", ""LSCC"", ""WWD""]",False,True,True,False,2.372149333333333,66.66666666666666,True
-2025-12-05,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2025-12-05,rel_spy_20,rel_spy_20,3,3,"[""CVNA"", ""LSCC"", ""WWD""]",False,True,True,False,2.372149333333333,66.66666666666666,True
 2025-12-12,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""TSLA"", ""ZION"", ""BLK""]",True,True,True,True,-1.6991936666666667,33.33333333333333,True
 2025-12-12,entry_volume,ibd_entry_volume_ratio,3,2,"[""FEIM"", ""ROKU""]",True,False,True,False,11.774829333333335,33.33333333333333,True
 2025-12-12,eps,eps_yoy_growth,3,3,"[""IBM"", ""NUTX"", ""ROKU""]",True,True,True,True,0.8947526666666666,33.33333333333333,True
 2025-12-12,momentum_20,mom_20,3,3,"[""NUTX"", ""FEIM"", ""AEO""]",True,True,True,True,11.024601333333335,66.66666666666666,True
-2025-12-12,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-12-12,rel_spy_20,rel_spy_20,3,3,"[""NUTX"", ""FEIM"", ""AEO""]",True,True,True,True,11.024601333333335,66.66666666666666,True
 2025-12-19,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SHOP"", ""HWM"", ""TTWO""]",True,True,True,True,-1.0057436666666668,33.33333333333333,True
 2025-12-19,entry_volume,ibd_entry_volume_ratio,3,3,"[""PAC"", ""MNST"", ""SCHW""]",True,True,True,True,2.109809,0.0,False
 2025-12-19,eps,eps_yoy_growth,3,3,"[""LLY"", ""PLTR"", ""MU""]",True,True,True,True,5.0109916666666665,33.33333333333333,True
 2025-12-19,momentum_20,mom_20,3,3,"[""RKLB"", ""ALM"", ""MU""]",True,True,True,True,21.181319666666667,33.33333333333333,True
-2025-12-19,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-12-19,rel_spy_20,rel_spy_20,3,3,"[""RKLB"", ""ALM"", ""MU""]",True,True,True,True,21.181319666666667,33.33333333333333,True
 2025-12-26,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""CASY"", ""HWM"", ""SMTC""]",True,True,True,True,6.532311,0.0,False
 2025-12-26,entry_volume,ibd_entry_volume_ratio,3,3,"[""FEIM"", ""HEI"", ""HUT""]",True,True,True,True,3.278238,33.33333333333333,True
 2025-12-26,eps,eps_yoy_growth,3,3,"[""HUT"", ""SCHW"", ""SMTC""]",True,True,True,True,8.459821333333332,0.0,False
 2025-12-26,momentum_20,mom_20,3,3,"[""FEIM"", ""ALM"", ""HUT""]",True,True,True,True,11.649259333333333,66.66666666666666,True
-2025-12-26,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2025-12-26,rel_spy_20,rel_spy_20,3,3,"[""FEIM"", ""ALM"", ""HUT""]",True,True,True,True,11.649259333333333,66.66666666666666,True
 2026-01-02,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SHEL"", ""GEV"", ""HEI""]",True,True,True,True,3.4140073333333336,66.66666666666666,True
 2026-01-02,entry_volume,ibd_entry_volume_ratio,3,2,"[""BIDU"", ""ASML""]",True,False,True,False,7.232989,0.0,False
 2026-01-02,eps,eps_yoy_growth,3,3,"[""BTSG"", ""GEV"", ""RKLB""]",True,True,True,True,4.609877333333333,33.33333333333333,True
 2026-01-02,momentum_20,mom_20,3,3,"[""RKLB"", ""BIDU"", ""GEV""]",True,True,True,True,3.7946333333333335,33.33333333333333,True
-2026-01-02,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-01-02,rel_spy_20,rel_spy_20,3,3,"[""RKLB"", ""BIDU"", ""GEV""]",True,True,True,True,3.7946333333333335,33.33333333333333,True
 2026-01-09,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SOLV"", ""NTRA"", ""AZN""]",True,True,True,True,-7.062297,66.66666666666666,True
 2026-01-09,entry_volume,ibd_entry_volume_ratio,3,3,"[""FTAI"", ""ASML"", ""SNDK""]",True,True,True,True,27.930445333333335,0.0,False
 2026-01-09,eps,eps_yoy_growth,3,3,"[""HUT"", ""LGND"", ""SOLV""]",True,True,True,True,-7.594584333333333,100.0,True
 2026-01-09,momentum_20,mom_20,3,3,"[""SNDK"", ""FTAI"", ""HUT""]",True,True,True,True,22.157410999999996,33.33333333333333,True
-2026-01-09,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-01-09,rel_spy_20,rel_spy_20,3,3,"[""SNDK"", ""FTAI"", ""HUT""]",True,True,True,True,22.157410999999996,33.33333333333333,True
 2026-01-16,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""IBKR"", ""SANM"", ""TKO""]",True,True,True,True,-3.3054640000000006,33.33333333333333,True
 2026-01-16,entry_volume,ibd_entry_volume_ratio,3,3,"[""ASTS"", ""MRNA"", ""IBKR""]",True,True,True,True,-5.986008666666667,66.66666666666666,True
 2026-01-16,eps,eps_yoy_growth,3,3,"[""JNJ"", ""SCHW"", ""STX""]",True,True,True,True,10.715801333333332,33.33333333333333,True
 2026-01-16,momentum_20,mom_20,3,3,"[""ASTS"", ""MRNA"", ""SANM""]",True,True,True,True,-11.530489666666668,100.0,True
-2026-01-16,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-01-16,rel_spy_20,rel_spy_20,3,3,"[""ASTS"", ""MRNA"", ""SANM""]",True,True,True,True,-11.530489666666668,100.0,True
 2026-01-23,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""MTB"", ""COHR"", ""PAC""]",True,True,True,True,10.278991,33.33333333333333,True
 2026-01-23,entry_volume,ibd_entry_volume_ratio,3,3,"[""ALM"", ""LMND"", ""BKR""]",True,True,True,True,0.004382333333332156,66.66666666666666,True
 2026-01-23,eps,eps_yoy_growth,3,3,"[""COHR"", ""ROKU"", ""CVNA""]",True,True,True,True,-8.411689666666666,100.0,True
 2026-01-23,momentum_20,mom_20,3,3,"[""BILI"", ""ALM"", ""BKR""]",True,True,True,True,12.136117333333331,66.66666666666666,True
-2026-01-23,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-01-23,rel_spy_20,rel_spy_20,3,3,"[""BILI"", ""ALM"", ""BKR""]",True,True,True,True,12.136117333333331,66.66666666666666,True
 2026-01-30,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""AAPL"", ""CAH"", ""GSK""]",True,True,True,True,7.011123333333333,0.0,False
 2026-01-30,entry_volume,ibd_entry_volume_ratio,3,3,"[""ALM"", ""ZM"", ""IBM""]",True,True,True,True,12.957962999999998,66.66666666666666,True
 2026-01-30,eps,eps_yoy_growth,3,3,"[""IBM"", ""ZM"", ""PFG""]",True,True,True,True,-13.693576,66.66666666666666,True
 2026-01-30,momentum_20,mom_20,3,3,"[""LMT"", ""ALM"", ""AAOI""]",True,True,True,True,78.336981,33.33333333333333,True
-2026-01-30,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-01-30,rel_spy_20,rel_spy_20,3,3,"[""LMT"", ""ALM"", ""AAOI""]",True,True,True,True,78.336981,33.33333333333333,True
 2026-02-13,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""PFIS"", ""NYAX"", ""MAS""]",True,True,True,True,-5.913140666666667,100.0,True
 2026-02-13,entry_volume,ibd_entry_volume_ratio,3,3,"[""AZN"", ""GNRC"", ""SN""]",True,True,True,True,-11.999712,100.0,True
 2026-02-13,eps,eps_yoy_growth,3,3,"[""PFIS"", ""VRT"", ""NEM""]",True,True,True,True,-0.6920630000000001,66.66666666666666,True
 2026-02-13,momentum_20,mom_20,3,3,"[""GNRC"", ""VRT"", ""WULF""]",True,True,True,True,2.458936,66.66666666666666,True
-2026-02-13,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-02-13,rel_spy_20,rel_spy_20,3,3,"[""GNRC"", ""VRT"", ""WULF""]",True,True,True,True,2.458936,66.66666666666666,True
 2026-02-20,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""UBS"", ""HWM"", ""AS""]",True,True,True,True,-13.655067333333335,100.0,True
 2026-02-20,entry_volume,ibd_entry_volume_ratio,3,3,"[""AXTI"", ""PAC"", ""RTX""]",True,True,True,True,31.106756000000004,66.66666666666666,True
 2026-02-20,eps,eps_yoy_growth,3,3,"[""TTMI"", ""CDE"", ""COHR""]",True,True,True,True,-9.902662999999999,66.66666666666666,True
 2026-02-20,momentum_20,mom_20,3,3,"[""AXTI"", ""XPO"", ""AAOI""]",True,True,True,True,64.45093466666667,66.66666666666666,True
-2026-02-20,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-02-20,rel_spy_20,rel_spy_20,3,3,"[""AXTI"", ""XPO"", ""AAOI""]",True,True,True,True,64.45093466666667,66.66666666666666,True
 2026-02-27,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""BTSG"", ""APEI"", ""BMY""]",True,True,True,True,6.4915069999999995,66.66666666666666,True
 2026-02-27,entry_volume,ibd_entry_volume_ratio,3,3,"[""NATL"", ""CASY"", ""FIGS""]",True,True,True,True,-2.0745746666666665,33.33333333333333,True
 2026-02-27,eps,eps_yoy_growth,3,3,"[""EQIX"", ""BMY"", ""FIGS""]",True,True,True,True,-3.8991396666666667,66.66666666666666,True
 2026-02-27,momentum_20,mom_20,3,3,"[""FIGS"", ""NATL"", ""EQIX""]",True,True,True,True,-3.0441160000000003,33.33333333333333,True
-2026-02-27,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-02-27,rel_spy_20,rel_spy_20,3,3,"[""FIGS"", ""NATL"", ""EQIX""]",True,True,True,True,-3.0441160000000003,33.33333333333333,True
 2026-03-06,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""LMT"", ""VVX"", ""FIGS""]",True,True,True,True,-8.063467666666666,100.0,True
 2026-03-06,entry_volume,ibd_entry_volume_ratio,3,3,"[""EXPE"", ""FIGS"", ""CF""]",True,True,True,True,-3.123498,100.0,True
 2026-03-06,eps,eps_yoy_growth,3,3,"[""FIGS"", ""MPC"", ""LMT""]",True,True,True,True,-4.439510333333334,66.66666666666666,True
 2026-03-06,momentum_20,mom_20,3,3,"[""FIGS"", ""CF"", ""PBF""]",True,True,True,True,0.7667053333333333,100.0,True
-2026-03-06,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-03-06,rel_spy_20,rel_spy_20,3,3,"[""FIGS"", ""CF"", ""PBF""]",True,True,True,True,0.7667053333333333,100.0,True
 2026-03-13,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""KR"", ""EQIX"", ""SNDK""]",True,True,True,True,12.370113333333334,66.66666666666666,True
 2026-03-13,entry_volume,ibd_entry_volume_ratio,3,2,"[""APEI"", ""DOCN""]",True,False,True,False,4.779422666666666,33.33333333333333,True
 2026-03-13,eps,eps_yoy_growth,3,3,"[""EQIX"", ""SNDK"", ""NFG""]",True,True,True,True,13.917118,33.33333333333333,True
 2026-03-13,momentum_20,mom_20,3,3,"[""APEI"", ""DOCN"", ""SNDK""]",True,True,True,True,17.626564,66.66666666666666,True
-2026-03-13,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-03-13,rel_spy_20,rel_spy_20,3,3,"[""APEI"", ""DOCN"", ""SNDK""]",True,True,True,True,17.626564,66.66666666666666,True
 2026-03-20,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""MTZ"", ""STX"", ""CIEN""]",True,True,True,True,25.085573666666665,66.66666666666666,True
 2026-03-20,entry_volume,ibd_entry_volume_ratio,3,3,"[""BTU"", ""STX"", ""DOCN""]",True,True,True,True,2.624317,100.0,True
 2026-03-20,eps,eps_yoy_growth,3,3,"[""CIEN"", ""WDC"", ""MTZ""]",True,True,True,True,23.934490333333333,66.66666666666666,True
 2026-03-20,momentum_20,mom_20,3,3,"[""SEDG"", ""DOCN"", ""CIEN""]",True,True,True,True,3.872007,100.0,True
-2026-03-20,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-03-20,rel_spy_20,rel_spy_20,3,3,"[""SEDG"", ""DOCN"", ""CIEN""]",True,True,True,True,3.872007,100.0,True
 2026-03-27,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""GEV"", ""PFIS"", ""EQIX""]",True,True,True,True,16.555938333333334,0.0,False
 2026-03-27,entry_volume,ibd_entry_volume_ratio,3,3,"[""DELL"", ""CASY"", ""NEM""]",True,True,True,True,16.344703,33.33333333333333,True
 2026-03-27,eps,eps_yoy_growth,3,3,"[""EQIX"", ""GEV"", ""NFG""]",True,True,True,True,11.678091333333333,33.33333333333333,True
 2026-03-27,momentum_20,mom_20,3,3,"[""DELL"", ""NFG"", ""CASY""]",True,True,True,True,10.346469333333333,66.66666666666666,True
-2026-03-27,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-03-27,rel_spy_20,rel_spy_20,3,3,"[""DELL"", ""NFG"", ""CASY""]",True,True,True,True,10.346469333333333,66.66666666666666,True
 2026-04-02,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""FN"", ""BMY"", ""FBNC""]",False,True,True,False,9.708537666666667,0.0,False
 2026-04-02,entry_volume,ibd_entry_volume_ratio,3,3,"[""CLST"", ""ECO"", ""MRVL""]",False,True,True,False,16.735943666666667,0.0,False
 2026-04-02,eps,eps_yoy_growth,3,3,"[""SSRM"", ""EQIX"", ""BMY""]",False,True,True,False,-1.513779666666667,33.33333333333333,True
 2026-04-02,momentum_20,mom_20,3,3,"[""PL"", ""MRVL"", ""LITE""]",False,True,True,False,24.908028,33.33333333333333,True
-2026-04-02,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-04-02,rel_spy_20,rel_spy_20,3,3,"[""PL"", ""MRVL"", ""LITE""]",False,True,True,False,24.908028,33.33333333333333,True
 2026-04-10,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""BBT"", ""CAT"", ""XPO""]",True,True,True,True,1.3265706666666672,33.33333333333333,True
 2026-04-10,entry_volume,ibd_entry_volume_ratio,3,3,"[""DBD"", ""AEHR"", ""FRAF""]",True,True,True,True,14.237089,33.33333333333333,True
 2026-04-10,eps,eps_yoy_growth,3,3,"[""SSRM"", ""NVT"", ""FRAF""]",True,True,True,True,12.92988266666667,33.33333333333333,True
 2026-04-10,momentum_20,mom_20,3,3,"[""SPIR"", ""AEHR"", ""MRVL""]",True,True,True,True,22.415757,33.33333333333333,True
-2026-04-10,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-04-10,rel_spy_20,rel_spy_20,3,3,"[""SPIR"", ""AEHR"", ""MRVL""]",True,True,True,True,22.415757,33.33333333333333,True
 2026-04-17,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""FBP"", ""CAC"", ""ACLX""]",False,True,False,False,,,
 2026-04-17,entry_volume,ibd_entry_volume_ratio,3,3,"[""GSAT"", ""TRVI"", ""SILC""]",False,True,True,False,12.624907,66.66666666666666,True
 2026-04-17,eps,eps_yoy_growth,3,3,"[""CNA"", ""BFH"", ""UVE""]",False,True,True,False,-0.11285300000000002,66.66666666666666,True
 2026-04-17,momentum_20,mom_20,3,3,"[""SILC"", ""HUT"", ""PL""]",False,True,True,False,27.890441666666664,66.66666666666666,True
-2026-04-17,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-04-17,rel_spy_20,rel_spy_20,3,3,"[""SILC"", ""HUT"", ""PL""]",False,True,True,False,27.890441666666664,66.66666666666666,True
 2026-04-24,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""TWST"", ""GOOG"", ""PRA""]",False,True,False,False,,,
 2026-04-24,entry_volume,ibd_entry_volume_ratio,3,3,"[""NYAX"", ""INBX"", ""CHMG""]",False,True,True,False,-4.1602206666666675,33.33333333333333,True
 2026-04-24,eps,eps_yoy_growth,3,3,"[""UVE"", ""REPX"", ""TDW""]",False,True,True,False,-1.8135723333333331,66.66666666666666,True
 2026-04-24,momentum_20,mom_20,3,3,"[""POET"", ""INBX"", ""ASYS""]",False,True,True,False,16.453979666666665,100.0,True
-2026-04-24,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-04-24,rel_spy_20,rel_spy_20,3,3,"[""POET"", ""INBX"", ""ASYS""]",False,True,True,False,16.453979666666665,100.0,True
 2026-05-01,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""AAPL"", ""AEP"", ""PFIS""]",False,True,True,False,1.8220973333333337,33.33333333333333,True
 2026-05-01,entry_volume,ibd_entry_volume_ratio,3,3,"[""KALV"", ""MRAM"", ""BAND""]",False,True,False,False,,,
 2026-05-01,eps,eps_yoy_growth,3,3,"[""DINO"", ""LAMR"", ""REPX""]",False,True,True,False,2.523670666666667,33.33333333333333,True
 2026-05-01,momentum_20,mom_20,3,3,"[""BAND"", ""MRAM"", ""ANAB""]",False,True,True,False,27.611580000000004,66.66666666666666,True
-2026-05-01,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-05-01,rel_spy_20,rel_spy_20,3,3,"[""BAND"", ""MRAM"", ""ANAB""]",False,True,True,False,27.611580000000004,66.66666666666666,True
 2026-05-08,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""AKR"", ""SYRE"", ""PRA""]",False,True,False,False,,,
 2026-05-08,entry_volume,ibd_entry_volume_ratio,3,3,"[""FSEA"", ""WFCF"", ""CYTK""]",False,True,True,False,-15.882878333333332,66.66666666666666,True
 2026-05-08,eps,eps_yoy_growth,3,3,"[""TRS"", ""AMN"", ""TSN""]",False,True,True,False,-5.503507333333334,100.0,True
 2026-05-08,momentum_20,mom_20,3,3,"[""MXL"", ""JLHL"", ""LIFE""]",False,True,True,False,22.772078333333337,100.0,True
-2026-05-08,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-05-08,rel_spy_20,rel_spy_20,3,3,"[""MXL"", ""JLHL"", ""LIFE""]",False,True,True,False,22.772078333333337,100.0,True
 2026-05-15,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""KRYS"", ""VLGEA"", ""PM""]",False,True,True,False,-2.8135056666666665,66.66666666666666,True
 2026-05-15,entry_volume,ibd_entry_volume_ratio,3,3,"[""CAEP"", ""LQDA"", ""ELMD""]",False,True,False,False,,,
 2026-05-15,eps,eps_yoy_growth,3,3,"[""COHR"", ""MPC"", ""DCO""]",False,True,True,False,7.2918666666666665,33.33333333333333,True
 2026-05-15,momentum_20,mom_20,3,3,"[""TRT"", ""AKAM"", ""FTNT""]",False,True,True,False,-10.726947333333333,66.66666666666666,True
-2026-05-15,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-05-15,rel_spy_20,rel_spy_20,3,3,"[""TRT"", ""AKAM"", ""FTNT""]",False,True,True,False,-10.726947333333333,66.66666666666666,True
 2026-05-22,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""ARCB"", ""HLT"", ""KLAC""]",False,True,True,False,15.953396666666668,0.0,False
 2026-05-22,entry_volume,ibd_entry_volume_ratio,3,3,"[""PDLB"", ""ROIV"", ""RXO""]",False,True,True,False,4.81181,0.0,False
 2026-05-22,eps,eps_yoy_growth,3,3,"[""TRS"", ""ACNB"", ""AKR""]",False,True,True,False,4.598086333333334,0.0,False
 2026-05-22,momentum_20,mom_20,3,3,"[""OSS"", ""LQDA"", ""VOYG""]",False,True,True,False,-4.518006333333333,100.0,True
-2026-05-22,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-05-22,rel_spy_20,rel_spy_20,3,3,"[""OSS"", ""LQDA"", ""VOYG""]",False,True,True,False,-4.518006333333333,100.0,True
 2026-05-29,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SILA"", ""BJRI"", ""CATY""]",False,True,False,False,,,
 2026-05-29,entry_volume,ibd_entry_volume_ratio,3,3,"[""ASTC"", ""UMAC"", ""FUSB""]",False,True,True,False,-33.250188,66.66666666666666,True
 2026-05-29,eps,eps_yoy_growth,3,3,"[""NBIX"", ""CENX"", ""SBLK""]",False,True,True,False,-10.314627333333332,66.66666666666666,True
 2026-05-29,momentum_20,mom_20,3,3,"[""ASTC"", ""UMAC"", ""VELO""]",False,True,True,False,-41.809071,100.0,True
-2026-05-29,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-05-29,rel_spy_20,rel_spy_20,3,3,"[""ASTC"", ""UMAC"", ""VELO""]",False,True,True,False,-41.809071,100.0,True
 2026-06-05,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""FBP"", ""WLKP"", ""AROW""]",False,True,True,False,4.632419666666666,0.0,False
 2026-06-05,entry_volume,ibd_entry_volume_ratio,3,3,"[""VSXY"", ""FTK"", ""TBBB""]",False,True,True,False,2.276552333333333,33.33333333333333,True
 2026-06-05,eps,eps_yoy_growth,3,3,"[""DINO"", ""AMN"", ""AFL""]",False,True,True,False,5.504715333333333,66.66666666666666,True
 2026-06-05,momentum_20,mom_20,3,3,"[""JLHL"", ""VSXY"", ""FTK""]",False,True,True,False,-30.947556000000002,66.66666666666666,True
-2026-06-05,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-06-05,rel_spy_20,rel_spy_20,3,3,"[""JLHL"", ""VSXY"", ""FTK""]",False,True,True,False,-30.947556000000002,66.66666666666666,True
 2026-06-12,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""WWD"", ""INCY"", ""CZWI""]",False,True,True,False,4.249188666666667,33.33333333333333,True
 2026-06-12,entry_volume,ibd_entry_volume_ratio,3,3,"[""NUVL"", ""OCC"", ""FDSB""]",False,True,False,False,,,
 2026-06-12,eps,eps_yoy_growth,3,3,"[""ACNB"", ""PLOW"", ""CALY""]",False,True,True,False,-0.7567330000000001,33.33333333333333,True
 2026-06-12,momentum_20,mom_20,3,3,"[""OCC"", ""FAC"", ""SNDK""]",False,True,True,False,-40.082233333333335,100.0,True
-2026-06-12,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-06-12,rel_spy_20,rel_spy_20,3,3,"[""OCC"", ""FAC"", ""SNDK""]",False,True,True,False,-40.082233333333335,100.0,True
 2026-06-18,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""AFBI"", ""EIG"", ""SLAB""]",False,True,False,False,,,
 2026-06-18,entry_volume,ibd_entry_volume_ratio,3,3,"[""ALOT"", ""HQ"", ""SWBI""]",False,True,True,False,-16.956496333333334,66.66666666666666,True
 2026-06-18,eps,eps_yoy_growth,3,3,"[""TRS"", ""VSXY"", ""CALY""]",False,True,True,False,0.9212850000000001,66.66666666666666,True
 2026-06-18,momentum_20,mom_20,3,3,"[""HQ"", ""ALOT"", ""SHAZ""]",False,True,True,False,-26.218974333333335,66.66666666666666,True
-2026-06-18,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-06-18,rel_spy_20,rel_spy_20,3,3,"[""HQ"", ""ALOT"", ""SHAZ""]",False,True,True,False,-26.218974333333335,66.66666666666666,True
 2026-06-26,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""NTCT"", ""NGS"", ""BFS""]",False,True,True,False,-8.448851000000001,33.33333333333333,True
 2026-06-26,entry_volume,ibd_entry_volume_ratio,3,3,"[""APGE"", ""CBFV"", ""ACA""]",False,True,True,False,-0.7869040000000002,0.0,False
 2026-06-26,eps,eps_yoy_growth,3,3,"[""AMN"", ""AFL"", ""PLOW""]",False,True,True,False,-2.7721016666666665,33.33333333333333,True
 2026-06-26,momentum_20,mom_20,3,3,"[""NVCT"", ""APGE"", ""SI""]",False,True,True,False,-9.305943000000001,33.33333333333333,True
-2026-06-26,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-06-26,rel_spy_20,rel_spy_20,3,3,"[""NVCT"", ""APGE"", ""SI""]",False,True,True,False,-9.305943000000001,33.33333333333333,True
 2026-07-02,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""CNS"", ""JAZZ"", ""NUVL""]",False,True,False,False,,,
 2026-07-02,entry_volume,ibd_entry_volume_ratio,3,3,"[""CCXI"", ""BSET"", ""CBNA""]",False,True,True,False,-4.793527666666667,66.66666666666666,True
 2026-07-02,eps,eps_yoy_growth,3,3,"[""DINO"", ""AFL"", ""NBIX""]",False,True,True,False,7.243870333333334,0.0,False
 2026-07-02,momentum_20,mom_20,3,3,"[""BLZE"", ""CCXI"", ""NUTX""]",False,True,True,False,-12.906938000000002,100.0,True
-2026-07-02,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-07-02,rel_spy_20,rel_spy_20,3,3,"[""BLZE"", ""CCXI"", ""NUTX""]",False,True,True,False,-12.906938000000002,100.0,True
 2026-07-10,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""LASR"", ""SLAB"", ""AAPL""]",False,True,True,False,-10.222068666666667,33.33333333333333,True
 2026-07-10,entry_volume,ibd_entry_volume_ratio,3,3,"[""TRAX"", ""BBIO"", ""PENG""]",False,True,True,False,2.4607739999999985,33.33333333333333,True
 2026-07-10,eps,eps_yoy_growth,3,3,"[""DINO"", ""PENG"", ""SBLK""]",False,True,True,False,-4.120466666666667,33.33333333333333,True
 2026-07-10,momentum_20,mom_20,3,3,"[""FTH"", ""TRAX"", ""WYFI""]",False,True,True,False,-6.5974960000000005,66.66666666666666,True
-2026-07-10,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-07-10,rel_spy_20,rel_spy_20,3,3,"[""FTH"", ""TRAX"", ""WYFI""]",False,True,True,False,-6.5974960000000005,66.66666666666666,True
 2026-07-17,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""ALX"", ""PKOH"", ""SMBC""]",False,True,True,False,7.888554666666667,33.33333333333333,True
 2026-07-17,entry_volume,ibd_entry_volume_ratio,3,3,"[""TCBK"", ""GHRS"", ""CDNA""]",False,True,True,False,5.807942333333334,66.66666666666666,True
 2026-07-17,eps,eps_yoy_growth,3,3,"[""DINO"", ""AFL"", ""CALY""]",False,True,True,False,-2.886875666666666,66.66666666666666,True
 2026-07-17,momentum_20,mom_20,3,3,"[""FBRX"", ""CRNX"", ""COAG""]",False,True,True,False,22.261884,33.33333333333333,True
-2026-07-17,rel_spy_20,rel_spy_20,3,0,[],False,False,True,False,0.0,0.0,False
+2026-07-17,rel_spy_20,rel_spy_20,3,3,"[""FBRX"", ""CRNX"", ""COAG""]",False,True,True,False,22.261884,33.33333333333333,True
 2026-07-24,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""SPG"", ""ALOT"", ""RBCAA""]",True,True,True,True,-1.668007,0.0,False
 2026-07-24,entry_volume,ibd_entry_volume_ratio,3,3,"[""EDRY"", ""SAFT"", ""BLFS""]",True,True,True,True,40.055225,0.0,False
 2026-07-24,eps,eps_yoy_growth,3,3,"[""ACNB"", ""LPG"", ""IRM""]",True,True,True,True,5.410733333333333,33.33333333333333,True
 2026-07-24,momentum_20,mom_20,3,3,"[""SAFT"", ""NVEC"", ""LPG""]",True,True,True,True,4.2203773333333325,33.33333333333333,True
-2026-07-24,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-07-24,rel_spy_20,rel_spy_20,3,3,"[""SAFT"", ""NVEC"", ""LPG""]",True,True,True,True,4.2203773333333325,33.33333333333333,True
 2026-07-31,closest_to_trigger,current_vs_ibd_candidate_pct,3,3,"[""MANU"", ""BPOP"", ""FSEA""]",True,True,True,True,-3.109279666666667,33.33333333333333,True
 2026-07-31,entry_volume,ibd_entry_volume_ratio,3,3,"[""MTX"", ""RCKY"", ""SAIH""]",True,True,True,True,3.051135333333333,33.33333333333333,True
 2026-07-31,eps,eps_yoy_growth,3,3,"[""VSXY"", ""LPG"", ""GIII""]",True,True,True,True,-3.316126,66.66666666666666,True
 2026-07-31,momentum_20,mom_20,3,3,"[""TRAX"", ""RACC"", ""SAIH""]",True,True,True,True,4.078105666666667,66.66666666666666,True
-2026-07-31,rel_spy_20,rel_spy_20,3,0,[],True,False,True,False,0.0,0.0,False
+2026-07-31,rel_spy_20,rel_spy_20,3,3,"[""TRAX"", ""RACC"", ""SAIH""]",True,True,True,True,4.078105666666667,66.66666666666666,True
 2026-08-07,closest_to_trigger,current_vs_ibd_candidate_pct,0,0,[],False,False,True,False,0.0,0.0,False
 2026-08-07,entry_volume,ibd_entry_volume_ratio,0,0,[],False,False,True,False,0.0,0.0,False
 2026-08-07,eps,eps_yoy_growth,0,0,[],False,False,True,False,0.0,0.0,False

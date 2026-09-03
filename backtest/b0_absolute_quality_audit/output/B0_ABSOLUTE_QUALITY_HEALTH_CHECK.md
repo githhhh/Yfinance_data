@@ -1,4 +1,4 @@
-# Current Production B0 — Absolute Quality Health Check v1.1
+# Current Production B0 — Absolute Quality Health Check v1.2
 
 ## Executive coordinates
 
@@ -73,6 +73,21 @@ Matched-N is retained as a name-selection diagnostic only:
 - Median matched-N edge: **2.27pp**
 - Beat-rate: **65.0%**
 
+### Temporal support coverage
+
+Strict-support results are interpreted together with their calendar concentration.
+
+| Comparison | Quarter | Support weeks | Total snapshots | Support rate |
+| --- | --- | ---: | ---: | ---: |
+| raw_fixed3_primary | 2025Q4 | 7 | 11 | 63.6% |
+| raw_fixed3_primary | 2026Q1 | 12 | 12 | 100.0% |
+| raw_fixed3_primary | 2026Q2 | 1 | 13 | 7.7% |
+| raw_fixed3_primary | 2026Q3 | 2 | 6 | 33.3% |
+| simple_momentum_20 | 2025Q4 | 7 | 11 | 63.6% |
+| simple_momentum_20 | 2026Q1 | 12 | 12 | 100.0% |
+| simple_momentum_20 | 2026Q2 | 1 | 13 | 7.7% |
+| simple_momentum_20 | 2026Q3 | 2 | 6 | 33.3% |
+
 ## 4. Underfill / cash policy — Fill3 counterfactual ladder
 
 ### Why B0 is underfilled
@@ -92,7 +107,7 @@ Every Fill3 policy preserves all original B0 picks. It may only fill empty slots
 - SINGLE_REJECT: fill with the highest B0-ranked candidate that failed exactly one hard gate.
 - ANY_REJECT: diagnostic upper bound; any rejected known-industry candidate may fill.
 
-| Policy | Scope | Weeks | Mean Δ vs B0 | Median Δ | Beat B0 | Stop Δ pp | Ruin-week Δ pp | Full3 | Added-pick mean |
+| Policy | Scope | Weeks | Mean Δ vs B0 | Median Δ | Beat B0 | Slot-stop exposure Δ | Any Stop/≤-8 week Δ | Full3 | Added-pick mean |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | B0_ORIGINAL | all_mature | 41 | 0.00pp | 0.00pp | 0.0% | 0.00pp | 0.00pp | 58.5% | N/A |
 | B0_ORIGINAL | underfilled_only | 17 | 0.00pp | 0.00pp | 0.0% | 0.00pp | 0.00pp | 0.0% | N/A |
@@ -105,7 +120,34 @@ Every Fill3 policy preserves all original B0 picks. It may only fill empty slots
 | B0_FILL3_ANY_REJECT | all_mature | 41 | 1.24pp | 0.00pp | 29.3% | 7.32pp | 7.32pp | 100.0% | 4.43% |
 | B0_FILL3_ANY_REJECT | underfilled_only | 17 | 2.98pp | 2.12pp | 70.6% | 17.65pp | 17.65pp | 100.0% | 4.43% |
 
-Interpretation rule: do not change Production to always-3 merely because fixed-3 random has a higher mean. The minimal-change candidate is B0_FILL3_SINGLE_REJECT; only a coherent gain on underfilled weeks without material Stop/Ruin deterioration would justify future shadow testing.
+### Per-pick quality — removes the mechanical effect of holding more names
+
+| Policy | Cohort | Picks | Mean W4 | Median W4 | P10 | CVaR10 | Positive | Stop8/pick | Final W4≤-8 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| B0_FILL3_RELAX_INDUSTRY | original_b0 | 22 | 6.16% | 5.15% | -5.91% | -9.60% | 72.7% | 31.8% | 4.5% |
+| B0_FILL3_RELAX_INDUSTRY | added_fill | 2 | -18.61% | -18.61% | -25.16% | -26.80% | 0.0% | 100.0% | 100.0% |
+| B0_FILL3_EPS_ONLY | original_b0 | 22 | 6.16% | 5.15% | -5.91% | -9.60% | 72.7% | 31.8% | 4.5% |
+| B0_FILL3_EPS_ONLY | added_fill | 4 | 6.71% | 4.62% | -0.44% | -2.04% | 75.0% | 25.0% | 0.0% |
+| B0_FILL3_SINGLE_REJECT | original_b0 | 22 | 6.16% | 5.15% | -5.91% | -9.60% | 72.7% | 31.8% | 4.5% |
+| B0_FILL3_SINGLE_REJECT | added_fill | 29 | 3.65% | 5.92% | -17.19% | -19.96% | 58.6% | 34.5% | 17.2% |
+| B0_FILL3_ANY_REJECT | original_b0 | 22 | 6.16% | 5.15% | -5.91% | -9.60% | 72.7% | 31.8% | 4.5% |
+| B0_FILL3_ANY_REJECT | added_fill | 29 | 5.25% | 6.30% | -15.13% | -17.98% | 62.1% | 31.0% | 13.8% |
+
+Added fills by exact reject reason:
+
+| Policy | Reject reason | Picks | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| B0_FILL3_RELAX_INDUSTRY | (none) | 2 | -18.61% | -18.61% | 0.0% | 100.0% | 100.0% |
+| B0_FILL3_EPS_ONLY | eps_unknown | 4 | 6.71% | 4.62% | 75.0% | 25.0% | 0.0% |
+| B0_FILL3_SINGLE_REJECT | eps_unknown | 3 | 7.84% | 5.92% | 66.7% | 33.3% | 0.0% |
+| B0_FILL3_SINGLE_REJECT | non_actionable | 26 | 3.16% | 5.95% | 57.7% | 34.6% | 19.2% |
+| B0_FILL3_ANY_REJECT | eps_unknown | 3 | 7.84% | 5.92% | 66.7% | 33.3% | 0.0% |
+| B0_FILL3_ANY_REJECT | non_actionable | 23 | 3.80% | 6.09% | 56.5% | 34.8% | 17.4% |
+| B0_FILL3_ANY_REJECT | non_actionable|eps_unknown | 3 | 13.74% | 12.55% | 100.0% | 0.0% | 0.0% |
+
+Portfolio-level any-stop/≤-8-week deltas rise mechanically when more positions are held; they are exposure diagnostics, not proof that each added name is intrinsically riskier. Per-pick Stop8 and terminal-left-tail rates above are the quality comparison.
+
+Interpretation rule: do not change Production to always-3 merely because fixed-3 random has a higher mean. The minimal-change candidate is B0_FILL3_SINGLE_REJECT; only a coherent gain on underfilled weeks without material per-pick or portfolio left-tail deterioration would justify future shadow testing.
 
 ## 5. Eligibility gate quality
 
@@ -166,15 +208,37 @@ A strong Top bucket does not imply globally monotonic fine ranking; the entire b
 
 ## 8. Simple raw-PIT baselines — tradable next-open outcome
 
-| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ | Median Δ | Beat B0 | 95% mean-edge CI | Mean w/o best1 | Mean w/o best2 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
-| closest_to_trigger | 22 | 2.49% | 1.34% | -1.58pp | 0.19pp | 50.0% | [-6.62pp, 4.01pp] | -2.73pp | -3.35pp |
-| entry_volume | 19 | 6.42% | 2.62% | 2.49pp | -0.18pp | 47.4% | [-4.97pp, 8.38pp] | 0.42pp | -1.34pp |
-| eps | 22 | 1.73% | 2.75% | -2.34pp | -1.16pp | 45.5% | [-9.56pp, 4.75pp] | -3.47pp | -4.63pp |
-| momentum_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp |
-| rel_spy_20 | 0 | N/A | N/A | N/A | N/A | N/A | [N/A, N/A] | N/A | N/A |
+| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ | Median Δ | Beat B0 | 95% mean-edge CI | Mean w/o best1 | Mean w/o best2 | Stop exposure Δ | Any Stop/≤-8 week Δ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| closest_to_trigger | 22 | 2.49% | 1.34% | -1.58pp | 0.19pp | 50.0% | [-6.62pp, 4.01pp] | -2.73pp | -3.35pp | 21.21pp | 22.73pp |
+| entry_volume | 19 | 6.42% | 2.62% | 2.49pp | -0.18pp | 47.4% | [-4.97pp, 8.38pp] | 0.42pp | -1.34pp | 22.81pp | 15.79pp |
+| eps | 22 | 1.73% | 2.75% | -2.34pp | -1.16pp | 45.5% | [-9.56pp, 4.75pp] | -3.47pp | -4.63pp | 30.30pp | 40.91pp |
+| momentum_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp | 37.88pp | 50.00pp |
+| rel_spy_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp | 37.88pp | 50.00pp |
 
 Large mean gains with flat/negative medians or strong best-week dependence are treated as right-tail hypotheses, not as proof of stable superiority.
+
+### Momentum20 gate-location diagnostic
+
+This answers whether the raw momentum baseline's incremental names were already inside the B0 eligible universe or mainly outside the hard gates.
+
+| Cohort | Picks | Share of momentum picks | Selected by B0 | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| all | 66 | 100.0% | 16.7% | 11.70% | 3.57% | 60.6% | 59.1% | 21.2% |
+| eligible | 11 | 16.7% | 100.0% | 20.71% | 13.10% | 81.8% | 45.5% | 18.2% |
+| gate_outside | 55 | 83.3% | 0.0% | 9.90% | 2.20% | 56.4% | 61.8% | 21.8% |
+
+Gate-outside momentum picks by exact reject reason:
+
+| Reject reason | Picks | Share of gate-outside momentum | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clear_geometry_failure | 3 | 5.5% | 4.46% | 0.17% | 66.7% | 0.0% | 0.0% |
+| clear_geometry_failure|eps_unknown | 2 | 3.6% | 34.24% | 34.24% | 50.0% | 50.0% | 50.0% |
+| eps_unknown | 1 | 1.8% | 2.70% | 2.70% | 100.0% | 0.0% | 0.0% |
+| non_actionable | 38 | 69.1% | 9.75% | 0.79% | 50.0% | 68.4% | 26.3% |
+| non_actionable|clear_geometry_failure | 4 | 7.3% | 7.37% | 8.42% | 100.0% | 50.0% | 0.0% |
+| non_actionable|clear_geometry_failure|eps_unknown | 1 | 1.8% | -3.79% | -3.79% | 0.0% | 100.0% | 0.0% |
+| non_actionable|eps_unknown | 6 | 10.9% | 10.65% | 12.30% | 66.7% | 66.7% | 16.7% |
 
 ## 9. SPY / QQQ benchmark — Yahoo, same tradable clock
 
@@ -183,7 +247,7 @@ Large mean gains with flat/negative medians or strong best-week dependence are t
 | SPY | 41 | 1.53% | 3.63% | 2.10pp | 2.51pp | 3.76pp | [-0.39pp, 5.12pp] |
 | QQQ | 41 | 1.79% | 3.63% | 1.84pp | 2.29pp | 3.51pp | [-1.32pp, 5.25pp] |
 
-## 10. Non-overlap stability
+## 10. Non-overlap stability — ranking, raw fixed3, and momentum20
 
 | Comparison | Offset | Weeks | Value mean | Benchmark mean | Spread mean | Spread median |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -195,6 +259,10 @@ Large mean gains with flat/negative medians or strong best-week dependence are t
 | b0_vs_raw_fixed3_next_open | 1 | 6 | 0.88% | 4.51% | -3.63pp | -1.59pp |
 | b0_vs_raw_fixed3_next_open | 2 | 5 | 4.45% | 3.71% | 0.74pp | 0.69pp |
 | b0_vs_raw_fixed3_next_open | 3 | 5 | 8.48% | 6.72% | 1.76pp | 3.31pp |
+| momentum20_vs_b0_next_open | 0 | 6 | 6.64% | 3.25% | 3.39pp | 6.47pp |
+| momentum20_vs_b0_next_open | 1 | 6 | 13.93% | 0.88% | 13.05pp | 5.12pp |
+| momentum20_vs_b0_next_open | 2 | 5 | 7.02% | 4.45% | 2.57pp | -0.37pp |
+| momentum20_vs_b0_next_open | 3 | 5 | 19.79% | 8.48% | 11.31pp | 8.11pp |
 
 ## Evidence boundary
 
@@ -204,8 +272,8 @@ This report is a retrospective measurement instrument. It can identify where B0 
 
 ## Provenance
 
-- source_git_sha: 7e88af66cf89599e9d661a203293965cebcc46ae
-- protocol_version: b0_absolute_quality_v1_1
+- source_git_sha: 1e43e644413187a2c54fcea614363aa892592bd9
+- protocol_version: b0_absolute_quality_v1_2
 - production_b0_hash: 115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477
 - panel_hash: d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5
 - base_price_cache_hash: 1dfced4c23c639478dd42f0188648823f1c2cafea796fc1a043c56d87d55eb4f

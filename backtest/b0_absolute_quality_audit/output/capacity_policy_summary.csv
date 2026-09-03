@@ -1,4 +1,4 @@
-policy_id,scope,support_weeks,mean_return,median_return,mean_spread_vs_b0,median_spread_vs_b0,beat_b0_rate,spread_ci_low,spread_ci_high,mean_stop_delta_pp,ruin_week_delta_pp,full3_rate,mean_added_pick_return,median_added_pick_return
+policy_id,scope,support_weeks,mean_return,median_return,mean_spread_vs_b0,median_spread_vs_b0,beat_b0_rate,spread_ci_low,spread_ci_high,mean_slot_stop_exposure_delta_pp,any_stop_or_le8_week_delta_pp,full3_rate,mean_added_pick_return,median_added_pick_return
 B0_ORIGINAL,all_mature,41,3.6288398536585365,2.364088666666667,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.5853658536585366,,
 B0_ORIGINAL,underfilled_only,17,2.655338745098039,2.364088666666667,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,,
 B0_FILL3_RELAX_INDUSTRY,all_mature,41,3.3261999186991873,1.897781666666667,-0.3026399349593496,0.0,0.0,-0.823151,0.0,1.6260162601626014,4.878048780487805,0.6097560975609756,-18.612356,-18.612356
