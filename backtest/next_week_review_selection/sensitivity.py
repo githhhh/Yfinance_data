@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from .metrics import compare_metrics, evaluate_selection
+from .utils import ZERO_TOL
 
 
 KEYS = ["snapshot_date", "code"]
@@ -85,11 +86,15 @@ def setup_balanced_sensitivity(
         if metric.endswith("_delta_vs_b0"):
             if "loser_capture_lift" in metric or "severe_loser" in metric:
                 summary[f"setup_nonworse_rate_{metric}"] = (
-                    float((values <= 0).mean()) if len(values) else np.nan
+                    float((values <= ZERO_TOL).mean())
+                    if len(values)
+                    else np.nan
                 )
             else:
                 summary[f"setup_nonnegative_rate_{metric}"] = (
-                    float((values >= 0).mean()) if len(values) else np.nan
+                    float((values >= -ZERO_TOL).mean())
+                    if len(values)
+                    else np.nan
                 )
     return detail, pd.DataFrame([summary])
 
