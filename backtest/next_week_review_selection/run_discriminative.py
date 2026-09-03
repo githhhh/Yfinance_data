@@ -28,6 +28,7 @@ from .oracle import add_weekly_oracle_flags
 from .run import build_weekend_event_panel
 from .sensitivity import setup_balanced_sensitivity
 from .utils import (
+    ZERO_TOL,
     is_nonnegative,
     is_nonpositive,
     content_hash,
@@ -185,6 +186,7 @@ def run_research(
         "min_train_weeks": min_train_weeks,
         "test_weeks": test_weeks,
         "max_attention_multiplier": MAX_ATTENTION_MULTIPLIER,
+        "numeric_zero_tolerance": ZERO_TOL,
         "candidate_library_size": len(candidate_library()),
         "static_rule": rule_to_dict(static_rule),
         "static_status_pre_setup_sensitivity": static_status_pre_sensitivity,
@@ -409,6 +411,7 @@ def _render_report(
             "",
             "## Guardrails",
             f"- attention multiplier cap: <= {MAX_ATTENTION_MULTIPLIER:.2f}x B0",
+            f"- numeric zero tolerance: {ZERO_TOL:g}",
             "- fixed anchor: Near5 + UNCONFIRMED/BELOW_TRIGGER + >=2 evidence families + Geometry allow",
             "- candidate refinements use at most two coarse, interpretable PIT conditions",
             "- first 20 weeks choose one static discovery rule; it remains frozen across all formal replay folds",
