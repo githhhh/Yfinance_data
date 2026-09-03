@@ -28,6 +28,8 @@ from .oracle import add_weekly_oracle_flags
 from .run import build_weekend_event_panel
 from .sensitivity import setup_balanced_sensitivity
 from .utils import (
+    is_nonnegative,
+    is_nonpositive,
     content_hash,
     load_pools,
     load_price_cache,
@@ -329,8 +331,8 @@ def _apply_setup_sensitivity_gate(
         return "NO_STABLE_DISCRIMINATIVE_RULE_SETUP_SENSITIVITY"
 
     passes = (
-        float(winner_mean) >= 0
-        and float(loser_mean) <= 0
+        is_nonnegative(winner_mean)
+        and is_nonpositive(loser_mean)
         and float(winner_rate) >= 0.60
         and float(loser_rate) >= 0.60
     )
