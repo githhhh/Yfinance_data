@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dashboard.services.bf_transition import analyze_bf_transitions
+from dashboard.services import analyze_bf_transitions
 from dashboard.services.bf_midweek_review import build_midweek_review
 
 
