@@ -435,6 +435,7 @@ def _exited_actionable_event(
     row: pd.Series,
     *,
     previous_codes: set[str],
+    previous_status_by_code: dict[str, str | None],
     previous_available: bool,
 ) -> BFAttentionEvent | None:
     if to_bool(row.get("signal")) is not True:
@@ -450,7 +451,7 @@ def _exited_actionable_event(
         change_group="LEFT_ACTIONABLE",
         signal_origin="EXITED",
         baseline_status="ACTIONABLE",
-        previous_status="ACTIONABLE" if previous_available and code in previous_codes else None,
+        previous_status=previous_status_by_code.get(code) if previous_available else None,
         current_status=None,
         is_new_since_previous=is_new,
         reasons=("LEFT_ACTIONABLE", "EXITED_POOL"),
@@ -495,6 +496,7 @@ def analyze_bf_transitions(
     previous_available = previous_pool is not None and not previous_pool.empty
     previous_by_code: dict[str, pd.Series] = {}
     previous_event_type_by_code: dict[str, str | None] = {}
+    previous_status_by_code: dict[str, str | None] = {}
     previous_codes: set[str] = set()
     if previous_available:
         previous = normalize_transition_pool(previous_pool, label="previous")
@@ -503,6 +505,9 @@ def analyze_bf_transitions(
         for _, row in previous_review.iterrows():
             code = str(row["code"])
             previous_by_code[code] = row
+            previous_status_by_code[code] = _optional_text(
+                row.get("review_effective_entry_status")
+            )
             descriptor = _attention_descriptor(row)
             previous_event_type_by_code[code] = descriptor[0] if descriptor else None
 
@@ -528,6 +533,7 @@ def analyze_bf_transitions(
             event = _exited_actionable_event(
                 row,
                 previous_codes=previous_codes,
+                previous_status_by_code=previous_status_by_code,
                 previous_available=previous_available,
             )
             if event is not None:
