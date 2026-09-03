@@ -182,6 +182,12 @@ def test_adaptive_policy_gate_can_pass_with_different_fold_rules():
             "mean_tradable_winner_lift_delta": 0.03,
             "mean_tradable_loser_lift_delta": -0.02,
             "mean_incremental_opportunity_efficiency": 0.4,
+            "mean_tradable_winner_lift_delta_2w": 0.01,
+            "mean_tradable_loser_lift_delta_2w": -0.01,
+            "mean_tradable_winner_lift_delta_3w": 0.02,
+            "mean_tradable_loser_lift_delta_3w": -0.02,
+            "mean_tradable_winner_lift_delta_4w": 0.03,
+            "mean_tradable_loser_lift_delta_4w": -0.01,
         }
     ])
     assert adaptive_policy_status(summary) == "RETROSPECTIVE_ADAPTIVE_CANDIDATE"
