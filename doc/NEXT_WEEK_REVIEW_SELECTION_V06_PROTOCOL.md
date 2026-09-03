@@ -126,7 +126,10 @@ EXTENDED 仍不进入核心 selector。
 - Opportunity Recall Δ > 0；
 - 2–4W mean Winner Lift Δ >= 0；
 - 2–4W mean Loser Lift Δ <= 0；
-- 至少 2/3 horizons 同时满足 Winner Lift >=0 且 Loser Lift <=0。
+- 至少 2/3 horizons 同时满足 Winner Lift >=0 且 Loser Lift <=0；
+- discovery train 切成 3 个 chronological blocks，至少 2/3 blocks 同时满足 Opportunity Δ > 0、Winner Lift Δ >= 0、Loser Lift Δ <= 0。
+
+这一步用于避免某一个大信号周或单一时期主导 discovery 选择。因为 B0_NO_EXPANSION 是合法 fallback，所以稳定性门槛不会强迫一个差规则进入后续 replay。
 
 没有满足者：
 
