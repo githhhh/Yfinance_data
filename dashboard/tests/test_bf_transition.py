@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 
 from dashboard.services import analyze_bf_transitions
@@ -228,6 +230,9 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
         "MEDIUM": 1,
         "NOTIFICATION_ELIGIBLE": 3,
     }
+    payload = events["BECAME"].to_dict()
+    assert payload["facts"]["snapshot_date"] == "2026-07-29"
+    json.dumps(payload)
 
 
 def test_previous_pool_only_marks_new_material_events_for_notification():
@@ -313,6 +318,9 @@ def test_previous_pool_only_marks_new_material_events_for_notification():
     assert events["OLD_BECAME"].is_new_since_previous is False
     assert events["NEW_BECAME"].is_new_since_previous is True
     assert tuple(event.code for event in result.notification_events) == ("NEW_BECAME",)
+    assert tuple(item["code"] for item in result.attention_payload(notification_only=True)) == (
+        "NEW_BECAME",
+    )
 
 
 def test_new_signal_actionable_is_high_attention_with_origin_context():
