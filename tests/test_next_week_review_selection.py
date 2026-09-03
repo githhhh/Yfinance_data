@@ -193,6 +193,28 @@ def test_adaptive_policy_gate_can_pass_with_different_fold_rules():
     assert adaptive_policy_status(summary) == "RETROSPECTIVE_ADAPTIVE_CANDIDATE"
 
 
+
+def test_adaptive_policy_gate_rejects_single_horizon_degradation():
+    summary = pd.DataFrame([
+        {
+            "folds": 5,
+            "opportunity_positive_rate": 0.8,
+            "tradable_winner_lift_nonnegative_rate": 0.8,
+            "tradable_loser_lift_nonworse_rate": 0.8,
+            "mean_opportunity_delta": 0.2,
+            "mean_tradable_winner_lift_delta": 0.03,
+            "mean_tradable_loser_lift_delta": -0.02,
+            "mean_incremental_opportunity_efficiency": 0.4,
+            "mean_tradable_winner_lift_delta_2w": -0.01,
+            "mean_tradable_loser_lift_delta_2w": -0.01,
+            "mean_tradable_winner_lift_delta_3w": 0.02,
+            "mean_tradable_loser_lift_delta_3w": -0.02,
+            "mean_tradable_winner_lift_delta_4w": 0.03,
+            "mean_tradable_loser_lift_delta_4w": -0.01,
+        }
+    ])
+    assert adaptive_policy_status(summary) == "NO_STABLE_ADAPTIVE_POLICY"
+
 def _row(
     code,
     status,
