@@ -248,6 +248,7 @@
     "mean_gate_lift": 2.004724518531654,
     "median_gate_lift": 3.834628361823362
   },
+  "idealized_stop8_execution_semantics": "If a selected name ever triggers next_open_w4_stop8, its scenario return is set to exactly -8%; otherwise terminal next-open W4 is used. This is an optimistic no-slippage scenario, not realized execution.",
   "momentum_gate": {
     "all": {
       "picks": 66,

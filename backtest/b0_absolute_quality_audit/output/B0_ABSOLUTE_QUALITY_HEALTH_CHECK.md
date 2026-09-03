@@ -1,4 +1,4 @@
-# Current Production B0 — Absolute Quality Health Check v1.2
+# Current Production B0 — Absolute Quality Health Check v1.3
 
 ## Executive coordinates
 
@@ -145,6 +145,23 @@ Added fills by exact reject reason:
 | B0_FILL3_ANY_REJECT | non_actionable | 23 | 3.80% | 6.09% | 56.5% | 34.8% | 17.4% |
 | B0_FILL3_ANY_REJECT | non_actionable|eps_unknown | 3 | 13.74% | 12.55% | 100.0% | 0.0% | 0.0% |
 
+### Idealized Stop8 execution scenario
+
+For every name that triggers Stop8, scenario return is set to exactly -8%; otherwise terminal W4 is used. This is optimistic no-slippage execution and should be read as a scenario, not realized fills.
+
+| Policy | Scope | Weeks | Stop8-exec mean | Stop8-exec median | Mean Δ vs B0 | Median Δ | Beat B0 | 95% mean-edge CI | Worst | P10 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| B0_ORIGINAL | all_mature | 41 | 2.18% | 0.68% | 0.00pp | 0.00pp | 0.0% | [0.00pp, 0.00pp] | -8.00% | -3.23% |
+| B0_ORIGINAL | underfilled_only | 17 | 1.49% | 0.68% | 0.00pp | 0.00pp | 0.0% | [0.00pp, 0.00pp] | -5.33% | -2.67% |
+| B0_FILL3_RELAX_INDUSTRY | all_mature | 41 | 2.05% | 0.68% | -0.13pp | 0.00pp | 0.0% | [-0.33pp, 0.00pp] | -8.00% | -3.23% |
+| B0_FILL3_RELAX_INDUSTRY | underfilled_only | 17 | 1.18% | 0.68% | -0.31pp | 0.00pp | 0.0% | [-0.63pp, 0.00pp] | -5.33% | -2.67% |
+| B0_FILL3_EPS_ONLY | all_mature | 41 | 2.35% | 1.21% | 0.17pp | 0.00pp | 7.3% | [-0.20pp, 0.70pp] | -8.00% | -3.23% |
+| B0_FILL3_EPS_ONLY | underfilled_only | 17 | 1.90% | 1.21% | 0.41pp | 0.00pp | 17.6% | [-0.31pp, 1.63pp] | -5.33% | -2.67% |
+| B0_FILL3_SINGLE_REJECT | all_mature | 41 | 2.82% | 4.06% | 0.64pp | 0.00pp | 24.4% | [-0.25pp, 2.27pp] | -8.00% | -4.52% |
+| B0_FILL3_SINGLE_REJECT | underfilled_only | 17 | 3.04% | 5.18% | 1.55pp | 0.35pp | 58.8% | [-0.75pp, 5.40pp] | -8.00% | -8.00% |
+| B0_FILL3_ANY_REJECT | all_mature | 41 | 3.08% | 4.06% | 0.90pp | 0.00pp | 26.8% | [-0.03pp, 2.40pp] | -8.00% | -4.23% |
+| B0_FILL3_ANY_REJECT | underfilled_only | 17 | 3.65% | 5.18% | 2.16pp | 1.69pp | 64.7% | [-0.01pp, 5.62pp] | -8.00% | -4.49% |
+
 Portfolio-level any-stop/≤-8-week deltas rise mechanically when more positions are held; they are exposure diagnostics, not proof that each added name is intrinsically riskier. Per-pick Stop8 and terminal-left-tail rates above are the quality comparison.
 
 Interpretation rule: do not change Production to always-3 merely because fixed-3 random has a higher mean. The minimal-change candidate is B0_FILL3_SINGLE_REJECT; only a coherent gain on underfilled weeks without material per-pick or portfolio left-tail deterioration would justify future shadow testing.
@@ -214,7 +231,17 @@ A strong Top bucket does not imply globally monotonic fine ranking; the entire b
 | entry_volume | 19 | 6.42% | 2.62% | 2.49pp | -0.18pp | 47.4% | [-4.97pp, 8.38pp] | 0.42pp | -1.34pp | 22.81pp | 15.79pp |
 | eps | 22 | 1.73% | 2.75% | -2.34pp | -1.16pp | 45.5% | [-9.56pp, 4.75pp] | -3.47pp | -4.63pp | 30.30pp | 40.91pp |
 | momentum_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp | 37.88pp | 50.00pp |
-| rel_spy_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp | 37.88pp | 50.00pp |
+
+### Idealized Stop8 execution scenario for simple baselines
+
+| Baseline | Weeks | Stop8-exec mean | Stop8-exec median | Mean Δ vs B0 | Median Δ | Beat B0 | 95% mean-edge CI | Worst | P10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| closest_to_trigger | 22 | -0.06% | -1.17% | -1.75pp | -2.25pp | 45.5% | [-4.37pp, 0.97pp] | -8.00% | -7.77% |
+| entry_volume | 19 | 4.29% | 2.11% | 3.10pp | -2.39pp | 42.1% | [-2.46pp, 7.09pp] | -8.00% | -8.00% |
+| eps | 22 | 0.42% | -1.23% | -1.27pp | -2.10pp | 40.9% | [-2.94pp, 1.60pp] | -8.00% | -7.85% |
+| momentum_20 | 22 | 3.79% | -0.33% | 2.10pp | -2.67pp | 31.8% | [-2.08pp, 7.04pp] | -8.00% | -8.00% |
+
+Relative-SPY 20-session momentum is retained as a PIT diagnostic field, not as an independent Top3 baseline: subtracting the same SPY return from every candidate in one snapshot cannot change that snapshot's cross-sectional momentum ranking.
 
 Large mean gains with flat/negative medians or strong best-week dependence are treated as right-tail hypotheses, not as proof of stable superiority.
 
@@ -263,6 +290,10 @@ Gate-outside momentum picks by exact reject reason:
 | momentum20_vs_b0_next_open | 1 | 6 | 13.93% | 0.88% | 13.05pp | 5.12pp |
 | momentum20_vs_b0_next_open | 2 | 5 | 7.02% | 4.45% | 2.57pp | -0.37pp |
 | momentum20_vs_b0_next_open | 3 | 5 | 19.79% | 8.48% | 11.31pp | 8.11pp |
+| momentum20_vs_b0_idealized_stop8 | 0 | 6 | 1.85% | 2.65% | -0.80pp | -4.97pp |
+| momentum20_vs_b0_idealized_stop8 | 1 | 6 | 5.24% | 1.39% | 3.85pp | 2.98pp |
+| momentum20_vs_b0_idealized_stop8 | 2 | 5 | -0.16% | 2.49% | -2.64pp | -2.67pp |
+| momentum20_vs_b0_idealized_stop8 | 3 | 5 | 8.31% | 0.11% | 8.21pp | -2.67pp |
 
 ## Evidence boundary
 
@@ -272,8 +303,8 @@ This report is a retrospective measurement instrument. It can identify where B0 
 
 ## Provenance
 
-- source_git_sha: 1e43e644413187a2c54fcea614363aa892592bd9
-- protocol_version: b0_absolute_quality_v1_2
+- source_git_sha: a00083ef1018735fa1963f7591740763c9e05e1c
+- protocol_version: b0_absolute_quality_v1_3
 - production_b0_hash: 115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477
 - panel_hash: d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5
 - base_price_cache_hash: 1dfced4c23c639478dd42f0188648823f1c2cafea796fc1a043c56d87d55eb4f
