@@ -1,0 +1,98 @@
+{
+  "overall": "RETAIN_B0_WITHIN_TRACK_F_TESTED_COMPOSITIONS",
+  "shadow_candidates": [],
+  "policy_verdicts": [
+    {
+      "policy_id": "TRACK_F__CONFIRMED_ONLY_TOP3",
+      "verdict": "NO_HISTORICAL_SUPPORT_TO_REPLACE_B0",
+      "failed_checks": [
+        "full_mean",
+        "locked_mean",
+        "full_median",
+        "locked_median",
+        "locked_stop",
+        "locked_ruin",
+        "full_ci_low",
+        "locked_ci_low"
+      ],
+      "checks": {
+        "full_support": true,
+        "locked_support": true,
+        "full_mean": false,
+        "locked_mean": false,
+        "full_median": false,
+        "locked_median": false,
+        "full_cvar": true,
+        "locked_cvar": true,
+        "full_stop": true,
+        "locked_stop": false,
+        "full_ruin": true,
+        "locked_ruin": false,
+        "full_ci_low": false,
+        "locked_ci_low": false
+      }
+    },
+    {
+      "policy_id": "TRACK_F__CONFIRMED_PARITY_FALLBACK",
+      "verdict": "NO_HISTORICAL_SUPPORT_TO_REPLACE_B0",
+      "failed_checks": [
+        "full_mean",
+        "locked_mean",
+        "full_median",
+        "locked_median",
+        "full_cvar",
+        "locked_stop",
+        "locked_ruin",
+        "full_ci_low",
+        "locked_ci_low"
+      ],
+      "checks": {
+        "full_support": true,
+        "locked_support": true,
+        "full_mean": false,
+        "locked_mean": false,
+        "full_median": false,
+        "locked_median": false,
+        "full_cvar": false,
+        "locked_cvar": true,
+        "full_stop": true,
+        "locked_stop": false,
+        "full_ruin": true,
+        "locked_ruin": false,
+        "full_ci_low": false,
+        "locked_ci_low": false
+      }
+    },
+    {
+      "policy_id": "TRACK_F__FCS_MAX1",
+      "verdict": "NO_HISTORICAL_SUPPORT_TO_REPLACE_B0",
+      "failed_checks": [
+        "full_mean",
+        "locked_mean",
+        "full_median",
+        "locked_median",
+        "locked_stop",
+        "locked_ruin",
+        "full_ci_low",
+        "locked_ci_low"
+      ],
+      "checks": {
+        "full_support": true,
+        "locked_support": true,
+        "full_mean": false,
+        "locked_mean": false,
+        "full_median": false,
+        "locked_median": false,
+        "full_cvar": true,
+        "locked_cvar": true,
+        "full_stop": true,
+        "locked_stop": false,
+        "full_ruin": true,
+        "locked_ruin": false,
+        "full_ci_low": false,
+        "locked_ci_low": false
+      }
+    }
+  ],
+  "note": "Retrospective gate only. No Track F policy can be promoted without genuinely unseen future observations."
+}
