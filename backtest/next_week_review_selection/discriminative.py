@@ -259,7 +259,7 @@ def evaluate_candidate_grid(
     )
     grid["attention_cap_pass"] = pd.to_numeric(
         grid["attention_multiplier_vs_b0"], errors="coerce"
-    ).le(MAX_ATTENTION_MULTIPLIER)
+    ).le(MAX_ATTENTION_MULTIPLIER + ZERO_TOL)
     grid["train_quality_gate_pass"] = grid.apply(_train_quality_gate, axis=1)
     grid["feasible"] = (
         grid["signature_representative"]
