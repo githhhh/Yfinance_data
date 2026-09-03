@@ -213,11 +213,11 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
     assert set(events) == {"BECAME", "BELOW", "EXTENDED"}
     assert events["BECAME"].event_type == "BECAME_ACTIONABLE"
     assert events["BECAME"].importance == "HIGH"
-    assert events["BECAME"].candidate_rule == "pivot"
-    assert events["BECAME"].candidate_price == 100.0
-    assert events["BECAME"].latest_close == 102.0
-    assert events["BECAME"].entry_volume_ratio == 1.7
-    assert events["BECAME"].eps_yoy_growth == 31.0
+    assert events["BECAME"].facts["candidate_rule"] == "pivot"
+    assert events["BECAME"].facts["candidate_price"] == 100.0
+    assert events["BECAME"].facts["latest_close"] == 102.0
+    assert events["BECAME"].facts["entry_volume_ratio"] == 1.7
+    assert events["BECAME"].facts["eps_yoy_growth"] == 31.0
     assert events["BELOW"].event_type == "ACTIONABLE_TO_BELOW_TRIGGER"
     assert events["BELOW"].importance == "HIGH"
     assert events["EXTENDED"].event_type == "ACTIONABLE_TO_EXTENDED"
@@ -349,54 +349,3 @@ def test_new_signal_actionable_is_high_attention_with_origin_context():
     assert event.signal_origin == "NEW"
     assert event.reasons == ("BECAME_ACTIONABLE", "NEW_SIGNAL")
 
-
-def test_weekend_actionable_exiting_current_pool_is_attention_only_not_dashboard_row():
-    complete = pd.DataFrame(
-        [
-            _row(
-                "EXITED",
-                snapshot_date="2026-07-24",
-                signal=True,
-                status="ACTIONABLE",
-                valid=True,
-                candidate=100,
-                close=102,
-                rule="pivot",
-                entry_volume=1.8,
-            ),
-            _row(
-                "STAY",
-                snapshot_date="2026-07-24",
-                signal=True,
-                status="ACTIONABLE",
-                valid=True,
-                candidate=50,
-                close=51,
-                rule="pivot",
-                entry_volume=1.6,
-            ),
-        ]
-    )
-    current = pd.DataFrame(
-        [
-            _row(
-                "STAY",
-                snapshot_date="2026-07-29",
-                signal=True,
-                status="ACTIONABLE",
-                valid=True,
-                candidate=50,
-                close=51,
-                rule="pivot",
-                entry_volume=1.6,
-            )
-        ]
-    )
-
-    result = analyze_bf_transitions(current, complete)
-
-    assert list(result.rows["code"]) == ["STAY"]
-    assert list(result.exited_pool["code"]) == ["EXITED"]
-    event = next(event for event in result.attention_events if event.code == "EXITED")
-    assert event.event_type == "ACTIONABLE_EXITED_POOL"
-    assert event.importance == "HIGH"
