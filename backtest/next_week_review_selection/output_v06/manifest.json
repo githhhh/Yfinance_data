@@ -1,0 +1,34 @@
+{
+  "adaptive_status": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "atr_used": false,
+  "c_rank_used": false,
+  "candidate_library_size": 25,
+  "eps_pit": "backtest/ibd_skill_replay_pools/signal_eps_pit.csv",
+  "eps_pit_sha256": "b3c16fed08a15d11b415842a8129ba1fa3f9b0c12797afee4a26f61b87a5a381",
+  "formal_first_snapshot": "2026-03-13",
+  "formal_fold_count": 5,
+  "formal_last_snapshot": "2026-07-24",
+  "formal_snapshot_count": 20,
+  "historical_oos_reused_from_prior_iterations": true,
+  "max_attention_multiplier": 1.5,
+  "min_train_weeks": 20,
+  "ml_used": false,
+  "numeric_zero_tolerance": 1e-12,
+  "pool_root": "backtest/ibd_skill_replay_pools",
+  "price_cache": "results_pkl/stock_data_290826_1d.pkl",
+  "price_cache_sha256": "7abd108660fcbdcfa016946491c2520e9a34496b43393e9f36e34b92d51df89f",
+  "production_authorization": false,
+  "rd_agent_used": false,
+  "static_rule": {
+    "conditions": [
+      "REQ_VOLUME",
+      "REQ_SUPPLY"
+    ],
+    "name": "V06_REQ_VOLUME_SUPPLY"
+  },
+  "static_status": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "static_status_pre_setup_sensitivity": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "status": "retrospective_reused_history_confirmation",
+  "study": "next_week_review_selection_v06_discriminative",
+  "test_weeks": 4
+}

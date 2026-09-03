@@ -1,0 +1,13 @@
+{
+  "static_status_pre_setup_sensitivity": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "static_status": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "static_rule": {
+    "name": "V06_REQ_VOLUME_SUPPLY",
+    "conditions": [
+      "REQ_VOLUME",
+      "REQ_SUPPLY"
+    ]
+  },
+  "adaptive_status": "NO_STABLE_DISCRIMINATIVE_RULE",
+  "note": "retrospective reused-history confirmation only; future sealed weeks are required for production authorization"
+}
