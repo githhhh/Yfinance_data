@@ -4,6 +4,7 @@ from backtest.next_week_review_selection.discriminative import (
     B0_NAME,
     MAX_ATTENTION_MULTIPLIER,
     RefinementRule,
+    _horizon_consistency,
     anchor_rule,
     candidate_library,
     choose_train_refinement,
@@ -76,6 +77,19 @@ def test_numeric_zero_tolerance_treats_machine_epsilon_as_zero():
     assert is_nonpositive(-eps)
     assert is_nonpositive(eps)
     assert not is_positive(eps)
+
+
+def test_horizon_consistency_treats_machine_epsilon_loser_delta_as_zero():
+    eps = 2.220446049250313e-16
+    row = {
+        "tradable_winner_capture_lift_2w_delta_vs_b0": 0.01,
+        "tradable_loser_capture_lift_2w_delta_vs_b0": eps,
+        "tradable_winner_capture_lift_3w_delta_vs_b0": 0.02,
+        "tradable_loser_capture_lift_3w_delta_vs_b0": 0.01,
+        "tradable_winner_capture_lift_4w_delta_vs_b0": 0.03,
+        "tradable_loser_capture_lift_4w_delta_vs_b0": -0.01,
+    }
+    assert _horizon_consistency(row) == 2
 
 
 def test_policy_status_accepts_machine_epsilon_loser_delta_as_nonworse():
