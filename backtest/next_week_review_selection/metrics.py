@@ -129,6 +129,20 @@ def compare_metrics(
             candidate.get(metric), baseline.get(metric)
         )
 
+    for horizon in HORIZONS:
+        for metric in (
+            f"big_winner_recall_{horizon}",
+            f"winner_capture_lift_{horizon}",
+            f"loser_capture_lift_{horizon}",
+            f"tradable_big_winner_recall_{horizon}",
+            f"tradable_winner_capture_lift_{horizon}",
+            f"tradable_loser_capture_lift_{horizon}",
+            f"opp_severe_loser_exposure_{horizon}",
+        ):
+            out[f"{metric}_delta_vs_b0"] = _delta(
+                candidate.get(metric), baseline.get(metric)
+            )
+
     added_reviews = _delta(
         candidate.get("evaluable_picks_1w"),
         baseline.get("evaluable_picks_1w"),
