@@ -19,6 +19,19 @@ from backtest.b0_absolute_quality_audit.metrics import (
     four_offset_nonoverlap,
     safe_spearman,
 )
+from backtest.b0_absolute_quality_audit.market_data import (
+    build_next_open_forward_returns,
+    download_yahoo_supplement,
+    find_codes_needing_yahoo,
+)
+from backtest.b0_absolute_quality_audit.capacity import (
+    fill_capacity_codes,
+    underfill_cause,
+)
+from backtest.b0_absolute_quality_audit.v11 import (
+    _rejection_summaries,
+    active_choice_eligible_rows,
+)
 from backtest.b0_absolute_quality_audit.portfolio import (
     distribution_summary,
     exact_portfolio_distribution,
@@ -250,3 +263,238 @@ def test_snapshot_forward_return_is_not_mature_before_cache_reaches_target():
     out = build_snapshot_forward_returns(panel, prices, extra_codes=())
     assert bool(out.iloc[0]["snapshot_price_valid"]) is False
     assert pd.isna(out.iloc[0]["snapshot_w4_return_pct"])
+
+
+
+def test_next_open_outcome_uses_first_session_after_snapshot_and_entry_day_low():
+    panel = pd.DataFrame([
+        {"snapshot_date": "2026-01-02", "code": "AAA"},
+    ])
+    prices = pd.DataFrame([
+        {
+            "code": "AAA", "date": "2026-01-02",
+            "open": 99.0, "high": 101.0, "low": 80.0, "close": 100.0,
+            "volume": 1, "source": "test",
+        },
+        {
+            "code": "AAA", "date": "2026-01-05",
+            "open": 101.0, "high": 103.0, "low": 92.0, "close": 102.0,
+            "volume": 1, "source": "test",
+        },
+        {
+            "code": "AAA", "date": "2026-01-30",
+            "open": 109.0, "high": 111.0, "low": 108.0, "close": 110.0,
+            "volume": 1, "source": "test",
+        },
+        {
+            "code": "AAA", "date": "2026-02-02",
+            "open": 111.0, "high": 112.0, "low": 110.0, "close": 111.0,
+            "volume": 1, "source": "test",
+        },
+    ])
+    out = build_next_open_forward_returns(panel, prices, extra_codes=())
+    row = out.iloc[0]
+    assert row["next_open_entry_date"] == "2026-01-05"
+    assert row["next_open_end_date"] == "2026-02-02"
+    assert row["next_open_w4_return_pct"] == round((111.0 / 101.0 - 1.0) * 100.0, 6)
+    # Snapshot-day low=80 is ignored; entry-session low=92 is below 101*0.92.
+    assert bool(row["next_open_w4_stop8"]) is True
+
+
+def test_next_open_audit_freezes_aug_7_as_immature_at_frozen_asof():
+    panel = pd.DataFrame([
+        {"snapshot_date": "2026-08-07", "code": "AAA"},
+    ])
+    prices = pd.DataFrame([
+        {
+            "code": "AAA", "date": "2026-08-10",
+            "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0,
+            "volume": 1, "source": "test",
+        },
+        {
+            "code": "AAA", "date": "2026-09-03",
+            "open": 105.0, "high": 106.0, "low": 104.0, "close": 105.0,
+            "volume": 1, "source": "test",
+        },
+    ])
+    out = build_next_open_forward_returns(panel, prices, extra_codes=())
+    row = out.iloc[0]
+    assert bool(row["next_open_price_valid"]) is False
+    assert row["next_open_invalid_reason"] == "HORIZON_NOT_MATURE_AS_OF"
+
+
+def test_yahoo_need_detection_always_includes_spy_qqq_and_missing_code():
+    panel = pd.DataFrame([
+        {"snapshot_date": "2026-01-02", "code": "MISS"},
+    ])
+    base = pd.DataFrame(
+        columns=["code", "date", "open", "high", "low", "close", "volume", "source"]
+    )
+    needed = find_codes_needing_yahoo(panel, base)
+    assert "MISS" in needed
+    assert "SPY" in needed
+    assert "QQQ" in needed
+
+
+def _capacity_frame() -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "code": "A", "industry": "I1",
+            "current_b0_selected": True, "current_b0_pick_order": 1,
+            "current_b0_eligible": True, "current_b0_raw_rank": 1,
+            "current_b0_reject_reasons": "",
+        },
+        {
+            "code": "B", "industry": "I1",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": True, "current_b0_raw_rank": 2,
+            "current_b0_reject_reasons": "",
+        },
+        {
+            "code": "C", "industry": "I2",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": False, "current_b0_raw_rank": 3,
+            "current_b0_reject_reasons": "eps_unknown",
+        },
+        {
+            "code": "D", "industry": "I3",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": False, "current_b0_raw_rank": 4,
+            "current_b0_reject_reasons": "non_actionable",
+        },
+        {
+            "code": "E", "industry": "I4",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": False, "current_b0_raw_rank": 5,
+            "current_b0_reject_reasons": "non_actionable|eps_unknown",
+        },
+    ])
+
+
+def test_fill3_policies_never_replace_original_b0_pick():
+    frame = _capacity_frame()
+    for policy in [
+        "B0_FILL3_RELAX_INDUSTRY",
+        "B0_FILL3_EPS_ONLY",
+        "B0_FILL3_SINGLE_REJECT",
+        "B0_FILL3_ANY_REJECT",
+    ]:
+        picks = fill_capacity_codes(frame, policy)
+        assert picks[0] == "A"
+        assert "A" in picks
+
+
+def test_fill3_relax_industry_changes_only_industry_constraint():
+    picks = fill_capacity_codes(_capacity_frame(), "B0_FILL3_RELAX_INDUSTRY")
+    assert picks == ["A", "B"]
+
+
+def test_fill3_eps_only_accepts_only_sole_eps_reject():
+    picks = fill_capacity_codes(_capacity_frame(), "B0_FILL3_EPS_ONLY")
+    assert picks == ["A", "C"]
+    assert "E" not in picks
+
+
+def test_fill3_single_reject_can_fill_three_but_excludes_multi_failure():
+    picks = fill_capacity_codes(_capacity_frame(), "B0_FILL3_SINGLE_REJECT")
+    assert picks == ["A", "C", "D"]
+    assert "E" not in picks
+
+
+def test_underfill_cause_distinguishes_eligibility_shortage_from_industry():
+    assert underfill_cause(_capacity_frame()) == "ELIGIBILITY_SHORTAGE"
+
+    frame = pd.DataFrame([
+        {
+            "code": "A", "industry": "I1",
+            "current_b0_selected": True, "current_b0_pick_order": 1,
+            "current_b0_eligible": True, "current_b0_raw_rank": 1,
+            "current_b0_reject_reasons": "",
+        },
+        {
+            "code": "B", "industry": "I1",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": True, "current_b0_raw_rank": 2,
+            "current_b0_reject_reasons": "",
+        },
+        {
+            "code": "C", "industry": "I1",
+            "current_b0_selected": False, "current_b0_pick_order": None,
+            "current_b0_eligible": True, "current_b0_raw_rank": 3,
+            "current_b0_reject_reasons": "",
+        },
+    ])
+    assert underfill_cause(frame) == "INDUSTRY_CONSTRAINT"
+
+
+def test_rejection_summary_separates_exclusive_from_overlap():
+    events = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "A",
+            "reasons": "eps_unknown", "reason_count": 1,
+            "exclusive_reason": "eps_unknown",
+            "next_open_w4_return_pct": 10.0, "next_open_w4_stop8": False,
+            "is_top20_winner": True, "is_big_winner": False,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "B",
+            "reasons": "eps_unknown|non_actionable", "reason_count": 2,
+            "exclusive_reason": "",
+            "next_open_w4_return_pct": 20.0, "next_open_w4_stop8": False,
+            "is_top20_winner": True, "is_big_winner": True,
+        },
+    ])
+    exclusive, overlap, combos = _rejection_summaries(events)
+    eps_exclusive = exclusive[exclusive["exclusive_reason"] == "eps_unknown"].iloc[0]
+    eps_overlap = overlap[overlap["reason"] == "eps_unknown"].iloc[0]
+    assert eps_exclusive["candidate_events"] == 1
+    assert eps_overlap["label_events"] == 2
+    assert eps_overlap["multi_reason_rate"] == 0.5
+    assert set(combos["reasons"]) == {"eps_unknown", "eps_unknown|non_actionable"}
+
+
+
+def test_yahoo_benchmark_download_fails_closed(tmp_path):
+    class EmptyProvider:
+        def download_batch_stocks(self, symbols, period="1y", interval="1d"):
+            return {}, list(symbols)
+
+    panel = pd.DataFrame([
+        {"snapshot_date": "2026-01-02", "code": "AAA"},
+    ])
+    base = pd.DataFrame(
+        columns=["code", "date", "open", "high", "low", "close", "volume", "source"]
+    )
+
+    import pytest
+    with pytest.raises(RuntimeError, match="Yahoo benchmark download failed"):
+        download_yahoo_supplement(
+            panel,
+            base,
+            provider=EmptyProvider(),
+            supplement_path=tmp_path / "supp.parquet",
+            audit_path=tmp_path / "audit.csv",
+        )
+
+
+
+def test_active_choice_headline_excludes_single_feasible_portfolio_week():
+    frame = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "primary_valid": True,
+            "active_choice": False,
+            "feasible_portfolio_count": 1,
+            "b0_percentile": 100.0,
+        },
+        {
+            "snapshot_date": "2026-01-09",
+            "primary_valid": True,
+            "active_choice": True,
+            "feasible_portfolio_count": 10,
+            "b0_percentile": 60.0,
+        },
+    ])
+    active = active_choice_eligible_rows(frame)
+    assert active["snapshot_date"].tolist() == ["2026-01-09"]
+    assert active["b0_percentile"].tolist() == [60.0]

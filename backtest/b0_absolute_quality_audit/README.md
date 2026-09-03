@@ -1,111 +1,176 @@
-# B0 Absolute Quality Audit
+# B0 Absolute Quality Audit v1.1
 
-This audit answers a different question from Track C/D/E/F:
+This audit measures the current Production B0 without searching for a B1 and without modifying Production.
 
-> How good or bad is the current Production B0 in absolute terms?
+## Why v1.1 exists
 
-It does not search for a B1 and does not mutate Production.
+The first absolute audit exposed useful structure but also three measurement problems:
 
-## Core design
+1. Eligible-random percentile included many weeks with only one feasible portfolio, mechanically inflating the percentile.
+2. Raw fixed-capacity results were based on snapshot-close outcomes and only 21 fully covered weeks, heavily concentrated in early underfilled regimes.
+3. Reject-reason labels overlapped, so a descriptive label table could be misread as single-gate causal attribution.
 
-B0 is recomputed directly from:
+v1.1 fixes all three and adds explicit capacity counterfactuals plus SPY/QQQ.
 
-    dashboard/skill_industry_eps_known.py
+## Frozen data boundary
 
-on the frozen replay panel. Historical helper columns such as b0_eligible and is_b0 are not trusted as the current baseline.
+AUDIT_AS_OF_DATE = 2026-09-02
 
-Two outcome systems are kept separate.
+Bars after this date are ignored even if materialization is run later.
 
-### Entry-aligned W4
+The audit first uses the existing frozen daily price cache. It then identifies only the tickers that cannot form a mature tradable outcome and downloads those symbols, plus SPY/QQQ, through the repository's existing YahooDataProvider:
 
-Used only where a Production-style entry outcome is well defined:
+- auto_adjust=False
+- raw Yahoo OHLC precision
+- ticker alias resolution from the existing audit utilities
 
-- current B0 absolute W4 cohort quality;
-- B0 vs exact feasible random portfolios inside the current B0-eligible universe;
-- eligible-universe oracle capture;
-- ranking monotonicity and rank buckets.
+Downloaded bars are written to this audit's output directory. The shared base price cache is never mutated.
 
-Primary eligible-random weeks require 100% W4 return/stop maturity across the eligible universe.
+## Tradable raw outcome
 
-### Snapshot-close +28 calendar-day W4
+Raw-universe, Fill3, simple-rule and market comparisons use:
 
-Used for the raw Review Universe:
+first trading-session open strictly after snapshot -> close at entry date + 28 calendar days
 
-- raw signal random benchmark;
-- eligibility winner retention / rejected winner rate;
-- rejection-reason opportunity cost;
-- simple de-anchored one-factor baselines;
-- raw-universe oracle capture;
-- SPY / QQQ comparison.
+Stop8 includes the entry session low.
 
-The raw Review Universe is simply:
+This avoids using the snapshot close even though the snapshot/pool is only known after that close.
 
-    signal == True
-    AND ibd_candidate_rule is non-empty
+The existing entry-aligned W4 outcome is retained only for the current B0-eligible ranking audit.
 
-It is never conditioned on:
+## Ranking quality
 
-- b0_eligible;
-- B0 Lane;
-- B0 raw rank;
-- B0 evidence/risk count;
-- B0 reason codes.
+The headline eligible-random percentile uses only active-choice weeks:
 
-Primary raw-universe inference requires 100% snapshot-W4 price coverage for that week. Partial-price weeks remain diagnostic only because missing tickers include delisted/acquired names and silently deleting them could bias the benchmark.
+- all eligible outcomes mature;
+- B0 has at least one pick;
+- there are more than one feasible distinct-industry portfolios.
 
-The fixed-capacity raw benchmark is intentionally de-anchored from B0 abstention: if the raw universe can supply three distinct-industry names, the benchmark uses three slots even when B0 selected fewer or zero names.
+Weeks with one feasible portfolio are reported as gate-locked/no-choice weeks and cannot inflate ranking percentile.
 
-## Main health coordinates
+## Variable capacity: how B0 is evaluated
 
-1. Absolute B0 W4 distribution:
-   mean, median, P10/P25/P75/P90, CVaR10, positive-week rate, Stop8, one-pick ruin, coverage.
+B0 is intentionally allowed to select 0–3 names in Production. v1.1 therefore uses two separate axes:
 
-2. Eligible random percentile:
-   exact feasible same-N distinct-industry portfolio distribution whenever tractable; deterministic Monte Carlo only when combinations exceed the frozen limit.
+### Name-selection quality
 
-3. Raw signal random percentile:
-   - Primary: fixed capacity up to three distinct-industry positions, independent of B0's weekly pick count.
-   - Secondary: Matched-N random, same weekly position count as B0, for conditional name-selection quality.
+Matched-N random uses the same weekly number of positions as B0. It asks:
 
-4. Oracle capture:
-   (B0 - random mean) / (oracle - random mean).
+Given the same amount of invested capital, did B0 choose better names?
 
-5. Eligibility opportunity cost:
-   top-20% winner retention, >=20% winner retention, rejected-winner rate, bottom-20% loser rejection, eligible-minus-rejected W4 lift.
+### Capital-utilization quality
 
-6. Fine-ranking information:
-   weekly Spearman of -eligible_rank vs W4, Top3-vs-all-eligible lift, rank buckets.
+Raw fixed-capacity uses up to three distinct-industry names whenever the raw signal universe can supply them. It asks:
 
-7. Simple de-anchored baselines:
-   closest-to-trigger, entry-volume, EPS, 20-day momentum, 20-day relative strength vs SPY.
+Was B0's decision to leave slots empty economically useful?
 
-8. Market context:
-   SPY and QQQ snapshot-W4 benchmarks when present in the frozen price cache.
+Raw fixed-capacity results are also split by original B0 pick count (0/1/2/3).
 
-9. W4 overlap robustness:
-   four non-overlapping offsets plus 4-week moving-block bootstrap.
+## Fill3 diagnostic ladder
 
-## Important interpretation rule
+Production is not changed. Four counterfactuals preserve every original B0 pick and may only fill unused slots:
 
-Weekly W4 cohorts overlap. They are selection-quality observations, not independent monthly trades and must not be directly annualized into CAGR.
+1. B0_FILL3_RELAX_INDUSTRY
+   - only already-eligible candidates;
+   - relax distinct1 for empty slots;
+   - isolates the industry constraint.
 
-All current historical evidence is retrospective: B0 and several of its components were developed with visibility into this period. Confidence intervals describe historical stability, not virgin OOS proof.
+2. B0_FILL3_EPS_ONLY
+   - keep distinct1;
+   - fill only candidates rejected solely for eps_unknown.
 
-## Materialize
+3. B0_FILL3_SINGLE_REJECT
+   - keep distinct1;
+   - fill the highest B0-ranked candidate that failed exactly one hard gate;
+   - this is the minimal general soft-gate candidate.
 
-Gemini/local runner must not patch research source code.
+4. B0_FILL3_ANY_REJECT
+   - keep known-industry distinct1;
+   - any rejected candidate may fill;
+   - diagnostic upper bound only.
 
-    git checkout codex/clean-latest-quant-trade-replay-pools
-    git pull --ff-only
+No fill policy may replace an original B0 pick.
 
-    /Users/dev/.conda/envs/quant_env/bin/python -m pytest -q       tests/test_b0_absolute_quality_audit.py
+A Production move toward "prefer 3 names" is justified only if a minimal Fill3 policy improves underfilled-week capital return without material Stop/Ruin degradation. A higher fixed-3 random mean by itself is not enough.
 
-    /Users/dev/.conda/envs/quant_env/bin/python -m       backtest.b0_absolute_quality_audit.cli materialize
+## Eligibility audit
 
-Then run the existing Track/B0 regression suite.
+Winner retention is reported together with eligibility acceptance rate:
 
-Successful materialization should commit only:
+- winner retention / acceptance rate = winner enrichment;
+- loser retention / acceptance rate = loser depletion/enrichment.
 
-    backtest/b0_absolute_quality_audit/output/
+Final Top3 winner capture is compared with both:
 
-If execution fails, return the exact error instead of modifying source locally.
+- random Matched-N expected capture;
+- mechanical fixed-3 expected capture.
+
+Low recall is never interpreted without selectivity.
+
+## Reject reasons
+
+Two separate tables are produced:
+
+- exclusive_rejection_summary.csv: candidates with exactly one reject reason; this is the relevant single-gate diagnostic.
+- overlap_rejection_summary.csv: descriptive labels; not causal.
+- rejection_combinations.csv: exact reason combinations.
+
+## Simple baselines
+
+Closest-to-trigger, entry volume, EPS, momentum20 and relative-SPY20:
+
+- read only raw PIT features;
+- use fixed capacity;
+- require full feature capacity for a primary weekly comparison;
+- use tradable next-open W4;
+- report block-bootstrap CI, median edge, beat rate, mean without best 1/2 weeks.
+
+A large right-tail mean is not called stable superiority.
+
+## Outputs
+
+Materialization writes only under:
+
+backtest/b0_absolute_quality_audit/output/
+
+including:
+
+- B0_ABSOLUTE_QUALITY_HEALTH_CHECK.md
+- b0_health_summary.json
+- current_b0_state.csv
+- eligible_random_weekly.csv
+- raw_random_weekly.csv
+- eligibility_gate_weekly.csv
+- exclusive_rejection_summary.csv
+- overlap_rejection_summary.csv
+- rejection_combinations.csv
+- capacity_policy_weekly.csv
+- capacity_policy_summary.csv
+- underfill_cause_summary.csv
+- simple_baseline_summary.csv
+- market_benchmark_summary.csv
+- nonoverlap_offsets.csv
+- yahoo_price_supplement.parquet
+- yahoo_download_audit.csv
+- run_manifest.json
+
+## Local materialization
+
+Gemini/local runner must not patch source.
+
+Commands:
+
+git checkout codex/clean-latest-quant-trade-replay-pools
+git pull --ff-only
+
+/Users/dev/.conda/envs/quant_env/bin/python -m pytest -q tests/test_b0_absolute_quality_audit.py
+
+/Users/dev/.conda/envs/quant_env/bin/python -m backtest.b0_absolute_quality_audit.cli materialize
+
+Then run the existing B0 / Track B/C/D/E/F regression suite.
+
+If successful, commit only:
+
+backtest/b0_absolute_quality_audit/output/
+
+If anything fails, return the exact failure and do not patch the source locally.
