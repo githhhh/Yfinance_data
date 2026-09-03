@@ -10,6 +10,7 @@ from .discriminative import (
     B0_NAME,
     FORMAL_HORIZONS,
     MAX_ATTENTION_MULTIPLIER,
+    candidate_library,
     oos_policy_status,
     rule_to_dict,
     run_discriminative_walk_forward,
@@ -105,15 +106,12 @@ def run_research(
     )
 
     formal_selections = study["formal_selections"]
-    formal_weeks = sorted(
-        set(
-            fold_results["test_start"].astype(str).tolist()
-            + fold_results["test_end"].astype(str).tolist()
-        )
+    formal_calendar = study["formal_calendar"]
+    actual_formal_snapshots = (
+        sorted(formal_calendar["snapshot_date"].astype(str).unique())
+        if not formal_calendar.empty
+        else []
     )
-    actual_formal_snapshots = sorted(
-        formal_selections["snapshot_date"].astype(str).unique()
-    ) if not formal_selections.empty else []
     formal_panel = panel[
         panel["snapshot_date"].astype(str).isin(actual_formal_snapshots)
     ].copy()
@@ -180,13 +178,18 @@ def run_research(
         "min_train_weeks": min_train_weeks,
         "test_weeks": test_weeks,
         "max_attention_multiplier": MAX_ATTENTION_MULTIPLIER,
-        "candidate_library_size": 25,
+        "candidate_library_size": len(candidate_library()),
         "static_rule": rule_to_dict(static_rule),
         "static_status": static_status,
         "adaptive_status": adaptive_status,
         "formal_fold_count": int(fold_results["fold"].nunique()),
         "formal_snapshot_count": len(actual_formal_snapshots),
-        "formal_span_endpoints": formal_weeks,
+        "formal_first_snapshot": (
+            actual_formal_snapshots[0] if actual_formal_snapshots else ""
+        ),
+        "formal_last_snapshot": (
+            actual_formal_snapshots[-1] if actual_formal_snapshots else ""
+        ),
         "rd_agent_used": False,
         "ml_used": False,
         "c_rank_used": False,
@@ -217,6 +220,7 @@ def run_research(
         "adaptive_oos_summary.csv": output_dir / "adaptive_oos_summary.csv",
         "adaptive_convergence.csv": output_dir / "adaptive_convergence.csv",
         "formal_selections.csv": output_dir / "formal_selections.csv",
+        "formal_calendar.csv": output_dir / "formal_calendar.csv",
         "static_weekly_metrics.csv": output_dir / "static_weekly_metrics.csv",
         "b0_weekly_metrics.csv": output_dir / "b0_weekly_metrics.csv",
         "static_oos_bootstrap.csv": output_dir / "static_oos_bootstrap.csv",
@@ -250,6 +254,7 @@ def run_research(
         outputs["adaptive_convergence.csv"], index=False
     )
     formal_selections.to_csv(outputs["formal_selections.csv"], index=False)
+    formal_calendar.to_csv(outputs["formal_calendar.csv"], index=False)
     static_weekly.to_csv(outputs["static_weekly_metrics.csv"], index=False)
     b0_weekly.to_csv(outputs["b0_weekly_metrics.csv"], index=False)
     static_bootstrap.to_csv(outputs["static_oos_bootstrap.csv"], index=False)
