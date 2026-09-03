@@ -1,0 +1,8 @@
+level,value,fold_count,formal_folds,fold_share
+EVIDENCE_PROFILE,volume+eps+supply_contraction,2,5,0.4
+EVIDENCE_PROFILE,volume+rs_near_high+supply_contraction,2,5,0.4
+EVIDENCE_PROFILE,eps+rs_near_high+supply_contraction,1,5,0.2
+EXACT_RULE,CORE_NEAR5_UB_E2_GA_NO_EPS,2,5,0.4
+EXACT_RULE,CORE_NEAR5_UB_E2_GA_NO_RS_NEAR_HIGH,2,5,0.4
+EXACT_RULE,CORE_NEAR5_UB_E2_GA_NO_VOLUME,1,5,0.2
+STRUCTURE,near=5|statuses=UNCONFIRMED+BELOW_TRIGGER|minE=2|geometry=allow,5,5,1.0

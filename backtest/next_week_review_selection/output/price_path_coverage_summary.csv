@@ -1,0 +1,2 @@
+rows,symbol_found_count,symbol_found_rate,complete_1w_count,complete_1w_rate,complete_2w_count,complete_2w_rate,complete_3w_count,complete_3w_rate,complete_4w_count,complete_4w_rate,state_COMPLETE_4W,state_MISSING_SYMBOL,state_SHORT_3W,state_SHORT_4W,state_NO_FORWARD_BARS
+2738,1946,0.7107377647918188,1944,0.7100073046018992,1944,0.7100073046018992,1788,0.6530314097881665,1683,0.614682249817385,1683,792,156,105,2

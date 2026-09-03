@@ -1,0 +1,25 @@
+{
+  "adaptive_policy_status": "NO_STABLE_ADAPTIVE_POLICY",
+  "formal_oos_fold_count": 5,
+  "tail_exploratory_week_count": 2,
+  "static_rule_status": "NO_CONVERGENT_STATIC_RULE",
+  "static_rule": null,
+  "dominant_convergence": {
+    "exact_rule": {
+      "value": "CORE_NEAR5_UB_E2_GA_NO_EPS",
+      "fold_count": 2,
+      "fold_share": 0.4
+    },
+    "structure": {
+      "value": "near=5|statuses=UNCONFIRMED+BELOW_TRIGGER|minE=2|geometry=allow",
+      "fold_count": 5,
+      "fold_share": 1.0
+    },
+    "evidence_profile": {
+      "value": "volume+eps+supply_contraction",
+      "fold_count": 2,
+      "fold_share": 0.4
+    }
+  },
+  "note": "retrospective research only; no production authorization"
+}
