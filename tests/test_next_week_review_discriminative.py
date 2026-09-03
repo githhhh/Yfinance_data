@@ -10,6 +10,12 @@ from backtest.next_week_review_selection.discriminative import (
     oos_policy_status,
     select_refined,
 )
+from backtest.next_week_review_selection.utils import (
+    ZERO_TOL,
+    is_nonnegative,
+    is_nonpositive,
+    is_positive,
+)
 
 
 def test_anchor_is_fixed_near5_ub_e2_geometry_allow():
@@ -60,6 +66,44 @@ def test_b0_no_expansion_is_valid_fallback():
     selected = select_refined(pool, None)
     assert selected["code"].tolist() == ["ACT"]
     assert selected["variant"].tolist() == [B0_NAME]
+
+
+def test_numeric_zero_tolerance_treats_machine_epsilon_as_zero():
+    eps = 2.220446049250313e-16
+    assert ZERO_TOL > eps
+    assert is_nonnegative(-eps)
+    assert is_nonnegative(eps)
+    assert is_nonpositive(-eps)
+    assert is_nonpositive(eps)
+    assert not is_positive(eps)
+
+
+def test_policy_status_accepts_machine_epsilon_loser_delta_as_nonworse():
+    eps = 2.220446049250313e-16
+    summary = pd.DataFrame([
+        {
+            "evaluation_role": "STATIC_DISCOVERY_RULE",
+            "folds": 5,
+            "expanded_fold_rate": 0.8,
+            "opportunity_positive_rate": 0.8,
+            "winner_lift_nonnegative_rate": 0.8,
+            "loser_lift_nonworse_rate": 0.8,
+            "mean_opportunity_delta": 0.10,
+            "mean_winner_lift_delta": 0.03,
+            "mean_loser_lift_delta": eps,
+            "mean_attention_multiplier_vs_b0": 1.3,
+            "mean_incremental_opportunities_per_added_review": 0.8,
+            "mean_winner_lift_delta_2w": 0.01,
+            "mean_loser_lift_delta_2w": eps,
+            "mean_winner_lift_delta_3w": 0.02,
+            "mean_loser_lift_delta_3w": -0.02,
+            "mean_winner_lift_delta_4w": 0.03,
+            "mean_loser_lift_delta_4w": -0.01,
+        }
+    ])
+    assert oos_policy_status(
+        summary, static_rule_exists=True
+    ) == "RETROSPECTIVE_DISCRIMINATIVE_CANDIDATE"
 
 
 def test_policy_status_rejects_hidden_2w_degradation():
