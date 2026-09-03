@@ -32,6 +32,7 @@ from .config import (
     PANEL_SOURCE,
     PRICE_CACHE,
     PRODUCTION_B0_PATH,
+    PROTOCOL_VERSION,
 )
 from .data import (
     add_current_b0_state,
@@ -40,9 +41,16 @@ from .data import (
     load_price_cache,
     sha256_file,
 )
+from .diagnostics import (
+    capacity_pick_quality,
+    momentum_gate_diagnostics,
+    momentum_nonoverlap,
+    support_calendar_summary,
+)
 from .market_data import (
     build_next_open_forward_returns,
     download_yahoo_supplement,
+    spy_momentum_asof,
 )
 from .metrics import (
     aggregate_oracle_capture,
@@ -82,11 +90,26 @@ def build_v11_frame() -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
         how="left",
         validate="one_to_one",
     )
+    spy_mom = spy_momentum_asof(
+        supplement.prices,
+        merged["snapshot_date"].astype(str).unique().tolist(),
+        sessions=20,
+    )
+    merged = merged.merge(
+        spy_mom,
+        on="snapshot_date",
+        how="left",
+        validate="many_to_one",
+    )
+    merged["rel_spy_20"] = (
+        pd.to_numeric(merged.get("mom_20"), errors="coerce")
+        - pd.to_numeric(merged.get("spy_momentum"), errors="coerce")
+    )
     benchmarks = forward[forward["code"].isin(BENCHMARK_CODES)].copy()
 
     manifest = {
         "source_git_sha": git_sha(),
-        "protocol_version": "b0_absolute_quality_v1_1",
+        "protocol_version": PROTOCOL_VERSION,
         "audit_as_of_date": AUDIT_AS_OF_DATE,
         "panel_hash": sha256_file(PANEL_SOURCE),
         "production_b0_hash": sha256_file(PRODUCTION_B0_PATH),
@@ -98,6 +121,10 @@ def build_v11_frame() -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
         "current_eligible_rows": int(merged["current_b0_eligible"].sum()),
         "current_selected_rows": int(merged["current_b0_selected"].sum()),
         "benchmark_codes": list(BENCHMARK_CODES),
+        "relative_momentum_semantics": (
+            "rel_spy_20 recomputed inside audit as candidate frozen mom_20 minus "
+            "Yahoo-supplemented SPY 20-session momentum as of snapshot close."
+        ),
         "raw_outcome_semantics": (
             "Tradable first-session open strictly after snapshot -> close at "
             "entry_date+28 calendar days, frozen at AUDIT_AS_OF_DATE."
@@ -295,8 +322,19 @@ def _rejection_summaries(events: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFra
 def _simple_summary(simple: pd.DataFrame, b0_weekly: pd.DataFrame) -> pd.DataFrame:
     if simple.empty:
         return pd.DataFrame()
-    b0 = b0_weekly[["snapshot_date", "next_open_capital_adjusted"]].rename(
-        columns={"next_open_capital_adjusted": "b0_return"}
+    b0 = b0_weekly[
+        [
+            "snapshot_date",
+            "next_open_capital_adjusted",
+            "next_open_stop8_pct",
+            "next_open_one_pick_ruined",
+        ]
+    ].rename(
+        columns={
+            "next_open_capital_adjusted": "b0_return",
+            "next_open_stop8_pct": "b0_stop8_pct",
+            "next_open_one_pick_ruined": "b0_any_stop_or_le8",
+        }
     )
     rows: list[dict[str, Any]] = []
 
@@ -321,6 +359,12 @@ def _simple_summary(simple: pd.DataFrame, b0_weekly: pd.DataFrame) -> pd.DataFra
                 "mean_without_best1": None,
                 "mean_without_best2": None,
                 "positive_edge_concentration": None,
+                "mean_stop8_pct": None,
+                "b0_mean_stop8_pct": None,
+                "stop8_exposure_delta_pp": None,
+                "any_stop_or_le8_week_rate": None,
+                "b0_any_stop_or_le8_week_rate": None,
+                "any_stop_or_le8_week_delta_pp": None,
             })
             continue
 
@@ -348,6 +392,30 @@ def _simple_summary(simple: pd.DataFrame, b0_weekly: pd.DataFrame) -> pd.DataFra
             ),
             "positive_edge_concentration": (
                 None if positive_sum <= 0 else float(ordered.iloc[0] / positive_sum)
+            ),
+            "mean_stop8_pct": float(
+                pd.to_numeric(valid["stop8_pct"], errors="coerce").mean()
+            ),
+            "b0_mean_stop8_pct": float(
+                pd.to_numeric(valid["b0_stop8_pct"], errors="coerce").mean()
+            ),
+            "stop8_exposure_delta_pp": float(
+                (
+                    pd.to_numeric(valid["stop8_pct"], errors="coerce")
+                    - pd.to_numeric(valid["b0_stop8_pct"], errors="coerce")
+                ).mean()
+            ),
+            "any_stop_or_le8_week_rate": float(
+                valid["one_pick_ruined"].astype(float).mean()
+            ),
+            "b0_any_stop_or_le8_week_rate": float(
+                valid["b0_any_stop_or_le8"].astype(float).mean()
+            ),
+            "any_stop_or_le8_week_delta_pp": float(
+                (
+                    valid["one_pick_ruined"].astype(float)
+                    - valid["b0_any_stop_or_le8"].astype(float)
+                ).mean() * 100.0
             ),
         })
     return pd.DataFrame(rows)
@@ -420,8 +488,12 @@ def _capacity_summary(weekly: pd.DataFrame) -> pd.DataFrame:
                 "spread_ci_high": (
                     None if valid.empty else moving_block_bootstrap_ci(spread.to_numpy())["mean_ci_high"]
                 ),
-                "mean_stop_delta_pp": None if valid.empty else float(stop_delta.mean()),
-                "ruin_week_delta_pp": None if valid.empty else float(ruin_delta.mean() * 100.0),
+                "mean_slot_stop_exposure_delta_pp": (
+                    None if valid.empty else float(stop_delta.mean())
+                ),
+                "any_stop_or_le8_week_delta_pp": (
+                    None if valid.empty else float(ruin_delta.mean() * 100.0)
+                ),
                 "full3_rate": None if valid.empty else float(valid["full3"].mean()),
                 "mean_added_pick_return": (
                     None if added_returns.empty else float(added_returns.mean())
@@ -936,6 +1008,17 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
         if not original_capacity.empty
         else pd.DataFrame()
     )
+    capacity_pick_quality_summary, capacity_added_reason_summary = capacity_pick_quality(
+        f["panel"], f["capacity_weekly"]
+    )
+    support_calendar = support_calendar_summary(
+        sorted(f["panel"]["snapshot_date"].astype(str).unique().tolist()),
+        f["raw_random_weekly"],
+        f["simple_weekly"],
+    )
+    momentum_gate_summary, momentum_gate_reason_summary = momentum_gate_diagnostics(
+        f["panel"], f["simple_weekly"]
+    )
 
     bmark = f["benchmarks"]
     market_rows: list[dict[str, Any]] = []
@@ -1009,6 +1092,9 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
         )
         off["comparison"] = "b0_vs_raw_fixed3_next_open"
         offsets.append(off)
+    mom_off = momentum_nonoverlap(f["simple_weekly"], b0)
+    if not mom_off.empty:
+        offsets.append(mom_off)
     nonoverlap = (
         pd.concat(offsets, ignore_index=True) if offsets else pd.DataFrame()
     )
@@ -1040,8 +1126,21 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
             "edge": raw_edge,
             "oracle_capture": raw_capture,
             "matched_n_edge": matched_edge,
+            "support_dates": raw_valid["snapshot_date"].astype(str).tolist(),
         },
         "gate": gate_summary,
+        "momentum_gate": (
+            {}
+            if momentum_gate_summary.empty
+            else {
+                row["cohort"]: {
+                    key: row[key]
+                    for key in momentum_gate_summary.columns
+                    if key != "cohort"
+                }
+                for _, row in momentum_gate_summary.iterrows()
+            }
+        ),
         "ranking_information": ranking_summary,
         "evidence_boundary": (
             "Retrospective audit. B0 was developed with visibility into this history. "
@@ -1059,7 +1158,12 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
         "rank_bucket_summary": rank_bucket_summary,
         "simple_summary": simple_summary,
         "capacity_summary": capacity_summary,
+        "capacity_pick_quality_summary": capacity_pick_quality_summary,
+        "capacity_added_reason_summary": capacity_added_reason_summary,
         "underfill_cause_summary": underfill_cause_summary,
+        "support_calendar_summary": support_calendar,
+        "momentum_gate_summary": momentum_gate_summary,
+        "momentum_gate_reason_summary": momentum_gate_reason_summary,
         "market_summary": market_summary,
         "nonoverlap": nonoverlap,
     }

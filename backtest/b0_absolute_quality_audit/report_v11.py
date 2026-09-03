@@ -32,7 +32,12 @@ def write_v11_report(
     health: dict[str, Any],
     raw_by_pick: pd.DataFrame,
     capacity: pd.DataFrame,
+    capacity_pick_quality: pd.DataFrame,
+    capacity_added_reason: pd.DataFrame,
     underfill_causes: pd.DataFrame,
+    support_calendar: pd.DataFrame,
+    momentum_gate: pd.DataFrame,
+    momentum_gate_reasons: pd.DataFrame,
     exclusive_reject: pd.DataFrame,
     overlap_reject: pd.DataFrame,
     reject_combos: pd.DataFrame,
@@ -49,7 +54,7 @@ def write_v11_report(
     info = health["ranking_information"]
 
     lines = [
-        "# Current Production B0 — Absolute Quality Health Check v1.1",
+        "# Current Production B0 — Absolute Quality Health Check v1.2",
         "",
         "## Executive coordinates",
         "",
@@ -156,6 +161,33 @@ def write_v11_report(
         f"- Median matched-N edge: **{_fmt(matched.get('spread', {}).get('median'), 2, 'pp')}**",
         f"- Beat-rate: **{_rate(matched.get('beat_rate'))}**",
         "",
+        "### Temporal support coverage",
+        "",
+        "Strict-support results are interpreted together with their calendar concentration.",
+        "",
+    ]
+
+    if support_calendar.empty:
+        lines.append("No support-calendar rows.")
+    else:
+        raw_support = support_calendar[
+            support_calendar["comparison"].isin(
+                ["raw_fixed3_primary", "simple_momentum_20"]
+            )
+        ]
+        lines += [
+            "| Comparison | Quarter | Support weeks | Total snapshots | Support rate |",
+            "| --- | --- | ---: | ---: | ---: |",
+        ]
+        for _, row in raw_support.iterrows():
+            lines.append(
+                f"| {row['comparison']} | {row['quarter']} | "
+                f"{int(row['support_weeks'])} | {int(row['total_snapshots'])} | "
+                f"{_rate(row['support_rate'])} |"
+            )
+
+    lines += [
+        "",
         "## 4. Underfill / cash policy — Fill3 counterfactual ladder",
         "",
         "### Why B0 is underfilled",
@@ -194,7 +226,7 @@ def write_v11_report(
         lines.append("No mature capacity diagnostics.")
     else:
         lines += [
-            "| Policy | Scope | Weeks | Mean Δ vs B0 | Median Δ | Beat B0 | Stop Δ pp | Ruin-week Δ pp | Full3 | Added-pick mean |",
+            "| Policy | Scope | Weeks | Mean Δ vs B0 | Median Δ | Beat B0 | Slot-stop exposure Δ | Any Stop/≤-8 week Δ | Full3 | Added-pick mean |",
             "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
         for _, row in capacity.iterrows():
@@ -203,17 +235,59 @@ def write_v11_report(
                 f"{_fmt(row['mean_spread_vs_b0'], 2, 'pp')} | "
                 f"{_fmt(row['median_spread_vs_b0'], 2, 'pp')} | "
                 f"{_rate(row['beat_b0_rate'])} | "
-                f"{_fmt(row['mean_stop_delta_pp'], 2, 'pp')} | "
-                f"{_fmt(row['ruin_week_delta_pp'], 2, 'pp')} | "
+                f"{_fmt(row['mean_slot_stop_exposure_delta_pp'], 2, 'pp')} | "
+                f"{_fmt(row['any_stop_or_le8_week_delta_pp'], 2, 'pp')} | "
                 f"{_rate(row['full3_rate'])} | "
                 f"{_fmt(row['mean_added_pick_return'], 2, '%')} |"
             )
 
     lines += [
         "",
+        "### Per-pick quality — removes the mechanical effect of holding more names",
+        "",
+    ]
+
+    if capacity_pick_quality.empty:
+        lines.append("No per-pick capacity diagnostics.")
+    else:
+        lines += [
+            "| Policy | Cohort | Picks | Mean W4 | Median W4 | P10 | CVaR10 | Positive | Stop8/pick | Final W4≤-8 |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for _, row in capacity_pick_quality.iterrows():
+            lines.append(
+                f"| {row['policy_id']} | {row['cohort']} | {int(row['picks'])} | "
+                f"{_fmt(row['mean_w4'], 2, '%')} | {_fmt(row['median_w4'], 2, '%')} | "
+                f"{_fmt(row['p10_w4'], 2, '%')} | {_fmt(row['cvar10_w4'], 2, '%')} | "
+                f"{_rate(row['positive_rate'])} | {_rate(row['stop8_rate'])} | "
+                f"{_rate(row['terminal_le_minus8_rate'])} |"
+            )
+
+    if not capacity_added_reason.empty:
+        lines += [
+            "",
+            "Added fills by exact reject reason:",
+            "",
+            "| Policy | Reject reason | Picks | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for _, row in capacity_added_reason.iterrows():
+            lines.append(
+                f"| {row['policy_id']} | {row['reject_reason']} | {int(row['picks'])} | "
+                f"{_fmt(row['mean_w4'], 2, '%')} | {_fmt(row['median_w4'], 2, '%')} | "
+                f"{_rate(row['positive_rate'])} | {_rate(row['stop8_rate'])} | "
+                f"{_rate(row['terminal_le_minus8_rate'])} |"
+            )
+
+    lines += [
+        "",
+        "Portfolio-level any-stop/≤-8-week deltas rise mechanically when more positions are held; "
+        "they are exposure diagnostics, not proof that each added name is intrinsically riskier. "
+        "Per-pick Stop8 and terminal-left-tail rates above are the quality comparison.",
+        "",
         "Interpretation rule: do not change Production to always-3 merely because fixed-3 random has a "
         "higher mean. The minimal-change candidate is B0_FILL3_SINGLE_REJECT; only a coherent gain "
-        "on underfilled weeks without material Stop/Ruin deterioration would justify future shadow testing.",
+        "on underfilled weeks without material per-pick or portfolio left-tail deterioration would justify future shadow testing.",
         "",
         "## 5. Eligibility gate quality",
         "",
@@ -324,8 +398,8 @@ def write_v11_report(
         lines.append("No full-capacity common-support simple baselines.")
     else:
         lines += [
-            "| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ | Median Δ | Beat B0 | 95% mean-edge CI | Mean w/o best1 | Mean w/o best2 |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+            "| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ | Median Δ | Beat B0 | 95% mean-edge CI | Mean w/o best1 | Mean w/o best2 | Stop exposure Δ | Any Stop/≤-8 week Δ |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |",
         ]
         for _, row in simple.iterrows():
             lines.append(
@@ -336,13 +410,58 @@ def write_v11_report(
                 f"{_rate(row['beat_b0_rate'])} | "
                 f"[{_fmt(row['spread_ci_low'], 2, 'pp')}, {_fmt(row['spread_ci_high'], 2, 'pp')}] | "
                 f"{_fmt(row['mean_without_best1'], 2, 'pp')} | "
-                f"{_fmt(row['mean_without_best2'], 2, 'pp')} |"
+                f"{_fmt(row['mean_without_best2'], 2, 'pp')} | "
+                f"{_fmt(row['stop8_exposure_delta_pp'], 2, 'pp')} | "
+                f"{_fmt(row['any_stop_or_le8_week_delta_pp'], 2, 'pp')} |"
             )
 
     lines += [
         "",
         "Large mean gains with flat/negative medians or strong best-week dependence are treated as "
         "right-tail hypotheses, not as proof of stable superiority.",
+        "",
+        "### Momentum20 gate-location diagnostic",
+        "",
+        "This answers whether the raw momentum baseline's incremental names were already inside "
+        "the B0 eligible universe or mainly outside the hard gates.",
+        "",
+    ]
+
+    if momentum_gate.empty:
+        lines.append("No momentum gate diagnostics.")
+    else:
+        lines += [
+            "| Cohort | Picks | Share of momentum picks | Selected by B0 | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for _, row in momentum_gate.iterrows():
+            lines.append(
+                f"| {row['cohort']} | {int(row['picks'])} | "
+                f"{_rate(row['share_of_momentum_picks'])} | "
+                f"{_rate(row['selected_by_b0_rate'])} | "
+                f"{_fmt(row['mean_w4'], 2, '%')} | {_fmt(row['median_w4'], 2, '%')} | "
+                f"{_rate(row['positive_rate'])} | {_rate(row['stop8_rate'])} | "
+                f"{_rate(row['terminal_le_minus8_rate'])} |"
+            )
+
+    if not momentum_gate_reasons.empty:
+        lines += [
+            "",
+            "Gate-outside momentum picks by exact reject reason:",
+            "",
+            "| Reject reason | Picks | Share of gate-outside momentum | Mean W4 | Median W4 | Positive | Stop8/pick | Final W4≤-8 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for _, row in momentum_gate_reasons.iterrows():
+            lines.append(
+                f"| {row['reject_reason']} | {int(row['picks'])} | "
+                f"{_rate(row['share_of_gate_outside_momentum'])} | "
+                f"{_fmt(row['mean_w4'], 2, '%')} | {_fmt(row['median_w4'], 2, '%')} | "
+                f"{_rate(row['positive_rate'])} | {_rate(row['stop8_rate'])} | "
+                f"{_rate(row['terminal_le_minus8_rate'])} |"
+            )
+
+    lines += [
         "",
         "## 9. SPY / QQQ benchmark — Yahoo, same tradable clock",
         "",
@@ -368,7 +487,7 @@ def write_v11_report(
 
     lines += [
         "",
-        "## 10. Non-overlap stability",
+        "## 10. Non-overlap stability — ranking, raw fixed3, and momentum20",
         "",
     ]
     if nonoverlap.empty:

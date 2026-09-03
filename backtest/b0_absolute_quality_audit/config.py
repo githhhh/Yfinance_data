@@ -11,7 +11,7 @@ OUT = AUDIT_ROOT / "output"
 PRICE_CACHE = ROOT / "backtest" / "b0_top3_quality_audit" / "data" / "signal_daily_prices.parquet"
 PRODUCTION_B0_PATH = ROOT / "dashboard" / "skill_industry_eps_known.py"
 
-PROTOCOL_VERSION = "b0_absolute_quality_v1_1"
+PROTOCOL_VERSION = "b0_absolute_quality_v1_2"
 PRIMARY_HORIZON = "W4"
 TOP_N = 3
 SNAPSHOT_FORWARD_DAYS = 28

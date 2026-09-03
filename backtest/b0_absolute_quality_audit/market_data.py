@@ -352,3 +352,35 @@ def build_next_open_forward_returns(
         rows.append(record)
 
     return pd.DataFrame(rows)
+
+
+
+def spy_momentum_asof(
+    prices: pd.DataFrame,
+    snapshots: list[str],
+    *,
+    sessions: int = 20,
+) -> pd.DataFrame:
+    """PIT SPY momentum at each snapshot close, using only bars <= snapshot."""
+    p = _normalize_price_frame(prices)
+    spy = p[p["code"] == "SPY"].sort_values("date").copy()
+    if spy.empty:
+        raise RuntimeError("SPY price history unavailable for relative-momentum audit")
+
+    spy["close"] = pd.to_numeric(spy["close"], errors="coerce")
+    spy["spy_momentum"] = spy["close"] / spy["close"].shift(sessions) - 1.0
+    events = pd.DataFrame({
+        "snapshot_date": [str(x) for x in sorted(set(snapshots))]
+    })
+    events["snapshot_dt"] = pd.to_datetime(events["snapshot_date"])
+    merged = pd.merge_asof(
+        events.sort_values("snapshot_dt"),
+        spy[["date", "spy_momentum"]].sort_values("date"),
+        left_on="snapshot_dt",
+        right_on="date",
+        direction="backward",
+        allow_exact_matches=True,
+    )
+    if (merged["date"] > merged["snapshot_dt"]).fillna(False).any():
+        raise AssertionError("future SPY leakage in relative-momentum audit")
+    return merged[["snapshot_date", "spy_momentum"]]

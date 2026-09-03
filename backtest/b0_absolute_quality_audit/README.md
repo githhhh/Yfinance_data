@@ -1,8 +1,8 @@
-# B0 Absolute Quality Audit v1.1
+# B0 Absolute Quality Audit v1.2
 
 This audit measures the current Production B0 without searching for a B1 and without modifying Production.
 
-## Why v1.1 exists
+## Why v1.2 exists
 
 The first absolute audit exposed useful structure but also three measurement problems:
 
@@ -10,7 +10,7 @@ The first absolute audit exposed useful structure but also three measurement pro
 2. Raw fixed-capacity results were based on snapshot-close outcomes and only 21 fully covered weeks, heavily concentrated in early underfilled regimes.
 3. Reject-reason labels overlapped, so a descriptive label table could be misread as single-gate causal attribution.
 
-v1.1 fixes all three and adds explicit capacity counterfactuals plus SPY/QQQ.
+v1.2 fixes all three and adds explicit capacity counterfactuals plus SPY/QQQ.
 
 ## Frozen data boundary
 
@@ -50,7 +50,7 @@ Weeks with one feasible portfolio are reported as gate-locked/no-choice weeks an
 
 ## Variable capacity: how B0 is evaluated
 
-B0 is intentionally allowed to select 0–3 names in Production. v1.1 therefore uses two separate axes:
+B0 is intentionally allowed to select 0–3 names in Production. v1.2 therefore uses two separate axes:
 
 ### Name-selection quality
 
@@ -174,3 +174,23 @@ If successful, commit only:
 backtest/b0_absolute_quality_audit/output/
 
 If anything fails, return the exact failure and do not patch the source locally.
+
+
+## v1.2 additions
+
+v1.2 closes the remaining interpretation gaps found after the first v1.1 materialization:
+
+- Fill3 risk is split into portfolio exposure metrics and true per-pick quality metrics.
+  Holding more positions mechanically raises the chance that at least one name stops; this is no longer
+  allowed to masquerade as proof that each fill name is intrinsically worse.
+- capacity_pick_quality_summary.csv compares original B0 picks and added fills on mean/median/P10/CVaR,
+  positive rate, Stop8 per pick, and final W4 <= -8% rate.
+- capacity_added_reason_summary.csv breaks added fills down by exact reject reason.
+- support_calendar_summary.csv exposes strict-support concentration by calendar quarter.
+- momentum_gate_summary.csv and momentum_gate_reason_summary.csv show whether the raw momentum baseline
+  obtains its picks inside or outside B0 eligibility, with separate return and risk statistics.
+- Momentum20 is included in the four-offset non-overlap table.
+- Simple baselines now report Stop8 exposure and any-stop-or-final<=-8 week deltas versus B0.
+- rel_spy_20 is recomputed point-in-time inside the audit using the frozen candidate mom_20 minus
+  Yahoo-supplemented SPY 20-session momentum as of each snapshot close; the previously dead 0-support
+  relative-strength baseline is therefore actually evaluated.

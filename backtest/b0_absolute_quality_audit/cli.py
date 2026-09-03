@@ -27,7 +27,12 @@ SIMPLE_WEEKLY = OUT / "simple_baseline_weekly.csv"
 SIMPLE_SUMMARY = OUT / "simple_baseline_summary.csv"
 CAPACITY_WEEKLY = OUT / "capacity_policy_weekly.csv"
 CAPACITY_SUMMARY = OUT / "capacity_policy_summary.csv"
+CAPACITY_PICK_QUALITY = OUT / "capacity_pick_quality_summary.csv"
+CAPACITY_ADDED_REASON = OUT / "capacity_added_reason_summary.csv"
 UNDERFILL_CAUSES = OUT / "underfill_cause_summary.csv"
+SUPPORT_CALENDAR = OUT / "support_calendar_summary.csv"
+MOMENTUM_GATE = OUT / "momentum_gate_summary.csv"
+MOMENTUM_GATE_REASONS = OUT / "momentum_gate_reason_summary.csv"
 MARKET_SUMMARY = OUT / "market_benchmark_summary.csv"
 NONOVERLAP = OUT / "nonoverlap_offsets.csv"
 HEALTH = OUT / "b0_health_summary.json"
@@ -66,6 +71,9 @@ def materialize() -> None:
         "current_b0_reject_reasons",
         "current_b0_selected",
         "current_b0_pick_order",
+        "mom_20",
+        "spy_momentum",
+        "rel_spy_20",
         "w4_return_pct",
         "w4_stop8",
         "next_open_w4_return_pct",
@@ -92,7 +100,12 @@ def materialize() -> None:
     _write_csv(summary["simple_summary"], SIMPLE_SUMMARY)
     _write_csv(frames["capacity_weekly"], CAPACITY_WEEKLY)
     _write_csv(summary["capacity_summary"], CAPACITY_SUMMARY)
+    _write_csv(summary["capacity_pick_quality_summary"], CAPACITY_PICK_QUALITY)
+    _write_csv(summary["capacity_added_reason_summary"], CAPACITY_ADDED_REASON)
     _write_csv(summary["underfill_cause_summary"], UNDERFILL_CAUSES)
+    _write_csv(summary["support_calendar_summary"], SUPPORT_CALENDAR)
+    _write_csv(summary["momentum_gate_summary"], MOMENTUM_GATE)
+    _write_csv(summary["momentum_gate_reason_summary"], MOMENTUM_GATE_REASONS)
     _write_csv(summary["market_summary"], MARKET_SUMMARY)
     _write_csv(summary["nonoverlap"], NONOVERLAP)
 
@@ -121,7 +134,8 @@ def materialize() -> None:
         ),
         "capacity_headline_rule": (
             "B0 original remains Production reference. Fill3 policies preserve all "
-            "original picks and only fill unused slots."
+            "original picks and only fill unused slots. Portfolio-level stop/any-loss "
+            "metrics are exposure diagnostics; per-pick quality is reported separately."
         ),
         "reject_reason_rule": (
             "Exclusive single-reason summary isolates gate-specific candidates but is "
@@ -129,6 +143,15 @@ def materialize() -> None:
         ),
         "simple_baseline_rule": (
             "Primary comparison requires full feature capacity and tradable next-open W4."
+        ),
+        "risk_semantics": (
+            "Portfolio any-stop-or-le8 means at least one held name either triggered Stop8 "
+            "or finished W4 <= -8%; it is position-count sensitive. Per-pick Stop8 and "
+            "terminal W4 <= -8% rates are reported separately for quality attribution."
+        ),
+        "momentum_location_rule": (
+            "Momentum gate diagnostics classify each primary-valid momentum pick by current "
+            "B0 eligibility and exact reject reason; they do not alter Production."
         ),
         "evidence_boundary": summary["health"]["evidence_boundary"],
     })
@@ -138,7 +161,12 @@ def materialize() -> None:
         health=summary["health"],
         raw_by_pick=summary["raw_by_pick_count"],
         capacity=summary["capacity_summary"],
+        capacity_pick_quality=summary["capacity_pick_quality_summary"],
+        capacity_added_reason=summary["capacity_added_reason_summary"],
         underfill_causes=summary["underfill_cause_summary"],
+        support_calendar=summary["support_calendar_summary"],
+        momentum_gate=summary["momentum_gate_summary"],
+        momentum_gate_reasons=summary["momentum_gate_reason_summary"],
         exclusive_reject=summary["exclusive_rejection_summary"],
         overlap_reject=summary["overlap_rejection_summary"],
         reject_combos=summary["rejection_combinations"],
@@ -166,7 +194,12 @@ def materialize() -> None:
         SIMPLE_SUMMARY,
         CAPACITY_WEEKLY,
         CAPACITY_SUMMARY,
+        CAPACITY_PICK_QUALITY,
+        CAPACITY_ADDED_REASON,
         UNDERFILL_CAUSES,
+        SUPPORT_CALENDAR,
+        MOMENTUM_GATE,
+        MOMENTUM_GATE_REASONS,
         MARKET_SUMMARY,
         NONOVERLAP,
         HEALTH,
@@ -185,7 +218,7 @@ def materialize() -> None:
     )
 
     h = summary["health"]
-    print("=== Current Production B0 Absolute Quality Audit v1.1 ===")
+    print("=== Current Production B0 Absolute Quality Audit v1.2 ===")
     print(f"source={manifest['source_git_sha']}")
     print(
         "ranking active-choice: "

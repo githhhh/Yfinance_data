@@ -9,6 +9,7 @@ from backtest.b0_absolute_quality_audit.audit import (
     raw_fixed_capacity_k,
 )
 from backtest.b0_absolute_quality_audit.config import (
+    PROTOCOL_VERSION,
     RAW_PRICE_COVERAGE_MIN_FOR_PRIMARY,
 )
 from backtest.b0_absolute_quality_audit.data import (
@@ -23,6 +24,7 @@ from backtest.b0_absolute_quality_audit.market_data import (
     build_next_open_forward_returns,
     download_yahoo_supplement,
     find_codes_needing_yahoo,
+    spy_momentum_asof,
 )
 from backtest.b0_absolute_quality_audit.capacity import (
     fill_capacity_codes,
@@ -31,6 +33,11 @@ from backtest.b0_absolute_quality_audit.capacity import (
 from backtest.b0_absolute_quality_audit.v11 import (
     _rejection_summaries,
     active_choice_eligible_rows,
+)
+from backtest.b0_absolute_quality_audit.diagnostics import (
+    capacity_pick_quality,
+    momentum_gate_diagnostics,
+    support_calendar_summary,
 )
 from backtest.b0_absolute_quality_audit.portfolio import (
     distribution_summary,
@@ -498,3 +505,159 @@ def test_active_choice_headline_excludes_single_feasible_portfolio_week():
     active = active_choice_eligible_rows(frame)
     assert active["snapshot_date"].tolist() == ["2026-01-09"]
     assert active["b0_percentile"].tolist() == [60.0]
+
+
+
+def test_protocol_v12():
+    assert PROTOCOL_VERSION == "b0_absolute_quality_v1_2"
+
+
+def test_capacity_pick_quality_separates_pick_risk_from_position_count():
+    panel = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "A",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 10.0,
+            "next_open_w4_stop8": False,
+            "current_b0_reject_reasons": "",
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "B",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 5.0,
+            "next_open_w4_stop8": False,
+            "current_b0_reject_reasons": "non_actionable",
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "C",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": -10.0,
+            "next_open_w4_stop8": True,
+            "current_b0_reject_reasons": "non_actionable",
+        },
+    ])
+    weekly = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "policy_id": "B0_FILL3_SINGLE_REJECT",
+            "original_pick_count": 1,
+            "mature": True,
+            "original_codes": '["A"]',
+            "added_codes": '["B", "C"]',
+        },
+    ])
+
+    summary, reasons = capacity_pick_quality(panel, weekly)
+    original = summary[summary["cohort"] == "original_b0"].iloc[0]
+    added = summary[summary["cohort"] == "added_fill"].iloc[0]
+
+    assert original["picks"] == 1
+    assert original["stop8_rate"] == 0.0
+    assert original["terminal_le_minus8_rate"] == 0.0
+    assert added["picks"] == 2
+    assert added["stop8_rate"] == 0.5
+    assert added["terminal_le_minus8_rate"] == 0.5
+    assert reasons.iloc[0]["reject_reason"] == "non_actionable"
+
+
+def test_support_calendar_exposes_quarter_concentration():
+    snapshots = [
+        "2025-12-19", "2025-12-26",
+        "2026-01-02", "2026-01-09",
+        "2026-04-03",
+    ]
+    raw = pd.DataFrame([
+        {"snapshot_date": d, "primary_valid": d != "2026-04-03"}
+        for d in snapshots
+    ])
+    simple = pd.DataFrame([
+        {
+            "snapshot_date": d,
+            "baseline": "momentum_20",
+            "primary_valid": d in {"2025-12-19", "2026-01-02"},
+        }
+        for d in snapshots
+    ])
+    out = support_calendar_summary(snapshots, raw, simple)
+
+    q1 = out[
+        (out["comparison"] == "simple_momentum_20")
+        & (out["quarter"] == "2026Q1")
+    ].iloc[0]
+    assert q1["support_weeks"] == 1
+    assert q1["total_snapshots"] == 2
+    assert q1["support_rate"] == 0.5
+
+
+def test_momentum_gate_diagnostic_locates_incremental_picks_outside_gate():
+    panel = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "A",
+            "current_b0_eligible": True, "current_b0_selected": True,
+            "current_b0_reject_reasons": "",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 10.0,
+            "next_open_w4_stop8": False,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "B",
+            "current_b0_eligible": False, "current_b0_selected": False,
+            "current_b0_reject_reasons": "non_actionable",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 5.0,
+            "next_open_w4_stop8": False,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "C",
+            "current_b0_eligible": False, "current_b0_selected": False,
+            "current_b0_reject_reasons": "non_actionable",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": -9.0,
+            "next_open_w4_stop8": True,
+        },
+    ])
+    simple = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "baseline": "momentum_20",
+            "primary_valid": True,
+            "codes": '["A", "B", "C"]',
+        },
+    ])
+
+    summary, reasons = momentum_gate_diagnostics(panel, simple)
+    eligible = summary[summary["cohort"] == "eligible"].iloc[0]
+    outside = summary[summary["cohort"] == "gate_outside"].iloc[0]
+
+    assert eligible["picks"] == 1
+    assert eligible["share_of_momentum_picks"] == 1 / 3
+    assert eligible["selected_by_b0_rate"] == 1.0
+    assert outside["picks"] == 2
+    assert outside["share_of_momentum_picks"] == 2 / 3
+    assert reasons.iloc[0]["reject_reason"] == "non_actionable"
+
+
+def test_spy_momentum_asof_uses_only_snapshot_or_earlier_bars():
+    dates = pd.date_range("2026-01-01", periods=22, freq="D")
+    closes = np.arange(100.0, 122.0)
+    prices = pd.DataFrame({
+        "code": "SPY",
+        "date": dates,
+        "open": closes,
+        "high": closes,
+        "low": closes,
+        "close": closes,
+        "volume": 1,
+        "source": "test",
+    })
+    # Add a huge future move that must not affect the snapshot value.
+    prices.loc[len(prices)] = {
+        "code": "SPY",
+        "date": pd.Timestamp("2026-02-15"),
+        "open": 1000.0, "high": 1000.0, "low": 1000.0, "close": 1000.0,
+        "volume": 1, "source": "test",
+    }
+
+    snapshot = str(dates[20].date())
+    out = spy_momentum_asof(prices, [snapshot], sessions=20)
+    assert out.iloc[0]["spy_momentum"] == (120.0 / 100.0 - 1.0)
