@@ -193,9 +193,25 @@ def run_research(
             adaptive_selected,
             variant="ADAPTIVE_POLICY_FORMAL_OOS",
         )
+        adaptive_missed_winners = missed_big_winners(
+            formal_panel, adaptive_selected
+        )
+        adaptive_included_losers = included_big_losers(
+            formal_panel, adaptive_selected
+        )
+        if not adaptive_missed_winners.empty:
+            adaptive_missed_winners.insert(
+                0, "audit_rule", "ADAPTIVE_POLICY_FORMAL_OOS"
+            )
+        if not adaptive_included_losers.empty:
+            adaptive_included_losers.insert(
+                0, "audit_rule", "ADAPTIVE_POLICY_FORMAL_OOS"
+            )
     else:
         adaptive_setup_detail = pd.DataFrame()
         adaptive_setup_summary = pd.DataFrame()
+        adaptive_missed_winners = pd.DataFrame()
+        adaptive_included_losers = pd.DataFrame()
 
     setup_balanced_summary = pd.concat(
         [primary_setup_summary, adaptive_setup_summary],
@@ -298,6 +314,8 @@ def run_research(
         "setup_sensitivity_primary.csv": output_dir / "setup_sensitivity_primary.csv",
         "setup_sensitivity_adaptive_oos.csv": output_dir / "setup_sensitivity_adaptive_oos.csv",
         "setup_balanced_summary.csv": output_dir / "setup_balanced_summary.csv",
+        "adaptive_oos_missed_big_winners.csv": output_dir / "adaptive_oos_missed_big_winners.csv",
+        "adaptive_oos_included_big_losers.csv": output_dir / "adaptive_oos_included_big_losers.csv",
         "missed_big_winners.csv": output_dir / "missed_big_winners.csv",
         "included_big_losers.csv": output_dir / "included_big_losers.csv",
         "extended_exploratory.csv": output_dir / "extended_exploratory.csv",
@@ -343,6 +361,12 @@ def run_research(
     )
     setup_balanced_summary.to_csv(
         outputs["setup_balanced_summary.csv"], index=False
+    )
+    adaptive_missed_winners.to_csv(
+        outputs["adaptive_oos_missed_big_winners.csv"], index=False
+    )
+    adaptive_included_losers.to_csv(
+        outputs["adaptive_oos_included_big_losers.csv"], index=False
     )
     missed_winners.to_csv(outputs["missed_big_winners.csv"], index=False)
     included_losers.to_csv(outputs["included_big_losers.csv"], index=False)
