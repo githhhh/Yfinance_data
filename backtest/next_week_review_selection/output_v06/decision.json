@@ -1,7 +1,0 @@
-{
-  "static_status_pre_setup_sensitivity": "NO_DISCOVERY_REFINEMENT",
-  "static_status": "NO_DISCOVERY_REFINEMENT",
-  "static_rule": null,
-  "adaptive_status": "NO_STABLE_DISCRIMINATIVE_RULE",
-  "note": "retrospective reused-history confirmation only; future sealed weeks are required for production authorization"
-}
