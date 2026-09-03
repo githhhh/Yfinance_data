@@ -47,6 +47,10 @@ from .diagnostics import (
     momentum_nonoverlap,
     support_calendar_summary,
 )
+from .execution import (
+    capacity_stop8_execution,
+    simple_stop8_execution,
+)
 from .market_data import (
     build_next_open_forward_returns,
     download_yahoo_supplement,
@@ -1011,6 +1015,12 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
     capacity_pick_quality_summary, capacity_added_reason_summary = capacity_pick_quality(
         f["panel"], f["capacity_weekly"]
     )
+    capacity_stop8_weekly, capacity_stop8_summary = capacity_stop8_execution(
+        f["panel"], f["capacity_weekly"]
+    )
+    simple_stop8_weekly, simple_stop8_summary = simple_stop8_execution(
+        f["panel"], f["simple_weekly"], b0
+    )
     support_calendar = support_calendar_summary(
         sorted(f["panel"]["snapshot_date"].astype(str).unique().tolist()),
         f["raw_random_weekly"],
@@ -1095,6 +1105,18 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
     mom_off = momentum_nonoverlap(f["simple_weekly"], b0)
     if not mom_off.empty:
         offsets.append(mom_off)
+    if not simple_stop8_weekly.empty:
+        mom_stop = simple_stop8_weekly[
+            simple_stop8_weekly["baseline"].astype(str) == "momentum_20"
+        ].copy()
+        if not mom_stop.empty:
+            off = four_offset_nonoverlap(
+                mom_stop,
+                value_col="idealized_stop8_return",
+                benchmark_col="b0_idealized_stop8_return",
+            )
+            off["comparison"] = "momentum20_vs_b0_idealized_stop8"
+            offsets.append(off)
     nonoverlap = (
         pd.concat(offsets, ignore_index=True) if offsets else pd.DataFrame()
     )
@@ -1129,6 +1151,11 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
             "support_dates": raw_valid["snapshot_date"].astype(str).tolist(),
         },
         "gate": gate_summary,
+        "idealized_stop8_execution_semantics": (
+            "If a selected name ever triggers next_open_w4_stop8, its scenario return "
+            "is set to exactly -8%; otherwise terminal next-open W4 is used. This is "
+            "an optimistic no-slippage scenario, not realized execution."
+        ),
         "momentum_gate": (
             {}
             if momentum_gate_summary.empty
@@ -1160,6 +1187,10 @@ def summarize_v11(core: dict[str, Any]) -> dict[str, Any]:
         "capacity_summary": capacity_summary,
         "capacity_pick_quality_summary": capacity_pick_quality_summary,
         "capacity_added_reason_summary": capacity_added_reason_summary,
+        "capacity_stop8_execution_weekly": capacity_stop8_weekly,
+        "capacity_stop8_execution_summary": capacity_stop8_summary,
+        "simple_stop8_execution_weekly": simple_stop8_weekly,
+        "simple_stop8_execution_summary": simple_stop8_summary,
         "underfill_cause_summary": underfill_cause_summary,
         "support_calendar_summary": support_calendar,
         "momentum_gate_summary": momentum_gate_summary,

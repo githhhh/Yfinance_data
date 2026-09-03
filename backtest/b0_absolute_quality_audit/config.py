@@ -11,7 +11,7 @@ OUT = AUDIT_ROOT / "output"
 PRICE_CACHE = ROOT / "backtest" / "b0_top3_quality_audit" / "data" / "signal_daily_prices.parquet"
 PRODUCTION_B0_PATH = ROOT / "dashboard" / "skill_industry_eps_known.py"
 
-PROTOCOL_VERSION = "b0_absolute_quality_v1_2"
+PROTOCOL_VERSION = "b0_absolute_quality_v1_3"
 PRIMARY_HORIZON = "W4"
 TOP_N = 3
 SNAPSHOT_FORWARD_DAYS = 28
@@ -32,7 +32,6 @@ SIMPLE_BASELINES = (
     ("entry_volume", "ibd_entry_volume_ratio", "desc"),
     ("eps", "eps_yoy_growth", "desc"),
     ("momentum_20", "mom_20", "desc"),
-    ("rel_spy_20", "rel_spy_20", "desc"),
 )
 
 # Primary raw inference remains fail-closed after Yahoo supplementation.

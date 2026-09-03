@@ -34,6 +34,7 @@ def write_v11_report(
     capacity: pd.DataFrame,
     capacity_pick_quality: pd.DataFrame,
     capacity_added_reason: pd.DataFrame,
+    capacity_stop8: pd.DataFrame,
     underfill_causes: pd.DataFrame,
     support_calendar: pd.DataFrame,
     momentum_gate: pd.DataFrame,
@@ -43,6 +44,7 @@ def write_v11_report(
     reject_combos: pd.DataFrame,
     rank_buckets: pd.DataFrame,
     simple: pd.DataFrame,
+    simple_stop8: pd.DataFrame,
     market: pd.DataFrame,
     nonoverlap: pd.DataFrame,
     manifest: dict[str, Any],
@@ -54,7 +56,7 @@ def write_v11_report(
     info = health["ranking_information"]
 
     lines = [
-        "# Current Production B0 — Absolute Quality Health Check v1.2",
+        "# Current Production B0 — Absolute Quality Health Check v1.3",
         "",
         "## Executive coordinates",
         "",
@@ -281,6 +283,34 @@ def write_v11_report(
 
     lines += [
         "",
+        "### Idealized Stop8 execution scenario",
+        "",
+        "For every name that triggers Stop8, scenario return is set to exactly -8%; "
+        "otherwise terminal W4 is used. This is optimistic no-slippage execution and "
+        "should be read as a scenario, not realized fills.",
+        "",
+    ]
+
+    if capacity_stop8.empty:
+        lines.append("No Stop8 execution capacity diagnostics.")
+    else:
+        lines += [
+            "| Policy | Scope | Weeks | Stop8-exec mean | Stop8-exec median | Mean Δ vs B0 | Median Δ | Beat B0 | 95% mean-edge CI | Worst | P10 |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+        ]
+        for _, row in capacity_stop8.iterrows():
+            lines.append(
+                f"| {row['policy_id']} | {row['scope']} | {int(row['support_weeks'])} | "
+                f"{_fmt(row['mean_return'], 2, '%')} | {_fmt(row['median_return'], 2, '%')} | "
+                f"{_fmt(row['mean_spread_vs_b0'], 2, 'pp')} | "
+                f"{_fmt(row['median_spread_vs_b0'], 2, 'pp')} | "
+                f"{_rate(row['beat_b0_rate'])} | "
+                f"[{_fmt(row['spread_ci_low'], 2, 'pp')}, {_fmt(row['spread_ci_high'], 2, 'pp')}] | "
+                f"{_fmt(row['worst_return'], 2, '%')} | {_fmt(row['p10_return'], 2, '%')} |"
+            )
+
+    lines += [
+        "",
         "Portfolio-level any-stop/≤-8-week deltas rise mechanically when more positions are held; "
         "they are exposure diagnostics, not proof that each added name is intrinsically riskier. "
         "Per-pick Stop8 and terminal-left-tail rates above are the quality comparison.",
@@ -416,6 +446,34 @@ def write_v11_report(
             )
 
     lines += [
+        "",
+        "### Idealized Stop8 execution scenario for simple baselines",
+        "",
+    ]
+
+    if simple_stop8.empty:
+        lines.append("No Stop8 execution simple-baseline diagnostics.")
+    else:
+        lines += [
+            "| Baseline | Weeks | Stop8-exec mean | Stop8-exec median | Mean Δ vs B0 | Median Δ | Beat B0 | 95% mean-edge CI | Worst | P10 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+        ]
+        for _, row in simple_stop8.iterrows():
+            lines.append(
+                f"| {row['baseline']} | {int(row['support_weeks'])} | "
+                f"{_fmt(row['mean_return'], 2, '%')} | {_fmt(row['median_return'], 2, '%')} | "
+                f"{_fmt(row['mean_spread_vs_b0'], 2, 'pp')} | "
+                f"{_fmt(row['median_spread_vs_b0'], 2, 'pp')} | "
+                f"{_rate(row['beat_b0_rate'])} | "
+                f"[{_fmt(row['spread_ci_low'], 2, 'pp')}, {_fmt(row['spread_ci_high'], 2, 'pp')}] | "
+                f"{_fmt(row['worst_return'], 2, '%')} | {_fmt(row['p10_return'], 2, '%')} |"
+            )
+
+    lines += [
+        "",
+        "Relative-SPY 20-session momentum is retained as a PIT diagnostic field, not as an "
+        "independent Top3 baseline: subtracting the same SPY return from every candidate in "
+        "one snapshot cannot change that snapshot's cross-sectional momentum ranking.",
         "",
         "Large mean gains with flat/negative medians or strong best-week dependence are treated as "
         "right-tail hypotheses, not as proof of stable superiority.",

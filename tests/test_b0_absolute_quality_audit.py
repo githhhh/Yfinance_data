@@ -11,6 +11,7 @@ from backtest.b0_absolute_quality_audit.audit import (
 from backtest.b0_absolute_quality_audit.config import (
     PROTOCOL_VERSION,
     RAW_PRICE_COVERAGE_MIN_FOR_PRIMARY,
+    SIMPLE_BASELINES,
 )
 from backtest.b0_absolute_quality_audit.data import (
     build_snapshot_forward_returns,
@@ -38,6 +39,11 @@ from backtest.b0_absolute_quality_audit.diagnostics import (
     capacity_pick_quality,
     momentum_gate_diagnostics,
     support_calendar_summary,
+)
+from backtest.b0_absolute_quality_audit.execution import (
+    capacity_stop8_execution,
+    idealized_stop8_capital_return,
+    simple_stop8_execution,
 )
 from backtest.b0_absolute_quality_audit.portfolio import (
     distribution_summary,
@@ -508,8 +514,11 @@ def test_active_choice_headline_excludes_single_feasible_portfolio_week():
 
 
 
-def test_protocol_v12():
-    assert PROTOCOL_VERSION == "b0_absolute_quality_v1_2"
+def test_protocol_v13():
+    assert PROTOCOL_VERSION == "b0_absolute_quality_v1_3"
+    names = [row[0] for row in SIMPLE_BASELINES]
+    assert "momentum_20" in names
+    assert "rel_spy_20" not in names
 
 
 def test_capacity_pick_quality_separates_pick_risk_from_position_count():
@@ -661,3 +670,97 @@ def test_spy_momentum_asof_uses_only_snapshot_or_earlier_bars():
     snapshot = str(dates[20].date())
     out = spy_momentum_asof(prices, [snapshot], sessions=20)
     assert out.iloc[0]["spy_momentum"] == (120.0 / 100.0 - 1.0)
+
+
+
+def test_idealized_stop8_execution_books_triggered_name_at_minus8():
+    panel = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "A",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 40.0,
+            "next_open_w4_stop8": True,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "B",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 5.0,
+            "next_open_w4_stop8": False,
+        },
+    ])
+    lookup = panel.set_index(["snapshot_date", "code"], drop=False)
+    out = idealized_stop8_capital_return(
+        lookup, "2026-01-02", ["A", "B"]
+    )
+    assert out == (-8.0 + 5.0) / 3.0
+
+
+def test_simple_stop8_execution_compares_same_week_b0_scenario():
+    panel = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "M",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 30.0,
+            "next_open_w4_stop8": True,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "B",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 6.0,
+            "next_open_w4_stop8": False,
+        },
+    ])
+    simple = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "baseline": "momentum_20",
+            "primary_valid": True,
+            "codes": '["M"]',
+        },
+    ])
+    b0 = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "selected_codes": '["B"]',
+        },
+    ])
+    weekly, summary = simple_stop8_execution(panel, simple, b0)
+    row = weekly.iloc[0]
+    assert row["idealized_stop8_return"] == -8.0 / 3.0
+    assert row["b0_idealized_stop8_return"] == 2.0
+    s = summary.iloc[0]
+    assert s["median_spread_vs_b0"] == (-8.0 / 3.0) - 2.0
+
+
+def test_capacity_stop8_execution_preserves_cash_slot_denominator():
+    panel = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02", "code": "A",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 9.0,
+            "next_open_w4_stop8": False,
+        },
+        {
+            "snapshot_date": "2026-01-02", "code": "C",
+            "next_open_price_valid": True,
+            "next_open_w4_return_pct": 20.0,
+            "next_open_w4_stop8": True,
+        },
+    ])
+    weekly = pd.DataFrame([
+        {
+            "snapshot_date": "2026-01-02",
+            "policy_id": "B0_FILL3_SINGLE_REJECT",
+            "original_pick_count": 1,
+            "underfill_cause": "ELIGIBILITY_SHORTAGE",
+            "mature": True,
+            "original_codes": '["A"]',
+            "codes": '["A", "C"]',
+        },
+    ])
+    detail, summary = capacity_stop8_execution(panel, weekly)
+    row = detail.iloc[0]
+    assert row["b0_idealized_stop8_return"] == 3.0
+    assert row["idealized_stop8_return"] == (9.0 - 8.0) / 3.0
+    under = summary[summary["scope"] == "underfilled_only"].iloc[0]
+    assert under["support_weeks"] == 1

@@ -1,8 +1,8 @@
-# B0 Absolute Quality Audit v1.2
+# B0 Absolute Quality Audit v1.3
 
 This audit measures the current Production B0 without searching for a B1 and without modifying Production.
 
-## Why v1.2 exists
+## Why v1.3 exists
 
 The first absolute audit exposed useful structure but also three measurement problems:
 
@@ -10,7 +10,7 @@ The first absolute audit exposed useful structure but also three measurement pro
 2. Raw fixed-capacity results were based on snapshot-close outcomes and only 21 fully covered weeks, heavily concentrated in early underfilled regimes.
 3. Reject-reason labels overlapped, so a descriptive label table could be misread as single-gate causal attribution.
 
-v1.2 fixes all three and adds explicit capacity counterfactuals plus SPY/QQQ.
+v1.3 fixes all three and adds explicit capacity counterfactuals plus SPY/QQQ.
 
 ## Frozen data boundary
 
@@ -50,7 +50,7 @@ Weeks with one feasible portfolio are reported as gate-locked/no-choice weeks an
 
 ## Variable capacity: how B0 is evaluated
 
-B0 is intentionally allowed to select 0–3 names in Production. v1.2 therefore uses two separate axes:
+B0 is intentionally allowed to select 0–3 names in Production. v1.3 therefore uses two separate axes:
 
 ### Name-selection quality
 
@@ -176,9 +176,9 @@ backtest/b0_absolute_quality_audit/output/
 If anything fails, return the exact failure and do not patch the source locally.
 
 
-## v1.2 additions
+## v1.3 additions
 
-v1.2 closes the remaining interpretation gaps found after the first v1.1 materialization:
+v1.3 closes the remaining interpretation gaps found after the first v1.1 materialization:
 
 - Fill3 risk is split into portfolio exposure metrics and true per-pick quality metrics.
   Holding more positions mechanically raises the chance that at least one name stops; this is no longer
@@ -194,3 +194,19 @@ v1.2 closes the remaining interpretation gaps found after the first v1.1 materia
 - rel_spy_20 is recomputed point-in-time inside the audit using the frozen candidate mom_20 minus
   Yahoo-supplemented SPY 20-session momentum as of each snapshot close; the previously dead 0-support
   relative-strength baseline is therefore actually evaluated.
+
+
+## v1.3 additions
+
+v1.3 closes the final execution-path gap revealed by v1.2:
+
+- Adds an idealized no-slippage Stop8 execution scenario. If a selected name ever
+  triggers the audit Stop8 flag, its scenario return is booked at exactly -8%;
+  otherwise its terminal next-open W4 return is used.
+- Writes simple_stop8_execution_weekly.csv / simple_stop8_execution_summary.csv.
+- Writes capacity_stop8_execution_weekly.csv / capacity_stop8_execution_summary.csv.
+- The Stop8 scenario is explicitly optimistic for gap-through-stop cases and is not
+  presented as realized execution.
+- rel_spy_20 remains a PIT diagnostic feature, but is removed as an independent Top3
+  simple baseline. Within one snapshot, subtracting the same SPY 20-session momentum
+  from every candidate cannot change the cross-sectional ordering produced by mom_20.

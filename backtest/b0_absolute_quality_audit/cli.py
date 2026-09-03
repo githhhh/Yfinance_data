@@ -29,6 +29,10 @@ CAPACITY_WEEKLY = OUT / "capacity_policy_weekly.csv"
 CAPACITY_SUMMARY = OUT / "capacity_policy_summary.csv"
 CAPACITY_PICK_QUALITY = OUT / "capacity_pick_quality_summary.csv"
 CAPACITY_ADDED_REASON = OUT / "capacity_added_reason_summary.csv"
+CAPACITY_STOP8_WEEKLY = OUT / "capacity_stop8_execution_weekly.csv"
+CAPACITY_STOP8_SUMMARY = OUT / "capacity_stop8_execution_summary.csv"
+SIMPLE_STOP8_WEEKLY = OUT / "simple_stop8_execution_weekly.csv"
+SIMPLE_STOP8_SUMMARY = OUT / "simple_stop8_execution_summary.csv"
 UNDERFILL_CAUSES = OUT / "underfill_cause_summary.csv"
 SUPPORT_CALENDAR = OUT / "support_calendar_summary.csv"
 MOMENTUM_GATE = OUT / "momentum_gate_summary.csv"
@@ -102,6 +106,10 @@ def materialize() -> None:
     _write_csv(summary["capacity_summary"], CAPACITY_SUMMARY)
     _write_csv(summary["capacity_pick_quality_summary"], CAPACITY_PICK_QUALITY)
     _write_csv(summary["capacity_added_reason_summary"], CAPACITY_ADDED_REASON)
+    _write_csv(summary["capacity_stop8_execution_weekly"], CAPACITY_STOP8_WEEKLY)
+    _write_csv(summary["capacity_stop8_execution_summary"], CAPACITY_STOP8_SUMMARY)
+    _write_csv(summary["simple_stop8_execution_weekly"], SIMPLE_STOP8_WEEKLY)
+    _write_csv(summary["simple_stop8_execution_summary"], SIMPLE_STOP8_SUMMARY)
     _write_csv(summary["underfill_cause_summary"], UNDERFILL_CAUSES)
     _write_csv(summary["support_calendar_summary"], SUPPORT_CALENDAR)
     _write_csv(summary["momentum_gate_summary"], MOMENTUM_GATE)
@@ -142,7 +150,13 @@ def materialize() -> None:
             "not causal proof; overlap summary is descriptive only."
         ),
         "simple_baseline_rule": (
-            "Primary comparison requires full feature capacity and tradable next-open W4."
+            "Primary comparison requires full feature capacity and tradable next-open W4. "
+            "rel_spy_20 is not treated as an independent Top3 baseline because subtracting "
+            "the same SPY momentum within a snapshot cannot change cross-sectional ranks."
+        ),
+        "idealized_stop8_execution_rule": (
+            "Scenario only: any name that triggers next_open_w4_stop8 is booked at exactly "
+            "-8%; all other names use terminal W4. No slippage/gap-through modeling."
         ),
         "risk_semantics": (
             "Portfolio any-stop-or-le8 means at least one held name either triggered Stop8 "
@@ -163,6 +177,7 @@ def materialize() -> None:
         capacity=summary["capacity_summary"],
         capacity_pick_quality=summary["capacity_pick_quality_summary"],
         capacity_added_reason=summary["capacity_added_reason_summary"],
+        capacity_stop8=summary["capacity_stop8_execution_summary"],
         underfill_causes=summary["underfill_cause_summary"],
         support_calendar=summary["support_calendar_summary"],
         momentum_gate=summary["momentum_gate_summary"],
@@ -172,6 +187,7 @@ def materialize() -> None:
         reject_combos=summary["rejection_combinations"],
         rank_buckets=summary["rank_bucket_summary"],
         simple=summary["simple_summary"],
+        simple_stop8=summary["simple_stop8_execution_summary"],
         market=summary["market_summary"],
         nonoverlap=summary["nonoverlap"],
         manifest=manifest,
@@ -196,6 +212,10 @@ def materialize() -> None:
         CAPACITY_SUMMARY,
         CAPACITY_PICK_QUALITY,
         CAPACITY_ADDED_REASON,
+        CAPACITY_STOP8_WEEKLY,
+        CAPACITY_STOP8_SUMMARY,
+        SIMPLE_STOP8_WEEKLY,
+        SIMPLE_STOP8_SUMMARY,
         UNDERFILL_CAUSES,
         SUPPORT_CALENDAR,
         MOMENTUM_GATE,
@@ -218,7 +238,7 @@ def materialize() -> None:
     )
 
     h = summary["health"]
-    print("=== Current Production B0 Absolute Quality Audit v1.2 ===")
+    print("=== Current Production B0 Absolute Quality Audit v1.3 ===")
     print(f"source={manifest['source_git_sha']}")
     print(
         "ranking active-choice: "
