@@ -124,6 +124,10 @@ v0.5 retrospective adaptive candidate gate：
 - mean Winner Lift Δ >= 0
 - mean Loser Lift Δ <= 0
 - mean Incremental Opportunities / Added Review > 0
+- **2W / 3W / 4W 各 horizon 的 mean Winner Lift Δ 均 >= 0**
+- **2W / 3W / 4W 各 horizon 的 mean Loser Lift Δ 均 <= 0**
+
+最后两条防止“4W 正向把 2W/3W 的劣化平均掉”。
 
 否则：
 
