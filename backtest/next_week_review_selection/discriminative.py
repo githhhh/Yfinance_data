@@ -15,7 +15,14 @@ from .selectors import (
     select_b0_actionable,
     select_supplemental,
 )
-from .utils import to_bool, to_float
+from .utils import (
+    ZERO_TOL,
+    is_nonnegative,
+    is_nonpositive,
+    is_positive,
+    to_bool,
+    to_float,
+)
 from .walk_forward import partition_walk_forward_weeks
 
 
@@ -542,8 +549,8 @@ def oos_policy_status(
         return "NO_STABLE_DISCRIMINATIVE_RULE"
 
     horizon_consistent = all(
-        float(row[f"mean_winner_lift_delta_{horizon}"]) >= 0
-        and float(row[f"mean_loser_lift_delta_{horizon}"]) <= 0
+        is_nonnegative(row[f"mean_winner_lift_delta_{horizon}"])
+        and is_nonpositive(row[f"mean_loser_lift_delta_{horizon}"])
         for horizon in FORMAL_HORIZONS
     )
     stable = (
@@ -551,11 +558,12 @@ def oos_policy_status(
         and float(row["opportunity_positive_rate"]) >= 0.60
         and float(row["winner_lift_nonnegative_rate"]) >= 0.60
         and float(row["loser_lift_nonworse_rate"]) >= 0.60
-        and float(row["mean_opportunity_delta"]) > 0
-        and float(row["mean_winner_lift_delta"]) >= 0
-        and float(row["mean_loser_lift_delta"]) <= 0
-        and float(row["mean_attention_multiplier_vs_b0"]) <= MAX_ATTENTION_MULTIPLIER
-        and float(row["mean_incremental_opportunities_per_added_review"]) > 0
+        and is_positive(row["mean_opportunity_delta"])
+        and is_nonnegative(row["mean_winner_lift_delta"])
+        and is_nonpositive(row["mean_loser_lift_delta"])
+        and float(row["mean_attention_multiplier_vs_b0"])
+        <= MAX_ATTENTION_MULTIPLIER + ZERO_TOL
+        and is_positive(row["mean_incremental_opportunities_per_added_review"])
         and horizon_consistent
     )
     return (
@@ -616,16 +624,17 @@ def _train_quality_gate(row: pd.Series) -> bool:
     if not all(_finite(value) for value in required):
         return False
     return (
-        float(row["attention_multiplier_vs_b0"]) <= MAX_ATTENTION_MULTIPLIER
+        float(row["attention_multiplier_vs_b0"])
+        <= MAX_ATTENTION_MULTIPLIER + ZERO_TOL
         and float(row["added_evaluable_reviews_vs_b0"]) > 0
-        and float(row["incremental_opportunities_per_added_review"]) > 0
-        and float(row["opportunity_recall_1w_delta_vs_b0"]) > 0
-        and float(
+        and is_positive(row["incremental_opportunities_per_added_review"])
+        and is_positive(row["opportunity_recall_1w_delta_vs_b0"])
+        and is_nonnegative(
             row["tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"]
-        ) >= 0
-        and float(
+        )
+        and is_nonpositive(
             row["tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"]
-        ) <= 0
+        )
         and int(row["horizon_consistency_count"]) >= 2
         and float(row.get("train_consistent_block_rate", 0.0)) >= (2.0 / 3.0)
     )
@@ -641,7 +650,7 @@ def _horizon_consistency(row: pd.Series | dict[str, object]) -> int:
             f"tradable_loser_capture_lift_{horizon}_delta_vs_b0"
         )
         if _finite(winner) and _finite(loser):
-            if float(winner) >= 0 and float(loser) <= 0:
+            if is_nonnegative(winner) and is_nonpositive(loser):
                 score += 1
     return score
 
@@ -694,19 +703,17 @@ def _train_block_consistency(
             continue
         evaluated += 1
         if (
-            float(candidate["opportunity_recall_1w_delta_vs_b0"]) > 0
-            and float(
+            is_positive(candidate["opportunity_recall_1w_delta_vs_b0"])
+            and is_nonnegative(
                 candidate[
                     "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
                 ]
             )
-            >= 0
-            and float(
+            and is_nonpositive(
                 candidate[
                     "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
                 ]
             )
-            <= 0
         ):
             consistent += 1
     rate = consistent / evaluated if evaluated else 0.0
@@ -732,15 +739,15 @@ def _pareto_mask(frame: pd.DataFrame) -> pd.Series:
                 a = _finite_value(frame.at[i, column], maximize)
                 b = _finite_value(frame.at[j, column], maximize)
                 if maximize:
-                    if b < a:
+                    if b < a - ZERO_TOL:
                         no_worse = False
                         break
-                    strictly_better |= b > a
+                    strictly_better |= b > a + ZERO_TOL
                 else:
-                    if b > a:
+                    if b > a + ZERO_TOL:
                         no_worse = False
                         break
-                    strictly_better |= b < a
+                    strictly_better |= b < a - ZERO_TOL
             if no_worse and strictly_better:
                 dominated = True
                 break
@@ -1112,17 +1119,17 @@ def _median(values: pd.Series) -> float:
 
 def _positive_rate(values: pd.Series) -> float:
     numeric = pd.to_numeric(values, errors="coerce").dropna()
-    return float((numeric > 0).mean()) if len(numeric) else 0.0
+    return float((numeric > ZERO_TOL).mean()) if len(numeric) else 0.0
 
 
 def _nonnegative_rate(values: pd.Series) -> float:
     numeric = pd.to_numeric(values, errors="coerce").dropna()
-    return float((numeric >= 0).mean()) if len(numeric) else 0.0
+    return float((numeric >= -ZERO_TOL).mean()) if len(numeric) else 0.0
 
 
 def _nonpositive_rate(values: pd.Series) -> float:
     numeric = pd.to_numeric(values, errors="coerce").dropna()
-    return float((numeric <= 0).mean()) if len(numeric) else 0.0
+    return float((numeric <= ZERO_TOL).mean()) if len(numeric) else 0.0
 
 
 def _finite(value: object) -> bool:
