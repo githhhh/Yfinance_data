@@ -149,7 +149,14 @@ def discovery_bucket_stats(discovery_panel: pd.DataFrame) -> pd.DataFrame:
         values = feature_buckets[feature]
         for bucket, index in values.groupby(values, dropna=False, sort=True).groups.items():
             group = work.loc[index]
-            rows.append(_bucket_summary(group, feature, str(bucket)))
+            rows.append(
+                _bucket_summary(
+                    group,
+                    feature,
+                    str(bucket),
+                    total_rows=len(work),
+                )
+            )
     return pd.DataFrame(rows)
 
 
@@ -184,6 +191,7 @@ def discovery_interaction_stats(discovery_panel: pd.DataFrame) -> pd.DataFrame:
                 group,
                 f"{left} x {right}",
                 f"{left_value} | {right_value}",
+                total_rows=len(work),
             )
             rows.append(row)
     return pd.DataFrame(rows)
@@ -212,6 +220,9 @@ def evaluate_candidate_grid(
         candidate["condition_count"] = len(rule.conditions)
         candidate["selection_signature"] = _selection_signature(selected)
         candidate["horizon_consistency_count"] = _horizon_consistency(candidate)
+        block_count, block_rate = _train_block_consistency(train_panel, rule)
+        candidate["train_consistent_blocks"] = block_count
+        candidate["train_consistent_block_rate"] = block_rate
         rows.append(candidate)
 
     grid = pd.DataFrame(rows)
@@ -310,6 +321,7 @@ def run_discriminative_walk_forward(
     choice_rows = []
     train_grids = []
     selection_rows = []
+    formal_calendar_rows = []
 
     for block in formal_blocks:
         fold = int(block["fold"])
@@ -377,6 +389,15 @@ def run_discriminative_walk_forward(
                 )
                 selection_rows.append(projected)
 
+        for snapshot in test_block:
+            formal_calendar_rows.append(
+                {
+                    "fold": fold,
+                    "snapshot_date": snapshot,
+                    "phase": "FORMAL_OOS",
+                }
+            )
+
         choice_rows.append(
             {
                 "fold": fold,
@@ -422,6 +443,7 @@ def run_discriminative_walk_forward(
             if selection_rows
             else pd.DataFrame()
         ),
+        "formal_calendar": pd.DataFrame(formal_calendar_rows),
         "adaptive_convergence": _adaptive_convergence(
             pd.DataFrame(choice_rows)
         ),
@@ -605,6 +627,7 @@ def _train_quality_gate(row: pd.Series) -> bool:
             row["tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"]
         ) <= 0
         and int(row["horizon_consistency_count"]) >= 2
+        and float(row.get("train_consistent_block_rate", 0.0)) >= (2.0 / 3.0)
     )
 
 
@@ -621,6 +644,73 @@ def _horizon_consistency(row: pd.Series | dict[str, object]) -> int:
             if float(winner) >= 0 and float(loser) <= 0:
                 score += 1
     return score
+
+
+def _train_block_consistency(
+    train_panel: pd.DataFrame,
+    rule: RefinementRule,
+    *,
+    blocks: int = 3,
+) -> tuple[int, float]:
+    weeks = sorted(train_panel["snapshot_date"].astype(str).unique())
+    if not weeks:
+        return 0, 0.0
+    week_blocks = [
+        list(block)
+        for block in np.array_split(
+            np.array(weeks, dtype=object), min(blocks, len(weeks))
+        )
+        if len(block)
+    ]
+    consistent = 0
+    evaluated = 0
+    for block_weeks in week_blocks:
+        subset = train_panel[
+            train_panel["snapshot_date"].astype(str).isin(block_weeks)
+        ].copy()
+        baseline = evaluate_selection(
+            subset,
+            select_refined_all_weeks(subset, None),
+            variant=B0_NAME,
+        )
+        candidate = compare_metrics(
+            evaluate_selection(
+                subset,
+                select_refined_all_weeks(subset, rule),
+                variant=rule.name,
+            ),
+            baseline,
+        )
+        needed = (
+            candidate.get("opportunity_recall_1w_delta_vs_b0"),
+            candidate.get(
+                "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+            ),
+            candidate.get(
+                "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+            ),
+        )
+        if not all(_finite(value) for value in needed):
+            continue
+        evaluated += 1
+        if (
+            float(candidate["opportunity_recall_1w_delta_vs_b0"]) > 0
+            and float(
+                candidate[
+                    "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+                ]
+            )
+            >= 0
+            and float(
+                candidate[
+                    "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+                ]
+            )
+            <= 0
+        ):
+            consistent += 1
+    rate = consistent / evaluated if evaluated else 0.0
+    return consistent, rate
 
 
 def _pareto_mask(frame: pd.DataFrame) -> pd.Series:
@@ -661,6 +751,7 @@ def _pareto_mask(frame: pd.DataFrame) -> pd.Series:
 def _rank_grid(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.sort_values(
         [
+            "train_consistent_block_rate",
             "horizon_consistency_count",
             "tradable_winner_capture_lift_mean_2_4w_delta_vs_b0",
             "tradable_loser_capture_lift_mean_2_4w_delta_vs_b0",
@@ -669,7 +760,7 @@ def _rank_grid(frame: pd.DataFrame) -> pd.DataFrame:
             "condition_count",
             "variant",
         ],
-        ascending=[False, False, True, False, True, True, True],
+        ascending=[False, False, False, True, False, True, True, True],
         kind="mergesort",
         na_position="last",
     )
@@ -773,6 +864,8 @@ def _bucket_summary(
     group: pd.DataFrame,
     feature: str,
     bucket: str,
+    *,
+    total_rows: int,
 ) -> dict[str, object]:
     total = len(group)
     quality = group.loc[group["_quality_evaluable"].eq(True)]
@@ -780,7 +873,7 @@ def _bucket_summary(
         "feature": feature,
         "bucket": bucket,
         "rows": total,
-        "sample_share": np.nan,
+        "sample_share": total / total_rows if total_rows else np.nan,
         "opportunity_rate": (
             float(group["review_opportunity_1w"].mean())
             if total
