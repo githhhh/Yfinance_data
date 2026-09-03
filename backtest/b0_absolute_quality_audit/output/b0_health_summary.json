@@ -1,7 +1,7 @@
 {
   "summary_policy": "NO_ARBITRARY_PASS_FAIL_THRESHOLD",
   "absolute": {
-    "entry_aligned_w4": {
+    "entry_aligned": {
       "n": 40,
       "mean": 3.472442,
       "median": 2.958217,
@@ -14,575 +14,223 @@
       "worst": -16.656767,
       "best": 32.012533
     },
-    "entry_aligned_block_bootstrap": {
+    "entry_block_bootstrap": {
       "n": 40,
       "mean_ci_low": 0.955876,
       "mean_ci_high": 5.787493,
       "median_ci_low": -0.0372,
       "median_ci_high": 4.367333
     },
-    "mean_capital_stop8_pct": 20.833333333333332,
-    "one_pick_ruin_week_rate": 0.475,
-    "mean_slot_coverage": 0.7698412698412698,
-    "full_top3_rate": 0.5952380952380952,
-    "zero_pick_weeks": 2
+    "mean_slot_coverage_all_snapshots": 0.7698412698412698,
+    "full3_rate_all_snapshots": 0.5952380952380952,
+    "pick_count_distribution": {
+      "0": 2,
+      "1": 8,
+      "2": 7,
+      "3": 25
+    }
   },
-  "eligible_random": {
-    "support_weeks": 38,
-    "median_weekly_percentile": 99.7024,
-    "mean_weekly_percentile": 80.46922368421053,
+  "eligible_ranking_active_choice": {
+    "all_valid_weeks": 38,
+    "no_choice_weeks": 17,
+    "active_choice_weeks": 21,
+    "mean_percentile": 64.65859523809524,
+    "median_percentile": 66.0,
     "edge": {
-      "support_weeks": 38,
+      "support_weeks": 21,
       "value": {
-        "n": 38,
-        "mean": 3.655202,
-        "median": 3.257117,
-        "p10": -5.436067,
-        "p25": -1.982558,
-        "p75": 7.452708,
-        "p90": 13.16177,
-        "cvar10": -9.97,
-        "positive_rate": 0.631579,
+        "n": 21,
+        "mean": 4.670006,
+        "median": 3.925733,
+        "p10": -5.476667,
+        "p25": -0.896033,
+        "p75": 7.676833,
+        "p90": 14.597167,
+        "cvar10": -9.909167,
+        "positive_rate": 0.666667,
         "worst": -16.656767,
         "best": 32.012533
       },
       "benchmark": {
-        "n": 38,
-        "mean": 1.874539,
-        "median": 1.585047,
-        "p10": -4.954383,
-        "p25": -2.224344,
-        "p75": 5.483912,
-        "p90": 12.367656,
-        "cvar10": -9.76405,
-        "positive_rate": 0.578947,
+        "n": 21,
+        "mean": 1.447854,
+        "median": 1.582718,
+        "p10": -4.87832,
+        "p25": -1.863177,
+        "p75": 4.906309,
+        "p90": 12.291243,
+        "cvar10": -9.578451,
+        "positive_rate": 0.571429,
         "worst": -18.169775,
         "best": 19.95256
       },
       "spread": {
-        "n": 38,
-        "mean": 1.780663,
-        "median": 0.0,
-        "p10": -1.501127,
-        "p25": -0.0,
-        "p75": 2.03633,
-        "p90": 7.04336,
-        "cvar10": -4.737045,
-        "positive_rate": 0.552632,
+        "n": 21,
+        "mean": 3.222152,
+        "median": 1.94762,
+        "p10": -4.613729,
+        "p25": 0.21629,
+        "p75": 5.612857,
+        "p90": 7.736042,
+        "cvar10": -5.410811,
+        "positive_rate": 0.761905,
         "worst": -6.749587,
         "best": 30.197064
       },
       "spread_block_bootstrap": {
-        "n": 38,
-        "mean_ci_low": 0.164547,
-        "mean_ci_high": 3.92049,
-        "median_ci_low": 0.0,
-        "median_ci_high": 1.223286
+        "n": 21,
+        "mean_ci_low": 0.315619,
+        "mean_ci_high": 6.677096,
+        "median_ci_low": -0.980576,
+        "median_ci_high": 3.19871
       },
-      "beat_rate": 0.552632
+      "beat_rate": 0.761905
     },
     "oracle_capture": {
-      "support_weeks": 38,
+      "support_weeks": 21,
       "aggregate_capture_ratio": 0.249685,
       "weekly_capture_mean": 0.185766,
       "weekly_capture_median": 0.196726,
       "weekly_capture_positive_rate": 0.761905
-    },
-    "unconstrained_edge": {
-      "support_weeks": 38,
-      "value": {
-        "n": 38,
-        "mean": 3.655202,
-        "median": 3.257117,
-        "p10": -5.436067,
-        "p25": -1.982558,
-        "p75": 7.452708,
-        "p90": 13.16177,
-        "cvar10": -9.97,
-        "positive_rate": 0.631579,
-        "worst": -16.656767,
-        "best": 32.012533
-      },
-      "benchmark": {
-        "n": 38,
-        "mean": 1.65545,
-        "median": 1.572754,
-        "p10": -4.889274,
-        "p25": -2.571846,
-        "p75": 4.720868,
-        "p90": 9.914883,
-        "cvar10": -9.774686,
-        "positive_rate": 0.578947,
-        "worst": -18.984745,
-        "best": 19.95256
-      },
-      "spread": {
-        "n": 38,
-        "mean": 1.999751,
-        "median": 0.0,
-        "p10": -1.376381,
-        "p25": -0.0,
-        "p75": 3.232434,
-        "p90": 7.233246,
-        "cvar10": -4.102196,
-        "positive_rate": 0.526316,
-        "worst": -6.749587,
-        "best": 30.282091
-      },
-      "spread_block_bootstrap": {
-        "n": 38,
-        "mean_ci_low": 0.39727,
-        "mean_ci_high": 4.079876,
-        "median_ci_low": -0.0,
-        "median_ci_high": 1.656314
-      },
-      "beat_rate": 0.526316
     }
   },
-  "raw_random_distinct1": {
-    "support_weeks": 21,
-    "mode": "fixed_capacity_up_to_3",
-    "median_weekly_percentile": 43.0769,
-    "mean_weekly_percentile": 50.372657142857136,
+  "raw_fixed_capacity_next_open": {
+    "support_weeks": 22,
+    "support_fraction_of_snapshots": 0.5238095238095238,
+    "mean_price_coverage_all_weeks": 0.9647387823050535,
+    "mean_percentile": 50.004768181818186,
+    "median_percentile": 53.57145,
     "edge": {
-      "support_weeks": 21,
+      "support_weeks": 22,
       "value": {
-        "n": 21,
-        "mean": 3.561206,
-        "median": 2.936295,
-        "p10": -4.731076,
-        "p25": -2.517322,
-        "p75": 8.358072,
-        "p90": 12.700828,
-        "cvar10": -7.05508,
-        "positive_rate": 0.619048,
-        "worst": -10.707906,
-        "best": 27.006897
+        "n": 22,
+        "mean": 4.065022,
+        "median": 1.784812,
+        "p10": -6.603311,
+        "p25": -0.63147,
+        "p75": 6.941173,
+        "p90": 12.446507,
+        "cvar10": -7.607239,
+        "positive_rate": 0.636364,
+        "worst": -8.667757,
+        "best": 44.501009
       },
       "benchmark": {
-        "n": 21,
-        "mean": 3.958669,
-        "median": 3.437437,
-        "p10": -1.829689,
-        "p25": 1.280479,
-        "p75": 7.006405,
-        "p90": 12.086856,
-        "cvar10": -4.698181,
-        "positive_rate": 0.761905,
-        "worst": -7.650844,
-        "best": 14.158207
+        "n": 22,
+        "mean": 4.365888,
+        "median": 2.939005,
+        "p10": -1.851355,
+        "p25": 0.256364,
+        "p75": 8.309744,
+        "p90": 12.539601,
+        "cvar10": -4.01041,
+        "positive_rate": 0.818182,
+        "worst": -7.801211,
+        "best": 16.938637
       },
       "spread": {
-        "n": 21,
-        "mean": -0.397464,
-        "median": -1.457379,
-        "p10": -10.569256,
-        "p25": -4.603976,
-        "p75": 4.677678,
-        "p90": 6.100357,
-        "cvar10": -12.462887,
-        "positive_rate": 0.47619,
-        "worst": -14.83102,
-        "best": 14.920041
+        "n": 22,
+        "mean": -0.300866,
+        "median": 0.242509,
+        "p10": -10.032126,
+        "p25": -5.109349,
+        "p75": 3.363442,
+        "p90": 6.754337,
+        "cvar10": -15.137622,
+        "positive_rate": 0.5,
+        "worst": -19.250516,
+        "best": 27.562372
       },
       "spread_block_bootstrap": {
-        "n": 21,
-        "mean_ci_low": -3.32079,
-        "mean_ci_high": 1.89294,
-        "median_ci_low": -3.13623,
-        "median_ci_high": 2.812889
+        "n": 22,
+        "mean_ci_low": -3.743157,
+        "mean_ci_high": 3.172072,
+        "median_ci_low": -3.901497,
+        "median_ci_high": 2.917824
       },
-      "beat_rate": 0.47619
+      "beat_rate": 0.5
     },
     "oracle_capture": {
-      "support_weeks": 21,
-      "aggregate_capture_ratio": -0.014997,
-      "weekly_capture_mean": -0.027924,
-      "weekly_capture_median": -0.06018,
-      "weekly_capture_positive_rate": 0.47619
+      "support_weeks": 22,
+      "aggregate_capture_ratio": -0.010297,
+      "weekly_capture_mean": -0.024364,
+      "weekly_capture_median": 0.009431,
+      "weekly_capture_positive_rate": 0.5
     },
-    "matched_n": {
-      "median_weekly_percentile": 75.0,
-      "mean_weekly_percentile": 63.859463157894744,
-      "edge": {
-        "support_weeks": 19,
-        "value": {
-          "n": 19,
-          "mean": 3.936069,
-          "median": 3.380446,
-          "p10": -4.930112,
-          "p25": -2.671031,
-          "p75": 9.088683,
-          "p90": 13.140461,
-          "cvar10": -8.217081,
-          "positive_rate": 0.684211,
-          "worst": -10.707906,
-          "best": 27.006897
-        },
-        "benchmark": {
-          "n": 19,
-          "mean": 2.373,
-          "median": 1.280479,
-          "p10": -1.401388,
-          "p25": -0.116501,
-          "p75": 3.459861,
-          "p90": 9.488484,
-          "cvar10": -4.620247,
-          "positive_rate": 0.736842,
-          "worst": -7.650844,
-          "best": 12.086856
-        },
-        "spread": {
-          "n": 19,
-          "mean": 1.563069,
-          "median": 2.689605,
-          "p10": -6.365017,
-          "p25": -1.460156,
-          "p75": 5.46323,
-          "p90": 8.363713,
-          "cvar10": -13.409703,
-          "positive_rate": 0.684211,
-          "worst": -14.83102,
-          "best": 14.920041
-        },
-        "spread_block_bootstrap": {
-          "n": 19,
-          "mean_ci_low": -0.931756,
-          "mean_ci_high": 3.496788,
-          "median_ci_low": -1.25043,
-          "median_ci_high": 3.433439
-        },
-        "beat_rate": 0.684211
-      }
-    },
-    "unconstrained_edge": {
-      "support_weeks": 19,
+    "matched_n_edge": {
+      "support_weeks": 20,
       "value": {
-        "n": 19,
-        "mean": 3.936069,
-        "median": 3.380446,
-        "p10": -4.930112,
-        "p25": -2.671031,
-        "p75": 9.088683,
-        "p90": 13.140461,
-        "cvar10": -8.217081,
-        "positive_rate": 0.684211,
-        "worst": -10.707906,
-        "best": 27.006897
+        "n": 20,
+        "mean": 4.471525,
+        "median": 2.39819,
+        "p10": -6.864594,
+        "p25": -1.196366,
+        "p75": 7.487575,
+        "p90": 13.095293,
+        "cvar10": -8.00511,
+        "positive_rate": 0.7,
+        "worst": -8.667757,
+        "best": 44.501009
       },
       "benchmark": {
-        "n": 19,
-        "mean": 1.782483,
-        "median": 0.801307,
-        "p10": -1.703838,
-        "p25": -0.965399,
-        "p75": 3.02603,
-        "p90": 8.984091,
-        "cvar10": -6.110292,
-        "positive_rate": 0.631579,
-        "worst": -10.059996,
-        "best": 11.580614
+        "n": 20,
+        "mean": 2.853529,
+        "median": 1.710479,
+        "p10": -0.731922,
+        "p25": -0.389366,
+        "p75": 3.95951,
+        "p90": 8.570326,
+        "cvar10": -4.282121,
+        "positive_rate": 0.7,
+        "worst": -7.801211,
+        "best": 16.938637
       },
       "spread": {
-        "n": 19,
-        "mean": 2.153586,
-        "median": 2.749839,
-        "p10": -5.865828,
-        "p25": -1.356994,
-        "p75": 6.742341,
-        "p90": 8.378405,
-        "cvar10": -11.60984,
-        "positive_rate": 0.684211,
-        "worst": -13.65824,
-        "best": 15.426283
+        "n": 20,
+        "mean": 1.617996,
+        "median": 2.265128,
+        "p10": -8.228503,
+        "p25": -2.910573,
+        "p75": 4.853785,
+        "p90": 8.131753,
+        "cvar10": -17.547436,
+        "positive_rate": 0.65,
+        "worst": -19.250516,
+        "best": 27.562372
       },
       "spread_block_bootstrap": {
-        "n": 19,
-        "mean_ci_low": -0.145156,
-        "mean_ci_high": 4.070394,
-        "median_ci_low": -1.044106,
-        "median_ci_high": 3.489031
+        "n": 20,
+        "mean_ci_low": -1.131542,
+        "mean_ci_high": 4.686899,
+        "median_ci_low": 1.241762,
+        "median_ci_high": 3.679974
       },
-      "beat_rate": 0.684211
+      "beat_rate": 0.65
     }
   },
-  "eligibility": {
-    "support_weeks": 21,
-    "mean_raw_price_coverage": 0.940929261904762,
-    "winner_retention_rate": 0.17117117117117117,
-    "b0_winner_capture_rate": 0.12612612612612611,
-    "rejected_winner_rate": 0.20444444444444446,
-    "bottom_loser_rejection_rate": 0.9279279279279279,
-    "big_winner_retention_rate": 0.1568627450980392,
-    "mean_gate_lift": 1.9902756473622383,
-    "median_gate_lift": 4.489782444444446
+  "gate": {
+    "support_weeks": 22,
+    "mean_price_coverage_all_weeks": 0.9647387823050535,
+    "raw_candidate_events": 631,
+    "eligible_candidate_events": 88,
+    "accept_rate": 0.13946117274167988,
+    "winner_retention_rate": 0.15671641791044777,
+    "winner_enrichment_vs_random_selectivity": 1.1237279511533242,
+    "bottom_loser_retention_rate": 0.09701492537313433,
+    "loser_retention_vs_random_selectivity": 0.6956411126187245,
+    "b0_winner_capture_rate": 0.1044776119402985,
+    "b0_winner_capture_enrichment_vs_matched_n_random": 1.6160301205944732,
+    "b0_winner_capture_enrichment_vs_fixed3_random": 0.9677363045043935,
+    "mean_gate_lift": 2.004724518531654,
+    "median_gate_lift": 3.834628361823362
   },
-  "ranking": {
+  "ranking_information": {
     "support_weeks": 38,
     "weekly_spearman_mean": 0.09425177106970513,
     "weekly_spearman_median": 0.12972896668548844,
     "positive_spearman_week_rate": 0.6666666666666666,
-    "b0_minus_eligible_mean_mean": 2.421021492628835,
-    "b0_minus_eligible_mean_median": 0.0,
-    "ranking_lift_block_bootstrap": {
-      "n": 38,
-      "mean_ci_low": 0.605017,
-      "mean_ci_high": 4.479067,
-      "median_ci_low": 0.0,
-      "median_ci_high": 1.656314
-    }
+    "selected_minus_eligible_mean": 2.421021492628835,
+    "selected_minus_eligible_median": 0.0
   },
-  "market": {
-    "vs_spy_selection_quality": {
-      "support_weeks": 0,
-      "value": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "benchmark": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread_block_bootstrap": {
-        "n": 0,
-        "mean_ci_low": null,
-        "mean_ci_high": null,
-        "median_ci_low": null,
-        "median_ci_high": null
-      },
-      "beat_rate": null
-    },
-    "vs_spy_exposure_matched": {
-      "support_weeks": 0,
-      "value": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "benchmark": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread_block_bootstrap": {
-        "n": 0,
-        "mean_ci_low": null,
-        "mean_ci_high": null,
-        "median_ci_low": null,
-        "median_ci_high": null
-      },
-      "beat_rate": null
-    },
-    "vs_spy_full_exposure": {
-      "support_weeks": 0,
-      "value": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "benchmark": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread_block_bootstrap": {
-        "n": 0,
-        "mean_ci_low": null,
-        "mean_ci_high": null,
-        "median_ci_low": null,
-        "median_ci_high": null
-      },
-      "beat_rate": null
-    },
-    "vs_qqq_selection_quality": {
-      "support_weeks": 0,
-      "value": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "benchmark": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread_block_bootstrap": {
-        "n": 0,
-        "mean_ci_low": null,
-        "mean_ci_high": null,
-        "median_ci_low": null,
-        "median_ci_high": null
-      },
-      "beat_rate": null
-    },
-    "vs_qqq_full_exposure": {
-      "support_weeks": 0,
-      "value": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "benchmark": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread": {
-        "n": 0,
-        "mean": null,
-        "median": null,
-        "p10": null,
-        "p25": null,
-        "p75": null,
-        "p90": null,
-        "cvar10": null,
-        "positive_rate": null,
-        "worst": null,
-        "best": null
-      },
-      "spread_block_bootstrap": {
-        "n": 0,
-        "mean_ci_low": null,
-        "mean_ci_high": null,
-        "median_ci_low": null,
-        "median_ci_high": null
-      },
-      "beat_rate": null
-    }
-  },
-  "evidence_boundary": "Retrospective diagnostic only. Current B0 and its components were developed with substantial visibility into this historical period; no p-value or CI is treated as virgin OOS proof."
+  "evidence_boundary": "Retrospective audit. B0 was developed with visibility into this history. Yahoo supplementation is frozen at 2026-09-02 and used only for outcome completion / benchmarks; no future bar after the frozen as-of date is allowed."
 }

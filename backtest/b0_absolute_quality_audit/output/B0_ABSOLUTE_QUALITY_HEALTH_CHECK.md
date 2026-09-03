@@ -1,166 +1,213 @@
-# Current Production B0 — Absolute Quality Health Check
+# Current Production B0 — Absolute Quality Health Check v1.1
 
 ## Executive coordinates
 
-- No arbitrary PASS/FAIL score is used. The report exposes the raw coordinates, uncertainty and oracle headroom; final interpretation must use them jointly.
+No composite PASS/FAIL score is used. B0 is evaluated on two separate axes:
 
-This audit measures the current Production B0 as-is. B0 is never used to define the raw-signal benchmark universe. Current B0 eligibility/rank/Top3 are recomputed from Production source; the frozen panel's old b0_eligible/is_b0 helper columns are not trusted.
+- **Name selection quality**: compare B0 with random portfolios using the same weekly N.
+- **Capital utilization quality**: compare B0 with a de-anchored fixed-capacity 3-slot portfolio and with explicit Fill3 counterfactuals.
 
-Two outcome systems are deliberately separated:
+This prevents B0's 0/1/2-stock weeks from being either unfairly punished in the ranking audit or automatically protected by forcing the benchmark to hold the same amount of cash.
 
-1. **Entry-aligned W4** — used for B0-eligible ranking/random/oracle comparisons.
-2. **Snapshot-close +28 calendar-day W4** — used for the raw signal universe, eligibility opportunity cost, simple baselines, and SPY/QQQ. This avoids pretending non-ACTIONABLE raw signals have a comparable Production entry event.
+Raw-universe and market comparisons use a tradable outcome:
 
-## 1. Absolute B0 W4 cohort quality
+**first trading-session open after the snapshot -> close at entry date + 28 calendar days**.
 
-| Metric | Current B0 |
+Yahoo supplementation and all benchmark outcomes are frozen at **2026-09-02**.
+
+## 1. Absolute Production B0
+
+| Metric | Value |
 | --- | ---: |
-| Mature/cash weeks | 40 |
-| Mean capital-adjusted W4 | 3.47% |
-| Median capital-adjusted W4 | 2.96% |
+| Mature entry-aligned weeks | 40 |
+| Mean W4 capital return | 3.47% |
+| Median W4 capital return | 2.96% |
 | P10 | -5.42% |
-| P25 | -1.26% |
-| P75 | 7.11% |
-| P90 | 12.75% |
 | CVaR10 | -9.97% |
-| Positive-week rate | 60.0% |
-| Worst cohort | -16.66% |
-| Best cohort | 32.01% |
-| Mean capital Stop8 | 20.83% |
-| One-pick-ruin week rate | 47.5% |
+| Positive week rate | 60.0% |
 | Mean slot coverage | 77.0% |
 | Full Top3 rate | 59.5% |
-| Zero-pick weeks | 2 |
 
-Moving-block (4-week) bootstrap for the overlapping W4 cohorts:
+Pick-count distribution across all snapshots: **{'0': 2, '1': 8, '2': 7, '3': 25}**.
 
-- Mean 95% CI: **[0.96%, 5.79%]**
-- Median 95% CI: **[-0.04%, 4.37%]**
+The absolute W4 cohorts overlap and must not be annualized as independent monthly trades.
 
-These are cohort-selection diagnostics, not a tradable CAGR. Weekly W4 windows overlap.
+## 2. Ranking quality — only weeks where ranking actually had a choice
 
-## 2. Does B0 ranking add value inside its own eligible universe?
+- Eligible/mature weeks: **38**
+- Gate-locked / one-feasible-portfolio weeks: **17**
+- **Active-choice weeks: 21**
+- Active-choice mean feasible percentile: **64.7%**
+- Active-choice median feasible percentile: **66.0%**
+- Mean B0 edge vs eligible random: **3.22pp**
+- Median edge: **1.95pp**
+- Beat-random week rate: **76.2%**
+- 4-week block-bootstrap mean-edge CI: **[0.32pp, 6.68pp]**
+- Aggregate oracle capture on active-choice weeks: **25.0%**
 
-- Strict common-maturity support: **38 weeks**
-- Median weekly feasible-portfolio percentile: **99.7%**
-- Mean weekly feasible-portfolio percentile: **80.5%**
-- Mean W4 edge vs exact eligible distinct-industry random: **1.78%**
-- Median W4 edge vs random: **0.00%**
-- Beat-random-mean week rate: **55.3%**
-- Edge block-bootstrap mean CI: **[0.16%, 3.92%]**
-- Eligible-universe aggregate oracle capture: **25.0%**
+This is the cleanest estimate of B0's incremental ranking skill after hard eligibility. Weeks with only one feasible portfolio are excluded from the percentile headline because there was no ranking decision to evaluate.
 
-Interpretation: this section isolates the ranking/selection layer after the current hard gates. A percentile near 50% means the detailed B0 ranking is not doing much once eligibility has already done the filtering.
+## 3. Whole-system quality vs raw signal universe — tradable next-open outcome
 
-## 3. Does the whole B0 system beat the raw signal universe?
+- Strict 100%-covered support: **22 weeks** (52.4% of all snapshots)
+- Mean raw price coverage across all weeks: **96.5%**
+- Mean fixed-3 percentile: **50.0%**
+- Median fixed-3 percentile: **53.6%**
+- Mean capital spread vs raw fixed-3 random: **-0.30pp**
+- Median spread: **0.24pp**
+- Beat fixed-3 random week rate: **50.0%**
+- Mean-edge block-bootstrap CI: **[-3.74pp, 3.17pp]**
+- Raw-universe aggregate oracle capture: **-1.0%**
 
-- Raw benchmark support with required price coverage: **21 weeks**
-- Median weekly percentile vs raw-signal **fixed-capacity** distinct-industry random: **43.1%**
-- Mean weekly percentile: **50.4%**
-- Mean snapshot-W4 edge vs raw random: **-0.40%**
-- Median snapshot-W4 edge: **-1.46%**
-- Beat-random-mean week rate: **47.6%**
-- Edge block-bootstrap mean CI: **[-3.32%, 1.89%]**
-- Raw-universe aggregate oracle capture: **-1.5%**
+### Raw fixed-3 result split by B0's actual weekly position count
 
-- Conditional Matched-N raw percentile median (name-selection only): **75.0%**
+| B0 picks | Weeks | B0 mean | Fixed-3 random mean | Mean Δ | Median Δ | Beat rate | Median percentile |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 2 | 0.00% | 2.18% | -2.18pp | -2.18pp | 0.0% | 34.2% |
+| 1 | 7 | 3.17% | 3.96% | -0.79pp | 2.52pp | 57.1% | 66.2% |
+| 2 | 6 | 3.34% | 5.11% | -1.77pp | 0.24pp | 50.0% | 53.3% |
+| 3 | 7 | 6.75% | 4.76% | 1.99pp | 4.91pp | 57.1% | 76.3% |
 
-This is the most important total-system coordinate: raw signal names are not pre-filtered by b0_eligible or Lane. The **primary fixed-capacity benchmark** mechanically fills up to three distinct-industry slots whenever the raw universe can do so, so B0 abstention/underfill is evaluated rather than copied into the benchmark. Matched-N is retained only as a conditional name-selection diagnostic.
+Matched-N is retained as a name-selection diagnostic only:
+- Mean matched-N edge: **1.62pp**
+- Median matched-N edge: **2.27pp**
+- Beat-rate: **65.0%**
 
-## 4. Eligibility gate: how many future winners does B0 retain or reject?
+## 4. Underfill / cash policy — Fill3 counterfactual ladder
 
-- Support weeks: **21**
-- Mean raw price-outcome coverage: **94.1%**
-- Top-20% future-winner retention by B0 eligibility: **17.1%**
-- Top-20% future-winner capture by final B0 picks: **12.6%**
-- Winner rate among rejected candidates: **20.4%**
-- Bottom-20% future-loser rejection rate: **92.8%**
-- >=20% big-winner retention: **15.7%**
-- Mean eligible-minus-rejected snapshot-W4 lift: **1.99%**
-- Median weekly gate lift: **4.49%**
+### Why B0 is underfilled
 
-### Hard-reject reason diagnostics
+| Cause | Weeks | Mean original picks | Mature next-open weeks |
+| --- | ---: | ---: | ---: |
+| ELIGIBILITY_SHORTAGE | 16 | 1.25 | 16 |
+| FULL | 25 | 3.00 | 24 |
+| INDUSTRY_CONSTRAINT | 1 | 2.00 | 1 |
 
-| Reject reason | Rows | Weeks | Mean W4 | Median W4 | Top20 winner rate | >=20% winner rate |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| non_actionable | 386 | 21 | 2.17% | 0.28% | 19.7% | 9.6% |
-| clear_geometry_failure | 71 | 18 | 1.88% | 0.74% | 23.9% | 8.5% |
-| eps_unknown | 73 | 19 | 3.55% | 2.10% | 24.7% | 8.2% |
+### Fill3 counterfactuals
 
-## 5. Fine-ranking information across the entire eligible universe
+Every Fill3 policy preserves all original B0 picks. It may only fill empty slots; it never replaces an original pick. This isolates the value of cash/underfill rather than creating a new ranking system.
 
-- Strict-maturity support: **38 weeks**
-- Mean weekly Spearman (-eligible_rank vs W4): **0.094**
-- Median weekly Spearman: **0.130**
-- Positive-Spearman week rate: **66.7%**
-- B0 selected mean minus all-eligible mean W4: **2.42%** mean / **0.00%** median
+- RELAX_INDUSTRY: only relax distinct-industry when already-eligible names remain.
+- EPS_ONLY: fill only with candidates rejected solely for EPS unknown; distinct1 remains.
+- SINGLE_REJECT: fill with the highest B0-ranked candidate that failed exactly one hard gate.
+- ANY_REJECT: diagnostic upper bound; any rejected known-industry candidate may fill.
 
-Rank-bucket outcome profile:
+| Policy | Scope | Weeks | Mean Δ vs B0 | Median Δ | Beat B0 | Stop Δ pp | Ruin-week Δ pp | Full3 | Added-pick mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| B0_ORIGINAL | all_mature | 41 | 0.00pp | 0.00pp | 0.0% | 0.00pp | 0.00pp | 58.5% | N/A |
+| B0_ORIGINAL | underfilled_only | 17 | 0.00pp | 0.00pp | 0.0% | 0.00pp | 0.00pp | 0.0% | N/A |
+| B0_FILL3_RELAX_INDUSTRY | all_mature | 41 | -0.30pp | 0.00pp | 0.0% | 1.63pp | 4.88pp | 61.0% | -18.61% |
+| B0_FILL3_RELAX_INDUSTRY | underfilled_only | 17 | -0.73pp | 0.00pp | 0.0% | 3.92pp | 11.76pp | 5.9% | -18.61% |
+| B0_FILL3_EPS_ONLY | all_mature | 41 | 0.22pp | 0.00pp | 7.3% | 0.81pp | 2.44pp | 61.0% | 6.71% |
+| B0_FILL3_EPS_ONLY | underfilled_only | 17 | 0.53pp | 0.00pp | 17.6% | 1.96pp | 5.88pp | 5.9% | 6.71% |
+| B0_FILL3_SINGLE_REJECT | all_mature | 41 | 0.86pp | 0.00pp | 26.8% | 8.13pp | 7.32pp | 100.0% | 3.37% |
+| B0_FILL3_SINGLE_REJECT | underfilled_only | 17 | 2.07pp | 1.97pp | 64.7% | 19.61pp | 17.65pp | 100.0% | 3.37% |
+| B0_FILL3_ANY_REJECT | all_mature | 41 | 1.24pp | 0.00pp | 29.3% | 7.32pp | 7.32pp | 100.0% | 4.43% |
+| B0_FILL3_ANY_REJECT | underfilled_only | 17 | 2.98pp | 2.12pp | 70.6% | 17.65pp | 17.65pp | 100.0% | 4.43% |
 
-| Eligible rank bucket | Candidate rows | Weeks | Mean W4 | Median W4 | Positive | Stop8 |
+Interpretation rule: do not change Production to always-3 merely because fixed-3 random has a higher mean. The minimal-change candidate is B0_FILL3_SINGLE_REJECT; only a coherent gain on underfilled weeks without material Stop/Ruin deterioration would justify future shadow testing.
+
+## 5. Eligibility gate quality
+
+- Strict support: **22 weeks**
+- Raw candidate events: **631**
+- Eligible candidate events: **88**
+- Acceptance rate: **13.9%**
+- Top20 winner retention: **15.7%**
+- Winner enrichment vs random acceptance: **1.12x**
+- Bottom20 loser retention: **9.7%**
+- Loser retention vs random acceptance: **0.70x**
+- Final B0 Top3 winner-capture rate: **10.4%**
+- Winner-capture enrichment vs Matched-N random: **1.62x**
+- Winner-capture enrichment vs mechanical fixed-3 random: **0.97x**
+- Mean eligible-minus-rejected W4 lift: **2.00pp**
+- Median weekly gate lift: **3.83pp**
+
+Low recall must therefore be interpreted together with the gate's acceptance rate. A gate accepting only a small fraction of the universe cannot be judged solely by the percentage of all future winners that it rejects.
+
+## 6. Reject-reason audit — exclusive attribution separated from overlap
+
+### Exclusive single-reason rejects
+
+| Sole reject reason | Events | Weeks | Mean W4 | Median W4 | Positive | Stop8 | Top20 winner | >=20% winner |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| non_actionable | 376 | 22 | 2.45% | -0.68% | 46.5% | 38.8% | 20.5% | 11.7% |
+| clear_geometry_failure | 67 | 18 | -0.71% | -0.73% | 43.3% | 37.3% | 14.9% | 4.5% |
+| eps_unknown | 11 | 8 | 11.32% | 2.70% | 63.6% | 27.3% | 27.3% | 9.1% |
+
+### Overlapping reason labels — descriptive only, not causal
+
+| Reason label | Events | Multi-reason share | Mean W4 | Median W4 | Top20 winner |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| non_actionable | 459 | 18.1% | 2.57% | -0.20% | 21.4% |
+| clear_geometry_failure | 94 | 28.7% | 1.31% | -0.67% | 17.0% |
+| eps_unknown | 81 | 86.4% | 4.27% | 1.15% | 27.2% |
+
+Reason-combination counts are separately materialized; overlapping labels must never be used to claim that one gate caused the rejection outcome.
+
+## 7. Fine-ranking information
+
+- Mature eligible-universe Spearman support: **38 weeks**
+- Mean weekly Spearman (-rank vs W4): **0.094**
+- Median Spearman: **0.130**
+- Positive-Spearman weeks: **66.7%**
+- Selected mean minus all-eligible mean: **2.42pp** mean / **0.00pp** median
+
+Rank buckets:
+
+| Rank bucket | Rows | Weeks | Mean W4 | Median W4 | Positive | Stop8 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | rank_1_3 | 93 | 38 | 4.18% | 2.66% | 62.4% | 29.0% |
 | rank_4_6 | 54 | 19 | 0.54% | 1.20% | 53.7% | 35.2% |
 | rank_7_10 | 54 | 14 | -3.29% | -0.68% | 46.3% | 31.5% |
 | rank_11_plus | 171 | 12 | 2.04% | 1.47% | 60.2% | 26.3% |
 
-## 6. Simple de-anchored rules from the raw signal universe
+A strong Top bucket does not imply globally monotonic fine ranking; the entire bucket curve and Spearman distribution must be considered.
 
-These rules do not use b0_eligible, B0 Lane, B0 rank, reason_codes, or future outcomes. They use one raw PIT feature plus distinct-industry selection and a de-anchored fixed capacity of up to three positions. Therefore they also challenge B0 abstention/underfill instead of copying B0's weekly position count.
+## 8. Simple raw-PIT baselines — tradable next-open outcome
 
-| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ vs B0 | Median Δ vs B0 | Beat B0 | Pick coverage |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| closest_to_trigger | 21 | 2.88% | 1.26% | -0.68% | -0.44% | 42.9% | 100.0% |
-| entry_volume | 21 | 5.89% | 3.80% | 2.33% | 1.31% | 57.1% | 95.2% |
-| eps | 21 | 1.94% | 4.75% | -1.62% | 0.10% | 52.4% | 100.0% |
-| momentum_20 | 21 | 9.17% | 4.75% | 5.61% | -0.09% | 47.6% | 100.0% |
-| rel_spy_20 | 21 | 0.00% | 0.00% | -3.56% | -2.94% | 28.6% | 0.0% |
+| Baseline | Weeks | Mean W4 | Median W4 | Mean Δ | Median Δ | Beat B0 | 95% mean-edge CI | Mean w/o best1 | Mean w/o best2 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| closest_to_trigger | 22 | 2.49% | 1.34% | -1.58pp | 0.19pp | 50.0% | [-6.62pp, 4.01pp] | -2.73pp | -3.35pp |
+| entry_volume | 19 | 6.42% | 2.62% | 2.49pp | -0.18pp | 47.4% | [-4.97pp, 8.38pp] | 0.42pp | -1.34pp |
+| eps | 22 | 1.73% | 2.75% | -2.34pp | -1.16pp | 45.5% | [-9.56pp, 4.75pp] | -3.47pp | -4.63pp |
+| momentum_20 | 22 | 11.70% | 4.15% | 7.64pp | 4.06pp | 63.6% | [2.19pp, 17.26pp] | 4.52pp | 3.05pp |
+| rel_spy_20 | 0 | N/A | N/A | N/A | N/A | N/A | [N/A, N/A] | N/A | N/A |
 
-## 7. Market benchmark
+Large mean gains with flat/negative medians or strong best-week dependence are treated as right-tail hypotheses, not as proof of stable superiority.
 
-- B0 active-pick snapshot-W4 mean spread vs SPY: **N/A** (0 weeks)
-- B0 capital-adjusted spread vs exposure-matched SPY: **N/A**
-- B0 capital-adjusted spread vs fully invested SPY: **N/A**
-- B0 active-pick snapshot-W4 mean spread vs QQQ: **N/A** (0 weeks)
-- B0 capital-adjusted spread vs fully invested QQQ: **N/A**
+## 9. SPY / QQQ benchmark — Yahoo, same tradable clock
 
-## 8. Four-offset non-overlap stability
+| Benchmark | Weeks | Benchmark mean | B0 capital mean | B0 vs fully invested | B0 vs exposure-matched | Active-pick selection spread | Full-spread 95% CI |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| SPY | 41 | 1.53% | 3.63% | 2.10pp | 2.51pp | 3.76pp | [-0.39pp, 5.12pp] |
+| QQQ | 41 | 1.79% | 3.63% | 1.84pp | 2.29pp | 3.51pp | [-1.32pp, 5.25pp] |
 
-Each row takes every fourth weekly cohort. This removes W4 horizon overlap within an offset.
+## 10. Non-overlap stability
 
-| Comparison | Offset | Weeks | Value mean | Value median | Benchmark mean | Spread mean | Spread median |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| b0_absolute_entry_w4 | 0 | 10 | 0.39% | -0.04% | N/A | N/A | N/A |
-| b0_absolute_entry_w4 | 1 | 10 | 1.11% | 3.27% | N/A | N/A | N/A |
-| b0_absolute_entry_w4 | 2 | 10 | 4.58% | 4.61% | N/A | N/A | N/A |
-| b0_absolute_entry_w4 | 3 | 10 | 7.80% | 4.15% | N/A | N/A | N/A |
-| b0_vs_eligible_random | 0 | 10 | 3.94% | 2.24% | 0.82% | 3.12% | 0.00% |
-| b0_vs_eligible_random | 1 | 10 | 8.36% | 4.81% | 6.90% | 1.46% | 0.00% |
-| b0_vs_eligible_random | 2 | 9 | 1.39% | -0.07% | 0.18% | 1.21% | 0.00% |
-| b0_vs_eligible_random | 3 | 9 | 0.37% | 3.61% | -0.85% | 1.22% | 0.83% |
-| b0_vs_raw_random_fixed_capacity | 0 | 6 | 2.08% | 0.00% | 2.17% | -0.08% | -2.50% |
-| b0_vs_raw_random_fixed_capacity | 1 | 5 | 2.27% | 3.51% | 4.34% | -2.07% | 1.43% |
-| b0_vs_raw_random_fixed_capacity | 2 | 5 | 4.32% | 4.42% | 4.44% | -0.11% | -1.46% |
-| b0_vs_raw_random_fixed_capacity | 3 | 5 | 5.86% | 2.94% | 5.25% | 0.61% | 2.81% |
+| Comparison | Offset | Weeks | Value mean | Benchmark mean | Spread mean | Spread median |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| active_choice_b0_vs_eligible_random | 0 | 6 | 4.19% | 2.07% | 2.11pp | 1.62pp |
+| active_choice_b0_vs_eligible_random | 1 | 5 | 3.82% | 2.66% | 1.16pp | 1.95pp |
+| active_choice_b0_vs_eligible_random | 2 | 5 | 1.43% | -0.37% | 1.80pp | 1.73pp |
+| active_choice_b0_vs_eligible_random | 3 | 5 | 9.33% | 1.30% | 8.03pp | 5.36pp |
+| b0_vs_raw_fixed3_next_open | 0 | 6 | 3.25% | 2.81% | 0.44pp | -1.92pp |
+| b0_vs_raw_fixed3_next_open | 1 | 6 | 0.88% | 4.51% | -3.63pp | -1.59pp |
+| b0_vs_raw_fixed3_next_open | 2 | 5 | 4.45% | 3.71% | 0.74pp | 0.69pp |
+| b0_vs_raw_fixed3_next_open | 3 | 5 | 8.48% | 6.72% | 1.76pp | 3.31pp |
 
-## 9. Evidence boundary
+## Evidence boundary
 
-Retrospective diagnostic only. Current B0 and its components were developed with substantial visibility into this historical period; no p-value or CI is treated as virgin OOS proof.
+Retrospective audit. B0 was developed with visibility into this history. Yahoo supplementation is frozen at 2026-09-02 and used only for outcome completion / benchmarks; no future bar after the frozen as-of date is allowed.
 
-The most reliable interpretation hierarchy is:
-
-1. raw-signal percentile / edge = total B0 selection-system quality;
-2. eligible-random percentile / edge = incremental ranking quality after hard gates;
-3. eligibility winner retention = gate opportunity-cost quality;
-4. oracle capture = how much headroom remains;
-5. four-offset consistency = whether overlapping W4 labels exaggerate stability.
-
-No single mean return or p-value is treated as a sufficient verdict.
+This report is a retrospective measurement instrument. It can identify where B0 appears strong or weak and which minimal counterfactual deserves future shadow testing; it cannot convert historical reuse into untouched OOS proof.
 
 ## Provenance
 
-- source_git_sha: 0ac4f69ba39722091df10553cfcf4ea677dde4e0
+- source_git_sha: 7e88af66cf89599e9d661a203293965cebcc46ae
+- protocol_version: b0_absolute_quality_v1_1
 - production_b0_hash: 115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477
 - panel_hash: d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5
-- price_cache_hash: 1dfced4c23c639478dd42f0188648823f1c2cafea796fc1a043c56d87d55eb4f
-- snapshots: **42** (2025-10-10 .. 2026-08-07)
+- base_price_cache_hash: 1dfced4c23c639478dd42f0188648823f1c2cafea796fc1a043c56d87d55eb4f
+- yahoo_supplement_hash: 7592cb7f55c3b301d06bd38882fd10b4e2302cc569b38e3287461721ad040ba0
+- audit_as_of_date: 2026-09-02

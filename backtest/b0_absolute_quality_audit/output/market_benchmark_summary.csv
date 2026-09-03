@@ -1,0 +1,3 @@
+benchmark,support_weeks,benchmark_mean,b0_capital_mean,full_exposure_mean_spread,full_exposure_median_spread,exposure_matched_mean_spread,selection_quality_support,active_pick_selection_mean_spread,full_spread_ci_low,full_spread_ci_high
+SPY,41,1.5325200975609756,3.6288398536585365,2.096319756097561,1.9239403333333334,2.514913203252033,39,3.7632354059829063,-0.393468,5.118545
+QQQ,41,1.7906931463414635,3.6288398536585365,1.838146707317073,2.6909783333333333,2.285633390243903,39,3.5130943290598293,-1.321799,5.251495
