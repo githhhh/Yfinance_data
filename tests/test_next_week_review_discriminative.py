@@ -186,4 +186,8 @@ def _row(
         "opp_big_loser_any_3w": False,
         "opp_big_winner_any_4w": False,
         "opp_big_loser_any_4w": False,
+        "opp_severe_loser_1w": False,
+        "opp_severe_loser_2w": False,
+        "opp_severe_loser_3w": False,
+        "opp_severe_loser_4w": False,
     }
