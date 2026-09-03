@@ -1,98 +1,188 @@
-# Next Week Review Selection 研究协议 v0.4
+# Next Week Review Selection 研究协议 v0.5
 
 日期：2026-09-03  
 分支：`research/next-week-review-selection`
 
-## 核心目标
+## 目标
 
-验证：
+v0.5 不再重复证明 Primary R1 的高召回特性，而是正式回答：
 
-> 在有限 Review 注意力下，Near Buy Point + 独立正证据能否比 ACTIONABLE-only 捕获更多真正可交易的大赢家，同时不让大输家暴露按列表扩张比例同步恶化。
+> **能否从 Supplemental Candidates 中找到一个 OOS 稳定、单位 Review 注意力效率更高的准入机制？**
 
-Primary R1、四个 evidence families、双时钟、容量归一化规则保持 v0.3 不变。
+最终目标不是最大化 Winner Recall，而是：
 
-## v0.4 新增：Price-Path Coverage Audit
+- Tradable Winner Capture Lift ↑
+- Tradable Loser Capture Lift 不上升
+- Incremental Opportunities / Added Review > 0
+- Review List 自然规模尽量小
+- 跨 OOS fold 方向稳定
 
-历史 active signal 不允许因为缺少未来价格路径而静默退出分母。
+## 1. Train provisional champion 必须进入 OOS
 
-每个 event 记录：
+废除 v0.4 的训练期 hard veto：
 
-- price cache 是否存在 ticker
-- ticker cache 首尾日期
-- snapshot 后可用 session 数
-- path state：
-  - MISSING_SYMBOL
-  - EMPTY_OR_INVALID_BARS
-  - NO_FORWARD_BARS
-  - SHORT_1W / SHORT_2W / SHORT_3W / SHORT_4W
-  - COMPLETE_4W
+`stability_floor >= 2/3` 不再是“能否进入 OOS”的门槛。
 
-必须按以下维度输出 coverage：
+每个 formal fold：
 
-- snapshot week
-- weekend status
-- setup
-- signal source
-- ticker
-- 1W 缺失明细
+1. 仅使用 train-as-of 数据
+2. Stage 1 核心结构搜索
+3. Stage 2 evidence-family ablation
+4. 在 Pareto frontier 中选择一个 provisional champion
+5. 冻结
+6. 进入下一块 OOS
 
-目的：解释 `active signals -> evaluable outcomes` 的缺口，并检查缺失是否与状态/规则/来源系统相关。
+训练稳定性只用于 Pareto 后的 deterministic tie-break，不拥有最终否决权。
 
-## v0.4 新增：Horizon-Aware As-Of Walk-Forward
+真正的否决权属于 OOS。
 
-废除旧的：
+## 2. Pareto 目标
 
-> 只有“整周 4W 覆盖 >= 某阈值”的 snapshot week 才进入优化。
+不构造加权综合分。
 
-新设计：
+Pareto objectives：
 
-- 保留全部 snapshot weeks；
-- 1W/2W/3W/4W 各自使用自己的可用历史；
-- 每个 label 记录实际 `end_date`；
-- 每个 Walk-forward fold 在 test block 第一个 snapshot close 作为 cutoff；
-- train 中只有 `label_end_date <= cutoff` 的 outcome 可以被使用；
-- cutoff 后才完成的 outcome 自动重新标为 censored；
-- Oracle 必须在 as-of masking 后重新构造。
+- `Tradable Winner Capture Lift` 最大化
+- `Tradable Loser Capture Lift` 最小化
+- `Incremental Opportunities / Added Review` 最大化
+- `Avg Watchlist Size Delta vs B0` 最小化
 
-因此：
+Pareto 内 tie-break：
 
-> 1W 可以使用更多近期训练历史，4W 自动少用几周，但不能为了 4W 把整个周从 1W/2W 研究中删除。
+1. training block stability
+2. Winner Lift
+3. Loser Lift
+4. incremental opportunity efficiency
+5. list size
+6. rule simplicity
+7. deterministic rule name
+
+## 3. 选择集合去重
+
+参数不同不等于研究假设不同。
+
+每个 train fold 对每条规则计算：
+
+`SHA256(sorted(snapshot_date, code) selected set)`
+
+选择集合完全相同的规则视为一个 effective hypothesis。
+
+代表规则：
+
+- 优先 complexity 更低
+- 再按 deterministic name
+
+Stage 1 与 Stage 2 均先去重后再进入 Pareto/选 champion。
+
+## 4. Formal OOS 与 Tail
 
 默认：
 
 - first train = 20 snapshot weeks
-- test block = 4 weeks
+- formal test block = 4 snapshot weeks
 - expanding window
-- train-only Stage1 + Stage2 selection
-- 同一 train-selected rule 至少 3 个真实 OOS folds 才能成为 retrospective candidate
 
-Champion 状态语义：
+只有完整 4-week test block 进入正式 OOS verdict。
 
-- OOS folds < 3 → `INSUFFICIENT_OOS_HISTORY`
-- OOS folds >= 3 但无稳定规则 → `NO_STABLE_NEXT_WEEK_REVIEW_RULE`
-- 达到稳定门槛 → `RETROSPECTIVE_CANDIDATE`
+当前 42 周预期结构：
 
-## 统计输出
+- 5 个完整 formal OOS folds
+- 最后 2 周为 `TAIL_EXPLORATORY`
 
-继续同时使用：
+Tail 可以计算，但不得进入：
 
-- micro aggregation
-- weekly macro aggregation
-- paired moving-block bootstrap
-- capacity-normalized Winner/Loser Capture Lift
-- Snapshot clock
-- Opportunity clock
-- missed winners / included losers case audit
+- stability rate
+- adaptive-policy verdict
+- static-rule convergence verdict
 
-Bootstrap 不再只给 2W~4W 聚合均值；必须同时输出 2W、3W、4W horizon-specific 指标。
+## 5. Adaptive Policy
 
-## 生产边界
+每个 fold 的 champion 可以不同。
 
-本研究仍不修改：
+因此主 OOS 对象不是“某一条固定规则”，而是：
 
-- 生产 Skill
-- Dashboard
-- Futu sync
-- C Rank
-- ATR
-- Daily State Machine
+> **只使用过去数据选择下一阶段 Review Rule 的 adaptive policy。**
+
+正式输出：
+
+- 每 fold train champion
+- 每 fold OOS metrics
+- 跨 fold adaptive aggregate
+- Winner Lift direction rate
+- Loser Lift non-worse rate
+- Opportunity positive rate
+- incremental opportunity efficiency
+- attention multiplier
+
+v0.5 retrospective adaptive candidate gate：
+
+- formal folds >= 3
+- Opportunity Δ > 0 的 fold 比例 >= 60%
+- Winner Lift Δ >= 0 的 fold 比例 >= 60%
+- Loser Lift Δ <= 0 的 fold 比例 >= 60%
+- mean Opportunity Δ > 0
+- mean Winner Lift Δ >= 0
+- mean Loser Lift Δ <= 0
+- mean Incremental Opportunities / Added Review > 0
+
+否则：
+
+`NO_STABLE_ADAPTIVE_POLICY`
+
+## 6. Rule Convergence
+
+同时回答：
+
+> train-only optimizer 是否反复收敛到相同结构？
+
+分别统计：
+
+- exact rule
+- structural key：Near / Status / min evidence / Geometry
+- evidence profile
+
+只有 exact rule 至少出现在 3 个 formal folds，且其被选中 fold 的 OOS 方向达到稳定门槛，才标记：
+
+`RETROSPECTIVE_CONVERGENT_RULE_CANDIDATE`
+
+否则：
+
+`NO_CONVERGENT_STATIC_RULE`
+
+该标签仍不是 production authorization。
+
+## 7. Setup-balanced sensitivity
+
+历史 price-cache coverage 在 setup 间不均衡，因此正式补充：
+
+- 按 `ibd_candidate_rule` 分层
+- 每个有 >=10 个完整 1W outcome 的 setup 才进入 balanced summary
+- setup 等权，不按样本行数加权
+
+对 Primary R1 和 formal OOS Adaptive Policy 都输出：
+
+- Opportunity Δ
+- Winner Lift Δ
+- Loser Lift Δ
+- Severe loser exposure Δ
+- Attention Δ
+- incremental opportunity efficiency
+
+若优势只来自少数高 coverage setup，不认为稳健。
+
+## 8. 保持不变的边界
+
+继续保留：
+
+- B0 ACTIONABLE 全保留
+- Primary R1 无 Geometry hard reject
+- 4 个独立 evidence families
+- False / Missing neutral
+- Snapshot clock + Opportunity clock
+- 1W/2W/3W/4W
+- price-path coverage audit
+- horizon-aware as-of censoring
+- moving-block bootstrap
+- EXTENDED exploratory only
+- C Rank / ATR 不参与
+- 不修改生产 Skill / Dashboard / Futu

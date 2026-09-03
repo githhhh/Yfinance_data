@@ -2,23 +2,25 @@
 
 Branch: `research/next-week-review-selection`
 
-v0.4 fixes two remaining research blockers:
+v0.5 turns the experiment into a real optimizer OOS test:
 
-1. Explicit price-path coverage audit explains why active signals do or do not have 1W/2W/3W/4W outcomes.
-2. Walk-forward is horizon-aware and as-of censored by each label's actual end date. The old all-or-nothing 4W mature-week gate is removed.
+- every formal fold must choose one train-only provisional champion;
+- training stability ranks candidates but cannot block OOS entry;
+- only full 4-week test blocks count formally;
+- the final partial block is `TAIL_EXPLORATORY`;
+- behaviorally identical rule parameterizations are de-duplicated by selection signature;
+- the main OOS object is the adaptive train-select-next-block policy;
+- exact/structural rule convergence is reported separately;
+- setup-balanced sensitivity checks whether apparent gains depend on uneven setup coverage.
 
-Primary R1 remains:
-
-`B0 ACTIONABLE-only + Near-Buy-Point UNCONFIRMED/BELOW_TRIGGER + >=1 independent positive evidence family`.
-
-Run:
+Run without changing parameters:
 
 ```bash
-conda run --no-capture-output -n quant_env \
-  python -m pytest tests/test_next_week_review_selection.py -q
+/Users/dev/.conda/envs/quant_env/bin/python \
+  -m pytest tests/test_next_week_review_selection.py -q
 
-conda run --no-capture-output -n quant_env \
-  python -m backtest.next_week_review_selection.run
+/Users/dev/.conda/envs/quant_env/bin/python \
+  -m backtest.next_week_review_selection.run
 ```
 
-Do not change parameters during the formal replay. Generated outputs are retrospective research artifacts only.
+Generated outputs are retrospective research artifacts only.

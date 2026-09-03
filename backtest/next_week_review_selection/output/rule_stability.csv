@@ -1,2 +1,0 @@
-evaluation_role,variant,folds,opportunity_positive_rate,tradable_winner_lift_nonnegative_rate,tradable_loser_lift_nonworse_rate,mean_opportunity_delta,mean_tradable_winner_lift_delta,mean_tradable_loser_lift_delta,mean_incremental_opportunity_efficiency,mean_attention_delta,rule_complexity,stability_floor
-PRIMARY_R1,R1_NEAR_BUY_POINT_PLUS_EVIDENCE,6,1.0,0.5,0.5,0.5111152594906989,0.06340269574696039,-0.025564887234469962,0.8562595100786629,47.25,0,0.5

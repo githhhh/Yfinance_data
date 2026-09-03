@@ -22,6 +22,7 @@ from .optimizer import select_all_weeks, two_stage_diagnostics
 from .oracle import add_weekly_oracle_flags, oracle_projection
 from .report import render_report
 from .search_space import generate_core_rules, generate_evidence_ablations
+from .sensitivity import setup_balanced_sensitivity
 from .selectors import (
     EVIDENCE_FAMILIES,
     primary_rule,
@@ -36,9 +37,12 @@ from .utils import (
     to_bool,
 )
 from .walk_forward import (
-    choose_retrospective_champion,
+    adaptive_policy_status,
+    convergent_static_candidate,
     run_walk_forward,
+    summarize_adaptive_policy,
     summarize_oos_stability,
+    summarize_rule_convergence,
 )
 
 
@@ -49,7 +53,7 @@ OUTPUT_DIR = Path("backtest/next_week_review_selection/output")
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Run Next Week Review Selection research."
+        description="Run Next Week Review Selection research v0.5."
     )
     parser.add_argument("--pool-root", default=str(POOL_ROOT))
     parser.add_argument("--price-cache", default=str(PRICE_CACHE))
@@ -91,6 +95,7 @@ def run_research(
 
     price_path_audits = build_price_path_audits(panel)
 
+    # Primary R1 remains a fixed diagnostic baseline.
     core = primary_rule()
     b0_selected = select_all_weeks(panel, None)
     primary_selected = select_all_weeks(panel, core)
@@ -129,6 +134,8 @@ def run_research(
         metrics=bootstrap_metrics,
     )
 
+    # Full-sample diagnostics are descriptive only. Formal selection happens
+    # inside walk-forward train windows.
     core_rules = generate_core_rules()
     full_evidence_rules, core_grid, evidence_grid = two_stage_diagnostics(
         panel, core_rules
@@ -139,56 +146,93 @@ def run_research(
         wf_champions,
         wf_core_train,
         wf_evidence_train,
+        tail_exploratory,
+        formal_oos_selections,
+        fold_calendar,
     ) = run_walk_forward(
         panel,
         core_rules,
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
     )
+
     oos_stability = summarize_oos_stability(fold_results)
-
-    candidate_rules: dict[str, object] = {}
-    for rule in full_evidence_rules:
-        candidate_rules[rule.name] = rule
-    if not wf_evidence_train.empty:
-        finalist_core_names = {
-            str(name).split("_ALL")[0].split("_NO_")[0]
-            for name in wf_evidence_train["variant"].dropna().astype(str)
-        }
-        for core_rule in core_rules:
-            if core_rule.name in finalist_core_names:
-                for rule in generate_evidence_ablations(core_rule):
-                    candidate_rules[rule.name] = rule
-
-    champion = choose_retrospective_champion(
-        oos_stability,
-        fold_results,
-        list(candidate_rules.values()),
+    adaptive_summary = summarize_adaptive_policy(fold_results)
+    adaptive_status = adaptive_policy_status(adaptive_summary)
+    convergence = summarize_rule_convergence(wf_champions)
+    static_status, static_rule_name = convergent_static_candidate(
+        convergence, oos_stability
     )
-    oos_fold_count = (
-        int(fold_results["fold"].nunique()) if not fold_results.empty else 0
+
+    formal_weeks = set(
+        fold_calendar.loc[
+            fold_calendar["phase"].eq("FORMAL_OOS"), "snapshot_date"
+        ].astype(str)
+    ) if not fold_calendar.empty else set()
+    formal_panel = panel[
+        panel["snapshot_date"].astype(str).isin(formal_weeks)
+    ].copy()
+
+    primary_setup_detail, primary_setup_summary = setup_balanced_sensitivity(
+        panel,
+        b0_selected,
+        primary_selected,
+        variant=core.name,
     )
-    if oos_fold_count < 3:
-        champion_status = "INSUFFICIENT_OOS_HISTORY"
-    elif champion is not None:
-        champion_status = "RETROSPECTIVE_CANDIDATE"
+
+    if not formal_oos_selections.empty and not formal_panel.empty:
+        formal_b0 = formal_oos_selections[
+            formal_oos_selections["evaluation_role"].eq("B0_ACTIONABLE_ONLY")
+        ].copy()
+        adaptive_selected = formal_oos_selections[
+            formal_oos_selections["evaluation_role"].eq("TRAIN_CHAMPION")
+        ].copy()
+        adaptive_setup_detail, adaptive_setup_summary = setup_balanced_sensitivity(
+            formal_panel,
+            formal_b0,
+            adaptive_selected,
+            variant="ADAPTIVE_POLICY_FORMAL_OOS",
+        )
     else:
-        champion_status = "NO_STABLE_NEXT_WEEK_REVIEW_RULE"
-    champion_name = champion.name if champion is not None else ""
+        adaptive_setup_detail = pd.DataFrame()
+        adaptive_setup_summary = pd.DataFrame()
+
+    setup_balanced_summary = pd.concat(
+        [primary_setup_summary, adaptive_setup_summary],
+        ignore_index=True,
+        sort=False,
+    )
+
+    all_rule_map = {rule.name: rule for rule in core_rules}
+    for core_rule in core_rules:
+        for rule in generate_evidence_ablations(core_rule):
+            all_rule_map[rule.name] = rule
+    for rule in full_evidence_rules:
+        all_rule_map[rule.name] = rule
+
+    static_rule = all_rule_map.get(static_rule_name)
+    static_latest = (
+        latest_review_list(panel, static_rule)
+        if static_rule is not None
+        else pd.DataFrame()
+    )
 
     missed_winners, included_losers = build_case_audits(
         panel,
         core_rule=core,
-        champion=champion,
+        static_rule=static_rule,
     )
-
     latest_review = latest_review_list(panel, core)
-    champion_latest = (
-        latest_review_list(panel, champion)
-        if champion is not None
-        else pd.DataFrame()
-    )
     extended = extended_exploratory_summary(panel)
+
+    formal_fold_count = (
+        int(wf_champions["fold"].nunique())
+        if not wf_champions.empty
+        else 0
+    )
+    tail_week_count = int(
+        fold_calendar["phase"].eq("TAIL_EXPLORATORY").sum()
+    ) if not fold_calendar.empty else 0
 
     manifest = experiment_manifest(
         panel=panel,
@@ -199,20 +243,33 @@ def run_research(
         evidence_rule_count=len(full_evidence_rules),
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
-        oos_fold_count=oos_fold_count,
-        champion_status=champion_status,
-        champion=champion,
+        formal_fold_count=formal_fold_count,
+        tail_week_count=tail_week_count,
+        adaptive_status=adaptive_status,
+        static_status=static_status,
+        static_rule=static_rule,
     )
-    data_audit = render_data_audit(panel, pools, eps, oos_fold_count)
+    data_audit = render_data_audit(
+        panel,
+        pools,
+        eps,
+        formal_fold_count=formal_fold_count,
+        tail_week_count=tail_week_count,
+    )
     report = render_report(
         baseline_vs_primary=baseline_vs_primary,
         macro_summary=macro_summary,
         bootstrap=bootstrap,
         coverage_summary=price_path_audits["price_path_coverage_summary.csv"],
+        adaptive_summary=adaptive_summary,
+        convergence=convergence,
+        setup_balanced_summary=setup_balanced_summary,
         oos_stability=oos_stability,
         walk_forward_champions=wf_champions,
-        champion_status=champion_status,
-        champion_rule=champion_name or "n/a",
+        tail_exploratory=tail_exploratory,
+        adaptive_status=adaptive_status,
+        static_status=static_status,
+        static_rule=static_rule_name,
         extended_exploratory=extended,
     )
 
@@ -221,7 +278,7 @@ def run_research(
         "weekend_event_panel.csv": output_dir / "weekend_event_panel.csv",
         "winner_loser_oracle.csv": output_dir / "winner_loser_oracle.csv",
         "next_week_review_list.csv": output_dir / "next_week_review_list.csv",
-        "champion_latest_review_list.csv": output_dir / "champion_latest_review_list.csv",
+        "static_candidate_latest_review_list.csv": output_dir / "static_candidate_latest_review_list.csv",
         "baseline_vs_primary.csv": output_dir / "baseline_vs_primary.csv",
         "weekly_macro_metrics.csv": output_dir / "weekly_macro_metrics.csv",
         "macro_summary.csv": output_dir / "macro_summary.csv",
@@ -232,7 +289,15 @@ def run_research(
         "walk_forward_champions.csv": output_dir / "walk_forward_champions.csv",
         "walk_forward_core_train.csv": output_dir / "walk_forward_core_train.csv",
         "walk_forward_evidence_train.csv": output_dir / "walk_forward_evidence_train.csv",
+        "formal_oos_selections.csv": output_dir / "formal_oos_selections.csv",
+        "fold_calendar.csv": output_dir / "fold_calendar.csv",
+        "tail_exploratory.csv": output_dir / "tail_exploratory.csv",
         "rule_stability.csv": output_dir / "rule_stability.csv",
+        "adaptive_policy_summary.csv": output_dir / "adaptive_policy_summary.csv",
+        "rule_convergence.csv": output_dir / "rule_convergence.csv",
+        "setup_sensitivity_primary.csv": output_dir / "setup_sensitivity_primary.csv",
+        "setup_sensitivity_adaptive_oos.csv": output_dir / "setup_sensitivity_adaptive_oos.csv",
+        "setup_balanced_summary.csv": output_dir / "setup_balanced_summary.csv",
         "missed_big_winners.csv": output_dir / "missed_big_winners.csv",
         "included_big_losers.csv": output_dir / "included_big_losers.csv",
         "extended_exploratory.csv": output_dir / "extended_exploratory.csv",
@@ -247,7 +312,9 @@ def run_research(
     panel.to_csv(outputs["weekend_event_panel.csv"], index=False)
     oracle_projection(panel).to_csv(outputs["winner_loser_oracle.csv"], index=False)
     latest_review.to_csv(outputs["next_week_review_list.csv"], index=False)
-    champion_latest.to_csv(outputs["champion_latest_review_list.csv"], index=False)
+    static_latest.to_csv(
+        outputs["static_candidate_latest_review_list.csv"], index=False
+    )
     baseline_vs_primary.to_csv(outputs["baseline_vs_primary.csv"], index=False)
     weekly_macro.to_csv(outputs["weekly_macro_metrics.csv"], index=False)
     macro_summary.to_csv(outputs["macro_summary.csv"], index=False)
@@ -257,21 +324,47 @@ def run_research(
     fold_results.to_csv(outputs["fold_level_results.csv"], index=False)
     wf_champions.to_csv(outputs["walk_forward_champions.csv"], index=False)
     wf_core_train.to_csv(outputs["walk_forward_core_train.csv"], index=False)
-    wf_evidence_train.to_csv(outputs["walk_forward_evidence_train.csv"], index=False)
+    wf_evidence_train.to_csv(
+        outputs["walk_forward_evidence_train.csv"], index=False
+    )
+    formal_oos_selections.to_csv(
+        outputs["formal_oos_selections.csv"], index=False
+    )
+    fold_calendar.to_csv(outputs["fold_calendar.csv"], index=False)
+    tail_exploratory.to_csv(outputs["tail_exploratory.csv"], index=False)
     oos_stability.to_csv(outputs["rule_stability.csv"], index=False)
+    adaptive_summary.to_csv(outputs["adaptive_policy_summary.csv"], index=False)
+    convergence.to_csv(outputs["rule_convergence.csv"], index=False)
+    primary_setup_detail.to_csv(
+        outputs["setup_sensitivity_primary.csv"], index=False
+    )
+    adaptive_setup_detail.to_csv(
+        outputs["setup_sensitivity_adaptive_oos.csv"], index=False
+    )
+    setup_balanced_summary.to_csv(
+        outputs["setup_balanced_summary.csv"], index=False
+    )
     missed_winners.to_csv(outputs["missed_big_winners.csv"], index=False)
     included_losers.to_csv(outputs["included_big_losers.csv"], index=False)
     extended.to_csv(outputs["extended_exploratory.csv"], index=False)
     for name, frame in price_path_audits.items():
         frame.to_csv(outputs[name], index=False)
 
+    dominant = _dominant_convergence(convergence)
     outputs["champion_rule.json"].write_text(
         json.dumps(
             {
-                "status": champion_status,
-                "oos_fold_count": oos_fold_count,
-                "rule": rule_to_dict(champion) if champion is not None else None,
-                "note": "retrospective research candidate; not production authorization",
+                "adaptive_policy_status": adaptive_status,
+                "formal_oos_fold_count": formal_fold_count,
+                "tail_exploratory_week_count": tail_week_count,
+                "static_rule_status": static_status,
+                "static_rule": (
+                    rule_to_dict(static_rule)
+                    if static_rule is not None
+                    else None
+                ),
+                "dominant_convergence": dominant,
+                "note": "retrospective research only; no production authorization",
             },
             ensure_ascii=False,
             indent=2,
@@ -333,14 +426,16 @@ def build_case_audits(
     panel: pd.DataFrame,
     *,
     core_rule,
-    champion,
+    static_rule,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     variants = [
         ("B0_ACTIONABLE_ONLY", select_all_weeks(panel, None)),
         (core_rule.name, select_all_weeks(panel, core_rule)),
     ]
-    if champion is not None and champion.name != core_rule.name:
-        variants.append((champion.name, select_all_weeks(panel, champion)))
+    if static_rule is not None and static_rule.name != core_rule.name:
+        variants.append(
+            (static_rule.name, select_all_weeks(panel, static_rule))
+        )
 
     missed_parts = []
     loser_parts = []
@@ -365,7 +460,7 @@ def build_case_audits(
 
 
 def latest_review_list(panel: pd.DataFrame, rule) -> pd.DataFrame:
-    if panel.empty:
+    if panel.empty or rule is None:
         return pd.DataFrame()
     latest = sorted(panel["snapshot_date"].astype(str).unique())[-1]
     week = panel[panel["snapshot_date"].astype(str).eq(latest)].copy()
@@ -447,18 +542,21 @@ def render_data_audit(
     panel: pd.DataFrame,
     pools: list[tuple[str, pd.DataFrame, Path]],
     eps: pd.DataFrame,
-    oos_fold_count: int,
+    *,
+    formal_fold_count: int,
+    tail_week_count: int,
 ) -> str:
     weeks = sorted(panel["snapshot_date"].astype(str).unique())
     lines = [
-        "# Next Week Review Selection - Data Audit",
+        "# Next Week Review Selection - Data Audit v0.5",
         "",
         f"- pool files loaded: {len(pools)}",
         f"- active-signal weeks: {len(weeks)}",
         f"- first snapshot: {weeks[0] if weeks else 'n/a'}",
         f"- last snapshot: {weeks[-1] if weeks else 'n/a'}",
         f"- active-signal events: {len(panel)}",
-        f"- walk-forward OOS folds: {oos_fold_count}",
+        f"- formal OOS folds: {formal_fold_count}",
+        f"- tail exploratory weeks: {tail_week_count}",
         (
             f"- verified PIT EPS rows: {int(eps['pit_eps_state'].eq('VERIFIED').sum())}"
             if not eps.empty
@@ -475,27 +573,20 @@ def render_data_audit(
             .astype(str)
             .nunique()
         )
-        opp_complete = int(
-            (
-                panel["review_opportunity_1w"].eq(True)
-                & panel[f"opp_forward_{horizon}_censored"].eq(False)
-            ).sum()
-        )
         lines.append(
             f"- complete snapshot-clock {horizon}: {complete}/{len(panel)} across {weeks_complete} weeks"
         )
-        lines.append(f"- complete opportunity-clock {horizon}: {opp_complete}")
     lines.extend(
         [
             "",
             "Guardrails:",
-            "- Price-path missingness has dedicated audits by week/status/setup/source/ticker.",
-            "- Walk-forward training is horizon-aware and as-of censored by actual label end date.",
-            "- No all-or-nothing 4W mature-week gate is used.",
-            "- Primary R1 has no Geometry hard reject.",
-            "- Volume is one independent evidence family.",
-            "- False/missing positive evidence is neutral.",
-            "- Snapshot and opportunity clocks are separate.",
+            "- Every formal fold receives a provisional train-only champion.",
+            "- Training stability is ranking-only, never an OOS admission veto.",
+            "- Partial final test block is excluded from the formal verdict.",
+            "- Behaviorally identical train rules are de-duplicated by selection signature.",
+            "- Adaptive policy and exact-rule convergence are separate conclusions.",
+            "- Setup-balanced sensitivity equal-weights eligible setup strata.",
+            "- Horizon-aware as-of censoring and price-path audits remain active.",
             "- C Rank and ATR are not used.",
             "",
         ]
@@ -513,13 +604,16 @@ def experiment_manifest(
     evidence_rule_count: int,
     min_train_weeks: int,
     test_weeks: int,
-    oos_fold_count: int,
-    champion_status: str,
-    champion,
+    formal_fold_count: int,
+    tail_week_count: int,
+    adaptive_status: str,
+    static_status: str,
+    static_rule,
 ) -> dict[str, object]:
     weeks = sorted(panel["snapshot_date"].astype(str).unique())
     return {
         "study": "next_week_review_selection",
+        "protocol_version": "0.5",
         "status": "retrospective_pre_registered_replay",
         "pool_root": str(pool_root),
         "price_cache": str(price_cache),
@@ -532,29 +626,51 @@ def experiment_manifest(
         "horizons": HORIZONS,
         "primary_rule": rule_to_dict(primary_rule()),
         "evidence_families": EVIDENCE_FAMILIES,
-        "price_path_coverage_audit": True,
         "search": {
             "stage_1_core_rule_count": core_rule_count,
-            "stage_2_full_sample_evidence_rule_count": evidence_rule_count,
-            "stage_2_policy": "leave_one_evidence_family_out_only_around_core_finalists",
+            "stage_2_full_sample_unique_evidence_rule_count": evidence_rule_count,
+            "selection_signature_dedupe": True,
+            "train_stability_is_hard_gate": False,
+            "pareto_weighted_score": False,
         },
         "walk_forward": {
             "min_train_weeks": min_train_weeks,
             "test_weeks": test_weeks,
-            "expanding_window": True,
+            "formal_full_block_only": True,
+            "formal_oos_fold_count": formal_fold_count,
+            "tail_exploratory_week_count": tail_week_count,
             "horizon_aware_asof_censoring": True,
-            "all_or_nothing_4w_week_gate": False,
             "test_used_for_selection": False,
-            "oos_fold_count": oos_fold_count,
         },
-        "champion_status": champion_status,
-        "champion_rule": (
-            rule_to_dict(champion) if champion is not None else None
+        "adaptive_policy_status": adaptive_status,
+        "static_rule_status": static_status,
+        "static_rule": (
+            rule_to_dict(static_rule) if static_rule is not None else None
         ),
+        "setup_balanced_sensitivity": True,
         "c_rank_used": False,
         "atr_used": False,
         "extended_in_core_selector": False,
     }
+
+
+def _dominant_convergence(convergence: pd.DataFrame) -> dict[str, object]:
+    if convergence.empty:
+        return {}
+    out: dict[str, object] = {}
+    for level in ("EXACT_RULE", "STRUCTURE", "EVIDENCE_PROFILE"):
+        rows = convergence[convergence["level"].eq(level)]
+        if rows.empty:
+            continue
+        best = rows.sort_values(
+            ["fold_count", "value"], ascending=[False, True]
+        ).iloc[0]
+        out[level.lower()] = {
+            "value": str(best["value"]),
+            "fold_count": int(best["fold_count"]),
+            "fold_share": float(best["fold_share"]),
+        }
+    return out
 
 
 def _median(frame: pd.DataFrame, column: str) -> float:

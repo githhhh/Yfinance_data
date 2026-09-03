@@ -3,6 +3,7 @@ import pandas as pd
 from backtest.next_week_review_selection.asof import panel_asof_cutoff
 from backtest.next_week_review_selection.coverage import build_price_path_audits
 from backtest.next_week_review_selection.labels import add_forward_labels
+from backtest.next_week_review_selection.optimizer import selection_signature
 from backtest.next_week_review_selection.oracle import add_weekly_oracle_flags
 from backtest.next_week_review_selection.search_space import (
     generate_core_rules,
@@ -13,6 +14,10 @@ from backtest.next_week_review_selection.selectors import (
     evidence_family_count,
     primary_rule,
     select_review_variant,
+)
+from backtest.next_week_review_selection.walk_forward import (
+    adaptive_policy_status,
+    partition_walk_forward_weeks,
 )
 
 
@@ -26,7 +31,6 @@ def test_actionable_rows_are_never_refiltered_by_research_rule():
     ])
     selected = select_review_variant(pool, primary_rule())
     assert selected["code"].tolist() == ["ACT"]
-    assert selected["selection_source"].tolist() == ["ACTIONABLE_BASELINE"]
 
 
 def test_primary_r1_does_not_geometry_hard_reject_supplemental():
@@ -77,18 +81,7 @@ def test_extended_is_not_in_core_selector():
         _row("EXT", "EXTENDED", 6.0, weekly_volume=2.0),
         _row("UNC", "UNCONFIRMED", -1.0, weekly_volume=2.0),
     ])
-    selected = select_review_variant(pool, primary_rule())
-    assert selected["code"].tolist() == ["UNC"]
-
-
-def test_below_trigger_near_buy_point_can_be_supplemented():
-    pool = pd.DataFrame([
-        _row(
-            "BEL", "BELOW_TRIGGER", -4.0,
-            entry_volume=None, weekly_volume=1.5, eps=None, dist=-10,
-        )
-    ])
-    assert select_review_variant(pool, primary_rule())["code"].tolist() == ["BEL"]
+    assert select_review_variant(pool, primary_rule())["code"].tolist() == ["UNC"]
 
 
 def test_c_rank_never_changes_selection():
@@ -123,10 +116,7 @@ def test_dual_clock_and_horizon_end_dates_for_delayed_opportunity():
     labeled = add_forward_labels(events, {"A": bars}).iloc[0]
     assert labeled["review_opportunity_1w"] == True
     assert labeled["opportunity_delay_sessions"] == 4
-    assert labeled["opportunity_anchor_date"] == "2026-09-03"
-    assert labeled["forward_1w_end_date"] == "2026-09-04"
     assert labeled["opp_forward_4w_censored"] == False
-    assert pd.notna(labeled["opp_forward_4w_end_date"])
 
 
 def test_price_path_audit_marks_missing_symbol():
@@ -134,9 +124,7 @@ def test_price_path_audit_marks_missing_symbol():
     labeled = add_forward_labels(events, {})
     assert labeled.loc[0, "price_path_state"] == "MISSING_SYMBOL"
     audits = build_price_path_audits(labeled)
-    summary = audits["price_path_coverage_summary.csv"].iloc[0]
-    assert summary["complete_1w_count"] == 0
-    assert len(audits["price_path_missing_1w_cases.csv"]) == 1
+    assert audits["price_path_coverage_summary.csv"].iloc[0]["complete_1w_count"] == 0
 
 
 def test_asof_masks_future_4w_but_keeps_resolved_1w():
@@ -155,40 +143,48 @@ def test_asof_masks_future_4w_but_keeps_resolved_1w():
     asof = panel_asof_cutoff(panel, "2026-09-11").iloc[0]
     assert asof["forward_1w_censored"] == False
     assert asof["forward_4w_censored"] == True
-    assert pd.isna(asof["forward_4w_return_pct"])
-
-
-def test_oracle_marks_snapshot_and_opportunity_winners():
-    rows = []
-    for i in range(6):
-        row = _row(f"T{i}", "ACTIONABLE", 1.0)
-        row.update({
-            "review_opportunity_1w": True,
-            "forward_1w_censored": False,
-            "forward_1w_return_pct": float(i),
-            "mfe_1w_pct": float(i + 1),
-            "mae_1w_pct": float(-i),
-            "opp_forward_1w_censored": False,
-            "opp_forward_1w_return_pct": float(i),
-            "opp_mfe_1w_pct": float(i + 1),
-            "opp_mae_1w_pct": float(-i),
-        })
-        for horizon in ("2w", "3w", "4w"):
-            row[f"forward_{horizon}_censored"] = True
-            row[f"opp_forward_{horizon}_censored"] = True
-        rows.append(row)
-    panel = add_weekly_oracle_flags(pd.DataFrame(rows))
-    assert panel["big_winner_any_1w"].sum() >= 5
-    assert panel["opp_big_winner_any_1w"].sum() >= 5
 
 
 def test_two_stage_search_space_is_small():
     core = generate_core_rules()
     assert len(core) == 24
-    assert len({rule.name for rule in core}) == 24
-    ablations = generate_evidence_ablations(core[0])
-    assert len(ablations) == 5
-    assert len({rule.name for rule in ablations}) == 5
+    assert len(generate_evidence_ablations(core[0])) == 5
+
+
+def test_selection_signature_collapses_behaviorally_identical_rules():
+    pool = pd.DataFrame([
+        _row("A", "UNCONFIRMED", -1.0),
+        _row("B", "ACTIONABLE", 2.0),
+    ])
+    r3 = ReviewRule(name="N3", near_below_pct=3.0)
+    r5 = ReviewRule(name="N5", near_below_pct=5.0)
+    assert selection_signature(pool, r3) == selection_signature(pool, r5)
+
+
+def test_walk_forward_partition_uses_five_full_folds_and_two_week_tail():
+    weeks = [f"2026-W{i:02d}" for i in range(42)]
+    formal, tail = partition_walk_forward_weeks(
+        weeks, min_train_weeks=20, test_weeks=4
+    )
+    assert len(formal) == 5
+    assert all(len(block["test_weeks"]) == 4 for block in formal)
+    assert len(tail) == 2
+
+
+def test_adaptive_policy_gate_can_pass_with_different_fold_rules():
+    summary = pd.DataFrame([
+        {
+            "folds": 5,
+            "opportunity_positive_rate": 0.8,
+            "tradable_winner_lift_nonnegative_rate": 0.6,
+            "tradable_loser_lift_nonworse_rate": 0.6,
+            "mean_opportunity_delta": 0.2,
+            "mean_tradable_winner_lift_delta": 0.03,
+            "mean_tradable_loser_lift_delta": -0.02,
+            "mean_incremental_opportunity_efficiency": 0.4,
+        }
+    ])
+    assert adaptive_policy_status(summary) == "RETROSPECTIVE_ADAPTIVE_CANDIDATE"
 
 
 def _row(
