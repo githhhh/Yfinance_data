@@ -114,6 +114,21 @@ EXTENDED 仍不进入核心 selector。
 
 候选库规模固定为 25。
 
+## 数值比较语义
+
+所有接近零的 Lift / Delta 比较统一使用：
+
+`ZERO_TOL = 1e-12`
+
+语义：
+
+- positive: `x > +ZERO_TOL`
+- nonnegative: `x >= -ZERO_TOL`
+- nonpositive / non-worse: `x <= +ZERO_TOL`
+
+该容差只用于消除 IEEE-754 浮点舍入噪声，例如
+`2.220446049250313e-16` 必须按 0 处理；它不改变任何研究阈值或业务门槛。
+
 ## Discovery rule selection
 
 每条候选在 discovery train 上：
