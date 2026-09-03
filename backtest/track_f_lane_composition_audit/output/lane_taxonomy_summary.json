@@ -1,0 +1,19 @@
+{
+  "total_review_rows": 2738,
+  "b0_eligible_rows": 414,
+  "eligible_composition_groups": {
+    "confirmed_pullback": 242,
+    "confirmed_non_pullback": 136,
+    "standard": 36
+  },
+  "constructive_pullback_rows": 1162,
+  "constructive_actionable_confirmed_branch_rows": 258,
+  "constructive_non_actionable_context_branch_rows": 904,
+  "constructive_other_rows": 0,
+  "standard_breakout_routes": {
+    "pullback": 30,
+    "non_pullback": 14
+  },
+  "eligible_standard_pullback_rows": 25,
+  "eligible_standard_non_pullback_rows": 11
+}
