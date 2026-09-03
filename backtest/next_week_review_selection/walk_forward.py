@@ -262,6 +262,8 @@ def summarize_adaptive_policy(fold_results: pd.DataFrame) -> pd.DataFrame:
     row["median_attention_multiplier_vs_b0"] = _median(
         chosen["attention_multiplier_vs_b0"]
     )
+    row["rule_complexity"] = pd.NA
+    row["mean_rule_complexity"] = _mean(chosen["rule_complexity"])
     return pd.DataFrame([row])
 
 
