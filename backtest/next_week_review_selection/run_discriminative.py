@@ -96,7 +96,7 @@ def run_research(
     adaptive_summary = summarize_oos_policy(
         fold_results, "ADAPTIVE_DISCRIMINATIVE_POLICY"
     )
-    static_status = oos_policy_status(
+    static_status_pre_sensitivity = oos_policy_status(
         static_summary,
         static_rule_exists=static_rule is not None,
     )
@@ -165,6 +165,11 @@ def run_research(
         missed = pd.DataFrame()
         included = pd.DataFrame()
 
+    static_status = _apply_setup_sensitivity_gate(
+        static_status_pre_sensitivity,
+        setup_summary,
+    )
+
     manifest = {
         "study": "next_week_review_selection_v06_discriminative",
         "status": "retrospective_reused_history_confirmation",
@@ -180,6 +185,7 @@ def run_research(
         "max_attention_multiplier": MAX_ATTENTION_MULTIPLIER,
         "candidate_library_size": len(candidate_library()),
         "static_rule": rule_to_dict(static_rule),
+        "static_status_pre_setup_sensitivity": static_status_pre_sensitivity,
         "static_status": static_status,
         "adaptive_status": adaptive_status,
         "formal_fold_count": int(fold_results["fold"].nunique()),
@@ -269,6 +275,7 @@ def run_research(
     outputs["decision.json"].write_text(
         json.dumps(
             {
+                "static_status_pre_setup_sensitivity": static_status_pre_sensitivity,
                 "static_status": static_status,
                 "static_rule": rule_to_dict(static_rule),
                 "adaptive_status": adaptive_status,
@@ -289,6 +296,49 @@ def run_research(
     )
     outputs["report.md"].write_text(report, encoding="utf-8")
     return {name: str(path) for name, path in outputs.items()}
+
+
+def _apply_setup_sensitivity_gate(
+    status: str,
+    setup_summary: pd.DataFrame,
+) -> str:
+    if status != "RETROSPECTIVE_DISCRIMINATIVE_CANDIDATE":
+        return status
+    if setup_summary.empty:
+        return "NO_STABLE_DISCRIMINATIVE_RULE_SETUP_SENSITIVITY"
+
+    row = setup_summary.iloc[0]
+    winner_mean = row.get(
+        "setup_balanced_mean_tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+    )
+    loser_mean = row.get(
+        "setup_balanced_mean_tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+    )
+    winner_rate = row.get(
+        "setup_nonnegative_rate_tradable_winner_capture_lift_mean_2_4w_delta_vs_b0"
+    )
+    loser_rate = row.get(
+        "setup_nonworse_rate_tradable_loser_capture_lift_mean_2_4w_delta_vs_b0"
+    )
+    values = (winner_mean, loser_mean, winner_rate, loser_rate)
+    try:
+        finite = all(pd.notna(value) for value in values)
+    except TypeError:
+        finite = False
+    if not finite:
+        return "NO_STABLE_DISCRIMINATIVE_RULE_SETUP_SENSITIVITY"
+
+    passes = (
+        float(winner_mean) >= 0
+        and float(loser_mean) <= 0
+        and float(winner_rate) >= 0.60
+        and float(loser_rate) >= 0.60
+    )
+    return (
+        status
+        if passes
+        else "NO_STABLE_DISCRIMINATIVE_RULE_SETUP_SENSITIVITY"
+    )
 
 
 def _render_report(
