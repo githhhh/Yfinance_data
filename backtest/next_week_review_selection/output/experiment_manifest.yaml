@@ -1,0 +1,60 @@
+{
+  "active_signal_weeks": 42,
+  "atr_used": false,
+  "c_rank_used": false,
+  "champion_rule": null,
+  "champion_status": "NO_STABLE_NEXT_WEEK_REVIEW_RULE",
+  "eps_pit": "backtest/ibd_skill_replay_pools/signal_eps_pit.csv",
+  "eps_pit_sha256": "b3c16fed08a15d11b415842a8129ba1fa3f9b0c12797afee4a26f61b87a5a381",
+  "evidence_families": [
+    "volume",
+    "eps",
+    "rs_near_high",
+    "supply_contraction"
+  ],
+  "extended_in_core_selector": false,
+  "first_snapshot": "2025-10-10",
+  "horizons": {
+    "1w": 5,
+    "2w": 10,
+    "3w": 15,
+    "4w": 20
+  },
+  "last_snapshot": "2026-08-07",
+  "pool_root": "backtest/ibd_skill_replay_pools",
+  "price_cache": "results_pkl/stock_data_290826_1d.pkl",
+  "price_cache_sha256": "7abd108660fcbdcfa016946491c2520e9a34496b43393e9f36e34b92d51df89f",
+  "price_path_coverage_audit": true,
+  "primary_rule": {
+    "enabled_evidence_families": [
+      "volume",
+      "eps",
+      "rs_near_high",
+      "supply_contraction"
+    ],
+    "exclude_clear_geometry_failure": false,
+    "min_evidence_families": 1,
+    "name": "R1_NEAR_BUY_POINT_PLUS_EVIDENCE",
+    "near_below_pct": 5.0,
+    "supplemental_statuses": [
+      "UNCONFIRMED",
+      "BELOW_TRIGGER"
+    ]
+  },
+  "search": {
+    "stage_1_core_rule_count": 24,
+    "stage_2_full_sample_evidence_rule_count": 20,
+    "stage_2_policy": "leave_one_evidence_family_out_only_around_core_finalists"
+  },
+  "status": "retrospective_pre_registered_replay",
+  "study": "next_week_review_selection",
+  "walk_forward": {
+    "all_or_nothing_4w_week_gate": false,
+    "expanding_window": true,
+    "horizon_aware_asof_censoring": true,
+    "min_train_weeks": 20,
+    "oos_fold_count": 6,
+    "test_used_for_selection": false,
+    "test_weeks": 4
+  }
+}
