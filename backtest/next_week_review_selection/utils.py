@@ -8,6 +8,9 @@ from pathlib import Path
 import pandas as pd
 
 
+ZERO_TOL = 1e-12
+
+
 def to_float(value: object) -> float | None:
     try:
         if value is None or pd.isna(value):
@@ -16,6 +19,21 @@ def to_float(value: object) -> float | None:
         return result if math.isfinite(result) else None
     except (TypeError, ValueError):
         return None
+
+
+def is_positive(value: object, *, tol: float = ZERO_TOL) -> bool:
+    number = to_float(value)
+    return number is not None and number > tol
+
+
+def is_nonnegative(value: object, *, tol: float = ZERO_TOL) -> bool:
+    number = to_float(value)
+    return number is not None and number >= -tol
+
+
+def is_nonpositive(value: object, *, tol: float = ZERO_TOL) -> bool:
+    number = to_float(value)
+    return number is not None and number <= tol
 
 
 def to_bool(value: object) -> bool | None:
