@@ -278,9 +278,21 @@ def adaptive_policy_status(adaptive_summary: pd.DataFrame) -> str:
         row["mean_tradable_loser_lift_delta"],
         row["mean_incremental_opportunity_efficiency"],
     ]
+    for horizon in ("2w", "3w", "4w"):
+        required.extend(
+            [
+                row[f"mean_tradable_winner_lift_delta_{horizon}"],
+                row[f"mean_tradable_loser_lift_delta_{horizon}"],
+            ]
+        )
     if not all(_finite(value) for value in required):
         return "NO_STABLE_ADAPTIVE_POLICY"
 
+    horizon_consistent = all(
+        float(row[f"mean_tradable_winner_lift_delta_{horizon}"]) >= 0
+        and float(row[f"mean_tradable_loser_lift_delta_{horizon}"]) <= 0
+        for horizon in ("2w", "3w", "4w")
+    )
     stable = (
         float(row["opportunity_positive_rate"]) >= 0.60
         and float(row["tradable_winner_lift_nonnegative_rate"]) >= 0.60
@@ -289,6 +301,7 @@ def adaptive_policy_status(adaptive_summary: pd.DataFrame) -> str:
         and float(row["mean_tradable_winner_lift_delta"]) >= 0
         and float(row["mean_tradable_loser_lift_delta"]) <= 0
         and float(row["mean_incremental_opportunity_efficiency"]) > 0
+        and horizon_consistent
     )
     return (
         "RETROSPECTIVE_ADAPTIVE_CANDIDATE"
@@ -348,6 +361,13 @@ def convergent_static_candidate(
     if row.empty:
         return "NO_CONVERGENT_STATIC_RULE", ""
     candidate = row.iloc[0]
+    horizon_consistent = all(
+        _finite(candidate[f"mean_tradable_winner_lift_delta_{horizon}"])
+        and float(candidate[f"mean_tradable_winner_lift_delta_{horizon}"]) >= 0
+        and _finite(candidate[f"mean_tradable_loser_lift_delta_{horizon}"])
+        and float(candidate[f"mean_tradable_loser_lift_delta_{horizon}"]) <= 0
+        for horizon in ("2w", "3w", "4w")
+    )
     stable = (
         int(candidate["folds"]) >= 3
         and float(candidate["stability_floor"]) >= 0.60
@@ -357,6 +377,7 @@ def convergent_static_candidate(
         and float(candidate["mean_tradable_winner_lift_delta"]) >= 0
         and _finite(candidate["mean_tradable_loser_lift_delta"])
         and float(candidate["mean_tradable_loser_lift_delta"]) <= 0
+        and horizon_consistent
     )
     return (
         ("RETROSPECTIVE_CONVERGENT_RULE_CANDIDATE", name)
@@ -508,6 +529,22 @@ def _stability_row(
             group["rule_complexity"], errors="coerce"
         ).dropna().empty else pd.NA,
     }
+    for horizon in ("2w", "3w", "4w"):
+        winner_col = f"tradable_winner_capture_lift_{horizon}_delta_vs_b0"
+        loser_col = f"tradable_loser_capture_lift_{horizon}_delta_vs_b0"
+        row[f"mean_tradable_winner_lift_delta_{horizon}"] = _mean(
+            group[winner_col]
+        )
+        row[f"mean_tradable_loser_lift_delta_{horizon}"] = _mean(
+            group[loser_col]
+        )
+        row[f"winner_lift_nonnegative_rate_{horizon}"] = _nonnegative_rate(
+            group[winner_col]
+        )
+        row[f"loser_lift_nonworse_rate_{horizon}"] = _nonpositive_rate(
+            group[loser_col]
+        )
+
     row["stability_floor"] = min(
         float(row["opportunity_positive_rate"]),
         float(row["tradable_winner_lift_nonnegative_rate"]),
