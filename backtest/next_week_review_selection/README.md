@@ -2,34 +2,23 @@
 
 Branch: `research/next-week-review-selection`
 
-This research compares:
+v0.4 fixes two remaining research blockers:
 
-`B0 ACTIONABLE-only`
+1. Explicit price-path coverage audit explains why active signals do or do not have 1W/2W/3W/4W outcomes.
+2. Walk-forward is horizon-aware and as-of censored by each label's actual end date. The old all-or-nothing 4W mature-week gate is removed.
 
-vs
+Primary R1 remains:
 
-`B0 + Near-Buy-Point UNCONFIRMED/BELOW_TRIGGER + >=1 independent positive evidence family`.
+`B0 ACTIONABLE-only + Near-Buy-Point UNCONFIRMED/BELOW_TRIGGER + >=1 independent positive evidence family`.
 
-v0.3 changes:
-- Primary R1 has no Geometry hard reject.
-- Entry + weekly volume form one Volume evidence family.
-- Snapshot clock and post-opportunity clock are both measured.
-- Winner/loser recall is capacity-normalized with capture lift.
-- Rule evolution is two-stage: 24 structural rules, then evidence-family leave-one-out only around finalists.
-- Weekly macro metrics and paired moving-block bootstrap are produced.
-
-Run tests:
+Run:
 
 ```bash
 conda run --no-capture-output -n quant_env \
   python -m pytest tests/test_next_week_review_selection.py -q
-```
 
-Run research:
-
-```bash
 conda run --no-capture-output -n quant_env \
   python -m backtest.next_week_review_selection.run
 ```
 
-Do not modify parameters during the run. Outputs remain retrospective research artifacts, not production authorization.
+Do not change parameters during the formal replay. Generated outputs are retrospective research artifacts only.

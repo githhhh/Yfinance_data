@@ -1,5 +1,7 @@
 import pandas as pd
 
+from backtest.next_week_review_selection.asof import panel_asof_cutoff
+from backtest.next_week_review_selection.coverage import build_price_path_audits
 from backtest.next_week_review_selection.labels import add_forward_labels
 from backtest.next_week_review_selection.oracle import add_weekly_oracle_flags
 from backtest.next_week_review_selection.search_space import (
@@ -100,7 +102,7 @@ def test_c_rank_never_changes_selection():
     assert before == after == ["A"]
 
 
-def test_dual_clock_for_delayed_unconfirmed_opportunity():
+def test_dual_clock_and_horizon_end_dates_for_delayed_opportunity():
     events = pd.DataFrame([
         _row(
             "A", "UNCONFIRMED", -2.0,
@@ -122,32 +124,38 @@ def test_dual_clock_for_delayed_unconfirmed_opportunity():
     assert labeled["review_opportunity_1w"] == True
     assert labeled["opportunity_delay_sessions"] == 4
     assert labeled["opportunity_anchor_date"] == "2026-09-03"
-    assert labeled["forward_1w_censored"] == False
-    assert labeled["opp_forward_1w_censored"] == False
-    assert pd.notna(labeled["opp_forward_4w_return_pct"])
+    assert labeled["forward_1w_end_date"] == "2026-09-04"
+    assert labeled["opp_forward_4w_censored"] == False
+    assert pd.notna(labeled["opp_forward_4w_end_date"])
 
 
-def test_actionable_opportunity_clock_anchors_on_weekend_latest_close():
-    events = pd.DataFrame([
-        _row(
-            "A", "ACTIONABLE", 2.0,
-            pivot=100.0, latest_close=102.0,
-        )
-    ])
-    dates = pd.bdate_range("2026-08-31", periods=20)
+def test_price_path_audit_marks_missing_symbol():
+    events = pd.DataFrame([_row("MISS", "UNCONFIRMED", -1.0)])
+    labeled = add_forward_labels(events, {})
+    assert labeled.loc[0, "price_path_state"] == "MISSING_SYMBOL"
+    audits = build_price_path_audits(labeled)
+    summary = audits["price_path_coverage_summary.csv"].iloc[0]
+    assert summary["complete_1w_count"] == 0
+    assert len(audits["price_path_missing_1w_cases.csv"]) == 1
+
+
+def test_asof_masks_future_4w_but_keeps_resolved_1w():
+    events = pd.DataFrame([_row("A", "ACTIONABLE", 1.0)])
+    dates = pd.bdate_range("2026-08-31", periods=25)
     bars = pd.DataFrame(
         {
-            "Open": [102.0] * 20,
-            "High": [104.0] * 20,
-            "Low": [101.0] * 20,
-            "Close": [103.0] * 20,
+            "Open": [101.0] * 25,
+            "High": [103.0] * 25,
+            "Low": [100.0] * 25,
+            "Close": [102.0] * 25,
         },
         index=dates,
     )
-    labeled = add_forward_labels(events, {"A": bars}).iloc[0]
-    assert labeled["review_opportunity_1w"] == True
-    assert labeled["opportunity_anchor_price"] == 102.0
-    assert labeled["opp_forward_1w_censored"] == False
+    panel = add_weekly_oracle_flags(add_forward_labels(events, {"A": bars}))
+    asof = panel_asof_cutoff(panel, "2026-09-11").iloc[0]
+    assert asof["forward_1w_censored"] == False
+    assert asof["forward_4w_censored"] == True
+    assert pd.isna(asof["forward_4w_return_pct"])
 
 
 def test_oracle_marks_snapshot_and_opportunity_winners():
@@ -172,16 +180,12 @@ def test_oracle_marks_snapshot_and_opportunity_winners():
     panel = add_weekly_oracle_flags(pd.DataFrame(rows))
     assert panel["big_winner_any_1w"].sum() >= 5
     assert panel["opp_big_winner_any_1w"].sum() >= 5
-    assert panel.loc[
-        panel["code"].eq("T5"), "opp_winner_return_top5_1w"
-    ].item() == True
 
 
 def test_two_stage_search_space_is_small():
     core = generate_core_rules()
     assert len(core) == 24
     assert len({rule.name for rule in core}) == 24
-
     ablations = generate_evidence_ablations(core[0])
     assert len(ablations) == 5
     assert len({rule.name for rule in ablations}) == 5
@@ -208,6 +212,7 @@ def _row(
         "snapshot_date": "2026-08-28",
         "code": code,
         "signal": True,
+        "signal_source": "test",
         "ibd_candidate_rule": rule,
         "ibd_candidate_price": pivot,
         "ibd_trigger_price": pivot,

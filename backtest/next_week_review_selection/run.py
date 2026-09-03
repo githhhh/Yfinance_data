@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .coverage import build_price_path_audits
 from .labels import HORIZONS, add_forward_labels
 from .metrics import (
     compare_metrics,
@@ -44,8 +45,6 @@ from .walk_forward import (
 POOL_ROOT = Path("backtest/ibd_skill_replay_pools")
 PRICE_CACHE = Path("results_pkl/stock_data_290826_1d.pkl")
 OUTPUT_DIR = Path("backtest/next_week_review_selection/output")
-MIN_4W_COMPLETE_COVERAGE = 0.50
-MIN_4W_COMPLETE_ROWS = 10
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -87,49 +86,52 @@ def run_research(
     panel = build_weekend_event_panel(pools, eps)
     panel = add_forward_labels(panel, prices)
     panel = add_weekly_oracle_flags(panel)
-    evaluation_panel = mature_four_week_panel(panel)
-    if evaluation_panel.empty:
-        raise ValueError("No sufficiently mature 4W snapshot weeks for research evaluation")
+    if panel.empty:
+        raise ValueError("No active-signal events available")
+
+    price_path_audits = build_price_path_audits(panel)
 
     core = primary_rule()
-    b0_selected = select_all_weeks(evaluation_panel, None)
-    primary_selected = select_all_weeks(evaluation_panel, core)
+    b0_selected = select_all_weeks(panel, None)
+    primary_selected = select_all_weeks(panel, core)
 
     b0_metrics = evaluate_selection(
-        evaluation_panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
+        panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
     )
     primary_metrics = compare_metrics(
-        evaluate_selection(
-            evaluation_panel, primary_selected, variant=core.name
-        ),
+        evaluate_selection(panel, primary_selected, variant=core.name),
         b0_metrics,
     )
     baseline_vs_primary = pd.DataFrame([b0_metrics, primary_metrics])
 
     b0_weekly = weekly_macro_table(
-        evaluation_panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
+        panel, b0_selected, variant="B0_ACTIONABLE_ONLY"
     )
     primary_weekly = weekly_macro_table(
-        evaluation_panel, primary_selected, variant=core.name
+        panel, primary_selected, variant=core.name
     )
     weekly_macro = pd.concat([b0_weekly, primary_weekly], ignore_index=True)
     macro_summary = macro_average_summary(weekly_macro)
+
+    bootstrap_metrics = ["opportunity_recall_1w", "avg_watchlist_size"]
+    for horizon in ("2w", "3w", "4w"):
+        bootstrap_metrics.extend(
+            [
+                f"tradable_big_winner_recall_{horizon}",
+                f"tradable_winner_capture_lift_{horizon}",
+                f"tradable_loser_capture_lift_{horizon}",
+                f"opp_severe_loser_exposure_{horizon}",
+            ]
+        )
     bootstrap = moving_block_bootstrap_delta(
         b0_weekly,
         primary_weekly,
-        metrics=[
-            "opportunity_recall_1w",
-            "tradable_big_winner_recall_mean_2_4w",
-            "tradable_winner_capture_lift_mean_2_4w",
-            "tradable_loser_capture_lift_mean_2_4w",
-            "opp_severe_loser_exposure_mean_2_4w",
-            "avg_watchlist_size",
-        ],
+        metrics=bootstrap_metrics,
     )
 
     core_rules = generate_core_rules()
     full_evidence_rules, core_grid, evidence_grid = two_stage_diagnostics(
-        evaluation_panel, core_rules
+        panel, core_rules
     )
 
     (
@@ -138,7 +140,7 @@ def run_research(
         wf_core_train,
         wf_evidence_train,
     ) = run_walk_forward(
-        evaluation_panel,
+        panel,
         core_rules,
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
@@ -163,15 +165,19 @@ def run_research(
         fold_results,
         list(candidate_rules.values()),
     )
-    champion_status = (
-        "RETROSPECTIVE_CANDIDATE"
-        if champion is not None
-        else "NO_STABLE_NEXT_WEEK_REVIEW_RULE"
+    oos_fold_count = (
+        int(fold_results["fold"].nunique()) if not fold_results.empty else 0
     )
+    if oos_fold_count < 3:
+        champion_status = "INSUFFICIENT_OOS_HISTORY"
+    elif champion is not None:
+        champion_status = "RETROSPECTIVE_CANDIDATE"
+    else:
+        champion_status = "NO_STABLE_NEXT_WEEK_REVIEW_RULE"
     champion_name = champion.name if champion is not None else ""
 
     missed_winners, included_losers = build_case_audits(
-        evaluation_panel,
+        panel,
         core_rule=core,
         champion=champion,
     )
@@ -186,7 +192,6 @@ def run_research(
 
     manifest = experiment_manifest(
         panel=panel,
-        evaluation_panel=evaluation_panel,
         pool_root=pool_root,
         price_cache=price_cache,
         eps_path=eps_path,
@@ -194,14 +199,16 @@ def run_research(
         evidence_rule_count=len(full_evidence_rules),
         min_train_weeks=min_train_weeks,
         test_weeks=test_weeks,
+        oos_fold_count=oos_fold_count,
         champion_status=champion_status,
         champion=champion,
     )
-    data_audit = render_data_audit(panel, evaluation_panel, pools, eps)
+    data_audit = render_data_audit(panel, pools, eps, oos_fold_count)
     report = render_report(
         baseline_vs_primary=baseline_vs_primary,
         macro_summary=macro_summary,
         bootstrap=bootstrap,
+        coverage_summary=price_path_audits["price_path_coverage_summary.csv"],
         oos_stability=oos_stability,
         walk_forward_champions=wf_champions,
         champion_status=champion_status,
@@ -233,6 +240,8 @@ def run_research(
         "experiment_manifest.yaml": output_dir / "experiment_manifest.yaml",
         "research_report.md": output_dir / "research_report.md",
     }
+    for name in price_path_audits:
+        outputs[name] = output_dir / name
 
     outputs["data_audit.md"].write_text(data_audit, encoding="utf-8")
     panel.to_csv(outputs["weekend_event_panel.csv"], index=False)
@@ -253,10 +262,14 @@ def run_research(
     missed_winners.to_csv(outputs["missed_big_winners.csv"], index=False)
     included_losers.to_csv(outputs["included_big_losers.csv"], index=False)
     extended.to_csv(outputs["extended_exploratory.csv"], index=False)
+    for name, frame in price_path_audits.items():
+        frame.to_csv(outputs[name], index=False)
+
     outputs["champion_rule.json"].write_text(
         json.dumps(
             {
                 "status": champion_status,
+                "oos_fold_count": oos_fold_count,
                 "rule": rule_to_dict(champion) if champion is not None else None,
                 "note": "retrospective research candidate; not production authorization",
             },
@@ -314,29 +327,6 @@ def build_weekend_event_panel(
         panel["pit_eps_state"].ne("VERIFIED"), "pit_eps_yoy_growth"
     ] = pd.NA
     return panel.reset_index(drop=True)
-
-
-def mature_four_week_panel(
-    panel: pd.DataFrame,
-    *,
-    min_complete_coverage: float = MIN_4W_COMPLETE_COVERAGE,
-    min_complete_rows: int = MIN_4W_COMPLETE_ROWS,
-) -> pd.DataFrame:
-    """Keep weeks with enough complete snapshot-clock 4W rows."""
-    if panel.empty:
-        return panel.copy()
-    stats = panel.groupby("snapshot_date")["forward_4w_censored"].agg(
-        total="size",
-        complete=lambda values: int(values.eq(False).sum()),
-    )
-    stats["coverage"] = stats["complete"] / stats["total"].clip(lower=1)
-    mature_weeks = stats[
-        stats["coverage"].ge(min_complete_coverage)
-        & stats["complete"].ge(min_complete_rows)
-    ].index.astype(str)
-    return panel[
-        panel["snapshot_date"].astype(str).isin(mature_weeks)
-    ].copy()
 
 
 def build_case_audits(
@@ -455,15 +445,11 @@ def extended_exploratory_summary(panel: pd.DataFrame) -> pd.DataFrame:
 
 def render_data_audit(
     panel: pd.DataFrame,
-    evaluation_panel: pd.DataFrame,
     pools: list[tuple[str, pd.DataFrame, Path]],
     eps: pd.DataFrame,
+    oos_fold_count: int,
 ) -> str:
-    weeks = (
-        sorted(panel["snapshot_date"].astype(str).unique())
-        if not panel.empty
-        else []
-    )
+    weeks = sorted(panel["snapshot_date"].astype(str).unique())
     lines = [
         "# Next Week Review Selection - Data Audit",
         "",
@@ -472,8 +458,7 @@ def render_data_audit(
         f"- first snapshot: {weeks[0] if weeks else 'n/a'}",
         f"- last snapshot: {weeks[-1] if weeks else 'n/a'}",
         f"- active-signal events: {len(panel)}",
-        f"- 4W-mature evaluation weeks: {evaluation_panel['snapshot_date'].astype(str).nunique()}",
-        f"- 4W-mature evaluation events: {len(evaluation_panel)}",
+        f"- walk-forward OOS folds: {oos_fold_count}",
         (
             f"- verified PIT EPS rows: {int(eps['pit_eps_state'].eq('VERIFIED').sum())}"
             if not eps.empty
@@ -482,25 +467,35 @@ def render_data_audit(
     ]
     for horizon in HORIZONS:
         complete = int(panel[f"forward_{horizon}_censored"].eq(False).sum())
+        weeks_complete = int(
+            panel.loc[
+                panel[f"forward_{horizon}_censored"].eq(False),
+                "snapshot_date",
+            ]
+            .astype(str)
+            .nunique()
+        )
         opp_complete = int(
             (
                 panel["review_opportunity_1w"].eq(True)
                 & panel[f"opp_forward_{horizon}_censored"].eq(False)
             ).sum()
         )
-        lines.append(f"- complete snapshot-clock {horizon}: {complete}/{len(panel)}")
+        lines.append(
+            f"- complete snapshot-clock {horizon}: {complete}/{len(panel)} across {weeks_complete} weeks"
+        )
         lines.append(f"- complete opportunity-clock {horizon}: {opp_complete}")
     lines.extend(
         [
             "",
             "Guardrails:",
+            "- Price-path missingness has dedicated audits by week/status/setup/source/ticker.",
+            "- Walk-forward training is horizon-aware and as-of censored by actual label end date.",
+            "- No all-or-nothing 4W mature-week gate is used.",
             "- Primary R1 has no Geometry hard reject.",
-            "- Volume is one evidence family even if entry and weekly volume both confirm.",
+            "- Volume is one independent evidence family.",
             "- False/missing positive evidence is neutral.",
-            "- Snapshot and opportunity clocks are kept separate.",
-            "- Winner recall is capacity-normalized with selection coverage/capture lift.",
-            "- Rule evolution is two-stage, not one 144-rule sweep.",
-            "- Weekly macro metrics + paired moving-block bootstrap are reported.",
+            "- Snapshot and opportunity clocks are separate.",
             "- C Rank and ATR are not used.",
             "",
         ]
@@ -511,7 +506,6 @@ def render_data_audit(
 def experiment_manifest(
     *,
     panel: pd.DataFrame,
-    evaluation_panel: pd.DataFrame,
     pool_root: Path,
     price_cache: Path,
     eps_path: Path,
@@ -519,14 +513,11 @@ def experiment_manifest(
     evidence_rule_count: int,
     min_train_weeks: int,
     test_weeks: int,
+    oos_fold_count: int,
     champion_status: str,
     champion,
 ) -> dict[str, object]:
-    weeks = (
-        sorted(panel["snapshot_date"].astype(str).unique())
-        if not panel.empty
-        else []
-    )
+    weeks = sorted(panel["snapshot_date"].astype(str).unique())
     return {
         "study": "next_week_review_selection",
         "status": "retrospective_pre_registered_replay",
@@ -536,18 +527,12 @@ def experiment_manifest(
         "eps_pit": str(eps_path),
         "eps_pit_sha256": content_hash(eps_path),
         "active_signal_weeks": len(weeks),
-        "mature_4w_evaluation_weeks": int(
-            evaluation_panel["snapshot_date"].astype(str).nunique()
-        ),
         "first_snapshot": weeks[0] if weeks else "",
         "last_snapshot": weeks[-1] if weeks else "",
         "horizons": HORIZONS,
-        "mature_4w_gate": {
-            "min_complete_coverage": MIN_4W_COMPLETE_COVERAGE,
-            "min_complete_rows": MIN_4W_COMPLETE_ROWS,
-        },
         "primary_rule": rule_to_dict(primary_rule()),
         "evidence_families": EVIDENCE_FAMILIES,
+        "price_path_coverage_audit": True,
         "search": {
             "stage_1_core_rule_count": core_rule_count,
             "stage_2_full_sample_evidence_rule_count": evidence_rule_count,
@@ -557,7 +542,10 @@ def experiment_manifest(
             "min_train_weeks": min_train_weeks,
             "test_weeks": test_weeks,
             "expanding_window": True,
+            "horizon_aware_asof_censoring": True,
+            "all_or_nothing_4w_week_gate": False,
             "test_used_for_selection": False,
+            "oos_fold_count": oos_fold_count,
         },
         "champion_status": champion_status,
         "champion_rule": (

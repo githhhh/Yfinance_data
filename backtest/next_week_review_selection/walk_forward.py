@@ -5,6 +5,7 @@ from dataclasses import asdict
 import numpy as np
 import pandas as pd
 
+from .asof import panel_asof_cutoff, resolved_week_counts
 from .metrics import compare_metrics, evaluate_selection
 from .optimizer import choose_training_champion, select_all_weeks
 from .selectors import ReviewRule, primary_rule, rule_complexity
@@ -17,10 +18,11 @@ def run_walk_forward(
     min_train_weeks: int = 20,
     test_weeks: int = 4,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Expanding-window two-stage walk-forward.
+    """Expanding-window, horizon-aware, leakage-safe walk-forward.
 
-    Each fold chooses the structural finalist and evidence ablation on train only,
-    freezes it, then evaluates only that champion plus the primary R1 on test.
+    The fold is defined by snapshot weeks, but training outcomes are censored
+    independently by their true 1W/2W/3W/4W end date as of the first test
+    snapshot close. This avoids the old all-or-nothing 4W mature-week gate.
     """
     weeks = sorted(panel["snapshot_date"].astype(str).unique())
     fold_rows = []
@@ -38,9 +40,11 @@ def run_walk_forward(
             break
 
         fold += 1
-        train = panel[
+        cutoff = test_block[0]
+        train_raw = panel[
             panel["snapshot_date"].astype(str).isin(train_weeks)
         ].copy()
+        train = panel_asof_cutoff(train_raw, cutoff)
         test = panel[
             panel["snapshot_date"].astype(str).isin(test_block)
         ].copy()
@@ -56,6 +60,7 @@ def run_walk_forward(
                 tagged = diag.copy()
                 tagged.insert(0, "fold", fold)
                 tagged.insert(1, "stage", stage)
+                tagged["asof_cutoff"] = cutoff
                 tagged["train_end"] = train_weeks[-1]
                 tagged["test_start"] = test_block[0]
                 tagged["test_end"] = test_block[-1]
@@ -80,6 +85,7 @@ def run_walk_forward(
             {
                 "fold": fold,
                 "evaluation_role": "PRIMARY_R1",
+                "asof_cutoff": cutoff,
                 "train_start": train_weeks[0],
                 "train_end": train_weeks[-1],
                 "test_start": test_block[0],
@@ -102,6 +108,7 @@ def run_walk_forward(
                 {
                     "fold": fold,
                     "evaluation_role": "TRAIN_CHAMPION",
+                    "asof_cutoff": cutoff,
                     "train_start": train_weeks[0],
                     "train_end": train_weeks[-1],
                     "test_start": test_block[0],
@@ -111,13 +118,20 @@ def run_walk_forward(
             )
             fold_rows.append(champion_metrics)
 
+        resolved = resolved_week_counts(train)
         champion_rows.append(
             {
                 "fold": fold,
+                "asof_cutoff": cutoff,
                 "train_start": train_weeks[0],
                 "train_end": train_weeks[-1],
                 "test_start": test_block[0],
                 "test_end": test_block[-1],
+                "train_snapshot_weeks": len(train_weeks),
+                "resolved_1w_train_weeks": resolved["1w"],
+                "resolved_2w_train_weeks": resolved["2w"],
+                "resolved_3w_train_weeks": resolved["3w"],
+                "resolved_4w_train_weeks": resolved["4w"],
                 "champion_rule": (
                     champion.name
                     if champion is not None

@@ -1,140 +1,95 @@
-# Next Week Review Selection 研究协议 v0.3
+# Next Week Review Selection 研究协议 v0.4
 
-日期：2026-09-02  
-分支：`research/next-week-review-selection`  
-研究基座：`codex/clean-latest-quant-trade-replay-pools`
+日期：2026-09-03  
+分支：`research/next-week-review-selection`
 
-## 核心假设
+## 核心目标
 
-> **B0 ACTIONABLE-only** vs **B0 + Near Buy Point 的 UNCONFIRMED / BELOW_TRIGGER + 至少一个独立正证据族**。
+验证：
 
-目标不是最大化 Winner Recall，而是在有限 Review List 扩张下，提高**可交易大赢家捕获效率**，同时避免大输家暴露按列表扩张比例同步恶化。
+> 在有限 Review 注意力下，Near Buy Point + 独立正证据能否比 ACTIONABLE-only 捕获更多真正可交易的大赢家，同时不让大输家暴露按列表扩张比例同步恶化。
 
-## Primary R1
+Primary R1、四个 evidence families、双时钟、容量归一化规则保持 v0.3 不变。
 
-Primary R1 完整保留 B0，不重新过滤 ACTIONABLE。
+## v0.4 新增：Price-Path Coverage Audit
 
-Supplemental：
-- UNCONFIRMED：默认 `-5% <= Vs Buy Point <= +5%`
-- BELOW_TRIGGER：默认 `-5% <= Vs Buy Point < 0%`
-- 至少 1 个独立正证据族
+历史 active signal 不允许因为缺少未来价格路径而静默退出分母。
 
-**Primary R1 不使用 Geometry hard reject。** Geometry 只作为独立 ablation。
+每个 event 记录：
 
-EXTENDED 不进入核心 R1，继续独立 exploratory。
+- price cache 是否存在 ticker
+- ticker cache 首尾日期
+- snapshot 后可用 session 数
+- path state：
+  - MISSING_SYMBOL
+  - EMPTY_OR_INVALID_BARS
+  - NO_FORWARD_BARS
+  - SHORT_1W / SHORT_2W / SHORT_3W / SHORT_4W
+  - COMPLETE_4W
 
-## 独立正证据族
+必须按以下维度输出 coverage：
 
-四个 evidence families：
+- snapshot week
+- weekend status
+- setup
+- signal source
+- ticker
+- 1W 缺失明细
 
-1. **Volume**：`ibd_entry_volume_ratio >= 1.5` OR `volume_ratio >= 1.3`
-2. **EPS**：PIT `eps_yoy_growth >= 25`
-3. **RS-near-high**：`dist_to_52w_high_pct > -5`
-4. **Supply contraction**：适用时 `pullback_v_is_dry == True`
+目的：解释 `active signals -> evaluable outcomes` 的缺口，并检查缺失是否与状态/规则/来源系统相关。
 
-Entry Volume 与 Weekly Volume 同属 Volume family，最多计 1 条独立证据。
+## v0.4 新增：Horizon-Aware As-Of Walk-Forward
 
-False / Missing = neutral，不扣分、不自动淘汰。
+废除旧的：
 
-## 双时钟评价
+> 只有“整周 4W 覆盖 >= 某阈值”的 snapshot week 才进入优化。
 
-### Snapshot clock
-从周末后的第一个交易日开始。
+新设计：
 
-回答：
-> 周末把它放进 Review List 后，它后来是不是大赢家 / 大输家？
+- 保留全部 snapshot weeks；
+- 1W/2W/3W/4W 各自使用自己的可用历史；
+- 每个 label 记录实际 `end_date`；
+- 每个 Walk-forward fold 在 test block 第一个 snapshot close 作为 cutoff；
+- train 中只有 `label_end_date <= cutoff` 的 outcome 可以被使用；
+- cutoff 后才完成的 outcome 自动重新标为 censored；
+- Oracle 必须在 as-of masking 后重新构造。
 
-### Opportunity clock
-只对实际形成 1W Review Opportunity 的标的：
+因此：
 
-- ACTIONABLE：周末 `latest_close` 为 anchor；
-- 非 ACTIONABLE：未来 5 日首次收盘进入 frozen Pivot 0%~+5% 的当日收盘为 anchor。
+> 1W 可以使用更多近期训练历史，4W 自动少用几周，但不能为了 4W 把整个周从 1W/2W 研究中删除。
 
-从 anchor 之后分别观察 1W / 2W / 3W / 4W。
+默认：
 
-回答：
-> 真正形成可交易机会之后，后续质量如何？
-
-两个时钟不得混用。
-
-## Winner / Loser Oracle
-
-每周全部 active signals 上建立 Snapshot Oracle。
-
-另在实际形成 Review Opportunity 且对应 horizon 完整的样本上建立 Opportunity Oracle。
-
-两个时钟均保留：
-- Return Top5
-- MFE Top5
-- Big Winner = Return Top5 OR MFE Top5
-- Return Bottom5
-- Severe Loser = MAE <= -8%
-- Big Loser = Bottom5 OR Severe Loser
-
-## 容量归一化
-
-Winner Recall 不能单独决定优劣。
-
-必须同时报告：
-- Selection Coverage
-- Winner Capture Lift = Winner Recall / Selection Coverage
-- Loser Capture Lift = Loser Inclusion / Selection Coverage
-- Incremental Opportunities / Added Review
-- Attention Multiplier vs B0
-
-理想方向：
-- Winner Recall ↑
-- Winner Capture Lift 不下降
-- Loser Capture Lift 不上升
-- Incremental Opportunities / Added Review > 0
-
-## 两阶段自进化
-
-### Stage 1：核心结构网格
-仅 24 个规则：
-
-- Near 下界：-3 / -5 / -7
-- Supplemental Status：U / U+BELOW
-- 最少证据族：1 / 2
-- Geometry：allow / exclude
-
-### Stage 2：证据族 ablation
-只围绕 Stage 1 的少数 Pareto finalists：
-
-- ALL
-- NO_VOLUME
-- NO_EPS
-- NO_RS_NEAR_HIGH
-- NO_SUPPLY_CONTRACTION
-
-不得一次性让 100+ 规则在同一 OOS 选择层竞争。
-
-## Walk-forward
-
+- first train = 20 snapshot weeks
+- test block = 4 weeks
 - expanding window
-- 默认首次 train >=20 周
-- 每 4 周冻结 OOS test block
-- 每 fold 的 Stage1 + Stage2 只用 train
-- test 绝不参与该 fold 规则选择
-- 同一 train-champion 至少经历 3 个 OOS folds 才有资格成为 retrospective candidate
+- train-only Stage1 + Stage2 selection
+- 同一 train-selected rule 至少 3 个真实 OOS folds 才能成为 retrospective candidate
 
-允许输出：
-`NO_STABLE_NEXT_WEEK_REVIEW_RULE`
+Champion 状态语义：
 
-## 统计稳健性
+- OOS folds < 3 → `INSUFFICIENT_OOS_HISTORY`
+- OOS folds >= 3 但无稳定规则 → `NO_STABLE_NEXT_WEEK_REVIEW_RULE`
+- 达到稳定门槛 → `RETROSPECTIVE_CANDIDATE`
 
-同时报告：
+## 统计输出
+
+继续同时使用：
 
 - micro aggregation
-- weekly macro average
-- paired 4-week moving-block bootstrap
-- week-level directional stability
+- weekly macro aggregation
+- paired moving-block bootstrap
+- capacity-normalized Winner/Loser Capture Lift
+- Snapshot clock
+- Opportunity clock
+- missed winners / included losers case audit
 
-最终判断以跨周稳定性优先，不让信号特别多的周支配结论。
+Bootstrap 不再只给 2W~4W 聚合均值；必须同时输出 2W、3W、4W horizon-specific 指标。
 
 ## 生产边界
 
-不修改：
+本研究仍不修改：
+
 - 生产 Skill
 - Dashboard
 - Futu sync

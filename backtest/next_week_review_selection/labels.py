@@ -20,14 +20,14 @@ def add_forward_labels(
     events: pd.DataFrame,
     prices: dict[str, pd.DataFrame],
 ) -> pd.DataFrame:
-    """Attach two forward clocks.
+    """Attach snapshot-clock, opportunity-clock, and price-path audit labels.
 
     Snapshot clock starts at the first session after the weekend snapshot.
     Opportunity clock starts after a real review opportunity is known:
     - ACTIONABLE: weekend latest_close is the anchor.
     - non-ACTIONABLE: first 1W close inside frozen Pivot..Pivot+5% is the anchor.
 
-    The selector never reads these ex-post columns.
+    Selector code must never read these ex-post columns.
     """
     rows: list[dict[str, Any]] = []
 
@@ -40,16 +40,41 @@ def add_forward_labels(
         status = str(event.get("ibd_entry_status", "") or "").strip().upper()
         labels = _empty_labels()
 
-        bars = normalize_bars(prices.get(code))
-        if snapshot is None or bars.empty:
+        raw_bars = prices.get(code)
+        labels["price_cache_symbol_found"] = code in prices
+        bars = normalize_bars(raw_bars)
+        if not labels["price_cache_symbol_found"]:
+            labels["price_path_state"] = "MISSING_SYMBOL"
+            rows.append({**row, **labels})
+            continue
+        if bars.empty:
+            labels["price_path_state"] = "EMPTY_OR_INVALID_BARS"
+            rows.append({**row, **labels})
+            continue
+        labels["price_cache_first_date"] = fmt_date(pd.Timestamp(bars.index.min()))
+        labels["price_cache_last_date"] = fmt_date(pd.Timestamp(bars.index.max()))
+
+        if snapshot is None:
+            labels["price_path_state"] = "INVALID_SNAPSHOT_DATE"
             rows.append({**row, **labels})
             continue
 
-        forward = bars[bars.index > snapshot].head(MAX_FORWARD_SESSIONS)
-        if forward.empty:
+        forward_all = bars[bars.index > snapshot]
+        labels["price_path_available_sessions"] = int(len(forward_all))
+        if forward_all.empty:
+            labels["price_path_state"] = "NO_FORWARD_BARS"
             rows.append({**row, **labels})
             continue
 
+        labels["price_path_first_forward_date"] = fmt_date(
+            pd.Timestamp(forward_all.index[0])
+        )
+        labels["price_path_last_forward_date"] = fmt_date(
+            pd.Timestamp(forward_all.index[-1])
+        )
+        labels["price_path_state"] = _path_state(len(forward_all))
+
+        forward = forward_all.head(MAX_FORWARD_SESSIONS)
         first_open = to_float(forward.iloc[0].get("Open"))
         if first_open is not None and first_open > 0:
             labels["observation_start_date"] = fmt_date(pd.Timestamp(forward.index[0]))
@@ -122,6 +147,9 @@ def _add_snapshot_horizon(
         return
 
     window = forward.head(sessions)
+    labels[f"forward_{horizon}_end_date"] = fmt_date(
+        pd.Timestamp(window.index[-1])
+    )
     labels[f"forward_{horizon}_return_pct"] = pct(
         to_float(window.iloc[-1].get("Close")), first_open
     )
@@ -146,6 +174,9 @@ def _add_opportunity_horizon(
         return
 
     window = post_opportunity.head(sessions)
+    labels[f"opp_forward_{horizon}_end_date"] = fmt_date(
+        pd.Timestamp(window.index[-1])
+    )
     labels[f"opp_forward_{horizon}_return_pct"] = pct(
         to_float(window.iloc[-1].get("Close")), anchor_price
     )
@@ -160,6 +191,18 @@ def _add_opportunity_horizon(
     )
 
 
+def _path_state(available_sessions: int) -> str:
+    if available_sessions < HORIZONS["1w"]:
+        return "SHORT_1W"
+    if available_sessions < HORIZONS["2w"]:
+        return "SHORT_2W"
+    if available_sessions < HORIZONS["3w"]:
+        return "SHORT_3W"
+    if available_sessions < HORIZONS["4w"]:
+        return "SHORT_4W"
+    return "COMPLETE_4W"
+
+
 def _opportunity_type(status: str) -> str:
     if status == "UNCONFIRMED":
         return "UNCONFIRMED_TO_ZONE"
@@ -172,6 +215,13 @@ def _opportunity_type(status: str) -> str:
 
 def _empty_labels() -> dict[str, Any]:
     labels: dict[str, Any] = {
+        "price_cache_symbol_found": False,
+        "price_cache_first_date": "",
+        "price_cache_last_date": "",
+        "price_path_state": "",
+        "price_path_available_sessions": 0,
+        "price_path_first_forward_date": "",
+        "price_path_last_forward_date": "",
         "observation_start_date": "",
         "observation_start_open": pd.NA,
         "review_opportunity_1w": False,
@@ -185,6 +235,7 @@ def _empty_labels() -> dict[str, Any]:
     for horizon in HORIZONS:
         labels[f"forward_{horizon}_censored"] = True
         labels[f"forward_{horizon}_sessions"] = 0
+        labels[f"forward_{horizon}_end_date"] = ""
         labels[f"forward_{horizon}_return_pct"] = pd.NA
         labels[f"mfe_{horizon}_pct"] = pd.NA
         labels[f"mae_{horizon}_pct"] = pd.NA
@@ -192,6 +243,7 @@ def _empty_labels() -> dict[str, Any]:
 
         labels[f"opp_forward_{horizon}_censored"] = True
         labels[f"opp_forward_{horizon}_sessions"] = 0
+        labels[f"opp_forward_{horizon}_end_date"] = ""
         labels[f"opp_forward_{horizon}_return_pct"] = pd.NA
         labels[f"opp_mfe_{horizon}_pct"] = pd.NA
         labels[f"opp_mae_{horizon}_pct"] = pd.NA
