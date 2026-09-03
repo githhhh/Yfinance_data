@@ -1,0 +1,13 @@
+offset,weeks,value_mean,value_median,value_positive_rate,comparison,benchmark_mean,spread_mean,spread_median,spread_positive_rate
+0,10,0.394573,-0.0372,0.3,b0_absolute_entry_w4,,,,
+1,10,1.108377,3.268483,0.6,b0_absolute_entry_w4,,,,
+2,10,4.582677,4.609767,0.7,b0_absolute_entry_w4,,,,
+3,10,7.80414,4.146533,0.8,b0_absolute_entry_w4,,,,
+0,10,3.944913,2.243517,0.6,b0_vs_eligible_random,0.819917,3.124997,0.0,0.6
+1,10,8.361473,4.812533,0.9,b0_vs_eligible_random,6.904611,1.456862,0.0,0.6
+2,9,1.389641,-0.0744,0.444444,b0_vs_eligible_random,0.180648,1.208993,0.0,0.444444
+3,9,0.36967,3.614567,0.555556,b0_vs_eligible_random,-0.848738,1.218408,0.827833,0.555556
+0,6,2.083764,0.0,0.333333,b0_vs_raw_random_fixed_capacity,2.165112,-0.081348,-2.499185,0.333333
+1,5,2.272574,3.510959,0.8,b0_vs_raw_random_fixed_capacity,4.342529,-2.069955,1.429831,0.6
+2,5,4.322942,4.420804,0.8,b0_vs_raw_random_fixed_capacity,4.437501,-0.114558,-1.457379,0.4
+3,5,5.861031,2.936295,0.6,b0_vs_raw_random_fixed_capacity,5.248247,0.612784,2.812889,0.6
