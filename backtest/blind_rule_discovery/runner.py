@@ -26,6 +26,9 @@ from .experiment import (
     validate_rule_support,
     write_agent_workspace,
 )
+from .outcomes import RESEARCH_PRICE_MODE, SPLIT_SAFE_PRICE_MODES
+
+DEFAULT_MIN_DISCOVERY_QUARTERS = 8
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spy-code", default="SPY")
     parser.add_argument("--benchmark-pkl", type=Path, default=None)
     parser.add_argument("--holdout-quarters", type=int, default=4)
+    parser.add_argument("--min-discovery-quarters", type=int, default=DEFAULT_MIN_DISCOVERY_QUARTERS)
     parser.add_argument("--stop-loss", type=float, default=-0.08)
     parser.add_argument("--winner-gain", type=float, default=0.20)
     parser.add_argument("--entry-window-sessions", type=int, default=5)
@@ -43,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-unadjusted-outcomes",
         action="store_true",
-        help="unsafe override when the pickle lacks Adj Close; canonical runs should not use it",
+        help="non-canonical debug override; normal research requires a verified split-safe price basis",
     )
     parser.add_argument("--agent-command", default="")
     parser.add_argument(
@@ -91,11 +95,35 @@ def _prepare_output_root(output_root: Path) -> None:
             shutil.rmtree(path)
 
 
+def _validate_split_safe_basis(
+    prices: dict,
+    benchmark_prices: dict,
+    *,
+    benchmark_code: str,
+    candidate_codes: set[str],
+) -> str:
+    benchmark_mode = str(benchmark_prices[benchmark_code].attrs.get("price_adjustment_mode") or "")
+    if benchmark_mode not in SPLIT_SAFE_PRICE_MODES:
+        raise ValueError(
+            f"benchmark {benchmark_code} lacks a verified split-safe price basis; mode={benchmark_mode!r}"
+        )
+    unsafe_codes = sorted(
+        code for code in candidate_codes
+        if code in prices and str(prices[code].attrs.get("price_adjustment_mode") or "") not in SPLIT_SAFE_PRICE_MODES
+    )
+    if unsafe_codes:
+        raise ValueError(
+            f"{len(unsafe_codes)} candidate symbols lack a verified split-safe price basis: "
+            + ",".join(unsafe_codes[:10])
+        )
+    return benchmark_mode
+
+
 def main() -> int:
     args = parse_args()
     _prepare_output_root(args.output_root)
     candidates_all = load_replay_candidates(args.replay_root)
-    require_adjusted = not args.allow_unadjusted_outcomes
+    require_split_safe = not args.allow_unadjusted_outcomes
     prices = load_price_pickle(args.daily_pkl)
     benchmark_prices = load_price_pickle(args.benchmark_pkl) if args.benchmark_pkl else prices
     if args.spy_code not in benchmark_prices:
@@ -111,20 +139,24 @@ def main() -> int:
     candidates, immature_quarter_rows, maturity_cutoff = restrict_to_mature_outcome_quarters(
         candidates_all, benchmark_prices[args.spy_code], minimum_sessions=future_sessions_required
     )
-    if require_adjusted:
-        benchmark_mode = benchmark_prices[args.spy_code].attrs.get("price_adjustment_mode")
-        if benchmark_mode != "adj_close_factor":
-            raise ValueError(f"benchmark {args.spy_code} lacks Adj Close; split-unsafe benchmark path")
-        candidate_codes = set(candidates["code"].astype(str))
-        unsafe_codes = sorted(
-            code for code in candidate_codes
-            if code in prices and prices[code].attrs.get("price_adjustment_mode") != "adj_close_factor"
+    mature_quarters = sorted(candidates["snapshot_date"].dt.to_period("Q").astype(str).unique())
+    required_quarters = args.holdout_quarters + args.min_discovery_quarters
+    if len(mature_quarters) < required_quarters:
+        raise ValueError(
+            f"only {len(mature_quarters)} mature candidate quarters are available; "
+            f"need at least {required_quarters} = {args.min_discovery_quarters} discovery + "
+            f"{args.holdout_quarters} sealed holdout quarters"
         )
-        if unsafe_codes:
-            raise ValueError(
-                f"{len(unsafe_codes)} candidate symbols lack Adj Close; split-unsafe outcome paths: "
-                + ",".join(unsafe_codes[:10])
-            )
+
+    benchmark_mode = "unverified_debug_override"
+    if require_split_safe:
+        benchmark_mode = _validate_split_safe_basis(
+            prices,
+            benchmark_prices,
+            benchmark_code=args.spy_code,
+            candidate_codes=set(candidates["code"].astype(str)),
+        )
+
     agent_df, feature_map, reviewer = build_blind_dataset(
         candidates,
         prices,
@@ -136,6 +168,13 @@ def main() -> int:
         reviewer,
         holdout_quarters=args.holdout_quarters,
     )
+    discovery_quarters = int(discovery_df["period_quarter"].nunique())
+    if discovery_quarters < args.min_discovery_quarters:
+        raise ValueError(
+            f"purge/embargo leaves only {discovery_quarters} discovery quarters; "
+            f"minimum is {args.min_discovery_quarters}"
+        )
+
     period_summary, feature_profile = build_feature_dossier(discovery_df)
     workspace = write_agent_workspace(
         discovery_df,
@@ -147,15 +186,21 @@ def main() -> int:
     metadata = {
         "daily_price_source_sha256": _sha256_file(args.daily_pkl),
         "benchmark_price_source_sha256": _sha256_file(args.benchmark_pkl) if args.benchmark_pkl else _sha256_file(args.daily_pkl),
-        "price_adjustment_required": require_adjusted,
+        "price_basis_required": require_split_safe,
+        "benchmark_price_adjustment_mode": benchmark_mode,
+        "canonical_research_price_mode": RESEARCH_PRICE_MODE,
         "candidate_rows_before_maturity_filter": int(len(candidates_all)),
         "candidate_rows": int(len(candidates)),
+        "mature_candidate_quarters": mature_quarters,
+        "required_mature_quarters": required_quarters,
+        "minimum_discovery_quarters": args.min_discovery_quarters,
         "excluded_immature_quarter_rows": int(len(immature_quarter_rows)),
         "outcome_maturity_cutoff": str(maturity_cutoff.date()),
         "usable_rows": int(len(agent_df)),
         "censored_rows": int((~reviewer["usable"].fillna(False)).sum()) if not reviewer.empty else 0,
         "censor_reasons": reviewer.loc[~reviewer["usable"].fillna(False), "reason"].fillna("unknown").value_counts().to_dict() if not reviewer.empty else {},
         "discovery_rows": int(len(discovery_df)),
+        "discovery_quarters": discovery_quarters,
         "embargo_rows": int(len(embargo_df)),
         "sealed_holdout_rows": int(len(holdout_df)),
         "sealed_holdout_quarters": sealed_quarters,
@@ -193,12 +238,10 @@ def main() -> int:
     if not rule_path.exists():
         raise FileNotFoundError("research command completed without agent_workspace/rule.json")
 
-    # P0 barrier: validate + freeze before any private mapping or holdout is written.
     rule = validate_rule_artifact(rule_path, discovery_df.columns)
     support = validate_rule_support(rule, discovery_df)
     freeze_manifest = freeze_rule_artifact(rule_path, args.output_root, agent_columns=discovery_df.columns)
 
-    # Only now materialize reviewer/private data and evaluate the sealed holdout once.
     reviewer.to_csv(args.output_root / "reviewer_outcomes.csv", index=False)
     embargo_df.to_csv(args.output_root / "embargo_samples.csv", index=False)
     holdout_df.to_csv(args.output_root / "sealed_holdout.csv", index=False)
