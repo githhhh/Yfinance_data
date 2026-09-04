@@ -14,6 +14,7 @@ from backtest.blind_rule_discovery.outcomes import (
 )
 from backtest.blind_rule_discovery.replay_builder import (
     MIN_ANALYSIS_QUARTERS,
+    MIN_BUNDLE_COVERAGE,
     _assert_research_bundle,
     assert_history_coverage,
     enumerate_snapshot_weeks_from_benchmark,
@@ -26,7 +27,7 @@ from backtest.blind_rule_discovery.research_data import (
 from backtest.latest_quant_trade_replay.runner import sha256_file
 
 
-def _daily(start: str, periods: int = 5) -> pd.DataFrame:
+def _daily(start: str, periods: int = 5, *, interval: str | None = None) -> pd.DataFrame:
     idx = pd.bdate_range(start, periods=periods)
     frame = pd.DataFrame(
         {
@@ -39,6 +40,8 @@ def _daily(start: str, periods: int = 5) -> pd.DataFrame:
         index=idx,
     )
     frame.attrs["price_adjustment_mode"] = RESEARCH_PRICE_MODE
+    if interval is not None:
+        frame.attrs["interval"] = interval
     return frame
 
 
@@ -46,14 +49,21 @@ def _write_bundle_files(tmp_path: Path) -> tuple[Path, Path, Path]:
     daily_path = tmp_path / "research_daily.pkl"
     weekly_path = tmp_path / "research_weekly.pkl"
     with daily_path.open("wb") as handle:
-        pickle.dump({"SPY": _daily("2017-01-03")}, handle)
+        pickle.dump({"SPY": _daily("2017-01-03", interval="1d")}, handle)
     with weekly_path.open("wb") as handle:
-        pickle.dump({"SPY": _daily("2017-01-03")}, handle)
+        pickle.dump({"SPY": _daily("2017-01-03", interval="1wk")}, handle)
     manifest = {
         "schema_version": 1,
+        "provider": "Yahoo Finance via yfinance",
+        "yfinance_version": "test",
         "price_adjustment_mode": RESEARCH_PRICE_MODE,
+        "daily_interval": "1d",
+        "weekly_interval": "1wk",
+        "weekly_source": "direct_yahoo_1wk_not_daily_resample",
         "auto_adjust": False,
+        "repair": True,
         "rounding": False,
+        "coverage": 1.0,
         "benchmark_codes_downloaded": ["SPY"],
         "daily_sha256": sha256_file(daily_path),
         "weekly_sha256": sha256_file(weekly_path),
@@ -140,6 +150,14 @@ def test_research_bundle_preflight_rejects_unverified_price_basis():
         _assert_research_bundle({"SPY": verified, "AAA": unverified}, benchmark_code="SPY")
 
 
+def test_research_bundle_preflight_rejects_wrong_interval():
+    frame = _daily("2024-01-02", interval="1wk")
+    with pytest.raises(ValueError, match="wrong interval"):
+        _assert_research_bundle(
+            {"SPY": frame}, benchmark_code="SPY", expected_interval="1d"
+        )
+
+
 def test_price_manifest_hash_must_match_exact_bundle(tmp_path: Path):
     daily_path, weekly_path, manifest_path = _write_bundle_files(tmp_path)
     manifest = validate_price_manifest(
@@ -161,6 +179,17 @@ def test_price_manifest_rejects_wrong_price_semantics(tmp_path: Path):
     manifest["price_adjustment_mode"] = "unknown"
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="price_adjustment_mode"):
+        validate_price_manifest(
+            manifest_path, daily_pkl=daily_path, weekly_pkl=weekly_path
+        )
+
+
+def test_price_manifest_rejects_low_coverage_even_if_builder_was_overridden(tmp_path: Path):
+    daily_path, weekly_path, manifest_path = _write_bundle_files(tmp_path)
+    manifest = json.loads(manifest_path.read_text())
+    manifest["coverage"] = MIN_BUNDLE_COVERAGE - 0.01
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="below canonical minimum"):
         validate_price_manifest(
             manifest_path, daily_pkl=daily_path, weekly_pkl=weekly_path
         )
@@ -206,3 +235,4 @@ def test_collect_research_universe_unions_strategy_replay_seed_and_benchmarks(tm
 
 def test_canonical_replay_capacity_is_fourteen_quarters():
     assert MIN_ANALYSIS_QUARTERS == 14
+    assert MIN_BUNDLE_COVERAGE == 0.98
