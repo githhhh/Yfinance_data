@@ -20,6 +20,7 @@ MAX_RULE_CLAUSES = 3
 MAX_RULE_CONDITIONS = 6
 RULE_OPERATORS = {">", ">=", "<", "<=", "==", "!="}
 
+
 def write_agent_workspace(
     agent_df: pd.DataFrame,
     output_root: Path,
@@ -48,6 +49,7 @@ Write rule.json with version=1 and clauses=[{\"all\":[{\"feature\":\"X001\",\"op
 """
     (workspace / "prompt.md").write_text(prompt, encoding="utf-8")
     return workspace
+
 
 def run_research_command(
     command: list[str],
@@ -79,7 +81,10 @@ def run_research_command(
     with tempfile.TemporaryDirectory(prefix="blind_rule_agent_") as tmp:
         isolated = Path(tmp) / "workspace"
         shutil.copytree(workspace, isolated)
-        home = Path(tmp) / "home"
+        # Keep HOME inside the only user-data tree granted by the sandbox. Some
+        # agent CLIs need a writable HOME for caches/config; placing it beside
+        # WORKSPACE would be correctly denied by the canonical macOS profile.
+        home = isolated / ".home"
         home.mkdir()
         env = os.environ.copy()
         env.update({"HOME": str(home), "PYTHONNOUSERSITE": "1"})
@@ -88,8 +93,6 @@ def run_research_command(
         wrapper = [part.replace("{workspace}", str(isolated)) for part in sandbox_prefix]
 
         # Empirically verify the same wrapper cannot read outside the agent workspace.
-        # This catches a syntactically valid but ineffective sandbox policy before
-        # the research process gets a chance to inspect B0/repository files.
         sentinel = Path(tmp) / "forbidden_sentinel.txt"
         sentinel.write_text("blind-discovery-private", encoding="utf-8")
         repo_root = Path(__file__).resolve().parents[2]
@@ -127,6 +130,7 @@ def run_research_command(
                 shutil.copy2(produced, workspace / name)
         return completed
 
+
 def _condition_mask(df: pd.DataFrame, condition: Mapping[str, Any]) -> pd.Series:
     feature = str(condition["feature"])
     op = str(condition["op"])
@@ -145,6 +149,7 @@ def _condition_mask(df: pd.DataFrame, condition: Mapping[str, Any]) -> pd.Series
     if op == "!=":
         return values != threshold
     raise ValueError(f"unsupported operator: {op}")
+
 
 def validate_rule_artifact(rule_path: Path, agent_columns: Iterable[str]) -> dict[str, Any]:
     """Validate the machine-executable subset before freezing or holdout access."""
@@ -177,6 +182,7 @@ def validate_rule_artifact(rule_path: Path, agent_columns: Iterable[str]) -> dic
                 raise ValueError("rule threshold must be a finite number")
     return rule
 
+
 def apply_rule(rule: Mapping[str, Any], df: pd.DataFrame) -> pd.Series:
     selected = pd.Series(False, index=df.index)
     for clause in rule["clauses"]:
@@ -185,6 +191,7 @@ def apply_rule(rule: Mapping[str, Any], df: pd.DataFrame) -> pd.Series:
             clause_mask &= _condition_mask(df, condition).fillna(False)
         selected |= clause_mask
     return selected
+
 
 def validate_rule_support(
     rule: Mapping[str, Any],
@@ -210,6 +217,7 @@ def validate_rule_support(
         "resolved_selected": resolved_selected,
     }
 
+
 def freeze_rule_artifact(rule_path: Path, output_root: Path, *, agent_columns: Iterable[str]) -> dict[str, Any]:
     """Validate then hash/freeze the rule before any holdout/private artifact exists."""
     rule = validate_rule_artifact(rule_path, agent_columns)
@@ -228,6 +236,7 @@ def freeze_rule_artifact(rule_path: Path, output_root: Path, *, agent_columns: I
     }
     (frozen_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
+
 
 def evaluate_frozen_rule(
     rule: Mapping[str, Any],
