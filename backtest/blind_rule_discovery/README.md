@@ -11,6 +11,7 @@ Canonical strategy-blind discovery experiment for upstream replay candidates. Ex
 - **Intervals:** `1d` and `1wk` are downloaded independently from Yahoo. Replay therefore receives the same interval semantics as production rather than a locally resampled weekly approximation.
 - **Calendar:** replay snapshot weeks come from actual SPY daily sessions. Historical holidays are not inferred from a hard-coded calendar.
 - **Replay execution:** current `quant_trade` replay is required to be stateless across weeks. Analysis weeks run in isolated spawned worker **processes**, never a thread pool. Each worker loads the large daily/weekly bundle once in its initializer, and IPC tasks carry only week dates.
+- **Parallel equivalence gate:** before resuming the current serial-built replay history with the new multi-process runner, a deterministic sample of existing successful serial weeks is recomputed with the spawned-process path and every pool field is compared ticker-by-ticker. Any strategy/data difference fails closed.
 - **Features:** an explicit point-in-time allowlist is anonymized to `X###`. Prior ranks/scores/status/selection artifacts are excluded by construction. Agent-facing `M_*` market features are trailing facts known at signal time.
 - **Time split:** default requirement is at least 8 discovery quarters plus 4 sealed holdout quarters. A 12-week purge/embargo removes discovery rows whose outcome window touches the holdout.
 - **RD-agent isolation:** OS/container sandbox is mandatory, preflight-probed, and execution is hard-capped at 3600 seconds.
@@ -39,9 +40,11 @@ Canonical execution verifies every stage:
 2. `replay_builder` independently requires >=98% joint 1d/1wk coverage, direct Yahoo `1wk`, 5Y pre-analysis context, identical daily/weekly symbol sets, a stateless local `quant_trade` replay contract, zero analysis failures, and >=14 successful quarters.
 3. Replay runs with `ProcessPoolExecutor` using the `spawn` context. No `ThreadPoolExecutor` is used. Each worker has its own Python module namespace, so the temporary `weekly_job._daily_map` monkey-patch cannot leak across concurrent weeks.
 4. Each worker writes a process-local EPS PIT CSV. The parent merges those stores only after worker completion, so there is no shared CSV writer despite parallel local SEC/companyfacts reads.
-5. `replay_builder` hashes exactly the persisted `*/breakout_follow_pool.csv` files into `research_replay_preflight.json`.
-6. blind `runner` verifies the exact daily-pkl SHA and replay dataset digest before Stage 1. Wrong/stale/tampered stage outputs are rejected.
-7. after candidate maturity filtering and purge, blind `runner` again requires >=8 discovery quarters before writing the agent workspace.
+5. `replay_equivalence` treats existing compatible serial pools as golden data. It selects temporal anchors plus high-signal weeks, recomputes them in spawned worker processes, and compares **all** `breakout_follow_pool.csv` columns keyed by `code`; no pool columns are excluded. Row order is ignored and only <=1e-12 numeric serialization noise is tolerated.
+6. The equivalence audit requires the local SEC `companyfacts.zip`, local `company_tickers.json`, and the serial-run EPS PIT seed. It writes only under `work/replay_equivalence/`; it never modifies the golden replay pools or canonical EPS PIT seed. Any worker/comparison error still produces `parallel_equivalence_report.json` with `verified=false` before failing.
+7. `replay_builder` hashes exactly the persisted `*/breakout_follow_pool.csv` files into `research_replay_preflight.json`.
+8. blind `runner` verifies the exact daily-pkl SHA and replay dataset digest before Stage 1. Wrong/stale/tampered stage outputs are rejected.
+9. after candidate maturity filtering and purge, blind `runner` again requires >=8 discovery quarters before writing the agent workspace.
 
 `--allow-unadjusted-outcomes` and `--allow-unverified-replay` are debug escape hatches only. They must not be used for canonical research.
 
@@ -61,6 +64,7 @@ $PY -m pytest \
   tests/test_blind_rule_discovery_ambiguous.py \
   tests/test_blind_rule_discovery_data_pipeline.py \
   tests/test_blind_rule_discovery_parallel_replay.py \
+  tests/test_blind_rule_discovery_replay_equivalence.py \
   tests/test_blind_rule_discovery_provenance.py \
   tests/test_blind_rule_discovery_sandbox.py -q
 ```
@@ -87,19 +91,42 @@ backtest/blind_rule_discovery/work/prices/price_manifest.json
 
 The builder requires SPY and >=98% joint daily/weekly symbol coverage by default.
 
-### 2. Rebuild/resume long-history replay pools with latest quant_trade logic
+### 2. Verify serial -> multi-process replay equivalence
 
-For a clean rebuild:
+For the current migration, **do this before continuing the existing ~86 successful serial weeks**. The command below treats those existing pools as golden data and does not modify them.
 
 ```bash
-rm -rf backtest/blind_rule_discovery/work/replay_pools
+rm -rf backtest/blind_rule_discovery/work/replay_equivalence
 
-$PY -m backtest.blind_rule_discovery.replay_builder \
+$PY -m backtest.blind_rule_discovery.replay_equivalence \
+  --baseline-root backtest/blind_rule_discovery/work/replay_pools \
   --quant-trade-path "$QUANT_TRADE" \
+  --sample-weeks 12 \
+  --min-quarters 4 \
   --workers 6
 ```
 
-If successful weeks already exist, **do not delete the replay directory**. Resume with:
+The audit deterministically mixes temporal anchor weeks with the highest-signal compatible weeks. It recomputes only those selected weeks under `work/replay_equivalence/parallel/`, using process-local copies of the existing EPS PIT seed.
+
+Inspect:
+
+```bash
+cat backtest/blind_rule_discovery/work/replay_equivalence/parallel_equivalence_report.json
+```
+
+**Do not continue the long replay unless:**
+
+```text
+"verified": true
+```
+
+and every item under `weeks` has `"equivalent": true` with `mismatch_count: 0`.
+
+If the audit reports a signal, EPS, trigger, geometry, discovery-feature, schema, ticker-set, worker, or comparison difference, stop and investigate that difference first. The audit compares all pool columns; it does not hide strategy-field drift behind an exclusion list.
+
+### 3. Resume/rebuild long-history replay pools with latest quant_trade logic
+
+After the equivalence gate passes, keep the existing successful replay directory and resume:
 
 ```bash
 $PY -m backtest.blind_rule_discovery.replay_builder \
@@ -110,6 +137,16 @@ $PY -m backtest.blind_rule_discovery.replay_builder \
 
 `--no-clean` only reuses a week when `metadata.json` is `status=success`, its pool CSV exists, and its daily/weekly bundle SHA plus `quant_trade` commit match the current run. All remaining weeks are submitted to spawned worker processes. The default worker count is capped at 6 to balance CPU utilization against the ~185MB immutable bundle held by each process; use `--workers 7` or `--workers 8` only when local RAM headroom is sufficient.
 
+For a future clean rebuild after equivalence of the execution model has already been established for the same price-bundle/quant_trade contract:
+
+```bash
+rm -rf backtest/blind_rule_discovery/work/replay_pools
+
+$PY -m backtest.blind_rule_discovery.replay_builder \
+  --quant-trade-path "$QUANT_TRADE" \
+  --workers 6
+```
+
 Inspect:
 
 ```bash
@@ -119,7 +156,7 @@ cat backtest/blind_rule_discovery/work/replay_pools/research_replay_report.md
 
 A successful preflight must show `execution_model=ProcessPoolExecutor_spawn`, `thread_pool_used=false`, zero analysis failures, complete expected week count, and at least 14 successful quarters.
 
-### 3. Prepare blind Stage 1 workspace
+### 4. Prepare blind Stage 1 workspace
 
 ```bash
 rm -rf backtest/blind_rule_discovery/output/local_run
@@ -147,7 +184,7 @@ ls -la backtest/blind_rule_discovery/output/local_run/agent_workspace
 
 `experiment_metadata.json` must report verified replay provenance, >=8 discovery quarters, and 4 sealed holdout quarters.
 
-### 4. Run the <=1h RD-agent research
+### 5. Run the <=1h RD-agent research
 
 Use a **fresh output root**. The macOS sandbox profile is `backtest/blind_rule_discovery/sandbox/macos_agent.sb`.
 
