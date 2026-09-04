@@ -305,3 +305,23 @@ def test_replay_preflight_rejects_wrong_daily_bundle(tmp_path: Path):
 def test_canonical_replay_capacity_is_fourteen_quarters():
     assert MIN_ANALYSIS_QUARTERS == 14
     assert MIN_BUNDLE_COVERAGE == 0.98
+
+
+def test_audit_pool_schema_permits_none_breakout_ratios_on_zero_range_candle():
+    from backtest.latest_quant_trade_replay import audit_pool_schema, EXPECTED_POOL_FIELDS
+    row = {col: 1.0 for col in EXPECTED_POOL_FIELDS}
+    row["code"] = "FLAT"
+    row["snapshot_date"] = "2024-05-31"
+    row["signal"] = True
+    row["signal_source"] = "ceiling"
+    row["ibd_entry_valid"] = 1.0
+    row["ibd_entry_date"] = "2024-05-28"
+    row["ibd_entry_rule"] = "ceiling"
+    row["ibd_entry_reject_reason"] = None
+    # On zero-range candle (High == Low), ratios are contractually None
+    row["ibd_entry_close_position"] = None
+    row["ibd_entry_breakout_range_ratio"] = None
+    df = pd.DataFrame([row])
+    audit = audit_pool_schema(df)
+    assert audit.schema_validation_status == "passed"
+

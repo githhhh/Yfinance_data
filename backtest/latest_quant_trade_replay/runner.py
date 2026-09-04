@@ -358,8 +358,14 @@ def run_one_week(
         from strategy.executor import core_run
         from strategy.run_context import RunContext
         from strategy_analysis.breakout_follow import weekly_job
+        import inspect
 
-        ctx = RunContext.replay(snapshot_date, old_pool=set(replay_old_pool or set()))
+        if "old_pool" in inspect.signature(RunContext.replay).parameters:
+            ctx = RunContext.replay(snapshot_date, old_pool=set(replay_old_pool or set()))
+        else:
+            ctx = RunContext.replay(snapshot_date)
+            if hasattr(ctx, "replay_old_pool"):
+                setattr(ctx, "replay_old_pool", set(replay_old_pool or set()))
         ctx.output_dir = str(run_output_dir)
         ctx.enable_futu = False
         ctx.enable_telegram = False
@@ -606,7 +612,10 @@ def _load_local_eps_supplement_sources(base_path: Path) -> dict[str, dict[str, f
         path = base_path / relative_path
         if not path.exists():
             continue
-        df = pd.read_csv(path, dtype={"code": str})
+        try:
+            df = pd.read_csv(path, dtype={"code": str})
+        except Exception:
+            continue
         if "code" not in df.columns or eps_col not in df.columns:
             continue
         cur = df.loc[:, ["code", eps_col]].copy()

@@ -362,6 +362,20 @@ def run_research_replay(
                 target_root = output_root if persist else warmup_root
                 if not persist:
                     warmup_weeks += 1
+                else:
+                    existing_meta_path = target_root / week.snapshot_date / "metadata.json"
+                    existing_pool_path = target_root / week.snapshot_date / "breakout_follow_pool.csv"
+                    if not clean and existing_meta_path.exists() and existing_pool_path.exists():
+                        try:
+                            existing_meta = json.loads(existing_meta_path.read_text(encoding="utf-8"))
+                            if existing_meta.get("status") == "success":
+                                row = existing_meta
+                                replay_old_pool = load_replay_old_pool_from_metadata(row)
+                                replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
+                                rows.append(row)
+                                continue
+                        except Exception:
+                            pass
                 row = run_one_week(
                     snapshot_date=week.snapshot_date,
                     expected_last_trading_day=week.expected_last_trading_day,

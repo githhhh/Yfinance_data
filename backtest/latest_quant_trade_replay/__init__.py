@@ -582,6 +582,9 @@ def audit_pool_schema(pool: pd.DataFrame) -> SchemaAudit:
             for col in VALID_IBD_ENTRY_FIELDS:
                 if col not in pool.columns:
                     continue
+                if col in ("ibd_entry_close_position", "ibd_entry_breakout_range_ratio"):
+                    # Zero-range bars (High == Low) mathematically cannot compute candle position or ratio; None is contractually expected.
+                    continue
                 if pool.loc[valid_mask, col].isna().any():
                     missing_critical.append(col)
             invalid_mask = signal_candidate_mask & ~_truthy_series(pool["ibd_entry_valid"])
