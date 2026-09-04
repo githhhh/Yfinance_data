@@ -1,16 +1,27 @@
 """Rebuild long-history weekly replay pools from the canonical research bundle.
 
-Unlike ``latest_quant_trade_replay`` historical-git mode, this runner does not
-need a point-in-time pickle commit for every week. It loads one long-history
-bundle, validates its provenance, clips it causally at each snapshot, warms
-old_pool before the analysis window, and only persists analysis weeks.
+Each analysis week is independent under the current stateless quant_trade replay
+contract. Weeks are executed with ``ProcessPoolExecutor`` so every worker has an
+isolated Python module namespace; this is required because ``run_one_week``
+temporarily monkey-patches ``weekly_job._daily_map``.
+
+Large daily/weekly bundles are loaded once per worker by the pool initializer.
+Tasks send only lightweight week metadata through IPC. Successful on-disk weeks
+are reused with ``--no-clean`` when their price-bundle and quant_trade provenance
+still matches the current run.
 """
 from __future__ import annotations
 
 import argparse
+import ast
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import gc
 import json
+import multiprocessing as mp
+import os
 from pathlib import Path
-import tempfile
+import shutil
+from typing import Any
 
 import pandas as pd
 
@@ -19,7 +30,6 @@ from backtest.latest_quant_trade_replay.runner import (
     clean_replay_output_root,
     git_commit,
     load_pickle_data,
-    load_replay_old_pool_from_metadata,
     run_one_week,
     sha256_file,
     write_data_source_audit_report,
@@ -39,9 +49,14 @@ DEFAULT_PRICE_MANIFEST = Path("backtest/blind_rule_discovery/work/prices/price_m
 DEFAULT_OUTPUT_ROOT = Path("backtest/blind_rule_discovery/work/replay_pools")
 DEFAULT_EPS_PIT_CACHE = Path("backtest/blind_rule_discovery/work/eps_pit_replay.csv")
 DEFAULT_BENCHMARK_CODE = "SPY"
+DEFAULT_WORKERS = max(1, min(6, max(1, (os.cpu_count() or 2) - 1)))
 MIN_ANALYSIS_QUARTERS = 14
 MIN_WEEKLY_LOOKBACK_DAYS = 5 * 365
 MIN_BUNDLE_COVERAGE = 0.98
+
+_WORKER_DAILY_DATA: dict[str, pd.DataFrame] | None = None
+_WORKER_WEEKLY_DATA: dict[str, pd.DataFrame] | None = None
+_WORKER_CONFIG: dict[str, Any] | None = None
 
 
 def _normalized_dates(frame: pd.DataFrame) -> pd.DatetimeIndex:
@@ -169,7 +184,7 @@ def assert_history_coverage(
     analysis_end: str,
     min_lookback_days: int = MIN_WEEKLY_LOOKBACK_DAYS,
 ) -> dict[str, str]:
-    """Require enough pre-warmup history for the strategy's 5Y weekly context."""
+    """Require enough pre-analysis history for the strategy's 5Y weekly context."""
     dates = pd.Series(_normalized_dates(benchmark)).dropna().sort_values()
     if dates.empty:
         raise ValueError("benchmark has no usable history")
@@ -211,6 +226,63 @@ def assert_weekly_lookback(
     return str(first.date())
 
 
+def assert_quant_trade_replay_stateless(quant_trade_path: Path) -> dict[str, object]:
+    """Verify the checked-out RunContext has no cross-week old-pool state contract.
+
+    Parallel week execution is valid only under this contract. The check is
+    static and read-only; quant_trade is never modified.
+    """
+    run_context_path = quant_trade_path / "strategy" / "run_context.py"
+    if not run_context_path.exists():
+        raise FileNotFoundError(f"quant_trade RunContext not found: {run_context_path}")
+    tree = ast.parse(run_context_path.read_text(encoding="utf-8"), filename=str(run_context_path))
+    run_context = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "RunContext"
+        ),
+        None,
+    )
+    if run_context is None:
+        raise RuntimeError("quant_trade strategy.run_context has no RunContext class")
+    replay = next(
+        (
+            node
+            for node in run_context.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "replay"
+        ),
+        None,
+    )
+    if replay is None:
+        raise RuntimeError("quant_trade RunContext has no replay() constructor")
+
+    arg_names = [
+        arg.arg
+        for arg in [*replay.args.posonlyargs, *replay.args.args, *replay.args.kwonlyargs]
+    ]
+    class_fields = {
+        node.target.id
+        for node in run_context.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    forbidden = {"old_pool", "replay_old_pool"}
+    if forbidden.intersection(arg_names) or forbidden.intersection(class_fields):
+        raise RuntimeError(
+            "parallel replay requires stateless quant_trade RunContext; "
+            f"found cross-week state in replay contract: args={arg_names}, fields={sorted(class_fields)}"
+        )
+    if replay.args.kwarg is not None:
+        raise RuntimeError(
+            "parallel replay refuses RunContext.replay(**kwargs); cross-week state contract is ambiguous"
+        )
+    return {
+        "run_context_path": str(run_context_path),
+        "replay_parameters": [name for name in arg_names if name != "cls"],
+        "state_mode": "stateless_independent_weeks",
+    }
+
+
 def _quarter_count(rows: list[dict]) -> int:
     return len(
         {
@@ -221,18 +293,182 @@ def _quarter_count(rows: list[dict]) -> int:
     )
 
 
+def _completed_week_metadata(
+    output_root: Path,
+    week: SnapshotWeek,
+    *,
+    daily_sha: str,
+    weekly_sha: str,
+    quant_trade_commit: str,
+) -> dict[str, Any] | None:
+    """Return a compatible successful checkpoint, otherwise force recomputation."""
+    week_dir = output_root / week.snapshot_date
+    metadata_path = week_dir / "metadata.json"
+    pool_path = week_dir / "breakout_follow_pool.csv"
+    if not metadata_path.exists() or not pool_path.exists():
+        return None
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if metadata.get("status") != "success":
+        return None
+    if str(metadata.get("snapshot_date")) != week.snapshot_date:
+        return None
+    if str(metadata.get("expected_last_trading_day")) != week.expected_last_trading_day:
+        return None
+    if metadata.get("data_source_mode") != "research_full_history_bundle":
+        return None
+    if str(metadata.get("daily_pkl_sha256") or "") != daily_sha:
+        return None
+    if str(metadata.get("weekly_pkl_sha256") or "") != weekly_sha:
+        return None
+    if str(metadata.get("quant_trade_commit") or "") != quant_trade_commit:
+        return None
+    return metadata
+
+
+def _worker_failure_row(
+    week: SnapshotWeek,
+    output_root: Path,
+    exc: BaseException,
+) -> dict[str, Any]:
+    week_dir = output_root / week.snapshot_date
+    week_dir.mkdir(parents=True, exist_ok=True)
+    row: dict[str, Any] = {
+        "snapshot_date": week.snapshot_date,
+        "expected_last_trading_day": week.expected_last_trading_day,
+        "status": "failed_worker_exception",
+        "failure_reason": f"{type(exc).__name__}: {exc}",
+        "output_pool_path": str(week_dir / "breakout_follow_pool.csv"),
+        "output_row_count": 0,
+        "data_source_mode": "research_full_history_bundle",
+        "replay_used_clipped_data": False,
+        "has_future_data_before_clip": False,
+        "schema_audit": {"schema_validation_status": "failed_worker_exception"},
+    }
+    (week_dir / "metadata.json").write_text(
+        json.dumps(row, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return row
+
+
+def _init_replay_worker(
+    daily_pkl: str,
+    weekly_pkl: str,
+    config: dict[str, Any],
+    eps_seed_path: str,
+    worker_cache_dir: str,
+) -> None:
+    """Load large immutable bundles once into each isolated worker process."""
+    global _WORKER_DAILY_DATA, _WORKER_WEEKLY_DATA, _WORKER_CONFIG
+    _WORKER_DAILY_DATA = load_pickle_data(Path(daily_pkl))
+    _WORKER_WEEKLY_DATA = load_pickle_data(Path(weekly_pkl))
+    _WORKER_CONFIG = dict(config)
+
+    cache_dir = Path(worker_cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    worker_cache = cache_dir / f"eps_pit_{os.getpid()}.csv"
+    seed = Path(eps_seed_path)
+    if seed.exists():
+        shutil.copy2(seed, worker_cache)
+    SignalEPSLookup.DEFAULT_REPLAY_CSV_PATH = str(worker_cache)
+
+
+def _run_week_worker(task: tuple[str, str]) -> dict[str, Any]:
+    """Execute one week using only process-local global state and lightweight IPC."""
+    if _WORKER_DAILY_DATA is None or _WORKER_WEEKLY_DATA is None or _WORKER_CONFIG is None:
+        raise RuntimeError("replay worker was not initialized")
+    snapshot_date, expected_last_trading_day = task
+    config = _WORKER_CONFIG
+    return run_one_week(
+        snapshot_date=snapshot_date,
+        expected_last_trading_day=expected_last_trading_day,
+        daily_pkl=None,
+        weekly_pkl=None,
+        daily_data=_WORKER_DAILY_DATA,
+        weekly_data=_WORKER_WEEKLY_DATA,
+        data_source_mode="research_full_history_bundle",
+        historical_pkl_commit=None,
+        historical_pkl_commit_date=None,
+        historical_pkl_candidate_count=None,
+        daily_pkl_file=config["daily_pkl"],
+        weekly_pkl_file=config["weekly_pkl"],
+        daily_pkl_sha256=config["daily_sha"],
+        weekly_pkl_sha256=config["weekly_sha"],
+        output_root=Path(config["output_root"]),
+        quant_trade_path=Path(config["quant_trade_path"]),
+        quant_trade_env=Path(config["quant_trade_env"]) if config["quant_trade_env"] else None,
+        yfinance_data_path=Path(config["yfinance_data_path"]),
+        quant_trade_commit=config["quant_trade_commit"],
+        replay_old_pool=set(),
+        replay_old_pool_source="stateless_parallel_independent_week",
+    )
+
+
+def _merge_worker_eps_caches(worker_cache_dir: Path, eps_pit_cache: Path) -> int:
+    """Merge process-local EPS PIT stores after workers exit, with conflict detection."""
+    worker_paths = sorted(worker_cache_dir.glob("*.csv"))
+    if not worker_paths:
+        return 0
+
+    frames: list[pd.DataFrame] = []
+    if eps_pit_cache.exists():
+        frames.append(pd.read_csv(eps_pit_cache))
+    for path in worker_paths:
+        frames.append(pd.read_csv(path))
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        return len(worker_paths)
+
+    combined = pd.concat(frames, ignore_index=True, sort=False)
+    required = {"snapshot_date", "code"}
+    if not required.issubset(combined.columns):
+        raise RuntimeError("worker EPS PIT cache missing snapshot_date/code key columns")
+
+    combined["snapshot_date"] = combined["snapshot_date"].astype(str).str[:10]
+    combined["code"] = combined["code"].astype(str).str.strip().str.upper()
+    duplicate = combined.duplicated(["snapshot_date", "code"], keep=False)
+    if bool(duplicate.any()):
+        value_columns = [
+            column
+            for column in combined.columns
+            if column not in {"snapshot_date", "code", "retrieved_at"}
+        ]
+        for key, group in combined.loc[duplicate].groupby(
+            ["snapshot_date", "code"], dropna=False
+        ):
+            normalized = group[value_columns].fillna("<NA>").astype(str).drop_duplicates()
+            if len(normalized) > 1:
+                raise RuntimeError(
+                    f"conflicting worker EPS PIT records for {key[0]} {key[1]}"
+                )
+
+    merged = (
+        combined.drop_duplicates(["snapshot_date", "code"], keep="last")
+        .sort_values(["snapshot_date", "code"], kind="stable")
+        .reset_index(drop=True)
+    )
+    eps_pit_cache.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = eps_pit_cache.with_name(f".{eps_pit_cache.name}.merge.tmp")
+    merged.to_csv(temp_path, index=False)
+    temp_path.replace(eps_pit_cache)
+    return len(worker_paths)
+
+
 def _write_research_replay_report(
     output_root: Path,
     *,
     rows: list[dict],
-    warmup_weeks: int,
-    warmup_failures: list[dict],
     manifest: dict[str, object],
     history_coverage: dict[str, str],
     benchmark_code: str,
     analysis_start: str,
     analysis_end: str,
     eps_pit_cache: Path,
+    workers: int,
+    skipped_weeks: int,
+    computed_weeks: int,
 ) -> None:
     failures = [row for row in rows if row.get("status") != "success"]
     successful = [row for row in rows if row.get("status") == "success"]
@@ -245,8 +481,10 @@ def _write_research_replay_report(
         f"- Price mode: `{RESEARCH_PRICE_MODE}`.",
         "- Daily/weekly inputs: direct Yahoo `1d` and `1wk`; weekly bars are not re-sampled locally.",
         "- Weekly snapshot calendar: actual SPY daily sessions; no hard-coded holiday table.",
-        "- Warmup weeks establish chronological old_pool state and are not persisted into discovery.",
-        f"- EPS PIT replay cache: `{eps_pit_cache}` (ignored work area, not tracked `us/signal_eps_pit_replay.csv`).",
+        "- Execution model: `ProcessPoolExecutor` with spawn; no thread pool is used.",
+        "- Every analysis week is independent under the verified stateless quant_trade replay contract.",
+        "- Large daily/weekly bundles are loaded once per worker; week tasks carry only date metadata.",
+        f"- EPS PIT replay cache: `{eps_pit_cache}`; workers write process-local caches which are merged after completion.",
         "- Existing B0 ranks/selections are not inputs to replay generation.",
         "",
         "## Coverage",
@@ -254,8 +492,9 @@ def _write_research_replay_report(
         f"- Analysis window: `{analysis_start}` through `{analysis_end}`.",
         f"- Benchmark: `{benchmark_code}`.",
         f"- Price history: `{history_coverage['first_session']}` through `{history_coverage['last_session']}`.",
-        f"- Warmup weeks executed: {warmup_weeks}.",
-        f"- Warmup failures: {len(warmup_failures)}.",
+        f"- Worker processes: {workers}.",
+        f"- Resume checkpoints reused: {skipped_weeks}.",
+        f"- Weeks submitted to workers: {computed_weeks}.",
         f"- Persisted analysis weeks: {len(rows)}.",
         f"- Successful analysis weeks: {len(successful)}.",
         f"- Failed analysis weeks: {len(failures)}.",
@@ -266,11 +505,10 @@ def _write_research_replay_report(
         "## Failures",
         "",
     ]
-    all_failures = [*warmup_failures, *failures]
-    if not all_failures:
+    if not failures:
         lines.append("- None.")
     else:
-        for row in all_failures:
+        for row in failures:
             lines.append(
                 f"- `{row.get('snapshot_date')}`: `{row.get('status')}` — {row.get('failure_reason') or '-'}"
             )
@@ -294,8 +532,13 @@ def run_research_replay(
     analysis_end: str = DEFAULT_ANALYSIS_END,
     min_analysis_quarters: int = MIN_ANALYSIS_QUARTERS,
     min_lookback_days: int = MIN_WEEKLY_LOOKBACK_DAYS,
+    workers: int = DEFAULT_WORKERS,
     clean: bool = True,
 ) -> list[dict]:
+    workers = int(workers)
+    if workers < 1:
+        raise ValueError("workers must be >= 1")
+
     manifest = validate_price_manifest(
         price_manifest, daily_pkl=daily_pkl, weekly_pkl=weekly_pkl
     )
@@ -320,98 +563,121 @@ def run_research_replay(
         warmup_start=warmup_start,
         min_lookback_days=min_lookback_days,
     )
-
-    all_weeks = enumerate_snapshot_weeks_from_benchmark(
-        daily_data[benchmark_code], start_date=warmup_start, end_date=analysis_end
+    analysis_weeks = enumerate_snapshot_weeks_from_benchmark(
+        daily_data[benchmark_code], start_date=analysis_start, end_date=analysis_end
     )
-    analysis_start_ts = pd.Timestamp(analysis_start).normalize()
-    analysis_weeks = [
-        week for week in all_weeks if pd.Timestamp(week.snapshot_date) >= analysis_start_ts
-    ]
     if not analysis_weeks:
         raise ValueError("analysis replay window contains no complete weeks")
+
+    quant_trade_path = quant_trade_path.resolve()
+    stateless_contract = assert_quant_trade_replay_stateless(quant_trade_path)
+    quant_trade_commit = git_commit(quant_trade_path)
+    yfinance_data_path = Path.cwd().resolve()
+    daily_pkl = daily_pkl.resolve()
+    weekly_pkl = weekly_pkl.resolve()
+    price_manifest = price_manifest.resolve()
+    output_root = output_root.resolve()
+    eps_pit_cache = eps_pit_cache.resolve()
+    quant_trade_env = quant_trade_env.resolve() if quant_trade_env is not None else None
 
     if clean:
         clean_replay_output_root(
             output_root,
-            reason="canonical blind-discovery long-history replay rebuild",
+            reason="canonical blind-discovery stateless parallel replay rebuild",
         )
     else:
         output_root.mkdir(parents=True, exist_ok=True)
 
-    quant_trade_commit = git_commit(quant_trade_path)
-    yfinance_data_path = Path.cwd()
     daily_sha = sha256_file(daily_pkl)
     weekly_sha = sha256_file(weekly_pkl)
-    rows: list[dict] = []
-    warmup_failures: list[dict] = []
-    warmup_weeks = 0
-    replay_old_pool: set[str] = set()
-    replay_old_pool_source = "cold_start_warmup"
+    rows: list[dict[str, Any]] = []
+    pending_weeks: list[SnapshotWeek] = []
 
-    eps_pit_cache = eps_pit_cache.resolve()
+    for week in analysis_weeks:
+        checkpoint = None
+        if not clean:
+            checkpoint = _completed_week_metadata(
+                output_root,
+                week,
+                daily_sha=daily_sha,
+                weekly_sha=weekly_sha,
+                quant_trade_commit=quant_trade_commit,
+            )
+        if checkpoint is None:
+            pending_weeks.append(week)
+        else:
+            rows.append(checkpoint)
+
+    skipped_weeks = len(rows)
+    computed_weeks = len(pending_weeks)
+    print(
+        f"[blind-replay] analysis_weeks={len(analysis_weeks)} "
+        f"resume_skipped={skipped_weeks} submitted={computed_weeks} workers={workers}"
+    )
+
+    # Parent validation no longer needs the ~185 MB bundle copies. Drop them
+    # before spawned workers each load their own process-local copy.
+    del daily_data, weekly_data
+    gc.collect()
+
+    worker_cache_dir = output_root / "_worker_eps_cache"
+    if worker_cache_dir.exists():
+        shutil.rmtree(worker_cache_dir)
+    worker_cache_dir.mkdir(parents=True, exist_ok=True)
     eps_pit_cache.parent.mkdir(parents=True, exist_ok=True)
     eps_cache_sha_before = sha256_file(eps_pit_cache) if eps_pit_cache.exists() else None
-    old_replay_eps_path = SignalEPSLookup.DEFAULT_REPLAY_CSV_PATH
-    SignalEPSLookup.DEFAULT_REPLAY_CSV_PATH = str(eps_pit_cache)
-    try:
-        with tempfile.TemporaryDirectory(prefix="blind_replay_warmup_") as tmp:
-            warmup_root = Path(tmp)
-            for week in all_weeks:
-                persist = pd.Timestamp(week.snapshot_date) >= analysis_start_ts
-                target_root = output_root if persist else warmup_root
-                if not persist:
-                    warmup_weeks += 1
-                else:
-                    existing_meta_path = target_root / week.snapshot_date / "metadata.json"
-                    existing_pool_path = target_root / week.snapshot_date / "breakout_follow_pool.csv"
-                    if not clean and existing_meta_path.exists() and existing_pool_path.exists():
-                        try:
-                            existing_meta = json.loads(existing_meta_path.read_text(encoding="utf-8"))
-                            if existing_meta.get("status") == "success":
-                                row = existing_meta
-                                replay_old_pool = load_replay_old_pool_from_metadata(row)
-                                replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
-                                rows.append(row)
-                                continue
-                        except Exception:
-                            pass
-                row = run_one_week(
-                    snapshot_date=week.snapshot_date,
-                    expected_last_trading_day=week.expected_last_trading_day,
-                    daily_pkl=None,
-                    weekly_pkl=None,
-                    daily_data=daily_data,
-                    weekly_data=weekly_data,
-                    data_source_mode="research_full_history_bundle",
-                    historical_pkl_commit=None,
-                    historical_pkl_commit_date=None,
-                    historical_pkl_candidate_count=None,
-                    daily_pkl_file=str(daily_pkl),
-                    weekly_pkl_file=str(weekly_pkl),
-                    daily_pkl_sha256=daily_sha,
-                    weekly_pkl_sha256=weekly_sha,
-                    output_root=target_root,
-                    quant_trade_path=quant_trade_path,
-                    quant_trade_env=quant_trade_env,
-                    yfinance_data_path=yfinance_data_path,
-                    quant_trade_commit=quant_trade_commit,
-                    replay_old_pool=replay_old_pool,
-                    replay_old_pool_source=replay_old_pool_source,
-                )
-                if row.get("status") != "success":
-                    if persist:
-                        rows.append(row)
-                    else:
-                        warmup_failures.append(row)
-                    break
-                replay_old_pool = load_replay_old_pool_from_metadata(row)
-                replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
-                if persist:
-                    rows.append(row)
-    finally:
-        SignalEPSLookup.DEFAULT_REPLAY_CSV_PATH = old_replay_eps_path
 
+    if pending_weeks:
+        worker_config: dict[str, Any] = {
+            "daily_pkl": str(daily_pkl),
+            "weekly_pkl": str(weekly_pkl),
+            "daily_sha": daily_sha,
+            "weekly_sha": weekly_sha,
+            "output_root": str(output_root),
+            "quant_trade_path": str(quant_trade_path),
+            "quant_trade_env": str(quant_trade_env) if quant_trade_env is not None else "",
+            "yfinance_data_path": str(yfinance_data_path),
+            "quant_trade_commit": quant_trade_commit,
+        }
+        spawn_context = mp.get_context("spawn")
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=spawn_context,
+            initializer=_init_replay_worker,
+            initargs=(
+                str(daily_pkl),
+                str(weekly_pkl),
+                worker_config,
+                str(eps_pit_cache),
+                str(worker_cache_dir),
+            ),
+        ) as executor:
+            future_to_week = {
+                executor.submit(
+                    _run_week_worker,
+                    (week.snapshot_date, week.expected_last_trading_day),
+                ): week
+                for week in pending_weeks
+            }
+            completed = 0
+            for future in as_completed(future_to_week):
+                week = future_to_week[future]
+                try:
+                    row = future.result()
+                except BaseException as exc:
+                    row = _worker_failure_row(week, output_root, exc)
+                rows.append(row)
+                completed += 1
+                if completed == 1 or completed % 10 == 0 or completed == computed_weeks:
+                    print(
+                        f"[blind-replay] completed={completed}/{computed_weeks} "
+                        f"latest={week.snapshot_date} status={row.get('status')}"
+                    )
+
+    worker_cache_count = _merge_worker_eps_caches(worker_cache_dir, eps_pit_cache)
+    shutil.rmtree(worker_cache_dir, ignore_errors=True)
+
+    rows.sort(key=lambda row: str(row.get("snapshot_date") or ""))
     write_manifest(output_root, rows)
     if rows:
         write_data_source_audit_report(output_root, rows)
@@ -424,10 +690,18 @@ def run_research_replay(
         "analysis_start": analysis_start,
         "analysis_end": analysis_end,
         "warmup_start": warmup_start,
-        "warmup_weeks": warmup_weeks,
-        "warmup_failed_weeks": len(warmup_failures),
+        "warmup_mode": "not_executed_stateless_quant_trade",
+        "warmup_weeks": 0,
+        "warmup_failed_weeks": 0,
         "analysis_weeks_expected": len(analysis_weeks),
         "analysis_weeks_persisted": len(rows),
+        "resume_skipped_weeks": skipped_weeks,
+        "worker_submitted_weeks": computed_weeks,
+        "worker_processes": workers,
+        "execution_model": "ProcessPoolExecutor_spawn",
+        "thread_pool_used": False,
+        "worker_bundle_loading": "initializer_once_per_process",
+        "worker_eps_cache_files_merged": worker_cache_count,
         "replay_pool_files": replay_pool_files,
         "replay_dataset_sha256": replay_digest,
         "successful_weeks": len(rows) - len(failed),
@@ -448,6 +722,8 @@ def run_research_replay(
         "eps_pit_cache": str(eps_pit_cache),
         "eps_pit_cache_sha256_before": eps_cache_sha_before,
         "eps_pit_cache_sha256_after": eps_cache_sha_after,
+        "quant_trade_commit": quant_trade_commit,
+        "quant_trade_replay_contract": stateless_contract,
         "universe_mode": manifest.get("universe_mode"),
         "universe_limitation": manifest.get("universe_limitation"),
     }
@@ -457,22 +733,17 @@ def run_research_replay(
     _write_research_replay_report(
         output_root,
         rows=rows,
-        warmup_weeks=warmup_weeks,
-        warmup_failures=warmup_failures,
         manifest=manifest,
         history_coverage=history_coverage,
         benchmark_code=benchmark_code,
         analysis_start=analysis_start,
         analysis_end=analysis_end,
         eps_pit_cache=eps_pit_cache,
+        workers=workers,
+        skipped_weeks=skipped_weeks,
+        computed_weeks=computed_weeks,
     )
 
-    if warmup_failures:
-        row = warmup_failures[0]
-        raise RuntimeError(
-            f"canonical replay warmup failed at {row.get('snapshot_date')}: "
-            f"{row.get('failure_reason') or row.get('status')}"
-        )
     if failed:
         row = failed[0]
         raise RuntimeError(
@@ -481,7 +752,8 @@ def run_research_replay(
         )
     if len(rows) != len(analysis_weeks) or replay_pool_files != len(analysis_weeks):
         raise RuntimeError(
-            f"canonical replay is incomplete: rows={len(rows)} pools={replay_pool_files} expected={len(analysis_weeks)}"
+            f"canonical replay is incomplete: rows={len(rows)} "
+            f"pools={replay_pool_files} expected={len(analysis_weeks)}"
         )
     if quarter_count < min_analysis_quarters:
         raise RuntimeError(
@@ -506,6 +778,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--analysis-end", default=DEFAULT_ANALYSIS_END)
     parser.add_argument("--min-analysis-quarters", type=int, default=MIN_ANALYSIS_QUARTERS)
     parser.add_argument("--min-lookback-days", type=int, default=MIN_WEEKLY_LOOKBACK_DAYS)
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--no-clean", action="store_true")
     return parser.parse_args(argv)
 
@@ -530,11 +803,17 @@ def main(argv: list[str] | None = None) -> int:
         analysis_end=args.analysis_end,
         min_analysis_quarters=args.min_analysis_quarters,
         min_lookback_days=args.min_lookback_days,
+        workers=args.workers,
         clean=not args.no_clean,
     )
     print(
         json.dumps(
-            {"status": "ok", "analysis_weeks": len(rows), "output_root": str(args.output_root)},
+            {
+                "status": "ok",
+                "analysis_weeks": len(rows),
+                "workers": args.workers,
+                "output_root": str(args.output_root),
+            },
             indent=2,
         )
     )
