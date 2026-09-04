@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 import numpy as np
@@ -10,9 +11,11 @@ from dashboard.data_utils import normalize_pool_df
 
 
 ENTRY_STATUSES = ("ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED")
+PUSH_BASELINE_COMPLETE = "COMPLETE"
+PUSH_BASELINE_PREVIOUS_MIDWEEK = "PREVIOUS_MIDWEEK"
 
 # Resolver-owned fields must remain atomically owned by the current signal row,
-# or by the weekend row only when the existing Carry rule applies.
+# or by the baseline row only when the existing Carry rule applies.
 SOURCE_FACT_FIELDS = (
     "signal_source",
     "ibd_candidate_rule",
@@ -39,8 +42,9 @@ ATTENTION_MEDIUM = "MEDIUM"
 class BFAttentionEvent:
     """Material transition facts for downstream analysis/notification.
 
-    facts is deliberately factual rather than notification copy. Consumers
-    can combine it with market context and decide whether/how to present it.
+    The event is always derived from one explicit baseline -> current
+    comparison. ``facts`` is deliberately factual rather than notification
+    copy so downstream analysis can combine it with market context.
     """
 
     code: str
@@ -49,9 +53,7 @@ class BFAttentionEvent:
     change_group: str
     signal_origin: str
     baseline_status: str | None
-    previous_status: str | None
     current_status: str | None
-    is_new_since_previous: bool | None
     reasons: tuple[str, ...]
     facts: dict[str, Any]
 
@@ -63,9 +65,7 @@ class BFAttentionEvent:
             "change_group": self.change_group,
             "signal_origin": self.signal_origin,
             "baseline_status": self.baseline_status,
-            "previous_status": self.previous_status,
             "current_status": self.current_status,
-            "is_new_since_previous": self.is_new_since_previous,
             "reasons": list(self.reasons),
             "facts": dict(self.facts),
         }
@@ -73,21 +73,33 @@ class BFAttentionEvent:
 
 @dataclass(frozen=True)
 class BFTransitionResult:
-    """Single transition contract shared by Dashboard, analysis and Futu."""
+    """Single transition contract shared by Dashboard, analysis and Futu.
+
+    ``rows`` / ``exited_pool`` / ``review_summary`` are always the stable
+    complete-week -> current Dashboard projection.
+
+    ``attention_events`` are a separate comparison for daily notification:
+    complete-week -> current on the first run of a review week, otherwise
+    previous-midweek -> current. The baseline is selected only from snapshot
+    dates; it never changes the Dashboard projection.
+    """
 
     rows: pd.DataFrame
     exited_pool: pd.DataFrame
     actionable_codes: tuple[str, ...]
     review_summary: dict[str, int]
     attention_events: tuple[BFAttentionEvent, ...]
-    notification_events: tuple[BFAttentionEvent, ...]
     attention_summary: dict[str, int]
     baseline_available: bool
     previous_available: bool
+    push_baseline: str
+    push_baseline_snapshot_date: date | None
+    current_snapshot_date: date | None
+    push_ready: bool
+    push_warnings: tuple[str, ...]
 
-    def attention_payload(self, *, notification_only: bool = False) -> tuple[dict[str, Any], ...]:
-        events = self.notification_events if notification_only else self.attention_events
-        return tuple(event.to_dict() for event in events)
+    def attention_payload(self) -> tuple[dict[str, Any], ...]:
+        return tuple(event.to_dict() for event in self.attention_events)
 
 
 def to_bool(value: Any) -> bool | None:
@@ -197,44 +209,44 @@ def _change_label(origin: str, baseline: str | None, effective: str | None, entr
 
 def _project(
     current: pd.DataFrame,
-    complete: pd.DataFrame,
+    baseline: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, tuple[str, ...], dict[str, int], bool]:
-    baseline_available = not complete.empty
-    complete_by_code = {str(row["code"]): row for _, row in complete.iterrows()}
+    baseline_available = not baseline.empty
+    baseline_by_code = {str(row["code"]): row for _, row in baseline.iterrows()}
     current_codes = set(current["code"])
     rows: list[dict[str, Any]] = []
 
     for _, current_row in current.iterrows():
         code = str(current_row["code"])
-        complete_row = complete_by_code.get(code)
+        baseline_row = baseline_by_code.get(code)
         signal_current = to_bool(current_row.get("signal")) is True
-        signal_complete = complete_row is not None and to_bool(complete_row.get("signal")) is True
+        signal_baseline = baseline_row is not None and to_bool(baseline_row.get("signal")) is True
         origin = "NONE"
         if baseline_available:
             origin = (
-                "RECONFIRMED" if signal_current and signal_complete
+                "RECONFIRMED" if signal_current and signal_baseline
                 else "NEW" if signal_current
-                else "CARRY" if signal_complete
+                else "CARRY" if signal_baseline
                 else "NONE"
             )
-        watch_active = signal_current or signal_complete
+        watch_active = signal_current or signal_baseline
 
         projected = current_row.to_dict()
         projected["review_pool_change"] = (
-            ("ENTERED" if complete_row is None else "STAYED")
+            ("ENTERED" if baseline_row is None else "STAYED")
             if baseline_available else "UNAVAILABLE"
         )
         projected["review_signal_origin"] = origin
         projected["review_watch_active"] = bool(watch_active)
         projected["review_baseline_available"] = baseline_available
 
-        selected_row = current_row if signal_current else complete_row if signal_complete else None
+        selected_row = current_row if signal_current else baseline_row if signal_baseline else None
         for field in SOURCE_FACT_FIELDS:
             projected[f"review_{field}"] = selected_row.get(field) if selected_row is not None else None
 
         baseline_status = (
-            _nonempty_status(complete_row.get("ibd_entry_status"), code=code)
-            if signal_complete else None
+            _nonempty_status(baseline_row.get("ibd_entry_status"), code=code)
+            if signal_baseline else None
         )
         effective_status = None
         candidate = None
@@ -288,7 +300,7 @@ def _project(
         review["review_entry_valid"] = pd.Series(
             review["review_entry_valid"].tolist(), index=review.index, dtype="object"
         )
-    exited = complete.loc[~complete["code"].isin(current_codes)].copy() if not complete.empty else complete.copy()
+    exited = baseline.loc[~baseline["code"].isin(current_codes)].copy() if not baseline.empty else baseline.copy()
     actionable = tuple(review.loc[review["review_futu_actionable"], "code"].astype(str).tolist())
     return review, exited, actionable, _review_summary(review, exited), baseline_available
 
@@ -323,6 +335,39 @@ def _number(value: Any) -> float | None:
 def _date_text(value: Any) -> str | None:
     parsed = pd.to_datetime(value, errors="coerce")
     return _text(value) if pd.isna(parsed) else parsed.date().isoformat()
+
+
+def _snapshot_date(pool: pd.DataFrame) -> date | None:
+    if pool.empty or "snapshot_date" not in pool.columns:
+        return None
+    parsed = pd.to_datetime(pool["snapshot_date"], errors="coerce")
+    if parsed.isna().any():
+        return None
+    values = tuple(dict.fromkeys(value.date() for value in parsed.tolist()))
+    return values[0] if len(values) == 1 else None
+
+
+def _select_push_baseline(
+    complete: pd.DataFrame,
+    previous: pd.DataFrame | None,
+) -> tuple[str, pd.DataFrame, date | None, tuple[str, ...]]:
+    """Select the notification baseline using only published snapshot dates."""
+
+    complete_date = _snapshot_date(complete)
+    if previous is None or previous.empty:
+        return PUSH_BASELINE_COMPLETE, complete, complete_date, ()
+
+    previous_date = _snapshot_date(previous)
+    if complete_date is None or previous_date is None:
+        return (
+            PUSH_BASELINE_COMPLETE,
+            complete,
+            complete_date,
+            ("Push baseline snapshot is unavailable or ambiguous; falling back to COMPLETE.",),
+        )
+    if complete_date >= previous_date:
+        return PUSH_BASELINE_COMPLETE, complete, complete_date, ()
+    return PUSH_BASELINE_PREVIOUS_MIDWEEK, previous, previous_date, ()
 
 
 def _attention_descriptor(row: pd.Series) -> tuple[str, str, tuple[str, ...]] | None:
@@ -365,87 +410,129 @@ def _facts(row: pd.Series) -> dict[str, Any]:
     }
 
 
-def analyze_bf_transitions(
-    current_pool: pd.DataFrame,
-    complete_pool: pd.DataFrame,
-    previous_pool: pd.DataFrame | None = None,
-) -> BFTransitionResult:
-    """Return authoritative weekend→current facts plus material attention events.
-
-    previous_pool is optional and only provides notification de-duplication.
-    It never changes the weekend→current rows consumed by the Dashboard.
-    """
-
-    current = normalize_transition_pool(current_pool, label="current")
-    complete = normalize_transition_pool(complete_pool, label="complete", allow_empty=True)
-    review, exited, actionable, summary, baseline_available = _project(current, complete)
-
-    previous_available = previous_pool is not None and not previous_pool.empty
-    previous_by_code: dict[str, pd.Series] = {}
-    previous_event_type: dict[str, str | None] = {}
-    if previous_available:
-        previous = normalize_transition_pool(previous_pool, label="previous")
-        previous_review, _, _, _, _ = _project(previous, complete)
-        for _, row in previous_review.iterrows():
-            code = str(row["code"])
-            previous_by_code[code] = row
-            descriptor = _attention_descriptor(row)
-            previous_event_type[code] = descriptor[0] if descriptor else None
-
+def _attention_events(review: pd.DataFrame, exited: pd.DataFrame) -> tuple[BFAttentionEvent, ...]:
     events: list[BFAttentionEvent] = []
     for _, row in review.iterrows():
         descriptor = _attention_descriptor(row)
         if descriptor is None:
             continue
         event_type, importance, reasons = descriptor
-        code = str(row["code"])
-        previous_row = previous_by_code.get(code)
         events.append(
             BFAttentionEvent(
-                code=code,
+                code=str(row["code"]),
                 event_type=event_type,
                 importance=importance,
                 change_group=_text(row.get("review_change_group")) or "UNCHANGED",
                 signal_origin=_text(row.get("review_signal_origin")) or "NONE",
                 baseline_status=_text(row.get("review_baseline_entry_status")),
-                previous_status=(
-                    _text(previous_row.get("review_effective_entry_status"))
-                    if previous_row is not None else None
-                ),
                 current_status=_text(row.get("review_effective_entry_status")),
-                is_new_since_previous=(
-                    None if not previous_available
-                    else event_type != previous_event_type.get(code)
-                ),
                 reasons=reasons,
                 facts=_facts(row),
             )
         )
 
+    # A baseline ACTIONABLE that disappears from the current pool is a material
+    # lifecycle event even though the current-left projection has no row for it.
+    for _, row in exited.iterrows():
+        if to_bool(row.get("signal")) is not True or _text(row.get("ibd_entry_status")) != "ACTIONABLE":
+            continue
+        events.append(
+            BFAttentionEvent(
+                code=str(row["code"]),
+                event_type="ACTIONABLE_EXITED_POOL",
+                importance=ATTENTION_HIGH,
+                change_group="LEFT_ACTIONABLE",
+                signal_origin="EXITED",
+                baseline_status="ACTIONABLE",
+                current_status=None,
+                reasons=("LEFT_ACTIONABLE", "EXITED_POOL"),
+                facts={
+                    "snapshot_date": _date_text(row.get("snapshot_date")),
+                    "signal_source": _text(row.get("signal_source")),
+                    "candidate_rule": _text(row.get("ibd_candidate_rule")),
+                    "candidate_price": _number(row.get("ibd_candidate_price")),
+                },
+            )
+        )
+
     order = {ATTENTION_HIGH: 0, ATTENTION_MEDIUM: 1}
     events.sort(key=lambda event: (order.get(event.importance, 9), event.code, event.event_type))
-    attention_events = tuple(events)
-    notification_events = tuple(
-        event
-        for event in attention_events
-        if not previous_available or event.is_new_since_previous is True
+    return tuple(events)
+
+
+def analyze_bf_transitions(
+    current_pool: pd.DataFrame,
+    complete_pool: pd.DataFrame,
+    previous_pool: pd.DataFrame | None = None,
+) -> BFTransitionResult:
+    """Analyze Dashboard and daily-attention transitions with separate baselines.
+
+    Dashboard is always complete-week -> current. Daily attention automatically
+    uses the newer of complete-week and previous-midweek as its baseline:
+
+    * COMPLETE when no previous midweek exists, or complete is equally/newer;
+    * PREVIOUS_MIDWEEK when that snapshot is newer than complete.
+
+    This keeps Dashboard semantics stable while making daily notifications true
+    previous-run -> current lifecycle changes after the first run of the week.
+    """
+
+    current = normalize_transition_pool(current_pool, label="current")
+    complete = normalize_transition_pool(complete_pool, label="complete", allow_empty=True)
+
+    # Stable Dashboard contract. Never substitute previous_pool here.
+    review, exited, actionable, summary, baseline_available = _project(current, complete)
+
+    previous_available = previous_pool is not None and not previous_pool.empty
+    previous = (
+        normalize_transition_pool(previous_pool, label="previous")
+        if previous_available else None
     )
+    push_baseline, push_pool, push_baseline_date, baseline_warnings = _select_push_baseline(
+        complete,
+        previous,
+    )
+    current_date = _snapshot_date(current)
+    warnings = list(baseline_warnings)
+    push_ready = True
+    if push_baseline_date is not None and current_date is not None:
+        if current_date <= push_baseline_date:
+            push_ready = False
+            warnings.append(
+                "Current snapshot is not newer than the selected push baseline; attention events suppressed."
+            )
+    elif previous_available:
+        # With a previous midweek supplied, snapshot ordering is part of the
+        # public push contract. Fail closed rather than guessing chronology.
+        push_ready = False
+        warnings.append(
+            "Push snapshot ordering cannot be verified; attention events suppressed."
+        )
+
+    attention: tuple[BFAttentionEvent, ...] = ()
+    if push_ready and not push_pool.empty:
+        push_review, push_exited, _, _, _ = _project(current, push_pool)
+        attention = _attention_events(push_review, push_exited)
+
     attention_summary = {
-        "TOTAL": len(attention_events),
-        "HIGH": sum(event.importance == ATTENTION_HIGH for event in attention_events),
-        "MEDIUM": sum(event.importance == ATTENTION_MEDIUM for event in attention_events),
-        "NOTIFICATION_ELIGIBLE": len(notification_events),
+        "TOTAL": len(attention),
+        "HIGH": sum(event.importance == ATTENTION_HIGH for event in attention),
+        "MEDIUM": sum(event.importance == ATTENTION_MEDIUM for event in attention),
     }
     return BFTransitionResult(
         rows=review,
         exited_pool=exited,
         actionable_codes=actionable,
         review_summary=summary,
-        attention_events=attention_events,
-        notification_events=notification_events,
+        attention_events=attention,
         attention_summary=attention_summary,
         baseline_available=baseline_available,
         previous_available=previous_available,
+        push_baseline=push_baseline,
+        push_baseline_snapshot_date=push_baseline_date,
+        current_snapshot_date=current_date,
+        push_ready=push_ready,
+        push_warnings=tuple(warnings),
     )
 
 
@@ -455,6 +542,8 @@ __all__ = [
     "BFAttentionEvent",
     "BFTransitionResult",
     "ENTRY_STATUSES",
+    "PUSH_BASELINE_COMPLETE",
+    "PUSH_BASELINE_PREVIOUS_MIDWEEK",
     "SOURCE_FACT_FIELDS",
     "analyze_bf_transitions",
 ]
