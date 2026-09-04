@@ -5,9 +5,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from sklearn.feature_selection import mutual_info_classif, mutual_info_score
+from sklearn.feature_selection import mutual_info_classif
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import mutual_info_score, roc_auc_score
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
