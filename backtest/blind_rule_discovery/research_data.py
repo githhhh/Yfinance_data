@@ -20,6 +20,11 @@ from typing import Iterable
 import pandas as pd
 import yfinance as yf
 
+from backtest.latest_quant_trade_replay.runner import (
+    _history_commit_rows,
+    _pkl_paths_at_commit,
+    load_git_pickle_data,
+)
 from market_universe import build_download_universe
 from .outcomes import RESEARCH_PRICE_MODE
 
@@ -76,17 +81,47 @@ def _symbols_from_pickle(path: Path) -> set[str]:
     }
 
 
+def _symbols_from_git_historical_pkls(repo_path: Path) -> set[str]:
+    """Best-effort union of symbols that appeared in committed historical 1d caches."""
+    symbols: set[str] = set()
+    seen_paths: set[str] = set()
+    try:
+        commits = _history_commit_rows(repo_path, "2000-01-01", "2100-01-01")
+    except Exception:
+        return symbols
+    for commit, _ in commits:
+        try:
+            paths = _pkl_paths_at_commit(repo_path, commit)
+        except Exception:
+            continue
+        for _, period, path in paths:
+            if period != "1d" or path in seen_paths:
+                continue
+            seen_paths.add(path)
+            try:
+                raw = load_git_pickle_data(repo_path, commit, path)
+            except Exception:
+                continue
+            symbols.update(
+                symbol
+                for symbol in (_normalize_symbol(v) for v in raw.keys())
+                if symbol and not symbol.startswith("__")
+            )
+    return symbols
+
+
 def collect_research_universe(
     *,
     data_root: Path = Path("."),
     replay_roots: Iterable[Path] = (DEFAULT_REPLAY_ROOT,),
     seed_pkl: Path | None = DEFAULT_SEED_PKL,
+    include_git_history: bool = True,
 ) -> list[str]:
-    """Union current strategy inputs with every symbol already known to replay/cache.
+    """Union current strategy inputs with every symbol already known to the repo.
 
-    This deliberately broadens the current strategy universe, but it is not a
-    historical listings database. The manifest calls that limitation out so
-    downstream research cannot silently claim point-in-time universe purity.
+    Git historical pkl symbols reduce current-cache survivorship, but this still
+    is not a complete point-in-time historical listings database. The manifest
+    retains that limitation explicitly.
     """
     symbols = {
         symbol
@@ -97,6 +132,8 @@ def collect_research_universe(
         symbols.update(_symbols_from_replay_root(root))
     if seed_pkl is not None:
         symbols.update(_symbols_from_pickle(seed_pkl))
+    if include_git_history:
+        symbols.update(_symbols_from_git_historical_pkls(data_root))
     symbols.update(BENCHMARK_CODES)
     return sorted(symbols)
 
@@ -225,6 +262,7 @@ def build_price_bundle(
         raise ValueError("research universe is empty")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    print(f"[blind-data] downloading {len(universe)} symbols at 1d")
     daily, daily_failures = _download_interval(
         universe,
         start=start,
@@ -233,6 +271,7 @@ def build_price_bundle(
         max_workers=max_workers,
         timeout=timeout,
     )
+    print(f"[blind-data] downloading {len(universe)} symbols at 1wk")
     weekly, weekly_failures = _download_interval(
         universe,
         start=start,
@@ -257,8 +296,6 @@ def build_price_bundle(
             f"joint={len(joint_symbols)} requested={requested}"
         )
 
-    # Persist only symbols with both intervals so the replay universe cannot
-    # differ between StockPeriod.DAILY and StockPeriod.WEEKLY by accident.
     daily = {symbol: daily[symbol] for symbol in joint_symbols}
     weekly = {symbol: weekly[symbol] for symbol in joint_symbols}
 
@@ -284,8 +321,8 @@ def build_price_bundle(
         "rounding": False,
         "start": start,
         "end_exclusive": end,
-        "universe_mode": "current_strategy_plus_known_replay_and_seed_cache",
-        "universe_limitation": "not a point-in-time historical listings database; survivorship remains a documented limitation",
+        "universe_mode": "current_strategy_plus_committed_replay_seed_cache_and_git_historical_pkls",
+        "universe_limitation": "best-effort union of repo-known symbols, not a complete point-in-time historical listings database; survivorship remains",
         "requested_symbols": requested,
         "daily_downloaded_symbols": daily_downloaded,
         "weekly_downloaded_symbols": weekly_downloaded,
@@ -320,6 +357,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-workers", type=int, default=8)
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument("--min-coverage", type=float, default=0.98)
+    parser.add_argument(
+        "--no-git-history-universe",
+        action="store_true",
+        help="debug only; canonical build includes symbols found in committed historical 1d pkls",
+    )
     return parser.parse_args(argv)
 
 
@@ -327,7 +369,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     replay_roots = args.replay_root or [DEFAULT_REPLAY_ROOT]
     universe = collect_research_universe(
-        data_root=Path("."), replay_roots=replay_roots, seed_pkl=args.seed_pkl
+        data_root=Path("."),
+        replay_roots=replay_roots,
+        seed_pkl=args.seed_pkl,
+        include_git_history=not args.no_git_history_universe,
     )
     manifest = build_price_bundle(
         universe=universe,
