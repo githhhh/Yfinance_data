@@ -303,6 +303,23 @@ def _quarter_count(rows: list[dict]) -> int:
     )
 
 
+def _assert_no_unexpected_resume_pools(
+    output_root: Path,
+    analysis_weeks: list[SnapshotWeek],
+) -> None:
+    expected = {week.snapshot_date for week in analysis_weeks}
+    unexpected = sorted(
+        path.parent.name
+        for path in output_root.glob("*/breakout_follow_pool.csv")
+        if path.parent.name not in expected
+    )
+    if unexpected:
+        raise RuntimeError(
+            "--no-clean output contains replay pools outside the requested analysis window: "
+            + ",".join(unexpected[:10])
+        )
+
+
 def _completed_week_metadata(
     output_root: Path,
     week: SnapshotWeek,
@@ -335,7 +352,9 @@ def _completed_week_metadata(
         return None
     if str(metadata.get("quant_trade_commit") or "") != quant_trade_commit:
         return None
-    return metadata
+    normalized = dict(metadata)
+    normalized["output_pool_path"] = str(pool_path)
+    return normalized
 
 
 def _worker_failure_row(
@@ -475,7 +494,9 @@ def _merge_worker_eps_caches(worker_cache_dir: Path, eps_pit_cache: Path) -> int
     ):
         normalized_key = (str(key[0])[:10], str(key[1]).strip().upper())
         workers_only = group.loc[group["_origin_rank"] == 1]
-        if normalized_key not in base_keys and len(_row_values_signature(workers_only, value_columns)) > 1:
+        if normalized_key not in base_keys and len(
+            _row_values_signature(workers_only, value_columns)
+        ) > 1:
             raise RuntimeError(
                 f"conflicting worker EPS PIT records for {normalized_key[0]} {normalized_key[1]}"
             )
@@ -637,6 +658,7 @@ def run_research_replay(
         )
     else:
         output_root.mkdir(parents=True, exist_ok=True)
+        _assert_no_unexpected_resume_pools(output_root, analysis_weeks)
 
     daily_sha = sha256_file(daily_pkl)
     weekly_sha = sha256_file(weekly_pkl)
