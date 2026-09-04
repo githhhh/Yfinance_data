@@ -98,6 +98,26 @@ class BFTransitionResult:
     def attention_payload(self) -> tuple[dict[str, Any], ...]:
         return tuple(event.to_dict() for event in self.attention_events)
 
+    def push_payload(self) -> dict[str, Any]:
+        """Return the JSON-friendly payload intended for the analysis repo."""
+        return {
+            "baseline": self.push_baseline,
+            "baseline_snapshot_date": (
+                self.push_baseline_snapshot_date.isoformat()
+                if self.push_baseline_snapshot_date is not None
+                else None
+            ),
+            "current_snapshot_date": (
+                self.current_snapshot_date.isoformat()
+                if self.current_snapshot_date is not None
+                else None
+            ),
+            "ready": self.push_ready,
+            "warnings": list(self.push_warnings),
+            "summary": dict(self.attention_summary),
+            "events": list(self.attention_payload()),
+        }
+
 
 def to_bool(value: Any) -> bool | None:
     if value is None or pd.isna(value):
@@ -208,11 +228,7 @@ def _project(
     current: pd.DataFrame,
     complete: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, tuple[str, ...], dict[str, int], bool]:
-    """Resolve one midweek pool against the complete-week authority.
-
-    This is the legacy Dashboard projection extracted unchanged. The complete
-    pool remains the source of Carry candidate facts.
-    """
+    """Resolve one midweek pool against the complete-week authority."""
 
     baseline_available = not complete.empty
     complete_by_code = {str(row["code"]): row for _, row in complete.iterrows()}
@@ -354,8 +370,6 @@ def _select_push_baseline(
     complete: pd.DataFrame,
     previous: pd.DataFrame | None,
 ) -> tuple[str, date | None, tuple[str, ...]]:
-    """Select the daily comparison baseline using only snapshot chronology."""
-
     complete_date = _snapshot_date(complete)
     if previous is None or previous.empty:
         return PUSH_BASELINE_COMPLETE, complete_date, ()
@@ -370,6 +384,21 @@ def _select_push_baseline(
     if complete_date >= previous_date:
         return PUSH_BASELINE_COMPLETE, complete_date, ()
     return PUSH_BASELINE_PREVIOUS_MIDWEEK, previous_date, ()
+
+
+def _signal_origin_between(
+    baseline_row: pd.Series | None,
+    current_row: pd.Series,
+) -> str:
+    baseline_signal = baseline_row is not None and to_bool(baseline_row.get("signal")) is True
+    current_signal = to_bool(current_row.get("signal")) is True
+    if baseline_signal and current_signal:
+        return "RECONFIRMED"
+    if current_signal:
+        return "NEW"
+    if baseline_signal:
+        return "CARRY"
+    return "NONE"
 
 
 def _attention_descriptor(
@@ -412,6 +441,7 @@ def _attention_descriptor(
 def _facts(row: pd.Series) -> dict[str, Any]:
     return {
         "snapshot_date": _date_text(row.get("snapshot_date")),
+        "weekend_signal_origin": _text(row.get("review_signal_origin")),
         "signal_source": _text(row.get("review_signal_source")),
         "candidate_rule": _text(row.get("review_ibd_candidate_rule")),
         "candidate_price": _number(row.get("review_candidate_price")),
@@ -456,7 +486,7 @@ def _attention_events_from_effective_states(
     current_review: pd.DataFrame,
     baseline_review: pd.DataFrame,
 ) -> tuple[BFAttentionEvent, ...]:
-    """Compare already-resolved effective states; do not re-resolve Carry."""
+    """Compare resolved states while retaining current market facts."""
 
     baseline_by_code = {
         str(row["code"]): row
@@ -474,7 +504,7 @@ def _attention_events_from_effective_states(
             else None
         )
         current_status = _text(current_row.get("review_effective_entry_status"))
-        signal_origin = _text(current_row.get("review_signal_origin")) or "NONE"
+        signal_origin = _signal_origin_between(baseline_row, current_row)
         descriptor = _attention_descriptor(baseline_status, current_status, signal_origin)
         if descriptor is None:
             continue
@@ -527,13 +557,11 @@ def analyze_bf_transitions(
 ) -> BFTransitionResult:
     """Analyze Dashboard and daily-attention transitions with separate baselines.
 
-    Dashboard is always complete-week -> current.
-
-    Daily attention selects its baseline by snapshot chronology. If complete is
-    equally/newer than previous midweek, it is the first comparison of a new
-    review week and uses complete -> current. Otherwise both previous and
-    current midweek pools are independently resolved against the same complete
-    pool, then their effective states are compared.
+    Dashboard is always complete-week -> current. Daily attention selects its
+    baseline by snapshot chronology. If complete is equally/newer than previous
+    midweek, it is the first comparison of a new review week. Otherwise the
+    previous and current midweek pools are independently resolved against the
+    same complete pool, then their effective states are compared.
     """
 
     current = normalize_transition_pool(current_pool, label="current")
@@ -555,9 +583,9 @@ def analyze_bf_transitions(
     current_date = _snapshot_date(current)
     warnings = list(baseline_warnings)
 
-    # Preserve existing no-previous behavior for Dashboard/API callers that do
-    # not carry snapshot metadata. Once previous_pool is supplied, chronology
-    # becomes part of the daily push contract and therefore fails closed.
+    # No-previous callers keep legacy behavior even without snapshot metadata.
+    # Once previous_pool is supplied, chronology is part of the push contract
+    # and therefore fails closed if it cannot be proven.
     push_ready = True
     if previous_available and (push_baseline_date is None or current_date is None):
         push_ready = False
