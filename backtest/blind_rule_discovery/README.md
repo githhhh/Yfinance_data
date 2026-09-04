@@ -56,7 +56,8 @@ QUANT_TRADE=/Users/dev/Documents/quant_trade
 $PY -m pytest \
   tests/test_blind_rule_discovery.py \
   tests/test_blind_rule_discovery_sandbox.py \
-  tests/test_blind_rule_discovery_data_pipeline.py -q
+  tests/test_blind_rule_discovery_data_pipeline.py \
+  tests/test_blind_rule_discovery_provenance.py -q
 ```
 
 ### 1. Build canonical long-history price bundle
