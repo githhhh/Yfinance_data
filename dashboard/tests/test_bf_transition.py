@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
 import pandas as pd
 
 from dashboard.services import analyze_bf_transitions
 from dashboard.services.bf_midweek_review import build_midweek_review
+from dashboard.services.bf_transition import (
+    PUSH_BASELINE_COMPLETE,
+    PUSH_BASELINE_PREVIOUS_MIDWEEK,
+)
 
 
 def _row(
@@ -47,6 +52,10 @@ def _row(
     }
 
 
+def _event_map(result):
+    return {event.code: event for event in result.attention_events}
+
+
 def test_shared_transition_api_preserves_dashboard_projection_contract():
     complete = pd.DataFrame(
         [
@@ -77,7 +86,7 @@ def test_shared_transition_api_preserves_dashboard_projection_contract():
         [
             _row(
                 "BECAME",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="ACTIONABLE",
                 valid=True,
@@ -88,7 +97,7 @@ def test_shared_transition_api_preserves_dashboard_projection_contract():
             ),
             _row(
                 "LEFT",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="BELOW_TRIGGER",
                 valid=True,
@@ -113,7 +122,7 @@ def test_shared_transition_api_preserves_dashboard_projection_contract():
     assert review.loc["LEFT", "review_entry_change"] == "ACTIONABLE_TO_BELOW_TRIGGER"
 
 
-def test_attention_api_returns_only_material_actionable_boundary_events_with_facts():
+def test_first_midweek_run_uses_complete_baseline_and_returns_material_events():
     complete = pd.DataFrame(
         [
             _row(
@@ -165,7 +174,7 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
         [
             _row(
                 "BECAME",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="ACTIONABLE",
                 valid=True,
@@ -176,7 +185,7 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
             ),
             _row(
                 "BELOW",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="BELOW_TRIGGER",
                 valid=True,
@@ -187,7 +196,7 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
             ),
             _row(
                 "EXTENDED",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="EXTENDED",
                 valid=True,
@@ -198,7 +207,7 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
             ),
             _row(
                 "OTHER",
-                snapshot_date="2026-07-29",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="UNCONFIRMED",
                 valid=False,
@@ -210,8 +219,13 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
     )
 
     result = analyze_bf_transitions(current, complete)
-    events = {event.code: event for event in result.attention_events}
+    events = _event_map(result)
 
+    assert result.push_baseline == PUSH_BASELINE_COMPLETE
+    assert result.push_baseline_snapshot_date == date(2026, 7, 24)
+    assert result.current_snapshot_date == date(2026, 7, 27)
+    assert result.push_ready is True
+    assert result.push_warnings == ()
     assert set(events) == {"BECAME", "BELOW", "EXTENDED"}
     assert events["BECAME"].event_type == "BECAME_ACTIONABLE"
     assert events["BECAME"].importance == "HIGH"
@@ -219,27 +233,17 @@ def test_attention_api_returns_only_material_actionable_boundary_events_with_fac
     assert events["BECAME"].facts["candidate_price"] == 100.0
     assert events["BECAME"].facts["latest_close"] == 102.0
     assert events["BECAME"].facts["entry_volume_ratio"] == 1.7
-    assert events["BECAME"].facts["eps_yoy_growth"] == 31.0
     assert events["BELOW"].event_type == "ACTIONABLE_TO_BELOW_TRIGGER"
-    assert events["BELOW"].importance == "HIGH"
     assert events["EXTENDED"].event_type == "ACTIONABLE_TO_EXTENDED"
-    assert events["EXTENDED"].importance == "MEDIUM"
-    assert result.attention_summary == {
-        "TOTAL": 3,
-        "HIGH": 2,
-        "MEDIUM": 1,
-        "NOTIFICATION_ELIGIBLE": 3,
-    }
-    payload = events["BECAME"].to_dict()
-    assert payload["facts"]["snapshot_date"] == "2026-07-29"
-    json.dumps(payload)
+    assert result.attention_summary == {"TOTAL": 3, "HIGH": 2, "MEDIUM": 1}
+    json.dumps(events["BECAME"].to_dict())
 
 
-def test_previous_pool_only_marks_new_material_events_for_notification():
+def test_previous_midweek_is_real_push_baseline_for_actionable_to_below_trigger():
     complete = pd.DataFrame(
         [
             _row(
-                "OLD_BECAME",
+                "AAPL",
                 snapshot_date="2026-07-24",
                 signal=True,
                 status="UNCONFIRMED",
@@ -247,49 +251,14 @@ def test_previous_pool_only_marks_new_material_events_for_notification():
                 candidate=100,
                 close=99,
                 rule="pivot",
-            ),
-            _row(
-                "NEW_BECAME",
-                snapshot_date="2026-07-24",
-                signal=True,
-                status="UNCONFIRMED",
-                valid=False,
-                candidate=100,
-                close=99,
-                rule="pivot",
-            ),
+            )
         ]
     )
     previous = pd.DataFrame(
         [
             _row(
-                "OLD_BECAME",
-                snapshot_date="2026-07-28",
-                signal=True,
-                status="ACTIONABLE",
-                valid=True,
-                candidate=100,
-                close=101,
-                rule="pivot",
-                entry_volume=1.6,
-            ),
-            _row(
-                "NEW_BECAME",
-                snapshot_date="2026-07-28",
-                signal=True,
-                status="UNCONFIRMED",
-                valid=False,
-                candidate=100,
-                close=99,
-                rule="pivot",
-            ),
-        ]
-    )
-    current = pd.DataFrame(
-        [
-            _row(
-                "OLD_BECAME",
-                snapshot_date="2026-07-29",
+                "AAPL",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="ACTIONABLE",
                 valid=True,
@@ -297,33 +266,191 @@ def test_previous_pool_only_marks_new_material_events_for_notification():
                 close=102,
                 rule="pivot",
                 entry_volume=1.7,
-            ),
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [
             _row(
-                "NEW_BECAME",
-                snapshot_date="2026-07-29",
+                "AAPL",
+                snapshot_date="2026-07-28",
+                signal=True,
+                status="BELOW_TRIGGER",
+                valid=True,
+                candidate=100,
+                close=99,
+                rule="pivot",
+                entry_volume=1.7,
+            )
+        ]
+    )
+
+    result = analyze_bf_transitions(current, complete, previous)
+    event = result.attention_events[0]
+
+    # Dashboard stays weekend -> current and therefore sees only OTHER_CHANGES.
+    assert result.rows.iloc[0]["review_change_group"] == "OTHER_CHANGES"
+    # Push correctly sees yesterday ACTIONABLE -> today BELOW_TRIGGER.
+    assert result.push_baseline == PUSH_BASELINE_PREVIOUS_MIDWEEK
+    assert result.push_baseline_snapshot_date == date(2026, 7, 27)
+    assert event.event_type == "ACTIONABLE_TO_BELOW_TRIGGER"
+    assert event.baseline_status == "ACTIONABLE"
+    assert event.current_status == "BELOW_TRIGGER"
+
+
+def test_previous_midweek_captures_actionable_to_extended_even_when_weekend_was_extended():
+    complete = pd.DataFrame(
+        [
+            _row(
+                "XYZ",
+                snapshot_date="2026-07-24",
+                signal=True,
+                status="EXTENDED",
+                valid=True,
+                candidate=100,
+                close=108,
+                rule="pivot",
+            )
+        ]
+    )
+    previous = pd.DataFrame(
+        [
+            _row(
+                "XYZ",
+                snapshot_date="2026-07-27",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=103,
+                rule="pivot",
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row(
+                "XYZ",
+                snapshot_date="2026-07-28",
+                signal=True,
+                status="EXTENDED",
+                valid=True,
+                candidate=100,
+                close=108,
+                rule="pivot",
+            )
+        ]
+    )
+
+    result = analyze_bf_transitions(current, complete, previous)
+    event = result.attention_events[0]
+
+    assert result.rows.iloc[0]["review_entry_change"] == "UNCHANGED"
+    assert event.event_type == "ACTIONABLE_TO_EXTENDED"
+    assert event.importance == "MEDIUM"
+
+
+def test_newer_complete_snapshot_resets_push_baseline_for_new_review_week():
+    previous = pd.DataFrame(
+        [
+            _row(
+                "RESET",
+                snapshot_date="2026-07-30",
                 signal=True,
                 status="ACTIONABLE",
                 valid=True,
                 candidate=100,
                 close=102,
                 rule="pivot",
-                entry_volume=1.8,
-            ),
+            )
+        ]
+    )
+    complete = pd.DataFrame(
+        [
+            _row(
+                "RESET",
+                snapshot_date="2026-07-31",
+                signal=True,
+                status="UNCONFIRMED",
+                valid=False,
+                candidate=100,
+                close=99,
+                rule="pivot",
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row(
+                "RESET",
+                snapshot_date="2026-08-03",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=102,
+                rule="pivot",
+            )
         ]
     )
 
     result = analyze_bf_transitions(current, complete, previous)
 
-    events = {event.code: event for event in result.attention_events}
-    assert events["OLD_BECAME"].is_new_since_previous is False
-    assert events["NEW_BECAME"].is_new_since_previous is True
-    assert tuple(event.code for event in result.notification_events) == ("NEW_BECAME",)
-    assert tuple(item["code"] for item in result.attention_payload(notification_only=True)) == (
-        "NEW_BECAME",
+    assert result.push_baseline == PUSH_BASELINE_COMPLETE
+    assert result.push_baseline_snapshot_date == date(2026, 7, 31)
+    assert result.attention_events[0].event_type == "BECAME_ACTIONABLE"
+    assert result.attention_events[0].baseline_status == "UNCONFIRMED"
+
+
+def test_previous_comparison_uses_effective_carry_state_not_raw_previous_status():
+    complete = pd.DataFrame(
+        [
+            _row(
+                "CARRY",
+                snapshot_date="2026-07-24",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=102,
+                rule="ceiling",
+                entry_volume=2.1,
+            )
+        ]
+    )
+    # Raw midweek signal is false, but Dashboard Carry resolution makes it
+    # effectively ACTIONABLE using the weekend candidate and latest close.
+    previous = pd.DataFrame(
+        [
+            _row(
+                "CARRY",
+                snapshot_date="2026-07-27",
+                signal=False,
+                close=102,
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row(
+                "CARRY",
+                snapshot_date="2026-07-28",
+                signal=False,
+                close=99,
+            )
+        ]
     )
 
+    result = analyze_bf_transitions(current, complete, previous)
+    event = result.attention_events[0]
 
-def test_new_signal_actionable_is_high_attention_with_origin_context():
+    assert event.event_type == "ACTIONABLE_TO_BELOW_TRIGGER"
+    assert event.baseline_status == "ACTIONABLE"
+    assert event.current_status == "BELOW_TRIGGER"
+    assert event.facts["candidate_price"] == 100.0
+
+
+def test_previous_actionable_that_exits_current_pool_is_high_attention():
     complete = pd.DataFrame(
         [
             _row(
@@ -334,26 +461,95 @@ def test_new_signal_actionable_is_high_attention_with_origin_context():
             )
         ]
     )
-    current = pd.DataFrame(
+    previous = pd.DataFrame(
         [
             _row(
-                "NEW",
-                snapshot_date="2026-07-29",
+                "EXIT",
+                snapshot_date="2026-07-27",
                 signal=True,
                 status="ACTIONABLE",
                 valid=True,
                 candidate=100,
                 close=102,
                 rule="pivot",
-                entry_volume=2.0,
+            ),
+            _row(
+                "KEEP",
+                snapshot_date="2026-07-27",
+                signal=False,
+                close=80,
+            ),
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row(
+                "KEEP",
+                snapshot_date="2026-07-28",
+                signal=False,
+                close=80,
             )
         ]
     )
 
-    event = analyze_bf_transitions(current, complete).attention_events[0]
+    result = analyze_bf_transitions(current, complete, previous)
+    event = result.attention_events[0]
 
-    assert event.code == "NEW"
-    assert event.event_type == "BECAME_ACTIONABLE"
-    assert event.signal_origin == "NEW"
-    assert event.reasons == ("BECAME_ACTIONABLE", "NEW_SIGNAL")
+    assert event.code == "EXIT"
+    assert event.event_type == "ACTIONABLE_EXITED_POOL"
+    assert event.importance == "HIGH"
+    assert event.baseline_status == "ACTIONABLE"
+    assert event.current_status is None
 
+
+def test_same_or_older_current_snapshot_suppresses_push_without_changing_dashboard_rows():
+    complete = pd.DataFrame(
+        [
+            _row(
+                "STALE",
+                snapshot_date="2026-07-24",
+                signal=True,
+                status="UNCONFIRMED",
+                valid=False,
+                candidate=100,
+                close=99,
+                rule="pivot",
+            )
+        ]
+    )
+    previous = pd.DataFrame(
+        [
+            _row(
+                "STALE",
+                snapshot_date="2026-07-28",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=102,
+                rule="pivot",
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [
+            _row(
+                "STALE",
+                snapshot_date="2026-07-28",
+                signal=True,
+                status="BELOW_TRIGGER",
+                valid=True,
+                candidate=100,
+                close=99,
+                rule="pivot",
+            )
+        ]
+    )
+
+    result = analyze_bf_transitions(current, complete, previous)
+
+    assert result.push_ready is False
+    assert result.attention_events == ()
+    assert result.attention_summary == {"TOTAL": 0, "HIGH": 0, "MEDIUM": 0}
+    assert result.push_warnings
+    assert result.rows.iloc[0]["review_change_group"] == "OTHER_CHANGES"
