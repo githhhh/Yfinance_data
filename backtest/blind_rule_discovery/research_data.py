@@ -243,8 +243,10 @@ def build_price_bundle(
     )
 
     requested = len(universe)
-    daily_coverage = len(daily) / requested if requested else 0.0
-    weekly_coverage = len(weekly) / requested if requested else 0.0
+    daily_downloaded = len(daily)
+    weekly_downloaded = len(weekly)
+    daily_coverage = daily_downloaded / requested if requested else 0.0
+    weekly_coverage = weekly_downloaded / requested if requested else 0.0
     joint_symbols = sorted(set(daily) & set(weekly))
     joint_coverage = len(joint_symbols) / requested if requested else 0.0
     if "SPY" not in daily or "SPY" not in weekly:
@@ -285,8 +287,8 @@ def build_price_bundle(
         "universe_mode": "current_strategy_plus_known_replay_and_seed_cache",
         "universe_limitation": "not a point-in-time historical listings database; survivorship remains a documented limitation",
         "requested_symbols": requested,
-        "daily_downloaded_symbols": len(daily) + len(set(daily_failures) & set(weekly)),
-        "weekly_downloaded_symbols": len(weekly) + len(set(weekly_failures) & set(daily)),
+        "daily_downloaded_symbols": daily_downloaded,
+        "weekly_downloaded_symbols": weekly_downloaded,
         "joint_downloaded_symbols": len(joint_symbols),
         "daily_coverage_before_intersection": daily_coverage,
         "weekly_coverage_before_intersection": weekly_coverage,
