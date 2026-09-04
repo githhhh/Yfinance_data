@@ -23,6 +23,17 @@ Canonical discovery experiment for replay candidates. B0/ranking/comparator code
 - Holdout: after freeze, the exact frozen rule is applied once and reported by quarter. `holdout_consumed.json` prevents silent re-evaluation in the same output root.
 - RD-agent runtime: hard cap 3600 seconds.
 
+## Data prerequisites
+
+Canonical research must satisfy both of these independently:
+
+1. **Replay-history depth**: enough historical replay candidate quarters must already exist before the sealed holdout. Do not reduce `--holdout-quarters` merely to make a short dataset run. The current committed `backtest/ibd_skill_replay_pools` starts in 2025Q4, so it is useful for pipeline validation but is not long enough for the default four-quarter sealed-holdout research protocol.
+2. **Outcome-price depth/quality**: a full-history daily price pickle must cover every replay candidate through its future outcome window and include `Adj Close` plus the benchmark symbol. The current `results_pkl/stock_data_290826_1d.pkl` is raw OHLCV-only and is therefore unsuitable for canonical outcome labeling.
+
+For a meaningful discovery run, regenerate replay pools farther back in time using a long-history point-in-time source, then use a split-safe full-history daily outcome source. Prefer at least 8 discovery quarters before the four sealed holdout quarters; more is better.
+
+The canonical benchmark is `SPY`. If an intentionally equivalent benchmark is used, pass it explicitly with `--spy-code` and document the change before research begins.
+
 ## Local verification
 
 From repository root:
@@ -38,15 +49,15 @@ git pull
 
 ## Stage 1: prepare the blind discovery workspace
 
-The current repository daily pickle can be used as the first local source. Canonical mode will fail closed if it does not contain `Adj Close` for the required symbols.
+Use the actual replay-pool root. The command below is a pipeline/preflight example only until long-history replay pools and a split-safe daily source are available.
 
 ```bash
 rm -rf backtest/blind_rule_discovery/output/local_run
 
 /Users/dev/.conda/envs/quant_env/bin/python \
   -m backtest.blind_rule_discovery.runner \
-  --replay-root backtest/latest_quant_trade_replay/output \
-  --daily-pkl results_pkl/stock_data_290826_1d.pkl \
+  --replay-root backtest/ibd_skill_replay_pools \
+  --daily-pkl /path/to/full_history_daily_with_adj_close_and_spy.pkl \
   --output-root backtest/blind_rule_discovery/output/local_run
 ```
 
@@ -65,8 +76,8 @@ Then run with the real installed RD-agent command. Use a fresh output root for e
 ```bash
 /Users/dev/.conda/envs/quant_env/bin/python \
   -m backtest.blind_rule_discovery.runner \
-  --replay-root backtest/latest_quant_trade_replay/output \
-  --daily-pkl results_pkl/stock_data_290826_1d.pkl \
+  --replay-root /path/to/long_history_replay_pools \
+  --daily-pkl /path/to/full_history_daily_with_adj_close_and_spy.pkl \
   --output-root backtest/blind_rule_discovery/output/rd_agent_run_01 \
   --agent-command '<installed RD-agent command that reads prompt.md/samples.csv and writes rule.json>' \
   --sandbox-prefix "sandbox-exec -D WORKSPACE={workspace} -D RUNTIME=/Users/dev/.conda/envs/quant_env -f $(pwd)/backtest/blind_rule_discovery/sandbox/macos_agent.sb"
