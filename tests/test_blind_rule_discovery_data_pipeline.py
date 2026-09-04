@@ -12,6 +12,10 @@ from backtest.blind_rule_discovery.outcomes import (
     is_split_safe_price_frame,
     load_price_pickle,
 )
+from backtest.blind_rule_discovery.pipeline_contract import (
+    replay_dataset_digest,
+    validate_replay_preflight,
+)
 from backtest.blind_rule_discovery.replay_builder import (
     MIN_ANALYSIS_QUARTERS,
     MIN_BUNDLE_COVERAGE,
@@ -231,6 +235,71 @@ def test_collect_research_universe_unions_strategy_replay_seed_and_benchmarks(tm
         data_root=tmp_path, replay_roots=[replay_root], seed_pkl=seed
     )
     assert {"AAA", "BBB", "CCC", "SPY", "^GSPC"}.issubset(set(universe))
+
+
+def test_replay_preflight_hash_chain_detects_candidate_tampering(tmp_path: Path):
+    daily_path = tmp_path / "research_daily.pkl"
+    daily_path.write_bytes(b"daily-bundle")
+    replay_root = tmp_path / "replay"
+    week = replay_root / "2023-01-06"
+    week.mkdir(parents=True)
+    pool = week / "breakout_follow_pool.csv"
+    pool.write_text("code,signal\nAAA,True\n", encoding="utf-8")
+    digest, pool_count = replay_dataset_digest(replay_root)
+    assert pool_count == 1
+    preflight = {
+        "price_adjustment_mode": RESEARCH_PRICE_MODE,
+        "benchmark_code": "SPY",
+        "warmup_failed_weeks": 0,
+        "failed_weeks": 0,
+        "analysis_weeks_expected": 1,
+        "analysis_weeks_persisted": 1,
+        "successful_quarters": 1,
+        "daily_pkl_sha256": sha256_file(daily_path),
+        "replay_dataset_sha256": digest,
+    }
+    (replay_root / "research_replay_preflight.json").write_text(
+        json.dumps(preflight), encoding="utf-8"
+    )
+    checked = validate_replay_preflight(
+        replay_root, daily_pkl=daily_path, required_quarters=1
+    )
+    assert checked["replay_dataset_sha256"] == digest
+
+    pool.write_text("code,signal\nAAA,False\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="dataset digest"):
+        validate_replay_preflight(
+            replay_root, daily_pkl=daily_path, required_quarters=1
+        )
+
+
+def test_replay_preflight_rejects_wrong_daily_bundle(tmp_path: Path):
+    daily_path = tmp_path / "research_daily.pkl"
+    daily_path.write_bytes(b"daily-bundle")
+    replay_root = tmp_path / "replay"
+    week = replay_root / "2023-01-06"
+    week.mkdir(parents=True)
+    (week / "breakout_follow_pool.csv").write_text("code,signal\nAAA,True\n")
+    digest, _ = replay_dataset_digest(replay_root)
+    (replay_root / "research_replay_preflight.json").write_text(
+        json.dumps(
+            {
+                "price_adjustment_mode": RESEARCH_PRICE_MODE,
+                "benchmark_code": "SPY",
+                "warmup_failed_weeks": 0,
+                "failed_weeks": 0,
+                "analysis_weeks_expected": 1,
+                "analysis_weeks_persisted": 1,
+                "successful_quarters": 1,
+                "daily_pkl_sha256": "wrong",
+                "replay_dataset_sha256": digest,
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="does not match the pkl used for replay"):
+        validate_replay_preflight(
+            replay_root, daily_pkl=daily_path, required_quarters=1
+        )
 
 
 def test_canonical_replay_capacity_is_fourteen_quarters():
