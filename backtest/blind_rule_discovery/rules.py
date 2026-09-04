@@ -86,6 +86,32 @@ def run_research_command(
         for name in ("PWD", "OLDPWD", "PYTHONPATH"):
             env.pop(name, None)
         wrapper = [part.replace("{workspace}", str(isolated)) for part in sandbox_prefix]
+
+        # Empirically verify the same wrapper cannot read outside the agent workspace.
+        # This catches a syntactically valid but ineffective sandbox policy before
+        # the research process gets a chance to inspect B0/repository files.
+        sentinel = Path(tmp) / "forbidden_sentinel.txt"
+        sentinel.write_text("blind-discovery-private", encoding="utf-8")
+        repo_root = Path(__file__).resolve().parents[2]
+        forbidden = [str(sentinel)]
+        if repo_root.exists():
+            forbidden.append(str(repo_root))
+        probe_script = 'for p in "$@"; do if [ -r "$p" ]; then exit 97; fi; done; exit 0'
+        probe = subprocess.run(
+            [*wrapper, "/bin/sh", "-c", probe_script, "sandbox-probe", *forbidden],
+            cwd=isolated,
+            text=True,
+            capture_output=True,
+            timeout=min(effective_timeout, 30),
+            check=False,
+            env=env,
+        )
+        if probe.returncode != 0:
+            raise RuntimeError(
+                "sandbox isolation preflight failed; wrapper can read outside workspace "
+                f"or cannot execute the isolation probe (returncode={probe.returncode})"
+            )
+
         completed = subprocess.run(
             [*wrapper, *command],
             cwd=isolated,
