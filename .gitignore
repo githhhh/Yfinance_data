@@ -30,3 +30,6 @@ prompt_cache.db
 backtest/b0_multifactor_challenge/agent_workspace/replay/
 backtest/rdagent_track_b_selector_challenge/agent_workspace/
 
+# Blind discovery long-history price/replay artifacts (local, reproducible)
+backtest/blind_rule_discovery/work/
+backtest/blind_rule_discovery/output/
