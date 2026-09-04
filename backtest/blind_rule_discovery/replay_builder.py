@@ -28,6 +28,7 @@ from backtest.latest_quant_trade_replay.runner import (
 from eps_pit.lookup import SignalEPSLookup
 
 from .outcomes import RESEARCH_PRICE_MODE
+from .pipeline_contract import replay_dataset_digest
 
 DEFAULT_WARMUP_START = "2022-07-01"
 DEFAULT_ANALYSIS_START = "2022-10-01"
@@ -389,8 +390,6 @@ def run_research_replay(
                         rows.append(row)
                     else:
                         warmup_failures.append(row)
-                    # A failed week breaks chronological old_pool state. Never
-                    # continue and pretend later weeks form a valid sequence.
                     break
                 replay_old_pool = load_replay_old_pool_from_metadata(row)
                 replay_old_pool_source = f"previous_replay_week:{week.snapshot_date}"
@@ -404,6 +403,7 @@ def run_research_replay(
         write_data_source_audit_report(output_root, rows)
 
     eps_cache_sha_after = sha256_file(eps_pit_cache) if eps_pit_cache.exists() else None
+    replay_digest, replay_pool_files = replay_dataset_digest(output_root)
     failed = [row for row in rows if row.get("status") != "success"]
     quarter_count = _quarter_count(rows)
     preflight = {
@@ -414,6 +414,8 @@ def run_research_replay(
         "warmup_failed_weeks": len(warmup_failures),
         "analysis_weeks_expected": len(analysis_weeks),
         "analysis_weeks_persisted": len(rows),
+        "replay_pool_files": replay_pool_files,
+        "replay_dataset_sha256": replay_digest,
         "successful_weeks": len(rows) - len(failed),
         "failed_weeks": len(failed),
         "successful_quarters": quarter_count,
@@ -421,6 +423,8 @@ def run_research_replay(
         "benchmark_code": benchmark_code,
         "daily_pkl": str(daily_pkl),
         "weekly_pkl": str(weekly_pkl),
+        "daily_pkl_sha256": daily_sha,
+        "weekly_pkl_sha256": weekly_sha,
         "price_manifest": str(price_manifest),
         "price_manifest_sha256": sha256_file(price_manifest),
         "price_adjustment_mode": RESEARCH_PRICE_MODE,
@@ -461,9 +465,9 @@ def run_research_replay(
             f"canonical replay failed at {row.get('snapshot_date')}: "
             f"{row.get('failure_reason') or row.get('status')}"
         )
-    if len(rows) != len(analysis_weeks):
+    if len(rows) != len(analysis_weeks) or replay_pool_files != len(analysis_weeks):
         raise RuntimeError(
-            f"canonical replay persisted {len(rows)} of {len(analysis_weeks)} expected analysis weeks"
+            f"canonical replay is incomplete: rows={len(rows)} pools={replay_pool_files} expected={len(analysis_weeks)}"
         )
     if quarter_count < min_analysis_quarters:
         raise RuntimeError(
