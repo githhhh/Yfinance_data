@@ -189,34 +189,28 @@ def evaluate_candidate_path(
     target_date = _first_event_date(window, threshold=config.winner_gain, entry_price=entry_price, side="up")
     stop_date = _first_event_date(window, threshold=config.stop_loss, entry_price=entry_price, side="down")
     first_bar = window.iloc[0]
-    if (
+    entry_day_order_unknown = (
         entry["entry_method"] == "intraday_trigger"
         and float(first_bar["Low"]) <= entry_price * (1.0 + config.stop_loss)
-    ):
-        return {
-            "label": "ambiguous_path",
-            "primary": "ambiguous",
-            "reason": "entry_day_stop_order_unknown",
-            "entry_date": entry_date,
-            "entry_price": entry_price,
-            **entry,
-        }
+    )
 
-    if target_date is not None and stop_date is not None and target_date == stop_date:
-        label, primary = "ambiguous_path", "ambiguous"
+    if entry_day_order_unknown:
+        label, primary, reason = "ambiguous_path", "ambiguous", "entry_day_stop_order_unknown"
+    elif target_date is not None and stop_date is not None and target_date == stop_date:
+        label, primary, reason = "ambiguous_path", "ambiguous", "same_bar_target_stop_order_unknown"
     elif target_date is not None and (stop_date is None or target_date < stop_date):
-        label, primary = "clean_winner", "winner"
+        label, primary, reason = "clean_winner", "winner", ""
     elif stop_date is not None and target_date is not None and stop_date < target_date:
-        label, primary = "stop_out_then_winner", "loser"
+        label, primary, reason = "stop_out_then_winner", "loser", ""
     elif stop_date is not None:
-        label, primary = "stopped_out_loser", "loser"
+        label, primary, reason = "stopped_out_loser", "loser", ""
     else:
-        label, primary = "unresolved", "unresolved"
+        label, primary, reason = "unresolved", "unresolved", ""
 
     result: dict[str, Any] = {
         "label": label,
         "primary": primary,
-        "reason": "",
+        "reason": reason,
         "entry_date": entry_date,
         "entry_price": entry_price,
         "entry_method": entry["entry_method"],
