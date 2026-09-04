@@ -1,9 +1,9 @@
 """Verify that spawned-process replay is data-equivalent to serial golden pools.
 
-This audit is intentionally separate from the long replay run.  It treats
+This audit is intentionally separate from the long replay run. It treats
 already-computed successful serial replay pools as golden data, recomputes a
 small deterministic cross-section with the new ProcessPoolExecutor path, and
-compares every pool field keyed by ticker.  It never mutates the golden replay
+compares every pool field keyed by ticker. It never mutates the golden replay
 root or the canonical EPS PIT seed cache.
 """
 from __future__ import annotations
@@ -13,7 +13,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import json
 import math
 import multiprocessing as mp
-import os
 from pathlib import Path
 import shutil
 import zipfile
@@ -226,6 +225,13 @@ def compare_pool_files(baseline_path: Path, candidate_path: Path) -> list[dict[s
     return compare_pool_frames(_read_pool(baseline_path), _read_pool(candidate_path))
 
 
+def _safe_sha256(path: Path) -> str | None:
+    try:
+        return sha256_file(path) if path.exists() else None
+    except Exception:
+        return None
+
+
 def _assert_local_eps_assets(repo_root: Path, eps_seed: Path) -> dict[str, Any]:
     """Fail closed when the claimed offline EPS prerequisites are not present."""
     companyfacts = repo_root / "output" / "eps_pit_cache" / "sec" / "companyfacts.zip"
@@ -241,14 +247,29 @@ def _assert_local_eps_assets(repo_root: Path, eps_seed: Path) -> dict[str, Any]:
             "offline SEC ticker map missing; replay could otherwise attempt network CIK lookup: "
             f"{ticker_map}"
         )
+    try:
+        ticker_payload = json.loads(ticker_map.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"offline SEC ticker map is unreadable: {ticker_map}") from exc
+    if not isinstance(ticker_payload, dict) or not ticker_payload:
+        raise RuntimeError(f"offline SEC ticker map is empty/invalid: {ticker_map}")
     if not eps_seed.exists():
         raise FileNotFoundError(
             f"canonical EPS PIT seed cache missing: {eps_seed}; equivalence audit requires the serial-run seed"
+        )
+    try:
+        seed_header = pd.read_csv(eps_seed, nrows=5)
+    except Exception as exc:
+        raise RuntimeError(f"canonical EPS PIT seed cache is unreadable: {eps_seed}") from exc
+    if not {"snapshot_date", "code"}.issubset(seed_header.columns):
+        raise RuntimeError(
+            f"canonical EPS PIT seed cache lacks snapshot_date/code keys: {eps_seed}"
         )
     return {
         "companyfacts_zip": str(companyfacts),
         "companyfacts_size": companyfacts.stat().st_size,
         "company_tickers_json": str(ticker_map),
+        "company_ticker_entries": len(ticker_payload),
         "eps_seed": str(eps_seed),
         "eps_seed_sha256": sha256_file(eps_seed),
     }
@@ -347,32 +368,52 @@ def run_equivalence_audit(
     del daily_data, weekly_data
 
     rows: dict[str, dict[str, Any]] = {}
-    spawn_context = mp.get_context("spawn")
-    with ProcessPoolExecutor(
-        max_workers=min(workers, len(selected)),
-        mp_context=spawn_context,
-        initializer=_init_replay_worker,
-        initargs=(
-            str(daily_pkl),
-            str(weekly_pkl),
-            worker_config,
-            str(eps_pit_cache),
-            str(worker_cache_dir),
-        ),
-    ) as executor:
-        future_to_week = {
-            executor.submit(
-                _run_week_worker,
-                (week.snapshot_date, week.expected_last_trading_day),
-            ): week
-            for week in selected
-        }
-        for future in as_completed(future_to_week):
-            week = future_to_week[future]
-            row = future.result()
-            rows[week.snapshot_date] = row
-            print(
-                f"[replay-equivalence] {week.snapshot_date} status={row.get('status')}"
+    pool_level_error: str | None = None
+    try:
+        spawn_context = mp.get_context("spawn")
+        with ProcessPoolExecutor(
+            max_workers=min(workers, len(selected)),
+            mp_context=spawn_context,
+            initializer=_init_replay_worker,
+            initargs=(
+                str(daily_pkl),
+                str(weekly_pkl),
+                worker_config,
+                str(eps_pit_cache),
+                str(worker_cache_dir),
+            ),
+        ) as executor:
+            future_to_week = {
+                executor.submit(
+                    _run_week_worker,
+                    (week.snapshot_date, week.expected_last_trading_day),
+                ): week
+                for week in selected
+            }
+            for future in as_completed(future_to_week):
+                week = future_to_week[future]
+                try:
+                    row = future.result()
+                except Exception as exc:
+                    row = {
+                        "snapshot_date": week.snapshot_date,
+                        "status": "failed_worker_exception",
+                        "failure_reason": f"{type(exc).__name__}: {exc}",
+                    }
+                rows[week.snapshot_date] = row
+                print(
+                    f"[replay-equivalence] {week.snapshot_date} status={row.get('status')}"
+                )
+    except Exception as exc:
+        pool_level_error = f"{type(exc).__name__}: {exc}"
+        for week in selected:
+            rows.setdefault(
+                week.snapshot_date,
+                {
+                    "snapshot_date": week.snapshot_date,
+                    "status": "failed_process_pool",
+                    "failure_reason": pool_level_error,
+                },
             )
 
     week_reports: list[dict[str, Any]] = []
@@ -390,7 +431,15 @@ def run_equivalence_audit(
                 }
             ]
         else:
-            mismatches = compare_pool_files(baseline_pool, candidate_pool)
+            try:
+                mismatches = compare_pool_files(baseline_pool, candidate_pool)
+            except Exception as exc:
+                mismatches = [
+                    {
+                        "kind": "comparison_error",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                ]
         total_mismatches += len(mismatches)
         week_reports.append(
             {
@@ -398,10 +447,8 @@ def run_equivalence_audit(
                 "quarter": str(pd.Timestamp(week.snapshot_date).to_period("Q")),
                 "baseline_pool": str(baseline_pool),
                 "candidate_pool": str(candidate_pool),
-                "baseline_sha256": sha256_file(baseline_pool),
-                "candidate_sha256": sha256_file(candidate_pool)
-                if candidate_pool.exists()
-                else None,
+                "baseline_sha256": _safe_sha256(baseline_pool),
+                "candidate_sha256": _safe_sha256(candidate_pool),
                 "parallel_status": row.get("status"),
                 "equivalent": not mismatches,
                 "mismatch_count": len(mismatches),
@@ -411,7 +458,7 @@ def run_equivalence_audit(
 
     report = {
         "schema_version": 1,
-        "verified": total_mismatches == 0,
+        "verified": total_mismatches == 0 and pool_level_error is None,
         "comparison_policy": {
             "scope": "all breakout_follow_pool.csv columns",
             "row_key": "code",
@@ -424,6 +471,7 @@ def run_equivalence_audit(
         "execution_model": "ProcessPoolExecutor_spawn",
         "thread_pool_used": False,
         "workers": min(workers, len(selected)),
+        "pool_level_error": pool_level_error,
         "baseline_root": str(baseline_root),
         "parallel_root": str(parallel_root),
         "daily_pkl_sha256": daily_sha,
