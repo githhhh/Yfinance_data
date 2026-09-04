@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import pickle
 from pathlib import Path
 
@@ -14,12 +15,15 @@ from backtest.blind_rule_discovery.outcomes import (
 from backtest.blind_rule_discovery.replay_builder import (
     MIN_ANALYSIS_QUARTERS,
     _assert_research_bundle,
+    assert_history_coverage,
     enumerate_snapshot_weeks_from_benchmark,
+    validate_price_manifest,
 )
 from backtest.blind_rule_discovery.research_data import (
     collect_research_universe,
     daily_to_weekly,
 )
+from backtest.latest_quant_trade_replay.runner import sha256_file
 
 
 def _daily(start: str, periods: int = 5) -> pd.DataFrame:
@@ -36,6 +40,27 @@ def _daily(start: str, periods: int = 5) -> pd.DataFrame:
     )
     frame.attrs["price_adjustment_mode"] = RESEARCH_PRICE_MODE
     return frame
+
+
+def _write_bundle_files(tmp_path: Path) -> tuple[Path, Path, Path]:
+    daily_path = tmp_path / "research_daily.pkl"
+    weekly_path = tmp_path / "research_weekly.pkl"
+    with daily_path.open("wb") as handle:
+        pickle.dump({"SPY": _daily("2017-01-03")}, handle)
+    with weekly_path.open("wb") as handle:
+        pickle.dump({"SPY": _daily("2017-01-03")}, handle)
+    manifest = {
+        "schema_version": 1,
+        "price_adjustment_mode": RESEARCH_PRICE_MODE,
+        "auto_adjust": False,
+        "rounding": False,
+        "benchmark_codes_downloaded": ["SPY"],
+        "daily_sha256": sha256_file(daily_path),
+        "weekly_sha256": sha256_file(weekly_path),
+    }
+    manifest_path = tmp_path / "price_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return daily_path, weekly_path, manifest_path
 
 
 def test_research_price_mode_does_not_apply_dividend_adj_close_factor(tmp_path: Path):
@@ -113,6 +138,52 @@ def test_research_bundle_preflight_rejects_unverified_price_basis():
     unverified.attrs.clear()
     with pytest.raises(ValueError, match="verified price mode"):
         _assert_research_bundle({"SPY": verified, "AAA": unverified}, benchmark_code="SPY")
+
+
+def test_price_manifest_hash_must_match_exact_bundle(tmp_path: Path):
+    daily_path, weekly_path, manifest_path = _write_bundle_files(tmp_path)
+    manifest = validate_price_manifest(
+        manifest_path, daily_pkl=daily_path, weekly_pkl=weekly_path
+    )
+    assert manifest["price_adjustment_mode"] == RESEARCH_PRICE_MODE
+
+    with daily_path.open("ab") as handle:
+        handle.write(b"tampered")
+    with pytest.raises(ValueError, match="daily pkl SHA256"):
+        validate_price_manifest(
+            manifest_path, daily_pkl=daily_path, weekly_pkl=weekly_path
+        )
+
+
+def test_price_manifest_rejects_wrong_price_semantics(tmp_path: Path):
+    daily_path, weekly_path, manifest_path = _write_bundle_files(tmp_path)
+    manifest = json.loads(manifest_path.read_text())
+    manifest["price_adjustment_mode"] = "unknown"
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="price_adjustment_mode"):
+        validate_price_manifest(
+            manifest_path, daily_pkl=daily_path, weekly_pkl=weekly_path
+        )
+
+
+def test_history_preflight_requires_five_year_context_before_warmup():
+    short = _daily("2020-01-02", periods=700)
+    with pytest.raises(ValueError, match="starts too late"):
+        assert_history_coverage(
+            short,
+            warmup_start="2022-07-01",
+            analysis_end="2022-12-30",
+            min_lookback_days=5 * 365,
+        )
+
+    long = _daily("2017-01-03", periods=1600)
+    coverage = assert_history_coverage(
+        long,
+        warmup_start="2022-07-01",
+        analysis_end="2022-12-30",
+        min_lookback_days=5 * 365,
+    )
+    assert coverage["first_session"] == "2017-01-03"
 
 
 def test_collect_research_universe_unions_strategy_replay_seed_and_benchmarks(tmp_path: Path):
