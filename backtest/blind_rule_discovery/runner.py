@@ -27,6 +27,7 @@ from .experiment import (
     write_agent_workspace,
 )
 from .outcomes import RESEARCH_PRICE_MODE, SPLIT_SAFE_PRICE_MODES
+from .pipeline_contract import validate_replay_preflight
 
 DEFAULT_MIN_DISCOVERY_QUARTERS = 8
 
@@ -48,6 +49,11 @@ def parse_args() -> argparse.Namespace:
         "--allow-unadjusted-outcomes",
         action="store_true",
         help="non-canonical debug override; normal research requires a verified split-safe price basis",
+    )
+    parser.add_argument(
+        "--allow-unverified-replay",
+        action="store_true",
+        help="non-canonical debug override; normal research requires replay_builder provenance",
     )
     parser.add_argument("--agent-command", default="")
     parser.add_argument(
@@ -102,6 +108,12 @@ def _validate_split_safe_basis(
     benchmark_code: str,
     candidate_codes: set[str],
 ) -> str:
+    missing_codes = sorted(candidate_codes.difference(prices))
+    if missing_codes:
+        raise ValueError(
+            f"{len(missing_codes)} mature replay candidate symbols are missing from outcome prices: "
+            + ",".join(missing_codes[:10])
+        )
     benchmark_mode = str(benchmark_prices[benchmark_code].attrs.get("price_adjustment_mode") or "")
     if benchmark_mode not in SPLIT_SAFE_PRICE_MODES:
         raise ValueError(
@@ -109,7 +121,7 @@ def _validate_split_safe_basis(
         )
     unsafe_codes = sorted(
         code for code in candidate_codes
-        if code in prices and str(prices[code].attrs.get("price_adjustment_mode") or "") not in SPLIT_SAFE_PRICE_MODES
+        if str(prices[code].attrs.get("price_adjustment_mode") or "") not in SPLIT_SAFE_PRICE_MODES
     )
     if unsafe_codes:
         raise ValueError(
@@ -122,6 +134,21 @@ def _validate_split_safe_basis(
 def main() -> int:
     args = parse_args()
     _prepare_output_root(args.output_root)
+    required_quarters = args.holdout_quarters + args.min_discovery_quarters
+
+    replay_provenance: dict[str, object] = {"verification": "debug_override"}
+    if not args.allow_unverified_replay:
+        replay_provenance = validate_replay_preflight(
+            args.replay_root,
+            daily_pkl=args.daily_pkl,
+            required_quarters=required_quarters,
+        )
+        if args.spy_code != str(replay_provenance.get("benchmark_code")):
+            raise ValueError(
+                f"Stage 1 benchmark {args.spy_code!r} differs from replay benchmark "
+                f"{replay_provenance.get('benchmark_code')!r}"
+            )
+
     candidates_all = load_replay_candidates(args.replay_root)
     require_split_safe = not args.allow_unadjusted_outcomes
     prices = load_price_pickle(args.daily_pkl)
@@ -140,7 +167,6 @@ def main() -> int:
         candidates_all, benchmark_prices[args.spy_code], minimum_sessions=future_sessions_required
     )
     mature_quarters = sorted(candidates["snapshot_date"].dt.to_period("Q").astype(str).unique())
-    required_quarters = args.holdout_quarters + args.min_discovery_quarters
     if len(mature_quarters) < required_quarters:
         raise ValueError(
             f"only {len(mature_quarters)} mature candidate quarters are available; "
@@ -186,6 +212,9 @@ def main() -> int:
     metadata = {
         "daily_price_source_sha256": _sha256_file(args.daily_pkl),
         "benchmark_price_source_sha256": _sha256_file(args.benchmark_pkl) if args.benchmark_pkl else _sha256_file(args.daily_pkl),
+        "replay_provenance_verified": not args.allow_unverified_replay,
+        "replay_dataset_sha256": replay_provenance.get("replay_dataset_sha256"),
+        "replay_price_manifest_sha256": replay_provenance.get("price_manifest_sha256"),
         "price_basis_required": require_split_safe,
         "benchmark_price_adjustment_mode": benchmark_mode,
         "canonical_research_price_mode": RESEARCH_PRICE_MODE,
