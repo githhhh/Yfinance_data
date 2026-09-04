@@ -10,6 +10,9 @@ from typing import Any
 import pandas as pd
 
 TRADING_HORIZONS = {"4w": 20, "8w": 40, "12w": 60}
+RESEARCH_PRICE_MODE = "yahoo_split_adjusted_ohlc_no_dividend_adjustment"
+SPLIT_SAFE_PRICE_MODES = {"adj_close_factor", RESEARCH_PRICE_MODE}
+
 
 @dataclass(frozen=True)
 class OutcomeConfig:
@@ -19,10 +22,12 @@ class OutcomeConfig:
     entry_window_sessions: int = 5
     max_entry_extension: float = 0.05
 
+
 def _normalize_price_frame(df: pd.DataFrame) -> pd.DataFrame:
     required = {"Open", "High", "Low", "Close"}
     if not required.issubset(df.columns):
         raise ValueError(f"price frame missing columns: {sorted(required - set(df.columns))}")
+    source_mode = str(df.attrs.get("price_adjustment_mode") or "")
     out = df.loc[:, ["Open", "High", "Low", "Close"]].copy()
     if "date" in df.columns:
         idx = pd.DatetimeIndex(pd.to_datetime(df["date"], errors="coerce"))
@@ -36,12 +41,18 @@ def _normalize_price_frame(df: pd.DataFrame) -> pd.DataFrame:
 
     adjustment_mode = "raw_no_adj_close"
     out["_adj_factor"] = 1.0
-    if "Adj Close" in df.columns:
+    if source_mode == RESEARCH_PRICE_MODE:
+        # Canonical research bundle: Yahoo OHLC with auto_adjust=False.  Yahoo
+        # historical Close/OHLC is split-adjusted; no dividend factor should be
+        # applied to a price-only stop/target path.
+        adjustment_mode = RESEARCH_PRICE_MODE
+    elif "Adj Close" in df.columns:
+        # Legacy compatibility for arbitrary historical files that only expose
+        # split safety through Adj Close.  This path remains supported for old
+        # tests/data, but canonical research uses RESEARCH_PRICE_MODE above.
         adj = pd.to_numeric(df["Adj Close"], errors="coerce").reset_index(drop=True)
         raw_close = pd.to_numeric(df["Close"], errors="coerce").reset_index(drop=True)
         factor = adj / raw_close.where(raw_close != 0)
-        # Preserve a continuous split/dividend-adjusted OHLC path while keeping
-        # the source download itself unadjusted.
         factor_values = factor.to_numpy()
         for col in ["Open", "High", "Low", "Close"]:
             out[col] = pd.to_numeric(out[col], errors="coerce").to_numpy() * factor_values
@@ -52,26 +63,38 @@ def _normalize_price_frame(df: pd.DataFrame) -> pd.DataFrame:
     out.attrs["price_adjustment_mode"] = adjustment_mode
     return out
 
+
+def is_split_safe_price_frame(frame: pd.DataFrame) -> bool:
+    return str(frame.attrs.get("price_adjustment_mode") or "") in SPLIT_SAFE_PRICE_MODES
+
+
 def load_price_pickle(path: Path, *, require_adjusted: bool = False) -> dict[str, pd.DataFrame]:
+    """Load price map and preserve/derive a verifiable split-safe basis.
+
+    ``require_adjusted`` is retained for backwards compatibility; semantically
+    it now means "require a verified split-safe basis", not "require dividend-
+    adjusted Adj Close".
+    """
     with path.open("rb") as handle:
         raw = pickle.load(handle)
     out: dict[str, pd.DataFrame] = {}
-    unadjusted: list[str] = []
+    unsafe: list[str] = []
     for code, value in raw.items():
         if isinstance(value, dict) and {"index", "columns", "data"}.issubset(value):
             value = pd.DataFrame(index=value["index"], columns=value["columns"], data=value["data"])
         if isinstance(value, pd.DataFrame):
             normalized = _normalize_price_frame(value)
             out[str(code)] = normalized
-            if normalized.attrs.get("price_adjustment_mode") != "adj_close_factor":
-                unadjusted.append(str(code))
-    if require_adjusted and unadjusted:
-        sample = ",".join(unadjusted[:10])
+            if not is_split_safe_price_frame(normalized):
+                unsafe.append(str(code))
+    if require_adjusted and unsafe:
+        sample = ",".join(unsafe[:10])
         raise ValueError(
-            f"outcome source lacks Adj Close for {len(unadjusted)} symbols ({sample}); "
+            f"outcome source lacks a verified split-safe price basis for {len(unsafe)} symbols ({sample}); "
             "refuse split-unsafe raw OHLC outcomes"
         )
     return out
+
 
 def restrict_to_mature_outcome_quarters(
     candidates: pd.DataFrame,
@@ -92,6 +115,7 @@ def restrict_to_mature_outcome_quarters(
         raise ValueError("no fully mature outcome quarters remain")
     return mature, excluded, maturity_cutoff
 
+
 def _first_event_date(window: pd.DataFrame, *, threshold: float, entry_price: float, side: str) -> pd.Timestamp | None:
     if side == "up":
         hits = window.loc[window["High"] >= entry_price * (1.0 + threshold), "date"]
@@ -100,6 +124,7 @@ def _first_event_date(window: pd.DataFrame, *, threshold: float, entry_price: fl
     else:
         raise ValueError(side)
     return None if hits.empty else pd.Timestamp(hits.iloc[0])
+
 
 def _benchmark_return(spy: pd.DataFrame, entry_date: pd.Timestamp, exit_date: pd.Timestamp) -> float | None:
     entry_rows = spy.loc[spy["date"] == entry_date]
@@ -110,6 +135,7 @@ def _benchmark_return(spy: pd.DataFrame, entry_date: pd.Timestamp, exit_date: pd
     exit_close = float(exit_rows.iloc[-1]["Close"])
     return exit_close / entry - 1.0 if entry > 0 else None
 
+
 def _adjusted_trigger_price(px: pd.DataFrame, signal_date: pd.Timestamp, trigger_price: float) -> float:
     history = px.loc[px["date"] <= signal_date]
     if "_adj_factor" in px.columns and not history.empty:
@@ -117,6 +143,7 @@ def _adjusted_trigger_price(px: pd.DataFrame, signal_date: pd.Timestamp, trigger
     else:
         factor = 1.0
     return trigger_price * factor
+
 
 def _resolve_executable_entry(
     px: pd.DataFrame,
@@ -153,6 +180,7 @@ def _resolve_executable_entry(
                 "trigger_price_adjusted": trigger,
             }
     return {"reason": "no_entry_within_buy_zone_window"}
+
 
 def evaluate_candidate_path(
     prices: pd.DataFrame,
@@ -236,12 +264,14 @@ def evaluate_candidate_path(
         result[f"excess_{name}"] = None if benchmark is None else stock_return - benchmark
     return result
 
+
 def _max_drawdown(close: pd.Series) -> float | None:
     values = pd.to_numeric(close, errors="coerce").dropna()
     if values.empty:
         return None
     running_peak = values.cummax()
     return float((values / running_peak - 1.0).min())
+
 
 def point_in_time_market_features(spy_prices: pd.DataFrame, signal_date: str | pd.Timestamp) -> dict[str, Any]:
     """Broad-market features known by the signal close; never use future period data."""
