@@ -3,8 +3,8 @@
 This is intentionally separate from the production rolling cache. Yahoo's
 historical ``Close``/OHLC series with ``auto_adjust=False`` is split-adjusted
 but not dividend-adjusted; that is the price basis wanted for executable
-stop/target research. The bundle records that provenance in DataFrame attrs
-and a sidecar manifest instead of requiring dividend-adjusted ``Adj Close``.
+stop/target research. Daily and weekly bars are downloaded independently from
+Yahoo so replay receives the same interval semantics as production.
 """
 from __future__ import annotations
 
@@ -101,12 +101,19 @@ def collect_research_universe(
     return sorted(symbols)
 
 
-def _download_one(symbol: str, *, start: str, end: str | None, timeout: float) -> tuple[str, pd.DataFrame | None, str]:
+def _download_one(
+    symbol: str,
+    *,
+    start: str,
+    end: str | None,
+    interval: str,
+    timeout: float,
+) -> tuple[str, pd.DataFrame | None, str]:
     try:
         data = yf.Ticker(symbol).history(
             start=start,
             end=end,
-            interval="1d",
+            interval=interval,
             auto_adjust=False,
             actions=True,
             repair=True,
@@ -130,17 +137,50 @@ def _download_one(symbol: str, *, start: str, end: str | None, timeout: float) -
         return symbol, None, "no_valid_ohlc"
     out.attrs["price_adjustment_mode"] = RESEARCH_PRICE_MODE
     out.attrs["source"] = "yfinance.Ticker.history"
+    out.attrs["interval"] = interval
     out.attrs["auto_adjust"] = False
     out.attrs["repair"] = True
     out.attrs["rounding"] = False
     return symbol, out, ""
 
 
-def daily_to_weekly(daily: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate daily bars by exchange week and label with the actual last session.
+def _download_interval(
+    universe: list[str],
+    *,
+    start: str,
+    end: str | None,
+    interval: str,
+    max_workers: int,
+    timeout: float,
+) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    data: dict[str, pd.DataFrame] = {}
+    failures: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=max(1, int(max_workers))) as executor:
+        futures = {
+            executor.submit(
+                _download_one,
+                symbol,
+                start=start,
+                end=end,
+                interval=interval,
+                timeout=timeout,
+            ): symbol
+            for symbol in universe
+        }
+        for future in as_completed(futures):
+            symbol, frame, reason = future.result()
+            if frame is None:
+                failures[symbol] = reason
+            else:
+                data[symbol] = frame
+    return data, failures
 
-    Using the actual final trading date avoids hard-coded holiday calendars and
-    preserves shortened weeks (e.g. a Thursday close before Good Friday).
+
+def daily_to_weekly(daily: pd.DataFrame) -> pd.DataFrame:
+    """Audit/test utility: aggregate daily bars using actual final session labels.
+
+    Canonical replay does not use this function; it downloads Yahoo 1wk bars
+    directly to match production interval semantics.
     """
     if daily.empty:
         return daily.copy()
@@ -179,36 +219,47 @@ def build_price_bundle(
     output_dir: Path,
     max_workers: int = 8,
     timeout: float = 15.0,
-    min_coverage: float = 0.90,
+    min_coverage: float = 0.98,
 ) -> dict[str, object]:
     if not universe:
         raise ValueError("research universe is empty")
     output_dir.mkdir(parents=True, exist_ok=True)
-    daily: dict[str, pd.DataFrame] = {}
-    failures: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=max(1, int(max_workers))) as executor:
-        futures = {
-            executor.submit(_download_one, symbol, start=start, end=end, timeout=timeout): symbol
-            for symbol in universe
-        }
-        for future in as_completed(futures):
-            symbol, frame, reason = future.result()
-            if frame is None:
-                failures[symbol] = reason
-            else:
-                daily[symbol] = frame
+
+    daily, daily_failures = _download_interval(
+        universe,
+        start=start,
+        end=end,
+        interval="1d",
+        max_workers=max_workers,
+        timeout=timeout,
+    )
+    weekly, weekly_failures = _download_interval(
+        universe,
+        start=start,
+        end=end,
+        interval="1wk",
+        max_workers=max_workers,
+        timeout=timeout,
+    )
 
     requested = len(universe)
-    coverage = len(daily) / requested if requested else 0.0
-    if "SPY" not in daily:
-        raise RuntimeError("canonical research bundle requires SPY")
-    if coverage < min_coverage:
+    daily_coverage = len(daily) / requested if requested else 0.0
+    weekly_coverage = len(weekly) / requested if requested else 0.0
+    joint_symbols = sorted(set(daily) & set(weekly))
+    joint_coverage = len(joint_symbols) / requested if requested else 0.0
+    if "SPY" not in daily or "SPY" not in weekly:
+        raise RuntimeError("canonical research bundle requires SPY in both 1d and 1wk data")
+    if joint_coverage < min_coverage:
         raise RuntimeError(
-            f"research price coverage {coverage:.3f} below minimum {min_coverage:.3f}; "
-            f"downloaded={len(daily)} requested={requested}"
+            f"joint research price coverage {joint_coverage:.3f} below minimum {min_coverage:.3f}; "
+            f"joint={len(joint_symbols)} requested={requested}"
         )
 
-    weekly = {symbol: daily_to_weekly(frame) for symbol, frame in daily.items()}
+    # Persist only symbols with both intervals so the replay universe cannot
+    # differ between StockPeriod.DAILY and StockPeriod.WEEKLY by accident.
+    daily = {symbol: daily[symbol] for symbol in joint_symbols}
+    weekly = {symbol: weekly[symbol] for symbol in joint_symbols}
+
     daily_path = output_dir / "research_daily.pkl"
     weekly_path = output_dir / "research_weekly.pkl"
     with daily_path.open("wb") as handle:
@@ -220,8 +271,12 @@ def build_price_bundle(
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "provider": "Yahoo Finance via yfinance",
+        "yfinance_version": getattr(yf, "__version__", None),
         "price_adjustment_mode": RESEARCH_PRICE_MODE,
-        "price_semantics": "OHLC split-adjusted, not dividend-adjusted; suitable for price-only stop/target paths",
+        "price_semantics": "Yahoo OHLC split-adjusted, not dividend-adjusted; suitable for price-only stop/target paths",
+        "daily_interval": "1d",
+        "weekly_interval": "1wk",
+        "weekly_source": "direct_yahoo_1wk_not_daily_resample",
         "auto_adjust": False,
         "repair": True,
         "rounding": False,
@@ -230,11 +285,18 @@ def build_price_bundle(
         "universe_mode": "current_strategy_plus_known_replay_and_seed_cache",
         "universe_limitation": "not a point-in-time historical listings database; survivorship remains a documented limitation",
         "requested_symbols": requested,
-        "downloaded_symbols": len(daily),
-        "coverage": coverage,
-        "failed_symbols": failures,
+        "daily_downloaded_symbols": len(daily) + len(set(daily_failures) & set(weekly)),
+        "weekly_downloaded_symbols": len(weekly) + len(set(weekly_failures) & set(daily)),
+        "joint_downloaded_symbols": len(joint_symbols),
+        "daily_coverage_before_intersection": daily_coverage,
+        "weekly_coverage_before_intersection": weekly_coverage,
+        "coverage": joint_coverage,
+        "failed_symbols_daily": daily_failures,
+        "failed_symbols_weekly": weekly_failures,
         "benchmark_codes_requested": list(BENCHMARK_CODES),
-        "benchmark_codes_downloaded": [code for code in BENCHMARK_CODES if code in daily],
+        "benchmark_codes_downloaded": [
+            code for code in BENCHMARK_CODES if code in daily and code in weekly
+        ],
         "daily_path": str(daily_path),
         "weekly_path": str(weekly_path),
         "daily_sha256": _sha256_file(daily_path),
@@ -255,7 +317,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--replay-root", type=Path, action="append", default=None)
     parser.add_argument("--max-workers", type=int, default=8)
     parser.add_argument("--timeout", type=float, default=15.0)
-    parser.add_argument("--min-coverage", type=float, default=0.90)
+    parser.add_argument("--min-coverage", type=float, default=0.98)
     return parser.parse_args(argv)
 
 
@@ -274,14 +336,19 @@ def main(argv: list[str] | None = None) -> int:
         timeout=args.timeout,
         min_coverage=args.min_coverage,
     )
-    print(json.dumps({
-        "status": "ok",
-        "requested_symbols": manifest["requested_symbols"],
-        "downloaded_symbols": manifest["downloaded_symbols"],
-        "coverage": manifest["coverage"],
-        "daily_path": manifest["daily_path"],
-        "weekly_path": manifest["weekly_path"],
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "requested_symbols": manifest["requested_symbols"],
+                "joint_downloaded_symbols": manifest["joint_downloaded_symbols"],
+                "coverage": manifest["coverage"],
+                "daily_path": manifest["daily_path"],
+                "weekly_path": manifest["weekly_path"],
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
