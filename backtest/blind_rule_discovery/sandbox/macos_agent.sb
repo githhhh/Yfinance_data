@@ -18,6 +18,8 @@
 ;; System/runtime code and configuration: read-only.
 (allow file-read*
     (subpath "/System")
+    (subpath "/bin")
+    (subpath "/sbin")
     (subpath "/usr")
     (subpath "/Library")
     (subpath "/private/etc")
