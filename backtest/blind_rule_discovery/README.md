@@ -1,88 +1,147 @@
 # Blind Rule Discovery
 
-Canonical discovery experiment for replay candidates. B0/ranking/comparator code is not an input to discovery.
+Canonical strategy-blind discovery experiment for upstream replay candidates. Existing B0 rank/score/Top3/comparator outputs are not discovery inputs.
 
 ## Research contract
 
-- Universe: every upstream `signal=True` replay candidate; no downstream rank/score/Top3 filter.
-- Entry: use the replay-time trigger/pivot. Over the next 5 sessions, a cross from below enters at trigger; a gap/open enters only up to +5% above trigger; extended opens are not retroactively bought on a same-day dip. Missing trigger means censored. No future low/rebound can become a hindsight buy point. Outcome OHLC is split-safe: canonical runs require `Adj Close` and derive a continuous adjusted OHLC path; raw unadjusted outcomes are refused unless explicitly overridden.
-- First-passage labels over 60 sessions:
-  - `clean_winner`: +20% before -8%.
-  - `stopped_out_loser`: -8% and no later +20% in-window.
-  - `stop_out_then_winner`: -8% first, later +20%; **still a trading loser**.
-  - `unresolved`: neither boundary; kept separate instead of being forced into loser.
-  - same-bar target/stop: `ambiguous_path`.
-- Features: explicit point-in-time allowlist only. Stock fields are anonymized to `X###`; prior rank/score/status/selection artifacts are absent by construction.
-- Market context: only `M_*` trailing features known at signal time are agent-facing. Full month/quarter SPY return/drawdown is reviewer-only and created after rule freeze.
-- Dossier: discovery-only monthly/quarterly counts and quantiles; no global mean. Input pool order is discarded before opaque sample IDs are assigned, so legacy sort order cannot leak.
-- Maturity: partial outcome quarters are excluded; a quarter is eligible only when its quarter-end signal date could have a full outcome window. Missing ticker/future-price outcomes are counted as censored attrition.
-- Holdout: latest 4 quarters by default, plus a **purge/embargo** removing any discovery sample whose 12-week outcome window touches holdout start.
-- Isolation: `--agent-command` is refused unless `--sandbox-prefix` is supplied. The same wrapper is preflight-probed and must be unable to read the repository root or an external sentinel before RD-agent is launched.
-- Rule: DNF JSON, at most 3 clauses / 6 conditions, conditions may reference only `X###` or `M_*`. `Y_*`, dates and IDs are rejected. Tiny period-specific rules are rejected before freeze.
-- Freeze barrier: rule validation + SHA freeze happen before feature map, embargo rows or holdout rows are written.
-- Holdout: after freeze, the exact frozen rule is applied once and reported by quarter. `holdout_consumed.json` prevents silent re-evaluation in the same output root.
-- RD-agent runtime: hard cap 3600 seconds.
+- **Universe of observations:** every upstream `signal=True` candidate produced by the reconstructed latest-logic replay. No downstream rank/score/selection filter is applied.
+- **Executable entry:** use the replay-time trigger/pivot. During the next 5 sessions, a cross from below enters at trigger; a gap/open enters only up to +5% above trigger. Extended opens are not retroactively bought on a same-day dip. Missing/untriggered entries are censored.
+- **Outcome path:** 60 trading sessions from executable entry. `clean_winner` is +20% before -8%; `stop_out_then_winner` is still a trading loser; `unresolved` and same-bar/entry-day ambiguity remain separate.
+- **Price basis:** canonical research uses Yahoo OHLC from `auto_adjust=False`, recorded as split-adjusted/non-dividend-adjusted price history. Do **not** multiply the path by dividend `Adj Close` factors. The bundle records and hashes this price contract.
+- **Intervals:** `1d` and `1wk` are downloaded independently from Yahoo. Replay therefore receives the same interval semantics as production rather than a locally resampled weekly approximation.
+- **Calendar:** replay snapshot weeks come from actual SPY daily sessions. Historical holidays are not inferred from a hard-coded calendar.
+- **Features:** an explicit point-in-time allowlist is anonymized to `X###`. Prior ranks/scores/status/selection artifacts are excluded by construction. Agent-facing `M_*` market features are trailing facts known at signal time.
+- **Time split:** default requirement is at least 8 discovery quarters plus 4 sealed holdout quarters. A 12-week purge/embargo removes discovery rows whose outcome window touches the holdout.
+- **RD-agent isolation:** OS/container sandbox is mandatory, preflight-probed, and execution is hard-capped at 3600 seconds.
+- **Frozen rule:** machine-readable DNF JSON, max 3 clauses / 6 conditions, executable fields limited to `X###` and `M_*`. Freeze/hash occurs before private feature mapping or holdout materialization.
+- **Holdout:** the frozen rule is evaluated once; `holdout_consumed.json` blocks silent repeated tuning against the same output root.
 
-## Data prerequisites
+## Canonical historical reconstruction
 
-Canonical research must satisfy both of these independently:
+The old committed `backtest/ibd_skill_replay_pools` starts too late for formal discovery. It is now used only as one source of known symbols when constructing the research universe.
 
-1. **Replay-history depth**: enough historical replay candidate quarters must already exist before the sealed holdout. Do not reduce `--holdout-quarters` merely to make a short dataset run. The current committed `backtest/ibd_skill_replay_pools` starts in 2025Q4, so it is useful for pipeline validation but is not long enough for the default four-quarter sealed-holdout research protocol.
-2. **Outcome-price depth/quality**: a full-history daily price pickle must cover every replay candidate through its future outcome window and include `Adj Close` plus the benchmark symbol. The current `results_pkl/stock_data_290826_1d.pkl` is raw OHLCV-only and is therefore unsuitable for canonical outcome labeling.
+The canonical local reconstruction is fixed to:
 
-For a meaningful discovery run, regenerate replay pools farther back in time using a long-history point-in-time source, then use a split-safe full-history daily outcome source. Prefer at least 8 discovery quarters before the four sealed holdout quarters; more is better.
+- price history start: `2017-01-01`;
+- old-pool warmup: `2022-07-01` through the start of analysis;
+- persisted replay analysis: `2022Q4` through `2026Q1` (`2022-10-01` through `2026-03-27` weekly snapshots);
+- minimum successful persisted quarters: 14;
+- blind Stage 1: minimum 8 discovery quarters + 4 sealed holdout quarters after maturity and purge checks.
 
-The canonical benchmark is `SPY`. If an intentionally equivalent benchmark is used, pass it explicitly with `--spy-code` and document the change before research begins.
+The research universe is the union of current strategy inputs, symbols already seen in committed replay pools, symbols in the current seed daily cache, and SPY/^GSPC. **This is not a point-in-time historical listings database.** Delisted/non-current symbols that are absent from every known source cannot be recovered, so survivorship remains a documented limitation. Conclusions from this experiment apply to the reconstructed current-known upstream universe, not an unbiased census of every historically listed US stock.
 
-## Local verification
+## Provenance / fail-close chain
 
-From repository root:
+Canonical execution verifies every stage:
+
+1. `research_data` writes `research_daily.pkl`, `research_weekly.pkl`, and `price_manifest.json` with provider parameters, yfinance version, joint coverage, source limitation, and SHA-256 hashes.
+2. `replay_builder` independently requires >=98% joint 1d/1wk coverage, direct Yahoo `1wk`, 5Y pre-warmup context, identical daily/weekly symbol sets, zero warmup/analysis failures, and >=14 successful quarters. Replay EPS PIT cache is redirected into ignored local work data instead of modifying tracked `us/signal_eps_pit_replay.csv`.
+3. `replay_builder` hashes exactly the persisted `*/breakout_follow_pool.csv` files into `research_replay_preflight.json`.
+4. blind `runner` verifies the exact daily-pkl SHA and replay dataset digest before Stage 1. Wrong/stale/tampered stage outputs are rejected.
+5. after candidate maturity filtering and purge, blind `runner` again requires >=8 discovery quarters before writing the agent workspace.
+
+`--allow-unadjusted-outcomes` and `--allow-unverified-replay` are debug escape hatches only. They must not be used for canonical research.
+
+## Local run
+
+Run from the `Yfinance_data` repository root. Adjust `QUANT_TRADE` only if your local path differs.
 
 ```bash
 git switch codex/clean-latest-quant-trade-replay-pools
 git pull
 
-/Users/dev/.conda/envs/quant_env/bin/python -m pytest \
+PY=/Users/dev/.conda/envs/quant_env/bin/python
+QUANT_TRADE=/Users/dev/Documents/quant_trade
+
+$PY -m pytest \
   tests/test_blind_rule_discovery.py \
-  tests/test_blind_rule_discovery_sandbox.py -q
+  tests/test_blind_rule_discovery_sandbox.py \
+  tests/test_blind_rule_discovery_data_pipeline.py -q
 ```
 
-## Stage 1: prepare the blind discovery workspace
+### 1. Build canonical long-history price bundle
 
-Use the actual replay-pool root. The command below is a pipeline/preflight example only until long-history replay pools and a split-safe daily source are available.
+This downloads both Yahoo `1d` and direct `1wk` history. Generated data is under gitignored `backtest/blind_rule_discovery/work/`.
+
+```bash
+rm -rf backtest/blind_rule_discovery/work/prices
+
+$PY -m backtest.blind_rule_discovery.research_data \
+  --start 2017-01-01 \
+  --output-dir backtest/blind_rule_discovery/work/prices
+```
+
+Expected files:
+
+```text
+backtest/blind_rule_discovery/work/prices/research_daily.pkl
+backtest/blind_rule_discovery/work/prices/research_weekly.pkl
+backtest/blind_rule_discovery/work/prices/price_manifest.json
+```
+
+The builder requires SPY and >=98% joint daily/weekly symbol coverage by default.
+
+### 2. Rebuild long-history replay pools with latest quant_trade logic
+
+```bash
+rm -rf backtest/blind_rule_discovery/work/replay_pools
+
+$PY -m backtest.blind_rule_discovery.replay_builder \
+  --quant-trade-path "$QUANT_TRADE"
+```
+
+This first runs the Q3-2022 warmup to reconstruct chronological `old_pool`, then persists weekly replay pools from 2022Q4 through 2026Q1. Any failed warmup week or analysis week aborts the canonical run instead of continuing with broken state.
+
+Inspect:
+
+```bash
+cat backtest/blind_rule_discovery/work/replay_pools/research_replay_preflight.json
+cat backtest/blind_rule_discovery/work/replay_pools/research_replay_report.md
+```
+
+The successful preflight must show zero warmup/analysis failures, complete expected week count, and at least 14 successful quarters.
+
+### 3. Prepare blind Stage 1 workspace
 
 ```bash
 rm -rf backtest/blind_rule_discovery/output/local_run
 
-/Users/dev/.conda/envs/quant_env/bin/python \
-  -m backtest.blind_rule_discovery.runner \
-  --replay-root backtest/ibd_skill_replay_pools \
-  --daily-pkl /path/to/full_history_daily_with_adj_close_and_spy.pkl \
+$PY -m backtest.blind_rule_discovery.runner \
+  --replay-root backtest/blind_rule_discovery/work/replay_pools \
+  --daily-pkl backtest/blind_rule_discovery/work/prices/research_daily.pkl \
   --output-root backtest/blind_rule_discovery/output/local_run
 ```
 
-At this stage only blind/public discovery artifacts are created. `private_feature_map.json`, `sealed_holdout.csv` and holdout results must not exist.
+At this point only blind/public artifacts may exist. In particular, before rule freeze these must **not** exist:
 
-## Stage 2: run RD-agent on macOS
+```text
+private_feature_map.json
+sealed_holdout.csv
+holdout_report.csv
+```
 
-A restrictive macOS profile is provided at `backtest/blind_rule_discovery/sandbox/macos_agent.sb`. Verify `sandbox-exec` exists first:
+Inspect:
+
+```bash
+cat backtest/blind_rule_discovery/output/local_run/experiment_metadata.json
+ls -la backtest/blind_rule_discovery/output/local_run/agent_workspace
+```
+
+`experiment_metadata.json` must report verified replay provenance, >=8 discovery quarters, and 4 sealed holdout quarters.
+
+### 4. Run the <=1h RD-agent research
+
+Use a **fresh output root**. The macOS sandbox profile is `backtest/blind_rule_discovery/sandbox/macos_agent.sb`.
 
 ```bash
 command -v sandbox-exec
-```
 
-Then run with the real installed RD-agent command. Use a fresh output root for each research attempt:
-
-```bash
-/Users/dev/.conda/envs/quant_env/bin/python \
-  -m backtest.blind_rule_discovery.runner \
-  --replay-root /path/to/long_history_replay_pools \
-  --daily-pkl /path/to/full_history_daily_with_adj_close_and_spy.pkl \
+$PY -m backtest.blind_rule_discovery.runner \
+  --replay-root backtest/blind_rule_discovery/work/replay_pools \
+  --daily-pkl backtest/blind_rule_discovery/work/prices/research_daily.pkl \
   --output-root backtest/blind_rule_discovery/output/rd_agent_run_01 \
   --agent-command '<installed RD-agent command that reads prompt.md/samples.csv and writes rule.json>' \
   --sandbox-prefix "sandbox-exec -D WORKSPACE={workspace} -D RUNTIME=/Users/dev/.conda/envs/quant_env -f $(pwd)/backtest/blind_rule_discovery/sandbox/macos_agent.sb"
 ```
 
-The sandbox preflight is fail-closed. If the profile can read outside the isolated workspace, RD-agent is not started.
-
-Do not use `--allow-unadjusted-outcomes` for the canonical research run.
+The sandbox must fail its isolation probe if it can see the repository or any external sentinel. Only after the agent returns a valid rule does the runner freeze it, materialize the private feature map/holdout, and perform the one-shot holdout evaluation.
