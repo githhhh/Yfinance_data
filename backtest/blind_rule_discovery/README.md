@@ -10,6 +10,7 @@ Canonical strategy-blind discovery experiment for upstream replay candidates. Ex
 - **Price basis:** canonical research uses Yahoo OHLC from `auto_adjust=False`, recorded as split-adjusted/non-dividend-adjusted price history. Do **not** multiply the path by dividend `Adj Close` factors. The bundle records and hashes this price contract.
 - **Intervals:** `1d` and `1wk` are downloaded independently from Yahoo. Replay therefore receives the same interval semantics as production rather than a locally resampled weekly approximation.
 - **Calendar:** replay snapshot weeks come from actual SPY daily sessions. Historical holidays are not inferred from a hard-coded calendar.
+- **Replay execution:** current `quant_trade` replay is required to be stateless across weeks. Analysis weeks run in isolated spawned worker **processes**, never a thread pool. Each worker loads the large daily/weekly bundle once in its initializer, and IPC tasks carry only week dates.
 - **Features:** an explicit point-in-time allowlist is anonymized to `X###`. Prior ranks/scores/status/selection artifacts are excluded by construction. Agent-facing `M_*` market features are trailing facts known at signal time.
 - **Time split:** default requirement is at least 8 discovery quarters plus 4 sealed holdout quarters. A 12-week purge/embargo removes discovery rows whose outcome window touches the holdout.
 - **RD-agent isolation:** OS/container sandbox is mandatory, preflight-probed, and execution is hard-capped at 3600 seconds.
@@ -23,22 +24,24 @@ The old committed `backtest/ibd_skill_replay_pools` starts too late for formal d
 The canonical local reconstruction is fixed to:
 
 - price history start: `2017-01-01`;
-- old-pool warmup: `2022-07-01` through the start of analysis;
+- historical lookback anchor: `2022-07-01` (used to enforce the required 5Y pre-analysis context; no sequential old-pool warmup is executed under the verified stateless replay contract);
 - persisted replay analysis: `2022Q4` through `2026Q1` (`2022-10-01` through `2026-03-27` weekly snapshots);
 - minimum successful persisted quarters: 14;
 - blind Stage 1: minimum 8 discovery quarters + 4 sealed holdout quarters after maturity and purge checks.
 
-The research universe is the union of current strategy inputs, symbols already seen in committed replay pools, symbols in the current seed daily cache, and SPY/^GSPC. **This is not a point-in-time historical listings database.** Delisted/non-current symbols that are absent from every known source cannot be recovered, so survivorship remains a documented limitation. Conclusions from this experiment apply to the reconstructed current-known upstream universe, not an unbiased census of every historically listed US stock.
+The research universe is the union of current strategy inputs, symbols already seen in committed replay pools, symbols in the current seed daily cache, symbols recoverable from Git-history daily pkl files, and SPY/^GSPC. **This is not a point-in-time historical listings database.** Delisted/non-current symbols that are absent from every known source cannot be recovered, so survivorship remains a documented limitation. Conclusions from this experiment apply to the reconstructed current-known upstream universe, not an unbiased census of every historically listed US stock.
 
 ## Provenance / fail-close chain
 
 Canonical execution verifies every stage:
 
 1. `research_data` writes `research_daily.pkl`, `research_weekly.pkl`, and `price_manifest.json` with provider parameters, yfinance version, joint coverage, source limitation, and SHA-256 hashes.
-2. `replay_builder` independently requires >=98% joint 1d/1wk coverage, direct Yahoo `1wk`, 5Y pre-warmup context, identical daily/weekly symbol sets, zero warmup/analysis failures, and >=14 successful quarters. Replay EPS PIT cache is redirected into ignored local work data instead of modifying tracked `us/signal_eps_pit_replay.csv`.
-3. `replay_builder` hashes exactly the persisted `*/breakout_follow_pool.csv` files into `research_replay_preflight.json`.
-4. blind `runner` verifies the exact daily-pkl SHA and replay dataset digest before Stage 1. Wrong/stale/tampered stage outputs are rejected.
-5. after candidate maturity filtering and purge, blind `runner` again requires >=8 discovery quarters before writing the agent workspace.
+2. `replay_builder` independently requires >=98% joint 1d/1wk coverage, direct Yahoo `1wk`, 5Y pre-analysis context, identical daily/weekly symbol sets, a stateless local `quant_trade` replay contract, zero analysis failures, and >=14 successful quarters.
+3. Replay runs with `ProcessPoolExecutor` using the `spawn` context. No `ThreadPoolExecutor` is used. Each worker has its own Python module namespace, so the temporary `weekly_job._daily_map` monkey-patch cannot leak across concurrent weeks.
+4. Each worker writes a process-local EPS PIT CSV. The parent merges those stores only after worker completion, so there is no shared CSV writer despite parallel local SEC/companyfacts reads.
+5. `replay_builder` hashes exactly the persisted `*/breakout_follow_pool.csv` files into `research_replay_preflight.json`.
+6. blind `runner` verifies the exact daily-pkl SHA and replay dataset digest before Stage 1. Wrong/stale/tampered stage outputs are rejected.
+7. after candidate maturity filtering and purge, blind `runner` again requires >=8 discovery quarters before writing the agent workspace.
 
 `--allow-unadjusted-outcomes` and `--allow-unverified-replay` are debug escape hatches only. They must not be used for canonical research.
 
@@ -57,6 +60,7 @@ $PY -m pytest \
   tests/test_blind_rule_discovery.py \
   tests/test_blind_rule_discovery_ambiguous.py \
   tests/test_blind_rule_discovery_data_pipeline.py \
+  tests/test_blind_rule_discovery_parallel_replay.py \
   tests/test_blind_rule_discovery_provenance.py \
   tests/test_blind_rule_discovery_sandbox.py -q
 ```
@@ -83,16 +87,28 @@ backtest/blind_rule_discovery/work/prices/price_manifest.json
 
 The builder requires SPY and >=98% joint daily/weekly symbol coverage by default.
 
-### 2. Rebuild long-history replay pools with latest quant_trade logic
+### 2. Rebuild/resume long-history replay pools with latest quant_trade logic
+
+For a clean rebuild:
 
 ```bash
 rm -rf backtest/blind_rule_discovery/work/replay_pools
 
 $PY -m backtest.blind_rule_discovery.replay_builder \
-  --quant-trade-path "$QUANT_TRADE"
+  --quant-trade-path "$QUANT_TRADE" \
+  --workers 6
 ```
 
-This first runs the Q3-2022 warmup to reconstruct chronological `old_pool`, then persists weekly replay pools from 2022Q4 through 2026Q1. Any failed warmup week or analysis week aborts the canonical run instead of continuing with broken state.
+If successful weeks already exist, **do not delete the replay directory**. Resume with:
+
+```bash
+$PY -m backtest.blind_rule_discovery.replay_builder \
+  --quant-trade-path "$QUANT_TRADE" \
+  --workers 6 \
+  --no-clean
+```
+
+`--no-clean` only reuses a week when `metadata.json` is `status=success`, its pool CSV exists, and its daily/weekly bundle SHA plus `quant_trade` commit match the current run. All remaining weeks are submitted to spawned worker processes. The default worker count is capped at 6 to balance CPU utilization against the ~185MB immutable bundle held by each process; use `--workers 7` or `--workers 8` only when local RAM headroom is sufficient.
 
 Inspect:
 
@@ -101,7 +117,7 @@ cat backtest/blind_rule_discovery/work/replay_pools/research_replay_preflight.js
 cat backtest/blind_rule_discovery/work/replay_pools/research_replay_report.md
 ```
 
-The successful preflight must show zero warmup/analysis failures, complete expected week count, and at least 14 successful quarters.
+A successful preflight must show `execution_model=ProcessPoolExecutor_spawn`, `thread_pool_used=false`, zero analysis failures, complete expected week count, and at least 14 successful quarters.
 
 ### 3. Prepare blind Stage 1 workspace
 
