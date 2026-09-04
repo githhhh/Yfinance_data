@@ -1,0 +1,30 @@
+;; macOS sandbox-exec profile for blind RD-agent discovery.
+;; Required parameters:
+;;   -D WORKSPACE=/absolute/path/to/isolated/workspace
+;;   -D RUNTIME=/absolute/path/to/python/or/agent/runtime/root
+;;
+;; The research process may read/write only WORKSPACE for experiment data.
+;; RUNTIME and system locations are read-only so Python/agent binaries can run.
+(version 1)
+(deny default)
+
+;; Process execution and normal runtime services.
+(allow process*)
+(allow signal (target self))
+(allow sysctl-read)
+(allow mach-lookup)
+(allow network-outbound)
+
+;; System/runtime code and configuration: read-only.
+(allow file-read*
+    (subpath "/System")
+    (subpath "/usr")
+    (subpath "/Library")
+    (subpath "/private/etc")
+    (subpath "/private/var/db")
+    (subpath "/dev")
+    (subpath (param "RUNTIME")))
+
+;; The only user-data tree visible to the agent.
+(allow file-read* (subpath (param "WORKSPACE")))
+(allow file-write* (subpath (param "WORKSPACE")))
