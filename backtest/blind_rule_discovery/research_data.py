@@ -1,9 +1,9 @@
 """Build the long-history market-data bundle used by blind rule discovery.
 
-This is intentionally separate from the production rolling cache.  Yahoo's
+This is intentionally separate from the production rolling cache. Yahoo's
 historical ``Close``/OHLC series with ``auto_adjust=False`` is split-adjusted
 but not dividend-adjusted; that is the price basis wanted for executable
-stop/target research.  The bundle records that provenance in DataFrame attrs
+stop/target research. The bundle records that provenance in DataFrame attrs
 and a sidecar manifest instead of requiring dividend-adjusted ``Adj Close``.
 """
 from __future__ import annotations
@@ -21,8 +21,8 @@ import pandas as pd
 import yfinance as yf
 
 from market_universe import build_download_universe
+from .outcomes import RESEARCH_PRICE_MODE
 
-RESEARCH_PRICE_MODE = "yahoo_split_adjusted_ohlc_no_dividend_adjustment"
 DEFAULT_PRICE_START = "2017-01-01"
 DEFAULT_REPLAY_ROOT = Path("backtest/ibd_skill_replay_pools")
 DEFAULT_SEED_PKL = Path("results_pkl/stock_data_290826_1d.pkl")
@@ -85,7 +85,7 @@ def collect_research_universe(
     """Union current strategy inputs with every symbol already known to replay/cache.
 
     This deliberately broadens the current strategy universe, but it is not a
-    historical listings database.  The manifest calls that limitation out so
+    historical listings database. The manifest calls that limitation out so
     downstream research cannot silently claim point-in-time universe purity.
     """
     symbols = {
