@@ -68,7 +68,8 @@ def test_no_clean_reuses_only_compatible_success_checkpoint(tmp_path: Path):
     week = SnapshotWeek("2024-01-05", "2024-01-05")
     week_dir = tmp_path / week.snapshot_date
     week_dir.mkdir()
-    (week_dir / "breakout_follow_pool.csv").write_text("code,signal\nAAA,True\n")
+    pool_path = week_dir / "breakout_follow_pool.csv"
+    pool_path.write_text("code,signal\nAAA,True\n")
     metadata = {
         "snapshot_date": week.snapshot_date,
         "expected_last_trading_day": week.expected_last_trading_day,
@@ -77,6 +78,7 @@ def test_no_clean_reuses_only_compatible_success_checkpoint(tmp_path: Path):
         "daily_pkl_sha256": "daily",
         "weekly_pkl_sha256": "weekly",
         "quant_trade_commit": "qt",
+        "output_pool_path": "stale/old/path.csv",
     }
     (week_dir / "metadata.json").write_text(json.dumps(metadata))
 
@@ -88,6 +90,7 @@ def test_no_clean_reuses_only_compatible_success_checkpoint(tmp_path: Path):
         quant_trade_commit="qt",
     )
     assert reused is not None
+    assert reused["output_pool_path"] == str(pool_path)
 
     assert rb._completed_week_metadata(
         tmp_path,
@@ -103,6 +106,20 @@ def test_no_clean_reuses_only_compatible_success_checkpoint(tmp_path: Path):
         weekly_sha="weekly",
         quant_trade_commit="changed",
     ) is None
+
+
+def test_no_clean_rejects_pool_outside_requested_analysis_window(tmp_path: Path):
+    expected = SnapshotWeek("2024-01-05", "2024-01-05")
+    expected_dir = tmp_path / expected.snapshot_date
+    expected_dir.mkdir()
+    (expected_dir / "breakout_follow_pool.csv").write_text("code,signal\nAAA,True\n")
+    rb._assert_no_unexpected_resume_pools(tmp_path, [expected])
+
+    stale = tmp_path / "2023-12-29"
+    stale.mkdir()
+    (stale / "breakout_follow_pool.csv").write_text("code,signal\nBBB,True\n")
+    with pytest.raises(RuntimeError, match="outside the requested analysis window"):
+        rb._assert_no_unexpected_resume_pools(tmp_path, [expected])
 
 
 def test_worker_task_uses_process_local_bundles_and_empty_cross_week_state(monkeypatch):
@@ -140,18 +157,42 @@ def test_worker_task_uses_process_local_bundles_and_empty_cross_week_state(monke
 def test_worker_eps_caches_merge_without_shared_writer(tmp_path: Path):
     final_cache = tmp_path / "eps.csv"
     pd.DataFrame(
-        [{"snapshot_date": "2024-01-05", "code": "AAA", "eps_yoy_growth": 10.0, "retrieved_at": "a"}]
+        [
+            {
+                "snapshot_date": "2024-01-05",
+                "code": "AAA",
+                "eps_yoy_growth": 10.0,
+                "retrieved_at": "2024-01-05T00:00:00Z",
+            }
+        ]
     ).to_csv(final_cache, index=False)
     worker_dir = tmp_path / "workers"
     worker_dir.mkdir()
     pd.DataFrame(
         [
-            {"snapshot_date": "2024-01-05", "code": "AAA", "eps_yoy_growth": 10.0, "retrieved_at": "b"},
-            {"snapshot_date": "2024-01-12", "code": "BBB", "eps_yoy_growth": 20.0, "retrieved_at": "b"},
+            {
+                "snapshot_date": "2024-01-05",
+                "code": "AAA",
+                "eps_yoy_growth": 10.0,
+                "retrieved_at": "2024-01-06T00:00:00Z",
+            },
+            {
+                "snapshot_date": "2024-01-12",
+                "code": "BBB",
+                "eps_yoy_growth": 20.0,
+                "retrieved_at": "2024-01-12T00:00:00Z",
+            },
         ]
     ).to_csv(worker_dir / "eps_pit_1.csv", index=False)
     pd.DataFrame(
-        [{"snapshot_date": "2024-01-19", "code": "CCC", "eps_yoy_growth": 30.0, "retrieved_at": "c"}]
+        [
+            {
+                "snapshot_date": "2024-01-19",
+                "code": "CCC",
+                "eps_yoy_growth": 30.0,
+                "retrieved_at": "2024-01-19T00:00:00Z",
+            }
+        ]
     ).to_csv(worker_dir / "eps_pit_2.csv", index=False)
 
     count = rb._merge_worker_eps_caches(worker_dir, final_cache)
@@ -164,7 +205,36 @@ def test_worker_eps_caches_merge_without_shared_writer(tmp_path: Path):
     ]
 
 
-def test_worker_eps_cache_merge_fails_on_conflicting_same_key(tmp_path: Path):
+def test_existing_eps_key_allows_newer_worker_refresh(tmp_path: Path):
+    final_cache = tmp_path / "eps.csv"
+    pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2024-01-05",
+                "code": "AAA",
+                "eps_yoy_growth": 10.0,
+                "retrieved_at": "2024-01-05T00:00:00Z",
+            }
+        ]
+    ).to_csv(final_cache, index=False)
+    worker_dir = tmp_path / "workers"
+    worker_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2024-01-05",
+                "code": "AAA",
+                "eps_yoy_growth": 11.0,
+                "retrieved_at": "2024-01-06T00:00:00Z",
+            }
+        ]
+    ).to_csv(worker_dir / "eps_pit_1.csv", index=False)
+    rb._merge_worker_eps_caches(worker_dir, final_cache)
+    merged = pd.read_csv(final_cache)
+    assert merged.iloc[0]["eps_yoy_growth"] == 11.0
+
+
+def test_worker_eps_cache_merge_fails_on_conflicting_new_same_key(tmp_path: Path):
     final_cache = tmp_path / "eps.csv"
     worker_dir = tmp_path / "workers"
     worker_dir.mkdir()
