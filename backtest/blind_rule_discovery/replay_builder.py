@@ -261,20 +261,30 @@ def assert_quant_trade_replay_stateless(quant_trade_path: Path) -> dict[str, obj
         arg.arg
         for arg in [*replay.args.posonlyargs, *replay.args.args, *replay.args.kwonlyargs]
     ]
-    class_fields = {
-        node.target.id
-        for node in run_context.body
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    class_fields: set[str] = set()
+    for node in run_context.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            class_fields.add(node.target.id)
+        elif isinstance(node, ast.Assign):
+            class_fields.update(
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            )
+    referenced_attrs = {
+        node.attr for node in ast.walk(run_context) if isinstance(node, ast.Attribute)
     }
     forbidden = {"old_pool", "replay_old_pool"}
-    if forbidden.intersection(arg_names) or forbidden.intersection(class_fields):
+    if (
+        forbidden.intersection(arg_names)
+        or forbidden.intersection(class_fields)
+        or forbidden.intersection(referenced_attrs)
+    ):
         raise RuntimeError(
             "parallel replay requires stateless quant_trade RunContext; "
             f"found cross-week state in replay contract: args={arg_names}, fields={sorted(class_fields)}"
         )
-    if replay.args.kwarg is not None:
+    if replay.args.vararg is not None or replay.args.kwarg is not None:
         raise RuntimeError(
-            "parallel replay refuses RunContext.replay(**kwargs); cross-week state contract is ambiguous"
+            "parallel replay refuses variadic RunContext.replay(); cross-week state contract is ambiguous"
         )
     return {
         "run_context_path": str(run_context_path),
@@ -331,7 +341,7 @@ def _completed_week_metadata(
 def _worker_failure_row(
     week: SnapshotWeek,
     output_root: Path,
-    exc: BaseException,
+    exc: Exception,
 ) -> dict[str, Any]:
     week_dir = output_root / week.snapshot_date
     week_dir.mkdir(parents=True, exist_ok=True)
@@ -406,51 +416,91 @@ def _run_week_worker(task: tuple[str, str]) -> dict[str, Any]:
     )
 
 
+def _row_values_signature(frame: pd.DataFrame, value_columns: list[str]) -> pd.DataFrame:
+    return frame[value_columns].fillna("<NA>").astype(str).drop_duplicates()
+
+
 def _merge_worker_eps_caches(worker_cache_dir: Path, eps_pit_cache: Path) -> int:
-    """Merge process-local EPS PIT stores after workers exit, with conflict detection."""
+    """Merge process-local EPS PIT stores after workers exit.
+
+    Every worker begins with the same read-only seed snapshot, so duplicate seed
+    rows are expected. For keys absent from the seed, disagreeing worker values
+    are a real correctness error. For an existing seed key, a worker refresh is
+    allowed and the newest ``retrieved_at`` wins deterministically.
+    """
     worker_paths = sorted(worker_cache_dir.glob("*.csv"))
     if not worker_paths:
         return 0
 
-    frames: list[pd.DataFrame] = []
+    tagged_frames: list[pd.DataFrame] = []
+    base_keys: set[tuple[str, str]] = set()
     if eps_pit_cache.exists():
-        frames.append(pd.read_csv(eps_pit_cache))
-    for path in worker_paths:
-        frames.append(pd.read_csv(path))
-    frames = [frame for frame in frames if not frame.empty]
-    if not frames:
+        base = pd.read_csv(eps_pit_cache)
+        if not base.empty:
+            base["_origin_rank"] = 0
+            base["_source_order"] = 0
+            tagged_frames.append(base)
+            if {"snapshot_date", "code"}.issubset(base.columns):
+                base_keys = {
+                    (str(row.snapshot_date)[:10], str(row.code).strip().upper())
+                    for row in base[["snapshot_date", "code"]].itertuples(index=False)
+                }
+    for order, path in enumerate(worker_paths, start=1):
+        frame = pd.read_csv(path)
+        if frame.empty:
+            continue
+        frame["_origin_rank"] = 1
+        frame["_source_order"] = order
+        tagged_frames.append(frame)
+    if not tagged_frames:
         return len(worker_paths)
 
-    combined = pd.concat(frames, ignore_index=True, sort=False)
+    combined = pd.concat(tagged_frames, ignore_index=True, sort=False)
     required = {"snapshot_date", "code"}
     if not required.issubset(combined.columns):
         raise RuntimeError("worker EPS PIT cache missing snapshot_date/code key columns")
 
     combined["snapshot_date"] = combined["snapshot_date"].astype(str).str[:10]
     combined["code"] = combined["code"].astype(str).str.strip().str.upper()
-    duplicate = combined.duplicated(["snapshot_date", "code"], keep=False)
-    if bool(duplicate.any()):
-        value_columns = [
-            column
-            for column in combined.columns
-            if column not in {"snapshot_date", "code", "retrieved_at"}
-        ]
-        for key, group in combined.loc[duplicate].groupby(
-            ["snapshot_date", "code"], dropna=False
-        ):
-            normalized = group[value_columns].fillna("<NA>").astype(str).drop_duplicates()
-            if len(normalized) > 1:
-                raise RuntimeError(
-                    f"conflicting worker EPS PIT records for {key[0]} {key[1]}"
-                )
+    helper_columns = {"_origin_rank", "_source_order", "_retrieved_ts"}
+    value_columns = [
+        column
+        for column in combined.columns
+        if column not in {"snapshot_date", "code", "retrieved_at", *helper_columns}
+    ]
 
+    duplicate = combined.duplicated(["snapshot_date", "code"], keep=False)
+    for key, group in combined.loc[duplicate].groupby(
+        ["snapshot_date", "code"], dropna=False
+    ):
+        normalized_key = (str(key[0])[:10], str(key[1]).strip().upper())
+        workers_only = group.loc[group["_origin_rank"] == 1]
+        if normalized_key not in base_keys and len(_row_values_signature(workers_only, value_columns)) > 1:
+            raise RuntimeError(
+                f"conflicting worker EPS PIT records for {normalized_key[0]} {normalized_key[1]}"
+            )
+
+    if "retrieved_at" in combined.columns:
+        combined["_retrieved_ts"] = pd.to_datetime(
+            combined["retrieved_at"], errors="coerce", utc=True
+        )
+    else:
+        combined["_retrieved_ts"] = pd.NaT
+    combined = combined.sort_values(
+        ["snapshot_date", "code", "_retrieved_ts", "_origin_rank", "_source_order"],
+        kind="stable",
+        na_position="first",
+    )
     merged = (
         combined.drop_duplicates(["snapshot_date", "code"], keep="last")
         .sort_values(["snapshot_date", "code"], kind="stable")
+        .drop(columns=list(helper_columns), errors="ignore")
         .reset_index(drop=True)
     )
     eps_pit_cache.parent.mkdir(parents=True, exist_ok=True)
     temp_path = eps_pit_cache.with_name(f".{eps_pit_cache.name}.merge.tmp")
+    if temp_path.exists():
+        temp_path.unlink()
     merged.to_csv(temp_path, index=False)
     temp_path.replace(eps_pit_cache)
     return len(worker_paths)
@@ -664,7 +714,7 @@ def run_research_replay(
                 week = future_to_week[future]
                 try:
                     row = future.result()
-                except BaseException as exc:
+                except Exception as exc:
                     row = _worker_failure_row(week, output_root, exc)
                 rows.append(row)
                 completed += 1
