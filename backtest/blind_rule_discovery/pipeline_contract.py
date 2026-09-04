@@ -57,10 +57,12 @@ def validate_replay_preflight(
         raise ValueError(
             f"canonical replay is incomplete: persisted={persisted} expected={expected}"
         )
+    declared_floor = int(preflight.get("minimum_required_quarters", 0))
+    effective_required = max(int(required_quarters), declared_floor)
     quarters = int(preflight.get("successful_quarters", 0))
-    if quarters < required_quarters:
+    if quarters < effective_required:
         raise ValueError(
-            f"canonical replay has only {quarters} successful quarters; need {required_quarters}"
+            f"canonical replay has only {quarters} successful quarters; need {effective_required}"
         )
     actual_daily_sha = sha256_file(daily_pkl)
     if str(preflight.get("daily_pkl_sha256") or "") != actual_daily_sha:
