@@ -8,19 +8,23 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import pandas as pd
 
 from dashboard.data_utils import (
     load_pool_csv,
-    normalize_pool_df,
     validate_pool_schema,
     validate_pool_semantics,
+)
+from dashboard.services.bf_transition import (
+    ENTRY_STATUSES,
+    SOURCE_FACT_FIELDS,
+    analyze_bf_transitions,
+    normalize_transition_pool as _normalized_pool,
+    to_bool as _to_bool,
 )
 
 
 BUSINESS_TIMEZONE = "Asia/Shanghai"
-ENTRY_STATUSES = ("ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED")
 SETUP_FILTER_OPTIONS = (
     "All",
     "ceiling",
@@ -69,25 +73,6 @@ class PoolAnalysisResult:
     midweek_baseline_available: bool = False
 
 
-SOURCE_FACT_FIELDS = (
-    "signal_source",
-    "ibd_candidate_rule",
-    "ibd_candidate_price",
-    "ibd_candidate_signal_source",
-    "ibd_candidate_extra",
-    "ibd_entry_valid",
-    "ibd_entry_date",
-    "ibd_entry_price",
-    "ibd_trigger_price",
-    "ibd_entry_volume_ratio",
-    "ibd_entry_close_vs_trigger_pct",
-    "ibd_entry_close_position",
-    "ibd_entry_breakout_range_ratio",
-    "ibd_entry_rule",
-    "ibd_entry_reject_reason",
-)
-
-
 def resolve_window(window_date: date) -> PoolWindow:
     if window_date.weekday() in {1, 2, 3, 4}:
         return PoolWindow.MIDWEEK
@@ -107,218 +92,24 @@ def complete_target_week(complete_date: date) -> date:
     raise ValueError(f"Invalid complete snapshot date: {complete_date.isoformat()}")
 
 
-def _to_bool(value: Any) -> bool | None:
-    if value is None or pd.isna(value):
-        return None
-    if isinstance(value, (bool, np.bool_)):
-        return bool(value)
-    if isinstance(value, (int, float)):
-        if value == 1:
-            return True
-        if value == 0:
-            return False
-    text = str(value).strip().lower()
-    if text in {"true", "t", "yes", "y", "1", "1.0"}:
-        return True
-    if text in {"false", "f", "no", "n", "0", "0.0"}:
-        return False
-    return None
-
-
-def _normalized_pool(pool: pd.DataFrame, *, label: str, allow_empty: bool = False) -> pd.DataFrame:
-    if pool is None or pool.empty:
-        if allow_empty:
-            return pd.DataFrame(columns=list(pool.columns) if pool is not None else [])
-        raise ValueError(f"{label} pool cannot be empty")
-    result = normalize_pool_df(pool)
-    required = {"code", "signal"}
-    missing = required.difference(result.columns)
-    if missing:
-        raise ValueError(f"{label} pool missing required columns: {sorted(missing)}")
-    codes = result["code"].astype("string").str.strip()
-    if codes.isna().any() or codes.eq("").any() or codes.str.lower().eq("nan").any():
-        raise ValueError(f"{label} pool code cannot be empty")
-    if codes.duplicated().any():
-        raise ValueError(f"{label} pool code cannot be duplicate")
-    result = result.copy()
-    result["code"] = codes.astype(str)
-    converted = result["signal"].map(_to_bool)
-    if converted.isna().any():
-        raise ValueError(f"{label} pool signal must be a valid boolean")
-    result["signal"] = pd.Series(converted.tolist(), index=result.index, dtype="object")
-    return result
-
-
-def _positive_number(value: Any, *, field: str, code: str) -> float:
-    parsed = pd.to_numeric(value, errors="coerce")
-    if pd.isna(parsed) or not np.isfinite(parsed) or float(parsed) <= 0:
-        raise ValueError(f"{code}: {field} must be a positive finite number")
-    return float(parsed)
-
-
-def _nonempty_status(value: Any, *, code: str) -> str:
-    if value is None or pd.isna(value) or not str(value).strip():
-        raise ValueError(f"{code}: IBD enrichment is incomplete")
-    status = str(value).strip()
-    if status not in ENTRY_STATUSES:
-        raise ValueError(f"{code}: invalid ibd_entry_status {status}")
-    return status
-
-
-def _calculate_status(entry_valid: Any, candidate: float, latest_close: float) -> str:
-    if _to_bool(entry_valid) is not True:
-        return "UNCONFIRMED"
-    # Keep Carry status aligned with the two-decimal funnel field published by
-    # quant_trade for ordinary signal rows.
-    current_vs_candidate_pct = round((latest_close / candidate - 1.0) * 100.0, 2)
-    if current_vs_candidate_pct < 0.0:
-        return "BELOW_TRIGGER"
-    if current_vs_candidate_pct <= 5.0:
-        return "ACTIONABLE"
-    return "EXTENDED"
-
-
-def _entry_change(baseline: str | None, effective: str | None) -> tuple[str, str]:
-    if baseline != "ACTIONABLE" and effective == "ACTIONABLE":
-        return "BECAME_ACTIONABLE", "BECAME_ACTIONABLE"
-    if baseline == "ACTIONABLE" and effective != "ACTIONABLE":
-        if effective == "EXTENDED":
-            detail = "ACTIONABLE_TO_EXTENDED"
-        elif effective == "BELOW_TRIGGER":
-            detail = "ACTIONABLE_TO_BELOW_TRIGGER"
-        else:
-            detail = "LEFT_ACTIONABLE"
-        return detail, "LEFT_ACTIONABLE"
-    if baseline == "ACTIONABLE" and effective == "ACTIONABLE":
-        return "STILL_ACTIONABLE", "UNCHANGED"
-    if baseline != effective:
-        return "STATUS_CHANGED", "OTHER_CHANGES"
-    return "UNCHANGED", "UNCHANGED"
-
-
-def _change_label(origin: str, baseline: str | None, effective: str | None, entry_change: str) -> str:
-    if entry_change == "STILL_ACTIONABLE":
-        return "STILL ACTIONABLE"
-    if baseline == "ACTIONABLE" and effective:
-        return f"ACTIONABLE → {effective.replace('_', ' ')}"
-    if origin in {"NEW", "CARRY", "RECONFIRMED"} and effective:
-        return f"{origin} → {effective.replace('_', ' ')}"
-    return effective.replace("_", " ") if effective else origin
-
-
 def build_midweek_review(
     current_pool: pd.DataFrame,
     complete_pool: pd.DataFrame,
 ) -> MidweekReviewResult:
-    current = _normalized_pool(current_pool, label="current")
-    complete = _normalized_pool(complete_pool, label="complete", allow_empty=True)
-    baseline_available = not complete.empty
-    complete_by_code = {
-        str(row["code"]): row
-        for _, row in complete.iterrows()
-    }
-    current_codes = set(current["code"])
-    rows: list[dict[str, Any]] = []
+    """Compatibility adapter over the shared BF transition API.
 
-    for _, current_row in current.iterrows():
-        code = str(current_row["code"])
-        complete_row = complete_by_code.get(code)
-        signal_current = _to_bool(current_row.get("signal")) is True
-        signal_complete = complete_row is not None and _to_bool(complete_row.get("signal")) is True
-        origin = "NONE"
-        if baseline_available:
-            origin = (
-                "RECONFIRMED"
-                if signal_current and signal_complete
-                else "NEW"
-                if signal_current
-                else "CARRY"
-                if signal_complete
-                else "NONE"
-            )
-        watch_active = signal_current or signal_complete
-        projected = current_row.to_dict()
-        projected["review_pool_change"] = (
-            "ENTERED" if complete_row is None else "STAYED"
-        ) if baseline_available else "UNAVAILABLE"
-        projected["review_signal_origin"] = origin
-        projected["review_watch_active"] = bool(watch_active)
-        projected["review_baseline_available"] = baseline_available
-
-        selected_row = current_row if signal_current else complete_row if signal_complete else None
-        for field in SOURCE_FACT_FIELDS:
-            projected[f"review_{field}"] = selected_row.get(field) if selected_row is not None else None
-
-        baseline_status = (
-            _nonempty_status(complete_row.get("ibd_entry_status"), code=code)
-            if signal_complete
-            else None
-        )
-        effective_status: str | None = None
-        candidate: float | None = None
-        current_vs_candidate: float | None = None
-        entry_valid: bool | None = None
-        if watch_active:
-            latest_close = _positive_number(current_row.get("latest_close"), field="latest_close", code=code)
-            candidate = _positive_number(selected_row.get("ibd_candidate_price"), field="candidate", code=code)
-            raw_valid = selected_row.get("ibd_entry_valid")
-            if raw_valid is None or pd.isna(raw_valid) or _to_bool(raw_valid) is None:
-                raise ValueError(f"{code}: IBD enrichment is incomplete")
-            entry_valid = _to_bool(raw_valid)
-            current_vs_candidate = round((latest_close / candidate - 1.0) * 100.0, 2)
-            if signal_current:
-                effective_status = _nonempty_status(current_row.get("ibd_entry_status"), code=code)
-            else:
-                effective_status = _calculate_status(entry_valid, candidate, latest_close)
-
-        if baseline_available:
-            entry_change, change_group = _entry_change(baseline_status, effective_status)
-            change_label = _change_label(origin, baseline_status, effective_status, entry_change)
-        else:
-            entry_change, change_group, change_label = "UNAVAILABLE", "UNCHANGED", ""
-        projected["review_candidate_price"] = candidate
-        projected["review_entry_valid"] = entry_valid
-        projected["review_baseline_entry_status"] = baseline_status
-        projected["review_effective_entry_status"] = effective_status
-        projected["review_current_vs_candidate_pct"] = current_vs_candidate
-        projected["review_entry_change"] = entry_change
-        projected["review_change_group"] = change_group
-        projected["review_change_label"] = change_label
-        projected["review_futu_actionable"] = bool(watch_active and effective_status == "ACTIONABLE")
-        change_rank = {
-            "BECAME_ACTIONABLE": 0,
-            "LEFT_ACTIONABLE": 1,
-            "OTHER_CHANGES": 2,
-            "UNCHANGED": 3,
-        }[change_group]
-        status_rank = {status: rank for rank, status in enumerate(ENTRY_STATUSES)}.get(effective_status, 9)
-        projected["review_priority"] = change_rank * 10 + status_rank
-        rows.append(projected)
-
-    review = pd.DataFrame(rows, index=current.index)
-    if "review_entry_valid" in review.columns:
-        review["review_entry_valid"] = pd.Series(
-            review["review_entry_valid"].tolist(), index=review.index, dtype="object"
-        )
-    exited = complete.loc[~complete["code"].isin(current_codes)].copy() if not complete.empty else complete.copy()
-    actionable = tuple(review.loc[review["review_futu_actionable"], "code"].astype(str).tolist())
-    summary = _build_summary(review, exited)
-    return MidweekReviewResult(review, exited, summary, actionable, baseline_available)
-
-
-def _build_summary(review: pd.DataFrame, exited: pd.DataFrame) -> dict[str, int]:
-    summary: dict[str, int] = {
-        "CURRENT_POOL": len(review),
-        "EXITED_POOL": len(exited),
-        "ACTIVE_SIGNALS": int(review.get("review_watch_active", pd.Series(dtype=bool)).sum()),
-    }
-    for value in ("BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES", "UNCHANGED"):
-        summary[value] = int(review.get("review_change_group", pd.Series(dtype=object)).eq(value).sum())
-    for value in ("NEW", "CARRY", "RECONFIRMED", "NONE"):
-        summary[value] = int(review.get("review_signal_origin", pd.Series(dtype=object)).eq(value).sum())
-    for value in ENTRY_STATUSES:
-        summary[value] = int(review.get("review_effective_entry_status", pd.Series(dtype=object)).eq(value).sum())
-    return summary
+    The Dashboard contract intentionally remains unchanged; transition
+    semantics now live in bf_transition so external consumers use the same
+    facts without re-implementing them.
+    """
+    transition = analyze_bf_transitions(current_pool, complete_pool)
+    return MidweekReviewResult(
+        current_review=transition.rows,
+        exited_pool=transition.exited_pool,
+        summary=transition.review_summary,
+        actionable_codes=transition.actionable_codes,
+        baseline_available=transition.baseline_available,
+    )
 
 
 def materialize_review_view(review: pd.DataFrame) -> pd.DataFrame:
