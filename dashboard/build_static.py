@@ -4,12 +4,17 @@ import argparse
 import json
 import math
 import shutil
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.data_utils import build_snapshot_freshness
 from dashboard.field_config import (
@@ -26,7 +31,6 @@ from dashboard.services.bf_midweek_review import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD_DIR = Path(__file__).resolve().parent
 STATIC_ASSETS = ("index.html", "app.js", "styles.css", "manifest.webmanifest")
 
