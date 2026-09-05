@@ -23,7 +23,9 @@ jobs:
           activate-environment: quant_env
           auto-activate-base: false
       - name: Install test dependencies
-        run: python -m pip install -U pytest pandas numpy streamlit plotly yfinance tradingview-screener requests
+        run: |
+          python -m pip install -r dashboard/requirements.txt
+          python -m pip install yfinance tradingview-screener requests
       - name: Run repository tests and publish validation output
         run: |
           set +e
