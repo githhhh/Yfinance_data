@@ -19,6 +19,7 @@ import pandas as pd
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
+    complete_snapshot_week,
     complete_target_week,
     is_valid_complete_baseline,
     monday_of_week,
@@ -529,6 +530,7 @@ __all__ = [
     "BreakoutFollowPoolKind",
     "BreakoutFollowPoolRun",
     "classify_breakout_follow_pool",
+    "complete_snapshot_week",
     "complete_target_week",
     "is_valid_complete_baseline",
     "load_industry_lookup",
