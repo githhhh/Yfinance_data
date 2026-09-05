@@ -65,6 +65,7 @@ def test_resolve_window_uses_saturday_through_monday_for_complete(value):
 @pytest.mark.parametrize(
     ("snapshot", "expected"),
     [
+        (date(2026, 7, 23), date(2026, 7, 27)),
         (date(2026, 7, 24), date(2026, 7, 27)),
         (date(2026, 7, 25), date(2026, 7, 27)),
         (date(2026, 7, 26), date(2026, 7, 27)),
@@ -75,8 +76,8 @@ def test_complete_target_week_maps_supported_snapshot_days(snapshot, expected):
     assert complete_target_week(snapshot) == expected
 
 
-@pytest.mark.parametrize("snapshot", [date(2026, 7, 28), date(2026, 7, 29), date(2026, 7, 30)])
-def test_complete_target_week_fails_closed_for_tuesday_through_thursday(snapshot):
+@pytest.mark.parametrize("snapshot", [date(2026, 7, 21), date(2026, 7, 22)])
+def test_complete_target_week_fails_closed_for_tuesday_and_wednesday(snapshot):
     with pytest.raises(ValueError, match="complete snapshot"):
         complete_target_week(snapshot)
 
@@ -257,6 +258,34 @@ def test_snapshot_builder_discards_a_schema_or_semantically_invalid_baseline(inv
     assert review.loc["OLD_CARRY", "review_signal_origin"] == "NONE"
 
 
+def test_thursday_complete_snapshot_carries_into_next_week_midweek():
+    complete = pd.DataFrame(
+        [
+            _row(
+                "HOLIDAY_CARRY",
+                snapshot_date="2026-07-23",
+                signal=True,
+                status="ACTIONABLE",
+                valid=True,
+                candidate=100,
+                close=103,
+                rule="ceiling",
+            )
+        ]
+    )
+    current = pd.DataFrame(
+        [_row("HOLIDAY_CARRY", snapshot_date="2026-07-29", signal=False, close=104)]
+    )
+
+    result = build_midweek_review_for_snapshots(current, complete)
+    row = result.current_review.set_index("code").loc["HOLIDAY_CARRY"]
+
+    assert result.baseline_available is True
+    assert result.actionable_codes == ("HOLIDAY_CARRY",)
+    assert row["review_signal_origin"] == "CARRY"
+    assert row["review_effective_entry_status"] == "ACTIONABLE"
+
+
 @pytest.mark.parametrize(
     ("column", "value", "message"),
     [
@@ -318,6 +347,29 @@ def test_analyze_uses_valid_midweek_in_window_and_preserves_source_files(tmp_pat
     assert result.actionable_codes == ("CARRY",)
     assert complete_path.read_bytes() == complete_before
     assert midweek_path.read_bytes() == midweek_before
+
+
+def test_analyze_uses_thursday_holiday_complete_as_valid_baseline(tmp_path):
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    pd.DataFrame(
+        [_row("CARRY", snapshot_date="2026-07-23", signal=True, status="ACTIONABLE", valid=True, candidate=100, close=103, rule="ceiling")]
+    ).to_csv(complete_path, index=False)
+    pd.DataFrame(
+        [_row("CARRY", snapshot_date="2026-07-29", signal=False, close=104)]
+    ).to_csv(midweek_path, index=False)
+
+    result = analyze_breakout_follow_pool(
+        complete_path,
+        midweek_path,
+        window_date=date(2026, 7, 30),
+    )
+
+    assert result.mode is PoolMode.MIDWEEK
+    assert result.midweek_baseline_available is True
+    assert result.complete_snapshot_date == date(2026, 7, 23)
+    assert result.review_week_start == date(2026, 7, 27)
+    assert result.actionable_codes == ("CARRY",)
 
 
 def test_analyze_ignores_stale_midweek_without_deleting_it(tmp_path):
