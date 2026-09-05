@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from enum import Enum
 import math
 from pathlib import Path
@@ -10,6 +10,13 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from bf_snapshot import (
+    BreakoutFollowPoolKind,
+    classify_breakout_follow_pool,
+    complete_target_week,
+    is_valid_complete_baseline,
+    monday_of_week,
+)
 from dashboard.data_utils import (
     load_pool_csv,
     validate_pool_schema,
@@ -74,22 +81,12 @@ class PoolAnalysisResult:
 
 
 def resolve_window(window_date: date) -> PoolWindow:
-    if window_date.weekday() in {1, 2, 3, 4}:
-        return PoolWindow.MIDWEEK
-    return PoolWindow.COMPLETE
-
-
-def monday_of_week(value: date) -> date:
-    return value - timedelta(days=value.weekday())
-
-
-def complete_target_week(complete_date: date) -> date:
-    weekday = complete_date.weekday()
-    if weekday == 0:
-        return complete_date
-    if weekday in {4, 5, 6}:
-        return complete_date + timedelta(days=7 - weekday)
-    raise ValueError(f"Invalid complete snapshot date: {complete_date.isoformat()}")
+    kind = classify_breakout_follow_pool(window_date)
+    return (
+        PoolWindow.MIDWEEK
+        if kind is BreakoutFollowPoolKind.MIDWEEK
+        else PoolWindow.COMPLETE
+    )
 
 
 def build_midweek_review(
@@ -437,16 +434,6 @@ def _snapshot_date(pool: pd.DataFrame, *, label: str) -> date:
     return next(iter(dates))
 
 
-def _has_valid_complete_baseline(complete_date: date, midweek_date: date) -> bool:
-    try:
-        return (
-            monday_of_week(midweek_date) == complete_target_week(complete_date)
-            and midweek_date > complete_date
-        )
-    except ValueError:
-        return False
-
-
 def build_midweek_review_for_snapshots(
     current_pool: pd.DataFrame,
     complete_pool: pd.DataFrame,
@@ -464,7 +451,7 @@ def build_midweek_review_for_snapshots(
                 raise ValueError("complete pool IBD enrichment is incomplete")
             validate_pool_semantics(complete)
             complete_date = _snapshot_date(complete, label="complete")
-            if _has_valid_complete_baseline(complete_date, current_date):
+            if is_valid_complete_baseline(complete_date, current_date):
                 baseline = complete
         except (TypeError, ValueError):
             baseline = pd.DataFrame()
@@ -522,7 +509,7 @@ def analyze_breakout_follow_pool(
         midweek_week = monday_of_week(midweek_date)
         review_week = complete_week or midweek_week
         try:
-            if complete_date is not None and _has_valid_complete_baseline(complete_date, midweek_date):
+            if complete_date is not None and is_valid_complete_baseline(complete_date, midweek_date):
                 review_result = build_midweek_review(midweek, complete)
                 midweek_available = True
             elif complete_week is None or midweek_week > complete_week:

@@ -126,29 +126,19 @@ window_date = datetime.now(ZoneInfo(settings.business_timezone)).date()
 
 ### 4.2 完整周目标周
 
-第一阶段按当前任务运行规律：
+完整周 `snapshot_date` 始终是实际最后交易日，不是任务运行日或文件生成日：
 
 | 完整周 `snapshot_date` | `review_week_start` |
 | --- | --- |
-| 周五 | 下周一 |
-| 周六 | 下周一 |
-| 周日 | 下周一 |
-| 周一 | 当周一 |
+| 普通周 Friday | 下周一 |
+| Friday 休市时的 Thursday | 下周一 |
 
-```python
-def complete_target_week(complete_date: date) -> date:
-    weekday = complete_date.weekday()
+该映射由 `bf_snapshot.complete_target_week()` 提供；需要持久化分析的 canonical 完整周
+标签由 `bf_snapshot.complete_snapshot_week()` 提供。周末、周一和普通 stale Thursday
+都不是合法的完整周 `snapshot_date`，必须 fail closed。
 
-    if weekday == 0:
-        return complete_date
-
-    if weekday in {4, 5, 6}:
-        return complete_date + timedelta(days=7 - weekday)
-
-    raise InvalidCompleteSnapshotDate(complete_date)
-```
-
-注意：这里的“周五”是完整周文件中的美股 `snapshot_date`，与 4.1 的 Dashboard 业务窗口不是同一个概念。
+注意：这里的“Friday/Thursday”是完整周文件中的美股实际行情 `snapshot_date`，与
+4.1 的 Dashboard 业务窗口不是同一个概念。
 
 ### 4.3 midweek 所属周
 
@@ -184,7 +174,7 @@ else:
 | `MIDWEEK` | 周中 Review，可切回完整周 | 返回投影 ACTIONABLE |
 | `MIDWEEK_WITHOUT_VALID_BASELINE` | 周中原始 Pool + 警告 | 只返回本次真实 ACTIONABLE，不 Carry |
 
-完整周日期出现在周二至周四时，第一阶段 fail closed，不猜测关联关系。
+完整周日期不能被 `bf_snapshot` authority 证明为合法完整周时，fail closed，不猜测关联关系。
 
 ---
 

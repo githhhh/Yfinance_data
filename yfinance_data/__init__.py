@@ -16,6 +16,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from bf_snapshot import (
+    BreakoutFollowPoolKind,
+    classify_breakout_follow_pool,
+    complete_snapshot_week,
+    complete_target_week,
+    is_valid_complete_baseline,
+    monday_of_week,
+)
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
 from eps_pit import EPSResolveMode, EPSStatus, SignalEPSLookup, enrich_pool_with_signal_eps
 from .pool_industry import enrich_pool_with_industry, load_industry_lookup
@@ -519,7 +527,13 @@ def _commit_pool(pool_path: str) -> None:
 __all__ = [
     "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH",
     "BREAKOUT_FOLLOW_POOL_PATH",
+    "BreakoutFollowPoolKind",
     "BreakoutFollowPoolRun",
+    "classify_breakout_follow_pool",
+    "complete_snapshot_week",
+    "complete_target_week",
+    "is_valid_complete_baseline",
     "load_industry_lookup",
+    "monday_of_week",
     "supplement_latest_pool_signal_eps",
 ]
