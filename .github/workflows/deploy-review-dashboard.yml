@@ -1,6 +1,15 @@
 name: Deploy Review Dashboard
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'us/breakout_follow_pool.csv'
+      - 'us/breakout_follow_pool_midweek.csv'
+      - 'dashboard/**'
+      - 'yfinance_data/**'
+      - 'bf_snapshot.py'
+      - '.github/workflows/deploy-review-dashboard.yml'
   push:
     branches: [main]
     paths:
@@ -15,21 +24,15 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: review-dashboard-pages
+  group: review-dashboard-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,6 +47,11 @@ jobs:
       - name: Install dashboard build dependencies
         run: pip install -r dashboard/requirements.txt
 
+      - name: Validate static sources
+        run: |
+          node --check dashboard/app.js
+          python -m py_compile dashboard/build_static.py
+
       - name: Validate authoritative pool projection
         run: |
           python dashboard/self_check.py \
@@ -55,13 +63,26 @@ jobs:
         run: python dashboard/build_static.py --output _site
 
       - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
