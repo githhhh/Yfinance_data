@@ -1,0 +1,26 @@
+name: Validate BF Calendar
+
+on:
+  push:
+    branches:
+      - ci/validate-bf-holiday-calendar
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: '3.12'
+          environment-name: quant_env
+          activate-environment: quant_env
+          auto-activate-base: false
+      - name: Install test dependencies
+        run: python -m pip install -U pytest pandas numpy streamlit yfinance tradingview-screener requests
+      - name: Run repository tests
+        run: python -m pytest tests dashboard/tests -q
