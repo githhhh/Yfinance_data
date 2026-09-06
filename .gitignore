@@ -11,10 +11,19 @@ token_*.json
 !.env.example
 credentials.json
 secrets.json
+.netrc
+.pypirc
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
 *.pem
 *.key
+*.p8
 *.p12
 *.pfx
+*.jks
+*.keystore
 
 # EPUB Unpacked Book
 .ibd_book_unpacked/
