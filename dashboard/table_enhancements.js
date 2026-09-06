@@ -340,3 +340,155 @@
   observer.observe(app, { childList: true, subtree: true });
   scheduleEnhance();
 })();
+
+(() => {
+  "use strict";
+
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  let dashboardData = null;
+  let refreshQueued = false;
+
+  function bool(value) {
+    if (value === true || value === 1) return true;
+    return ["true", "1", "1.0", "yes", "y", "t"].includes(String(value ?? "").trim().toLowerCase());
+  }
+
+  function num(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function isActive(row) {
+    if (Object.hasOwn(row, "review_watch_active")) return bool(row.review_watch_active);
+    return bool(row.signal);
+  }
+
+  function pressedValue(action) {
+    return app.querySelector(`[data-action="${action}"][aria-pressed="true"]`)?.dataset.value || null;
+  }
+
+  function quickValue(field) {
+    return app.querySelector(`[data-action="quick"][data-field="${field}"][aria-pressed="true"]`)?.dataset.value || "ALL";
+  }
+
+  function contextRows() {
+    if (!dashboardData) return [];
+    const period = pressedValue("period") || "WEEKEND";
+    const comparison = period === "MIDWEEK" && Boolean(dashboardData.meta?.midweek_baseline_available);
+    const source = period === "MIDWEEK" ? dashboardData.views?.midweek?.rows : dashboardData.views?.weekend?.rows;
+    let rows = Array.isArray(source) ? source.filter(isActive) : [];
+
+    if (comparison && pressedValue("scope") === "CHANGES") {
+      rows = rows.filter((row) => String(row.review_change_group || "UNCHANGED") !== "UNCHANGED");
+    }
+
+    const change = quickValue("change");
+    if (comparison && change !== "ALL") rows = rows.filter((row) => row.review_change_group === change);
+
+    const origin = quickValue("origin");
+    if (comparison && origin !== "ALL") rows = rows.filter((row) => row.review_signal_origin === origin);
+
+    const status = pressedValue("status");
+    if (status) rows = rows.filter((row) => row.ibd_entry_status === status);
+
+    const route = app.querySelector('[data-control="route"]')?.value || "All";
+    if (route !== "All") rows = rows.filter((row) => row.ibd_candidate_rule === route);
+
+    return rows;
+  }
+
+  function bounds(rows, field) {
+    const values = rows.map((row) => num(row[field])).filter((value) => value !== null);
+    if (!values.length) return null;
+    const low = Math.floor(Math.min(...values) * 10) / 10;
+    const high = Math.ceil(Math.max(...values) * 10) / 10;
+    return [Number(low.toFixed(1)), Number(high.toFixed(1))];
+  }
+
+  function format(value, kind) {
+    const parsed = num(value);
+    if (parsed === null) return "n/a";
+    if (kind === "pct") return `${parsed >= 0 ? "+" : ""}${parsed.toFixed(1)}%`;
+    return `${parsed.toFixed(1)}×`;
+  }
+
+  function labelText(name, inactive, value, kind) {
+    if (name === "distance-min") return `Vs Buy Point · Min · ${inactive ? "Full range" : format(value, kind)}`;
+    if (name === "distance-max") return `Vs Buy Point · Max · ${inactive ? "Full range" : format(value, kind)}`;
+    if (name === "entry-volume") return inactive ? "Entry Volume · Min · Full range" : `Entry Volume ≥ ${format(value, kind)}`;
+    return inactive ? "Weekly Volume · Min · Full range" : `Weekly Volume ≥ ${format(value, kind)}`;
+  }
+
+  function enhanceRange(name, rangeBounds, edge, kind) {
+    const input = app.querySelector(`[data-control="${name}"]`);
+    if (!input || !rangeBounds || input.dataset.dynamicBounds === "true") return;
+
+    const field = input.closest(".filter-field");
+    const label = field?.querySelector("label");
+    const valueLabels = field ? [...field.querySelectorAll(".range-values small")] : [];
+    const appStatus = valueLabels[1]?.textContent?.trim() || "";
+    const inactive = appStatus === "Any" || label?.textContent?.includes("Any");
+    const [low, high] = rangeBounds;
+    const previous = Number(input.value);
+
+    input.dataset.dynamicBounds = "true";
+    input.min = String(low);
+    input.max = String(high);
+    input.step = "0.1";
+
+    let nextValue = inactive ? (edge === "max" ? high : low) : Math.min(high, Math.max(low, previous));
+    if (!Number.isFinite(nextValue)) nextValue = edge === "max" ? high : low;
+    input.value = String(nextValue);
+
+    if (low === high) input.disabled = true;
+    if (valueLabels[0]) valueLabels[0].textContent = format(low, kind);
+    if (valueLabels[1]) valueLabels[1].textContent = format(high, kind);
+    if (label) label.textContent = labelText(name, inactive, nextValue, kind);
+
+    input.addEventListener("input", () => {
+      if (label) label.textContent = labelText(name, false, Number(input.value), kind);
+    });
+
+    if (!inactive && Math.abs(previous - nextValue) > 1e-9) {
+      queueMicrotask(() => input.dispatchEvent(new Event("change", { bubbles: true })));
+    }
+  }
+
+  function enhanceRanges() {
+    if (!dashboardData) return;
+    const rows = contextRows();
+    if (!rows.length) return;
+    enhanceRange("distance-min", bounds(rows, "current_vs_ibd_candidate_pct"), "min", "pct");
+    enhanceRange("distance-max", bounds(rows, "current_vs_ibd_candidate_pct"), "max", "pct");
+    enhanceRange("entry-volume", bounds(rows, "ibd_entry_volume_ratio"), "min", "x");
+    enhanceRange("weekly-volume", bounds(rows, "volume_ratio"), "min", "x");
+  }
+
+  function scheduleEnhance() {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    requestAnimationFrame(() => {
+      refreshQueued = false;
+      enhanceRanges();
+    });
+  }
+
+  const observer = new MutationObserver(scheduleEnhance);
+  observer.observe(app, { childList: true, subtree: true });
+
+  fetch("./data/dashboard.json", { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((payload) => {
+      dashboardData = payload;
+      scheduleEnhance();
+    })
+    .catch(() => {
+      dashboardData = null;
+    });
+})();
