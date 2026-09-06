@@ -40,6 +40,48 @@ STATIC_ASSETS = (
     "manifest.webmanifest",
 )
 
+# Public GitHub Pages contract. Pool/schema growth must never implicitly publish
+# new columns. Add a field here only when the static UI intentionally consumes it.
+PUBLIC_DASHBOARD_ROW_FIELDS = (
+    "code",
+    "signal",
+    "snapshot_date",
+    "review_watch_active",
+    "review_effective_entry_status",
+    "review_priority",
+    "review_baseline_entry_status",
+    "review_change_group",
+    "review_change_label",
+    "review_signal_origin",
+    "ibd_entry_status",
+    "ibd_candidate_rule",
+    "ibd_candidate_price",
+    "ibd_trigger_price",
+    "current_vs_ibd_candidate_pct",
+    "latest_close",
+    "ibd_entry_valid",
+    "ibd_entry_date",
+    "ibd_entry_volume_ratio",
+    "ibd_entry_vol_or_reject",
+    "ibd_entry_reject_reason",
+    "ibd_entry_close_position",
+    "ibd_entry_breakout_range_ratio",
+    "ibd_breakout_quality",
+    "volume_ratio",
+    "rank_C_continuous",
+    "C_continuous",
+    "eps_yoy_growth",
+    "price_52_week_high",
+    "dist_to_52w_high_pct",
+    "pullback_pct",
+    "pullback_pct_off_peak",
+    "pullback_duration_weeks",
+    "pullback_v_is_dry",
+    "base_depth_pct",
+    "base_duration_weeks",
+    "industry",
+)
+
 
 def _json_value(value: Any) -> Any:
     if value is None:
@@ -65,8 +107,9 @@ def _json_value(value: Any) -> Any:
 def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     if frame.empty:
         return []
+    fields = [field for field in PUBLIC_DASHBOARD_ROW_FIELDS if field in frame.columns]
     return [
-        {str(key): _json_value(value) for key, value in row.items()}
+        {field: _json_value(row.get(field)) for field in fields}
         for row in frame.to_dict(orient="records")
     ]
 
