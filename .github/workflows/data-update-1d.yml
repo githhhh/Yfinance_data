@@ -17,25 +17,33 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 15  # Extended timeout for daily data
+    timeout-minutes: 15
 
     steps:
-      # --- MAIN EXECUTION ---
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.x'
+
+      - name: Validate years input
+        env:
+          DOWNLOAD_YEARS: ${{ github.event.inputs.years || '2' }}
+        run: |
+          if ! [[ "$DOWNLOAD_YEARS" =~ ^[0-9]+$ ]] || (( DOWNLOAD_YEARS < 1 || DOWNLOAD_YEARS > 20 )); then
+            echo "::error::years must be an integer from 1 to 20"
+            exit 2
+          fi
 
       - name: Create results directory
         run: mkdir -p results_pkl
 
       - name: Install dependencies
-        run: pip install yfinance==1.0 tradingview-screener
+        run: pip install yfinance==1.0 tradingview-screener==3.2.1
 
       - name: Run Screener and Merge
         continue-on-error: true
@@ -44,23 +52,21 @@ jobs:
           python DataStore.py --screener-only --min-eps-growth=150
 
       - name: Run daily data download script
+        env:
+          DOWNLOAD_YEARS: ${{ github.event.inputs.years || '2' }}
         run: |
-          YEARS="${{ github.event.inputs.years || '2' }}"
-          echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z"), period=${YEARS}y"
-          python DataStore.py --period=${YEARS}y --interval=1d --skip-screener
+          echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z"), period=${DOWNLOAD_YEARS}y"
+          python DataStore.py --period="${DOWNLOAD_YEARS}y" --interval=1d --skip-screener
           echo "Daily data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
       - name: Clean old data files (Keep today only)
         run: |
           cd results_pkl 2>/dev/null || { echo "No results_pkl directory"; exit 0; }
-          
-          # Get current date suffix in %d%m%y format (e.g., 020126)
+
           TODAY=$(date +"%d%m%y")
           echo "Keeping files with suffix: $TODAY"
-          
-          # List all .pkl files that DON'T match today's suffix
           OLD_FILES=$(find . -name "*.pkl" ! -name "*${TODAY}*")
-          
+
           if [ -z "$OLD_FILES" ]; then
             echo "No old files to clean."
           else
@@ -71,10 +77,16 @@ jobs:
           fi
 
       - name: Commit and push daily data changes
+        env:
+          DOWNLOAD_YEARS: ${{ github.event.inputs.years || '2' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          YEARS="${{ github.event.inputs.years || '2' }}"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add results_pkl/ us/
-          git commit -m "Update daily stock data (${YEARS}Y-1D) [skip ci]" || echo "No changes to commit"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Update daily stock data (${DOWNLOAD_YEARS}Y-1D) [skip ci]"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
