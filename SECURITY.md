@@ -38,10 +38,11 @@ Schwab OAuth token refreshes written by `SchwabRawTokenClient` are saved with ow
 
 ## GitHub Actions Hardening
 
-- third-party/first-party reusable Actions are pinned to verified full commit SHAs rather than movable tags;
+- reusable GitHub Actions are pinned to verified full commit SHAs rather than movable tags;
 - read-only workflows use `persist-credentials: false`;
 - data-update workflows also checkout without persisted credentials even though the job has `contents: write`;
-- the write-capable `GITHUB_TOKEN` is exposed only to the final commit/push step;
+- trusted pinned Actions such as checkout/setup may receive `GITHUB_TOKEN` while they execute, but the token is not persisted into Git configuration for subsequent pip installs, screening, or data-download scripts;
+- explicit shell access to the write-capable token is limited to the final commit/push step, via `GH_TOKEN` and `gh auth setup-git`;
 - manual workflow inputs used by shell commands must be passed through environment variables and validated before use;
 - dependencies installed in write-capable data-update jobs should be version-pinned and updated deliberately.
 
