@@ -51,6 +51,7 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     for path in (
         output / "index.html",
         output / "app.js",
+        output / "table_enhancements.js",
         output / "styles.css",
         output / "manifest.webmanifest",
         output / ".nojekyll",
@@ -60,7 +61,14 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
 
     payload = json.loads((output / "data" / "dashboard.json").read_text(encoding="utf-8"))
     assert payload["views"]["weekend"]["rows"]
-    assert "streamlit" not in (output / "index.html").read_text(encoding="utf-8").lower()
+    index = (output / "index.html").read_text(encoding="utf-8").lower()
+    assert "streamlit" not in index
+    assert "table_enhancements.js" in index
+
+    enhancements = (output / "table_enhancements.js").read_text(encoding="utf-8")
+    assert "Breakout Price Quality" in enhancements
+    assert "Powerful" in enhancements
+    assert "data-sort-field" in enhancements
 
 
 def test_streamlit_runtime_has_been_removed() -> None:

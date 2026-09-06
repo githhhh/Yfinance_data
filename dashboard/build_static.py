@@ -32,7 +32,13 @@ from dashboard.services.bf_midweek_review import (
 
 
 DASHBOARD_DIR = Path(__file__).resolve().parent
-STATIC_ASSETS = ("index.html", "app.js", "styles.css", "manifest.webmanifest")
+STATIC_ASSETS = (
+    "index.html",
+    "app.js",
+    "table_enhancements.js",
+    "styles.css",
+    "manifest.webmanifest",
+)
 
 
 def _json_value(value: Any) -> Any:
