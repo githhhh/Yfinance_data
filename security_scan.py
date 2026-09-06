@@ -27,8 +27,19 @@ HISTORY_EXCLUDED_PATHS = (
     ":(exclude)output/**",
 )
 SAFE_ENV_FILENAMES = {".env.example", ".env.sample", ".env.template"}
-SENSITIVE_FILENAMES = {"credentials.json", "secrets.json", "token.json"}
-SENSITIVE_SUFFIXES = {".pem", ".key", ".p12", ".pfx"}
+SENSITIVE_FILENAMES = {
+    "credentials.json",
+    "secrets.json",
+    "token.json",
+    ".netrc",
+    ".pypirc",
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+}
+SENSITIVE_SUFFIXES = {".pem", ".key", ".p8", ".p12", ".pfx", ".jks", ".keystore"}
+SAFE_TEST_LITERALS = {"test_key", "test_secret", "fake_key", "fake_secret", "fake_token"}
 
 PLACEHOLDER_MARKERS = (
     "example",
@@ -74,6 +85,8 @@ def _looks_placeholder(value: str) -> bool:
     normalized = value.strip().strip("\"'").lower()
     if not normalized:
         return True
+    if normalized in SAFE_TEST_LITERALS:
+        return True
     if normalized.startswith("$"):
         return True
     if any(marker in normalized for marker in PLACEHOLDER_MARKERS):
@@ -90,7 +103,11 @@ TOKEN_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("github-fine-grained-token", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,255}\b")),
     ("aws-access-key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("openai-api-key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b")),
+    ("anthropic-api-key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
+    ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("huggingface-token", re.compile(r"\bhf_[A-Za-z0-9]{30,}\b")),
     ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    ("stripe-live-secret", re.compile(r"\bsk_live_[A-Za-z0-9]{20,}\b")),
     ("credential-url", re.compile(r"https?://[^\s/:@]+:[^\s/@]{6,}@[^\s]+")),
 )
 
