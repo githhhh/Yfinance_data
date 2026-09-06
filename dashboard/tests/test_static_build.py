@@ -4,7 +4,14 @@ import json
 from datetime import date
 from pathlib import Path
 
-from dashboard.build_static import build_dashboard_payload, build_site
+import pandas as pd
+
+from dashboard.build_static import (
+    PUBLIC_DASHBOARD_ROW_FIELDS,
+    _records,
+    build_dashboard_payload,
+    build_site,
+)
 from dashboard.data_utils import load_pool_csv
 
 
@@ -28,6 +35,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
     assert payload["default_period"] in {"WEEKEND", "MIDWEEK"}
 
     row = payload["views"]["weekend"]["rows"][0]
+    assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
     for field in (
         "code",
         "signal",
@@ -38,6 +46,25 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "review_priority",
     ):
         assert field in row
+
+
+def test_static_records_fail_closed_on_new_pool_columns() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "code": "SAFE",
+                "signal": True,
+                "ibd_entry_status": "ACTIONABLE",
+                "future_private_field": "must-not-publish",
+            }
+        ]
+    )
+
+    row = _records(frame)[0]
+
+    assert row["code"] == "SAFE"
+    assert "future_private_field" not in row
+    assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
 
 
 def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
@@ -61,6 +88,10 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
 
     payload = json.loads((output / "data" / "dashboard.json").read_text(encoding="utf-8"))
     assert payload["views"]["weekend"]["rows"]
+    for view in payload["views"].values():
+        for row in view["rows"]:
+            assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
+
     index = (output / "index.html").read_text(encoding="utf-8").lower()
     assert "streamlit" not in index
     assert "table_enhancements.js" in index
