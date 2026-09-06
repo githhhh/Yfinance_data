@@ -108,8 +108,8 @@ TOKEN_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("huggingface-token", re.compile(r"\bhf_[A-Za-z0-9]{30,}\b")),
     ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
     ("stripe-live-secret", re.compile(r"\bsk_live_[A-Za-z0-9]{20,}\b")),
-    ("credential-url", re.compile(r"https?://[^\s/:@]+:[^\s/@]{6,}@[^\s]+")),
 )
+CREDENTIAL_URL = re.compile(r"https?://[^\s/:@]+:([^\s/@]{6,})@[^\s]+")
 
 GENERIC_LITERAL = re.compile(
     r"(?i)\b(api[_-]?key|client[_-]?secret|app[_-]?secret|access[_-]?token|"
@@ -126,6 +126,11 @@ def _scan_line(text: str, source: str, line: int | None) -> list[Finding]:
     for kind, pattern in TOKEN_PATTERNS:
         if pattern.search(text):
             findings.append(Finding(kind, source, line))
+
+    for match in CREDENTIAL_URL.finditer(text):
+        password = match.group(1)
+        if not _looks_placeholder(password):
+            findings.append(Finding("credential-url", source, line))
 
     for match in GENERIC_LITERAL.finditer(text):
         value = match.group(2)
