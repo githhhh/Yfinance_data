@@ -1,18 +1,17 @@
 # Static Breakout Pool Review Dashboard Spec
 
-状态：当前 canonical Dashboard 规范  
+状态：当前唯一 Dashboard 心流 / 交互规范  
 日期：2026-09-06
 
-本文取代旧文档中的 **Streamlit / AG Grid 技术实现约束**，但保留已经确认的 Review 心流、数据语义和交互目标。旧文档继续作为历史设计依据，不再作为运行时技术规范。
+本文是静态 GitHub Pages Dashboard 的唯一交互规范。旧 Streamlit / AG Grid 时代的 Dashboard 设计文档已经删除；需要追溯设计演进时使用 Git 历史，不在当前文档目录保留重复规范。
 
 ## 1. 事实来源优先级
 
 发生冲突时按以下顺序处理：
 
 1. `quant_trade` 实际调用与 Yfinance_data 权威 Pool 发布契约；
-2. `DESIGN_yfinance_data_midweek_review.md` 的数据/状态语义；
-3. 本文的静态 Dashboard 心流与公开展示契约；
-4. 2026-07/08 的 Streamlit / AG Grid 文档作为历史交互参考。
+2. `DESIGN_yfinance_data_midweek_review.md` 的数据 / 状态语义；
+3. 本文的 Dashboard 心流、交互与公开展示契约。
 
 不得为了视觉或前端实现修改权威 Pool 数据、Midweek projection、Entry Status、Breakout Price Quality 或跨仓库接口。
 
@@ -111,6 +110,35 @@ ACTIONABLE → UNCONFIRMED → BELOW_TRIGGER → EXTENDED
 
 Reset 仅在有高级筛选时出现，并只重置高级筛选。
 
+#### Range 控件语义
+
+Range 控件必须基于**当前 Review 语境中的实际数据范围**，不能使用固定兜底范围冒充数据边界。
+
+当前语境包括：
+
+```text
+Period
++ Scope
++ Change
++ Origin
++ Entry Status
++ Setup
+```
+
+数值 Range 本身不参与自己的边界计算，避免拖动后把可调范围越缩越小。
+
+具体规则：
+
+- `Vs Buy Point · Min` 默认停在当前数据实际最小值；
+- `Vs Buy Point · Max` 默认停在当前数据实际最大值；
+- `Entry Volume Min`、`Weekly Volume Min` 默认停在当前数据实际最小值；
+- 默认完整范围属于**未启用筛选**，因此 `More Filters · None` 必须保持正确；
+- 未启用时标题显示 `Full range`，不使用 `Any` 表示滑块端点；
+- Range 下方固定展示当前语境的左右数据边界；
+- 用户把 Min 拖离左边界、或 Max 拖离右边界后，该条件才变为 active；
+- 当前语境变化后，Range 边界同步更新；旧阈值若已落在新数据范围之外，必须归一化，不能出现 UI 数值与实际过滤状态不一致；
+- 缺失值不用于计算数值边界；完整范围状态仍保持“未启用过滤”的原语义。
+
 ## 5. Results 与连续 Review
 
 ### 5.1 默认排序
@@ -145,7 +173,7 @@ Marginal
 Weak
 ```
 
-说明使用倒三角/递减宽度与颜色深浅表达强度，并保留文字。语义固定为：
+说明使用倒三角 / 递减宽度与颜色深浅表达强度，并保留文字。语义固定为：
 
 - Powerful：High close + full clearance
 - Strong：One strong, one solid
@@ -169,14 +197,15 @@ Selected Detail 位于结果摘要和表格之间；选行后原地更新，不�
 
 详情只解释当前行，不创建第二套筛选器。
 
-## 6. 响应式与心流
+## 6. 响应式与滚动
 
 桌面优先保持 Review Queue、筛选入口、Results 与 Selected Detail 在表格前连续出现，减少视觉跳跃。
 
 移动端：
 
 - Period / Scope、Quick filters、Status cards 自动换行；
-- 表格允许横向滚动，但 Code 列保持 sticky；
+- 表格允许横向与纵向滚动，但 Code 列保持 sticky；
+- 表格自身两个方向到边界时不使用 overscroll / bounce 弹性；页面外层正常纵向滚动不受影响；
 - 表头排序和 Quality 说明必须支持触屏；
 - 不为移动端复制第二套业务逻辑。
 
@@ -199,6 +228,8 @@ python dashboard/self_check.py \
   --csv us/breakout_follow_pool.csv \
   --midweek-csv us/breakout_follow_pool_midweek.csv
 python -m pytest dashboard/tests -q
+node --check dashboard/app.js
+node --check dashboard/table_enhancements.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 ```
@@ -208,17 +239,17 @@ python security_scan.py --history
 - Midweek / Weekend 默认语境正确；
 - Changes / All Signals 与 baseline 状态一致；
 - Quick filters、Status、More Filters 不互相误重置；
+- 默认 Range 显示当前语境真实边界，完整范围不显示 `Any`；
+- Range 拖动后 active 状态与结果数量一致；
 - 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；
+- 表格横纵滚动到边界不产生自身 bounce；
 - C Rank Reference 与 IBD Review 状态互不污染；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列。
 
-## 9. 历史文档
+## 9. 文档维护规则
 
-以下文件继续保存设计演进，但其中 Streamlit、AG Grid、`run_app.py`、固定组件尺寸等技术实现已被本文取代：
+Dashboard 心流、交互或静态展示行为发生变化时只更新本文。
 
-- `BREAKOUT_POOL_LOCAL_DASHBOARD_DESIGN.md`
-- `IBD_REVIEW_DASHBOARD_UX_UI_SPEC.md`
-- `DESIGN_yfinance_data_midweek_review_ui_alignment.md`
-- `2026-08-03-review-queue-flow-design.md`
-
-其中关于心流、字段语义、状态组合、默认排序和连续 Review 的产品原则仍可作为回归参考。
+- 不新增第二份 Dashboard UX / flow / UI alignment 规范；
+- 过时方案直接删除，Git 历史承担追溯职责；
+- 数据 schema 与 Midweek 数据状态设计仍分别由其专门文档维护，不和本文重复。
