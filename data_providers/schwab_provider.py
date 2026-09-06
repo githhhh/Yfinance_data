@@ -145,7 +145,10 @@ class SchwabRawTokenClient:
         return token if isinstance(token, dict) else {}
 
     def _save_token(self, token: Dict[str, Any]) -> None:
-        with open(self.creds.token_path, "w", encoding="utf-8") as f:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        fd = os.open(self.creds.token_path, flags, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(token, f, indent=2)
 
 
@@ -191,7 +194,6 @@ class SchwabDataProvider(BaseDataProvider):
             )
 
         try:
-            # schwab-py 客户端加载
             return schwab.auth.client_from_token_file(
                 token_path=self.creds.token_path,
                 api_key=self.creds.app_key,
@@ -221,15 +223,14 @@ class SchwabDataProvider(BaseDataProvider):
         self, symbol: str, period: str = "1y", interval: str = "1d"
     ) -> Optional[pd.DataFrame]:
         try:
-            # 兼容标准 yfinance 的符号格式 (例如 BRK-B 替换为 BRK.B 适配 Schwab)
             schwab_symbol = symbol.replace("-", ".")
             resp = self._request_price_history(schwab_symbol, period=period, interval=interval)
-            
+
             if resp is None:
                 return None
-                
+
             data_json = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
-            
+
             if not isinstance(data_json, dict) or data_json.get("empty", False):
                 return None
 
@@ -238,8 +239,7 @@ class SchwabDataProvider(BaseDataProvider):
                 return None
 
             df = pd.DataFrame(candles)
-            
-            # 列名重命名映射，强制与 yfinance / DataStore 输出 Schema 对齐
+
             col_map = {
                 "open": "Open",
                 "high": "High",
@@ -248,18 +248,17 @@ class SchwabDataProvider(BaseDataProvider):
                 "volume": "Volume",
             }
             df = df.rename(columns=col_map)
-            
+
             if "datetime" in df.columns:
                 df["Date"] = pd.to_datetime(df["datetime"], unit="ms", errors="coerce")
                 df = df.set_index("Date")
-            
+
             req_cols = ["Open", "High", "Low", "Close", "Volume"]
             if any(col not in df.columns for col in req_cols):
                 return None
 
             df = df[req_cols].copy()
-            
-            # Schwab candles are already raw OHLCV. Normalize dtype only; do not round.
+
             for col in req_cols:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -283,7 +282,6 @@ class SchwabDataProvider(BaseDataProvider):
                 return self.client.get_price_history(symbol)
             return None
         try:
-            # 判断频次类型
             if interval == "1wk":
                 freq_type = schwab.client.Client.PriceHistory.FrequencyType.WEEKLY
                 freq = schwab.client.Client.PriceHistory.Frequency.EVERY_WEEK
@@ -291,7 +289,6 @@ class SchwabDataProvider(BaseDataProvider):
                 freq_type = schwab.client.Client.PriceHistory.FrequencyType.DAILY
                 freq = schwab.client.Client.PriceHistory.Frequency.DAILY
 
-            # 判断周期
             period_type = schwab.client.Client.PriceHistory.PeriodType.YEAR
             period_num = 1
             if period.endswith("y"):
@@ -309,7 +306,6 @@ class SchwabDataProvider(BaseDataProvider):
             )
             return resp
         except AttributeError:
-            # Mock 环境或无 Client 属性时回退
             if hasattr(self.client, "get_price_history"):
                 return self.client.get_price_history(symbol)
             return None
