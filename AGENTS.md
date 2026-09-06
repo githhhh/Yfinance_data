@@ -7,7 +7,7 @@
 - `us/`：筛选结果与候选池 CSV
 - `results_pkl/`：行情缓存
 - `dashboard/`：静态复盘页面、共享投影逻辑及测试
-- `doc/`：经确认的正式文档
+- `doc/`：经确认的正式文档；当前 Dashboard 规范见 `doc/STATIC_REVIEW_DASHBOARD_SPEC.md`
 - `*_screener.py`：股票筛选入口
 
 ## 环境
@@ -19,6 +19,7 @@ conda activate quant_env
 python dashboard/self_check.py --csv us/breakout_follow_pool.csv --midweek-csv us/breakout_follow_pool_midweek.csv
 python -m pytest dashboard/tests -q
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
+python security_scan.py --history
 ```
 
 ## 强制规则
@@ -26,7 +27,8 @@ python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 - 先检查 Git 状态，只修改任务范围；未经授权不得改动 `us/`、`results_pkl/` 数据。
 - 修改仪表板后运行相关测试、`dashboard/self_check.py` 和静态构建。
 - Dashboard 不得重新引入 Streamlit、服务端运行时或第二套交易规则；状态、Midweek projection、Breakout Quality 等业务口径继续由 Python 权威层生成，浏览器只做展示、筛选、排序与交互。
-- 静态站不得包含账户、持仓、API Key 或其它私有交易数据。
+- 静态站不得包含账户、持仓、API Key、OAuth Token、broker account hash 或其它私有交易数据；新增 Pool 字段不得绕过 `PUBLIC_DASHBOARD_ROW_FIELDS` 自动发布。
+- 涉及凭据、provider、GitHub Actions、公开 payload 或 `.gitignore` 的修改必须运行 `python security_scan.py --history`；不得通过关闭扫描规则解决真实命中。
 - 过程笔记、计划、草稿、截图等临时材料放在项目外；禁止创建 `docs/superpowers/`、`dashboard/artifacts/`。
 - 正式设计文档必须事先讨论并获得用户批准。
 - 新增依赖须先说明；安装、测试和运行统一使用 `quant_env`。
