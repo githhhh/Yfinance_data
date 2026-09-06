@@ -71,4 +71,5 @@ jobs:
             exit 0
           fi
           git commit -m "Update weekly stock data (5Y-1WK) [skip ci]"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          gh auth setup-git
+          git push origin HEAD:main
