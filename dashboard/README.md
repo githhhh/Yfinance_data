@@ -2,7 +2,7 @@
 
 `dashboard/` 是 `breakout_follow_pool.csv` / `breakout_follow_pool_midweek.csv` 的静态 IBD Review 页面与共享投影逻辑。
 
-当前 UI/心流规范以 [`doc/STATIC_REVIEW_DASHBOARD_SPEC.md`](../doc/STATIC_REVIEW_DASHBOARD_SPEC.md) 为准；旧 Streamlit / AG Grid 文档只作为历史设计参考。
+当前且唯一的 UI / 心流 / 交互规范是 [`doc/STATIC_REVIEW_DASHBOARD_SPEC.md`](../doc/STATIC_REVIEW_DASHBOARD_SPEC.md)。过时 Dashboard 方案直接删除，需要追溯时使用 Git 历史，不保留平行规范。
 
 运行时不依赖 Streamlit。Python 负责读取权威 Pool、执行字段正规化与 Midweek projection，并生成静态 JSON；浏览器只负责展示、筛选、排序、选行、复制与响应式交互。
 
@@ -24,8 +24,10 @@
 - `EXTENDED`：已超过 Buy Point +5%。
 - Midweek Review 使用合法完整周 Pool 作为 baseline；没有合法 baseline 时关闭 Carry / Change / Origin 比较。
 - Midweek `Changes` 默认按 `Review Priority`；其它 Review 视图默认按 `C Rank`。
-- 默认排序只是入口；所有可见表头支持点击升/降序。
+- 默认排序只是入口；所有可见表头支持点击升 / 降序。
 - `Breakout Price Quality` 表头保留强度说明，质量计算仍完全来自 Python 权威层。
+- More Filters 的数值 Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`，不使用 `Any` 作为端点。
+- 表格横纵两个方向允许滚动，但表格自身到边界时关闭 overscroll / bounce。
 - `C Rank Reference` 独立，只对 Active Signals 做横向参考。
 
 ## 本地构建与验证
@@ -35,6 +37,8 @@ python dashboard/self_check.py \
   --csv us/breakout_follow_pool.csv \
   --midweek-csv us/breakout_follow_pool_midweek.csv
 python -m pytest dashboard/tests -q
+node --check dashboard/app.js
+node --check dashboard/table_enhancements.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 python -m http.server 8000 --directory /tmp/yfinance-dashboard-site
