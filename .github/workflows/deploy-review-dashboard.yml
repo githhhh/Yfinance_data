@@ -52,6 +52,7 @@ jobs:
       - name: Validate static sources
         run: |
           node --check dashboard/app.js
+          node --check dashboard/table_enhancements.js
           python -m py_compile dashboard/build_static.py
 
       - name: Validate authoritative pool projection
