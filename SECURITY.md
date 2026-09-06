@@ -34,6 +34,19 @@ Use environment variables or GitHub Actions secrets for credentials. Do not pass
 
 Local credential files are ignored by `.gitignore`, including `.env*`, token/credential JSON files, private-key files, and certificate bundles.
 
+Schwab OAuth token refreshes written by `SchwabRawTokenClient` are saved with owner-only `0600` permissions on supported Unix-like systems.
+
+## GitHub Actions Hardening
+
+- third-party/first-party reusable Actions are pinned to verified full commit SHAs rather than movable tags;
+- read-only workflows use `persist-credentials: false`;
+- data-update workflows also checkout without persisted credentials even though the job has `contents: write`;
+- the write-capable `GITHUB_TOKEN` is exposed only to the final commit/push step;
+- manual workflow inputs used by shell commands must be passed through environment variables and validated before use;
+- dependencies installed in write-capable data-update jobs should be version-pinned and updated deliberately.
+
+Do not replace these constraints with a long-lived PAT unless there is a demonstrated requirement that `GITHUB_TOKEN` cannot satisfy.
+
 ## Automated Scan
 
 Run locally before publishing security-sensitive changes:
