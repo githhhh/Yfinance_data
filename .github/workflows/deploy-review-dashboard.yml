@@ -1,0 +1,90 @@
+name: Deploy Review Dashboard
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'us/breakout_follow_pool.csv'
+      - 'us/breakout_follow_pool_midweek.csv'
+      - 'dashboard/**'
+      - 'yfinance_data/**'
+      - 'bf_snapshot.py'
+      - '.github/workflows/deploy-review-dashboard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'us/breakout_follow_pool.csv'
+      - 'us/breakout_follow_pool_midweek.csv'
+      - 'dashboard/**'
+      - 'yfinance_data/**'
+      - 'bf_snapshot.py'
+      - '.github/workflows/deploy-review-dashboard.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: review-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            dashboard/requirements.txt
+            dashboard/requirements-test.txt
+
+      - name: Install dashboard test dependencies
+        run: pip install -r dashboard/requirements-test.txt
+
+      - name: Validate static sources
+        run: |
+          node --check dashboard/app.js
+          python -m py_compile dashboard/build_static.py
+
+      - name: Validate authoritative pool projection
+        run: |
+          python dashboard/self_check.py \
+            --csv us/breakout_follow_pool.csv \
+            --midweek-csv us/breakout_follow_pool_midweek.csv
+          python -m pytest dashboard/tests -q
+
+      - name: Build static dashboard
+        run: python dashboard/build_static.py --output _site
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
