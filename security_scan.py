@@ -71,7 +71,7 @@ def _git(*args: str) -> str:
 
 
 def _looks_placeholder(value: str) -> bool:
-    normalized = value.strip().strip('"\'').lower()
+    normalized = value.strip().strip("\"'").lower()
     if not normalized:
         return True
     if normalized.startswith("$"):
@@ -116,7 +116,7 @@ def _scan_line(text: str, source: str, line: int | None) -> list[Finding]:
             findings.append(Finding(f"literal-{match.group(1).lower()}", source, line))
 
     for match in CLI_LITERAL.finditer(text):
-        value = match.group(1).strip('"\'')
+        value = match.group(1).strip("\"'")
         if not _looks_placeholder(value):
             findings.append(Finding("cli-literal-secret", source, line))
     return findings
@@ -210,14 +210,12 @@ def commit_email_warnings() -> list[str]:
         for email in _git("log", "--all", "--format=%ae").splitlines()
         if email.strip()
     }
-    exposed = sorted(
+    return sorted(
         email
         for email in emails
         if not email.endswith("@users.noreply.github.com")
-        and email not in {"noreply@github.com"}
-        and not email.endswith("@users.noreply.github.com")
+        and email != "noreply@github.com"
     )
-    return exposed
 
 
 def _deduplicate(findings: list[Finding]) -> list[Finding]:
