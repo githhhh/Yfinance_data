@@ -83,4 +83,5 @@ jobs:
             exit 0
           fi
           git commit -m "Update stock data [skip ci]"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          gh auth setup-git
+          git push origin HEAD:main
