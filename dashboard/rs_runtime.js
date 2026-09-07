@@ -137,20 +137,25 @@
     ].join("\n");
   }
 
+  function applyTooltip(node, copy) {
+    if (node.dataset.rsEnhanced === "true") {
+      node.dataset.rsTooltip = copy;
+      node.removeAttribute("title");
+      node.setAttribute("aria-label", `${node.textContent.trim() || "RS"}. Tap for RS reference details.`);
+    } else if (node.getAttribute("title") !== copy) {
+      node.setAttribute("title", copy);
+    }
+  }
+
   function setReferenceNode(node, code) {
     const poolDate = currentPoolDate();
     const state = stateFor(poolDate);
     const rating = ratingFor(code);
     const current = rating?.current ?? null;
-    node.textContent = current === null ? "N/A" : String(current);
+    const display = current === null ? "N/A" : String(current);
+    if (node.textContent !== display) node.textContent = display;
     node.classList.toggle("rs-stale", current !== null && state === "stale");
-    const copy = tooltip(code);
-    if (node.dataset.rsEnhanced === "true") {
-      node.dataset.rsTooltip = copy;
-      node.setAttribute("aria-label", `${node.textContent.trim() || "RS"}. Tap for RS reference details.`);
-    } else {
-      node.setAttribute("title", copy);
-    }
+    applyTooltip(node, tooltip(code));
   }
 
   function updateTable() {
@@ -189,11 +194,12 @@
     const poolDate = currentPoolDate();
     const state = stateFor(poolDate);
     if (!rating || rating.current === null || state === "loading" || state === "unavailable") {
-      value.textContent = "N/A";
+      if (value.textContent !== "N/A") value.textContent = "N/A";
     } else {
-      value.innerHTML = `${rating.current} <small>1M ${rating.m1 ?? "N/A"} · 3M ${rating.m3 ?? "N/A"} · 6M ${rating.m6 ?? "N/A"}${state === "stale" ? ` · stale ${reference.sourceDate || ""}` : ""}</small>`;
+      const html = `${rating.current} <small>1M ${rating.m1 ?? "N/A"} · 3M ${rating.m3 ?? "N/A"} · 6M ${rating.m6 ?? "N/A"}${state === "stale" ? ` · stale ${reference.sourceDate || ""}` : ""}</small>`;
+      if (value.innerHTML !== html) value.innerHTML = html;
     }
-    value.setAttribute("title", tooltip(code));
+    applyTooltip(value, tooltip(code));
   }
 
   function refresh() {
