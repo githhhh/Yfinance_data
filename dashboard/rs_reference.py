@@ -4,12 +4,14 @@ import csv
 import io
 import json
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from typing import Callable
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+
+from bf_snapshot import is_us_market_trading_day
 
 RS_SOURCE = "Fred6725/rs-log"
 RS_CSV_URL_TEMPLATE = "https://raw.githubusercontent.com/Fred6725/rs-log/{sha}/output/rs_stocks.csv"
@@ -18,6 +20,7 @@ RS_COMMIT_API_URL = (
     "?path=output/rs_stocks.csv&per_page=1"
 )
 RS_MARKET_TIMEZONE = ZoneInfo("America/New_York")
+RS_REGULAR_CLOSE = time(16, 0)
 RS_FIELDS = (
     "rs_percentile",
     "rs_1m_percentile",
@@ -60,6 +63,23 @@ def _coerce_percentile(value: object) -> int | None:
     return int(round(parsed))
 
 
+def _latest_completed_market_date(timestamp: datetime) -> date:
+    """Map an rs-log commit time to the latest completed US market session.
+
+    rs-log is published by a post-close workflow, but GitHub commit dates are
+    artifact times rather than market-data dates. On weekends and exchange
+    holidays those dates can differ. A delayed pre-close commit likewise still
+    belongs to the previous completed session.
+    """
+    local = timestamp.astimezone(RS_MARKET_TIMEZONE)
+    candidate = local.date()
+    if local.time() < RS_REGULAR_CLOSE:
+        candidate -= timedelta(days=1)
+    while not is_us_market_trading_day(candidate):
+        candidate -= timedelta(days=1)
+    return candidate
+
+
 def parse_rs_market_date(commit_payload: str | list[dict[str, object]]) -> tuple[date, str | None]:
     payload = json.loads(commit_payload) if isinstance(commit_payload, str) else commit_payload
     if not payload:
@@ -72,7 +92,7 @@ def parse_rs_market_date(commit_payload: str | list[dict[str, object]]) -> tuple
     if not isinstance(committer, dict) or not committer.get("date"):
         raise ValueError("rs-log commit timestamp is missing")
     timestamp = datetime.fromisoformat(str(committer["date"]).replace("Z", "+00:00"))
-    market_date = timestamp.astimezone(RS_MARKET_TIMEZONE).date()
+    market_date = _latest_completed_market_date(timestamp)
     sha = str(latest.get("sha")) if isinstance(latest, dict) and latest.get("sha") else None
     return market_date, sha
 
