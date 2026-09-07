@@ -1,5 +1,13 @@
 # Blind Rule Discovery R1-R5 最终审计结论
 
+> 2026-09-07 代码审计补充：R5 re-search 曾使用依赖 12 周恢复结果的
+> Persistent Stop 指标打破选优平局，但训练仅执行 W3 标签 purge。
+> 合成测试已复现该指标能改变选中规则。现已移除这一选优依赖，历史真实
+> 受影响折数尚未重算；本文旧数字保留，但 R5 re-search 的严格过去数据
+> 选优声明需等待修正后执行验证。固定 semantic-family 阈值不受该 tie-breaker
+> 直接影响。旧 pooled lift 还包含季度构成差异，不等同于个股增量能力。
+> 详见 [代码审计与 R6 执行说明](../backtest/blind_rule_discovery/R6_AUDIT_AND_EXECUTION.md)。
+
 > 状态：本轮研究最终收口文档  
 > 分支：`codex/clean-latest-quant-trade-replay-pools`  
 > R4 正式执行代码基准：`5f188d0262e518af736f0fa5e1f6ca3d3bf9197c`  

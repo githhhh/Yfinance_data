@@ -1,5 +1,11 @@
 # R5 Causal Stop-Risk Validation Protocol
 
+> 2026-09-07 source-audit correction: the original selection below used a
+> 12-week Persistent Stop tie breaker despite W3-only purging. Current code
+> removes that tie breaker and adds composition-adjusted pooled diagnostics.
+> Original outputs remain historical evidence and have not been recomputed here.
+> See [R6 audit and execution handoff](R6_AUDIT_AND_EXECUTION.md) before execution.
+
 R5 is the final narrow robustness study after R4.
 
 It exists because R4 found much stronger retrospective loser/stop-risk structure than

@@ -89,6 +89,21 @@ def test_risk_ranking_selects_consistent_high_stop_rule():
     assert best["persistent_stop_first_lift"] > 0.15
 
 
+def test_r5_ranking_does_not_use_unpurged_12week_outcomes_as_tiebreaker():
+    scored = pd.DataFrame([
+        {"rule_json": "a", "higher_stop_risk_quarter_fraction": 1.0,
+         "median_quarter_stop_first_lift": 0.2, "stop_first_reduction": -0.2,
+         "persistent_stop_first_rate": 0.1, "evaluable_n": 80},
+        {"rule_json": "b", "higher_stop_risk_quarter_fraction": 1.0,
+         "median_quarter_stop_first_lift": 0.2, "stop_first_reduction": -0.2,
+         "persistent_stop_first_rate": 0.9, "evaluable_n": 80},
+    ])
+    before = rank_stop_risk_rules(scored, baseline_persistent_rate=0.2)
+    scored["persistent_stop_first_rate"] = [0.99, 0.01]
+    after = rank_stop_risk_rules(scored, baseline_persistent_rate=0.2)
+    assert before.rule_json.tolist() == after.rule_json.tolist()
+
+
 def test_r5_rolling_preserves_every_fold_and_generalizes_synthetic_risk():
     data = risk_frame()
     features = [
@@ -178,3 +193,18 @@ def test_r5_summaries_count_all_folds_and_pooled_risk():
     assert target["pooled_selected_persistent_stop_lift"] > 0
     assert target["matched_positive_stop_lift_fraction"] == 1.0
     assert target["matched_positive_persistent_lift_fraction"] == 1.0
+
+
+def test_pooled_summary_adds_selection_weighted_baseline_for_composition():
+    rows = []
+    for selected, stops, baseline_stops in ((90, 81, 90), (10, 1, 10)):
+        rows.append(dict(scope="all", test_selected_n=selected, test_evaluable_n=selected,
+                         test_stop_first_n=stops, test_persistent_stop_first_n=stops,
+                         test_baseline_evaluable_n=100, test_baseline_stop_first_n=baseline_stops,
+                         test_baseline_persistent_stop_first_n=baseline_stops,
+                         test_stop_first_lift=0., test_persistent_stop_first_lift=0.,
+                         test_matched_stop_first_lift_p50=0., w3_label_overlap_after_purge=False,
+                         train_rows_purged_for_w3_overlap=0))
+    summary = summarize_risk_rolling(pd.DataFrame(rows))["all"]
+    assert abs(summary["pooled_selected_stop_first_lift"] - 0.32) < 1e-12
+    assert abs(summary["selection_weighted_stop_first_lift"]) < 1e-12
