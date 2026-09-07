@@ -3,11 +3,9 @@ from __future__ import annotations
 import csv
 import io
 import json
-import os
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Callable
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
@@ -41,17 +39,13 @@ class RSReferenceSnapshot:
 
 
 def _request_text(url: str, *, timeout: float = 12.0) -> str:
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "Yfinance_data-dashboard-rs-reference",
-    }
-    # Optional API auth is deliberately narrow. PR builds do not receive this
-    # token, and raw.githubusercontent.com never receives an Authorization
-    # header because the CSV is public and pinned by commit SHA.
-    token = os.environ.get("RS_GITHUB_TOKEN")
-    if token and urlparse(url).hostname == "api.github.com":
-        headers["Authorization"] = f"Bearer {token}"
-    request = Request(url, headers=headers)
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "Yfinance_data-dashboard-rs-reference",
+        },
+    )
     with urlopen(request, timeout=timeout) as response:
         return response.read().decode("utf-8")
 
