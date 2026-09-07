@@ -4,7 +4,7 @@
 
 当前且唯一的 UI / 心流 / 交互规范是 [`doc/STATIC_REVIEW_DASHBOARD_SPEC.md`](../doc/STATIC_REVIEW_DASHBOARD_SPEC.md)。过时 Dashboard 方案直接删除，需要追溯时使用 Git 历史，不保留平行规范。
 
-运行时不依赖 Streamlit。Python 负责读取权威 Pool、执行字段正规化与 Midweek projection，并生成静态 JSON；浏览器只负责展示、筛选、排序、选行、复制与响应式交互。
+运行时不依赖 Streamlit。Python 负责读取权威 Pool、执行字段正规化、Midweek projection，以及可失效的当前 RS reference enrichment；浏览器只负责展示、筛选、排序、选行、复制与响应式交互。
 
 ## Review 心流
 
@@ -23,12 +23,12 @@
 - `BELOW TRIGGER`：有效信号当前低于 Buy Point。
 - `EXTENDED`：已超过 Buy Point +5%。
 - Midweek Review 使用合法完整周 Pool 作为 baseline；没有合法 baseline 时关闭 Carry / Change / Origin 比较。
-- Midweek `Changes` 默认按 `Review Priority`；其它 Review 视图默认按 `C Rank`。
-- 默认排序只是入口；所有可见表头支持点击升 / 降序。
-- `Breakout Price Quality` 表头保留强度说明，质量计算仍完全来自 Python 权威层。
-- More Filters 的数值 Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`，不使用 `Any` 作为端点。
+- Midweek `Changes` 默认按 `Review Priority`；其它 Review 默认按 `Code`，不再使用 C Rank。
+- 主表以 `RS` 替代 C Rank 列。RS 只引用 `Fred6725/rs-log` 最新公开数据；只有 RS market date 与 Pool `snapshot_date` 严格一致才显示，否则 `N/A`。
+- RS 只是 context，不进入 Gate、Top3、Review Priority 或默认排序，也不保存为本仓库 PIT 历史。
+- `Breakout Price Quality` 仍由 Python 权威层生成，表头保留强度说明。
+- More Filters Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`。
 - 表格横纵两个方向允许滚动，但表格自身到边界时关闭 overscroll / bounce。
-- `C Rank Reference` 独立，只对 Active Signals 做横向参考。
 
 ## 本地构建与验证
 
@@ -39,36 +39,35 @@ python dashboard/self_check.py \
 python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
+node --check dashboard/rs_enhancements.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 python -m http.server 8000 --directory /tmp/yfinance-dashboard-site
 ```
 
-浏览器访问 `http://localhost:8000` 即可检查与 GitHub Pages 相同的静态产物。
+`build_static.py` 获取 RS 失败时仍正常构建，RS 显示 `N/A`。
 
 ## 部署
 
-`.github/workflows/deploy-review-dashboard.yml` 监听 `main` 上权威 BF Pool 的最终提交以及 Dashboard 自身修改：
-
 ```text
 quant_trade scheduled run
-  → Yfinance_data raw-data update
-  → quant_trade BreakoutFollow + IBD enrichment
   → Yfinance_data authority publish / validate
   → pool.commit() pushes breakout_follow_pool*.csv to main
   → Deploy Review Dashboard
+  → optional current rs-log enrichment
   → build_static.py
   → GitHub Pages
 ```
 
-因此 Pages 没有第二套 weekly/midweek 调度，也不会从原始行情下载 workflow 提前发布半成品。Pool 发布失败时，Pages 保持上一份成功部署的快照。
+Pages 没有第二套 weekly/midweek 调度。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署。
 
 ## Public payload 安全边界
 
 GitHub Pages 是公网资源。`dashboard/build_static.py` 通过 `PUBLIC_DASHBOARD_ROW_FIELDS` 显式白名单输出行字段：
 
 - Pool 新增列不会自动进入 `dashboard.json`；
-- 新字段只有在 UI 明确消费且确认可公开后才加入白名单；
+- C Rank / Continuous C 不再进入公开 payload；
+- RS 只发布当前 percentile 和 1M / 3M / 6M ago percentile；
 - 不得把账户、持仓、成本、订单、broker account hash、API Key、OAuth Token 或其它私有交易数据加入静态 payload。
 
 完整仓库安全约束见 [`SECURITY.md`](../SECURITY.md)。
