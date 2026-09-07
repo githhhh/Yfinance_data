@@ -74,6 +74,25 @@ def latest_completed_market_date(timestamp: datetime) -> date:
     return candidate
 
 
+def scheduled_refresh_publishable(payload: dict[str, object], timestamp: datetime) -> bool:
+    """Allow an RS-only Pages refresh only for a fully current market session."""
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        return False
+    rs = meta.get("rs_reference")
+    if not isinstance(rs, dict) or not bool(rs.get("available")):
+        return False
+
+    expected = latest_completed_market_date(timestamp).isoformat()
+    period = payload.get("default_period")
+    pool_date = (
+        meta.get("midweek_snapshot_date")
+        if period == "MIDWEEK"
+        else meta.get("complete_snapshot_date")
+    )
+    return rs.get("market_date") == expected and pool_date == expected
+
+
 def parse_rs_market_date(commit_payload: str | list[dict[str, object]]) -> tuple[date, str | None]:
     payload = json.loads(commit_payload) if isinstance(commit_payload, str) else commit_payload
     if not payload:
@@ -202,4 +221,5 @@ __all__ = [
     "parse_rs_csv",
     "parse_rs_market_date",
     "reference_meta",
+    "scheduled_refresh_publishable",
 ]
