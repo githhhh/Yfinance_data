@@ -24,18 +24,19 @@ not another search for a broad-market timing rule.
 The only approved R4 command is:
 
 ```bash
-python -m backtest.blind_rule_discovery.trigger_path_characterization_r4_final_runner ...
+python -m backtest.blind_rule_discovery.trigger_path_characterization_r4_causal_runner ...
 ```
 
-The following are implementation/development layers only and must not be executed as
-standalone R4 studies:
+All other R4 modules are implementation/development history and must not be executed
+as standalone research commands:
 
 - `trigger_path_characterization.py`
 - `trigger_path_characterization_r4.py`
 - `trigger_path_characterization_r4_runner.py`
 - `trigger_path_characterization_r4_search.py`
+- `trigger_path_characterization_r4_final_runner.py`
 
-Gemini/execution agents may run the final runner and read outputs only. They may not
+Gemini/execution agents may run the causal runner and read outputs only. They may not
 edit or patch any implementation during execution.
 
 ## 3. Entry semantics
@@ -92,20 +93,8 @@ For every usable entry:
 - W3 = 15 sessions;
 - W4 = 20 sessions.
 
-Report stock return and SPY excess return at every horizon with:
-
-```text
-p25 / p50 / p75
-```
-
-Also report:
-
-- 3w MAE p50;
-- 3w MFE p50;
-- 4w MAE p50;
-- 4w MFE p50;
-- `MFE_3w_p50 / abs(MAE_3w_p50)` when defined.
-
+Report stock return and SPY excess return at every horizon with `p25 / p50 / p75`.
+Also report 3w/4w MAE and MFE p50 and `MFE_3w_p50 / abs(MAE_3w_p50)` where defined.
 A high fast-winner probability without acceptable path/risk metrics is not sufficient.
 
 ## 7. Market timing and stock selection must remain separated
@@ -126,166 +115,104 @@ This is frozen retrospective context only. It is not newly validated OOS evidenc
 
 The stronger stock-selection control is identical `snapshot_date`.
 
-For every stock/execution feature compare `fast_winner_3w` stocks and
-`stop_first_3w` stocks from the same snapshot. Because broad-market state is identical
-within a snapshot, this directly tests stock-level separation.
+For every stock/execution feature compare `fast_winner_3w` and `stop_first_3w` stocks
+from the same snapshot. Because broad-market state is identical within a snapshot,
+this directly tests stock-level separation.
 
-Report at minimum:
-
-- matched snapshot count;
-- pairwise probability winner feature value > stop-first value;
-- equal-weight snapshot AUC median;
-- median within-snapshot feature difference;
-- sign-consistency fraction.
+Report matched snapshot count, pairwise probability winner value > stop-first value,
+equal-weight snapshot AUC median, median within-snapshot difference, and sign
+consistency.
 
 ## 8. Single-feature characterization
 
 Use deterministic historical q20/q40/q60/q80 bins. Apply the same full-history bin
-boundaries to both scopes:
+boundaries to both scopes: `all` and frozen `r3_favorable`.
 
-- `all`;
-- frozen `r3_favorable`.
-
-Every bin must report:
-
-- selected/evaluable/ambiguous support;
-- fast-winner rate and lift;
-- stop-first rate and reduction/lift;
-- unresolved rate;
-- persistent/recovered stop-first split;
-- W1-W4 p25/p50/p75 return and excess paths;
-- 3w/4w MAE/MFE;
-- evaluated-quarter count;
-- positive path-edge quarter fraction;
-- median/worst quarter path edge;
-- higher-stop-risk quarter fraction.
-
-`feature_extremes.csv` must separately identify the supported bin most associated
-with fast winners and the supported bin most associated with stop-first risk.
+Every bin must report support; fast-winner/stop-first/unresolved probabilities;
+persistent/recovered stop split; W1-W4 p25/p50/p75 return and excess; 3w/4w MAE/MFE;
+and quarter stability. `feature_extremes.csv` separately identifies the supported bin
+most associated with fast winners and the one most associated with stop-first risk.
 These are retrospective characterizations, not production thresholds.
 
 ## 9. Stock-only interaction search
 
-The search may use only:
+The search may use only the explicit stock/setup feature allowlist plus the causal
+execution features in section 3. **Every `M_*` feature is forbidden as a stock-condition
+input.**
 
-- the explicit stock/setup feature allowlist;
-- causal execution features from section 3.
+Generate deterministic q20/q40/q60/q80 conditions and test every supported single
+condition and every distinct-feature two-condition AND pair. There is no pair pruning,
+beam search, or LLM rule generation.
 
-**Every `M_*` feature is forbidden as a stock-condition input.**
+Candidate ranking uses fast-winner lift, stop-first reduction, path edge, W3 excess,
+3w MAE/MFE, and quarter stability. The vectorized candidate evaluator is only a
+performance optimization: it does not reduce the search space or change the frozen
+ranking semantics. Reported top rules are subsequently enriched with full W1-W4
+p25/p50/p75 distributions.
 
-Generate deterministic q20/q40/q60/q80 conditions and test:
-
-- every supported single condition;
-- every distinct-feature two-condition AND pair.
-
-There is no pair pruning or beam search in R4. No LLM chooses thresholds/rules.
-
-For ranking every candidate rule, the vectorized search computes only metrics required
-by the frozen score:
-
-- fast-winner lift;
-- stop-first reduction;
-- `path_edge = fast-winner lift + stop-first reduction`;
-- W3 excess p50;
-- 3w MAE/MFE and their ratio;
-- evaluated-quarter count;
-- positive/median/worst quarter path edge.
-
-This compact evaluation is a performance optimization only. It does **not** reduce the
-search space or change ranking semantics. After ranking, the final runner enriches
-reported top rules with full W1-W4 p25/p50/p75 path distributions.
-
-Frozen reporting limits:
-
-- quality-ranked rules: top 500;
-- winner-oriented view: top 200;
-- stop-risk view: top 200.
-
-The complete candidate count and pair count remain in metadata/search audit.
-
-The scalar `quality_score` is only an ordering aid; all underlying metrics are the
-primary evidence.
+Frozen output limits are top 500 quality-ranked, top 200 winner-oriented, and top 200
+stop-risk rules. Complete candidate/pair counts remain in metadata.
 
 ## 10. Separate winner and loser interaction views
 
-From the **same frozen search**, produce:
+From the **same frozen search**, produce `winner_interactions_*` and
+`stop_risk_interactions_*`. Do not run a second tuned search for either view.
 
-- `winner_interactions_*`: highest fast-winner lift, then lower stop risk / better W3;
-- `stop_risk_interactions_*`: highest stop-first lift, then weaker fast-winner/W3 path.
+## 11. Causal rolling robustness and label purge
 
-Do not run a second tuned search for either view.
-
-## 11. Rolling robustness
-
-Run expanding-window re-search separately for:
-
-- `all`;
-- frozen `r3_favorable`.
+Run expanding-window re-search separately for `all` and frozen `r3_favorable`.
 
 For every chronological fold:
 
-1. regenerate stock thresholds from past training quarters only;
-2. search/select the stock rule from past data only;
-3. freeze the rule;
-4. evaluate exactly the next entry quarter.
+1. define the next `entry_quarter` as the test quarter;
+2. take only earlier entry quarters as candidate training rows;
+3. **purge every training row whose `exit_date_w3` is missing or is on/after the first
+   calendar day of the test quarter**;
+4. regenerate stock thresholds from the remaining purged training data only;
+5. search/select the stock rule from that purged past data only;
+6. freeze the rule and evaluate exactly the next entry quarter.
 
-Every fold after the minimum training window must remain in output.
+This purge is mandatory because an entry in the final weeks of a training quarter can
+have its 15-session outcome inside the next quarter. Merely grouping by entry quarter
+is not sufficient causal isolation.
 
-If training support is insufficient, record `train_insufficient=1`, selected=0, and
-keep the fold in the all-fold denominator. Never silently drop difficult folds.
+Every fold must record:
 
-Rolling reporting must include:
+- `test_quarter_start`;
+- `train_rows_before_purge`;
+- `train_rows_after_purge`;
+- `train_rows_purged_for_w3_overlap`;
+- `train_max_exit_date_w3`;
+- `w3_label_overlap_after_purge` (must always be false).
 
-- all-fold positive path-edge fraction;
-- evaluable-fold positive path-edge fraction;
-- zero-selection count/fraction;
-- insufficient-training count/fraction;
-- same-snapshot matched edge where available;
-- pooled selected fast-winner/stop-first rates;
-- pooled baseline across all folds;
-- pooled baseline restricted to folds where the rule actually selected trades.
+Every chronological fold after the minimum training window remains in output. If
+post-purge training support is insufficient, record `train_insufficient=1`, select
+zero trades, and keep the fold in the all-fold denominator.
 
+Rolling reporting must include all-fold and evaluable-fold positive path-edge
+fractions, zero-selection and insufficient-training fractions, same-snapshot matched
+edge, and pooled baselines both across all folds and across selected/traded folds.
 The selected-fold baseline is the key pooled comparison for residual stock-selection
-edge. The all-fold baseline also reflects opportunity/timing availability.
+edge.
 
 ## 12. Interpretation boundary
 
-R4 can support claims such as:
-
-- a stock feature is repeatedly higher/lower in same-snapshot fast winners;
-- a feature bin historically lowers stop-first risk and improves W3/MAE/MFE;
-- a stock-only interaction retains path edge across multiple chronological folds;
-- favorable-market context plus a stock feature improves historical path quality.
-
-R4 alone cannot support:
-
-- "production Alpha";
-- immediate replacement of B0;
-- guaranteed threshold generalization;
-- treating the R3 favorable regime as new OOS evidence.
+R4 may support claims about historical same-snapshot winner/loser feature separation,
+stop-risk characteristics, and stock-only interactions that persist across multiple
+causally purged chronological folds. R4 alone cannot establish production Alpha,
+justify immediate replacement of B0, guarantee threshold generalization, or turn the
+R3 favorable regime into OOS evidence.
 
 ## 13. Executor discipline
 
 Gemini/execution agents are strictly read/run only.
 
-Allowed:
+Allowed: verify branch/HEAD/status, read this protocol, run committed tests, execute
+the causal frozen R4 runner once, and read/report outputs.
 
-- verify branch/HEAD/status;
-- read this protocol;
-- run committed tests;
-- execute the final frozen R4 runner once;
-- read generated outputs and report facts.
-
-Forbidden:
-
-- edit source/tests/docs/config;
-- create helper scripts/runners;
-- change default search/support thresholds;
-- change output limits;
-- call DeepSeek, another LLM, or RD-agent;
-- rerun with different parameters after seeing results;
-- overwrite R1/R2/R3 output;
-- commit anything.
+Forbidden: edit source/tests/docs/config; create helper scripts/runners; change default
+search/support thresholds or output limits; call DeepSeek/LLM/RD-agent; rerun with
+different parameters after seeing results; overwrite R1/R2/R3 output; commit anything.
 
 If a test or frozen command fails, stop and return the exact failure. Code repair must
 happen in a separate audited development turn before any new execution.
