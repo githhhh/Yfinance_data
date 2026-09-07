@@ -43,6 +43,10 @@ def write_agent_workspace(
 X### are anonymous stock features. M_* are broad-market features known at the signal date. Y_* are outcomes and MUST NEVER appear in the executable rule.
 Primary objective: distinguish Y_primary=winner from Y_primary=loser. A stop_out_then_winner is a loser because the real trade stopped out first. Keep unresolved and ambiguous samples separate; do not coerce them into losers.
 Use monthly/quarterly distributions and repeated-period evidence. Do not optimize a global average and do not infer X feature semantics.
+The research timeout is a safety ceiling, not a target.
+Stop early once a compact rule has stable repeated-period evidence and reasonable support.
+Do not continue searching merely because time, model calls, or compute budget remain.
+Prefer robustness and simplicity over exhaustive threshold search or discovery-set optimization.
 The executable rule must be compact DNF: top-level clauses are OR; conditions inside each clause are AND. Use at most 3 clauses and 6 total conditions.
 Only X### and M_* may be referenced by executable conditions. Allowed operators: >, >=, <, <=, ==, !=. Thresholds must be numeric.
 Write rule.json with version=1 and clauses=[{\"all\":[{\"feature\":\"X001\",\"op\":\">=\",\"threshold\":1.0}]}]. Optional rationale/evidence fields may be added, but no executable code or free-form expression is allowed.
