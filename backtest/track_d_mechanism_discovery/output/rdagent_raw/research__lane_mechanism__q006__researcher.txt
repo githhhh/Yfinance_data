@@ -1,0 +1,23 @@
+
+
+```json
+{
+  "mechanism_claim": "Lane functions primarily as a base-maturity / volatility-conditioned risk filter on constructive pullback setups: it reroutes capital away from shallow-base, high-vol-ratio candidates (pullback_duration ~7w, vol_ratio_5_20 ~1.2-1.5, moderate mom_20) without materially shifting median forward return, so portfolio variance — not expected return — is the primary object being changed.",
+  "evidence_for": [
+    "In pullback weeks (pullback_pct <0, duration 3-9w) the false_positive_ruin cohort (n=8) clusters at pullback_duration=7w with vol_ratio_5_20 in 1.24-1.45 and mom_20 in 0.07-0.18, while selected_winners in the same pullback band span vol_ratio 1.0-1.62 but carry higher up_day_ratio_20 (median 0.625 vs 0.5) and stronger mom_20 (median 0.16 vs 0.058), showing Lane's discrimination tracks volatility/base-quality rather than expected-return potential.",
+    "False_negative rate (~26%, n=7) is comparable to false_positive rate (~30%, n=8) and net-label balance is near zero, consistent with Lane redistributing risk rather than generating alpha in this cohort."
+  ],
+  "evidence_against": [
+    "Standardized deltas up_day_ratio_20 (-1.19σ) and mom_20 (-1.00σ) between FN and SW are large enough that Lane may also strip return-relevant quality, not just downside risk.",
+    "Two false_negative_big_winner labels show Lane actively destroys large upside in pullback weeks, contradicting a pure risk-only framing."
+  ],
+  "falsifiable_predictions": [
+    "Across constructive pullback cohorts, B0_LANE (full Lane) vs LANE_NEUTRAL portfolios should show statistically indistinguishable median W4 return (|Δ| < 0.5pp), but B0_LANE's 5th-percentile loss should be 1.3-1.8× tighter; SCORE_BEFORE_LANE and LANE_NEUTRAL mean returns should correlate >0.85.",
+    "Lane's marginal binary decisions should concentrate in the corner pullback_duration≈7w AND vol_ratio_5_20>1.2 AND mom_20<0.10, predicting >70% of B0_LANE-vs-LANE_NEUTRAL name-level disagreement lives in this region."
+  ],
+  "policy_implications": [
+    "Treat Lane as a risk-overlay / size-scaling signal rather than an alpha gate in pullback weeks: apply continuous shrinkage on position weight proportional to (pullback_duration, vol_ratio_5_20) rather than binary inclusion.",
+    "Recalibrate Lane specifically on the 7w-shallow-base corner to retain false_negative_big_winner setups while still suppressing the ruin cluster, and monitor left-tail compression vs neutral as the live validation metric."
+  ]
+}
+```

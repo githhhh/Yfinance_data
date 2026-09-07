@@ -1,0 +1,97 @@
+{
+  "tests": [
+    {
+      "name": "snapshot_regime_inheritance_test",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "B0 picks from same snapshot with matched up_day_ratio_20 (±0.05) and mom_20 (±0.03) should have similar ruin rates if up_day_ratio_20 drives outcome; ruin-rate divergence across same-snapshot matched pairs implicates snapshot-level regime effects",
+      "success_criterion": "Within-snapshot matched pairs show ruin_rate_delta < 0.15 between low and high up_day_ratio_20 strata",
+      "failure_criterion": "Within-snapshot matched pairs show ruin_rate_delta >= 0.15; OR ruin occurs in high up_day_ratio_20 stratum while low up_day_ratio_20 stratum produces winner—both outcomes in same snapshot would falsify stock-level accumulation mechanism"
+    },
+    {
+      "name": "filter_boundary_violation_test",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "comparison": "B0 picks violating the hard filter (up_day_ratio_20 < 0.60 AND mom_20 < 0.15) that still achieve selected_winner status test whether the conjunction is necessary for success",
+      "success_criterion": "Fewer than 15% of all selected_winners in the dataset violate both filter conditions simultaneously",
+      "failure_criterion": "20% or more of selected_winners violate both conditions (entity_2f86543bf6 with up_day_ratio_20=0.35, mom_20=-0.008 and entity_90a828939a with up_day_ratio_20=0.45, mom_20=0.036 are candidate violations in current data)"
+    },
+    {
+      "name": "momentum_regime_stability_test",
+      "features": [
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20"
+      ],
+      "comparison": "Skeptic claim that mom_20 is market-biased; test whether directionally-aligned short-term (5-day) and medium-term (20-day) slopes predict outcome better than momentum magnitude alone",
+      "success_criterion": "B0 picks where ma10_slope_5 and ma20_slope_5 share the same sign as mom_20 have ruin_rate < 0.25; sign-concordant accumulation indicates stable institutional backing",
+      "failure_criterion": "Sign-concordant picks have ruin_rate >= 0.25 OR sign-discordant picks (opposite slopes) have ruin_rate < 0.20—either falsifies momentum stability as mechanism"
+    },
+    {
+      "name": "volume_momentum_interaction_test",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Skeptic notes vol_ratio_5_20 range (1.1-1.8) overlaps completely between winners and ruins; test whether the interaction of volume ratio with momentum strength creates separation",
+      "success_criterion": "High vol_ratio_5_20 (>1.4) combined with high mom_20 (>0.15) yields ruin_rate < 0.20; low vol_ratio_5_20 (<1.2) combined with low mom_20 (<0.10) yields ruin_rate > 0.50",
+      "failure_criterion": "Both high-volume-high-momentum and low-volume-low-momentum strata produce similar ruin rates (±0.15)—disconfirms interaction mechanism"
+    },
+    {
+      "name": "price_extension_geometry_test",
+      "features": [
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "comparison": "Near-buy-point geometry claim: false_positive_ruin cases may have price extended too far from moving averages at entry (large px_vs_ma20/50) despite moderate momentum, creating vulnerability to mean-reversion pullbacks",
+      "success_criterion": "B0 picks with px_vs_ma20 > 0.10 AND mom_20 < 0.20 have ruin_rate > 0.50; extended price without strong momentum is the failure geometry",
+      "failure_criterion": "Extended-price-but-weak-momentum strata have ruin_rate < 0.35 OR tight-consolidation picks (px_vs_ma20 < 0.05) with same mom_20 range have higher ruin_rate—both would falsify geometry mechanism"
+    },
+    {
+      "name": "pullback_response_predictability_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Skeptic argues pullback metrics are outcome-correlated noise; test whether PIT features predict whether a pullback, if it occurs, becomes ruinous versus survivable",
+      "success_criterion": "Among B0 picks that experience pullback (identified via outcome_label containing pullback context), strong accumulation (up_day_ratio_20 >= 0.65 AND mom_20 >= 0.15) yields ruin_rate < 0.25; weak accumulation yields ruin_rate > 0.60",
+      "failure_criterion": "Strong-accumulation pullback cases have ruin_rate >= 0.40 OR weak-accumulation pullback cases have ruin_rate < 0.40—indicates PIT features cannot predict pullback response"
+    },
+    {
+      "name": "entry_quality_vs_position_size_confounding_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "comparison": "Researcher recommends position-size reduction for weak accumulation; test whether entry tightness (ibd_entry_close_vs_trigger_pct) interacts with accumulation quality to determine outcome",
+      "success_criterion": "Tight entries (ibd_entry_close_vs_trigger_pct < 0.025) with weak accumulation have ruin_rate < 0.35; loose entries (>0.05) with weak accumulation have ruin_rate > 0.50",
+      "failure_criterion": "Entry tightness does not modulate ruin_rate within accumulation strata (±0.15)—falsifies position-size policy as mechanism"
+    }
+  ],
+  "leakage_checks": [
+    "All test features (up_day_ratio_20, mom_20, vol_ratio_5_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) must be computed from data available at snapshot time only; no post-snapshot return data included in feature computation",
+    "Snapshot identity must not be used as a feature or stratification variable in any test; snapshot_anon is metadata, not a predictive input",
+    "Pullback metrics (pullback_pct, pullback_duration_weeks) must not appear in test feature lists; these are outcome-correlated variables that would introduce look-ahead leakage if used to predict the outcome they helped create",
+    "Outcome labels (selected_winner, false_positive_ruin, ruin) must not appear in test feature lists; these are dependent variables, not inputs",
+    "Each test must be executable using only features available at snapshot time; success/failure criteria must reference only the PIT feature values and the outcome label at analysis boundary",
+    "Cross-test consistency check: if snapshot_regime_inheritance_test fails (favoring regime explanation), then price_extension_geometry_test and momentum_regime_stability_test must be re-weighted to account for regime confounding before interpretation"
+  ],
+  "priority_order": [
+    "snapshot_regime_inheritance_test",
+    "filter_boundary_violation_test",
+    "momentum_regime_stability_test",
+    "pullback_response_predictability_test",
+    "volume_momentum_interaction_test",
+    "price_extension_geometry_test",
+    "entry_quality_vs_position_size_confounding_test"
+  ]
+}

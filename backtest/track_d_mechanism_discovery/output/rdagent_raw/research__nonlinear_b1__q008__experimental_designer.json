@@ -1,0 +1,101 @@
+{
+  "tests": [
+    {
+      "name": "interaction_ablation_table_within_b0",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within the 27-case B0 archaeology, fit four rank-correlation (Spearman) models against w4_return_bucket ordinal on the SAME B0 picks only: (A) mom_20 alone, (B) mom_20 + base_depth_pct additive (with standardized z-scores), (C) mom_20 x max(0, base_depth_pct + 0.25) multiplicative with the researcher's P, (D) mom_20 + up_day_ratio_20 + vol_ratio_5_20 additive. Compute rank-IC per model. Compare |IC_C - IC_D|; if |IC_C - IC_D| < 0.02 in absolute terms AND IC_A is within 0.01 of IC_C, the interaction is statistically indistinguishable from main effects.",
+      "success_criterion": "IC_C (multiplicative) exceeds IC_D (additive with up_day + vol_ratio) by >=0.02 in absolute rank-IC, AND IC_C exceeds IC_A (mom_20 alone) by >=0.02.",
+      "failure_criterion": "IC_D >= IC_C, OR IC_C - IC_A < 0.02. Either shows the interaction is not adding information beyond either mom_20 alone or the known strong controls."
+    },
+    {
+      "name": "shallow_high_mom_quadrant_ruin_enrichment",
+      "features": [
+        "base_depth_pct",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Pre-specify the cell base_depth_pct > -0.25 AND mom_20 > 0.15 as the 'shallow-high-mom' quadrant. Within the 27 B0 cases, compute ruin rate (outcome_label contains 'false_positive_ruin') in this cell vs the complement cell (base_depth_pct <= -0.25 OR mom_20 <= 0.15). Repeat the same quadrant split STRATIFIED by up_day_ratio_20 >= 0.55 vs < 0.55 to test whether the quadrant effect survives the known strong suppressor.",
+      "success_criterion": "Shallow-high-mom cell ruin rate >= 2x the complement cell ruin rate, AND the enrichment persists (>=1.5x) within the up_day_ratio_20 >= 0.55 stratum. The second condition is necessary to claim base_depth is not just proxying for up_day.",
+      "failure_criterion": "Shallow-high-mom enrichment < 1.5x in the high-up_day stratum, OR overall cell ruin rate <= complement ruin rate (i.e., the cell is not a coherent failure regime)."
+    },
+    {
+      "name": "deep_low_mom_rescue_test",
+      "features": [
+        "base_depth_pct",
+        "mom_20",
+        "px_vs_ma20"
+      ],
+      "comparison": "Pre-specify the 'deep-low-mom' rescue cell: base_depth_pct <= -0.30 AND mom_20 < 0.05. Within the 27 cases, check whether any ruin cases occupy this cell (entity_2f86543bf6 and entity_8ad5cd4795 are winners here, but entity_40ea0cfb3b has mom=0.024, base_depth not reported, and is a ruin — verify whether base_depth <= -0.30). If ruins are present in this cell, deep base does NOT rescue low-momentum breakouts, falsifying the 'accumulation cushion' rescue narrative.",
+      "success_criterion": "Zero ruin cases in the deep-low-mom cell (n in cell >= 3), supporting the rescue claim.",
+      "failure_criterion": "Any ruin in the deep-low-mom cell OR fewer than 3 observations in the cell (insufficient evidence, mark UNRESOLVED)."
+    },
+    {
+      "name": "reranker_demote_asymmetric_winner_audit",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "pullback_pct",
+        "px_vs_ma20"
+      ],
+      "comparison": "Compute P = mom_20 x max(0, base_depth_pct + 0.25) for each B0 pick. Rank all 27 cases by P desc. Identify cases in the TOP tercile of P that are labeled 'selected_winner' with w4_return_bucket = 'large_win' (e.g., entity_3adc078f01, entity_6618d3e80c, entity_b00579f203, entity_2c58cebc59, entity_ead73f4390). The proposed soft-demote-one-slot policy would re-rank these into lower slots. Calculate the count of large_wins that would be demoted past the top-N cutoff where N = floor(0.5 x 27) = 13.",
+      "success_criterion": "Fewer than 2 large_wins would be demoted below the 50th-percentile rank slot, AND no 'large_win' is demoted below the 40th-percentile slot. The re-ranker should not systematically cannibalize asymmetric upside.",
+      "failure_criterion": ">= 3 large_wins demoted below the 50th-percentile slot, OR any single large_win with pullback_pct worse than -30% (asymmetric profile) demoted past the 40th-percentile slot — because the ruin-prevention benefit on 4 middling names is unlikely to exceed the loss from mis-demoting one extreme winner."
+    },
+    {
+      "name": "collinearity_base_depth_vs_extension_proxies",
+      "features": [
+        "base_depth_pct",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "mom_20"
+      ],
+      "comparison": "Compute pairwise rank correlations among base_depth_pct, px_vs_ma20, px_vs_ma50, pullback_pct, mom_20 across the 27 cases. The skeptic claims base_depth_pct may be proxying for extension. If |rank_corr(base_depth_pct, px_vs_ma50)| > 0.5, then base_depth is largely redundant with extension, and the 'multiplicative with base_depth' encoding is approximately equivalent to 'multiplicative with px_vs_ma50'.",
+      "success_criterion": "|rank_corr(base_depth_pct, px_vs_ma50)| < 0.4 AND |rank_corr(base_depth_pct, px_vs_ma20)| < 0.4, establishing base_depth as a non-redundant dimension orthogonal to current extension.",
+      "failure_criterion": "Either rank correlation exceeds 0.5; the interaction should be re-encoded using px_vs_ma50 (or its residual) instead of base_depth_pct."
+    },
+    {
+      "name": "reranker_universe_size_invariant_check",
+      "features": [
+        "mom_20",
+        "base_depth_pct"
+      ],
+      "comparison": "The re-ranker P = mom_20 x max(0, base_depth_pct + 0.25) operates on EXISTING B0 picks only. Confirm: (i) the eligible-universe count BEFORE re-ranking equals the count AFTER re-ranking (no new picks added, none removed), (ii) rank-slot churn is bounded — no pick moves more than 3 slots, (iii) the set of top-N picks after re-ranking shares >=80% membership with the top-N before re-ranking (Jaccard >=0.8 at N = 13). This enforces the 3-slot accounting rule.",
+      "success_criterion": "Universe size unchanged AND Jaccard(top-N before, top-N after, N=13) >= 0.8 AND max slot-shift <= 3.",
+      "failure_criterion": "Universe size changes, OR Jaccard < 0.7, OR any pick shifts > 3 slots — the re-ranker is effectively re-defining the eligible universe rather than re-ranking within it."
+    },
+    {
+      "name": "threshold_split_stability",
+      "features": [
+        "base_depth_pct",
+        "mom_20"
+      ],
+      "comparison": "Randomly split the 27 B0 cases into two non-overlapping halves (seed fixed at 42, 100 bootstraps). On each half, find the optimal base_depth_pct threshold that maximizes the difference in ruin rate between 'shallow' and 'deep' cells at mom_20 > 0.15. Record the optimal threshold on each half. If the optimal threshold varies by >5pp between halves (e.g., -22% on one, -30% on the other), the cut-points (-25%, -30%) are sample-specific and not pre-specifiable.",
+      "success_criterion": "Optimal threshold std across splits <= 3pp AND median optimal threshold lies within [-27%, -23%] (bracketing the proposed -25%).",
+      "failure_criterion": "Optimal threshold std > 5pp OR median outside [-27%, -23%] — the proposed thresholds are unstable and the re-ranker would need to be re-tuned per cohort."
+    }
+  ],
+  "leakage_checks": [
+    "Verify all features are PIT (point-in-time): base_depth_pct must be computed on a frozen pre-entry window ending at least 1 day BEFORE the IBD entry trigger date — confirm window definition matches the snapshot_anon labels in the archaeology data.",
+    "Confirm mom_20 is the trailing 20-day return as of the same PIT cutoff date as base_depth_pct; if mom_20 uses a different anchor (e.g., close of entry day vs trigger day), the multiplicative product will leak post-trigger information into the score.",
+    "Verify that up_day_ratio_20 and vol_ratio_5_20 used in test 'shallow_high_mom_quadrant_ruin_enrichment' are computed on the SAME 20-day and 5-day windows as the candidate's mom_20 — mismatched windows would invalidate the conditional-on-up_day test.",
+    "Confirm that w4_return_bucket outcomes are assigned using only data through T+4 weeks from the entry trigger; any use of post-week-4 data to retroactively label 'false_negative_big_winner' could leak forward information into the falsifiable predictions.",
+    "Ensure the 3-slot accounting test ('reranker_universe_size_invariant_check') uses the SAME eligibility rules as the B0 baseline (same IBD-style filters applied at the SAME PIT date) — if the re-ranker runs on a different snapshot than the baseline B0 set, the universe-size claim is invalid.",
+    "Check that none of the 27 cases share the same snapshot_anon and entity_anon across train/holdout splits in the threshold stability test; if duplicates exist, the split-stability result is biased downward by within-entity correlation."
+  ],
+  "priority_order": [
+    "interaction_ablation_table_within_b0",
+    "shallow_high_mom_quadrant_ruin_enrichment",
+    "collinearity_base_depth_vs_extension_proxies",
+    "reranker_demote_asymmetric_winner_audit",
+    "deep_low_mom_rescue_test",
+    "threshold_split_stability",
+    "reranker_universe_size_invariant_check"
+  ]
+}

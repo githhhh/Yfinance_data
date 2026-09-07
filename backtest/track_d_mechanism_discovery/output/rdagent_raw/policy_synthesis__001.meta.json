@@ -1,0 +1,12 @@
+{
+  "purpose_id": "policy_synthesis__001",
+  "prompt_hash": "47b3edbe073fb0e508784b57c4cc39c0fa9d76a5936e3586c45f7991bdd7e321",
+  "response_hash": "4133ed3a16478cc587bf409ea951b909fcaca71d4d851e0612342aa0ee1cd2f6",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 2,
+  "compact_json_retry": true
+}

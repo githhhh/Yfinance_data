@@ -1,0 +1,56 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 35,
+  "mechanism_summary": "The hypothesized transmission is that pullback_v_is_dry=True marks downside candles printing on below-average volume (i.e., decline absorbed supply without capitulation distribution), and ibd_entry_volume_ratio ≥ ~1.5 marks institutional re-engagement on the breakout candle. As an INTERACTION the economic story is coherent: a quieter-during-decline + louder-on-breakout pattern fits an accumulation narrative. As two independent additive ranks the story fails redundancy because the standing B0 stack already prices generic volume (vol_ratio_5_20, Δ −1.05σ), momentum (mom_20, Δ −1.00σ) and relative strength (px_vs_ma50, Δ −0.85σ), and ibd_entry_volume_ratio is a shorter-window, same-family volume ratio that is almost certainly collinear with vol_ratio_5_20. Separately, pullback_v_is_dry is undefined for ~50% of the archaeology (no measured basing window), so the conditional is asked to discriminate only on a non-random subset; the NULL-pullback cohort is a different statistical population and any conditional implementation requires an explicit fallback branch for it. Three deep-pullback false-positive ruins in the archaeology (ccc90a671f −14.4%, 55c2da490e −12.3%, 8f0df3d38e −16.2%) sit inside the very 'deep + has-measured-pullback' regime and must be reconciled before claiming 'dry-pullback rescues.' The position-size scaler (size ∝ min(ibd_entry_volume_ratio, 2.5) when dry) is partially vol-targeting by construction and must be benchmarked against an ATR-risk-parity alternative at equal risk budget, not equal gross exposure. Until the three Tier-1 experiments (T1 partial rank-IC, T2 collapsed-3-cell monotonicity, T3 scaler-vs-ATR Sharpe) clear their pre-registered bars, the interaction is a plausible-but-untested story rather than a confirmed signal.",
+  "falsifiers": [
+    "T1 result: partial rank-IC of ibd_entry_volume_ratio (after partialling out mom_20, px_vs_ma50, vol_ratio_5_20 via OLS residuals) has bootstrap 95% CI (snapshot-cluster, n=27, cluster=snapshot_anon) crossing zero OR |IC| < 25% of the strongest unadjusted feature → mechanism is double-counting, not incremental.",
+    "T2 result: ruin_rate(Cell-A: dry ∧ entry_vol≥1.5) NOT strictly less than ruin_rate(Cell-B) < ruin_rate(Cell-C: wet ∧ entry_vol<1.5), OR A-vs-C separation < 1.5×, OR any cell < 4 independent cases → the interaction hypothesis is undecidable on this N; collapse to additive or fall back to a single feature.",
+    "T3 result: Sharpe(scheme-i) − Sharpe(scheme-ii) with bootstrap CI excluding zero fails to reach 0.10 → the position scaler is functionally ATR-vol-targeting and provides no incremental rank-alpha to the B0 portfolio; reject size-scaling branch of policy.",
+    "Reconciliation test: the three deep-pullback false-positive ruins (ccc90a671f, 55c2da490e, 8f0df3d38e) MUST be re-explainable under the proposed 3×2 contingency as 'wet pullback' (pullback_v_is_dry=False) with ibd_entry_volume_ratio < 1.5, otherwise the up-weight on 'deep + dry' is in-sample overfit to the winners alone.",
+    "Sensitivity test on the no-pullback (NULL pullback_pct) cohort: the proposed fallback rule (ibd_entry_volume_ratio ≥ 2.0 AND vol_ratio_5_20 ≥ 1.4) must separate no-pullback winners (entity_b00579f203 archetype) from no-pullback ruins (84824e6a20, b6bcccdf6a, 4fdc3699fd) at hit-rate ≥ 70%; otherwise the NULL branch is unreliable and cannot be silently folded into B0.",
+    "Multiplicity test: bootstrap the entire 27-case archaeology with snapshot-cluster resampling (excluding entity_6618d3e80c from cell numerators per leakage check); if the −0.50σ median delta on ibd_entry_volume_ratio loses significance after Benjamini-Hochberg correction at q=0.10 across the 5 reported features, the standalone signal is not robust enough to be load-bearing in policy."
+  ],
+  "actionable_design_principles": [
+    "Never expand the B0 eligible universe: any use of pullback_v_is_dry and ibd_entry_volume_ratio must be implemented as a within-B0 conditional re-rank AND/OR a position-size scaler; gating B0 membership on either feature violates the directional constraint and re-introduces the false_negative_relative suppression the B0 design explicitly forbids.",
+    "Separate predictive mechanism from construction effect: the rank-score branch and the size-multiplier branch must each be evaluated against distinct baselines (vs unadjusted B0 rank for the rank branch; vs ATR-risk-parity at equal dollar-vol for the size branch) and must not be justified on the same evidence.",
+    "Treat the no-pullback (NULL pullback_pct) cohort as a separate statistical population with its own fallback rule and its own archaeology; do not silently reduce the policy to a univariate ibd_entry_volume_ratio rule on the larger subsample, because doing so buries the selection bias and overstates the dry-pullback signal.",
+    "Pre-register the contingency and the cell-action map before seeing test outcomes; forbid cell actions keyed to single cases (e.g., the entity_3472243e0c NULL-pullback ruin and the entity_6618d3e80c dual-label entity should not be allowed to define policies on their own).",
+    "Make every conditional auditable from raw inputs at evaluation time: pullback_v_is_dry, ibd_entry_volume_ratio, mom_20, px_vs_ma50, vol_ratio_5_20 must be reproducible from data ≤ snapshot_anon timestamp without using w4_return or outcome_label in any derivation step; pin the snapshot and lock the cluster-bootstrap seed.",
+    "Distinguish vol-targeting from signal in the size branch: the scaler's lift must be measured at equal expected dollar-volatility (not equal gross), and the test must include an ATR-vol-targeting baseline as an explicit comparator; otherwise the policy is vol-targeting in disguise and adds no alpha.",
+    "Keep the regime-aware override (vol_ratio_5_20 < 1 → raise ibd_entry_volume_ratio threshold by ~0.3) out of any pre-registered policy until the archaeological evidence supports cross-sectional regime interactions; a single-case justification (entity_40ea0cfb3b) does not license an entire regime layer."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Within-B0 interaction re-rank: compute score_plus = base_b0_score + α · pullback_v_is_dry · max(0, ibd_entry_volume_ratio − 1.5), with α tuned via cross-validated rank-IC on snapshot-cluster bootstrap; apply ONLY when pullback_pct is non-null. Universe size equals |B0|; this is a strict re-rank, not a filter.",
+      "why_distinct": "Encodes the interaction as a single penalty/reward term rather than as two additive linear ranks, addressing the researcher's claim that the signal lives in the conditioning; keeps B0 membership identical; is inauditable-free because α is fit on a frozen snapshot and evaluated out-of-sample.",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "px_vs_ma50",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Adaptive capacity enters only through the interaction term scaling with entry-volume; flattening α → 0 recovers vanilla B0, so the policy is continuously tunable and the lift is bounded by the conditional signal alone, not by universe expansion."
+    },
+    {
+      "idea": "Position-size scaler with risk-budget neutrality: size = risk_budget / (atr_14_pct · (1 − β · max(0, 1.5 − ibd_entry_volume_ratio))), with β > 0 only when pullback_v_is_dry=True; the multiplier on entry-volume is bounded by cap (≤2.5) and falls to 1.0 when pullback_v_is_dry=False. Compare to ATR-vol-only baseline at equal risk budget, not equal gross.",
+      "why_distinct": "Decouples the scaler from gross-dollar equivalence and explicitly isolates the conditional term (β); requires a Sharpe difference ≥ 0.10 against the ATR baseline (T3) to be promoted, which is the only way to tell signal from vol-targeting.",
+      "features": [
+        "atr_14_pct",
+        "ibd_entry_volume_ratio",
+        "pullback_v_is_dry"
+      ],
+      "capacity_relevance": "This IS the adaptive-capacity branch of the policy — it scales risk up on dry-pullback + high-entry-volume breakouts where the interaction predicts constructive follow-through, and trims risk otherwise; it does not change the eligible set, only the per-name risk contribution."
+    },
+    {
+      "idea": "NULL-pullback fallback branch: when pullback_pct IS null, replace the interaction re-rank with a two-feature gate: keep B0 pick iff ibd_entry_volume_ratio ≥ 2.0 AND vol_ratio_5_20 ≥ 1.4; otherwise route to a 'review bucket' (full size but earlier review horizon) rather than an automatic drop. The fallback is a SEPARATE policy branch with its own archaeology audit, not a silent fuse into the dry-pullback rule.",
+      "why_distinct": "Forces explicit treatment of the ~50% NULL cohort as a distinct statistical population, addressing the skeptic's selection-bias attack; uses two volume-family features jointly to reduce single-feature overfit; routes ambiguous cases to review rather than exclusion, which is the only honest policy when the archaeological evidence on no-pullback winners and no-pullback ruins is balanced.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "pullback_pct_is_null"
+      ],
+      "capacity_relevance": "Capacity here is binary per name (full vs review-bucket); it is intentionally NOT a continuous scaler because the no-pullback cohort has too few cases to estimate a continuous response curve, and pretending otherwise would manufacture precision the data cannot support."
+    }
+  ]
+}

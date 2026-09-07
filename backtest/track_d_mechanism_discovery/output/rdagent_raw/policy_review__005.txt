@@ -1,0 +1,71 @@
+
+
+```json
+{
+  "reviews": [
+    {
+      "policy_id": "b0_continuous_breadth_rank",
+      "concerns": [
+        "up_day_ratio_20 appears both as the primary linear term (weight 1.5) AND as the left side of the interaction (weight 0.6), so the feature is doubly represented in the score — partial duplication inside the policy itself, and again across all five policies (feature concentration).",
+        "rank_pct bounds everything to [0,1], which is numerically clean but means the 'continuous' ranking experiment has lower dynamic range than the description implies — the test of q010 may have weak statistical power vs. the binary-penalty baseline it replaces.",
+        "No penalty mechanism at all: abstention behavior here depends entirely on fixed=3 capacity + distinct_1 crowding, making this policy unable to falsify risk-control questions despite claiming to decouple ranking from risk control — the decoupling is one-sided.",
+        "No min_score floor; under weak breadth regimes rank_pct scores compress toward 0, so the policy silently degenerates toward an unranked deterministic ordering at the cap. Mechanism clarity is good but the 'ranking hypothesis' is partly confounded with capacity."
+      ],
+      "novelty_0_100": 55,
+      "mechanism_clarity_0_100": 78
+    },
+    {
+      "policy_id": "vol_regime_quality_gate_no_dry_filter",
+      "concerns": [
+        "vol_ratio_5_20 > 1.3 trigger condition is empirical and not calibrated in spec; if this regime is rare in-sample, the policy is essentially dormant outside of stress windows — the 'falsifier-5' test will have very low effective sample size.",
+        "The -2.5 penalty on (mom_20<0.1 OR px_vs_ma50<0.08) with 'any' logic is broadly triggered because high vol regimes almost mechanically depress mom_20 — the two predicates are partly co-correlated, making the 'either' gate closer to a single condition in practice.",
+        "score_gap with gap=0.5 + dual penalty layer can manufacture wholesale abstention on vol-spike days when both predicates fire (penalty stack to -4.0) AND score separation fails — three independent abstention channels compounding.",
+        "Thresholds (0.1, 0.08) appear hand-tuned with no stated empirical derivation; this risks encoding prior in-sample observations back into the policy in a way that falsifier logic requires to be held out."
+      ],
+      "novelty_0_100": 52,
+      "mechanism_clarity_0_100": 68
+    },
+    {
+      "policy_id": "three_slot_crowding_quality_gated",
+      "concerns": [
+        "Triple abstention stack: min_score=0.5 hard floor + gap=1.0 between slots + distinct_1 industry mode forcing slot-3 cash on crowding. Any one of these gates manufactures abstention; the conjunction likely yields near-permanent cash states whenever scoring inputs are heterogeneous.",
+        "Severe feature scale mismatch: mom_20 (identity, unbounded %), up_day_ratio_20 (identity, bounded [0,1]), vol_ratio_5_20 (identity, unbounded ratio) — weighted sum has no interpretable scale, so the min_score=0.5 floor is effectively an arbitrary threshold on a non-calibrated aggregate.",
+        "Proxy risk: vol_ratio_5_20 is being used both as a 'quality' signal (linear +1.2) and conventionally represents risk/regime — collapsing quality and risk into one feature is the same conflation the policy supposedly decouples.",
+        "Conceptual duplication with policy 2: both use linear scoring on mom/vol/up_day_ratio_20 with threshold penalties and distinct_1 mode; policy 3's only structural innovation is the top1_confidence gap rule, which is capacity-infrastructure not a distinct mechanism.",
+        "description claims 'uniform quality scoring' but capacity rules are the dominant selector — this policy tests capacity rules more than it tests the quality features."
+      ],
+      "novelty_0_100": 25,
+      "mechanism_clarity_0_100": 45
+    },
+    {
+      "policy_id": "structural_loser_soft_reject_v1",
+      "concerns": [
+        "Naming is internally contradictory: 'soft reject' pairs with max_positions=1 and high positive weights (5.0, 4.0) on identity-scaled unbounded features — the linear positives push scores upward and the -3.0 penalty is the only brake, so on any non-ruin candidate the policy always picks. The 'soft' framing overstates how much this policy actually abstains.",
+        "Identity transform on px_vs_ma50 (a percentage often ranging widely) combined with weight 5.0 means a moderate extension produces huge positive score deltas; the asymmetric penalty is the only mechanism preventing binge-picking, which is structurally fragile.",
+        "min_score=0.0 means there is effectively no score floor, so the policy has no abstention regime except via the -3.0 cluster penalty and the max=1 cap. Combined with max=1, the policy will pick whichever candidate has the highest px_vs_ma50×up_day_ratio_20 product — this is a momentum-tilting policy disguised as a ruin-avoidance policy.",
+        "Ruined cluster thresholds (0.08, 0.55) are stated as empirically observed but used here as live filters without held-out validation; overfitting risk is high given 'failure_archaeology' origin.",
+        "max_positions=1 is the most aggressive abstention constraint across the portfolio of policies, yet with positive linear weights the 'abstention' is conditional on ranking only — interaction between these two rules is underspecified."
+      ],
+      "novelty_0_100": 48,
+      "mechanism_clarity_0_100": 55
+    },
+    {
+      "policy_id": "trigger_compression_rescue_v1",
+      "concerns": [
+        "weight -6.0 on ibd_entry_close_vs_trigger_pct is the largest-magnitude coefficient in the entire portfolio, and the negative sign means the score drops as the absolute value of the feature grows — the magnitude and sign convention for 'compressed' must be documented or this policy's behavior is opaque (positive near-trigger → rewards; far-from-trigger → penalizes, or the reverse, depending on sign).",
+        "Mechanism is explicitly tagged as 'empirically UNRESOLVED' in description — this is a probe, not a falsifier, and is structurally distinct from the other four (base=zero) but risks confounding if evaluated alongside them.",
+        "max_2_per_ind industry mode with only max_positions=2 is loose: under clustered signals, this policy permits more concentration than distinct_1 peers, which is the opposite crowding behavior the rest of the portfolio constrains.",
+        "Proxy risk: ibd_entry_close_vs_trigger_pct is a tightly constructed near-buy-point geometry feature; combined with up_day_ratio_20, this is essentially a 'fresh breakout + healthy tape' signal that may correlate strongly with already-tested momentum proxies in other policies.",
+        "Cap of 2 with no min_score means abstention risk is moderate, but the policy could over-pick when rescue signals cluster (e.g., breakout days), which is the opposite failure mode from policies 2-4."
+      ],
+      "novelty_0_100": 80,
+      "mechanism_clarity_0_100": 60
+    }
+  ],
+  "cross_policy_notes": [
+    "Feature concentration: up_day_ratio_20 appears in all 5 policies; mom_20 in 2 of 5; distinct_1 in 4 of 5. The 'falsifier' claims cannot be fully independent given this overlap — most pairwise comparisons will be dominated by shared features rather than orthogonal mechanism tests.",
+    "Capacity-driven abstention manufacturing: policies 3 and 4 have explicit abstention architectures (min_score + gap, max=1), policy 2 has implicit abstention under regime stress, policy 1 is abstention-cushioned by fixed=3. The portfolio as a whole does not isolate capacity effects from feature/method effects.",
+    "Three of five policies (2, 3, 4) implement the same template: b0_rank + linear scoring on bounded quality features + asymmetric threshold penalty + distinct_1. Mechanism novelty within that template is low; the portfolio is heavily clustered around one archetype plus one outlier (policy 5)."
+  ]
+}
+```

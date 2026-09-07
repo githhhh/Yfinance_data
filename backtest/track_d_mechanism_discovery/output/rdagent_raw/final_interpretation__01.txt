@@ -1,0 +1,21 @@
+
+
+```json
+{
+  "conclusion": "The locked mechanism map identifies evidence_risk as the single ESSENTIAL component — removing it in confirmation causes a uniformly negative response (cvar_delta = -0.7478, mean_spread = -3.249, stop_delta_pct = +11.11%, positive_block_ratio = 0.00 across 12 support weeks). lane, freshness, and distinct1 are HELPFUL but non-critical: they produce mixed knockouts (some positive mean_spread, but confirmation either fails risk_noninferior or shows zero positive_block_ratio). dry_false_penalty, eps_preference, weekly_volume, and entry_volume are UNCERTAIN — their single-rule knockouts are indistinguishable from B0 on confirmation means and show no downside-control degradation, indicating these components contribute no measurable marginal mechanism beyond what B0 already provides. Because no frozen B1, single-rule repair, or pre-screened Minimal-B0 passed untouched confirmation gates, the defensible conclusion is a tiered map (ESSENTIAL → HELPFUL → UNCERTAIN) rather than a claim that any specific repair is superior to B0.",
+  "strongest_evidence": [
+    "evidence_risk knockout (12 wk confirmation): cvar_delta = -0.7478, mean_spread = -3.249, median_spread = -2.9845, stop_delta_pct = +11.11%, positive_block_ratio = 0.00 — the only component whose removal is directionally and unanimously negative on risk and stop-loss metrics, supporting ESSENTIAL status.",
+    "distinct1 knockout (12 wk confirmation): mean_spread = +0.5259, cvar_delta = -2.3401, positive_block_ratio = 0.25, Jaccard vs B0 = 0.8333 — confirms distinct1 contributes a real but tail-sensitive mechanism (mean-positive, CVaR-negative, high slot coverage 100%), consistent with HELPFUL classification.",
+    "freshness knockout (12 wk confirmation): mean_spread = +0.0254 but cvar_delta = -1.0231 and stop_delta_pct = -2.78%, pooled risk_noninferior = false — shows freshness acts as a downside attenuator rather than an alpha source, supporting HELPFUL rather than ESSENTIAL.",
+    "dry_false_penalty, weekly_volume, entry_volume, eps_preference knockouts: all confirmation metrics identical to B0 (mean_spread ≤ |0.0723|, cvar_delta = 0, positive_block_ratio ≤ 0.25 with three of four at 0.0) — direct evidence these components are dormant in the current policy space, validating UNCERTAIN status."
+  ],
+  "contradictions": [
+    "TRACK_D_DSL__downside_distress_hard_gate (agent_b1) is the only forward policy with a positive confirmation CVaR delta (+3.7332) and confirmed risk_noninferior at the 12-week support level (slot_coverage 100%, full_top3_rate 100%, stop_delta_pct 0.0), yet it failed the B1 gate. This directly contradicts the implicit assumption that confirmation metrics alone suffice to identify a superior mechanism — a positive, risk-noninferior forward candidate exists but is excluded by the frozen gate, suggesting the B1 criterion is either mis-calibrated or measuring a dimension orthogonal to the confirmation surface.",
+    "lane knockout shows HELPFUL status with confirmation mean_spread = +0.0788 and positive_block_ratio = 0.25, but its screen-phase mean_spread was -7.221 with pooled mean_spread = -2.3545 and pooled median_spread = -3.4117 — a >90× gap between screen and confirmation means. The HELPFUL verdict is fragile and depends entirely on which forward windows were evaluated at confirmation.",
+    "distinct1 is classified HELPFUL, but its confirmation shows risk_noninferior = false and CVaR delta = -2.3401 (the worst cvar_delta among HELPFUL/UNCERTAIN components). Its 'helpfulness' is a mean-spread artifact (+0.5259) that is offset by a tail-risk deterioration, indicating the verdict taxonomy may conflate alpha contribution with risk contribution."
+  ],
+  "unresolved": [
+    "Is the downside_distress_hard_gate's confirmation-stage CVaR improvement of +3.7332 (with risk_noninferior pass and 100% slot coverage over 12 weeks) a genuine mechanism signal or a block-heterogeneity artifact concentrated in FWD_5 (+1.8089) and FWD_6 (+3.3058)? A targeted forward shadow adding 6–12 additional FWD blocks with comparable regime mix would determine whether the B1-gate failure reflects gate mis-specification or sample luck, and would resolve whether a constrained variant of this policy should be re-promoted in a future Track D cycle."
+  ]
+}
+```

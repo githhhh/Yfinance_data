@@ -1,0 +1,56 @@
+{
+  "strongest_counterclaim": "The claimed pullback_v_is_dry × current_vs_ibd_candidate_pct interaction is largely a proxy artifact for the already-known vol_ratio_5_20 × mom_20 regime, not an independent signal. The 'dry pullback' flag is operationally a binarized form of vol_ratio_5_20 < 1.0 inside a specific lookback window, and the 'extension' flag is operationally a binarized form of px_vs_ma50 (or current_vs_ibd_candidate_pct). Because both inputs are themselves already represented in the feature set — vol_ratio_5_20 (std_delta −1.0455) and mom_20 (std_delta −1.0005) being the two strongest false-negative discriminators — the apparent interaction captures no marginal information once those continuous features are present, and the proposed multiplicative encoding (1+a)(1+b) is mathematically NOT an interaction term anyway, it is two independent multiplicative marginals, so the claim that the product encodes interaction is incoherent.",
+  "attacks": [
+    {
+      "issue": "Construct redundancy: pullback_v_is_dry is a windowed, thresholded restatement of vol_ratio_5_20",
+      "why_it_matters": "vol_ratio_5_20 already shows the largest false-negative contrast in the archaeology (std_delta −1.0455). Any 'interaction' that conditions on a binarization of the strongest existing feature cannot be expected to add new ranking power; it can only re-discretize known signal and lose information through thresholding."
+    },
+    {
+      "issue": "The proposed B0_adjusted_score = B0_score * (1 + 0.15*pullback_v_is_dry) * (1 + 0.10*min(current_vs_ibd_candidate_pct/3, 1)) is multiplicative marginals, not an interaction term",
+      "why_it_matters": "A genuine interaction requires a term proportional to (pullback_v_is_dry * current_vs_ibd_candidate_pct). The encoding factorizes into two independent multipliers on B0_score, so the policy does not actually test or operationalize the claimed interaction — it implements the prior main effects and labels the result 'interaction'. This is an internal inconsistency between the mechanism claim and the policy_implications."
+    },
+    {
+      "issue": "Sample is dominated by null-pullback rows, biasing any interaction estimate toward the subset where pullback_v_is_dry is defined",
+      "why_it_matters": "At least 13 of 27 cases have null pullback_duration_weeks / pullback_pct, including most large_win winners (entity_ead73f4390, entity_2f86543bf6, entity_b00579f203, entity_bec51a4227). The 'interaction' is therefore evaluated on a non-random subset (only candidates that consolidated) and cannot be claimed to separate winners from losers in the full B0 universe without extrapolation."
+    },
+    {
+      "issue": "Counterexample: extended stocks with elevated volume but null pullback that won — entity_ead73f4390 (mom_20=0.32, vol_ratio_5_20=1.77, px_vs_ma50=0.185, large_win, null pullback)",
+      "why_it_matters": "This is exactly the 'extended-without-dry-reset' quadrant that the mechanism predicts should be a ruin regime, yet it is a selected_winner with large_win bucket. The mechanism claim is falsified by this single case if the proposed hard-veto rule were applied to it. The 'distribution' interpretation of elevated volume is therefore wrong at least some of the time — elevated volume can also mark institutional accumulation / breakout follow-through, which is the alternative explanation the claim ignores."
+    },
+    {
+      "issue": "Counterexample: shallow-pullback, elevated-volume winner — entity_440e297253 (pullback_pct=−1.5%, vol_ratio_5_20=1.59, large_win)",
+      "why_it_matters": "The Researcher cites this case as evidence against a 'dry volume required' rule, but it also contradicts the interaction claim: this is a shallow-pullback winner with non-dry volume. If the interaction were truly the dominant axis, this case should be in a 'mixed' bucket, not a clean winner — yet it dominates. The interaction hypothesis fails to explain why this extended-with-elevated-volume, non-dry-pullback candidate still produced a large_win."
+    },
+    {
+      "issue": "Confounding by mom_20 / ma slope: the 'dry pullback × extended' winners are also the 'high mom_20' stocks",
+      "why_it_matters": "Look at entity_3adc078f01 (mom_20=0.172, ma10_slope_5=0.063, ma20_slope_5=0.073, large_win) versus entity_b6bcccdf6a (mom_20=0.176, ma10_slope_5=0.067, ma20_slope_5=0.045, ruin). They are nearly identical on the trend-strength features and nearly identical on pullback fields (both null), yet diverge in outcome. The interaction with current_vs_ibd_candidate_pct cannot explain this divergence either; the residual is being driven by something else entirely (likely idiosyncratic news / sector rotation), making the interaction at best a noise-reduction rather than a mechanism story."
+    },
+    {
+      "issue": "Standardized delta for current_vs_ibd_candidate_pct is only −0.1984 — third-quartile weakest in the archaeology",
+      "why_it_matters": "If current_vs_ibd_candidate_pct is itself a weak discriminator, no interaction involving it as a factor can be expected to be strong unless the interaction is very large. The numeric contrast does not support treating it as a regime-defining variable, which is what the mechanism requires. Using a weak marginal as the spine of an interaction is a recipe for overfitting on 27 cases."
+    },
+    {
+      "issue": "Lookback-window leakage risk: the pullback detection window likely overlaps with the W4 forward outcome window used in archaeology",
+      "why_it_matters": "If pullback_v_is_dry is computed on data that includes the post-entry price/volume path, then any correlation with W4 outcome is contaminated by forward information. The archaeology cannot validate a feature whose construction window contains the label. This is a label-leakage concern that is independent of sample size."
+    },
+    {
+      "issue": "Hard-veto rule (drop current_vs_ibd_candidate_pct > 3.0% AND pullback_v_is_dry=0) contradicts the 'no universe expansion' constraint in spirit",
+      "why_it_matters": "Even a 'soft' veto shrinks the eligible set; the policy frames the veto as preserving the universe while simultaneously recommending a hard drop in one quadrant. If the ruin concentration in that quadrant is as claimed (the falsifiable prediction says 'highest sub-regime ruin rate'), then the veto materially reduces candidate count and breaks the B0 contract. The Researcher is implicitly trading one constraint for another without acknowledging it."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 candidate with pullback_v_is_dry = 1 AND current_vs_ibd_candidate_pct < 0% that is a large_win — would refute the gating claim that dry-pullback benefit requires trending",
+    "B0 candidate with pullback_v_is_dry = 0 AND current_vs_ibd_candidate_pct in (1.5%, 3.0%) that is a large_win — would refute the 'extended-and-distributing = ruin' quadrant",
+    "B0 candidate with both pullback fields null AND vol_ratio_5_20 < 0.9 that is a ruin — would refute the 'no pullback yet = keep with vol confirmation' rule",
+    "Two near-identical B0 candidates differing only in pullback_v_is_dry flag but having identical vol_ratio_5_20 — would isolate whether the binarization itself adds information",
+    "A B0 candidate with current_vs_ibd_candidate_pct > 4% AND pullback_v_is_dry = 1 that ruins — would refute the directional claim that dry volume rescues extension",
+    "Snapshot-stratified cross-tabs: is the interaction effect concentrated in one snapshot (snap_d0d57b1e40 contains multiple mixed-outcome cases) and absent elsewhere, indicating snapshot-level regime rather than feature-level interaction?"
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample holdout (not in the discovery 27) of at least 100 B0 candidates where the four-quadrant interaction shows a monotonic ruin-rate ordering with effect magnitude > 5pp between adjacent quadrants AND the interaction term adds marginal Sharpe over a baseline model that already includes vol_ratio_5_20 and current_vs_ibd_candidate_pct as continuous features",
+    "A non-parametric partial-dependence plot on a holdout showing that predicted W4 return as a function of current_vs_ibd_candidate_pct visibly differs between pullback_v_is_dry = 0 and pullback_v_is_dry = 1, with non-parallel curves (the defining signature of statistical interaction)",
+    "An ablation demonstrating that adding pullback_v_is_dry × current_vs_ibd_candidate_pct as a true cross-term (not multiplicative marginals) improves a held-out log-loss / brier score over a model with the two main effects alone",
+    "Evidence that pullback_v_is_dry is constructed from data strictly before the W4 measurement window, ruling out label leakage",
+    "Resolution of the null-pullback winners: if most null-pullback selected_winners can be shown to share a structural property (e.g., they were bought on breakout day, never had a pullback to evaluate) then the interaction claim can be restricted to a clean subpopulation and tested — until then it remains confounded with sample selection"
+  ]
+}

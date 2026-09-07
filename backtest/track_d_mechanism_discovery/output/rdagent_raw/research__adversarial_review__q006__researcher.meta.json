@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__adversarial_review__q006__researcher",
+  "prompt_hash": "757de3dd40e92c63c1720cd1be999b73108dc0d252a42c72fa5939629a84ecf8",
+  "response_hash": "4290cb49cb6b002b0b2c259358558a9819d720fe2687d8daa868a792e9ace1bd",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 3,
+  "compact_json_retry": true
+}

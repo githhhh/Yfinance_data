@@ -1,0 +1,53 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "M3_momentum_monotonicity_vs_threshold_test",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "comparison": "For the 11 selected_winners and 7 false_negative cases (false_negative_relative + false_negative_big_winner), fit a logistic regression of outcome on these three features. Then test H0: the relationship is a smooth monotonic function (linearity in logit, no interactions) vs. H1: there is a discrete jump/discontinuity in the predicted probability surface. Operationalized via: (a) comparison of AUC for linear-logit vs. classification-tree model with max_depth=2; (b) Hartigan dip-test on the predicted-probability distribution to detect multimodality; (c) gap-statistic on the 1-D projection onto the linear predictor. If the tree model does not improve AUC by >0.05 AND the predicted-probability distribution is unimodal AND no gap exceeds 0.20 in the projection, B0 operates as a smooth continuous scorer on these features (continuous-proxy frame supported). If any of the three fail, the gate hypothesis for analogous B0 components (eps_preference) gains prior plausibility because B0 itself uses threshold structure on measured features.",
+      "success_criterion": "Linear-logit AUC > 0.85 AND tree-AUC − linear-AUC < 0.05 AND dip-test p > 0.10 AND max gap < 0.20 — supports the researcher\u2019s claim that B0\u2019s measured feature block is a continuous scorer, which by parallel construction makes eps_preference\u2019s continuous-proxy interpretation more defensible.",
+      "failure_criterion": "Tree-AUC > linear-AUC + 0.05 OR dip-test p < 0.10 OR max gap > 0.20 — falsifies the continuous-proxy frame for the measured block and raises prior probability that eps_preference is also operating as a categorical gate rather than as a smooth weight."
+    },
+    {
+      "name": "M3_residual_capacity_after_momentum_controls",
+      "features": [
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Estimate pseudo-R\u00b2 (McFadden) of a logistic model predicting outcome_label \u2208 {selected_winner, false_positive_ruin, false_negative_relative, false_negative_big_winner} (multinomial) using only these three features on the 27 case entities plus the matched non-case B0 candidates available in each snapshot. Decompose total variance into (i) explained by the three momentum features and (ii) residual. The residual-capacity fraction bounds the maximum additional signal any orthogonal feature (including eps_preference) could contribute. Cross-validate with leave-one-snapshot-out to prevent snapshot-specific overfit. If the residual-capacity fraction is < 0.15 AND the three-feature model\u2019s misclassification rate among ruins vs. winners is < 25%, then there is structurally little room for eps_preference to add orthogonal information, supporting the redundancy claim. If the residual-capacity is > 0.35 OR the misclassification rate among ruins vs. winners is > 40%, then substantial unexplained structure remains that eps_preference (or another unmeasured fundamental feature) could plausibly fill, supporting the skeptic\u2019s orthogonal-information frame.",
+      "success_criterion": "Three-feature pseudo-R\u00b2 (McFadden) > 0.30 AND residual-capacity < 0.15 AND cross-validated ruin-vs-winner misclassification < 0.25 — the momentum block is sufficient, eps_preference\u2019s independent contribution is bounded to a narrow band, redundancy hypothesis supported.",
+      "failure_criterion": "Pseudo-R\u00b2 < 0.15 OR residual-capacity > 0.35 OR cross-validated ruin-vs-winner misclassification > 0.40 — leaves room for eps_preference or analogous orthogonal information to be operative; the redundancy claim as stated is not supported by the measured-feature evidence."
+    },
+    {
+      "name": "M3_regime_heterogeneity_across_snapshots",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "comparison": "Stratify the 27 cases by snapshot_anon and recompute the three-feature logistic coefficients (mom_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) within each snapshot stratum that contains \u22653 cases. Test coefficient heterogeneity via a Chow-type breakpoint test (permutation-based, n_perm=2000, given small n per stratum). If coefficients are stable (sign and rank-order preserved across snapshots, p > 0.30 for heterogeneity test), then the pooled redundancy conclusion is internally consistent and can be carried across regimes. If coefficients flip sign or magnitude across snapshots (p < 0.10 for heterogeneity), then the redundancy of eps_preference (and of any B0 term) is regime-conditional: in some snapshots momentum terms dominate, in others a different feature class may dominate. This would NOT falsify the redundancy claim outright but would scope it: eps_preference\u2019s role can only be assessed conditional on regime, and the prior\u2019s unconditional-redundancy language is wrong.",
+      "success_criterion": "Coefficient sign-rank concordance \u2265 80% across snapshot strata AND permutation heterogeneity p > 0.30 — the pooled redundancy story is stable; researcher\u2019s mechanism claim holds unconditionally.",
+      "failure_criterion": "Sign-rank concordance < 70% OR heterogeneity p < 0.10 — the redundancy story is regime-dependent; the researcher\u2019s unconditional claim must be scoped or replaced with a regime-conditional formulation, and the skeptic\u2019s regime-heterogeneity attack is corroborated."
+    }
+  ],
+  "leakage_checks": [
+    "Verify each of the nine features listed in the three tests is computed strictly from data dated at or before snapshot_anon for every case entity; reject any case where the feature\u2019s computation window extends past the snapshot date.",
+    "Confirm that snapshot_anon identifiers do not encode calendar information (e.g., year, quarter, month) usable as a predictive feature; if such encoding exists, recompute the three tests after permuting snapshot labels within strata and check that the success criteria remain stable.",
+    "Verify that the 27 case entities and any matched controls are uniquely identified and that no entity appears in both the selected_winner and false_positive_ruin sets for the same snapshot (which would indicate label leakage).",
+    "Check that vol_ratio_5_20, mom_20, and ma10_slope_5 do not include the snapshot-date close in their computation windows in a way that creates a same-day autocorrelation with outcome_label; recompute with a 1-day lookback buffer and require <5% change in test statistics.",
+    "Audit the labels definition (false_negative_relative requires future W4 >=8% and >=5pp above B0 selected median, or >=5pp above worst B0 pick): ensure the threshold comparators (selected_median, worst B0 pick) are computed only from contemporaneous cases in the same snapshot, not from the full pooled set."
+  ],
+  "priority_order": [
+    "M3_residual_capacity_after_momentum_controls",
+    "M3_momentum_monotonicity_vs_threshold_test",
+    "M3_regime_heterogeneity_across_snapshots"
+  ]
+}
+```

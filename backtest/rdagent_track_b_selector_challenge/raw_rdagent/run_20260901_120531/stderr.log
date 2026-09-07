@@ -1,0 +1,67 @@
+2026-09-01 12:05:54.312 | INFO     | rdagent.oai.backend.litellm:__init__:54 - backend='rdagent.oai.backend.LiteLLMAPIBackend' chat_model='deepseek/deepseek-v4-pro' embedding_model='deepseek/deepseek-v4-pro' reasoning_effort='high' enable_response_schema=True reasoning_think_rm=False log_llm_chat_content=False use_azure=False chat_use_azure=False embedding_use_azure=False chat_use_azure_token_provider=False embedding_use_azure_token_provider=False managed_identity_client_id=None max_retry=15 retry_wait_seconds=15 dump_chat_cache=False use_chat_cache=False dump_embedding_cache=False use_embedding_cache=False prompt_cache_path='/Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/prompt_cache.db' max_past_message_include=10 timeout_fail_limit=10 violation_fail_limit=1 use_auto_chat_cache_seed_gen=False init_chat_cache_seed=42 openai_api_key='***REDACTED***' chat_openai_api_key=None chat_openai_base_url=None chat_azure_api_base='' chat_azure_api_version='' chat_max_tokens=None chat_temperature=0.5 chat_stream=False chat_seed=None chat_frequency_penalty=0.0 chat_presence_penalty=0.0 chat_token_limit=100000 default_system_prompt="You are an AI assistant who helps to answer user's questions." system_prompt_role='system' embedding_openai_api_key='' embedding_openai_base_url='' embedding_azure_api_base='' embedding_azure_api_version='' embedding_max_str_num=50 embedding_max_length=8192 use_llama2=False llama2_ckpt_dir='Llama-2-7b-chat' llama2_tokenizer_path='Llama-2-7b-chat/tokenizer.model' llams2_max_batch_size=8 use_gcr_endpoint=False gcr_endpoint_type='llama2_70b' llama2_70b_endpoint='' llama2_70b_endpoint_key='' llama2_70b_endpoint_deployment='' llama3_70b_endpoint='' llama3_70b_endpoint_key='' llama3_70b_endpoint_deployment='' phi2_endpoint='' phi2_endpoint_key='' phi2_endpoint_deployment='' phi3_4k_endpoint='' phi3_4k_endpoint_key='' phi3_4k_endpoint_deployment='' phi3_128k_endpoint='' phi3_128k_endpoint_key='' phi3_128k_endpoint_deployment='' gcr_endpoint_temperature=0.7 gcr_endpoint_top_p=0.9 gcr_endpoint_do_sample=False gcr_endpoint_max_token=100 chat_use_azure_deepseek=False chat_azure_deepseek_endpoint='' chat_azure_deepseek_key='' chat_model_map={}
+2026-09-01 12:05:54.323 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 314
+2026-09-01 12:05:54.529 | INFO     | rdagent.components.coder.CoSTEER.knowledge_management:__init__:768 - CoSTEER Knowledge Graph loaded, size=0
+2026-09-01 12:05:54.557 | INFO     | rdagent.utils.workflow.loop:_run_step:212 - Start Loop 0, Step 0: direct_exp_gen
+2026-09-01 12:06:17.743 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:07:47.244 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+
+Workflow Progress:   0%|          | 0/4 [00:00<?, ?step/s]
+Workflow Progress:  25%|██▌       | 1/4 [00:00<00:00, 1669.71step/s, loop_index=0, step_index=1, step_name=coding]2026-09-01 12:07:47.695 | INFO     | rdagent.utils.workflow.loop:_run_step:212 - Start Loop 0, Step 1: coding
+
+
+Implementing:   0%|          | 0/10 [00:00<?, ?it/s][A2026-09-01 12:07:48.176 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3040
+2026-09-01 12:08:10.385 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:08:10.434 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3031
+2026-09-01 12:08:20.336 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:08:20.913 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 2999
+2026-09-01 12:08:33.592 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:08:46.331 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3728
+2026-09-01 12:08:52.146 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3442
+2026-09-01 12:08:57.624 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:09:26.521 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:09:26.644 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3457
+2026-09-01 12:09:29.291 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3140
+2026-09-01 12:09:39.215 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:09:56.080 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:09:56.092 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3539
+2026-09-01 12:10:20.403 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3501
+2026-09-01 12:10:48.098 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:10:48.100 | INFO     | rdagent.components.coder.CoSTEER.evaluators:evaluate:304 - Final decisions: [False, True, True] True count: 2
+2026-09-01 12:10:48.101 | WARNING  | rdagent.components.coder.CoSTEER.knowledge_management:load_dumped_knowledge_base:93 - Dump knowledge base path is not set, skip dumping.
+2026-09-01 12:10:48.106 | WARNING  | rdagent.components.coder.CoSTEER.knowledge_management:dump_knowledge_base:84 - Dump knowledge base path is not set, skip dumping.
+2026-09-01 12:10:48.107 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Volume_Confirmed_RiskAdj_Mom_20]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/7e5444955adf42ea88577d6c4d65780d
+2026-09-01 12:10:48.108 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Base_Tightness_Score]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/b80f3ab718714c62bebea6c79601f8a7
+2026-09-01 12:10:48.109 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Rel_Strength_Acceleration_20_60]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/5c3bd989c8d24c5a963a8e6b433d80bd
+
+
+Implementing:  10%|█         | 1/10 [03:00<27:03, 180.41s/it][A2026-09-01 12:10:48.131 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 4370
+2026-09-01 12:10:58.200 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:11:09.092 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:11:09.106 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3582
+2026-09-01 12:11:16.889 | INFO     | rdagent.oai.backend.litellm:_calculate_token_from_messages:67 - [96mToken count: [0m 3173
+2026-09-01 12:11:22.998 | INFO     | rdagent.oai.backend.base:_create_chat_completion_auto_continue:644 - Using OpenAI response format: {'type': 'json_object'}
+2026-09-01 12:11:22.999 | INFO     | rdagent.components.coder.CoSTEER.evaluators:evaluate:304 - Final decisions: [True, True, True] True count: 3
+2026-09-01 12:11:23.001 | WARNING  | rdagent.components.coder.CoSTEER.knowledge_management:load_dumped_knowledge_base:93 - Dump knowledge base path is not set, skip dumping.
+2026-09-01 12:11:23.007 | WARNING  | rdagent.components.coder.CoSTEER.knowledge_management:dump_knowledge_base:84 - Dump knowledge base path is not set, skip dumping.
+2026-09-01 12:11:23.024 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Volume_Confirmed_RiskAdj_Mom_20]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/7e5444955adf42ea88577d6c4d65780d
+2026-09-01 12:11:23.025 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Base_Tightness_Score]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/b80f3ab718714c62bebea6c79601f8a7
+2026-09-01 12:11:23.025 | INFO     | rdagent.components.coder.CoSTEER:develop:129 - evolving workspace: File Factor[Rel_Strength_Acceleration_20_60]: /Users/dev/Documents/Yfinance_data/backtest/rdagent_track_b_selector_challenge/agent_workspace/git_ignore_folder/RD-Agent_workspace/5c3bd989c8d24c5a963a8e6b433d80bd
+2026-09-01 12:11:23.026 | INFO     | rdagent.core.evolving_agent:multistep_evolve:114 - All tasks in evolving subject have been completed.
+
+Implementing:  10%|█         | 1/10 [03:35<32:17, 215.33s/it]
+2026-09-01 12:11:23.027 | INFO     | rdagent.components.coder.CoSTEER:develop:141 - Fallback to the fallback solution.
+
+Workflow Progress:  50%|█████     | 2/4 [03:35<03:35, 107.72s/step, loop_index=0, step_index=2, step_name=running]2026-09-01 12:11:23.034 | INFO     | rdagent.utils.workflow.loop:_run_step:212 - Start Loop 1, Step 0: direct_exp_gen
+2026-09-01 12:11:23.034 | WARNING  | rdagent.utils.workflow.loop:run:380 - Reach stop criterion and stop loop: Step count reached
+
+Workflow Progress:  50%|█████     | 2/4 [03:38<03:38, 109.23s/step, loop_index=0, step_index=2, step_name=running]
+
+Workflow Progress:   0%|          | 0/4 [00:00<?, ?step/s]
+Workflow Progress:  25%|██▌       | 1/4 [00:00<00:00, 32017.59step/s, loop_index=1, step_index=1, step_name=coding]/Users/dev/.conda/envs/quant_env/lib/python3.11/multiprocessing/resource_tracker.py:123: UserWarning: resource_tracker: process died unexpectedly, relaunching.  Some resources might leak.
+  warnings.warn('resource_tracker: process died unexpectedly, '
+
+Workflow Progress:  25%|██▌       | 1/4 [00:00<00:01,  2.73step/s, loop_index=1, step_index=1, step_name=coding]   
+Traceback (most recent call last):
+  File "/Users/dev/.conda/envs/quant_env/lib/python3.11/multiprocessing/resource_tracker.py", line 239, in main
+    cache[rtype].remove(name)
+KeyError: '/loky-26231-nf6ettiz'

@@ -1,0 +1,190 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_snapshot_joint_realized_counterfactual",
+      "features": [
+        "is_b0_pick",
+        "snapshot_anon",
+        "w4_return_bucket",
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within each snapshot_anon, treat co-occurring entities as a candidate pool and compute equal-weight-1 (100% Top1), equal-weight-2 (Top1+Top2), and equal-weight-3 (Top1+Top2+Top3) realized W4 bucket mixtures using w4_return_bucket mapped to numeric payoffs (ruin=-1.0, loss=-0.5, small_win=+0.5, large_win=+1.0). Average across snapshots stratified by within-snapshot Top1-Top2 feature gap (z-score on mom_20+up_day_ratio_20+vol_ratio_5_20+px_vs_ma50).",
+      "success_criterion": "In the high-gap stratum (top tercile of within-snapshot gap), mean 1-slot payoff > mean 3-slot payoff by ≥0.20 AND 1-slot hit rate of 'large_win' > 3-slot hit rate.",
+      "failure_criterion": "3-slot payoff ≥ 1-slot payoff in the high-gap stratum, OR the gap-stratified difference is not monotone (low-gap ≤ high-gap in reverse)."
+    },
+    {
+      "name": "position_sizing_adjusted_ruin_per_dollar",
+      "features": [
+        "is_b0_pick",
+        "snapshot_anon",
+        "w4_return_bucket",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "px_vs_ma20"
+      ],
+      "comparison": "For each snapshot, compute ruin event rate (w4_return_bucket=='ruin') and ruin magnitude per dollar deployed under four capital accounting schemes: (A) 1-slot at 100%, (B) 2-slot at 50/50, (C) 3-slot at 33/33/33, (D) 1-slot at 60% + cash 40% (capacity-1 with sizing haircut). Ruin-per-dollar = P(ruin) × ruin_magnitude × slot_weight.",
+      "success_criterion": "In high-gap snapshots, ruin-per-dollar for (A) ≤ ruin-per-dollar for (C) by ≥30% (concentration genuinely reduces ruin exposure per dollar).",
+      "failure_criterion": "Ruin-per-dollar for (A) is equal to or greater than (C) — i.e., concentrating does NOT reduce ruin exposure per dollar of capital, falsifying the 'ruin-multiplier' mechanism."
+    },
+    {
+      "name": "snapshot_ruin_clustering_independence_test",
+      "features": [
+        "snapshot_anon",
+        "w4_return_bucket",
+        "is_b0_pick"
+      ],
+      "comparison": "Compute (i) the empirical probability that two independent candidates within the same snapshot_anon both ruin (P_ruin^2 under independence), (ii) the observed co-ruin rate among all pairs of co-snapshot entities, and (iii) a Fisher exact / chi-square test of within-snapshot ruin independence. Restrict to snapshots with ≥3 entities.",
+      "success_criterion": "Observed co-ruin rate ≤ P_independent × 1.5 (no meaningful positive dependence; diversification within snapshot is well-defined).",
+      "failure_criterion": "Observed co-ruin rate ≥ 2× P_independent (ruin is correlated within snapshot; 3-slot deployment within a hostile snapshot provides little variance reduction, and the diversification half of the prior's logic collapses)."
+    },
+    {
+      "name": "PIT_computable_gap_score_construction",
+      "features": [
+        "mom_20",
+        "mom_60",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "comparison": "Construct a decision-time computable Top1-Top2 gap = |z(Top1) − z(Top2)| where z is the cross-sectional z-score of a fixed composite (mean of z-scored mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50) computed only from PIT features observable before entry. Verify gap is (i) finite and non-degenerate for ≥80% of snapshot×Top2 pairs, (ii) uncorrelated with w4_return_bucket at the Top2 level (i.e., the gap itself is not a leak of the outcome), and (iii) monotone in the false_negative cohort's standardized deltas.",
+      "success_criterion": "Gap is computable for ≥80% of candidate pairs AND its tercile partition reproduces the false-negative vs selected_winner cohort separation with standardized delta ≥0.5 σ on at least one of mom_20, up_day_ratio_20, vol_ratio_5_20.",
+      "failure_criterion": "Gap is undefined for >20% of pairs, OR its tercile partition fails to separate the two cohorts (delta <0.3 σ on all four composite features), demonstrating the rule is not operationalizable at decision time."
+    },
+    {
+      "name": "symmetric_labeling_contrast_retest",
+      "features": [
+        "is_b0_pick",
+        "w4_return_bucket",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "comparison": "Re-compute the numeric_contrasts table under symmetric labeling: restrict BOTH is_b0_pick=true and is_b0_pick=false cohorts to w4_return_bucket in {large_win} AND apply the same ≥8% W4 + ≥5pp-above-cohort-median rule used for the false-negative bar. Re-derive standardized deltas on all 10 PIT features.",
+      "success_criterion": "Standardized delta of false_negative_minus_selected_winner remains ≤-0.5 σ on at least 5 of 10 features under symmetric labeling (the alpha-decay claim survives label-symmetry correction).",
+      "failure_criterion": "Standardized deltas compress to between -0.3 and +0.3 σ on ≥7 of 10 features — the apparent gap is an artifact of asymmetric cohort construction."
+    },
+    {
+      "name": "FDR_corrected_feature_persistence",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ma50_slope_10",
+        "mom_20",
+        "mom_60",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "atr_14_pct",
+        "rv_20",
+        "volume_ratio",
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "base_depth_pct",
+        "base_duration_weeks",
+        "base_mbox_count",
+        "dist_to_52w_high_pct",
+        "current_vs_ibd_candidate_pct",
+        "ibd_entry_breakout_range_ratio",
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position"
+      ],
+      "comparison": "Apply Benjamini-Hochberg FDR correction at q=0.10 to the full set of 23 standardized deltas in the false_negative vs selected_winner contrast. Count features that survive.",
+      "success_criterion": "≥5 features survive FDR q < 0.10 with absolute standardized delta ≥0.5.",
+      "failure_criterion": "<3 features survive FDR correction — the 'structural weakness' signature is exploratory noise across a wide screen."
+    },
+    {
+      "name": "ruin_cluster_snapshot_throttle_test",
+      "features": [
+        "snapshot_anon",
+        "is_b0_pick",
+        "w4_return_bucket",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Identify snapshots with ≥2 false_positive_ruin cases (the clustered-ruin snapshots in the archaeology: snap_71486ed83c, snap_b8420124eb, snap_d0d57b1e40). Within those snapshots, compute realized payoff under three regime-aware rules: (i) throttle to 0 slots (full abstain), (ii) throttle to 1 slot (Top1 only), (iii) maintain 3 slots equal-weight. Compare aggregate payoff.",
+      "success_criterion": "Throttle-to-0 OR throttle-to-1 yields strictly higher aggregate payoff than 3-slot in clustered-ruin snapshots (regime throttling adds value beyond simple slot count).",
+      "failure_criterion": "3-slot aggregate payoff ≥ throttle-to-1 in clustered-ruin snapshots — the ruin damage is concentrated within Top1 itself and slot-count throttling does not address it."
+    },
+    {
+      "name": "MNAR_sensitivity_pullback_signature",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "base_duration_weeks",
+        "base_mbox_count",
+        "base_depth_pct",
+        "is_b0_pick"
+      ],
+      "comparison": "Among the 11/27 cases with null pullback_duration_weeks and pullback_pct, impute using available base_* and ibd_entry_* features via median imputation stratified by is_b0_pick and snapshot_anon cluster. Re-derive the false_negative vs selected_winner pullback_pct delta and pullback_duration_weeks delta with imputed values included.",
+      "success_criterion": "Pullback_pct delta remains ≥+4pp (i.e., false_negatives still show shallower pullbacks after MNAR imputation) and pullback_duration_weeks delta remains ≤-1 week.",
+      "failure_criterion": "Pullback_pct delta collapses to <+2pp OR reverses sign after imputation — the 'deep base = winner' mechanism is selection-biased by missingness."
+    },
+    {
+      "name": "top1_ruin_tail_capacity1_falsifier",
+      "features": [
+        "is_b0_pick",
+        "w4_return_bucket",
+        "snapshot_anon",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Compute the empirical ruin rate (w4_return_bucket=='ruin') and loss rate (w4_return_bucket in {loss, ruin}) among is_b0_pick=true entities, both unconditionally and conditioned on the high-gap strata (using the PIT-computable gap from test 4). The capacity=1 rule assumes Top1 ruin rate is low enough that full concentration is tolerable.",
+      "success_criterion": "Top1 ruin rate <25% AND loss+ruin rate <50% in the high-gap stratum (concentration is empirically defensible).",
+      "failure_criterion": "Top1 ruin rate ≥35% OR loss+ruin rate ≥60% in the high-gap stratum — concentration of full capital on Top1 amplifies a tail that is itself ruin-prone, so the 'Top1 conviction' premise of the adaptive rule is violated regardless of Top2/Top3 quality."
+    },
+    {
+      "name": "high_gap_within_snapshot_diversification_within_sector_breaker",
+      "features": [
+        "snapshot_anon",
+        "is_b0_pick",
+        "w4_return_bucket",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "comparison": "Within each high-gap snapshot, partition entities into 'high-feature-coherence' (mom_20, vol_ratio_5_20, px_vs_ma50 all above snapshot median) and 'low-feature-coherence' subsets. Compare 3-slot equal-weight payoff on the high-coherence subset vs the snapshot-wide 3-slot allocation. Tests whether diversification across high-coherence candidates within an otherwise hostile regime rescues the 3-slot outcome.",
+      "success_criterion": "Within-snapshot high-coherence 3-slot payoff > snapshot-wide 3-slot payoff AND > high-gap 1-slot payoff (diversification can be reconstructed along a feature-coherence axis).",
+      "failure_criterion": "Within-snapshot high-coherence 3-slot payoff ≤ snapshot-wide 3-slot payoff — the high-coherence subset ruins together (feature-coherence = correlation), confirming the snapshot-level correlation finding from test 3."
+    }
+  ],
+  "leakage_checks": [
+    "Verify no test uses w4_return_bucket, outcome_label, entity_anon, or snapshot_anon as an input feature (only as stratification or outcome variables).",
+    "Verify the PIT-computable gap construction (test 4) does NOT include any feature whose value is determined by or updated after the entry trigger (ibd_entry_* features are entry-time and acceptable; w4_* and post-W4 features are excluded).",
+    "Verify that the imputation in test 8 does not use w4_return_bucket, outcome_label, or any feature whose value is only defined post-outcome.",
+    "Verify that snapshot_anon is used only as a grouping/stratification variable, never as a numeric input or one-hot encoded into the model.",
+    "Verify no test introduces outer-forward outcomes (no W4 returns beyond the frozen w4_return_bucket labels, no forward-looking labels beyond what's in the archaeology).",
+    "Verify that is_b0_pick is treated as a cohort label (not a feature) in tests 5, 6, 8 to avoid tautological selection-on-observables leakage."
+  ],
+  "priority_order": [
+    "within_snapshot_joint_realized_counterfactual",
+    "position_sizing_adjusted_ruin_per_dollar",
+    "snapshot_ruin_clustering_independence_test",
+    "PIT_computable_gap_score_construction",
+    "top1_ruin_tail_capacity1_falsifier",
+    "symmetric_labeling_contrast_retest",
+    "FDR_corrected_feature_persistence",
+    "ruin_cluster_snapshot_throttle_test",
+    "MNAR_sensitivity_pullback_signature",
+    "high_gap_within_snapshot_diversification_within_sector_breaker"
+  ]
+}
+```

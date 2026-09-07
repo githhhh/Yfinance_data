@@ -1,0 +1,77 @@
+{
+  "policies": [
+    {
+      "policy_id": "structural_loser_soft_reject_v1",
+      "description": "Soft-reject B0 picks in the unstable-quadrant (low extension + weak internal strength) per failure_archaeology__q004. Continuous ranking via linear terms on px_vs_ma50 and up_day_ratio_20; asymmetric penalty added when BOTH fall below empirically observed ruin-cluster thresholds (px_vs_ma50<0.08, up_day_ratio_20<0.55). Preserves override capability by reducing score rather than hard-excluding.",
+      "research_origin": "failure_archaeology__q004",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "identity",
+          "weight": 5.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 4.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "px_vs_ma50",
+              "op": "lt",
+              "value": 0.08
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.55
+            }
+          ],
+          "add": -3.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 1,
+          "min_score": 0.0
+        }
+      }
+    },
+    {
+      "policy_id": "trigger_compression_rescue_v1",
+      "description": "Rescue false-negative non-picks under near-buy-point geometry per failure_archaeology__q017. Dual-stratum policy on base=zero: rewards compressed ibd_entry_close_vs_trigger_pct paired with adequate up_day_ratio_20; caps intake at 2 positions to limit exposure to a mechanism that is directionally suggestive but empirically UNRESOLVED. Distinct from policy 1 by addressing the opposite failure mode (missed winners) and using a different base + selector regime.",
+      "research_origin": "failure_archaeology__q017",
+      "base": "zero",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "ibd_entry_close_vs_trigger_pct",
+          "transform": "identity",
+          "weight": -6.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 3.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 2
+        }
+      }
+    }
+  ],
+  "batch_rationale": "Two non-redundant policies targeting opposite failure modes identified by separate archaeology tracks. Policy 1 (failure_archaeology__q004) reduces ruin-type false-positives via an unstable-quadrant penalty; Policy 2 (failure_archaeology__q017) attempts to recapture missed winners via trigger-distance compression on the non-pick stratum. They differ on base (b0_rank vs zero), features (px_vs_ma50+threshold vs ibd_entry_close_vs_trigger_pct), and selector regime (distinct_1 single-position cap vs max_2_per_ind soft cap), so coefficient-only variants are avoided. Both use strictly PIT-safe features (no pullback_pct, w4_return_bucket, or pullback_duration_weeks), and both carry the explicit falsifier paths documented in the source research: Policy 1 is invalidated if px_vs_ma50_conditional_independence fails or counterexamples emerge in the unstable quadrant; Policy 2 is invalidated by the trigger_distance_vs_price_extension_redundancy test or by snapshot_regime_vol_ratio_confounding."
+}

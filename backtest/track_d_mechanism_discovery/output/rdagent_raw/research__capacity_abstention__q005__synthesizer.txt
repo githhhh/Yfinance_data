@@ -1,0 +1,47 @@
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The hypothesis that a minimum-z PIT composite (across {mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, ma10_slope_5, ma20_slope_5}, standardized against the false-negative cluster median) can directionally identify a weak third candidate at entry is plausible but uncalibrated in the frozen 27-case window. The directional signal is supported (FN cluster sits ~0.6–1.2 standardized units below SW on the top-4 PIT features), but three distinct layers of evidence undermine a calibrated threshold claim: (i) the FN-cluster centroid is partly defined by an outer-forward outcome rule ('W4 ≥ 8% AND ≥ 5pp above B0 median'), so the anchor is a hybrid PIT/forward object rather than a clean PIT object — this is implicit leakage at the centroid definition, not at the candidate observation; (ii) the cross-feature correlations, the snapshot-cluster structure, and the missingness pattern of pullback_pct introduce correlated-noise and small-sample artifacts that the static standardizations cannot disentangle; (iii) the 1/2/3-slot economic comparison is fundamentally a covariance question (correlated momentum factors in #2 and #3 reduce diversification benefit) that the frozen sample cannot resolve because within-snapshot covariance estimation requires per-snapshot degrees-of-freedom the data does not contain. The most defensible reading is that an AND-conditioned floor on 4 (not 6) top-features, anchored at a hand-tuned percentile rather than the empirical FN median, gives a directional abstention signal useful at the policy-as-prior level, but the SNR is not high enough to support a deterministic threshold rule.",
+  "falsifiers": [
+    "T1 outcome: if min-z false-abstention rate on SW exceeds 25% OR is not lower than max-z baseline, the apparent multi-feature gain is redundancy-not-signal (composite fails the parsimony test and collapses to single-feature dominance).",
+    "T3 outcome: if ≥ 4 entities flip decision across the three FN-anchor rules, the floor's mean is unstable at n=5–7 and any min-z<0 gate is anchor-leakage rather than signal.",
+    "T6 outcome: if within-snapshot average |ρ| ≥ 0.55 across the six features, the 1/2/3 economic ordering is determined by covariance, not per-candidate alpha — the position-count policy must be reformulated under a within-snapshot covariance penalty, and τ becomes correlation-conditional.",
+    "T7 outcome: if AUC(composite) ≤ AUC(best single feature, likely mom_20 or up_day_ratio_20), the multi-feature floor is parsimony-violating and should collapse to a one-threshold rule with a calibration guardrail.",
+    "Calibration falsifier: if a held-out forward window (n ≥ 30 new candidates, observed forward only AFTER entry) shows the floor's lift over a no-floor baseline has 95% CI crossing zero, the directional signal does not survive sample extension.",
+    "Label-anchor falsifier: an explicit re-labeling of the 'false_negative' cluster using a non-W4-anchored definition (e.g., bottom-quartile by base_depth_pct AND bottom-quartile by mom_20) yields a centroid that does NOT rank-order the existing 27 cases the same way, indicating the current FN centroid is label-coupled and the floor inherits that coupling.",
+    "Position-count falsifier: across all snapshots with ≥ 3 candidates in the held-out window, the Sharpe ordering 3-slot ≤ 2-slot ≤ 1-slot is reversed from the theory's diversification prediction, implying correlated residual dominates the diversification payoff and the 3-slot default is structurally sub-optimal."
+  ],
+  "actionable_design_principles": [
+    "Pre-specify the floor statistic computation BEFORE seeing any candidate: Z_floor(c) = min over k in {1..K} of [ (x_k(c) − μ_k(FN_anchor)) / σ_k(FN_anchor) ], where K starts at 4 (mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50) and is recursively reduced by Held-out AUC gain ≥ 0.03 per added feature.",
+    "Anchor contamination control: the FN cluster definition must be re-expressed as a PIT-only proxy (bottom-quartile by base_depth_pct AND bottom-quartile by mom_20, for example) for at least one sensitivity branch; report the floor thresholds and SW/FN flip counts under both anchor rules side by side.",
+    "Separate the two distinct policy questions: (a) whether to abstain on #3 given a PIT composite (a ranking/abstention problem), and (b) whether 1, 2, or 3 slots is optimal under marginal-correlation structure (a portfolio construction problem). Do not let one resolve the other.",
+    "Do not use pullback_pct in the composite until its missingness-driven positive delta is decomposed against an explicit null model (T4); if the +0.64 delta collapses to null-distribution noise, drop the feature from the floor entirely rather than imputing.",
+    "Calibration guardrail: any floor-driven abstention must be paired with a separate 'conviction ceiling' check (absolute minimum on mom_20 OR px_vs_ma50) to avoid the false-abstention failure mode already observed in entity_2f86543bf6, where low PIT readings paired with favorable base structure produced a large_win.",
+    "Snapshot heterogeneity: treat each snap_* as a regime marker in policy documentation; if the held-out extension shows floor behavior reverses across snapshots, the floor should become snapshot-conditional (regime-gated) rather than universal.",
+    "Capital-allocation rule under unresolved covariance: when the within-snapshot |ρ| cannot be estimated with confidence, default to 1- or 2-position deployment rather than 3, on the basis that the downside of correlated residual is asymmetric (FN_relative compounds across the holding window whereas FP_ruin is concentrated in single names)."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Z_floor_AND_gate_with_conviction_ceiling_v1",
+      "why_distinct": "Combines the minimum-z AND-condition (the Researcher's mechanism) with an absolute floor on a single high-AUC feature to bound the false-abstention failure mode (entity_2f86543bf6-type). Operates strictly on PIT values, with the FN-cluster centroid computed under a PIT-only proxy branch in parallel to the original (mixed-anchor) branch.",
+      "features": ["mom_20", "up_day_ratio_20", "vol_ratio_5_20", "px_vs_ma50", "px_vs_ma20", "ma10_slope_5"],
+      "capacity_relevance": "Directly operationalizes the 'weak third candidate' abstention signal under a fixed 3-slot capital budget. By AND-conditioning across the top-4 features and OR-conditioning with a single-feature ceiling, the policy preserves the FR-defined direction while hedging against the false-abstention tail observed in the frozen set. The dual-anchor branch addresses the implicit-leakage concern raised by the Skeptic without requiring a relabeling of the full dataset."
+    },
+    {
+      "idea": "Snapshot_regime_conditional_slot_allocator_v1",
+      "why_distinct": "Reframes the 1/2/3-slot choice as a regime-conditional decision: when within-snapshot covariance among the top-4 PIT features is above a sentinel threshold (estimated on a rolling window), the policy allocates ≤ 2 slots regardless of individual PIT strength; otherwise it allocates up to 3 slots gated only by the Z_floor. This explicitly decouples the per-candidate alpha question from the portfolio-construction question, which the prior analysis conflated.",
+      "features": ["mom_20", "up_day_ratio_20", "vol_ratio_5_20", "px_vs_ma50", "is_b0_pick"],
+      "capacity_relevance": "Maps directly to the position-count economic question (1 vs 2 vs 3 slots) by making the covariance regime observable and policyable, rather than assuming independence between slots. Avoids the dominant-mode failure where the third slot loads correlated factor exposure and adds residual rather than alpha."
+    },
+    {
+      "idea": "PIT_only_FN_anchor_proxy_branch_v1",
+      "why_distinct": "Replaces the mixed PIT/forward FN-cluster anchor with a pure-PIT proxy (e.g., bottom-quartile by base_depth_pct AND mom_20 cross-quartile) and runs the Z_floor statistic against both anchors in parallel. The capacity decision is made on whichever anchor yields the higher held-out AUC, with a mandatory dual-anchor disagreement audit when the two floors give conflicting abstention calls on the same candidate.",
+      "features": ["base_depth_pct", "mom_20", "up_day_ratio_20", "vol_ratio_5_20", "px_vs_ma50"],
+      "capacity_relevance": "Provides a falsifiable, auditable handling of the implicit-leakage concern at the centroid definition. The disagreement audit creates a documented uncertainty band that maps onto an explicit capacity reduction (e.g., demote 3-slot to 2-slot when anchors disagree on the third candidate) rather than silently inheriting the leakage into the threshold."
+    }
+  ]
+}
+```

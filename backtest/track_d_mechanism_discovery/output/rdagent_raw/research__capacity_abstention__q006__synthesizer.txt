@@ -1,0 +1,92 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The adaptive 0/1/2/3 capacity rule hypothesizes that the third-ranked candidate carries incremental information beyond slots 1 and 2, and that when this candidate is weak on entry-time point-in-time features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma20, px_vs_ma50, MA slopes), capacity 0 (abstain) or capacity 1 (concentrated bet) dominates capacity 3 (full fill) on risk-adjusted return. The economic meaning is: capacity 1 trades diversification for concentration on highest-conviction signal, capacity 2 trades one unit of concentration for modest diversification if the second slot is comparable in quality, and capacity 3 requires three comparable-quality setups or it dilutes the portfolio with an inferior signal that increases ruin probability without proportional expected return. The 27-case archaeology is consistent with this mechanism (false-positive-ruin candidates cluster at weak-to-moderate PIT feature values; selected winners show higher medians on the same features), but the evidence is too small, too outcome-leaked in label construction, and lacks the matched within-date capacity counterfactuals needed to causally attribute outcomes to capacity rather than to candidate selection or regime. Therefore the mechanism is theoretically coherent and economically meaningful but not empirically established.",
+  "falsifiers": [
+    "Matched-pair within-date test (Test 4): construct B0 pick dates where slots 1 and 2 have near-identical composite quality (±0.5σ) at entry. If μ(capacity 3) ≥ μ(capacity 2) ≥ μ(capacity 1) on risk-adjusted return in more than 10% of pairs after Bonferroni correction, the weak-third abstention rule is refuted because the marginal slot adds value even when its quality is below slot 1 and 2.",
+    "Rank × quality interaction test (Test 2): a regression of W4 return on rank × weak-quality-pass status, with snapshot-clustered standard errors, must show a significant negative interaction. If weak-quality-fail at rank 1 produces outcomes statistically indistinguishable from weak-quality-pass at rank 1 (no rank interaction), the rule's premise that quality matters more at rank 3 than rank 1 is false.",
+    "Replacement quality differential (Test 5): for abstained capacity-0 cases, the paired (abstained quality, replacement quality) distribution must show replacement quality > abstained quality at p < 0.05. If replacement quality is equal or lower, capacity 0 destroys expected value and the rule's 'optionality' justification collapses.",
+    "Within-weak-stratum composite discrimination (Test 7): within the weak stratum, the composite threshold's out-of-fold AUC for ruin prediction must exceed the best single-feature AUC by ≥0.05 (DeLong p < 0.05). If any single feature (e.g., up_day_ratio_20 alone) matches the composite, the composite is over-specified and the multi-feature justification for abstention is unjustified complexity.",
+    "Regime concentration test (Test 3): if ruin at rank 3 distributes uniformly across regime clusters (rv_20 × up_day_ratio_20 quantiles), the rule captures regime rather than slot-position-specific candidate quality and should be reformulated as a regime filter, not a capacity rule.",
+    "Capacity-0 optionality realization (Test 6): high-replacement-quality paths must show significantly lower ruin probability than low-replacement-quality paths. If replacement quality has no relationship to subsequent performance, capacity 0 is decision noise rather than value preservation.",
+    "Reproducible counter-example: if a stable population of weak-third candidates (below all prespecified thresholds) consistently achieves W4 ≥ median(selected winners) after costs across out-of-sample periods, the proposed quality dimensions are mis-specified and the mechanism is refuted on construct validity.",
+    "Sharpe monotonicity test: incremental Sharpe ratio of slot 3 over slots 1-2 baseline must be significantly negative in the weak-third stratum and non-negative in the strong-third stratum. Failure of either sign in either stratum refutes the adaptive rule."
+  ],
+  "actionable_design_principles": [
+    "Treat capacity as a ranked, testable decision variable, not a default fill-rate: assign capacity 0 for clearly weak third candidates, capacity 1 for one dominant setup, capacity 2 for two comparable setups, and capacity 3 only when three candidates are similarly strong on entry-time PIT features.",
+    "Construct all thresholds and capacity assignments exclusively from point-in-time entry features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma20, px_vs_ma50, ma10_slope_5, ma20_slope_5); never use outcome labels, w4_return_bucket, or future W4 returns as inputs.",
+    "Block inference at the snapshot level: cluster standard errors by snapshot_anon, treat multiple B0 picks within a snapshot as non-independent because regime exposure is shared, and avoid calendar- or ticker-based features.",
+    "Run capacity counterfactuals within the same date with identical entry timing, capital scaling, and transaction-cost assumptions; the only varying input is which slots are occupied. Construct matched-pairs comparisons when slot 1/2 quality is held fixed.",
+    "Use walk-forward validation and Bonferroni or Benjamini-Hochberg correction across all within-test multiple comparisons to prevent threshold fishing and false discovery from the seven proposed tests.",
+    "Separate the candidate-selection decision (is this a B0-eligible setup?) from the capacity-allocation decision (do we deploy 0, 1, 2, or 3 slots to this universe?). Conflating them obscures whether observed ruin is attributable to weak selection or to portfolio dilution.",
+    "Quantify the opportunity cost of capacity 0 by estimating replacement candidate quality at defined future entry windows (1, 3, 5 trading days) using only that candidate's PIT features, never retrospective features.",
+    "Document regime context (entry-time rv_20 and up_day_ratio_20 quantile) for every capacity decision, and test regime × capacity interactions before generalizing the rule across market states."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Adaptive capacity assignment keyed on rank-3 composite quality",
+      "why_distinct": "Translates the adaptive 0/1/2/3 rule into a DSL operator that consumes the third-ranked candidate's entry-time PIT composite and outputs a capacity integer. Distinct from a generic fill policy because it conditions on rank-3 quality relative to slots 1-2, not on absolute threshold alone.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "capacity_relevance": "Direct: emits capacity ∈ {0, 1, 2, 3} as the policy output. Capacity 0 when rank-3 composite falls below weak threshold AND relative gap to slot-2 exceeds δ; capacity 1 only when slot-1 composite strongly exceeds slot-2 and slot-3; capacity 2 when slot-1 and slot-2 are comparable and slot-3 is below weak threshold; capacity 3 only when all three slots clear the strong threshold."
+    },
+    {
+      "idea": "Within-date marginal slot contribution estimator",
+      "why_distinct": "Computes the incremental risk-adjusted return of slot 3 over a slot-1-2 baseline using only contemporaneous matched observations and snapshot-clustered inference. Distinct from a static rule because it estimates the causal marginal effect of capacity choice rather than asserting one.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Inputs include the composite quality of all three slots and outputs a marginal Sharpe estimate for slot 3. Capacity decision follows from the sign and significance of this marginal; abstention (capacity 0) when marginal is negative or insignificant."
+    },
+    {
+      "idea": "Capacity-0 replacement quality differential",
+      "why_distinct": "Simulates abstention by estimating the quality of the first B0-eligible replacement candidate in a forward entry window (1/3/5 trading days) and outputs the paired quality gap. Distinct because it makes the opportunity cost of abstention explicit and testable rather than treating capacity 0 as free optionality.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Feeds back into the capacity decision: if replacement quality systematically exceeds abstained quality, capacity 0 is value-preserving; if not, capacity 0 destroys value and the rule should default to capacity ≥ 1."
+    },
+    {
+      "idea": "Regime-conditioned capacity multiplier",
+      "why_distinct": "Applies a regime scalar to the capacity decision based on entry-time realized volatility (rv_20) and breadth (up_day_ratio_20) quantile. Distinct because it captures the regime interaction documented in the archaeology (ruin concentrates at rank 3 in adverse regimes) rather than applying a uniform rule across market states.",
+      "features": [
+        "rv_20",
+        "up_day_ratio_20",
+        "atr_14_pct"
+      ],
+      "capacity_relevance": "Scales the weak-third threshold: in adverse regimes (high rv_20, low up_day_ratio_20), the weak threshold tightens, biasing toward capacity 0 or 1; in benign regimes, the threshold relaxes toward capacity 2 or 3. Tests whether regime × rank interaction is significant."
+    },
+    {
+      "idea": "Rank-conditioned weak-quality interaction regressor",
+      "why_distinct": "Embeds a rank × weak-quality interaction term into the DSL so that the same weak-quality signal at rank 1 vs rank 3 produces different capacity recommendations. Distinct because it explicitly tests the claim that quality matters more at lower ranks, not just whether weak quality predicts poor outcomes.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Outputs an interaction coefficient that, if significant, validates the asymmetric treatment of weak quality across ranks. If insignificant, refutes the premise that rank-3 abstention is fundamentally different from rank-1 abstention."
+    }
+  ]
+}
+```

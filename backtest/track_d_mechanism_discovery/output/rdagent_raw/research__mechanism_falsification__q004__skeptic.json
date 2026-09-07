@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "B0 'freshness' is not an independent corrective-recency signal but a redundant re-encoding of an early-breakout / vol-regime composite already captured by vol_ratio_5_20, px_vs_ma20/ma50, and ibd_entry_close_vs_trigger_pct; in the 27-case archaeology the pullback-depth/duration framing obscures a multicollinearity structure in which the largest false-negative contrast (vol_ratio_5_20, standardized delta -1.05) belongs to a neighboring B0 term, not to any freshness construct, and several high-freshness setups (deep, recent pullbacks) underperform.",
+  "attacks": [
+    {
+      "issue": "The freshness construct is not identified separately from its supposed neighbors because the candidate control set was chosen to exclude ibd_entry_close_vs_trigger_pct from the 'neighboring' family, even though this variable is itself a point-in-time recency/extension measure (-0.70 standardized delta vs. selected winners). Treating freshness as separable while omitting the single most temporally local neighbor is construct laundering.",
+      "why_it_matters": "Any apparent incremental value of freshness is an arithmetic consequence of the omitted variable: the very proxy for 'how recent is the trigger relative to the prior pivot' is hidden in a competing term, so any 'independent' freshness contribution measured against the remaining covariates is partly the masked ibd_entry_close_vs_trigger_pct effect."
+    },
+    {
+      "issue": "Conditional inclusion bias: pullback_duration_weeks and pullback_pct are undefined for entities that never entered a recognized pullback state under B0 rules. The 27-case panel is therefore not random with respect to freshness - it oversamples setups that satisfied prior eligibility filters. A freshness coefficient estimated on this conditional sample is mechanically biased toward zero (range restriction) and any signal it surfaces is confounded with the upstream eligibility filter that created the missingness.",
+      "why_it_matters": "Even a real freshness effect would be attenuated by the missing-not-at-random truncation, and the sign of any observed effect is not identifiable without modeling the missingness mechanism. Null findings would be falsely reassuring; positive findings would be confounded with the eligibility filter."
+    },
+    {
+      "issue": "The 27 cases contain a single entity (entity_6618d3e80c) carrying the joint label false_positive_ruin|selected_winner, plus cases with null pullback fields that are silently treated as 'no pullback'. Together these create label/feature ambiguity that, in a small n=27 panel, can flip any 'freshness' effect across a sign-change threshold purely by reclassifying one or two outliers.",
+      "why_it_matters": "With n=27 the effective degrees of freedom are too few to survive even one such reclassification. Any claim that freshness carries independent predictive content is therefore not statistically falsifiable at this sample size, and the point estimates are dominated by edge-case label noise rather than a mechanism."
+    },
+    {
+      "issue": "Counterexample density: at least three large-freshness setups underperformed (entity_8f0df3d38e: 7wk/-16.2% -> ruin; entity_ccc90a671f: 7wk/-14.4% -> ruin; entity_55c2da490e: 7wk/-12.3% -> ruin), while a low-freshness setup won (entity_440e297253: 3wk/-1.5% -> large_win). This is a higher concentration of deep-pullback failures than shallow-pullback wins, opposite to the directional reading of a depth-based freshness hypothesis.",
+      "why_it_matters": "If freshness were truly a corrective-recency signal, deep-recent pullbacks should dominate the selected_winner bucket relative to false_positive_ruin. The observed pattern - deep pullbacks concentrating in false positives - is evidence against, not for, the depth/duration reading of freshness."
+    },
+    {
+      "issue": "The single largest standardized delta in the false-negative vs. selected-winner contrast is vol_ratio_5_20 at -1.05, larger than any pullback-related feature. Freshness is most plausibly reading off this volatility-regime variable rather than off pullback structure; the 'freshness' label is therefore misnamed and its claimed mechanism (price-time corrective activity) is unsupported by the dominant contrast.",
+      "why_it_matters": "If the underlying signal is recent volatility expansion - the canonical signature of an early breakout - then freshness collapses into a duplicate of an existing B0 term and cannot survive a partial-correlation test controlling for vol_ratio_5_20. Any claim that freshness has independent predictive content must first survive this specific control."
+    },
+    {
+      "issue": "The researcher output treats post-decision labels (selected_winner, false_positive_ruin, false_negative_relative) as inputs to the falsification logic. These labels encode W4 relative-to-cohort outcomes and therefore embed the very selection rule whose freshness component is being tested. Using a label that already depends on the B0 score to evaluate the B0 score is circular and inflates apparent sharpness.",
+      "why_it_matters": "Any 'freshness correctly distinguishes winners from losers' finding that uses these labels is partly a tautology: the labels were constructed from a rule that already weighted the same family of inputs. Circular evaluation makes the mechanism unfalsifiable from within the supplied evidence."
+    },
+    {
+      "issue": "Within-stratum testability is undermined: freshness is supposed to refine selection inside cohorts that already pass mom_20, slope, and extension filters. The 27 cases are too sparse to support stratum-conditional analysis (most strata have n<5), so any 'no within-strata effect' claim is an artifact of insufficient power, not evidence of redundancy.",
+      "why_it_matters": "A cleaner falsification requires matched strata of size sufficient for conditional inference. The current evidence cannot distinguish 'freshness is redundant' from 'freshness is real but undetectable at n=27 per stratum', so the researcher output's redundancy reading is itself unfalsifiable."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A selected_winner with a null or extremely stale (>= 12-week) pullback record: this would directly contradict a recency-based freshness specification, since a 'fresh' corrective event is conspicuously absent yet the setup still wins.",
+    "A false_positive_ruin with a textbook-deep recent pullback (>= 6 weeks, >= -15%) AND a large positive vol_ratio_5_20: this isolates the case where freshness mechanisms and breakout mechanisms conflict, and would localize which component (pullback vs. vol-regime) is driving outcomes.",
+    "A pair of snapshots from the same cohort window where one candidate has shallower/shorter pullback and wins while the matched deeper/longer pullback candidate loses: this directly inverts the freshness directional hypothesis at fixed sector/regime.",
+    "An entity where ibd_entry_close_vs_trigger_pct is high (>= 0.05) but pullback recency is also 'fresh', testing whether the freshness construct is additive to or substitutable with the existing entry-extension B0 term.",
+    "A false_negative_big_winner entity whose ma10_slope_5 and ma20_slope_5 are above selected-winner medians yet was missed: this isolates whether the exclusion was driven by freshness or by upstream rules; if upstream rules explain the miss, freshness is non-additive by construction."
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered, point-in-time freshness construct with explicit missingness categories, evaluated in a held-out window with nested likelihood-ratio or partial R-squared tests against the full neighboring-B0 set INCLUDING ibd_entry_close_vs_trigger_pct and vol_ratio_5_20, yielding a directionally stable, statistically positive incremental contribution at adequate per-stratum n.",
+    "A within-stratum matched comparison (mom_20, slopes, extension, vol_ratio_5_20 all matched to within tight bands) showing that high-freshness and low-freshness candidates differ in conditional W4 return distribution at conventional significance levels, replicated across two independent time regimes.",
+    "An ablation in which freshness is added to a baseline that already contains vol_ratio_5_20 and ibd_entry_close_vs_trigger_pct and produces a calibration improvement (Brier score, ruin rate) that survives a 5pp transaction-cost haircut - showing the mechanism, not the collinearity, is what carries the value.",
+    "Direct evidence that freshness is NOT simply vol_ratio_5_20 in disguise: namely a construct whose partial correlation with vol_ratio_5_20 is low (<0.3) and whose incremental coefficient in a regression with both terms included remains significant out-of-sample.",
+    "Re-labeling of the n=27 archaeology under independent rules (e.g., fixed forward-return thresholds rather than cohort-relative labels) that reproduces the freshness direction - this would break the circular dependency between the evaluation label and the B0 score."
+  ]
+}

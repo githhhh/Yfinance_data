@@ -1,0 +1,58 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 47,
+  "mechanism_summary": "The volume-dryup mechanism receives directional support from the 1.24 vs 1.42 vol_ratio_5_20 median gap (standardized delta ≈ -1.0) and from entity_8f0df3d38e's pullback pattern (volume confirmed then dried over 7 weeks), but the proposed slope-ratio discriminator lacks independence from mom_20. The slope ratio (ma10_slope_5/ma20_slope_5) appears to be a mathematical compression of momentum baseline rather than an independent predictor—lower mom_20 mechanically produces lower slope ratios without adding causal force. The up_day_ratio_20 feature overlaps substantially across outcomes and is misaligned with the falsifiable prediction that uses it, creating an internal inconsistency. Pullback_duration_weeks null in 4 of 8 ruin cases cannot be reconciled with the gradual-dryup narrative without post-hoc 'fast ruin' auxiliary assumptions. The threshold of 1.35 is empirically derived from the same discovery set, not from hold-out density analysis. Overall, volume weakness is plausibly associated with ruin, but the specific PIT-observable discriminator (slope_ratio < 2.0) and the causal mechanism (volume expansion without momentum acceleration) remain unproven.",
+  "falsifiers": [
+    "Cross-snapshot hold-out: vol_ratio_5_20 < 1.30 AND slope_ratio < 2.0 fails to predict ≥12% drawdown at >60% frequency in ≥2/3 of held-out snap_* folds",
+    "Momentum-conditioned test: after matching false_positive_ruin and selected_winner on mom_20 ± 0.02, slope_ratio yields AUC ≤ 0.65, confirming it is a momentum proxy",
+    "High-volume counterexample: a B0 pick with vol_ratio_5_20 > 1.40 AND mom_20 > 0.20 AND slope_ratio < 1.5 results in selected_winner, contradicting the necessity of slope_ratio > 2.0",
+    "Pullback_null heterogeneity: Mann-Whitney U shows no PIT feature distinguishes null vs non-null pullback subgroups within false_positive_ruin (all p ≥ 0.15), confirming the mechanism pools mechanistically distinct outcomes",
+    "Logistic regression: slope_ratio coefficient p ≥ 0.10 after controlling for mom_20, confirming the skeptic's artifactual counterclaim"
+  ],
+  "actionable_design_principles": [
+    "Use vol_ratio_5_20 as a monotonic continuous predictor in position-sizing models rather than as a binary threshold; any threshold requires hold-out validation before deployment",
+    "Do not condition ruin predictions on slope_ratio without first establishing it retains discriminability after mom_20 control; if it does not, exclude it from the model",
+    "Treat pullback_duration_weeks null as a distinct subgroup requiring separate modeling rather than missing-at-random; consider whether 'fast ruin' has a different feature signature at snapshot time",
+    "Reserve up_day_ratio_20 for symmetry checks or regime characterization; do not use it as a directional filter without first establishing correlation with mom_20 is < 0.15",
+    "Require cross-snapshot hold-out validation before treating any threshold (vol_ratio_5_20 < 1.30, slope_ratio < 2.0) as a production signal filter"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Vol_ratio_conditional_entry_gate: require vol_ratio_5_20 > 1.35 for any B0 pick to receive >1x base weight; below 1.35 receives 0.5x or is excluded",
+      "why_distinct": "Unlike the slope_ratio threshold, vol_ratio_5_20 shows standardized delta ≈ -1.0 and is not a mathematical function of momentum baseline; however, this remains a hypothesis until cross-snapshot hold-out validation confirms >60% ruin precision",
+      "features": [
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Position sizing / conviction scoring"
+    },
+    {
+      "idea": "Momentum_exclusion_zone: if mom_20 < 0.10, do not use slope_ratio as a discriminator; treat the B0 pick as low-conviction regardless of slope_ratio value",
+      "why_distinct": "When mom_20 is very low, slope_ratio becomes maximally coupled to momentum baseline, reducing its independent information content; this is a conservative adjustment that reduces false positives at the cost of possibly missing early-stage breakouts",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "capacity_relevance": "Entry filter / conviction scoring"
+    },
+    {
+      "idea": "Pullback_null_early_stop: for false_positive_ruin cases where pullback_duration_weeks IS NULL at snapshot time, apply tighter stop-loss (e.g., 8% vs standard 12%) anticipating fast-ruin pathway",
+      "why_distinct": "Null pullback cases may represent instantaneous distribution rather than gradual mean reversion; the absence of observable pullback phase suggests price failure without warning pullback, requiring proactive rather than reactive risk management",
+      "features": [
+        "pullback_duration_weeks",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Risk management / stop-loss timing"
+    },
+    {
+      "idea": "Snapshot_regime_interaction: include snap_* as a stratification variable in any threshold validation, or derive snapshot-specific thresholds if ruin base rates vary >20% across snapshots",
+      "why_distinct": "The skeptic correctly identifies that distinct snapshots span different market regimes; treating all snapshots as exchangeable may obscure regime-conditional feature predictiveness and inflate apparent discriminability",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Cross-temporal generalization"
+    }
+  ]
+}

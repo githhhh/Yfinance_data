@@ -1,0 +1,130 @@
+
+
+
+```json
+{
+  "proposals": [
+    {
+      "family": "novel_heuristic",
+      "name": "dry_pullback_breakout",
+      "hypothesis": "Pullbacks with drying volume historically signal institutional accumulation; combine with breakout volume confirmation for higher-quality entries.",
+      "params": {
+        "dry_weight": 4.5,
+        "base_depth_penalty": 1.0,
+        "volume_spike_bonus": 3.0,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "shallow_base_strict_selection",
+      "hypothesis": "Deep bases (>30% depth) historically exhibit weaker subsequent performance; penalize depth heavily while maintaining diverse sector exposure.",
+      "params": {
+        "dry_weight": 1.0,
+        "base_depth_penalty": 5.0,
+        "volume_spike_bonus": 2.0,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "relative_strength_rotation",
+      "hypothesis": "Stocks outperforming SPY over 20 days indicate sector rotation strength; favor relative strength while limiting concentration per industry.",
+      "params": {
+        "dry_weight": 2.0,
+        "base_depth_penalty": 2.5,
+        "volume_spike_bonus": 2.5,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "breakout_quality_focus",
+      "hypothesis": "Entry day characteristics (close position, range ratio, volume) directly measure institutional sponsorship quality; weight entry attributes over base structure.",
+      "params": {
+        "dry_weight": 1.0,
+        "base_depth_penalty": 1.5,
+        "volume_spike_bonus": 4.5,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "medium_base_duration",
+      "hypothesis": "Very short bases (<13 weeks) lack proper consolidation; very long bases (>65 weeks) may indicate distribution; medium-duration bases offer balanced risk/reward.",
+      "params": {
+        "dry_weight": 2.5,
+        "base_depth_penalty": 4.0,
+        "volume_spike_bonus": 1.5,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "low_volatility_acceleration",
+      "hypothesis": "Low realized volatility stocks with accelerating momentum may offer better risk-adjusted setups; combine volatility filtering with momentum scoring.",
+      "params": {
+        "dry_weight": 3.0,
+        "base_depth_penalty": 2.0,
+        "volume_spike_bonus": 3.5,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "actionable_uptrend_confirmation",
+      "hypothesis": "ACTIONABLE status represents confirmed setups; require actionable flag while selecting for stocks with positive relative strength vs market.",
+      "params": {
+        "dry_weight": 2.0,
+        "base_depth_penalty": 3.5,
+        "volume_spike_bonus": 2.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "three_weeks_tight_momentum",
+      "hypothesis": "Three-weeks-tight pattern represents tight consolidation before momentum ignition; weight this candidate type while favoring short-term momentum.",
+      "params": {
+        "dry_weight": 1.5,
+        "base_depth_penalty": 2.0,
+        "volume_spike_bonus": 4.0,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "high_up_day_ratio_momentum",
+      "hypothesis": "High up_day_ratio_20 (>65th percentile) indicates persistent upward drift; combine with recent momentum acceleration for quality confirmation.",
+      "params": {
+        "dry_weight": 3.5,
+        "base_depth_penalty": 1.5,
+        "volume_spike_bonus": 2.5,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "extended_range_pullback",
+      "hypothesis": "EXTENDED status with pullback offers second-chance entries; allow extended status but only when pullback is present and volume is dry.",
+      "params": {
+        "dry_weight": 5.0,
+        "base_depth_penalty": 3.0,
+        "volume_spike_bonus": 1.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "novel_heuristic",
+      "name": "volume_mbox_composite",
+      "hypothesis": "Multi-microbox bases (mbox_count >=5) indicate complex base-building; combine with volume confirmation for stocks with structured accumulation patterns.",
+      "params": {
+        "dry_weight": 2.0,
+        "base_depth_penalty": 2.5,
+        "volume_spike_bonus": 3.5,
+        "selector_mode": "distinct_1"
+      }
+    }
+  ]
+}
+```

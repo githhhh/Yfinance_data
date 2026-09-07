@@ -1,0 +1,61 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 45,
+  "mechanism_summary": "The 'late-stage acceleration' signature (mom_20 0.02-0.25, vol_ratio_5_20 >= 1.2, up_day_ratio_20 0.4-0.65) captures a statistical association in discovery data but lacks structural validity. Three correlated features measuring the same phenomenon (recent price trend) were extracted from the same snapshot window used to define ruin outcomes, creating outcome-conditioned feature construction. Entity_3adc078f01 (selected_winner with up_day_ratio_20=0.65, vol_ratio_5_20=1.14, mom_20=0.172—firmly inside the claimed ruin range) directly contradicts the mechanism. Industry concentration, the explicit conditioning variable in the research question, is unmeasured. The apparent discrimination may reflect concentration beta, snapshot-specific noise, or overfitting to correlated features rather than a distinct causal channel.",
+  "falsifiers": [
+    "Find >= 3 B0 picks in holdout snapshots with mom_20 0.15-0.25, vol_ratio_5_20 1.2-1.4, up_day_ratio_20 0.5-0.65 producing selected_winner outcomes—this invalidates the signature's specificity",
+    "Identify ruin cases with vol_ratio_5_20 < 1.1 AND mom_20 < 0.10—demonstrates low-volatility, low-momentum stocks can also ruin, invalidating acceleration-only mechanism",
+    "Cross-snapshot replication: applying signature cutoffs from discovery snapshots to predict outcomes in snapshots with n >= 20 per category must achieve P(ruin) >= 2x baseline—currently entirely in-sample",
+    "If a single feature (mom_20 or vol_ratio_5_20 alone) achieves >= 80% of the discrimination of the 3-feature bundle, the signature is collinearity-inflated rather than genuinely multi-dimensional",
+    "Show that signature-defined subsets have statistically indistinguishable ruin rates from non-signature B0 subsets within the same snapshots—the signature adds no incremental value beyond B0 selection itself",
+    "Find a selected_winner with up_day_ratio_20 >= 0.7 AND vol_ratio_5_20 >= 1.5 AND mom_20 >= 0.25 AND ibd_entry_close_vs_trigger_pct > 0.03 that still ruins—this directly contradicts the researcher's falsifiable prediction",
+    "Demonstrate that null pullback cases have mechanically different pre-entry features (higher vol_ratio_5_20 OR shorter base_duration_weeks) versus non-null cases—if indistinguishable, nulls reflect outcome-dependent tracking termination"
+  ],
+  "actionable_design_principles": [
+    "Do not encode the signature as a causal filter until cross-snapshot replication demonstrates temporal stability with n >= 20 ruin cases in holdout",
+    "Test each signature feature individually before using the joint bundle—bundle inflation from collinearity can mimic specificity",
+    "Separate concentration risk from individual stock features: a stock with the ruin signature in a diversified portfolio may not ruin; the same stock under concentration may ruin due to correlated exit pressure",
+    "Treat pullback nulls as outcome-dependent censoring, not as independent confirmation signals",
+    "Prioritize tests that falsify the signature's boundary conditions: entity_3adc078f01 analog search and low-vol ruin counterexample are highest priority"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Dual-threshold confirmation filter: accept B0 pick only if (up_day_ratio_20 >= 0.7 OR vol_ratio_5_20 < 1.2 OR mom_20 > 0.25) to exclude the late-acceleration zone, pending holdout validation",
+      "why_distinct": "Differs from researcher's filter by using OR logic (at least one winner-indicator must be present) rather than AND exclusion, reducing false-negative rate while still avoiding the concentrated acceleration zone",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Capacity 2/3: improves signal quality by rejecting outcome-conditioned signatures without requiring full mechanism validation"
+    },
+    {
+      "idea": "Concentration-adjusted exit timer: for B0 picks with vol_ratio_5_20 >= 1.3 AND mom_20 < 0.20, reduce maximum holding period by 2 weeks relative to baseline, triggered only when position represents > 15% of portfolio concentration",
+      "why_distinct": "Explicitly links the signature to the missing variable (concentration) rather than treating it as an unconditional filter; differs from researcher's concentration adjustment proposal by using position-weight trigger rather than assumed concentration state",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "concentration_proxy (portfolio_weight)"
+      ],
+      "capacity_relevance": "Capacity 3/3: addresses the research question's explicit framing around concentration effects that the current evidence cannot disentangle"
+    },
+    {
+      "idea": "Null-pullback exclusion flag: treat ruin cases with null pullback_duration_weeks as outcome-censored rather than structurally null; exclude from signature computation and use only as secondary confirmation of ruin label",
+      "why_distinct": "Addresses skeptic's outcome-dependent missingness attack; researcher treats nulls as secondary confirmation but they reflect data availability bias",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "capacity_relevance": "Capacity 1/3: data quality hygiene without requiring new features"
+    },
+    {
+      "idea": "Single-feature triage before bundle: compute ruin P(ruin|vol_ratio_5_20 >= 1.2) and P(ruin|mom_20 in 0.02-0.25) separately; only use joint bundle if single features achieve < 70% of bundle's discrimination",
+      "why_distinct": "Operationalizes the collinearity_decomposition test from experimental_designer before policy deployment; prevents overfitting from bundle inflation",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Capacity 2/3: test design integrated into policy decision point"
+    }
+  ]
+}

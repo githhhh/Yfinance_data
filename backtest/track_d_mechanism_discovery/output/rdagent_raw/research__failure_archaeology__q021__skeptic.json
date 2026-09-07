@@ -1,0 +1,50 @@
+{
+  "strongest_counterclaim": "The 'dry-up rescues B0 rejections' pattern is (a) not specific to false-negatives because selected_winners with identical vol_ratio_5_20 fingerprints (entity_8ad5cd4795 vol=0.996, entity_bec51a4227 vol=1.008, entity_d2ca7853ba vol=1.091) all produce large_win outcomes, and (b) not even reliable within false-negatives because entity_bfb308b24a has vol_ratio_5_20 = 1.187 — inside the proposed dry-up band — and resolved as a LOSS. The mechanism is a post-hoc narrative fitted to n=3 cases whose label is itself defined by the forward outcome, so it is descriptive rather than predictive.",
+  "attacks": [
+    {
+      "issue": "Circular class definition: 'false_negative' requires W4 return ≥ 8% AND ≥5pp above B0-selected median by construction. Any 'false_negative → large_winner' case is selected into the class by the outcome itself, so the dry-up signature is being fit to a group whose membership depends on the same forward variable the mechanism is supposed to predict.",
+      "why_it_matters": "This is the single most damaging critique. The hypothesis is unfalsifiable as currently framed — every false-negative big-winner exists by definition, so the n=3 evidence for dry-up cannot be evidence for dry-up as a predictive feature. A non-circular version would define 'false_negative' purely on the snapshot features (e.g., B0-rejected AND vol_ratio_5_20 ≤ 1.15) and then test forward outcomes."
+    },
+    {
+      "issue": "Selected winners share the dry-up fingerprint: entity_8ad5cd4795 (vol=0.996, large_win, up_day_ratio=0.70), entity_bec51a4227 (vol=1.008, large_win, up_day_ratio=0.70), entity_d2ca7853ba (vol=1.091, large_win, up_day_ratio=0.65). Dry-up coexists with high up_day_ratio_20 and large_win in the SELECTED pool.",
+      "why_it_matters": "If the proposed mechanism is 'dry-up + quiet base → large move', this mechanism already operates in the population that B0 successfully picked. The dry-up feature alone does not identify which B0 rejections will be rescued; it identifies quiet-base setups regardless of B0 status. The researcher confuses 'necessary condition' with 'specific rescue pathway'."
+    },
+    {
+      "issue": "Within-bucket counterexample entity_bfb308b24a: vol_ratio_5_20 = 1.187 (in the ≤1.15–1.20 'dry-up or near-dry-up' neighborhood the researcher implies), up_day_ratio_20 = 0.45, ma10_slope_5 = 0.012, mom_20 = 0.027 — every signature matches the proposed joint condition except the threshold — yet W4 outcome = LOSS.",
+      "why_it_matters": "Even granting all joint conditions, this case failed. With only 3 successes and 1 like-configured failure, the precision of the rule is at best 75% on an n=4 sample — well within sampling noise. The researcher's policy implication of 'second-chance watchlist' is not supported by this precision estimate."
+    },
+    {
+      "issue": "Snapshot/temporal clustering: 5 of 7 false-negatives come from a single snapshot (snap_71486ed83c), and both false-negative big_winners in that snapshot (entity_535a1beed7, entity_de1c657364) plus entity_05b4c6b1f7 in snap_d0d57b1e40 share it. The other 5 snapshots contribute zero big-winners. The 'dry-up signature' is indistinguishable from 'snap_71486ed83c regime effect'.",
+      "why_it_matters": "The contrast table's standardized deltas are computed across snapshots pooled together. Without within-snapshot controls, the median differences between false-negative and selected-winner pools could be entirely a between-snapshot artifact — i.e., snap_71486ed83c happens to have lighter-volume, lower-momentum names regardless of B0 outcome. The mechanism hypothesis is confounded with regime."
+    },
+    {
+      "issue": "Asymmetric entry baseline: ibd_entry_close_vs_trigger_pct median for false-negatives is 0.019 vs 0.030 for selected_winners. A 'large_win' defined as W4 ≥ 8% from a lower entry (further below the IBD pivot) is mechanically easier to achieve than the same return from a higher entry — selected winners have to climb further. The forward outcome metric is biased toward the false-negative class.",
+      "why_it_matters": "This is a measurement-side bias that the researcher did not condition on. False-negative 'big winners' may simply be names that entered closer to a recent low, with vol_ratio_5_20 reflecting low recent activity near that low — a level effect, not an absorption mechanism. W4 return measured from entry close is the wrong yardstick if the entry itself is at a local trough."
+    },
+    {
+      "issue": "Missing-not-at-random pullback data: many false-negatives have pullback_duration_weeks = null and pullback_pct = null (entity_d8e8e7b814, entity_05b4c6b1f7, entity_ad2bfdee3f, entity_535a1beed7, entity_2f86543bf6, etc.). The big-winner false-negatives that DO have pullback data (entity_de1c657364 has 8-week -7.3% base; entity_df5478102d has 4-week -5% base) cannot be cleanly compared against missing-data cases.",
+      "why_it_matters": "The 'quiet basing' narrative relies on the pullback base features for 2 of the 3 big-winners. If the third (entity_535a1beed7) has null base data, the joint signature 'dry-up + 8-week shallow base + high up_day_ratio' cannot actually be verified across all three cases. The mechanism claim is more fragmented than the researcher's 'joint condition' language implies."
+    },
+    {
+      "issue": "Vol_ratio_5_20 is a noisy ratio with no volume level context: a stock with avg 5-day volume of 50K shares and 20-day avg of 45K gives 1.11 (same ratio as 5M vs 4.5M). Dry-up on a 50K-share name is not absorption; it is illiquidity.",
+      "why_it_matters": "Without absolute volume or float, the 'dry-up = absorption' mechanism is unfalsifiable: the same vol_ratio_5_20 number means completely different things across names. The researcher uses the ratio as if it were scale-invariant when the proposed mechanism (supply consumed at low participation) requires absolute volume context to be coherent."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "False-negative with vol_ratio_5_20 ≥ 1.50 that resolves as w4_return_bucket = large_win (the researcher's own proposed falsifier — if any future B0-rejected name with volume-confirmed breakout behavior also produces a big W4 payoff, the rescue specificity collapses).",
+    "Selected_winner with vol_ratio_5_20 ≤ 0.90 that produces w4_return_bucket = loss or small_win (would show dry-up does NOT produce large moves in the native pool, weakening the 'quiet-base universality' alternative).",
+    "False-negative with vol_ratio_5_20 ≤ 1.15 AND up_day_ratio_20 ≥ 0.50 AND positive ma10_slope_5 that resolves as w4_return_bucket = loss or small_win (a direct hit on the proposed joint condition that fails — entity_bfb308b24a is the closest existing approximation but vol=1.187 is just outside).",
+    "A false-negative big-winner emerging from any snapshot other than snap_71486ed83c or snap_d0d57b1e40 (would show the pattern is regime-general; the current evidence is concentrated in 2 of ~10 snapshots).",
+    "A false-negative with negative mom_20 (like entity_ad2bfdee3f, mom=-0.046, vol=1.179, small_win) that nonetheless produces large_win (would undermine the 'mildly positive mom_20' part of the joint condition).",
+    "Sector/industry-matched pair: a B0-selected name and a B0-rejected name from the same sector and same snapshot where the rejected name has the dry-up signature and the selected name has a volume-confirmation signature — compare W4 outcomes to isolate the mechanism.",
+    "Re-running with ibd_entry_close_vs_trigger_pct controlled: compare false-negative vs selected-winner pools matched on entry-close-vs-trigger distance to remove the asymmetric baseline bias."
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered holdout where 'false_negative' is defined on snapshot features alone (B0-rejected + vol_ratio_5_20 ≤ 1.15) BEFORE the W4 outcome is observed, and the dry-up subset shows a statistically significant W4-return lift over the non-dry-up rejected subset on n ≥ 30 with bootstrap CI excluding zero.",
+    "Replication of the dry-up+base joint signature producing ≥ 5 large_winners across ≥ 4 distinct snapshots — currently the pattern lives in 2 snapshots, which is consistent with a market-regime coincidence.",
+    "Demonstration that AFTER conditioning on snapshot, sector, and entry-close-vs-trigger bucket, the dry-up signature still adds independent lift to W4 return in the false-negative pool.",
+    "A controlled test where the same entity's vol_ratio_5_20 is replaced by a random permutation from the same snapshot — the proposed mechanism should produce lift, the permuted feature should not. This rules out the vol_ratio_5_20 acting as a generic proxy for low-information regime.",
+    "Evidence that the vol_ratio_5_20 dry-up is not just low activity but specifically low activity following a failed B0 attempt (i.e., the volume drop is post-rejection, not pre-existing) — currently the data only shows a snapshot value, not a delta around the rejection event.",
+    "Until then, the prior mechanism claim should be marked UNRESOLVED: the within-bucket n is too small, the snapshot concentration is too high, the class definition is circular, and the same fingerprint produces large_wins in the SELECTED pool, so the proposed rule cannot be distinguished from 'quiet-base setups tend to run, regardless of B0 status'."
+  ]
+}

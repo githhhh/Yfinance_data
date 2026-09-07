@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 58,
+  "mechanism_summary": "The freshness component (operationalized via base_duration_weeks, pullback_pct, pullback_duration_weeks) captures a partially non-redundant temporal signal not fully reducible to concurrent momentum features (mom_20, ma10_slope_5, up_day_ratio_20, ma20_slope_5). Evidence from the failure archaeology shows pullback_pct has a standardized delta of +0.6404 between false negatives and selected winners—false negatives exhibit shallower pullbacks, indicating slower temporal recovery from retracements. This is not captured by ma_slope features, which encode current velocity, not recovery behavior across time intervals. However, the primary momentum features dominate effect sizes (standardized deltas of -1.00 to -1.19 vs -0.42 for base_duration_weeks), suggesting freshness contributes marginal signal rather than core predictive power. The entity_2f86543bf6 case (selected_winner with mom_20=-0.008) illustrates the lower bound of momentum's reach. The mechanism is better described as 'partial redundancy with measurement contamination' than 'complete redundancy with zero signal'—freshness may encode a real causal structure (temporal distance from base formation) but via suboptimal proxies that overlap substantially with momentum features. Regime-specific effects (freshness may be more critical for low-momentum breakouts) remain untested and unresolved.",
+  "falsifiers": [
+    "Conditional AUC test: adding base_duration_weeks to momentum-only logistic regression improves AUC by < 0.005 when controlling for mom_20 (±0.02), ma10_slope_5 (±0.005), up_day_ratio_20 (±0.10), ma20_slope_5 (±0.005)—this would confirm redundancy with conditional independence satisfied",
+    "Conditional mutual information I(selected_winner; base_duration_weeks | momentum_features) < 0.01 bits AND I(selected_winner; pullback_pct | momentum_features) < 0.01 bits—information-theoretic threshold confirming no residual temporal signal",
+    "Paired entity analysis: no significant difference (p ≥ 0.10) in selected_winner rate between entity pairs matched on all momentum features but differing in base_duration_weeks by ≥ 20 weeks—would confirm freshness has no discriminative power after conditioning",
+    "Prospective holdout test: atomic 'trading_days_since_ibd_trigger_entry' underperforms the current composite freshness_score by any margin—would invert the conclusion: freshness is real but composite is suboptimal, not redundant",
+    "Regime-stratified test: AUC improvement < 0.005 in BOTH high-momentum and low-momentum regimes when adding base_duration_weeks to momentum baseline—confirms unconditional redundancy across the full momentum spectrum",
+    "Ruin-within-high-momentum test: no significant difference in base_duration_weeks or pullback metrics between selected_winner|false_positive_ruin and false_positive_ruin cases within the mom_20 > 0.20 subset—would confirm freshness filters high-momentum cases redundantly"
+  ],
+  "actionable_design_principles": [
+    "Decompose freshness into two sub-components: (a) 'recovery_timing' (pullback_pct, pullback_duration_weeks) and (b) 'base_staleness' (base_duration_weeks). These have different redundancy profiles—recovery_timing appears non-redundant based on effect size (+0.64), base_staleness appears more redundant (standardized delta -0.42).",
+    "Test recovery_timing as a distinct mechanism from momentum: pullback_pct measures depth of correction FROM peak, while ma10_slope_5 measures current upward velocity. These are orthogonal signal dimensions. A composite that blends them conflates distinct causal pathways.",
+    "Replace the composite freshness_score with atomic PIT-observable features: trading_days_since_ibd_trigger_entry (atomic temporal distance) and pullback_recovery_rate (pullback_pct / pullback_duration_weeks). This addresses measurement contamination without prejudging mechanism validity.",
+    "Implement regime-stratified weighting: allow freshness features higher weight in low-momentum regime (mom_20 < 0.10) where momentum features have lower signal-to-noise, while reducing freshness weight in high-momentum regime (mom_20 > 0.20) where momentum dominates.",
+    "Use freshness as a secondary filter rather than primary feature: apply a freshness threshold (e.g., base_duration_weeks < 50 OR pullback_recovery_rate > threshold) to exclude stale setups before momentum scoring, reducing model complexity while preserving optionality.",
+    "Treat 'ruin-within-high-momentum' cases (entity_6618d3e80c, entity_3472243e0c) as a diagnostic subset: if freshness features cannot distinguish winner-from-ruin within this subset, confirm freshness is redundant for high-momentum filtering but not necessarily for low-momentum selection."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Regime-conditional freshness weight: dynamically scale freshness feature weight based on momentum regime, with higher weight when mom_20 < 0.10 and lower weight when mom_20 > 0.20",
+      "why_distinct": "This addresses the skeptic's attack that redundancy may be regime-dependent. Rather than binary redundancy verdict, this policy admits conditional value in specific momentum contexts while acknowledging redundancy in others.",
+      "features": ["mom_20", "base_duration_weeks", "pullback_pct", "pullback_duration_weeks", "ma10_slope_5"],
+      "capacity_relevance": "Captures regime-specific capacity constraints: low-momentum setups may have higher false-negative rates, making freshness-filtering more valuable for universe coverage in that regime."
+    },
+    {
+      "idea": "Atomic temporal distance feature: replace composite freshness_score with trading_days_since_ibd_trigger_entry (integer, PIT-observable) as the primary freshness signal, eliminating proxy contamination from momentum-encoded features",
+      "why_distinct": "This directly addresses the researcher's own policy implication. If the atomic variable outperforms the composite on holdout, the composite was suboptimal measurement, not redundancy. This is a cleaner falsification of the measurement-versus-mechanism distinction.",
+      "features": ["trading_days_since_ibd_trigger_entry", "mom_20", "ma10_slope_5", "up_day_ratio_20"],
+      "capacity_relevance": "Simplifies feature set and reduces model complexity, potentially improving generalization in low-data regimes where composite features introduce measurement noise."
+    },
+    {
+      "idea": "Recovery velocity composite: construct pullback_recovery_rate = pullback_pct / pullback_duration_weeks (normalized by ATR to handle volatility scaling), testing whether recovery behavior across time intervals adds signal beyond current velocity",
+      "why_distinct": "This operationalizes the non-redundant signal suggested by pullback_pct standardized_delta=+0.6404. It measures 'how fast the recovery occurs relative to depth', which is a distinct mechanism from ma10_slope_5 ('current velocity').",
+      "features": ["pullback_pct", "pullback_duration_weeks", "atr_14_pct", "mom_20", "ma10_slope_5"],
+      "capacity_relevance": "Captures recovery dynamics in volatile markets where pullback patterns are more common, potentially improving selection in high-VIX regimes where base-duration signals may be noisier."
+    },
+    {
+      "idea": "Freshness as exclusion filter: use base_duration_weeks > 60 weeks AND pullback_pct null as a hard exclusion rule rather than a scoring feature, reducing freshness leverage on model decisions while preserving its filtering value",
+      "why_distinct": "This aligns with the researcher's ambiguity policy: treat freshness as a secondary filter (reducing leverage) rather than a primary feature, acknowledging its partial redundancy while preserving optionality.",
+      "features": ["base_duration_weeks", "pullback_pct", "mom_20", "up_day_ratio_20", "ma10_slope_5"],
+      "capacity_relevance": "Preserves freshness's utility for eliminating extremely stale setups (likely lower capacity due to base complexity) while preventing freshness from dominating portfolio construction via high-weight composite scoring."
+    }
+  ]
+}
+```

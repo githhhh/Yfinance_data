@@ -1,0 +1,46 @@
+{
+  "strongest_counterclaim": "The entire 'false-negative' category is a post-hoc constructed set using forward-looking outcomes (W4 >= 8%, >= 5pp above B0 median), which guarantees that any observed feature distribution is a mixture of predictive signal and outcome-contingent selection bias. The claim that ibd_entry_close_vs_trigger_pct captures 'true geometry' while MA-slopes and momentum are 'proxy discriminators' is circular: ibd_entry_close_vs_trigger_pct is itself just another proxy, and the researcher never isolates the actual geometric property (spatial position relative to the trigger line at entry) from the correlated price-ratio measures. The mechanism is unfalsifiable because it retrofits geometry post-outcome.",
+  "attacks": [
+    {
+      "issue": "Outcome-contingent category construction introduces selection bias into all feature distributions",
+      "why_it_matters": "The 'false-negative' label requires W4 >= 8% and >= 5pp above B0 median—information unavailable at snapshot time. This means the category is defined by future performance, not snapshot geometry. Any feature contrast between false-negatives and selected-winners is contaminated by having selected on the outcome. The researcher cannot claim these features 'predict' false-negative status when the category was constructed using the very outcome the features allegedly predict. This is textbook circular validation."
+    },
+    {
+      "issue": "The 'trigger-distance geometry' mechanism is never actually measured",
+      "why_it_matters": "The researcher claims ibd_entry_close_vs_trigger_pct proxies for 'true geometry' while MA-slopes are 'proxy discriminators,' but provides no evidence that ibd_entry_close_vs_trigger_pct correlates with a distinct geometric property. Both are price ratios derived from the same price series. The actual spatial geometry (where the entry candle sits relative to the trigger line on the chart) is never isolated from these correlated derivatives. Without a causal graph showing why one proxy is 'true' and another is 'correlated proxy,' this is assertion, not mechanism."
+    },
+    {
+      "issue": "Sample size insufficient for the stated precision claims (27 cases, 2-7 false-negative sub-types)",
+      "why_it_matters": "The researcher proposes Condition B claiming ma20_slope_5 sign reversal will increase precision by >= 15 percentage points. With at most 7 false-negative cases total (5 relative + 2 big_winner), no statistical test can support a 15pp claim. The 95% confidence intervals on any split would be enormous. The standardized_delta values in the contrasts table (-0.5988 for ma20_slope_5) barely exceed 0.5 SD, indicating weak and likely non-replicable separations."
+    },
+    {
+      "issue": "Cross-snapshot aggregation obscures regime heterogeneity",
+      "why_it_matters": "Cases come from snapshots spanning snap_724342c280 through snap_b8420124eb, with no adjustment for market regime (bull/bear/sideways), sector rotation, or volatility regime changes. The vol_ratio_5_20 contrasts could simply reflect that some snapshots occurred in high-VIX environments where all stocks had compressed volume ratios. Without conditioning on regime, the contrasts conflate time-period effects with the alleged geometric mechanism."
+    },
+    {
+      "issue": "The policy implication contradicts the mechanism claim",
+      "why_it_matters": "The researcher recommends 'avoiding ma10_slope_5, ma20_slope_5, or mom_20 as independent selection gates' near trigger-distance thresholds. But the mechanism claim states these proxies 'covary with the wrong subset of the true causal geometry.' If this is true, removing the proxies should either help (if they exclude true winners) or hurt (if they exclude noise). The researcher never demonstrates that including them causes harm—only that winners happened to have lower values. This is selection effect, not causal exclusion."
+    },
+    {
+      "issue": "pullback_pct nulls undermine the 'compressed geometry' argument",
+      "why_it_matters": "The researcher correctly notes that selected winners with extreme pullbacks (-42.3%, -25.1%) still won, claiming pullback_pct is an outcome variable. However, the researcher simultaneously uses ibd_entry_close_vs_trigger_pct as a causal predictor. If pullback_pct is outcome-correlated, then ibd_entry_close_vs_trigger_pct, being a price ratio also derived from the same price series, is equally outcome-correlated. The researcher cannot have it both ways: either price-derived ratios are causal (for ibd_entry_close_vs_trigger_pct) or they're outcome-correlated (for pullback_pct)."
+    },
+    {
+      "issue": "The 'false_positive_ruin|selected_winner' dual-label entity_6618d3e80c is treated as evidence for boundary ambiguity but could indicate label noise",
+      "why_it_matters": "A single entity receiving both ruin and winner labels suggests the labeling protocol lacks rigor—perhaps the entity was held through multiple trades, or the label aggregation method is flawed. If labels are noisy, all contrasts are unreliable. The researcher should demonstrate label reliability before claiming any mechanism."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where ibd_entry_close_vs_trigger_pct < 0.015, up_day_ratio_20 >= 0.45, and vol_ratio_5_20 < 1.25 but W4 returned <= 0% (failed false-negative prediction)",
+    "Cases where ma20_slope_5 is negative and W4 was a large win that were NOT labeled false-negative (suggesting the mechanism is outcome-contingent, not geometric)",
+    "Snapshots where vol_ratio_5_20 was high (>1.5) but ibd_entry_close_vs_trigger_pct was low (<0.02) and the entity still failed—a test of whether the mechanism is geometry-based or simply a regime effect",
+    "B0-selected picks that had compressed trigger-distance (ibd_entry_close_vs_trigger_pct < 0.02) but still ruined, which would show the 'true geometry' does not protect against loss",
+    "A time-period hold-out test: train on snapshots 1-15, test on 16-27, and verify the predicted false-negative capture rate exceeds B0's base capture rate"
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample test showing that applying the Condition A filter (ibd_entry_close_vs_trigger_pct < 0.015, up_day_ratio_20 >= 0.45, vol_ratio_5_20 < 1.25) to a hold-out snapshot set produces >= 60% hit rate on large_win outcomes, with the test set having no overlap with discovery cases",
+    "A demonstrated causal graph: (trigger geometry) -> (ibd_entry_close_vs_trigger_pct) -> (W4 outcome), with instrumental variable evidence that ibd_entry_close_vs_trigger_pct operates through geometry and not through correlated momentum",
+    "A within-snapshot randomization test showing that swapping ma10_slope_5 and mom_20 for random noise in B0's selection pipeline changes the false-negative capture rate by >= 20%, proving these are causal exclusions and not spurious correlations",
+    "Evidence that the 7-week pullback cases (entity_8f0df3d38e, entity_ccc90a671f) are structurally distinct from the no-pullback cases, explaining why the geometry worked for some and not others without reference to post-snapshot information"
+  ]
+}

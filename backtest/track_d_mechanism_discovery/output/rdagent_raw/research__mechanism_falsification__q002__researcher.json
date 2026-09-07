@@ -1,0 +1,30 @@
+{
+  "mechanism_claim": "The 'dry_false_penalty' claims to identify and penalize B0 candidates that resemble historical false-positive ruptures under 'dry' (low-conviction / declining-trend) pre-entry conditions, but frozen failure-archaeology indicates its inputs are co-linear with neighboring B0 terms (momentum, slope, up-day ratio, volume-ratio, px-vs-MA) that already discriminate winners from losers, leaving little incremental information.",
+  "evidence_for": [
+    "The 8 false_positive_ruin cases span an enormous mom_20 range (0.024 to 0.242) and a wide ma10_slope_5 range (-0.006 to 0.091), which is hard to reconcile with a single coherent 'dry' archetype.",
+    "Several ruin cases (entity_4fdc3699fd mom=0.185/slope=0.091, entity_3472243e0c mom=0.242, entity_b6bcccdf6a mom=0.176) actually exhibit higher momentum and slope medians than multiple selected_winners, implying the penalty is firing on the opposite of 'dry' in some cases.",
+    "up_day_ratio_20 for ruin cases averages ~0.54 versus ~0.60 for winners and ~0.53 for false_negatives — the same direction and magnitude already exploited by base B0 terms.",
+    "ibd_entry_close_vs_trigger_pct is elevated (0.034–0.074) in most ruin cases, again overlapping with features captured by the breakout/entry terms of B0."
+  ],
+  "evidence_against": [
+    "Numeric contrasts show the four most discriminative features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) already achieve standardized |delta| of 0.85–1.19 between selected_winners and false_negatives; a penalty built from the same primitives cannot add orthogonal signal.",
+    "False-positive ruins share the lowest up_day_ratio_20 and vol_ratio_5_20 values with false-negatives, suggesting both error modes are read by the same primitive features rather than by a uniquely 'dry' signature.",
+    "The mix-label case entity_6618d3e80c (false_positive_ruin|selected_winner) with very high px_vs_ma50 (0.337) and large_win w4 bucket shows the same B0 fingerprint can produce both ruin and success — inconsistent with a clean, reproducible penalty trigger.",
+    "Vol_ratio_5_20 for ruin cases ranges 0.91–1.63, overlapping almost entirely with the selected_winner distribution (1.01–1.77), so a 'dry volume' threshold cannot uniquely separate them.",
+    "Pullback data is null in 6/8 ruin cases, meaning the penalty is being applied without one of the intended conditioning inputs, weakening any claim of conditional independence from neighboring terms."
+  ],
+  "falsifiable_predictions": [
+    "If 'dry_false_penalty' carries independent signal, then after regressing out its value from the sum of all other B0 components, the residual penalty should still produce a statistically significant rank-correlation (Spearman |ρ| > 0.10, p<0.05) with ruin outcomes on an out-of-sample holdout — failure to meet this falsifies independence.",
+    "If the penalty is redundant, leave-one-out refitting of B0 without this term should not change hit-rate on ruin cases by more than ±2 percentage points at the same selection rate; a degradation greater than 5 pp would falsify redundancy.",
+    "If the 'dry' descriptor is real, restricting ruin analysis to cases with up_day_ratio_20 ≤ 0.5 AND vol_ratio_5_20 ≤ 1.2 should sharply concentrate the penalty's gradient; absence of such concentration (i.e., similar penalty values across dry and non-dry sub-regimes) falsifies the 'dry' framing.",
+    "Partial-dependence analysis should show a flat marginal effect of the penalty on ruin probability once mom_20, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20 are held at observed values; a flat curve falsifies incremental information."
+  ],
+  "policy_implications": [
+    "Replace the penalty with a residual-based score: regress each ruin-indicator candidate feature on the other B0 components and use only the orthogonal residual (e.g., mom_20_resid, slope_resid) so any retained signal is provably independent of neighbors.",
+    "Re-anchor the penalty on a regime-conditional model rather than a static 'dry' threshold, because the current cases violate the dry archetype in ~50% of ruins (mom > 0.15).",
+    "Add a double-selection test (e.g., knockoff or controlled-variable inclusion) before allowing the penalty into the production score, so neighboring-term leakage cannot silently inflate B0.",
+    "Audit pullback-naN handling: 6/8 ruin cases have null pullback fields, so the penalty is currently firing on incomplete state — a cleaner replacement must explicitly gate on data completeness or impute deterministically.",
+    "Consider dropping the component entirely if, after orthogonalization, its out-of-sample hit-rate contribution is inside its bootstrap confidence interval centered on zero — UNRESOLVED pending holdout evaluation.",
+    "Disentangle mechanism from portfolio construction: ensure the penalty is evaluated purely on PIT-observable features (up_day_ratio, momentum, slope, vol_ratio at snapshot) and not on the w4_return_bucket or outcome_label fields that appear in the archaeology set."
+  ]
+}

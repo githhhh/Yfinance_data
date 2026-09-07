@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__adversarial_review__q004__skeptic",
+  "prompt_hash": "56ba266b9bec26543fc2246c66a3d1138caa35936a3bf0a9fc1f0ec792db64d1",
+  "response_hash": "89dd9b840a44cc21a49a2254c126819e375e82537cd11cd11d28c8d236f0e436",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

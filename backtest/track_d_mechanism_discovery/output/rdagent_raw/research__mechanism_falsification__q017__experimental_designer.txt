@@ -1,0 +1,104 @@
+
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "four_feature_linear_proxy_fidelity",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Logistic regression of is_b0_pick on four features vs lane's actual picks",
+      "success_criterion": "AUC >= 0.95 and calibration slope within [0.85, 1.15] when predicting lane's picks",
+      "failure_criterion": "AUC < 0.90 OR calibration slope outside [0.80, 1.20], indicating non-linear decision boundary"
+    },
+    {
+      "name": "null_pullback_redundancy_check",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Whether null pullback cases (n=4) are correctly predicted by four-feature composite without special imputation",
+      "success_criterion": "All null-pullback lane-picks (is_b0_pick=true) fall within top-quartile of four-feature Z-score distribution",
+      "failure_criterion": "Any null-pullback lane-pick falls below the Z-score threshold needed to achieve 70% precision on winners, proving implicit imputation logic exists"
+    },
+    {
+      "name": "fifth_signal_ibd_entry_contribution",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Partial correlation of ibd_entry_close_vs_trigger_pct with is_b0_pick after controlling for the four features",
+      "success_criterion": "Partial R^2 < 0.05 for ibd_entry_close_vs_trigger_pct, confirming it's redundant",
+      "failure_criterion": "Partial R^2 >= 0.10, confirming ibd_entry_close_vs_trigger_pct is a non-redundant fifth signal"
+    },
+    {
+      "name": "false_positive_ruin_explanation_gap",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "mom_60",
+        "atr_14_pct"
+      ],
+      "comparison": "Feature values of 8 false_positive_ruin cases vs selected_winner cases on 6 momentum/volatility features",
+      "success_criterion": "At least 5 of 8 ruin cases fall within interquartile range of selected_winner feature values, showing four features cannot distinguish them",
+      "failure_criterion": "Ruin cases form a distinct cluster (>=3 sigma from winner centroid) on at least 2 features, proving non-linear decision boundary exists"
+    },
+    {
+      "name": "collinearity_factor_structure",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "PCA on the four features to determine if single latent factor explains >75% variance",
+      "success_criterion": "PC1 explains <75% variance, confirming four independent signals rather than single underlying factor",
+      "failure_criterion": "PC1 explains >=80% variance, confirming four features are proxies for one latent 'chart quality' factor"
+    },
+    {
+      "name": "residual_predictive_power_test",
+      "features": [
+        "is_b0_pick",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "mom_60",
+        "volume_ratio"
+      ],
+      "comparison": "Whether is_b0_pick adds outcome-predictive power beyond the four-feature composite Z-score",
+      "success_criterion": "Logistic regression predicting outcome (winner vs ruin) shows is_b0_pick coefficient not significant (p > 0.10) after including Z-score",
+      "failure_criterion": "is_b0_pick remains significant (p < 0.05) after controlling for Z-score, confirming lane adds non-redundant outcome information"
+    }
+  ],
+  "leakage_checks": [
+    "is_b0_pick must not be used as a predictor in any test—only as the target variable for fidelity and residual power tests",
+    "snapshot_anon must not enter any model; all features are entity-level only",
+    "Outcome labels (selected_winner, false_positive_ruin) must only appear as targets, never as inputs",
+    "For the residual power test, Z-score must be computed from training-fold coefficients only, not from full-sample fits",
+    "PCA for collinearity check must use correlation matrix (standardized features) to avoid scale artifacts"
+  ],
+  "priority_order": [
+    "four_feature_linear_proxy_fidelity",
+    "collinearity_factor_structure",
+    "null_pullback_redundancy_check",
+    "fifth_signal_ibd_entry_contribution",
+    "false_positive_ruin_explanation_gap",
+    "residual_predictive_power_test"
+  ]
+}
+```

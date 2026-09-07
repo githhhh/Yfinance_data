@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "matched_pair_residual_pullback",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "pullback_pct"
+      ],
+      "comparison": "Within the pullback_observed subset only, pair each false_negative_big_winner|false_negative_relative case to its nearest selected_winner by Mahalanobis distance on (vol_ratio_5_20, mom_20) using ±0.15 vol / ±0.05 mom tolerance. Compute the paired median residual of pullback_pct (FN minus winner). Repeat for pullback_duration_weeks as a secondary residual.",
+      "success_criterion": "|paired median residual pullback_pct| > 5pp AND |paired median residual pullback_duration_weeks| > 1.5w (pullback retains independent information after removing vol/momentum regime).",
+      "failure_criterion": "|paired median residual pullback_pct| < 2pp AND |paired median residual pullback_duration_weeks| < 1w (pullback is mediator-only artifact; the researcher mechanism holds and reallocation of weight is justified)."
+    },
+    {
+      "name": "pullback_x_tape_signflip",
+      "features": [
+        "pullback_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within B0=true cases, split by up_day_ratio_20 median (0.55) AND vol_ratio_5_20 median (1.42) into four regime cells. In each cell compute median pullback_pct of false_positive_ruin vs selected_winner. Test for sign-flip of the (ruin - winner) pullback_pct gap across the four cells; require >=2 cells with opposite-signed gaps exceeding 4pp magnitude.",
+      "success_criterion": "Sign-flip confirmed (Kruskal-Wallis on regime-interaction term p<0.1) AND |gap| > 4pp in at least two cells with opposite signs -> pullback semantics are a regime-conditioned marker, not a direct signal (supports skeptic's regime-marker interpretation).",
+      "failure_criterion": "Gap direction is consistent across all four cells (Kruskal-Wallis p>0.3) AND |gap| < 3pp everywhere -> pullback carries a stable direct effect that is NOT vol/momentum-mediated (researcher's epiphenomenon claim is wrong)."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm every feature is computed at or before snapshot timestamp; reject the test if pullback_pct or pullback_duration_weeks is derived from any price observation after the snapshot's date (PIT violation via forward-window pullback).",
+    "Confirm W4_return_bucket, outcome_label, and labels are used ONLY as the dependent variable, never as inputs to the matched-pair or interaction regressions (circular-label leakage flagged by the skeptic must be structurally excluded)."
+  ],
+  "priority_order": [
+    "matched_pair_residual_pullback",
+    "pullback_x_tape_signflip"
+  ]
+}

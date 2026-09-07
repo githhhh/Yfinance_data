@@ -1,0 +1,24 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The conjunctive dry-pullback × pivot-distance modifier is an artifact of snapshot-level dispersion, not a stable within-B0 mechanism: in snap_d0d57b1e40 the same feature ranges produce both FP_ruin (entity_84824e6a20, entity_6618d3e80c) AND selected_winner (entity_bec51a4227), and the 'adaptive capacity' inputs (vol_ratio_5_20, up_day_ratio_20) are contemporaneous proxies already correlated with the existing B0 score (e.g., current_vs_ibd_candidate_pct tracks ibd_entry_close_vs_trigger_pct with std_delta -0.70). The modifier is a near-zero-information reshuffle that will not survive held-out testing.",
+  "attacks": [
+    {
+      "issue": "Same-snapshot outcome inversion: snap_d0d57b1e40 contains entity_84824e6a20 (FP_ruin, mom_20=0.067, up_day_ratio=0.40) and entity_bec51a4227 (SW, mom_20=0.166, up_day_ratio=0.70) with similar pullback=null signatures; snap_b8420124eb contains SW entity_d2ca7853ba (mom_20=0.159) and FP_ruin entity_40ea0cfb3b (mom_20=0.024). Any conjunctive rule applied within-snapshot must discriminate these — but the proposed modifier relies on the very features (mom, vol_ratio, up_day_ratio) that already co-move with the original B0 score, making the marginal lift effectively zero.",
+      "why_it_matters": "If the modifier cannot separate FP_ruin from SW within the same regime snapshot using the proposed conjunctive rule, then the claimed mechanism is either redundant with B0 or regime-dependent; either way it fails the 'without expanding B0' constraint because any conditional split must carve a sub-pool — and sub-pools in this N=27 sample are too thin (2–3 cases per snapshot-cell) to estimate reliably."
+    },
+    {
+      "issue": "The null-pullback 'graceful degrade to base_depth_pct + base_duration_weeks' fallback is itself an eligibility change: it substitutes a different feature representation for ~10/27 cases (all top performers, including entity_ead73f4390, entity_28a6ec4601, entity_b00579f203 are SW with null pullbacks AND high mom_20/px_vs_ma50). Encoding a different feature for these rows means the B0 scoring is no longer the same model — the 'no expansion' constraint is violated at the representation layer, not the universe layer.",
+      "why_it_matters": "Researcher claims universe preservation, but representation substitution changes what B0 effectively scores; the held-out test of 'B0 universe, hit rate, and recall preserved by construction' is unfalsifiable because the score function itself changes for a large minority of cases."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within snap_d0d57b1e40 and snap_b8420124eb, compute the proposed s_mod for the FP_ruin vs SW pairs and verify the modifier flips the ordering — if it does not, the conjunctive rule has zero within-snapshot lift and the cross-snapshot lift is just regime mean reversion.",
+    "Test whether current_vs_ibd_candidate_pct adds information beyond ibd_entry_close_vs_trigger_pct in a bivariate regression on outcome: if partial R^2 < 1%, the 'room to pivot' axis is a redundant proxy and the modifier collapses to the dry-pullback axis alone."
+  ],
+  "what_would_change_my_mind": [
+    "A within-snapshot leave-one-out test showing the conjunctive modifier flips ≥2 of the 3 same-snapshot FP/SW pairs in the discovery set, OR a held-out slice (≥30 cases, multiple snapshots) where ruin_rate drops ≥3pp with hit_rate drop ≤1pp — anything weaker is indistinguishable from regime-noise reshuffling."
+  ]
+}
+```

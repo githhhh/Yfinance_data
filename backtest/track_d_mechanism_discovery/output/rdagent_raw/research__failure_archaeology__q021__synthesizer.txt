@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 30,
+  "mechanism_summary": "Among B0-screened false-negative non-picks that subsequently become large winners (n=3 observed), a volume dry-up signature (vol_ratio_5_20 at or below ~1.15) layered on quietly basing price action (mildly positive ma10/ma20 slopes, modest mom_20, mid-range up_day_ratio_20) is empirically present. The proposed mechanism is that dry-up acts as post-rejection absorption — supply from the failed B0 breakout has been consumed at low participation, so the next leg can run on light volume rather than requiring breakout confirmation. However, the evidence is structurally weak: (a) the false_negative → large_winner class is defined using the forward outcome itself, so feature-fit is circular; (b) selected winners also exhibit the dry-up fingerprint (entity_8ad5cd4795 at 0.996, entity_bec51a4227 at 1.008, entity_d2ca7853ba at 1.091, all large_wins), meaning dry-up is not a rescue-specific signature but a general quiet-base indicator; (c) within-bucket counterexample entity_bfb308b24a matched the proposed joint condition except for threshold and produced a LOSS; (d) 5 of 7 false-negatives cluster in a single snapshot (snap_71486ed83c), making the pattern indistinguishable from a regime effect; (e) entry baseline asymmetry (false-negative median ibd_entry_close_vs_trigger_pct 0.019 vs selected 0.030) mechanically biases the w4_return_bucket yardstick in favor of false-negatives. The mechanism is consistent with the data but not established by it.",
+  "falsifiers": [
+    "A future false-negative (B0-rejected) case with vol_ratio_5_20 ≥ 1.50 resolving as w4_return_bucket = large_win would eliminate the rescue specificity claim and force retirement of any dry-up-only rescue rule.",
+    "A false-negative with vol_ratio_5_20 ≤ 0.90 AND ma20_slope_5 ≤ -0.005 becoming a large_win would show dry-up works without trend support, undermining the proposed 'quiet basing' joint condition.",
+    "Failure of the entry-baseline matched-pair test (false-negative with dry-up signature paired with selected winner at matched entry distance, dry-up side wins < 60% of pairs across ≥ 10 pairs) would invalidate the rescue claim while controlling for entry-trough bias.",
+    "Non-monotonic vol_ratio_5_20 dose-response within the false-negative pool (volume-confirmed tertile producing ≥ large_win rate as the dry tertile) would refute the absorption-as-rescue framing.",
+    "Snap_71486ed83c regime replication failure: if the dry-up signature fails to identify large winners in any subsequent snapshot, the pattern is regime-dependent rather than mechanistic.",
+    "Dry-up rescue lifting large_win rate by a comparable amount in BOTH the is_b0_pick=false and is_b0_pick=true pools (interaction term non-positive) would collapse the rescue claim into a general quiet-base generality."
+  ],
+  "actionable_design_principles": [
+    "Do NOT deploy a 'post-B0-rejection dry-up' watchlist filter yet. Treat the pattern as a hypothesis subject to the falsification checks above; the n=3 sample and circular class definition preclude operational use.",
+    "Any test of the dry-up rescue hypothesis MUST use a PIT-only definition of the candidate pool (B0-rejected AND vol_ratio_5_20 ≤ 1.15 defined at snapshot time, with forward label blind to test execution). Otherwise the test is circular and uninformative.",
+    "Match on entry baseline (ibd_entry_close_vs_trigger_pct within ±0.005, same snapshot) before drawing any mechanistic conclusion; the entry-distance asymmetry can otherwise manufacture apparent wins.",
+    "Snapshot-stratify every test. Pooling across snap_71486ed83c and others with zero false-negative big_winners will manufacture deltas that are regime artifacts rather than feature effects.",
+    "Test dry-up as a general quiet-base indicator (across both B0-selected and B0-rejected pools) before claiming rescue specificity. The expected null is that dry-up+slope+UDR predicts large_wins in both arms.",
+    "Separate mechanism from sizing: even if dry-up rescue were validated, position sizing on second-chance entries should remain smaller than for native B0 winners because the base-case population is non-identical.",
+    "Report precision and lift at all pre-specified cutoffs (0.90, 1.00, 1.10, 1.15, 1.20, 1.30, 1.40, 1.50). Do not pick the threshold post-hoc; if no cutoff satisfies precision ≥ 50% AND lift ≥ 15pp simultaneously, the rule has no operating point.",
+    "Pullback features (pullback_pct, pullback_duration_weeks) have substantial null rates; restrict to complete-case analysis and report cell n. If key cells fall below n=2, mark UNRESOLVED rather than imputing.",
+    "Track forward expansion explicitly: if the next forward sample produces even one false-negative with vol_ratio_5_20 ≥ 1.50 → large_win, retire the rescue rule rather than patching the threshold — the mechanistic specificity is the basis for its value."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "PIT-only dry-up rescue candidate filter: is_b0_pick = false AND vol_ratio_5_20 ≤ 1.15 AND ma10_slope_5 > 0 AND up_day_ratio_20 ≥ 0.50, evaluated at snapshot time without reference to forward labels. Used as a hypothesis-generating watchlist only, never as an auto-entry signal, until n≥15 PIT-labeled forward cases accumulate.",
+      "why_distinct": "This is the only non-circular operational translation of the researcher's claim. It forbids using w4_return_bucket or false_negative_* labels in the candidate definition, which is the failure mode flagged by the skeptic.",
+      "features": ["is_b0_pick", "vol_ratio_5_20", "ma10_slope_5", "up_day_ratio_20"],
+      "capacity_relevance": "Filters the B0-rejected pool to a small quiet-base subset; capacity-neutral on its own and gates the next-stage scoring rule rather than producing trades directly."
+    },
+    {
+      "idea": "Symmetry guardrail: the same dry-up definition applied to is_b0_pick=true must NOT produce a comparable lift in large_win rate over the selected-winner baseline. If it does, the rescue language is invalid and the rule should be retitled as a general quiet-base detector with no B0-specific role.",
+      "why_distinct": "Addresses the skeptic's primary attack that selected winners share the dry-up fingerprint. This is a regime check on the policy rather than a separate feature rule.",
+      "features": ["is_b0_pick", "vol_ratio_5_20", "ma10_slope_5", "up_day_ratio_20"],
+      "capacity_relevance": "Diagnostic only; does not alter capacity directly but gates whether the candidate filter above may be activated."
+    },
+    {
+      "idea": "Entry-baseline-matched scoring weight: when scoring B0-rejected dry-up candidates, condition the score on matched ibd_entry_close_vs_trigger_pct distance to the nearest B0-selected name in the same snapshot. Down-weight or zero out the score when no matched anchor exists.",
+      "why_distinct": "Directly addresses the entry-trough measurement bias. Without this, a 'win' at the false-negative entry price is mechanically easier to print than the same return from a higher entry.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "snapshot_anon"],
+      "capacity_relevance": "Reduces false-positive scoring rather than expanding capacity; conservative on its own."
+    },
+    {
+      "idea": "Counterfactual retirement trigger: if any new false-negative case arrives with vol_ratio_5_20 ≥ 1.50 and resolves as large_win, automatically retire the dry-up rescue rule. Do not patch thresholds.",
+      "why_distinct": "Operationalizes the falsifier as a policy rule rather than relying on ad-hoc review. Forces the system to honor mechanistic specificity over empirical hit-rate preservation.",
+      "features": ["vol_ratio_5_20", "is_b0_pick"],
+      "capacity_relevance": "Capacity-deactivating; used as a kill-switch rather than an allocation rule."
+    },
+    {
+      "idea": "Snapshot-stratified baseline estimator: compute vol_ratio_5_20, ma10_slope_5, up_day_ratio_20 medians within each snapshot stratum rather than across the pooled false-negative pool. Use snapshot-local rank rather than absolute threshold when the snapshot's empirical vol_ratio_5_20 distribution shifts.",
+      "why_distinct": "Addresses the snapshot clustering critique (5/7 false-negatives in one snapshot) without abandoning the feature. A relative-rank version is robust to regime shifts and provides a natural within-snapshot falsifier.",
+      "features": ["snapshot_anon", "vol_ratio_5_20", "ma10_slope_5", "up_day_ratio_20"],
+      "capacity_relevance": "Stabilizes the candidate filter across regime changes; capacity-neutral but reduces false discovery during regime transitions."
+    }
+  ]
+}
+```

@@ -1,0 +1,66 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "Lane in 'constructive pullback' weeks acts as a hybrid filter that partly compresses left-tail risk but is contaminated by return-relevant channels (mom_20 and vol_ratio_5_20 are demonstrably correlated with subsequent return, not just downside variance). The hypothesis is supported only in a narrow sub-regime — shallow base-building pullbacks (pullback_pct in -8% to -15%, base_duration >=40w, pullback_duration 5-7w) where Lane's binary rejection concentrates on a specific corner (vol_ratio_5_20>1.2 AND mom_20<0.10). Outside that sub-regime — particularly in deep-drawdown pullbacks (<-20%) and in the false_negative_big_winner cases — Lane destroys measurable upside. The 'constructive pullback' label itself is heterogeneous in the evidence pool (pullback_pct ranges -1.5% to -42.3%), so any aggregate claim about Lane's effect in this cohort averages over structurally distinct regimes and is therefore context-dependent by construction.",
+  "falsifiers": [
+    "Refutation test 1 (Lane-pure-risk): In pullback cohort with pullback_pct in [-15%, -8%] AND base_duration>=40w AND pullback_duration in [5,7]w (n>=30 required), B0_LANE vs LANE_NEUTRAL must show |median W4 delta| < 0.4pp AND identical 95th-percentile (delta < 0.3pp). Failure on either criterion refutes the risk-only framing in the shallow-base sub-regime.",
+    "Refutation test 2 (right-tail preservation): Across the full pullback cohort, the false_negative_big_winner rate among B0_LANE-excluded names must remain below 5%. Current evidence shows 2/7 ≈ 29% false-negative-big-winner rate among is_b0_pick:false rows, which is already consistent with active right-tail truncation.",
+    "Refutation test 3 (return-orthogonality): After residualizing mom_20 and vol_ratio_5_20 on pullback_duration, base_depth_pct, and base_duration_weeks, the residuals must show zero independent correlation (|r| < 0.10) with W4 return bucket. The current -1.00σ mom_20 delta and -1.05σ vol_ratio delta are inconsistent with this unless residualized within the shallow-base sub-cohort only.",
+    "Refutation test 4 (score-orthogonality): SCORE_BEFORE_LANE rank correlation between B0_LANE-selected and LANE_NEUTRAL-selected portfolios must exceed 0.85 in the shallow-base sub-cohort. If correlation falls below 0.70, Lane is acting on a non-orthogonal signal channel that the researcher claims is risk-only.",
+    "Refutation test 5 (stability): Lane binary decisions for the same entity across consecutive pullback weeks with feature drift < 10% must agree in >=85% of cases. High flip-rate would expose that Lane's signal is noisy rather than a principled risk overlay."
+  ],
+  "actionable_design_principles": [
+    "Split the 'constructive pullback' universe into shallow-base (pullback_pct in [-15%, -5%], base_duration>=40w, pullback_duration 3-7w) and deep-pullback (pullback_pct < -20%) sub-cohorts before any Lane evaluation. The aggregate cohort mixes regimes where Lane behaves oppositely.",
+    "Treat mom_20 and vol_ratio_5_20 as return-relevant features in pullback weeks, not risk proxies. Use position-size shrinkage rather than binary inclusion when these features are mid-range (mom_20 in [0.08, 0.18], vol_ratio_5_20 in [1.1, 1.5]) to avoid destroying alpha while still dampening the ruin corner.",
+    "Monitor both tails independently when validating Lane changes in pullback regimes. A Sortino-vs-Sharpe decomposition of any Lane-filtered vs Lane-masked pullback portfolio must show left-tail compression (5th-percentile improvement) dominating right-tail loss (95th-percentile degradation). A Sharpe improvement driven by mean preservation alone is the falsification signal.",
+    "Reserve binary Lane inclusion/exclusion for the high-confidence corner (pullback_duration≈7w AND vol_ratio_5_20>1.4 AND mom_20<0.05 AND up_day_ratio_20<0.5). Outside this corner, fall back to continuous risk scaling.",
+    "Cap Lane's effect in pullback weeks by an alpha-cost budget: if the false_negative_big_winner rate in the backtest cohort exceeds 8%, force Lane into a soft-mode (continuous scoring) rather than hard reject for that week."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "LaneSoftModePullback: in pullback weeks (pullback_pct<0), downgrade Lane from binary to continuous score, weighted by a risk-only transform that subtracts any component aligned with mom_20 or vol_ratio_5_20 in their return-predictive direction.",
+      "why_distinct": "Current Lane treats mom_20/vol_ratio as risk proxies; this rule explicitly separates their risk contribution from their return contribution, applying Lane only on the residualized risk channel.",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "mom_20_residual",
+        "vol_ratio_5_20_residual",
+        "up_day_ratio_20",
+        "base_duration_weeks"
+      ],
+      "capacity_relevance": "Targets the false_negative_big_winner count (currently 2/27, projected to rise with more pullback data) without reintroducing the false_positive_ruin cluster by preserving the vol-ratio / pullback-duration corner."
+    },
+    {
+      "idea": "LaneRegimeGate: split Lane evaluation by pullback_depth_bucket (shallow: -15% to -5%, mid: -25% to -15%, deep: <-25%) and apply different Lane thresholds per bucket. Shallow bucket keeps current Lane; mid bucket widens Lane tolerance by 20%; deep bucket disables Lane risk-rejection entirely (rely on size-scaling only).",
+      "why_distinct": "The deep-pullback cases in the archaeology pool (entity_3adc078f01 at -42.3%, entity_2c58cebc59 at -25.1%) show Lane made binary calls on structurally different setups where Lane's signal is uncalibrated. Disabling Lane in deep-pullback avoids both false negatives and false positives.",
+      "features": [
+        "pullback_pct",
+        "base_depth_pct",
+        "pullback_duration_weeks",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Removes the regime-contamination problem identified by the skeptic without throwing away Lane's signal in the regime where it has empirical support (shallow base-building pullbacks)."
+    },
+    {
+      "idea": "LaneTailBudget: enforce a per-week cap on the contribution of Lane-excluded names to the right tail (95th-percentile W4 return of LANE_NEUTRAL minus B0_LANE). If the cap is breached for 3 consecutive weeks, Lane is auto-switched to advisory-only mode.",
+      "why_distinct": "Operationalizes the researcher's 1.3-1.8× left-tail tightening AND the skeptic's right-tail truncation concern simultaneously, by making right-tail preservation a hard constraint rather than a soft prediction.",
+      "features": [
+        "w4_return_p95_excluded",
+        "w4_return_p05_included",
+        "lane_decision_flip_rate"
+      ],
+      "capacity_relevance": "Directly bounds the alpha-destruction cost of Lane, which is the failure mode the skeptic's two false_negative_big_winner cases demonstrate."
+    },
+    {
+      "idea": "LaneOrthogonalityAudit: weekly test that computes SCORE_BEFORE_LANE rank correlation between B0_LANE-selected and LANE_NEUTRAL-selected candidate sets. If correlation drops below 0.80 for two consecutive weeks in pullback regimes, flag Lane for recalibration rather than continuing to apply it.",
+      "why_distinct": "Converts the experimental designer's orthogonality check from a one-off archaeology into a live guardrail, preventing Lane drift toward return-channel contamination.",
+      "features": [
+        "score_before_lane",
+        "lane_decision",
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "capacity_relevance": "Catches the failure mode where Lane silently starts selecting on mom_20/vol_ratio in their return-predictive direction, which the -1.00σ and -1.05σ standardized deltas already partially evidence."
+    }
+  ]
+}

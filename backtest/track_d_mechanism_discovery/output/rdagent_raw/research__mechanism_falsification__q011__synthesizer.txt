@@ -1,0 +1,63 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 45,
+  "mechanism_summary": "On the available 27-case archaeology, the features that best discriminate selected_winners from false_negatives (mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, ma10_slope_5) are all upside-tilted ranking signals, not downside-asymmetric risk signals; however, the inverted pullback_pct pattern (selected winners come from deeper drawdowns) is consistent with base-quality discrimination, which is itself a documented risk-control heuristic. The dataset is too small and too contaminated by forward-return label construction (per method_note) for either the ranking interpretation or the risk-control interpretation to be falsified. The component's behavior at the SCORE level has never been analyzed (no decile of evidence_risk output, no partial correlation holding score constant, no regime-conditional breakdown). Until those score-level and regime-conditional tests run, the historical value cannot be cleanly attributed to downside-risk control versus return ranking; both mechanisms remain simultaneously plausible, and the answer depends on which analytical lens one privileges (cross-sectional medians favor ranking; base-reset logic favors risk control).",
+  "falsifiers": [
+    "F1 (ranking wins): Reconstruct false-negative labels using only PIT-safe proxies (subsequent base-break confirmation, vol-regime shift, distribution-day accumulation over the next 4w) and rerun the numeric_contrasts; if the ranking-feature deltas persist with std|delta| > 0.7 on at least three of {mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50}, ranking is the dominant mechanism.",
+    "F2 (risk-control wins): Compute the actual evidence_risk score for every entity, split into deciles, and show that ruin probability DECREASES across deciles with monotone chi-squared trend p < 0.05 AND that mom_20 within the highest-score decile is uncorrelated or NEGATIVELY correlated with subsequent 4w max-drawdown — proving the score penalizes high-mom high-vulnerability names rather than rewards them.",
+    "F3 (regime matters): If evidence_risk's score drifts with VIX or cross-sectional dispersion of returns (rank-correlation |rho| > 0.30), then cross-sectional median comparisons are blind to time-varying risk control and the ranking interpretation is misleading; verdict must be CONTEXT_DEPENDENT on regime.",
+    "F4 (component isolation fails): Hold the other B0 sub-components constant (residualize is_b0_pick on all non-evidence_risk component scores) and re-test whether evidence_risk's marginal contribution carries any downside-asymmetric coefficient at all — if not, evidence_risk is redundant with another component and the attribution is moot.",
+    "F5 (replacement wins out-of-sample): A downside-specific composite built from lower-shadow frequency, downside-vol ratio, close-to-low ratio, and base-quality deterioration must achieve lower ruin-rate at equal or greater selection breadth on held-out data; failure here means the original component is doing something the cleaner replacement cannot replicate."
+  ],
+  "actionable_design_principles": [
+    "Score-level before feature-level: any future attribution of evidence_risk must operate on the actual component output (deciles, partial correlations, Shapley attribution on the score itself), not on the marginal association of constituent features with outcome labels.",
+    "Regime-conditioning is non-optional: mandate at least three regime partitions (VIX quartile, cross-sectional dispersion quartile, vol-regime shift flag) before claiming the component is 'ranking-style' — a flat cross-sectional median hides regime-dependent risk control.",
+    "Label hygiene is a hard precondition: rebuild false-negative labels with PIT-only diagnostics (subsequent base structure, vol-regime confirmation, distribution-day count) before re-running any asymmetry claim, otherwise every numeric_contrast is circular per the method_note definition.",
+    "Component orthogonality audit: compute the partial correlation of evidence_risk's score with downside-asymmetric proxies AFTER residualizing on the ranking features (mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20); if |partial-rho| < 0.10, the component carries no independent downside information and the ranking interpretation wins on the orthogonality criterion.",
+    "Entry-vs-management separation: ruin attribution must be partitioned between entry signal and exit/stop-loss discipline; an entry component cannot be evaluated for risk control without a fixed position-management layer in the counterfactual.",
+    "Minimum sample threshold: no claim about evidence_risk should be made on fewer than ~150 entity-decisions (≈5x the 27-case archaeology) with at least 25 ruin events; current 8-ruin sample cannot support chi-squared or decile-based inference."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "evidence_risk_score_decile_monitor",
+      "why_distinct": "Operationalizes the score-level diagnostic the prior roles could not perform; tracks ruin-rate by decile of the actual component output rather than by raw feature medians, which sidesteps the label-contamination attack from the skeptic.",
+      "features": [
+        "evidence_risk_score",
+        "w4_max_drawdown",
+        "ruin_label",
+        "decile_id"
+      ],
+      "capacity_relevance:": "Requires per-entity component-score history (not provided in archaeology) and a snapshot-clustered bootstrap to avoid within-snapshot correlation; enables direct falsifier F2 and resolves CONTEXT_DEPENDENT status if decile-monotonicity holds."
+    },
+    {
+      "idea": "regime_conditional_evidence_risk_gate",
+      "why_distinct": "Adds a regime layer that the cross-sectional analysis ignored per the skeptic's regime-dependence attack; lets the same component be ranking-style in calm regimes and risk-controlling in stressed regimes without forcing a single label.",
+      "features": [
+        "vix_regime_quartile",
+        "cs_dispersion_20d",
+        "vol_regime_shift_flag",
+        "evidence_risk_score"
+      ],
+      "capacity_relevance:": "Needs a regime-classification rule (e.g., VIX 75th-pct threshold over trailing 60d) and snapshot-conditional evaluation; directly tests falsifier F3 and lets the policy be regime-aware without redesigning the component."
+    },
+    {
+      "idea": "orthogonalized_downside_residual",
+      "why_distinct": "Constructs a 'pure risk' signal by regressing any candidate risk score on the ranking block (mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20) and using the standardized residual; this is the operationalization of the researcher's orthogonalization recommendation in a way the skeptic cannot dismiss as unverified, because the residual carries no ranking information by construction.",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "downside_atr_ratio",
+        "lower_shadow_freq_20",
+        "close_to_low_ratio_20",
+        "distribution_day_count_10"
+      ],
+      "capacity_relevance:": "Requires all downside-asymmetric features to be confirmed PIT-available (lower_shadow_freq, close_to_low_ratio derivable from OHLC; distribution_day_count needs an explicit rule); the residual itself is the new component, so any downstream policy that compares B0 to a replacement is comparing apples to apples on the orthogonality axis."
+    }
+  ]
+}
+```

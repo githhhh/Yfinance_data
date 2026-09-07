@@ -1,0 +1,87 @@
+{
+  "tests": [
+    {
+      "name": "vol_ratio_conditional_ruin_rate",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "outcome_label"
+      ],
+      "comparison": "Within mom_20 >= 0.10 cohort, partition by vol_ratio_5_20 quartile. Compute ruin_rate (false_positive_ruin / all picks) per quartile.",
+      "success_criterion": "If vol_ratio_5_20 is a return amplifier (researcher claim): top-quartile vol_ratio_5_20 should have ruin_rate >= 2x bottom-quartile ruin_rate. This confirms it amplifies risk alongside returns.",
+      "failure_criterion": "If vol_ratio_5_20 is a risk proxy (skeptic claim): ruin_rate should be EQUAL or LOWER in top-quartile vs bottom-quartile, OR ruin_rate should be uncorrelated with vol_ratio_5_20 within the momentum cohort. This would indicate high volatility triggers caution, not aggression."
+    },
+    {
+      "name": "pullback_null_outcome_differential",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "outcome_label",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Compare outcome distribution between pullback_pct=null cases vs pullback_pct=non-null cases. Compute win_rate and ruin_rate for each subset.",
+      "success_criterion": "If null means 'no significant drawdown recorded' (supporting researcher): null subset should have lower ruin_rate than non-null subset AND null subset should have higher up_day_ratio_20 median. This confirms the component tolerates drawdowns when they are recorded but not when they are absent.",
+      "failure_criterion": "If null means 'drawdown not recorded due to collection regime' (skeptic claim): null subset should have SIMILAR ruin_rate to non-null subset despite different up_day_ratio_20 distribution. This would invalidate using pullback_pct nulls as evidence of risk insensitivity."
+    },
+    {
+      "name": "up_day_ratio_discrimination_test",
+      "features": [
+        "up_day_ratio_20",
+        "mom_20",
+        "outcome_label"
+      ],
+      "comparison": "Within false_positive_ruin subset, test whether up_day_ratio_20 is lower than in selected_winner subset. Also test within false_negative subset for comparison. Compute standardized delta for up_day_ratio_20 between ruin and winner outcomes.",
+      "success_criterion": "If up_day_ratio_20 is a return ranker (researcher claim): selected_winner median > false_positive_ruin median with standardized_delta >= 0.5. This confirms the component ranks by consistency-of-up-days, not by risk awareness.",
+      "failure_criterion": "If up_day_ratio_20 is a risk discriminator (skeptic alternative): false_positive_ruin should have significantly LOWER up_day_ratio_20 than selected_winner (standardized_delta <= -0.5), indicating high up-day ratio does NOT prevent ruin and may be a false-positive predictor."
+    },
+    {
+      "name": "px_vs_ma50_position_inversion_test",
+      "features": [
+        "px_vs_ma50",
+        "mom_20",
+        "outcome_label"
+      ],
+      "comparison": "Among selected_winner cases, partition by px_vs_ma50 >= 0.15 (elevated price position) vs px_vs_ma50 < 0.15. Test whether elevated position predicts ruin false-positives at higher rate than lower position.",
+      "success_criterion": "If px_vs_ma50 drives selection without risk control (researcher claim): ruin_rate should be EQUAL or HIGHER in the elevated-position subset, indicating the component overweights distance-from-moving-average as a momentum signal regardless of risk.",
+      "failure_criterion": "If px_vs_ma50 correlates with lower ruin risk (skeptic alternative): ruin_rate in elevated-position subset should be significantly LOWER (>= 30% reduction), indicating the component implicitly captures risk through price-position filtering."
+    },
+    {
+      "name": "vol_mom_interaction_ruin_predictor",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "outcome_label"
+      ],
+      "comparison": "Compute interaction term vol_ratio_5_20 * mom_20. Test whether interaction predicts ruin outcomes better than either feature alone. Use logistic regression or threshold analysis on the interaction.",
+      "success_criterion": "If interaction predicts ruin (researcher falsification target): the combination of high vol_ratio_5_20 (>1.3) AND high mom_20 (>0.15) should have ruin_rate > 40%, confirming this pattern is a ruin-generating signal the component fails to filter.",
+      "failure_criterion": "If interaction does NOT predict ruin beyond individual features: ruin cases should have similar vol_ratio_5_20 * mom_20 distribution to selected_winner cases. This would indicate the component is NOT overlooking an obvious risk signal and ruin occurs through other mechanisms."
+    },
+    {
+      "name": "downstream_position_size_inference",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "pullback_pct",
+        "outcome_label"
+      ],
+      "comparison": "If B0 operates in a two-stage pipeline, high-volatility picks should show different risk-management behavior: test whether pullback_pct magnitude (where available) is SMALLER for high vol_ratio_5_20 picks than for low vol_ratio_5_20 picks within the selected_winner subset.",
+      "success_criterion": "If downstream risk management exists (skeptic claim): high vol_ratio_5_20 selected_winner cases should have smaller |pullback_pct| median than low vol_ratio_5_20 selected_winner cases, indicating high-vol picks are managed more conservatively.",
+      "failure_criterion": "If no downstream risk management: pullback_pct should be SIMILAR across vol_ratio_5_20 strata for selected_winner cases, indicating the component bears sole responsibility for risk outcomes."
+    }
+  ],
+  "leakage_checks": [
+    "Do not use outcome_label features to train or tune the tests themselves—tests must be specified using pre-outcome feature distributions only",
+    "Pullback_pct and pullback_duration_weeks are available features but may have systematic missingness; tests must account for null-subset differential before attributing causal meaning",
+    "Failure archaeology sample is conditioned on known errors; any test comparing ruin_rate across feature strata must acknowledge the enriched failure rate is not the population ruin_rate",
+    "up_day_ratio_20 and vol_ratio_5_20 are computed from the same 20-day window; ensure temporal alignment with outcome measurement is not confounded by snapshot timing",
+    "Do not infer from test results that distinct1 'should' implement risk filtering if downstream pipeline components exist—the attribution of responsibility depends on architectural intent, not just outcome correlation"
+  ],
+  "priority_order": [
+    "vol_ratio_conditional_ruin_rate",
+    "pullback_null_outcome_differential",
+    "vol_mom_interaction_ruin_predictor",
+    "up_day_ratio_discrimination_test",
+    "px_vs_ma50_position_inversion_test",
+    "downstream_position_size_inference"
+  ]
+}

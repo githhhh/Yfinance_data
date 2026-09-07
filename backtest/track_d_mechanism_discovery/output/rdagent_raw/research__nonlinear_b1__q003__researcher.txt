@@ -1,0 +1,27 @@
+
+
+```json
+{
+  "mechanism_claim": "Within the fixed B0 candidate set, stocks whose recent pullback was orderly ('dry': low intraday vol, narrow range, contained drawdown) AND whose current price sits near or just above the IBD candidate pivot (current_vs_ibd_candidate_pct modest, ~1.5–2.0x band) carry the highest risk-adjusted runway; conversely, B0 picks that are simultaneously extended relative to IBD pivot AND whose pullback showed vol expansion are late-stage, prone to false_positive_ruin because the breakout has already consumed the move and the correction was technically messy (supply not absorbed). Adaptive capacity here = the joint condition (dry_pullback × room_to_pivot) acting as a re-ranking modifier, not an eligibility gate.",
+  "evidence_for": [
+    "Numeric contrast shows selected_winners have deeper pullbacks (median -15.9% vs FN -7.3%, std_delta +0.64) but LONGER durations (5.5w vs 4.0w), consistent with 'dry' = controlled grind down over time, not sharp V-rebound — exactly the vol-absorbed signature.",
+    "Selected_winners carry higher vol_ratio_5_20 (1.42 vs FN 1.18, std_delta -1.05) AND higher up_day_ratio (0.625 vs 0.50) post-pullback, indicating the dry pullback transitions into a vol-expanding, up-biased accumulation — adaptive capacity confirmed by post-entry behavior, not pre-entry hope.",
+    "False_positive_ruin cases cluster in two signatures: (a) high-mom + elevated px_vs_ma50 (entity_6618d3e80c at +33.7%, entity_3472243e0c at +24% mom_20) where current_vs_ibd_candidate_pct is implicitly far above pivot — late extension with no runway; (b) shallow mom + mid-extension with up_day_ratio 0.4–0.5 (entity_84824e6a20, entity_40ea0cfb3b) — technically 'dry' but trend-weak, a failure mode of the dry filter when applied without the pivot-distance clause."
+  ],
+  "evidence_against": [
+    "current_vs_ibd_candidate_pct alone is weakly discriminative (std_delta only -0.20 between FN and SW), so the mechanism depends on interaction with pullback quality; if used linearly it adds noise rather than signal.",
+    "entity_6618d3e80c is labeled both false_positive_ruin AND selected_winner, showing the dry-pullback signature can coexist with ruin when the pivot-distance clause is loose — the interaction must be conjunctive, not disjunctive.",
+    "Several selected_winners have null pullback fields (entity_ead73f4390, entity_28a6ec4601, entity_b00579f203), meaning the 'dry pullback' condition is undefined for IPO/breakout-from-base names — the encoding must gracefully degrade (e.g., fall back to base tightness proxies) rather than exclude, otherwise it silently shrinks the effective B0 set."
+  ],
+  "falsifiable_predictions": [
+    "Within B0 picks, a re-rank that penalizes (high current_vs_ibd_candidate_pct > ~2.2x) AND (non-dry pullback: vol_ratio_5_20 > 1.5 with up_day_ratio < 0.55) should reduce ruin_rate more than it reduces hit_rate; the test is ruin_rate drop ≥ 3pp with hit_rate drop ≤ 1pp on held-out discovery slice.",
+    "If adaptive_capacity is genuinely conjunctive, then restricting the modifier to ONLY the dry_pullback axis (ignoring pivot distance) should produce a small ruin reduction but a meaningful hit_rate reduction — i.e., the mechanism fails its isolation test unless both axes interact.",
+    "On the false_negative_relative cohort (entity_df5478102d, entity_d8e8e7b814), applying the modifier should UP-rank them because their current_vs_ibd_candidate_pct is below median and their pullback quality is acceptable; if these still underperform after re-rank, the mechanism is mis-specified for the 'missed winner' leg."
+  ],
+  "policy_implications": [
+    "Encode as a continuous rank-modifier score s_mod = f(pullback_dry_score) × (1 − sigmoid((cvibd − pivot_mid)/band)) applied AFTER the existing B0 score, with the null-pullback fallback to base_depth_pct + base_duration_weeks to avoid silently shrinking eligibility.",
+    "Set the modifier's neutral zone (no up/down-rank) around the empirical SW medians (current_vs_ibd_candidate_pct ≈ 1.98, vol_ratio_5_20 ≈ 1.42, up_day_ratio ≈ 0.625) so the B0 universe, hit rate, and recall are preserved by construction — only intra-pool ordering changes.",
+    "Stress-test in two regimes: (i) high-dispersion uptrend where current_vs_ibd_candidate_pct is universally inflated (expect modifier to lose signal, monitor regime flag); (ii) choppy market where pullback_v_is_dry is ambiguous (expect vol_ratio to be noisy; consider gating with 20-day realized vol floor before applying)."
+  ]
+}
+```

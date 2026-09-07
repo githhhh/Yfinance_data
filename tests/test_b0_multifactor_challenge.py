@@ -20,3 +20,48 @@ def test_top3_respects_industry_diversity_and_does_not_pre_filter_missing_label(
 def test_agent_leakage_contract_names_cover_labels_and_future_entry_state():
     assert {'is_b0','pick_order','is_valid_entry','entry_status'} <= LEAK_EXACT
     assert 'w1_' in LEAK_PREFIX and 'w4_' in LEAK_PREFIX
+
+
+def test_agent_feature_mode_includes_agent_factors():
+    from backtest.b0_multifactor_challenge.evaluate import _features
+    panel = pd.DataFrame({
+        'current_vs_ibd_candidate_pct': [1.0],
+        'mom_20': [0.5],
+        'agent_factor_risk_adj_mom_20': [0.1],
+        'agent_factor_vol_confirmed_mom_20': [0.2],
+    })
+    f_f0 = _features(panel, 'f0')
+    f_f1 = _features(panel, 'f1')
+    f_agent = _features(panel, 'agent')
+    assert 'agent_factor_risk_adj_mom_20' not in f_f0
+    assert 'agent_factor_risk_adj_mom_20' not in f_f1
+    assert 'agent_factor_risk_adj_mom_20' in f_agent
+    assert 'agent_factor_vol_confirmed_mom_20' in f_agent
+
+
+def test_rdagent_factor_manifest_and_artifacts():
+    import json
+    from pathlib import Path
+    base = Path(__file__).resolve().parents[1] / 'backtest/b0_multifactor_challenge'
+    manifest_p = base / 'output/rdagent/factor_manifest.json'
+    assert manifest_p.exists()
+    m = json.loads(manifest_p.read_text(encoding='utf-8'))
+    assert m['agent_framework']
+    assert len(m['factors']) >= 3
+    for f in m['factors']:
+        assert f['audit_passed'] is True
+        assert f['leakage'] is False
+        factor_file = base / 'output/rdagent' / f['code_path']
+        assert factor_file.exists()
+
+
+def test_agent_b0_paired_comparison_schema():
+    from pathlib import Path
+    base = Path(__file__).resolve().parents[1] / 'backtest/b0_multifactor_challenge'
+    p = base / 'output/agent_b0_paired_comparison.csv'
+    assert p.exists()
+    df = pd.read_csv(p)
+    required_cols = {'model', 'segment', 'horizon', 'weeks', 'median_spread_pct', 'mean_spread_pct', 'beat_b0_pct', 'stop_delta_pct'}
+    assert required_cols <= set(df.columns)
+    assert len(df) > 0
+

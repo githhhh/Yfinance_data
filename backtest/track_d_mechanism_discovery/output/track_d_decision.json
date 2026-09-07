@@ -1,0 +1,87 @@
+{
+  "state": "STATE_D_MECHANISM_MAP_WITH_B0_RETAINED",
+  "winner": null,
+  "component_verdicts": [
+    {
+      "component": "lane",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.0788,
+      "knockout_median_spread": -2.8251,
+      "knockout_cvar_delta": 0.0,
+      "knockout_stop_delta_pct": 5.55,
+      "positive_block_ratio": 0.25,
+      "verdict": "HELPFUL"
+    },
+    {
+      "component": "dry_false_penalty",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.0,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": 0.0,
+      "knockout_stop_delta_pct": 0.0,
+      "positive_block_ratio": 0.0,
+      "verdict": "UNCERTAIN"
+    },
+    {
+      "component": "evidence_risk",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": -3.249,
+      "knockout_median_spread": -2.9845,
+      "knockout_cvar_delta": -0.7478,
+      "knockout_stop_delta_pct": 11.11,
+      "positive_block_ratio": 0.0,
+      "verdict": "ESSENTIAL"
+    },
+    {
+      "component": "freshness",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.0254,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": -1.0231,
+      "knockout_stop_delta_pct": -2.78,
+      "positive_block_ratio": 0.25,
+      "verdict": "HELPFUL"
+    },
+    {
+      "component": "eps_preference",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.0723,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": 0.0,
+      "knockout_stop_delta_pct": 0.0,
+      "positive_block_ratio": 0.25,
+      "verdict": "UNCERTAIN"
+    },
+    {
+      "component": "weekly_volume",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.0,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": 0.0,
+      "knockout_stop_delta_pct": 0.0,
+      "positive_block_ratio": 0.0,
+      "verdict": "UNCERTAIN"
+    },
+    {
+      "component": "entry_volume",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": -0.0522,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": 0.0,
+      "knockout_stop_delta_pct": 0.0,
+      "positive_block_ratio": 0.0,
+      "verdict": "UNCERTAIN"
+    },
+    {
+      "component": "distinct1",
+      "confirmation_support_weeks": 12,
+      "knockout_mean_spread": 0.5259,
+      "knockout_median_spread": 0.0,
+      "knockout_cvar_delta": -2.3401,
+      "knockout_stop_delta_pct": 0.0,
+      "positive_block_ratio": 0.25,
+      "verdict": "HELPFUL"
+    }
+  ],
+  "decision_basis": "No frozen B1, single-rule repair, or pre-screened Minimal-B0 passed untouched confirmation gates. The actionable result is the component mechanism map, not a claim that B0 is unbeatable."
+}

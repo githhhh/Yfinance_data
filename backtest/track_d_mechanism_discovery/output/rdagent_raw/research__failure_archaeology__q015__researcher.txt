@@ -1,0 +1,34 @@
+
+
+
+```json
+{
+  "mechanism_claim": "False-negative non-picks that become large winners exhibit a specific combination: moderate pullback depth (-5% to -8%) with extended duration (≥4 weeks), low up_day_ratio_20 (0.45-0.50), and nascent momentum recovery (mom_20 ≈ 0.06-0.07). The B0 selector misses these because they fail the breakout-trigger proximity threshold (ibd_entry_close_vs_trigger_pct < 0.02) while in pullback consolidation, yet they contain enough embedded strength to resume. In contrast, selected_winner breakout setups have tighter trigger proximity and stronger pre-snapshot momentum, making them easier to catch.",
+  "evidence_for": [
+    "entity_de1c657364 (false_negative_big_winner): 8-week pullback of -7.3%, up_day_ratio_20=0.65, mom_20=0.058, ibd_entry_close_vs_trigger_pct=0.012 — qualifies as embedded strength during pullback, missed by B0 due to low trigger proximity",
+    "entity_535a1beed7 (false_negative_big_winner): up_day_ratio_20=0.50, mom_20=0.028, vol_ratio_5_20=1.174 — low momentum but large_win outcome, indicating pullback-consolidation base building",
+    "entity_05b4c6b1f7 (false_negative_relative, large_win): up_day_ratio_20=0.50, mom_20=0.070, vol_ratio_5_20=0.964 — non-breakout profile yet produces large win, suggesting recovery from extended consolidation",
+    "Selected winners with pullbacks (entity_3adc078f01, entity_2c58cebc59) show steeper pullback_pct (-25% to -42%) and higher mom_20 (0.171-0.321), confirming the 'missed in deeper pullback' sub-pattern for selected winners",
+    "Numeric contrasts confirm false negatives cluster toward lower up_day_ratio_20 (median 0.50 vs 0.625 for selected_winner), lower mom_20 (median 0.058 vs 0.163), and shallower pullback_pct (median -7.3% vs -15.9%)"
+  ],
+  "evidence_against": [
+    "entity_bfb308b24a (false_negative_relative, loss): has pullback_duration_weeks=4, pullback_pct=-12.1%, up_day_ratio_20=0.45 — similar pullback profile to big-winner false negatives but produces loss, suggesting the pattern alone is insufficient",
+    "entity_df5478102d (false_negative_relative, small_win): pullback_pct=-5.0% with 4-week duration but yields only small_win, indicating same pullback characteristics can produce different magnitude outcomes",
+    "entity_ad2bfdee3f (false_negative_relative): mom_20=-0.046, px_vs_ma20=0.007, px_vs_ma50=-0.033 — negative momentum with price below MA50, yet only small_win, confirming momentum sign matters for outcome magnitude",
+    "False negatives with null pullback data (entity_535a1beed7, entity_d8e8e7b814) complicate the pullback-depth mechanism — some large-win false negatives have no recorded pullback, suggesting alternative paths to embedded strength",
+    "Selected winners without pullbacks (entity_28a6ec4601, entity_90a828939a) achieve large_win with moderate momentum and typical trigger proximity, indicating the mechanism does not explain all large-win outcomes"
+  ],
+  "falsifiable_predictions": [
+    "If a non-pick has up_day_ratio_20 < 0.45, mom_20 < 0.05, and no observable pullback (or pullback_pct > -5%), then it should NOT produce a large_win outcome within 4 weeks",
+    "If a non-pick exhibits pullback_pct between -5% and -8% with pullback_duration_weeks ≥ 4, up_day_ratio_20 ≥ 0.50, and mom_20 ≥ 0.055, then it should produce a W4 return ≥ selected_winner median (prediction conditional on PIT observability of these features)",
+    "If ibd_entry_close_vs_trigger_pct > 0.03 for a non-pick, the B0 selector should capture it; absence of capture implies other features suppress the pick signal (testable by checking if is_b0_pick=true for all entities with ibd_entry_close_vs_trigger_pct > 0.03)",
+    "Counterexample to invalidate: find a non-pick with up_day_ratio_20 ≥ 0.55, mom_20 ≥ 0.12, vol_ratio_5_20 ≥ 1.40, pullback_pct between -5% and -10%, pullback_duration_weeks ≥ 4, that produces a w4_return_bucket of 'loss' or 'ruin' — this would falsify the embedded-strength mechanism"
+  ],
+  "policy_implications": [
+    "B0 selector could incorporate a secondary pass: for non-picks with ibd_entry_close_vs_trigger_pct < 0.02, evaluate whether pullback_duration_weeks ≥ 4, up_day_ratio_20 ≥ 0.50, and mom_20 ≥ 0.055 as qualifying conditions for a pullback-track watchlist",
+    "Portfolio construction: false negatives with shallow pullbacks (-5% to -8%) represent a distinct risk-reward profile vs. deep-pullback selected winners — the former may offer better risk-adjusted entry if momentum recovery is genuine",
+    "Risk management: false negatives with low up_day_ratio_20 (< 0.45) and shallow pullback should be treated as lower-conviction signals even if other features appear positive; sizing should reflect the evidence_against cases showing loss outcomes with similar pullback profiles",
+    "Snapshot-time filtering: any feature requiring knowledge of future price trajectory (e.g., whether pullback concludes at a specific price level) must be excluded; all qualifying features must be computable from data available at snapshot_anon timestamp"
+  ]
+}
+```

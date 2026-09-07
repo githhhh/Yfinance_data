@@ -1,0 +1,42 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The redundancy claim is methodologically backward—the high standardized deltas (-1.19, -1.05, -1.00) do not prove multicollinearity; they prove each feature independently predicts outcome. True redundancy would manifest as near-zero marginal contribution when features are combined, but the evidence presented only shows marginal separation. The component's historical value may stem from capturing a latent 'institutional accumulation quality' construct that happens to load on all three features—dropping any one loses predictive surface, not redundant signal.",
+  "attacks": [
+    {
+      "issue": "Redundancy inference conflates correlation with redundancy in a predictive context",
+      "why_it_matters": "The researcher assumes high inter-feature correlation (r>0.8) implies triple-counting. But correlation structures in sample do not determine marginal contribution in a composite. If up_day_ratio_20, vol_ratio_5_20, and mom_20 each capture distinct variance slices of institutional accumulation (behavioral, flow, price acceleration), the penalty is not triple-counting—it is aggregating orthogonal signal surfaces. The falsification test would require ablation analysis: does removing each feature degrade false-positive detection independently? The standardized deltas alone cannot answer this."
+    },
+    {
+      "issue": "The failure archaeology is snapshot-biased and non-representative",
+      "why_it_matters": "All 27 cases are drawn from a small set of snapshot IDs (snap_724342c280 appears 4 times, snap_71486ed83c appears 6 times). This clusters the analysis in specific market regimes. If 'dry_false_penalty' works differently across volatility regimes (e.g., high-VIX vs low-VIX markets), the redundancy signal may be a sample artifact of regime-concentrated archaeology. The researcher cannot claim general mechanism without randomizing across snapshots."
+    },
+    {
+      "issue": "The 'selected_winner' label conflates cases that may have different causal structures",
+      "why_it_matters": "Among the 11 selected_winner cases, outcomes range from 'small_win' to 'large_win' to 'ruin' (entity_6618d3e80c: 'false_positive_ruin|selected_winner'). This hybrid label suggests the penalty operates on a probabilistic manifold, not a binary mechanism. The researcher treats false_positive_ruin as the target, but selected_winner cases with high pullback_pct (e.g., entity_3adc078f01: pullback_pct=-42.3, selected_winner) contradict the claim that the penalty prevents ruin—it failed to trigger there."
+    },
+    {
+      "issue": "The pullback_duration_weeks finding contradicts the mechanism claim",
+      "why_it_matters": "The researcher notes FN median pullback_duration=4.0 vs SW=5.5 (standardized Δ=-0.73), interpreting this as 'pullback behavior NOT penalized but LACKING in false negatives.' This is actually evidence against the penalty's mechanism: if long pullbacks predict winners, the penalty should reward patience, not penalize quick entries. The current penalty appears to be anti-correlated with the patience signal, suggesting it may be capturing something else entirely (perhaps momentum exhaustion timing)."
+    },
+    {
+      "issue": "No out-of-sample validation of the redundancy hypothesis",
+      "why_it_matters": "The evidence is entirely in-sample discovery. The researcher's claim that 'out-of-sample false-positive rate should not increase by more than 5%' is a prediction, not evidence. Given the collinearity concern, a consolidated conviction_score may actually perform WORSE out-of-sample due to error amplification in the combined estimate, not better. The researcher has not demonstrated that the current multi-feature implementation degrades performance relative to alternatives."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A time period where up_day_ratio_20, vol_ratio_5_20, and mom_20 diverge in their signals (e.g., high momentum but low volume expansion), and the penalty correctly identifies false positives in only one direction—proving non-redundancy.",
+    "Snapshots from low-volatility regimes (vol_ratio_5_20 median <1.2) where the penalty's false-positive detection accuracy drops to chance—proving regime-contingency rather than stable mechanism.",
+    "Cases where entity_2f86543bf6-like patterns (low up_day_ratio, low momentum) achieve selected_winner outcomes without other compensating features—proving the penalty is not deterministically protective.",
+    "A/B test data where the penalty is turned off for a held-out sample and false-positive rate increases by >10%—direct evidence of causal mechanism, currently absent.",
+    "Cases with ma10_slope_5 >> ma20_slope_5 (velocity divergence) that are selected_winner despite low long-window conviction—proving short-term velocity signals are not captured by current inputs."
+  ],
+  "what_would_change_my_mind": [
+    "Ablation evidence showing that removing any single feature from 'dry_false_penalty' does NOT increase false-positive rate out-of-sample, while consolidating to a single conviction_score does NOT degrade performance—this would confirm true redundancy.",
+    "Randomized snapshot selection showing the standardized deltas hold across all market regimes without significant interaction effects—this would rule out snapshot-specific artifacts.",
+    "Causal identification strategy (instrumental variable or natural experiment) demonstrating the penalty causes false-positive reduction, not merely correlates with it—this would separate mechanism from confound.",
+    "Evidence that 'dry_false_penalty' is applied at portfolio construction (position sizing, not stock selection), and its value comes from correlation with other portfolio-level decisions rather than stock-level prediction—this would reframe the mechanism claim entirely."
+  ]
+}
+```

@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The adaptive 0/1/2/3 capacity rule is a three-way conflation that the prior roles did not fully separate: (a) it conflates 'crowding' (industry-level co-movement structure) with 'extension' (single-name momentum signature), because the proposed crowding proxies (vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, up_day_ratio_20) are exactly the features with the largest standardized delta (−1.19, −0.85, −1.05) separating winners from false-negatives — i.e., the crowding detector restates base-signal strength; (b) it conflates 'slot count' with 'capital allocation', because slots 1/2/3 only behave as the researcher's 'leverage-on-same-bet' if equal-weight and full reinvestment is assumed — under a Kelly-fraction or conviction-weighted sizing, slot=3 in a moderately correlated industry (ρ≈0.5) actually delivers LOWER variance than slot=1 (variance ratio ≈0.67), which inverts the researcher's claim; (c) it conflates 'capacity' with 'exposure', because capacity=0 is a different asset class (cash/treasuries) whose expected return is regime-dependent and not comparable on Sharpe to capacity=3 in equity. Under extreme crowding (ρ→0.85+) the leverage-not-diversification claim is plausible, but the evidence base (N=27, one snapshot contributing 8/27) is too thin and too entangled with selection alpha to confirm or refute it. The rule's economic meaning of choosing 1 vs 2 vs 3 positions under fixed 3-slot capital is therefore not uniform across regimes: in dispersed regimes it is genuine diversification with variance-scaling ≈N; in moderately crowded regimes (the modal case) it is approximately true equal-weight with correlation-adjusted scaling ≈(1+(N−1)ρ)/N; and only in extreme crowding does it collapse to leveraged single-bet. The mechanism is directionally correct at the tails, mis-specified in the body, and untestable with current evidence.",
+  "falsifiers": [
+    "PIT intra-industry correlation audit: for each snapshot with ≥2 B0 candidates, compute pairwise |ρ| of daily returns over the 4-week pre-entry window using only industry-constituent return series (not the candidate names themselves). If the median pre-entry ρ across 'crowded' snapshots is <0.40, the leverage-not-diversification mechanism fails because equal-weight true diversification dominates. If the median ρ is ≥0.75, the researcher's claim holds.",
+    "Capital-allocation ambiguity audit (NEW): declare explicitly whether adding slot N (a) takes from existing slots, (b) takes from the 2 unused slots' cash reserve, or (c) adds new capital on margin. The variance-ratio predictions diverge by ≥2× across these three interpretations; without specification, every empirical test of the rule is undefined.",
+    "Lottery-tail skew test: in crowded snapshots, if the 5th-percentile W4 return under capacity=3 is NOT more catastrophic (>1.5× deeper loss) than under capacity=1, the rule is not concentrating left-tail risk and the 'leverage on same bet' framing is wrong. Symmetrically, in dispersed snapshots if the 95th-percentile W4 return under capacity=3 is <1.3× the capacity=1 95th percentile, slot=3 is not buying right-tail either.",
+    "Out-of-cluster holdout test: re-fit the crowding detector on a leave-one-snapshot-out basis (drop snap_71486ed83c, then each other snapshot in turn). If capacity assignments flip on >25% of cases across the 27 leave-one-out runs, the rule is fitting to one window's industry composition and any variance-ratio test on the in-sample data is overfit.",
+    "Anti-crowding winner counterexample expansion (extends Skeptic's 2f86543bf6 point): identify ≥3 entities where the candidate scores in the bottom quartile on EVERY crowding proxy AND is_b0_pick=true AND outcome_label=selected_winner. If ≥3 such cases exist, the rule's binary crowding partition is empirically wrong because real winners systematically fail the crowding filter, and the opportunity cost of the rule exceeds its ruin-avoidance benefit.",
+    "Selection-circularity refutation (operationalizes Skeptic's circularity attack): regress capacity assignment on the base-signal-strength z-score; if R² ≥ 0.40, the crowding detector is a linear re-encoding of signal strength, the 'diversification' claim reduces to 'de-leverage when signals are hot', and the rule should be re-specified as a sizing rule rather than a slot-count rule.",
+    "Regime-conditional baseline test: compare capacity=0 vs capacity=3 Sharpe separately in (a) the discovery-train window, (b) a held-out window with ≥10% market drawdown, and (c) a held-out window with breadth thrust (≥60% NYSE stocks above 200-day MA). If capacity=3 dominance appears only in breadth-thrust regimes (the natural habitat of momentum signals), the rule's falsification in regime (b) shows the 'cash is better' conclusion is a regime-bias artifact and capacity=0 is not a robust alternative."
+  ],
+  "actionable_design_principles": [
+    "Separate three orthogonal layers explicitly in any implementation: (1) selection — which names pass the base filter, (2) crowding — independent measure of industry co-movement PIT, (3) capacity/sizing — dollar exposure per slot and total capital deployed. Conflating layers makes the rule untestable.",
+    "Define 'slot' as a dollar fraction of allocated capital with a documented reinvestment policy (e.g., slot N takes 1/(N+N_unused) of remaining cash reserve, NOT a proportional cut of existing slots). Without this specification, capacity=2 and capacity=3 have no defined economic meaning.",
+    "Use orthogonal crowding features only — features NOT in the base-signal-strength set. Concrete candidates: IBD relative-strength rank percentile overlap across candidates, GICS sub-industry constituents' average 20-day correlation, sector ETF return dispersion, breadth-of-advance within sub-industry. These are industry-structure features, not single-name extension features.",
+    "Prefer continuous sizing (e.g., dollar exposure = f(orthogonal_crowding_score)) over discrete capacity=1/2/3 buckets. The discrete bucket boundary at slot=2 implies a discontinuous risk jump that has no economic justification in the evidence and makes the rule brittle to perturbation.",
+    "Always log the realized pairwise correlation between co-slot candidates at entry (using pre-entry daily returns). This is a PIT-only audit that lets you distinguish leverage-mode from diversification-mode slot behavior in real time without waiting for W4 outcomes.",
+    "Distinguish capacity=0 (cash/treasuries) from capacity=1 explicitly in any Sharpe comparison. Capacity=0 has different return distribution, different variance, and different regime dependence; comparing it to capacity=3 on raw Sharpe conflates asset-class choice with industry choice.",
+    "Reject any backtest that uses post-entry W4 outcomes in the capacity assignment decision — this is the most common source of hindsight-bias in capacity-rule research and is explicitly forbidden by the PIT constraint.",
+    "Maintain a minimum sample threshold (e.g., ≥30 independent snapshots) before drawing mechanism conclusions. The current 27-case evidence with 8 from one snapshot does not meet this bar; treat all current findings as hypothesis-generating only."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "orthogonal_crowding_gate",
+      "why_distinct": "Replaces the proposed crowding detector (which reuses vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, up_day_ratio_20 — the same features that select winners) with industry-structure features only: sub_industry_pairwise_corr_20d (pre-entry), sub_industry_breadth_pct (fraction of constituents above 20-day MA), sector_etf_dispersion_5d, ibd_rs_rank_overlap_count (how many of the B0 candidates fall in top-decile industry RS). This breaks the circularity that the Skeptic identified.",
+      "features": ["sub_industry_pairwise_corr_20d", "sub_industry_breadth_pct", "sector_etf_dispersion_5d", "ibd_rs_rank_overlap_count"],
+      "capacity_relevance": "Outputs a continuous crowding score 0–1; maps to capacity as 0→0 slots, <0.33→1 slot, 0.33–0.66→2 slots, >0.66→3 slots, but with explicit dollar allocation defined separately (see sizing_per_slot policy)."
+    },
+    {
+      "idea": "sizing_per_slot",
+      "why_distinct": "Decouples slot count from dollar allocation. Defines per-slot capital fraction as 1/(active_slots + reserved_cash_slots) with explicit reserved_cash_slots ≥ 1 always. This makes capacity=2/3 economically meaningful (they take from cash reserve, not from slot-1), and prevents the equal-weight → leveraged-bet collapse that the Skeptic's ρ<1 argument exposes.",
+      "features": ["active_slot_count", "reserved_cash_slot_count", "per_slot_capital_fraction", "max_single_name_exposure_pct"],
+      "capacity_relevance": "Capacity=1 with reserved_cash=2 means 33% deployed, 67% cash. Capacity=3 with reserved_cash=0 means 100% deployed across 3 names. Capacity=0 means 100% cash. The economic distinction between slots is now continuous and auditable."
+    },
+    {
+      "idea": "pit_correlation_audit",
+      "why_distinct": "Requires logging the realized pre-entry pairwise correlation of returns between co-slot candidates. This converts the assumed ρ (from crowding proxies) into an observed ρ at entry time, enabling live verification of whether the rule is operating in leverage-mode (ρ>0.7) or diversification-mode (ρ<0.4) — the central unresolved empirical question.",
+      "features": ["candidate_pair_return_corr_20d_pre_entry", "candidate_pair_volume_corr_20d_pre_entry", "candidate_pair_rs_rank_corr_pre_entry"],
+      "capacity_relevance": "If observed_ρ > 0.7, the rule overrides to reduce capacity by 1 (or shrink per-slot sizing by 50%) regardless of what the orthogonal_crowding_gate said. This is the operational mechanism for the variance-ratio falsifier — instead of waiting for W4 outcomes, the rule self-corrects at entry based on measured correlation."
+    },
+    {
+      "idea": "lottery_tail_monitor",
+      "why_distinct": "Tracks the realized left-tail (5th percentile) and right-tail (95th percentile) of slot combinations vs single-slot outcomes, separately in crowded and dispersed regimes. This explicitly tests the 'slot=3 is leverage on left-tail' vs 'slot=3 buys right-tail' alternative, which is the empirical question the researcher's variance-ratio test cannot cleanly answer.",
+      "features": ["rolling_5pct_w4_return_by_capacity_bucket", "rolling_95pct_w4_return_by_capacity_bucket", "capacity_regime_conditional_tail_ratio"],
+      "capacity_relevance": "If left-tail worsens >1.5× when going from capacity=1 to capacity=3 in crowded regimes, capacity is mis-specified for that regime and the rule should default to capacity=1 with residual cash. If right-tail improves <1.3× in dispersed regimes, slot=3 is not buying meaningful upside either and the framework should be re-examined."
+    },
+    {
+      "idea": "anti_crowding_winner_lot",
+      "why_distinct": "Carves out a minimum capacity=1 override slot for any candidate that scores in the bottom quartile on the orthogonal crowding features but in the top quartile on base-signal strength (e.g., mom_20 in top quartile, sub_industry_breadth_pct in bottom quartile). This directly addresses the Skeptic's entity 2f86543bf6 counterexample — winners that come from anti-crowding trades.",
+      "features": ["base_signal_zscore", "crowding_zscore", "anti_crowding_overall_long_flag"],
+      "capacity_relevance": "Forces the rule to keep at least one slot open in every snapshot regardless of crowding reading, but limits it to one. Prevents full capacity=0 abstention when genuine anti-crowding opportunities exist, which the evidence (2 winners with negative momentum slopes) suggests is non-trivial."
+    }
+  ]
+}
+```

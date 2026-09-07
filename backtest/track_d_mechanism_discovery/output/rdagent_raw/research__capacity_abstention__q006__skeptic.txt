@@ -1,0 +1,57 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The proposed adaptive capacity rule is not falsifiable from this evidence because (a) the 'weak' label itself is partially defined by future outcomes (the false-negative definition uses W4 >= 8%), (b) the archaeology cannot separate candidate-quality effects from portfolio-diversification effects, and (c) capacity 0 is not a true abstention but a deferred selection whose opportunity cost is unmeasured. The null hypothesis that the third slot should always be filled cannot be rejected; in fact the selected-winner cases entity_2f86543bf6 (mom_20 = -0.008, up_day_ratio_20 = 0.35) and entity_8ad5cd4795 (negative MA slopes) are direct entry-time counterexamples that the prior mechanism accommodates only by retreating to 'weak ≠ certain loss', which is materially weaker than the abstention claim.",
+  "attacks": [
+    {
+      "issue": "Target leakage in the 'false negative' definition itself",
+      "why_it_matters": "The archaeology requires false negatives to have future W4 >= 8% AND >=5pp above the B0 selected median. This makes 'false negative' a post-hoc construct that selects entities which were rejected at entry but would have been large winners. The standardized deltas (mom_20, up_day_ratio_20, vol_ratio_5_20) that allegedly characterize 'weak' candidates are computed on a population that was filtered precisely because they won. Any threshold derived from these medians inherits the W4 conditioning and cannot be used entry-time without re-introducing the leakage."
+    },
+    {
+      "issue": "Conflation of candidate-quality effect with slot-filling/diversification effect",
+      "why_it_matters": "All 27 cases are B0 picks observed together. The evidence never contrasts a regime where slot 3 is filled with the same candidate against a regime where slot 3 is left open (or filled with an alternative). Capacity 1, 2, and 3 cannot be disentangled from one another: there is no within-snapshot, within-rank, within-date comparison where the only difference is whether slot 3 is occupied. The 'rule' therefore cannot be empirically tested on this evidence regardless of threshold choice."
+    },
+    {
+      "issue": "Capacity 0 is not a real abstention; it is an unmodeled deferred fill",
+      "why_it_matters": "If a portfolio maintains a target of 3 slots, capacity 0 today implies the slot will be filled tomorrow or next week by whatever candidate is available then. The archaeology provides no evidence on (i) the quality of replacement candidates, (ii) the timing cost of waiting, or (iii) whether the replacement is systematically better or worse than today's weak third. The 'preserves optionality' framing in the prior output is untested and could easily be wrong — replacements during rising regimes may be weaker than the abstained weak third."
+    },
+    {
+      "issue": "Selected-winner cases with weak entry features directly refute a hard abstention threshold",
+      "why_it_matters": "entity_2f86543bf6 (mom_20 = -0.008, ma20_slope_5 = -0.008, up_day_ratio_20 = 0.35) and entity_8ad5cd4795 (ma10_slope_5 = -0.006, ma20_slope_5 = -0.003) would be classified 'weak' on the proposed dimensions yet both became large_win. If these were third-ranked candidates under fixed 3-slot capital, abstention would have left return on the table. The prior researcher's escape — that 'weak ≠ certain loss' — collapses the abstention claim into noise tolerance, at which point the rule has no decision content."
+    },
+    {
+      "issue": "Median standardized differences conflate magnitude with policy thresholding",
+      "why_it_matters": "Standardized deltas of -1.19 (up_day_ratio_20) and -1.05 (vol_ratio_5_20) are computed on small, non-i.i.d. samples with heteroscedastic features across snapshots. A delta of -1σ in 27 mixed-snapshot cases does not imply a policy-relevant cutoff exists at, say, up_day_ratio_20 < 0.50. Bootstrap intervals would almost certainly overlap the false-positive-ruin and selected-winner medians, especially because 8 false-positive-ruin cases also exhibit moderate up_day_ratio_20 (0.40–0.65)."
+    },
+    {
+      "issue": "The 'weak third' stratum is never isolated; the rule's conditioning variable is missing",
+      "why_it_matters": "The evidence does not record candidate rank (1st, 2nd, 3rd) within B0. Some false-positive-ruin cases may have been the strongest pick of the day; some selected-winners may have been the weakest. Without rank conditioning, the claim 'capacity 0 for weak third' cannot be evaluated: the same feature profile on a #1 candidate may have entirely different implications than on a #3 candidate. The prior policy implication collapses without this conditioning."
+    },
+    {
+      "issue": "Survivorship in label assignment biases the false-positive-ruin count",
+      "why_it_matters": "Eight false-positive-ruin cases share the snapshot snap_d0d57b1e40 / snap_b8420124eb / snap_71486ed83c cluster. If a single bad regime produced multiple ruins (e.g., a sharp drawdown window), the 'weak candidate → ruin' mechanism is actually a 'bad-regime → ruin' mechanism, and the abstention rule would not generalize. Snapshot clustering is not controlled for."
+    },
+    {
+      "issue": "The 'adaptive 0/1/2/3' framing implies ordinality of conviction, but capacity may be a latching constraint, not a belief",
+      "why_it_matters": "If portfolio construction is constrained (e.g., sector exposure limits, cash buffer rules, margin requirements), capacity 0/1/2/3 may be mechanically determined by constraints rather than belief strength. Treating capacity as a free ordinal signal of candidate quality introduces a category error: the same 'weak third' could legitimately be capacity 0 due to a cash rule rather than a conviction rule, and the archaeology cannot separate belief from constraint."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A weak-on-features third-ranked candidate that produced a top-decile W4 return despite low up_day_ratio_20, low vol_ratio_5_20, and proximity to MA20/MA50 (the entity_2f86543bf6 archetype) — demonstrates that entry-time weakness does not bound forward return.",
+    "A 'strong-on-features' third-ranked candidate that subsequently produced a ruin or loss bucket — demonstrates that the proposed quality dimensions do not guarantee success.",
+    "A matched pair of identical snapshots where slot 3 was filled vs left open, with measurable incremental Sharpe, max drawdown, and replacement-candidate quality — the only design capable of falsifying the rule.",
+    "False-positive-ruin cases where the same entity's rank within B0 was #1 rather than #3, demonstrating that the ruin is candidate-independent of slot position.",
+    "A regime where weak third candidates systematically outperformed strong third candidates (e.g., late-stage bull market where breadth is already narrowing) — would invalidate the directional claim of the abstention hypothesis.",
+    "Cases where the entity had weak entry features, was correctly abstained (capacity 0), and the replacement candidate subsequently lost — direct evidence that capacity 0 is not free."
+  ],
+  "what_would_change_my_mind": [
+    "A within-snapshot, within-date, matched experiment where for each B0 pick day we observe (i) the candidate quality features of all 3 B0 slots, (ii) the candidate that would have replaced slot 3 if left empty, and (iii) the W4 outcome under both 'fill slot 3' and 'leave slot 3 / fill replacement' policies. If 'leave slot 3' dominates on risk-adjusted return after costs, the abstention claim is no longer UNRESOLVED.",
+    "An entry-time-only threshold (no future return in its construction) for 'weak third' that, when applied prospectively out-of-sample, produces monotonically lower mean W4 return and higher loss frequency for the 'weak third fill' group vs the 'weak third abstain' group, with statistically significant separation after multiple-testing correction.",
+    "Evidence that false-positive-ruin cases predominantly occur at rank 3 within B0 (i.e., that ruin is conditional on slot position, not just on candidate quality). Without this, rank-conditioning of the rule has no empirical anchor.",
+    "A demonstrated monotonic relationship: capacity 0 > capacity 1 > capacity 2 > capacity 3 in average next-period risk-adjusted return, holding first-two-slot quality fixed. Any deviation (e.g., capacity 2 > capacity 1) would falsify the ordinal conviction interpretation.",
+    "Replacement-candidate evidence showing that candidates available on day t+1 are systematically higher-quality than the abstained weak third, AND that this replacement advantage persists across regimes. This is what 'preserves optionality' actually requires to be true.",
+    "Decomposition of the false-positive-ruin population into 'regime-driven' vs 'candidate-driven' failures, demonstrating that abstaining on weak features would have prevented the ruin in the latter case only."
+  ]
+}
+```

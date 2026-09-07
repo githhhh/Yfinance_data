@@ -1,0 +1,89 @@
+{
+  "tests": [
+    {
+      "name": "slope_ratio_discrimination_test",
+      "features": [
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "is_b0_pick"
+      ],
+      "comparison": "ma10_slope_5 / ma20_slope_5 ratio calculated at snapshot; ruination vs selected_winner groups compared via Mann-Whitney U on ratio values",
+      "success_criterion": "Ratio median for false_positive_ruin cases is statistically significantly lower (p<0.05) than ratio median for selected_winner cases, and ratio threshold of 1.0 achieves >70% separation accuracy",
+      "failure_criterion": "No significant difference in ratio distributions between outcome groups, OR ratio threshold of 1.0 produces <60% separation—invalidating slope-ratio-as-gate claim"
+    },
+    {
+      "name": "volume_ratio_standalone_test",
+      "features": [
+        "vol_ratio_5_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Direct comparison of vol_ratio_5_20 distributions between false_positive_ruin and selected_winner without conditioning on any momentum features; test whether vol_ratio alone discriminates",
+      "success_criterion": "vol_ratio_5_20 median for false_positive_ruin is significantly lower (p<0.05) than selected_winner, AND vol_ratio < 1.0 predicts ruin in >75% of applicable cases",
+      "failure_criterion": "vol_ratio_5_20 distributions are statistically indistinguishable between outcome groups (p>0.1), OR vol_ratio < 1.0 appears in selected_winner cases at comparable frequency to ruin cases—falsifying volume-dry-up mechanism"
+    },
+    {
+      "name": "momentum_only_test",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "is_b0_pick"
+      ],
+      "comparison": "Test whether mom_20 AND ma10_slope_5 together (without volume) can discriminate ruin vs winner; addresses skeptic's claim that vol_ratio_5_20 is backward-looking and redundant with recent momentum",
+      "success_criterion": "Combination of mom_20 < 0.08 AND ma10_slope_5 < 0.02 predicts false_positive_ruin in >70% of cases where both conditions hold",
+      "failure_criterion": "Momentum-only features produce no significant discrimination (AUC < 0.6 for ruin vs winner), indicating volume features are necessary for prediction"
+    },
+    {
+      "name": "within_snapshot_regime_test",
+      "features": [
+        "snapshot_anon",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Identify snapshots containing both false_positive_ruin and selected_winner B0 picks; test whether feature values overlap within regime, directly testing skeptic's claim that features cannot discriminate within market regime",
+      "success_criterion": "No snapshot contains mixed outcome B0 picks with identical vol_ratio_5_20 (±0.1) AND identical ma10_slope_5 (±0.01) AND identical mom_20 (±0.02)—demonstrating features do discriminate within regime",
+      "failure_criterion": "At least one snapshot shows false_positive_ruin and selected_winner with overlapping feature values within stated tolerances—falsifying feature discriminability within regime"
+    },
+    {
+      "name": "hybrid_label_ambiguity_test",
+      "features": [
+        "entity_anon",
+        "is_b0_pick",
+        "outcome_label"
+      ],
+      "comparison": "Quantify contamination from entity_6618d3e80c (dual-labeled false_positive_ruin|selected_winner) and any other multi-outcome entities; test sensitivity of pattern to their exclusion",
+      "success_criterion": "Removing dual-labeled entities changes ruin vs winner median for vol_ratio_5_20 by <0.05 AND changes slope ratio median by <0.1—demonstrating robustness to labeling ambiguity",
+      "failure_criterion": "Removing dual-labeled entities flips the sign of median difference between outcome groups for any feature, OR causes statistically significant shift in distributions—revealing pattern is labeling-dependent"
+    },
+    {
+      "name": "ibd_entry_distance_decay_test",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "vol_ratio_5_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Test whether ibd_entry_close_vs_trigger_pct (distance from trigger) moderates vol_ratio_5_20's predictive power; addresses researcher claim that entry quality interacts with volume confirmation",
+      "success_criterion": "Among B0 picks with vol_ratio_5_20 > 1.3, those with ibd_entry_close_vs_trigger_pct > 0.04 show ruin rate < 20%, while those with ibd_entry_close_vs_trigger_pct < 0.02 show ruin rate > 50%",
+      "failure_criterion": "ibd_entry_close_vs_trigger_pct does not moderate vol_ratio_5_20's relationship to outcome (no significant interaction in logistic regression)"
+    }
+  ],
+  "leakage_checks": [
+    "pullback_duration_weeks and pullback_pct excluded from all test features—these are post-snapshot observables unavailable at decision time",
+    "w4_return_bucket excluded from test features—it's an outer-forward outcome, not a PIT feature",
+    "snapshot_anon used only for regime stratification in within_snapshot_regime_test, never as a predictor feature",
+    "All slope ratios computed from same 5-day window (ma10_slope_5, ma20_slope_5) must be flagged as potentially redundant per skeptic's circularity concern; tests do not claim independence between these features",
+    "Tests 1-3 use only pre-snapshot PIT features; no feature represents information that would not be available to a trader at the moment of B0 signal",
+    "Test 4 (within-snapshot regime) uses snapshot_anon only to group cases for comparison, not as a predictive feature per rules",
+    "Test 5 (hybrid label) is a sensitivity check, not a predictive test; its purpose is to verify the stability of findings under labeling noise"
+  ],
+  "priority_order": [
+    "volume_ratio_standalone_test",
+    "slope_ratio_discrimination_test",
+    "hybrid_label_ambiguity_test",
+    "within_snapshot_regime_test",
+    "momentum_only_test",
+    "ibd_entry_distance_decay_test"
+  ]
+}

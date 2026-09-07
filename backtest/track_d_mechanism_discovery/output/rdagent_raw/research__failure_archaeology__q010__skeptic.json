@@ -1,0 +1,37 @@
+{
+  "strongest_counterclaim": "The slope ratio (ma10_slope_5 / ma20_slope_5) is a mathematical artifact of dividing by a near-zero denominator, not an independent causal mechanism. The false-positive ruin signal is actually explained by IBD entry tightness (ibd_entry_close_vs_trigger_pct > 0.045) combined with sector concentration, with the slope ratio merely correlating with these confounders.",
+  "attacks": [
+    {
+      "issue": "Denominator instability creates spurious ratios",
+      "why_it_matters": "entity_55c2da490e has ma20_slope_5 = -0.0049 (negative denominator) producing a slope_ratio of -4.08—a sign-flip artifact that has no mechanical interpretation as 'acceleration.' Similarly, entity_40ea0cfb3b has ma20_slope_5 = 0.0018 (near-zero denominator) producing a ratio of 13.9x that is an artifact of measurement noise in ma20_slope_5, not a real divergence signal. Using ratio metrics with near-zero denominators violates the interval-scale requirement for meaningful division operations."
+    },
+    {
+      "issue": "IBD entry tightness confounds the mechanism",
+      "why_it_matters": "The numeric_contrasts show ibd_entry_close_vs_trigger_pct has a standardized_delta of only -0.6952 between false_negatives and selected_winners, but this understates its importance for RUIN specifically. All 8 false_positive_ruin cases have ibd_entry_close_vs_trigger_pct in the range 0.028-0.074, while selected_winners span 0.001-0.070 with no lower bound constraint. The mechanism conflates 'tight entry' (a known overfitting risk) with 'slope divergence,' when the former is the actual predictive variable and the latter is a consequence of tight entries capturing transient momentum spikes."
+    },
+    {
+      "issue": "Pullback duration clustering is a sample artifact",
+      "why_it_matters": "6 out of 8 false_positive_ruin cases have pullback_duration_weeks exactly 7.0 weeks (entity_8f0df3d38e, entity_ccc90a671f, entity_55c2da490e) or null. This clustering at the 7-week mark is improbable under a continuous mechanism and suggests either (a) a data pipeline artifact where 7 weeks is a default fill value, or (b) the outcome classification itself uses a 7-week threshold to define 'ruin.' If the outcome definition uses a 7-week duration cutoff for ruin classification, the analysis is circular—the supposed PIT-visible precursor is downstream of the classification rule."
+    },
+    {
+      "issue": "No independent validation set",
+      "why_it_matters": "The entire analysis uses 'discovery-train-only' data (method_note: 'Discovery-train-only anonymized error archaeology'). The falsifiable predictions specify testing on 'independent snapshots' and 'rolling 27-case windows,' but the claim is being evaluated on the same 27 cases used to generate it. With n=27 and approximately 20 features, the probability of finding at least one feature with standardized_delta > 1.0 by chance (multiple testing problem) exceeds 60%. The claimed mechanism may be a selection artifact of mining 20+ features across a small sample."
+    },
+    {
+      "issue": "Entity_6618d3e80c falsifies the deterministic interpretation but the researcher retreats to 'probabilistic' without evidence",
+      "why_it_matters": "The researcher correctly notes entity_6618d3e80c has slope_ratio = 3.71x AND outcome = selected_winner, then concludes the mechanism is 'probabilistic.' But this concession is unearned—if the mechanism were genuinely probabilistic, the slope_ratio would have documented predictive power conditional on other variables. No such conditional analysis exists in the claim. The retreat to 'probabilistic' is a unfalsifiable hedge that cannot be rejected by any observation in this dataset, violating the Popperian criterion for scientific theories."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with slope_ratio > 2.0, ibd_entry_close_vs_trigger_pct > 0.05, and industry concentration in the top quartile that do NOT result in ruin (to test if the mechanism requires concentration as a necessary condition).",
+    "B0 picks with slope_ratio < 1.2, low mom_20 (0.05-0.15), and high vol_ratio (1.3-1.6) that produce ruin outcomes (to test if slope_ratio is truly necessary vs. optional).",
+    "Temporal validation: apply the slope_ratio > 1.5 filter to snapshots NOT used in training (e.g., adjacent time periods) and measure whether ruin probability actually exceeds 30%.",
+    "Synthetic counterexample construction: generate random portfolios with the same feature distributions as ruin cases but shuffled outcome labels, and verify the slope_ratio distribution does NOT separate the shuffled groups."
+  ],
+  "what_would_change_my_mind": [
+    "Demonstration that slope_ratio > 1.5 retains predictive power (p < 0.05) in a held-out validation set of at least 50 B0 picks where the mechanism was not used to select the training cases.",
+    "A mechanistic explanation for why negative ma20_slope_5 denominators (entity_55c2da490e) should be excluded from the ratio calculation, and evidence that the remaining positive-denominator ratio cases still separate ruin from winners.",
+    "Confirmation that pullback_duration_weeks = 7.0 is NOT a data pipeline artifact or classification threshold, with evidence that ruin cases with different pullback durations show the same slope_ratio distribution.",
+    "A causal model (e.g., instrumental variable or regression discontinuity design) showing that slope_ratio manipulation (if possible) would change ruin probability, not merely that slope_ratio correlates with ruin conditional on other variables."
+  ]
+}

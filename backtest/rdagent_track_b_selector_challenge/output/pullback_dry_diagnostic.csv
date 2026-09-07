@@ -1,0 +1,5 @@
+universe,state,sample_size,pct_of_universe,w1_mature_count,w1_mean_pct,w1_median_pct,w1_p10_pct,w1_p90_pct,w1_cvar10_pct,w1_stop8_rate_pct,w2_mature_count,w2_mean_pct,w2_median_pct,w2_p10_pct,w2_p90_pct,w2_cvar10_pct,w2_stop8_rate_pct,w4_mature_count,w4_mean_pct,w4_median_pct,w4_p10_pct,w4_p90_pct,w4_cvar10_pct,w4_stop8_rate_pct
+signal,True,4,100.0,0,,,,,,,0,,,,,,,2,-1.5,-1.5,,,-8.0,50.0
+signal,All,4,100.0,0,,,,,,,0,,,,,,,2,-1.5,-1.5,,,-8.0,50.0
+actionable,True,4,100.0,0,,,,,,,0,,,,,,,2,-1.5,-1.5,,,-8.0,50.0
+actionable,All,4,100.0,0,,,,,,,0,,,,,,,2,-1.5,-1.5,,,-8.0,50.0

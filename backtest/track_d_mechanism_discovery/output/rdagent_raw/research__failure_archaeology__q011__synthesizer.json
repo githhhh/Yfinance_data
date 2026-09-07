@@ -1,0 +1,61 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "The slope ratio (ma10_slope_5 / ma20_slope_5) is a weak, conditional predictor of ruin that is largely confounded with entry timing (ibd_entry_close_vs_trigger_pct). Evidence from the 27-case discovery set shows: (1) all false_positive_ruin cases with high slope ratio (>2.0x) also have ibd_entry_close_vs_trigger_pct in the upper quartile (>0.065), while selected_winners with low slope ratios have early entries; (2) the numeric contrasts show up_day_ratio_20 (standardized delta -1.19) and vol_ratio_5_20 (delta -1.05) as stronger separators than slope metrics (delta ~-0.6); (3) entity_3adc078f01 (selected_winner, large_win) has ratio 0.87x and vol_ratio 1.14—below any proposed threshold—directly undercutting the mechanism. The velocity plateau mechanism is plausible in domain theory but not confirmed by this data. The industry concentration amplifier cannot be evaluated with current frozen evidence and is marked UNRESOLVED. The ibd_entry_close_vs_trigger_pct feature is the dominant predictor; slope ratio adds marginal conditional value only.",
+  "falsifiers": [
+    "A held-out replication where slope ratio retains ruin-predictive power after conditioning on ibd_entry_close_vs_trigger_pct quartile within the same snapshot—current evidence does not establish this orthogonality",
+    "Bootstrap instability: with N=8 ruin and N=11 winners, the 2.0x threshold estimate has wide confidence bounds; resampling may shift the optimal threshold substantially, making the specific value a data-snooped artifact",
+    "Counterexample survivorship: entity_3adc078f01 is a selected_winner (large_win) with ratio 0.87x and vol_ratio 1.14, below all proposed thresholds—mechanism does not predict this case's success",
+    "Vol_ratio non-separation: entity_bec51a4227 (selected_winner) has vol_ratio 1.01 and entity_3adc078f01 (winner) has vol_ratio 1.14; a vol_ratio >1.4 filter would eliminate true winners",
+    "Snapshot heterogeneity confounding: ruin base rates may differ systematically across snapshots; if true, individual-level feature claims are confounded by unobserved regime effects",
+    "Industry concentration UNRESOLVED: no sector-ETF momentum or concentration index data exists to test the causal amplifier hypothesis—attributing ruin to concentration is currently unfalsifiable narrative"
+  ],
+  "actionable_design_principles": [
+    "Prioritize ibd_entry_close_vs_trigger_pct as the primary ruin risk feature; it is available at snapshot time, has cleaner separation (winners median ~0.030 vs ruin ~0.069), and is not a derived kinematic artifact",
+    "Treat ma10_slope_5/ma20_slope_5 ratio as a conditional secondary filter only: apply it AFTER stratifying on entry timing tercile, not as a standalone criterion—its orthogonal contribution is unconfirmed but plausible in domain theory",
+    "Use up_day_ratio_20 < 0.50 as an additional negative signal; standardized delta of -1.19 is the strongest feature separation, and it is available at snapshot time",
+    "Do not use vol_ratio_5_20 > 1.4 as a hard filter; winners exist below this threshold (entity_bec51a4227 at 1.01, entity_3adc078f01 at 1.14)—consider it a soft risk indicator only",
+    "Incorporate snapshot-level regime indicators if available; snapshot pooling without regime controls risks omitted-variable bias in individual-level mechanism claims",
+    "Avoid pullback metrics (pullback_pct, pullback_duration_weeks) as predictive features—they are post-hoc outcomes, not snapshot-time information",
+    "If industry concentration is suspected as the causal amplifier, the correct policy response is position sizing reduction on high-entry-proximity picks rather than elimination, to preserve winner capture while limiting ruin exposure"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage entry filter: Stage 1 uses ibd_entry_close_vs_trigger_pct ≤ 0.040 as a hard screen; Stage 2 applies slope ratio > 2.0 ONLY to cases already in the 0.040-0.080 entry band to catch residual late-breakout risk",
+      "why_distinct": "Separates the primary entry-timing signal from the secondary slope artifact; avoids eliminating early-entry winners (like entity_ead73f4390 at 0.0017) while filtering late-entry ruin cases",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "ma10_slope_5",
+        "ma20_slope_5"
+      ],
+      "capacity_relevance": "Aligns with the finding that entry proximity is the dominant predictor while slope ratio adds conditional marginal value only in the ambiguous middle band"
+    },
+    {
+      "idea": "Choppiness risk penalty: reduce position size by 30% for B0 picks with up_day_ratio_20 < 0.50, independent of entry timing, because low up-day fraction signals weak internal momentum coherence",
+      "why_distinct": "up_day_ratio_20 has the highest standardized separation (delta -1.19) and is orthogonal to entry timing mechanics—targets a distinct signal dimension",
+      "features": [
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Captures the 'choppiness within momentum' signal that neither entry timing nor slope ratio directly measures; directly addresses the concern that low up_day_ratio cases are more ruin-prone"
+    },
+    {
+      "idea": "Vol-regime conditioning on position size rather than inclusion/exclusion: assign smaller weights (≤50% of base) to B0 picks with vol_ratio_5_20 > 1.5, but retain them in the portfolio to preserve winner capture",
+      "why_distinct": "Treats high volatility as a sizing signal, not a binary filter; avoids eliminating winners like entity_bec51a4227 (vol_ratio 1.01) and entity_3adc078f01 (1.14) who coexist with high-vol ruin cases",
+      "features": [
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Acknowledges vol_ratio has weak separation power (winners span 0.96-1.77) and should modulate exposure, not determine inclusion"
+    },
+    {
+      "idea": "Snapshot-stratified validation requirement: any proposed feature threshold (slope ratio > 2.0, vol_ratio > 1.4) must be tested for stability across individual snapshots before deployment, rejecting thresholds that flip direction in even one snapshot",
+      "why_distinct": "Directly addresses the unobserved regime heterogeneity attack; ensures the feature-outcome relationship is not an artifact of snapshot pooling",
+      "features": [
+        "snapshot_anon",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Prevents overfitting to the 27-case sample by requiring cross-regime validation; the experimental designer's snapshot_regime_heterogeneity_test is a prerequisite for any threshold deployment"
+    }
+  ]
+}

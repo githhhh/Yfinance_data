@@ -1,0 +1,34 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 32,
+  "mechanism_summary": "The proposed adaptive-capacity channel is theoretically coherent (post-B0 multiplicative penalty using mom_20 x |base_depth_pct| preserves the eligible set) but the empirical evidence in the 27-case archaeology does not isolate an interaction. mom_20 carries the bulk of the separation (standardized delta -1.00) and its colinear proxies vol_ratio_5_20 (-1.05) and up_day_ratio_20 (-1.19) are equally or more diagnostic, while base_depth_pct shows near-zero effect (delta 0.19) with the WRONG sign (selected winners are 3.7pp shallower than false_negatives). The 'deep base sustains continuation' narrative is contradicted by entity_ead73f4390 (mom_20=0.32, px_vs_ma50=0.18, large_win) and entity_2c58cebc59 (mom_20=0.32, pullback -25%, large_win). What is supported is the weaker claim that B0 picks with mom_20 above ~0.15 paired with weakening distribution/up_day stats carry elevated ruin probability; base_depth_pct should be downgraded from regime modifier to optional tie-breaker until reconciled sign evidence appears.",
+  "falsifiers": [
+    "Held-out (not the same 27 cases) monotonic ruin probability across mom_20 quintiles within B0 with interaction term base_depth_pct statistically significant (p<0.05) and stable cell counts (>=10 per cell) after controlling for vol_ratio_5_20 and up_day_ratio_20.",
+    "Larger-sample reconciliation that selected_winners are DEEPER (more negative base_depth_pct) than false_negatives, reversing the +3.7pp shallowness observed here; absent this, base_depth_pct has no directional mechanism."
+  ],
+  "actionable_design_principles": [
+    "Encode adaptive exposure as a soft post-rank weight on the existing PIT signal set; never as a pre-filter that expands or contracts B0 membership. The shrinkage floor (e.g., 0.5x) must be respected so high-mom/deep-base winners (entity_ead73f4390, entity_2c58cebc59) are not deselected.",
+    "Parameter calibration must be done with frozen alpha/threshold/k on a held-out split distinct from the 27 discovery cases; report ruin-count and winner-count deltas with binomial confidence intervals and pre-register the composite criterion before evaluation."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Within-B0 capacity_weight = clip(1 - alpha*(mom_20 - threshold)*penalty_modifier, floor, 1.0), where penalty_modifier defaults to 1.0 and is optionally scaled by (1 - min(base_depth_pct / base_ref, 1.0)) so base_depth enters only as a soft tie-breaker, never as the regime gate.",
+      "why_distinct": "Demotes base_depth_pct from regime modifier (whose evidence sign is reversed) to tie-breaker; lets mom_20 alone drive the penalty (which is what the data supports), while preserving the soft-floor protection against deselecting high-mom/deep-base winners.",
+      "features": [
+        "mom_20",
+        "base_depth_pct"
+      ],
+      "capacity_relevance": "Scales B0 position size without altering eligible universe; alpha and base_ref jointly control regime sensitivity."
+    },
+    {
+      "idea": "Proxy-conditioned capacity gate: trigger penalty only when vol_ratio_5_20>1.4 AND up_day_ratio_20<0.55 co-occur; mom_20 acts as continuous secondary factor, not primary. Falls back to no-shrinkage when proxies are absent.",
+      "why_distinct": "Uses the strongest PIT proxies (standardized delta -1.05, -1.19) as the gating condition rather than mom_20 alone; avoids the colinearity/double-penalization attack raised by the skeptic.",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Capacity shrinks only in the high-vol / low-up-day cluster where ruins cluster (e.g., entity_84824e6a20 vol=1.63 up=0.4 ruin); capacity stays full otherwise."
+    }
+  ]
+}

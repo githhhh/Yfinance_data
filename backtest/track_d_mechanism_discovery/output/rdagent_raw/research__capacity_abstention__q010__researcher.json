@@ -1,0 +1,33 @@
+{
+  "mechanism_claim": "In low setup-density regimes, the candidate pool is shifted toward marginal profiles whose PIT-observable features (up_day_ratio_20 ≈ 0.40–0.65, vol_ratio_5_20 ≈ 1.0–1.6, mom_20 ≈ 0.02–0.25, px_vs_ma50 ≈ 0.05–0.15) overlap materially with the false_positive_ruin region of historical outcomes; cash dominates the unfilled slot because (a) the marginal candidate's expected return net of asymmetric ruin risk is negative, and (b) holding cash preserves option value for the next higher-quality setup without paying a ruin tax. Selecting 1, 2, or 3 positions under fixed 3-slot capital therefore has non-linear economic meaning: slot 1 captures the highest-quality setup (positive EV), slot 2 captures the second-best (often breakeven to slightly positive), and slot 3 captures the marginal candidate (expected negative EV, dominated by ruin tail).",
+  "evidence_for": [
+    "8 of 27 archaeological cases are labeled false_positive_ruin despite passing the b0 entry filter; their PIT features sit in a band that partially overlaps selected_winners (e.g., entity_8f0df3d38e: mom_20=0.176, vol_ratio_5_20=1.24, up_day_ratio=0.65, yet w4_return=ruin; entity_3472243e0c: mom_20=0.242, vol_ratio=1.21, up_day_ratio=0.65, w4=ruin).",
+    "Numeric contrast: false_negatives vs selected_winners show standardized deltas of -1.19 (up_day_ratio), -1.05 (vol_ratio_5_20), -1.00 (mom_20), -0.85 (px_vs_ma50), confirming that the very features that distinguish true winners from non-winners are concentrated in the high-density tail.",
+    "The median up_day_ratio for selected_winners (0.625) sits above the false_negative median (0.50); the false_positive_ruin cases cluster between these values, indicating they enter the portfolio from the ambiguous middle of the distribution.",
+    "Pullback_pct median delta (+8.6, standardized 0.64) shows winners had deeper, longer-duration pullbacks (median 5.5 weeks vs 4.0), meaning many marginal candidates fail the deeper-base confirmation that requires time to develop — so in low-density snapshots the pullback-confirmed cohort is small.",
+    "Ruin outcome bucket outcomes (w4_return=ruin) imply asymmetric losses: one ruin can erase the gains of multiple winners in a 3-position portfolio, making the variance contribution of the lowest-quality slot disproportionately negative.",
+    "Only 1 case carries the dual label 'false_positive_ruin|selected_winner' (entity_6618d3e80c), showing that even setups with strong features (mom_20=0.251, px_vs_ma50=0.337) can bifurcate — indicating the feature filter is necessary but not sufficient."
+  ],
+  "evidence_against": [
+    "Several false_negative_relative cases (e.g., entity_de1c657364: pullback_pct=-7.3, mom_20=0.058, up_day_ratio=0.65) became large winners despite mid-tier features, implying that abstaining on marginal setups forgoes real upside and the opportunity cost of cash is non-zero.",
+    "2-position diversification could theoretically reduce portfolio variance if position failures are weakly correlated; the archaeology does not directly test cross-position correlation in low-density snapshots.",
+    "Cash has no explicit yield modeled here; in regimes where the benchmark drifts upward, 2/3 idle capital may underperform even a marginal 3rd slot — the data does not net out this benchmark drift.",
+    "Selected_winners themselves sometimes have only modestly above-threshold features (entity_90a828939a: mom_20=0.036, up_day_ratio=0.45, w4=large_win), showing that high-conviction gating on the listed features would have skipped real winners.",
+    "Sample size (n=27, of which only ~11 selected_winners and 8 false_positive_ruin) is small; the apparent separation between winner and ruin distributions may shrink with more data."
+  ],
+  "falsifiable_predictions": [
+    "If fewer than 3 candidates in a snapshot satisfy ALL of {up_day_ratio_20 ≥ 0.60, vol_ratio_5_20 ≥ 1.40, mom_20 ≥ 0.15}, then a 3-slot full-deployment portfolio will underperform a 1-slot portfolio on risk-adjusted return over W4 because the 3rd slot's ruin probability exceeds ~35%.",
+    "If the marginal (lowest-feature) candidate has up_day_ratio_20 < 0.55 OR vol_ratio_5_20 < 1.30, the contribution of that slot to portfolio expected value is negative and dominated by the ruin tail; cash strictly dominates deployment of that slot.",
+    "In low-density snapshots (≤2 qualifying setups), the conditional probability of w4_return_bucket='ruin' for any slot whose up_day_ratio_20 falls in [0.40, 0.60] AND vol_ratio_5_20 in [1.0, 1.5] is ≥30%, versus ≤10% for slots with all three features above the thresholds.",
+    "Sharpe ratio ordering in low-density regimes: 1-position ≥ 2-position > 3-position; this ordering should reverse (3 > 2 > 1) in high-density regimes where all slots meet the feature thresholds.",
+    "The 2nd slot's marginal value (ΔEV of moving from 1 to 2 positions) is positive only when the 2nd-best candidate has up_day_ratio_20 ≥ 0.60 AND mom_20 ≥ 0.10; below these, the 2nd slot is net-negative."
+  ],
+  "policy_implications": [
+    "Adopt a slot-deployment quality gate using PIT-observable features only: require up_day_ratio_20 ≥ 0.60, vol_ratio_5_20 ≥ 1.40, and mom_20 ≥ 0.15 for any slot to be filled; below these thresholds the slot defaults to cash.",
+    "In low setup-density snapshots, cap deployment at min(N_qualifying, 2) positions; explicitly prohibit forcing the 3rd slot when only 1 or 2 setups clear the gate, because the historical false_positive_ruin band coincides with the marginal-candidate range.",
+    "Treat cash as a position with explicit option value: the cost of an unfilled slot equals the expected EV of the best future setup discounted by arrival probability, not zero — this should be netted against any marginal candidate's expected return before deployment.",
+    "When only 1 setup qualifies, prefer single concentrated deployment over forcing diversification; when 2 qualify, deploy both; reserve the right to hold 1–2 slots in cash without penalty.",
+    "Track per-slot feature overlap with the false_positive_ruin profile (up_day_ratio in [0.40,0.65], vol_ratio in [1.0,1.6], mom_20 in [0.02,0.25]) as a pre-trade risk flag; if the marginal candidate lands in this band, abstain regardless of slot count.",
+    "Re-evaluate the feature thresholds quarterly using expanding archaeology: if the winner/ruin separation weakens over time, raise the thresholds rather than lowering them, because the ruin tail is asymmetric and dominates the loss profile."
+  ]
+}

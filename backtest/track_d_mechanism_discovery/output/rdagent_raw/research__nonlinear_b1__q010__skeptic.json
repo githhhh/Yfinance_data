@@ -1,0 +1,61 @@
+{
+  "strongest_counterclaim": "The proposed piecewise close_position × volume_ratio gate is not an independent signal — it is a recoded proxy for the same latent construct (short-term price extension + participation momentum) that B0 already captures via up_day_ratio_20, mom_20, and px_vs_ma50, and its apparent separability derives from a 27-case single-window discovery sample with heavy clustering in two snapshots and conditioning on B0 survivors. The 'institutional commitment' mechanism is unfalsifiable post-hoc narration; the data are equally consistent with the well-documented short-term drift / one-day reversal pattern in which names that close near the high on above-average volume continue to drift in the direction of the close for the next few weeks. Any predictive gain will collapse out-of-sample once the snapshot regime and the up_day_ratio_20 / mom_20 / px_vs_ma50 controls are included jointly.",
+  "attacks": [
+    {
+      "issue": "Collider conditioning on an unobserved universe",
+      "why_it_matters": "B0 is itself a non-random selector — it preferentially admits names that 'look like breakouts.' Conditioning a downstream rule on B0 picks opens a collider: any feature correlated with B0 admission (and volume_ratio_5_20 is one, because low-volume names rarely look like breakouts) will appear predictive of post-admission outcome even if it has zero causal effect on the underlying universe. The claim that the gate 'doesn't expand B0' disguises that it is conditioning the analysis on a non-representative subset; the FN cases (is_b0_pick=false) are precisely the test set the model would need, and their distribution is confounded with snapshot rather than with the gate itself."
+    },
+    {
+      "issue": "Severe confounding with up_day_ratio_20 and mom_20 (the strongest standardized deltas in the evidence)",
+      "why_it_matters": "The numeric contrasts show up_day_ratio_20 (std delta -1.19) and mom_20 (-1.00) separate FN from SW much more strongly than close_position (-0.46) or volume_ratio (-0.50). close_position and volume_ratio_5_20 are mechanically correlated with these: a name with high up_day_ratio_20 has been trending up, which elevates volume_ratio relative to a 20-day baseline and pushes close_position higher on the breakout day. Without a multivariate model showing the gate adds information beyond up_day_ratio_20 + mom_20 + px_vs_ma50, the piecewise structure is at best redundant and at worst a leakage channel for overfitting."
+    },
+    {
+      "issue": "Snapshot-level clustering dominates feature-outcome associations",
+      "why_it_matters": "Six of eight false_positive_ruin cases and all five false_negative cases come from just two snapshots (snap_71486ed83c and snap_d0d57b1e40). The ruins cluster not by feature values but by snapshot regime; entity_ccc90a671f (ruin, vol=1.45) and entity_440e297253 (SW, vol=1.59) come from different snapshots with nearly identical volume profiles. Any cross-snapshot rule derived from this sample is fitting snapshot identity, not a generalizable gate. A within-snapshot fixed-effects analysis would likely shrink the apparent gate effect."
+    },
+    {
+      "issue": "Mechanism claim is post-hoc and contradicts the short-term reversal literature",
+      "why_it_matters": "The 'institutional commitment resists mean-reversion' story is a narrative imposed on a pattern. The observed correlation (high close_position + high volume_ratio → continuation) is precisely what the short-term drift / continuation literature predicts for any name, and it does not require a special 'institutional' mechanism. Furthermore, the prior claim treats close_position>=0.85 + high volume as 'commitment,' but in standard microstructure, a close near the high on elevated volume is also the textbook signature of an exhaustion day that marks a swing high. The mechanism is therefore ambiguous in both directions; the data cannot distinguish commitment from exhaustion."
+    },
+    {
+      "issue": "The cell structure admits counterexamples in nearly every cell",
+      "why_it_matters": "Looking at the proposed cell boundaries: high-volume-high-close has entity_b6bcccdf6a (ruin/loss at vol=1.31, close_vs_trigger=0.032, close_position presumably high); mid-volume with tight close has entity_bec51a4227 (SW large_win at vol=1.007) which the policy calls a 'soft-pass' but would actually be demoted under the strict floor; high-volume with low close has entity_2f86543bf6 (SW large_win with negative slopes and low up_day_ratio_20=0.35). The proposed four-cell partition misclassifies multiple of the 11 selected winners, and the 'soft-pass with size discount' workaround is ad hoc and untested."
+    },
+    {
+      "issue": "Entity_6618d3e80c carries mutually exclusive labels in the same evidence",
+      "why_it_matters": "The dual annotation (false_positive_ruin|selected_winner) at vol_ratio=1.45, close_vs_trigger=0.051, up_day_ratio_20=0.55 is presented as evidence for the 'soft threshold' interpretation, but it more directly indicates label noise or label ambiguity in the discovery method. A model that needs to explain a contradiction within a single observation cannot claim a clean threshold; the data-generating process for the labels is itself in question, and any threshold fit to noisy labels will replicate the noise."
+    },
+    {
+      "issue": "Sample-size constraint and multiple-testing burden are not addressed",
+      "why_it_matters": "With 27 cases, the proposed four-cell partition yields an average of <7 cases per cell; the falsifiable predictions (e.g., 'large_win rate > 60% in upper cell') require dozens of observations per cell to be distinguishable from sampling noise. No correction for the number of candidate thresholds (1.2/1.3/1.5/1.7/1.8 across two features and a continuous close_position) is offered. The threshold values are cherry-picked to fit the discovery set."
+    },
+    {
+      "issue": "The 'without expanding the B0 universe' framing hides effective shrinkage and is not a neutral constraint",
+      "why_it_matters": "The constraint forbids expanding the eligible set but allows shrinking it. A post-B0 hard-exclude cell (e.g., volume<1.3) would drop entity_3472243e0c, entity_55c2da490e, entity_40ea0cfb3b, entity_b6bcccdf6a-class setups that the data show can be winners; a soft-pass in the mid-band shrinks expected edge per name. The 'universe-neutral' language disguises a portfolio-construction choice (concentration of bets) that affects realized ruin rate but not the underlying edge. This is a portfolio effect dressed as a predictive signal."
+    },
+    {
+      "issue": "volume_ratio_5_20 is a regime-dependent feature with no regime conditioning",
+      "why_it_matters": "volume_ratio relative to a 20-day baseline has a regime-dependent mean: in low-volatility regimes (VIX<15) typical volume_ratio is ~1.0-1.2, so a 1.7 floor would exclude the entire universe; in high-volatility regimes, the same 1.7 floor would be common. The proposed thresholds are calibrated to a specific regime in the discovery window and will misfire in other regimes. No VIX/bin/realized-vol interaction is specified, and entity_40ea0cfb3b (vol=0.91 → ruin) and entity_05b4c6b1f7 (vol=0.96 → FN large_win) demonstrate that the same low-volume value has opposite consequences."
+    },
+    {
+      "issue": "The threshold boundaries are not data-derived; they are round-number defaults that fit the sample",
+      "why_it_matters": "1.3, 1.5, 1.7, 0.80, 0.85 — these are aesthetic numbers, not optimized cutoffs with reported cross-validation or sensitivity analysis. With 27 cases, many threshold partitions will produce cells that 'look right.' The lack of any stability check (jackknife, bootstrap, leave-one-snapshot-out) means the reported cells are overfit."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with volume_ratio < 1.2 that nonetheless produce large_win W4 outcomes across multiple non-discovery snapshots — particularly entity_bec51a4227 (vol=1.007, SW large_win) and entity_05b4c6b1f7 (vol=0.964, FN large_win) classes.",
+    "B0 picks in the high-volume-high-close cell (vol>1.7, close_position>0.85) that end in ruin or loss — needed to break the 'commitment' mechanism. entity_b6bcccdf6a (vol=1.31, ruin) is in the same general neighborhood; entity_d2ca7853ba (vol=1.09, SW) shows that low-vol winners exist too.",
+    "Two B0 picks in the same snapshot with nearly identical (volume_ratio, close_position) tuples but opposite outcomes (ruin vs SW). If found, the gate cannot separate them.",
+    "A snapshot where the proposed gate would have excluded > 30% of subsequently-winning picks, demonstrating regime fragility.",
+    "Within-snapshot fixed-effects coefficients showing the gate adds zero incremental log-likelihood beyond up_day_ratio_20 + mom_20 + px_vs_ma50.",
+    "A B0 pick in the proposed demote cell (vol<1.3 OR close_position<0.75) that goes on to be a top-decile winner — to test whether the demotion systematically forfeits alpha."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample test on at least two snapshots not in the discovery set, with reported cell-by-cell outcome rates and a confidence interval showing the gate separates from the up_day_ratio_20 + mom_20 + px_vs_ma50 baseline at p<0.05.",
+    "A leave-one-snapshot-out cross-validation showing the threshold values (1.3/1.7, 0.80/0.85) are stable across folds rather than collapsing toward a single number.",
+    "A multivariate logistic or gradient-boosted model in which the close_position × volume_ratio interaction term enters with a coefficient that is statistically significant and robust to feature permutation, after the controls up_day_ratio_20, mom_20, px_vs_ma50, ma10_slope_5 are included.",
+    "A demonstration that the proposed demotion of the low-volume-extended cell reduces forward ruin rate by > 20% in a backtest without simultaneously reducing large_win rate by a comparable amount (i.e., not just shifting the distribution of outcomes but actually improving conditional expected value).",
+    "A regime-conditioning specification (e.g., volume floor scaled by realized 20-day vol or VIX bucket) that improves the gate's predictive accuracy in both calm and stressed regimes.",
+    "Replication of the cell-outcome rates on an independent dataset of equal or greater size, with the same labels generated by the same discovery method."
+  ]
+}

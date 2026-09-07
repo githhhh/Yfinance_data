@@ -1,0 +1,23 @@
+{
+  "mechanism_claim": "ibd_entry_close_position and ibd_entry_volume_ratio jointly measure breakout conviction: a close in the upper portion of the day's range confirms that buyers defended the breakout, while a volume ratio >1 confirms participation rather than thin-air drift. When the two agree (high-high), the B0 candidate is a real institutional accumulation pivot and earns full adaptive capacity; when they disagree (one high, one low), the breakout is fragile (thin breakout or distribution) and should receive a reduced or zero position even though it passes the B0 filter. Encoding this preserves the eligible universe but re-weights exposure by cross-sectional conviction rank, so marginal B0 picks degrade gracefully instead of being hard-rejected.",
+  "evidence_for": [
+    "Numeric contrasts show false_negative medians trail selected_winner medians on both features (close_position delta -0.039, volume_ratio delta -0.215), and standardized deltas are among the larger moves (close_position std=-0.46, volume_ratio std=-0.50), consistent with the joint signal discriminating survivors from misses.",
+    "False-positive ruin cases cluster where close_vs_trigger_pct is elevated (0.06-0.07) but vol_ratio_5_20 sits only mid-pack (~1.2-1.6) with up_day_ratio often ≤0.5 (entity_84824e6a20 up_day=0.4, entity_b6bcccdf6a up_day=0.4) — i.e. price pushed to trigger on weak/contradictory tape.",
+    "Selected winners with very high close_vs_trigger and very high vol_ratio_5_20 (entity_b00579f203: 0.0465/1.58, entity_ead73f4390: 0.0017/1.77, entity_2c58cebc59: 0.034/1.62) correspond to large_win buckets, supporting the high-high = full-capacity hypothesis."
+  ],
+  "evidence_against": [
+    "entity_6618d3e80c is dual-labeled selected_winner|false_positive_ruin with a high volume_ratio (1.45) and strong px_vs_ma50 (33.7%), showing the high-high combination is not sufficient when downstream drawdown control is missing — adaptive capacity can shrink ruin magnitude but cannot fully prevent it under distribution regimes.",
+    "entity_55c2da490e and entity_40ea0cfb3b are ruins with relatively low close_vs_trigger (0.028, 0.061) yet still destroyed; ruin is achievable from sub-trigger-grade entries, so the rule must not over-trust mid-range close_position as safe.",
+    "False-negative cases (entity_de1c657364, entity_535a1beed7) sometimes carry decent up_day_ratio (0.5-0.65) but low vol_ratio_5_20 (1.15-1.17), indicating that absent volume confirmation, B0 currently filters them out — the same feature that causes FNs can be repurposed for capacity rather than eligibility without changing the universe."
+  ],
+  "falsifiable_predictions": [
+    "Among B0-eligible picks, those with close_position > 0.85 AND volume_ratio > 1.5 (top-tertile of a composite conviction rank) will realize W4 returns above the cross-sectional median of B0 picks at a hit rate materially higher than picks satisfying only one of the two thresholds.",
+    "Reducing position size to ~50% on picks where the two features disagree (high-low or low-high) will shrink aggregate ruin rate (large_loss + ruin bucket frequency) more than it shrinks aggregate large_win rate, i.e. the convexity of the payoff improves without shrinking upside participation.",
+    "In regime slices where up_day_ratio_20 < 0.5 at entry, the high-high conviction subset will still underperform its in-regime baseline because the close/volume joint signal does not substitute for trend quality; capacity rule should be gated by trend filter rather than applied unconditionally."
+  ],
+  "policy_implications": [
+    "Encode a conviction score = zscore(close_position) + zscore(volume_ratio) computed on the B0-eligible cross-section only, then map to a position scalar (e.g. 0x below threshold, 0.5x when one leg passes, 1.0-1.25x when both pass) so the eligible universe is unchanged but capital is concentrated where buyers and participation agree.",
+    "Add a regime gate: when 5-day MA10 slope or 20-day up_day_ratio falls below the cross-sectional median, clip the conviction scalar to 1.0 so adaptive capacity does not amplify exposure in deteriorating tape.",
+    "Track capacity-adjusted W4 outcomes by conviction bucket to validate whether the high-high bucket earns a convexity premium; if not, collapse to a binary eligibility gate rather than continuous sizing."
+  ]
+}

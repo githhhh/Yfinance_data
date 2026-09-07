@@ -1,0 +1,58 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The prior mechanism claim is unfalsifiable as stated because (a) the feature-threshold gate is derived from the wrong comparison group (false_negatives vs selected_winners rather than false_positive_ruin vs selected_winners), (b) ruin events are demonstrably regime-clustered within snapshots (snap_71486ed83c and snap_b8420124eb each contain multiple ruin cases), which destroys the diversification assumption that slot 2/3 ruins are approximately independent, and (c) the 'option value of cash' double-counts the same marginal-feature problem by deferring it to the next snapshot rather than resolving it. The non-linear slot-EV ordering (slot1>slot2>slot3>cash) is therefore not an intrinsic property of low-density regimes — it is an artifact of (i) feature-based ranking that has already been shown to bifurcate on strong setups (entity_6618d3e80c: mom_20=0.251, px_vs_ma50=0.337, BOTH ruin and winner), and (ii) pooling across heterogeneous regimes that drives the apparent ruin tail.",
+  "attacks": [
+    {
+      "issue": "Threshold derivation uses the wrong reference distribution. The numeric contrasts compare false_negatives (rejected setups) against selected_winners, but the marginal-slot decision is between DEPLOYING a passing setup or holding cash — i.e., the relevant comparison is selected_winners vs false_positive_ruin (8 cases). The false_positive_ruin median up_day_ratio is in [0.50–0.65], overlapping the selected_winner median of 0.625; the gates derived from the false_negative comparison (≥0.60) would fail to exclude a meaningful fraction of ruin cases.",
+      "why_it_matters": "If the thresholds cannot separate the actually-risky cohort from the winning cohort on the demonstrated sample, the policy implication 'cash dominates slot 3' is unsupported. The signal-to-noise in the discrimination is much weaker than the researcher claims."
+    },
+    {
+      "issue": "Regime-driven ruin correlation within snapshots. snap_71486ed83c contains at least 4 false_positive_ruin/false_negative cases; snap_b8420124eb contains 2 false_positive_ruin cases plus a selected_winner. This is consistent with a market-regime effect (e.g., a sector drawdown week) that hits multiple slots simultaneously. The 'diversification across 2–3 slots reduces variance' assumption baked into the slot-EV ordering is therefore likely false.",
+      "why_it_matters": "If ruins are correlated across slots within a snapshot, the marginal variance reduction from slot 1→2 is small, and the comparison should be '1 concentrated slot vs 3 correlated slots,' which inverts the policy. The 'slot 2 is breakeven, slot 3 is negative' ordering collapses under correlated ruin."
+    },
+    {
+      "issue": "Omitted-variable confound on the ruin label. The feature set shown (up_day_ratio, vol_ratio, mom_20, px_vs_ma50, ma slopes, pullback stats) does not include earnings-date proximity, sector beta, market-cap, ADV liquidity, or borrow availability — common causes of idiosyncratic W4 ruin. entity_2c58cebc59 had pullback_pct=-25.1 yet produced large_win; entity_3adc078f01 had pullback_pct=-42.3 and large_win. The 'ruin' label may be driven by variables orthogonal to the PIT feature gate.",
+      "why_it_matters": "If ruin is driven by omitted variables, capping deployment at 2 slots based on observable features does not actually reduce ruin exposure — it just reduces exposure to the same marginal setups that were going to fail anyway. The cash buffer provides no insurance against regime-wide or event-driven ruin."
+    },
+    {
+      "issue": "Circular 'option value of cash'. The researcher claims cash has option value equal to 'expected EV of best future setup discounted by arrival probability.' But the next setup available in the same regime will have the same marginal-feature profile (low density is itself a regime property). Deferring deployment to the next snapshot does not escape the marginal-candidate problem; it just delays it.",
+      "why_it_matters": "This makes the policy 'prefer 1 concentrated slot + cash' unfalsifiable: any period of cash holding can be retrospectively justified by 'waiting for the next setup,' while no deployment decision is ever proven wrong because future outcomes are not observed. The option-value argument is rhetorical, not empirical."
+    },
+    {
+      "issue": "Magnitude of 'ruin' is unknown. The w4_return_bucket='ruin' label could be -20% or -80%. Without the underlying return magnitude, the EV arithmetic for the marginal slot is impossible. If ruin = -25% with probability 30% and large_win = +30% with probability 50% with breakeven otherwise, the slot has EV = 0.5*30 + 0.3*(-25) + 0.2*0 = +7.5% — positive, not negative. The asymmetry claim is asserted, not computed.",
+      "why_it_matters": "The entire 'cash dominates slot 3' conclusion rests on ruin being catastrophic enough AND frequent enough to swamp winner gains. With n=27 and undefined ruin magnitude, this is an unsubstantiated claim. The mechanism_claim is a story, not a calculation."
+    },
+    {
+      "issue": "Bifurcation on strong setups invalidates the gating logic. entity_6618d3e80c has features well above the proposed thresholds (mom_20=0.251, px_vs_ma50=0.337, up_day_ratio=0.55) and carries the dual label 'false_positive_ruin|selected_winner' — meaning the same setup produced both a ruin-cohort outcome and a winner-cohort outcome. This shows the feature gate has a non-trivial false-positive rate even at the strong end.",
+      "why_it_matters": "If even setups that pass the gate can bifurcate into ruin vs winner within the same snapshot, the gate is necessary-but-insufficient for the researcher's stated policy. The 'slot 1 positive EV' claim is conditional on a regime axis the gate does not measure."
+    },
+    {
+      "issue": "Density is never operationalized. The mechanism_claim and policy_implications both reference 'low setup density,' but the archaeology data contains no density field — snapshots are identified by hash only. The researcher infers density from sample composition without defining it, measuring it, or stratifying by it. The falsifiable predictions reference density thresholds that cannot be checked against the evidence.",
+      "why_it_matters": "A claim that depends on a regime variable that is neither measured nor defined in the data is not testable. The policy 'cap deployment at min(N_qualifying, 2)' presupposes a definition of qualifying that the data does not support."
+    },
+    {
+      "issue": "Sample artifact: n=27 discovery-train only. With 8 false_positive_ruin, 11 selected_winner, 5 false_negative_relative, 2 false_negative_big_winner, 1 dual-label, the per-bucket n is below any reasonable statistical-power threshold. The standardized deltas shown (max ~1.2) are moderate, not strong; small-sample deltas of this magnitude are consistent with random variation around zero.",
+      "why_it_matters": "An effect size of 0.6–1.2 standardized units in a 27-case archaeology is suggestive, not conclusive. The 'asymmetric ruin dominates' narrative is built on point estimates whose confidence intervals would likely include zero or reverse sign with another 27 cases."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A snapshot where the 2nd-best setup by the researcher's feature rank produced the largest W4 gain of the three slots — demonstrating that slot ordering by EV is not monotonically decreasing in feature rank.",
+    "A held-out snapshot where 3 marginal slots (all below the proposed thresholds) collectively produced a higher W4 return than the 1-slot 'concentrate on best' alternative — falsifying the slot3-dominance claim.",
+    "Cross-snapshot ruin correlation: cases from different snapshots but the same calendar week that all show false_positive_ruin, isolating regime from features.",
+    "A ruin case where the failing slot's features all CLEAR the proposed thresholds (up_day_ratio≥0.60, vol_ratio≥1.40, mom_20≥0.15), demonstrating gate-bypass.",
+    "A bull-regime snapshot where the researcher-classified 'marginal' 3rd slot produced large_win despite features in the false_positive_ruin band — showing regime overrides feature signal.",
+    "A negative benchmark-drift period where holding 2/3 in cash produced a portfolio return below even a single moderate-win slot — falsifying the option-value-of-cash claim.",
+    "A snapshot where selected_winners had lower median features than false_positive_ruin cases — demonstrating the ordering can reverse."
+  ],
+  "what_would_change_my_mind": [
+    "A held-out test (n≥30 low-density snapshots) where 1-slot deployment strictly dominates 2- and 3-slot deployment on Sharpe with p<0.05, AND where ruin magnitudes are reported (not just bucketed) so that EV arithmetic is verifiable.",
+    "Evidence that within a single snapshot, ruin outcomes across multiple slots are approximately uncorrelated — measured either by sign-correlation of W4 returns or by feature-conditional independence tests — supporting the diversification assumption.",
+    "A regime-stratified analysis (bull vs bear vs neutral snapshots) showing the ruin probability of marginal slots is materially lower in regimes where the marginal slots also have high features, not just lower marginal-feature counts overall.",
+    "Calculation of cash option value using a stated discount rate and arrival probability, showing that the option value exceeds the marginal slot's expected EV with statistical significance across multiple held-out snapshots.",
+    "Demonstration that the proposed gates (up_day_ratio≥0.60, vol_ratio≥1.40, mom_≥0.15) actually exclude a majority of false_positive_ruin cases while including a majority of selected_winner cases on the discovery sample — i.e., that the gates work on the correct reference comparison.",
+    "Evidence that features not shown in the archaeology (earnings proximity, sector exposure, liquidity, beta) do not dominate the ruin signal — i.e., that the visible feature set is sufficient for the gating logic."
+  ]
+}
+```

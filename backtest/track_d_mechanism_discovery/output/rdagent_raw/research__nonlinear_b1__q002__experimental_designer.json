@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "interaction_vs_binarized_volratio_ablation",
+      "features": [
+        "pullback_v_is_dry",
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "On a held-out B0 sample (not the 27 archaeology cases), fit two nested models predicting W4 bucket from the same continuous base: (M1) vol_ratio_5_20 + current_vs_ibd_candidate_pct + mom_20 + px_vs_ma50 as continuous terms; (M2) M1 plus the explicit cross-term pullback_v_is_dry * current_vs_ibd_candidate_pct (a true interaction, not multiplicative marginals). Compare partial-dependence curves of W4 outcome vs current_vs_ibd_candidate_pct separately for pullback_v_is_dry=0 and =1. Test non-parallelism (slope difference > 0.5pp per 1pp of current_vs_ibd_candidate_pct) and brier/log-loss improvement of M2 over M1.",
+      "success_criterion": "M2 improves brier score by >=2% relative AND partial-dependence curves for the two pullback_v_is_dry strata cross or differ in slope by >=0.5pp/1pp extension, with the dry-stratum curve showing positive marginal return on extension and the non-dry stratum flat or negative.",
+      "failure_criterion": "Curves are statistically parallel (slope difference < 0.2pp/1pp, overlapping CIs) AND M2 brier improvement < 1%; in that case pullback_v_is_dry adds no information beyond vol_ratio_5_20 and the interaction claim collapses to a binarization artifact."
+    },
+    {
+      "name": "four_quadrant_ruin_rate_with_null_separation",
+      "features": [
+        "pullback_v_is_dry",
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20",
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "comparison": "Stratify B0 candidates into 6 cells: (i) pullback_v_is_dry=1 & current_vs_ibd_candidate_pct in [0,3%], (ii) pullback_v_is_dry=1 & current_vs_ibd_candidate_pct >3%, (iii) pullback_v_is_dry=0 & current_vs_ibd_candidate_pct in [0,3%], (iv) pullback_v_is_dry=0 & current_vs_ibd_candidate_pct >3%, (v) pullback_v_is_dry=null, (vi) pullback_v_is_dry=1 & current_vs_ibd_candidate_pct <0. Compute ruin rate per cell. The null cell is kept separate so the interaction is not evaluated on the sample-selected subset.",
+      "success_criterion": "Ruin rate in cell (iv) > cell (iii) by >=10pp AND cell (iv) > cell (ii) by >=10pp, with cell (v) ruin rate NOT exceeding cell (iv) by more than 5pp — confirming the 'extended-and-non-dry = ruin' quadrant and showing null-pullback cases do not silently dominate the result.",
+      "failure_criterion": "Cell ordering is flat (any adjacent pair differs by <5pp) OR the null cell (v) has the highest ruin rate, which would mean the interaction hypothesis is driven by sample selection on the pullback-defined subset and cannot be generalized to the full B0 universe."
+    }
+  ],
+  "leakage_checks": [
+    "Verify pullback_v_is_dry is computed from a window that ends at least N trading days before the W4 measurement anchor (pre-specified N, e.g., 5 trading days). If the pullback detection window includes post-entry price/volume, any apparent interaction is forward-contaminated and the test must be rerun with the window truncated to data strictly available at snapshot time.",
+    "Verify current_vs_ibd_candidate_pct at the snapshot uses the IBD pivot level that was fixed at the original IBD candidate formation date (not updated retroactively to the snapshot close), so the 'extension' measurement is a PIT value and not a restated post-hoc pivot.",
+    "Confirm that for any matched-pair subgroup in the ablation, both arms share the same snapshot date, so snapshot-level regime effects (e.g., snap_d0d57b1e40 contamination seen by the Skeptic) cannot masquerade as the interaction."
+  ],
+  "priority_order": [
+    "interaction_vs_binarized_volratio_ablation",
+    "four_quadrant_ruin_rate_with_null_separation"
+  ]
+}

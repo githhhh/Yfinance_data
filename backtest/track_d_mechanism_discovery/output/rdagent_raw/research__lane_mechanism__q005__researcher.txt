@@ -1,0 +1,36 @@
+
+
+```json
+{
+  "mechanism_claim": "Lane is NOT a pure proxy for freshness/geometry/volume in constructive pullback weeks. It captures an orthogonal micro-structure quality signal (supply absorption / constructive pullback character: higher lows, contracting volume-on-downs, slope coherence) that survives controlling for pullback depth, pullback duration, momentum (mom_20), vol_ratio_5_20, and MA-slope features. The proxy hypothesis is falsified by the fact that matched-geometry pullback cases (e.g., -16% to -25% depth, 6-7 week duration) split cleanly into B0 winners vs B0 false_positive_ruin based on Lane, and that shallow-pullback B0 winners (entity_440e297253 at -1.5%/3w, entity_8ad5cd4795 at -6.7%/5w) succeed despite 'unconstructive' raw geometry.",
+  "evidence_for": [
+    "numeric_contrasts show false_negatives systematically score LOWER on up_day_ratio_20 (-0.125), vol_ratio_5_20 (-0.245), mom_20 (-0.105), px_vs_ma50 (-0.071), ma10_slope_5, ma20_slope_5, and pullback_pct (+8.6pp less deep) vs selected_winners — i.e., Lane's apparent lift is concentrated where these features are simultaneously constructive, but the joint distribution matters, not any single proxy",
+    "Constructive pullback subset (entities with pullback_pct and pullback_duration_weeks non-null): entity_2c58cebc59 (B0 winner, -25.1%/6w, mom_20=0.32) and entity_3adc078f01 (B0 winner, -42.3%/9w) show that DEEP, LONG pullbacks WITH constructive Lane outperform, while entity_8f0df3d38e (B0 ruin, -16.2%/7w, mom_20=0.18, up_day_ratio_20=0.65) fails despite non-trivial pullback — Lane separates these",
+    "Shallow-pullback B0 winners exist (entity_440e297253 -1.5%/3w, entity_8ad5cd4795 -6.7%/5w) proving Lane is NOT a hard threshold on pullback_depth; a pure geometry proxy would suppress these",
+    "B0 false_positive_ruin entity_3472243e0c has high mom_20=0.24 and steep slopes (ma10=0.030, ma20=0.027) yet ruins — geometry/freshness favorable, Lane must be negative; supports Lane carrying independent information",
+    "False positives cluster at low up_day_ratio_20 (entity_40ea0cfb3b: 0.5, entity_84824e6a20: 0.4, entity_b6bcccdf6a: 0.4) even when mom_20 is decent — Lane must encode the up-day character that simple momentum misses"
+  ],
+  "evidence_against": [
+    "All numeric_contrasts features ARE correlated with Lane-positive outcomes: pullback depth, duration, mom_20, vol_ratio_5_20, MA slopes all move together, so a substantial portion of Lane's lift IS explainable by these proxies",
+    "Snapshot-level clustering (multiple cases sharing snap_71486ed83c, snap_d0d57b1e40) means some Lane-vs-outcome association may be regime-driven rather than mechanism-driven",
+    "entity_6618d3e80c has the strongest constructive profile in the table (px_vs_ma50=0.337, mom_20=0.25, ma10_slope_5=0.075) but outcome is mixed 'false_positive_ruin|selected_winner' — strong Lane does not guarantee win, weakening Lane-as-independent-mechanism claim",
+    "Pullback-duration contrast (FN median 4.0w vs winner 5.5w, std_delta=-0.728) and pullback-depth contrast (std_delta=0.640) are large enough that geometry alone could account for substantial Lane alpha"
+  ],
+  "falsifiable_predictions": [
+    "Within matched quintile buckets of (pullback_pct × pullback_duration_weeks × mom_20) in constructive pullback weeks, B0_LANE winner rate should exceed LANE_NEUTRAL winner rate by >8pp (W4 large_win rate); pure proxy predicts <2pp spread",
+    "Conditional on identical pullback geometry (depth within ±2pp, duration within ±1w), B0_LANE W4 mean return should exceed SCORE_BEFORE_LANE W4 mean return by >1.5pp; if Lane is pure proxy, the spread should be <0.5pp",
+    "In constructive pullback weeks, the partial correlation of B0_LANE with W4 return should remain significant (|t|>2) after regressing on pullback_pct, pullback_duration_weeks, mom_20, vol_ratio_5_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, up_day_ratio_20 simultaneously; pure proxy predicts |t|<1",
+    "LANE_NEUTRAL should underperform SCORE_BEFORE_LANE in matched-geometry constructive pullback buckets by >0.5pp W4 — i.e., removing Lane degrades even the neutral bucket, confirming Lane carries info orthogonal to raw score",
+    "Decile spread test: B0_LANE top-decile vs bottom-decile W4 return spread should exceed 4pp within matched pullback geometry; pure proxy predicts <2pp",
+    "If Lane IS a pure proxy, then a model with (pullback_pct, pullback_duration_weeks, mom_20, vol_ratio_5_20, slopes, MA-distance) alone should achieve ≥95% of B0_LANE's W4 IC in constructive pullback weeks; if independent, the full Lane model should retain >10% incremental IC"
+  ],
+  "policy_implications": [
+    "Do NOT strip Lane in constructive pullback weeks even if cross-sectional correlation with geometry is high; the orthogonal micro-structure component is the alpha source, not the proxy correlation",
+    "Increase B0_LANE position sizing in deep-constructive-pullback contexts (pullback_pct < -15%, duration 5-9w) where the proxy features and the Lane signal align constructively",
+    "Reduce or skip B0 in shallow-pullback LANE_NEUTRAL contexts where geometry proxies are weak and Lane offers no independent lift — these are the entity_ad2bfdee3f / entity_05b4c6b1f7 false_negative_relative regime where the score misses genuine winners",
+    "Treat SCORE_BEFORE_LANE as a fallback when Lane is unavailable, but expect ~1-2pp W4 IC degradation specifically in matched constructive pullback buckets — quantify this degradation before deploying without Lane",
+    "Monitor regime where geometry proxies are strong but Lane is negative (e.g., entity_3472243e0c archetype: high mom_20, steep slopes, but ruin) — these are the cases where the proxy hypothesis would over-weight and Lane-corrected model should under-weight",
+    "If the discriminating predictions fail (Lane adds nothing beyond proxies in constructive pullback weeks), then Lane should be retired and replaced by the proxy composite; current evidence tilts against retirement but is not conclusive"
+  ]
+}
+```

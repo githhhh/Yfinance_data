@@ -1,0 +1,49 @@
+
+
+```json
+{
+  "strongest_counterclaim": "weekly_volume (operationalized as vol_ratio_5_20) is NEITHER a clean return-ranking filter NOR a downside-risk control — it is a redundant, collinear proxy that inherits its apparent discrimination from up_day_ratio_20 and mom_20, and its 'rank winners vs false negatives' signal evaporates once you condition on either of those. The prior conclusion that it is 'return-ranking only' still credits the feature with too much independent work; in reality it is a regime/IBD-pivot tagger whose coefficient should be shrunk, not reinterpreted as a ranking engine.",
+  "attacks": [
+    {
+      "issue": "Collinearity collapse: vol_ratio_5_20 (std delta -1.05) is statistically indistinguishable from up_day_ratio_20 (std delta -1.19) and mom_20 (std delta -1.00). All three load on the same 'constructive participation' latent factor. The prior researcher treats vol_ratio_5_20 as an independent ranking axis, but a single factor capturing 60%+ of the variance in all three would render volume information redundant.",
+      "why_it_matters": "If vol_ratio_5_20 is just a proxy for up_day_ratio_20, then weekly_volume contributes ~0 marginal information to the B0 score. The 'return-ranking' framing inflates its real role. A cleaner test: compute partial Spearman correlation of vol_ratio_5_20 with outcome residualized on up_day_ratio_20 and mom_20; if it drops below 0.10, the feature is redundant."
+    },
+    {
+      "issue": "Snapshot/regime clustering creates a pseudo-signal. snap_71486ed83c alone contains 4 of the 7 false_negatives; snap_b8420124eb contains 3 of 8 false_positive_ruins; snap_d0d57b1e40 contains 4 of 27 cases. Volume ratios within a snapshot are mechanically correlated (same market regime), so the median difference between FN and winner is partially a between-snapshot effect, not a within-stock feature effect.",
+      "why_it_matters": "The prior researcher's median comparison (FN 1.18 vs winner 1.42) conflates cross-sectional feature discrimination with cross-regime distribution differences. A within-snapshot KS test on snap_71486ed83c alone would tell us whether volume actually discriminates winners from losers when regime is held constant."
+    },
+    {
+      "issue": "Direction-reversal artifact between volume_ratio (std delta +0.23) and vol_ratio_5_20 (std delta -1.05) suggests weekly_volume is either (a) aggregating multiple volume windows with opposite signs, or (b) the published operationalization does not match what B0 actually consumes. The prior researcher flags this in policy but does not falsify their own conclusion on it.",
+      "why_it_matters": "If the aggregated weekly_volume is a 60-day/5-day mix with the two windows pulling in opposite directions, the resulting coefficient may be near-zero in expectation. The strong negative delta on vol_ratio_5_20 alone may not survive when the actual production feature is used. This makes the entire mechanism_claim untestable with the current evidence."
+    },
+    {
+      "issue": "Sample size and survivor bias: 27 cases across ~5 snapshots is far too small to support the causal claim 'vol_ratio_5_20 does not separate winners from ruins.' The eight ruins span only the 0.91–1.63 range with overlap to winners; a KS test at n=8 vs n=11 has roughly 30% power to detect a moderate effect. The prior researcher treats non-significance as evidence of equivalence — it is not.",
+      "why_it_matters": "Claiming that weekly_volume does not perform downside-risk control from a single underpowered archaeology is the same statistical error as the original B0 designers might be making in the opposite direction. A 200+ case held-out cohort with pre-registered ruin thresholds is the minimum to falsify either claim."
+    },
+    {
+      "issue": "Counterexample entity_8ad5cd4795: vol_ratio_5_20 = 0.996 (BELOW the 1.0 'risk' threshold), ma10_slope_5 = -0.006 (FLAT), yet outcome = selected_winner large_win. If weekly_volume were a downside-risk control, this case should not have been allowed; if it were a strict return-ranking filter, a sub-1.0 ratio should correlate with underperformance. Neither holds. The feature is being used loosely, not as a hard gate.",
+      "why_it_matters": "A feature that does not actually gate low-volume entries cannot be described as a 'risk control' in any operational sense. The prior researcher's evidence-against list acknowledges this indirectly but does not confront the implication: weekly_volume may be neither filter nor ranking axis — it may be window dressing in the B0 score."
+    },
+    {
+      "issue": "Post-entry ruin is confounded with pre-entry signal: false_positive_ruins are labeled by W4 outcomes that occur AFTER the volume ratio was measured. vol_ratio_5_20 is a pre-entry snapshot feature being asked to predict post-entry ruin trajectory, which is a different statistical object than entry-time selection. The prior conflation of 'did not flag the ruin' with 'does not perform risk control' assumes a horizon match that may not exist.",
+      "why_it_matters": "A volume snapshot at entry cannot detect distribution days that occur in W2 or W3. Attributing post-entry ruin to a pre-entry feature failure overstates the feature's responsibility. The cleaner replacement might be a time-varying volume/price divergence metric, not a snapshot ratio."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases with vol_ratio_5_20 < 1.0 that DID become selected_winners (entity_8ad5cd4795 is one — find 5+ more to show the threshold is not enforced as a risk gate).",
+    "Cases with vol_ratio_5_20 > 1.5 and ru|selected_winner labels (entity_6618d3e80c is one — these prove that high volume does not immunize against ruin AND that the system both wins and loses on the same name).",
+    "Within-snapshot pairs where two entities have vol_ratio_5_20 differing by ≥ 0.4 but identical outcomes (e.g., within snap_71486ed83c) — these falsify the within-regime ranking power.",
+    "Entities where weekly_volume changed rank order between two consecutive snapshots but outcome label flipped in the same direction as the OTHER features (momentum, up_day_ratio) — these show volume is being driven, not driving.",
+    "Snapshot pairs with similar volume distributions but different ruin rates — these isolate regime from feature and show the apparent ranking signal is actually a regime artifact.",
+    "Cases where the ruin entity had HIGH volume AND constructive momentum (entity_84824e6a20, entity_b6bcccdf6a) — these are the hardest cases for any volume-based risk control and define the irreducible ruin floor."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample ablation: remove weekly_volume entirely from B0 and show that ruin rate among selected names changes by < 2pp — this would confirm the feature is doing neither ranking nor risk control and the prior's 'return-ranking' framing is still too generous.",
+    "A pre-registered out-of-sample test where tightening weekly_volume to vol_ratio_5_20 ≥ 1.3 reduces ruin rate by ≥ 30% relative to baseline, holding all other B0 features constant — this would falsify my redundancy claim and rehabilitate the feature as a real (if modest) downside-risk control.",
+    "A conditional analysis showing that vol_ratio_5_20 contributes ≥ 0.10 partial correlation with outcome AFTER residualizing on up_day_ratio_20, mom_20, and px_vs_ma20 — this would falsify my collinearity claim and show the feature carries independent information.",
+    "Within-snapshot KS tests showing the vol_ratio_5_20 distribution differs significantly (p < 0.05) between winners and ruins when computed separately for each of the 5+ snapshots — this would control for the regime artifact I flagged and could rehabilitate either ranking or risk-control interpretations.",
+    "A reveal of the actual production weekly_volume aggregation formula showing it is NOT a 5-day/20-day ratio but a longer-window measure (e.g., 10-week/50-week) — this would invalidate my direction-reversal concern and require a fresh evaluation.",
+    "A larger archaeology (n ≥ 200) showing that the 8-ruin sample was underpowered and a moderate effect size DOES exist for vol_ratio_5_20 separating ruin from winner — this would refute my sample-size attack and require the prior researcher to revisit their non-significance-as-equivalence claim."
+  ]
+}
+```

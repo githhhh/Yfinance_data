@@ -1,0 +1,56 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 72,
+  "mechanism_summary": "The 'dry pullback' semantic is a conjunctive 3-dimensional construct (shallow depth × short duration × below-trend volume-during-pullback) but the available evidence schema captures only 1.5 dimensions: pullback_pct (full) and pullback_duration_weeks (partial, ~50% NULL). The 'dryness' qualifier — the volume-during-pullback-relative-to-pre-pullback ratio — is entirely absent; vol_ratio_5_20 is a snapshot-level feature that conflates pre-pullback vol expansion with pullback-specific dryness and therefore cannot stand in for it. Consequently, the Researcher's epiphenomenon claim and the Skeptic's mediator rebuttal are both arguing about a reduced-form 2D shadow of a 3D construct. Worse, the pullback_NULL subset (≈50% of B0 picks, including 4/6 of the strongest winners and 4/8 ruins) is not a missing-data problem to be imputed but a structurally different population — 'vol-expansion-without-pullback' names that ran away before a pullback could form — and pooling it with the pullback_observed subset in any contrast is the methodological root cause of both the Researcher's over-confident 'drop pullback' verdict and the Skeptic's equally over-confident 'UNRESOLVED because of missingness' verdict. A second-order problem: the Experimental Designer's matched-pair test is proposed on the pullback_observed subset (effective n≈13, with Mahalanobis tolerance yielding perhaps 5-7 viable pairs), giving paired-Wilcoxon power ≈0.4 to detect a 5pp median shift at α=0.05 — so the test is biased toward returning 'failure_criterion met' regardless of the true effect, meaning even a clean execution of the proposed protocol cannot resolve the question.",
+  "falsifiers": [
+    "Compute pullback_volume_ratio = (median daily volume in pullback weeks) / (median daily volume in the 4 calendar weeks immediately preceding pullback onset) for every B0 pick with non-null pullback_pct; if, after controlling for vol_ratio_5_20 and mom_20, this feature's standardized delta is <0.3 across the ≈13 observed cases AND it shows no sign-flip interaction with up_day_ratio_20, the 'dryness' semantic is empirically empty and the Researcher's epiphenomenon claim becomes default-true.",
+    "Run the matched-pair residual test on the pullback_observed subset ONLY (n≈13), but require power-calibrated minimum detectable effect of ≥8pp paired pullback_pct residual (not 5pp) and a binomial ruin-vs-win split of ≤60/40 within pairs; if both bounds are met, the regime-marker interpretation is supported and pullback semantics must be condition-gated, not dropped wholesale.",
+    "Stratify B0 picks into pullback_observed vs pullback_NULL cells and re-estimate vol_ratio_5_20's standardized delta within each cell separately; if the delta shrinks substantially (≥30% relative drop) within the pullback_NULL cell relative to the pooled estimate, the Researcher's claim that 'vol/mom dominate by 1.5-1.9x' is a population-mix artifact from conflating the two cells, and the 'vol/mom dominance' conclusion partially collapses.",
+    "Check temporal confounding: replicate the full contrast on a snapshot-stratified subsample that excludes snap_71486ed83c and snap_d0d57b1e40 (which together contribute 9/27 cases); if the pullback_pct standardized delta changes sign or magnitude by ≥0.4 std between the full sample and this date-balanced subsample, all prior contrast-based conclusions are regime-confounded and the verdict remains UNRESOLVED regardless of any matched-pair result on the full sample.",
+    "Construct a synthetic 'dry' label using the existing snapshot data (e.g., define dry := pullback_pct between -3% and -10% AND up_day_ratio_20 ≥ 0.5 AND vol_ratio_5_20 ≤ 1.4) and measure forward W4 return against the residual; if this constructed dry subset shows ruin rate within ±5pp of the B0-selected median, the operational definition of 'dry' is too loose to be load-bearing, and the original claim must be re-specified before any further test is informative."
+  ],
+  "actionable_design_principles": [
+    "Never pool pullback_observed and pullback_NULL B0 picks in a single contrast; they are different populations (post-pullback consolidation vs pre-pullback breakout continuation) and pooling them is the root cause of every conclusion drawn so far. All future analyses must split on pullback_status as a first-class stratum.",
+    "Separate the gating question ('should presence/absence of an observed pullback be a hard filter?') from the weighting question ('how much should pullback_pct count in the within-observed-pullback scoring model?'). The evidence is sufficient to test the gating question (it is a population-selection effect, not a feature effect) but is NOT sufficient to test the weighting question without a new feature and a larger sample.",
+    "Construct pullback_volume_ratio (volume-during-pullback / volume-pre-pullback) in the snapshot ETL before any further debate about whether to drop or retain pullback semantics; without this feature the 'dry' qualifier is undefined in evidence and the question is structurally UNRESOLVED.",
+    "Pre-register the minimum detectable effect for any matched-pair test on the pullback_observed subset; given effective n≈13 with Mahalanobis matching, report power alongside the test result so that 'failure to reject' is not misread as 'evidence of null effect'.",
+    "When evaluating a feature with 50% structural NULLs, never report a single-feature standardized delta as if it were comparable to a fully-observed feature's delta; either report effective-n-adjusted confidence intervals or restrict the contrast to the observed subset with explicit sample-size disclosure."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Add a `requires_pullback_volume_ratio` declaration to the B0 scoring model schema; any model that references `pullback_pct` or `pullback_duration_weeks` as inputs must also declare a `pullback_volume_ratio` input sourced from the snapshot ETL, and the model is rejected at compile time if the feature is missing.",
+      "why_distinct": "This is a structural enforcement of the 'dry' qualifier rather than a runtime check; it prevents the existing research failure mode in which a 3D construct is tested via a 1.5D proxy and the missing dimension is silently ignored.",
+      "features": [
+        "pullback_volume_ratio",
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "capacity_relevance": "Adds one new derived feature to the snapshot ETL and a schema-level constraint to the model DSL; does not change runtime scoring capacity but eliminates an entire class of silently-incorrect inferences."
+    },
+    {
+      "idea": "Add a routing rule that partitions B0 picks into two scoring paths at evaluation time: `pullback_observed_path` (uses pullback_pct, pullback_duration_weeks, pullback_volume_ratio jointly) and `vol_expansion_no_pullback_path` (uses vol_ratio_5_20, mom_20, up_day_ratio_20 only, with no pullback features permitted as inputs). The final score is a path-conditional output, not a pooled linear combination.",
+      "why_distinct": "Unlike a pooled linear model with pullback features set to NULL-imputed values, this routing prevents the pullback_NULL population from contaminating the coefficient estimates of the pullback_observed population and vice versa; it makes the population-mix artifact structurally impossible rather than statistically detectable.",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "pullback_volume_ratio",
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Requires the DSL to support conditional path evaluation; doubles the number of effective scoring models but each path operates on a cleaner population and can be trained on roughly half the data with sharper coefficients."
+    },
+    {
+      "idea": "Add a snapshot-stratified audit log that, for every B0 pick, records (i) pullback_status ∈ {observed, null, shallow, deep}, (ii) the matched selected_winner entity's pullback_status, (iii) vol_ratio_5_20 and mom_20 at snapshot, and (iv) the snapshot date. This log enables the matched-pair and temporal-confounding falsifiers to be executed as scheduled re-tests rather than as one-off analyses, and surfaces date-clustering problems automatically.",
+      "why_distinct": "This is observability infrastructure rather than a model change; it converts a static 27-case archaeology into a continuously-refreshable diagnostic that can detect when the population mix drifts over time.",
+      "features": [
+        "snapshot_id",
+        "pullback_status",
+        "matched_pair_id",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Storage-only addition; no impact on scoring latency or model capacity, but enables falsifier #2 (matched-pair) and falsifier #4 (temporal confounding) to be re-run on every refresh without manual re-extraction."
+    }
+  ]
+}

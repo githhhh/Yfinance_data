@@ -1,0 +1,43 @@
+{
+  "strongest_counterclaim": "Lane is not a linear proxy for the four-feature composite but rather implements a conditional, threshold-based decision rule that handles missing pullback data via implicit imputation or default logic, and whose apparent redundancy with up_day_ratio_20/vol_ratio_5_20/mom_20/px_vs_ma50 is an artifact of (i) collinearity among predictors masking lane's true non-linear decision boundary and (ii) the 27-case discovery sample being too small to distinguish a true linear proxy from a more complex decision surface.",
+  "attacks": [
+    {
+      "issue": "Null pullback handling is unexplained",
+      "why_it_matters": "Four selected-winner cases (entity_ead73f4390, entity_2f86543bf6, entity_6618d3e80c, entity_28a6ec4601) have null pullback_duration_weeks and null pullback_pct. If lane were a pure linear composite of the four features, it would need no pullback data. Yet lane clearly handles these nulls—either by defaulting to 'select' or by imputing values from related columns. This implicit imputation logic means lane is not a simple weighted sum; it contains hidden branching that the four-feature model lacks. The 41% winner rate and 8 ruinations cannot be replicated by a linear composite without specifying how nulls are treated, because null strategy itself modulates selection and ruin outcomes."
+    },
+    {
+      "issue": "Collinearity creates spurious redundancy appearance",
+      "why_it_matters": "up_day_ratio_20, vol_ratio_5_20, mom_20, and px_vs_ma50 are all momentum/volume trend measures that tend to co-elevate in strong-chart setups. Their standardized deltas (−1.19, −1.05, −1.00, −0.85) decline monotonically, which is consistent with a single underlying latent factor (e.g., 'chart quality') rather than four independent signals. In a 27-case sample, a principal component analysis would likely show that >80% of variance in these four features loads onto a single component. This means the 'composite score Z' in the falsifiable predictions would be dominated by one factor, and lane's apparent correlation with Z could reflect correlation with that single factor rather than genuine redundancy with all four features independently."
+    },
+    {
+      "issue": "The false-positive ruin cases are not explained by the four features",
+      "why_it_matters": "Eight cases are 'false_positive_ruin' despite being lane picks. Examining these: entity_8f0df3d38e (mom_20=0.176, vol_ratio=1.24), entity_4fdc3699fd (mom_20=0.185, vol_ratio=1.38), entity_3472243e0c (mom_20=0.242, vol_ratio=1.21), entity_ccc90a671f (mom_20=0.074, vol_ratio=1.45). These have moderate-to-strong feature values that should predict winners under a linear proxy model. Their ruination implies lane's decision boundary is not linear in these features—it likely involves a volatility-over-momentum interaction or a drawdown-velocity term not present in the four-feature composite. The ruin cases represent systematic deviation from the linear proxy prediction."
+    },
+    {
+      "issue": "ibd_entry_close_vs_trigger_pct is a non-redundant fifth signal",
+      "why_it_matters": "The numeric contrasts show ibd_entry_close_vs_trigger_pct has a standardized delta of −0.70 between false negatives and selected winners (medians 0.019 vs 0.030). This feature was explicitly excluded from the 'four-feature composite' but appears in the data and differentiates the outcome classes. The prior research acknowledges this as 'potential non-redundant contribution' but dismisses it. However, if lane uses ibd_entry_close_vs_trigger_pct as an additional gate or weight, then the four-feature composite is incomplete by construction and the redundancy claim is falsified by the evidence already in hand."
+    },
+    {
+      "issue": "No threshold non-linearity is specified",
+      "why_it_matters": "The claim 'lane is largely a linear proxy' fails to specify the functional form. Is it a hard threshold (e.g., up_day_ratio_20 > 0.6 AND vol_ratio_5_20 > 1.3)? A logistic model with interaction terms? A decision tree? Without this specification, the claim cannot be tested. The evidence of up_day_ratio_20=0.4 selecting some winners (entity_84824e6a20, entity_b6bcccdf6a) while up_day_ratio_20=0.35 also selects a winner (entity_2f86543bf6) suggests the boundary is not simply a monotonic function of the four features—there are compensating interactions (e.g., high vol_ratio_5_20 compensating for low up_day_ratio_20) that a linear model cannot capture without explicit interaction terms."
+    },
+    {
+      "issue": "Snapshot temporal clustering introduces regime confounding",
+      "why_it_matters": "The cases reference five distinct snapshots (snap_724342c280, snap_287267e812, snap_eb3d8128cc, snap_c7fa0b9bb6, snap_12ebd0d057, etc.). Lane's thresholds may have been calibrated to market conditions prevalent during snapshot formation. The four-feature composite may be spuriously correlated with lane's picks within each snapshot (because both reflect snapshot-specific conditions) but fail out-of-time. This is a classic regime-confounding artifact in small discovery samples."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A lane pick where up_day_ratio_20 < 0.40 AND vol_ratio_5_20 < 1.10 AND mom_20 < 0.05 AND px_vs_ma50 < 0.05 yet the outcome is 'selected_winner' or even 'large_win'. This would directly falsify the linear proxy claim by showing lane selects on features outside the four-feature space.",
+    "A case where the four-feature composite score Z exceeds the proposed threshold but lane does NOT pick (is_b0_pick=false). This would show the four features are insufficient to determine lane's decision even when they strongly favor selection.",
+    "A false-positive ruin case with all four features at or below the false-negative medians (up_day_ratio_20 ≤ 0.50, vol_ratio_5_20 ≤ 1.18, mom_20 ≤ 0.058, px_vs_ma50 ≤ 0.056). Such a case would indicate lane's decision is driven by factors not in the four-feature set.",
+    "Cases where pullback_pct is available and extreme (e.g., pullback_pct < −40%) yet lane still picks, but the composite Z score based only on the four features is below threshold. This would show lane tolerates deep pullbacks in a way the composite cannot replicate.",
+    "A lane pick with ibd_entry_close_vs_trigger_pct < 0.005 (near-zero gap) but strong four-feature values, to test whether lane relies on entry-tightness as a distinct signal from the four-feature composite."
+  ],
+  "what_would_change_my_mind": [
+    "An explicit reconstruction of lane's decision logic (the exact threshold values, logical operators, and null-handling rules) that, when applied to the 27-case sample, produces exactly the 19 is_b0_pick=true assignments and 8 ruin outcomes, and this reconstruction relies only on the four features (no additional variables). This would confirm lane is genuinely redundant.",
+    "A bootstrap or cross-validation test showing that a four-feature logistic regression trained on the 27 cases reproduces lane's picks with AUC > 0.95 and the interaction terms are all non-significant, confirming the relationship is linear rather than threshold-dependent.",
+    "Demonstration that removing lane and substituting the four-feature composite Z (with a calibrated threshold) yields equivalent out-of-sample performance (within ±5pp on winner rate and ruin count) across at least two temporally disjoint holdout periods not used in the discovery sample.",
+    "Evidence that the 'null pullback' cases are assigned a deterministic default value (e.g., pullback_pct=0 or pullback_duration_weeks=median) and that lane's picks on those cases can be perfectly predicted by the four-feature composite once this imputation is applied. If null handling introduces additional variance that the composite cannot explain, the redundancy claim fails.",
+    "A causal inference analysis (e.g., instrumental variable approach or regression discontinuity design using the snapshot boundaries) showing that lane's pick status mediates no additional outcome variance beyond the four features, confirming it is a confound rather than a causal mechanism."
+  ]
+}

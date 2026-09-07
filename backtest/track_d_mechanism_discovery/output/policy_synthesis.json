@@ -1,0 +1,1824 @@
+{
+  "policies": [
+    {
+      "policy_id": "lane_x_slope_sign_probe",
+      "description": "Tests whether px_vs_ma20 (lane) is a redundant smoother or carries information invisible to B0's linear-additive framing via interaction with MA20 slope sign. If AUC gain over B0 exceeds 0.01 in snapshot-blocked CV, lane is an interaction operator, not degenerate.",
+      "research_origin": "mechanism_falsification__q001",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "interaction",
+          "left": "px_vs_ma20",
+          "right": "ma20_slope_5",
+          "transform": "zscore",
+          "weight": 1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 2,
+          "min_score": 0.5
+        }
+      },
+      "spec_hash": "fb8ddbae712b54ab4f86499ccf9798825cba29d9bb44bdb80db7382c16f32262"
+    },
+    {
+      "policy_id": "vol_ratio_regime_gate",
+      "description": "Tests whether vol_ratio_5_20 is a ranking proxy or downside-risk control by conditioning on MA10 slope sign. Low vol + negative slope = liquidity veto; tests the two-axis conditional gate that resolves the researcher's two failure modes (low-vol-flat ruins and high-vol-distribution ruins).",
+      "research_origin": "mechanism_falsification__q014",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": 1.0
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": 0.8
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lt",
+              "value": 0.9
+            },
+            {
+              "feature": "ma10_slope_5",
+              "op": "lt",
+              "value": 0.0
+            }
+          ],
+          "add": -2.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 2
+        }
+      },
+      "spec_hash": "4489ff5f4ac91a20bc1fb2e60ce7548331bc4d35b702cc830a2feab58da9bd02"
+    },
+    {
+      "policy_id": "volume_dryup_filter",
+      "description": "Tests the volume-dryup ruin mechanism: penalize low-vol entries (dryup) and high-vol-with-low-momentum (distribution). Pre-registered cross-snapshot hold-out required before production deployment per the archaeology's regime-conditionality finding.",
+      "research_origin": "failure_archaeology__q007",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": 0.6
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lt",
+              "value": 1.3
+            }
+          ],
+          "add": -1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.4
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.1
+            }
+          ],
+          "add": -1.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 2,
+          "gap": 0.3
+        }
+      },
+      "spec_hash": "241857f47747320bc728add07f2ab638cd3cdcccfc58b9b6c1f8bd6867fade08"
+    },
+    {
+      "policy_id": "volume_conditional_pivot_confirmation",
+      "description": "Treats ibd_entry_volume_ratio as a passive confirmation marker: volume contributes only when the three strongest pivot signals (mom_20, vol_ratio_5_20, px_vs_ma50) all clear thresholds simultaneously. Tests the falsifiable contrast that high-volume entries without strong pivots carry elevated ruin risk.",
+      "research_origin": "mechanism_falsification__q015 / composite_momentum_confirmation",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "mom_20",
+              "op": "gt",
+              "value": 0.1
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.3
+            },
+            {
+              "feature": "px_vs_ma50",
+              "op": "gt",
+              "value": 0.08
+            }
+          ],
+          "add": 2.5
+        },
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "mom_20",
+              "op": "lte",
+              "value": 0.1
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lte",
+              "value": 1.3
+            },
+            {
+              "feature": "px_vs_ma50",
+              "op": "lte",
+              "value": 0.08
+            }
+          ],
+          "add": -3.0
+        },
+        {
+          "type": "linear",
+          "feature": "ibd_entry_volume_ratio",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "interaction",
+          "left": "ibd_entry_volume_ratio",
+          "right": "mom_20",
+          "transform": "zscore",
+          "weight": 1.2
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 1,
+          "gap": 0.2
+        }
+      },
+      "spec_hash": "94054e772c0a187b47f662933959f34d8337646c441efb707c4c4666c7781da7"
+    },
+    {
+      "policy_id": "snapshot_norm_vol_with_slope_trap",
+      "description": "Makes vol_ratio_5_20 relative to snapshot context (entity vs snapshot median, z-scored) and pairs with slope_ratio interaction to filter high-vol_ratio cases where short-term slope acceleration is disproportionate to longer-term trend — the hypothesized 'professional accumulation trap' pattern.",
+      "research_origin": "failure_archaeology__q008 / snapshot_normalized_vol_ratio",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": 1.0
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": -0.8
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "ma10_slope_5",
+              "op": "gt",
+              "value": 0.05
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.4
+            }
+          ],
+          "add": -2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.5
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.3
+            }
+          ],
+          "add": -1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 1,
+          "gap": 0.2
+        }
+      },
+      "spec_hash": "422c5f423af1ed40ce1691f03bff12797d498a39fc40bb0577daee6b6cfdb6a4"
+    },
+    {
+      "policy_id": "orthogonal_breadth_decomposition",
+      "description": "Replace 7-feature evidence_risk with its two candidate-orthogonal sub-features: up_day_ratio_20 (breadth/tape-strength, count statistic) and vol_ratio_5_20 (short-horizon volatility, different noise floor from mom_20). Drops ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, ibd_entry_close_vs_trigger_pct on the basis that they are absorbed by trend_b0/relative_strength_b0.",
+      "research_origin": "mechanism_falsification__q003 / falsifier 3 (decomposition loading) + design principle 4",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 2.0
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 1.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 1,
+          "gap": 0.5
+        }
+      },
+      "spec_hash": "b783421184d3a91f6974a4a3bfdf92238b74377952b87787aec6a2583d2ae6fb"
+    },
+    {
+      "policy_id": "tape_volatility_interaction_probe",
+      "description": "Tests the third failure mode: that evidence_risk's residual content is interactional (breadth x short-vol) rather than additive. Adds z(up_day_ratio_20) * z(vol_ratio_5_20) term to the B0 baseline. Interactional content is the falsifier Experimental Designer's interaction_surface_vol_x_upday test targets.",
+      "research_origin": "mechanism_falsification__q003 / dsl_policy_ideas[1] interaction term",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 1.0
+        },
+        {
+          "type": "interaction",
+          "left": "up_day_ratio_20",
+          "right": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 1.2
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 1,
+          "gap": 0.5
+        }
+      },
+      "spec_hash": "b90cfcec62b57169eb3e074d20f14ba1823b849125b023cd1cf9d69803289143"
+    },
+    {
+      "policy_id": "breadth_bounded_vol",
+      "description": "Tests distinct1's mechanism: sign-flips vol_ratio_5_20 (bounded vol preference = risk control) while keeping up_day_ratio_20 and mom_20 positive (return ranking). This separates identification (momentum/breadth) from filtering (volatility cap), and addresses the confirmed structural-risk pattern that high-mom + high-vol co-occurs with ruin.",
+      "research_origin": "mechanism_falsification__q016 / failure_archaeology__q009 — dual-threshold + sign-flip on vol_ratio_5_20",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": -0.8
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 1,
+          "gap": 0.5
+        }
+      },
+      "spec_hash": "b3ea8f17c2c5304a3bad8ccfa0d1ae766e2d7aed71049c3d82bf65485dddd611"
+    },
+    {
+      "policy_id": "slope_ratio_entry_tightness_ruin_gate",
+      "description": "Tests the q010 confounder hypothesis: whether slope_ratio (ma10_slope_5/ma20_slope_5) is an independent ruin precursor or an artifact of entry tightness and denominator instability. The threshold term gates slope_ratio computation on ma20_slope_5 > 0.01, and the interaction term between slope_ratio and ibd_entry_close_vs_trigger_pct exposes whether slope_ratio adds information conditional on entry tightness. A near-zero or sign-reversing interaction weight would falsify slope_ratio as separable from the entry-extension trio (q010 confounder decomposition).",
+      "research_origin": "failure_archaeology__q010",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "ma20_slope_5",
+              "op": "gt",
+              "value": 0.01
+            }
+          ],
+          "add": 0.0
+        },
+        {
+          "type": "linear",
+          "feature": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "linear",
+          "feature": "ibd_entry_close_vs_trigger_pct",
+          "transform": "neg_abs",
+          "weight": -1.0
+        },
+        {
+          "type": "interaction",
+          "left": "ma10_slope_5",
+          "right": "ibd_entry_close_vs_trigger_pct",
+          "transform": "zscore",
+          "weight": -0.6
+        },
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 0.6
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 0.3
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 0.3
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "zscore",
+          "weight": 0.3
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 3
+        }
+      },
+      "spec_hash": "9f6dd3f4fdb60156cb50576cf5273091c9ca4d738124600ccb8e0b09558e3936"
+    },
+    {
+      "policy_id": "gap_gated_continuous_slot_sizing",
+      "description": "Tests the q001 capacity-abstention claim: whether the Top1-Top2 quality gap should govern 3-slot capital allocation. Uses top1_confidence selector with explicit gap threshold so a large gap permits abstention (cash) on slot 2/3, while the vol-momentum interaction term prevents abstention during benign low-vol regimes. A negative shadow-PnL of the policy versus a forced-3-slot baseline would falsify the abstention claim.",
+      "research_origin": "capacity_abstention__q001",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 1.0
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "linear",
+          "feature": "ma10_slope_5",
+          "transform": "zscore",
+          "weight": 0.3
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "mom_20",
+          "transform": "zscore",
+          "weight": -0.4
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 0.15,
+          "min_score": 0.3
+        }
+      },
+      "spec_hash": "1fdf02de274cd3a5bdac38ad14d7246582934927a6b93857de21ffb6fcdbee46"
+    },
+    {
+      "policy_id": "entry_proximity_two_stage_v1",
+      "description": "Two-stage entry filter: hard screen on ibd_entry_close_vs_trigger_pct then conditional slope-ratio penalty in middle band; tests entry-timing as primary ruin mechanism.",
+      "research_origin": "failure_archaeology__q011",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "ibd_entry_close_vs_trigger_pct",
+              "op": "lte",
+              "value": 0.04
+            }
+          ],
+          "add": 0.0
+        },
+        {
+          "type": "linear",
+          "feature": "ibd_entry_close_vs_trigger_pct",
+          "transform": "identity",
+          "weight": -3.0
+        },
+        {
+          "type": "interaction",
+          "left": "ibd_entry_close_vs_trigger_pct",
+          "right": "ma10_slope_5",
+          "transform": "identity",
+          "weight": -2.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 0.7
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 2,
+          "gap": 0.15
+        }
+      },
+      "spec_hash": "3c1bc0d776c5ec9c97958dd2fc973afe8f798f1be8795296811f231e87b84936"
+    },
+    {
+      "policy_id": "ccm_gap_abstention_v1",
+      "description": "Top1-vs-Top2 quality gap drives slot allocation: large gap allows 3 positions, small gap forces concentration; tests whether gap is a valid PIT confidence proxy.",
+      "research_origin": "capacity_abstention__q002",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 1.0
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "zscore",
+          "weight": 0.5
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "neg_abs",
+          "weight": 0.3
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 0.4
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 0.5,
+          "min_score": 0.2
+        }
+      },
+      "spec_hash": "522fed79a34ca8040853b8d05105c98beb3b594bf87e30cba62998c0c803f9fd"
+    },
+    {
+      "policy_id": "weekly_volume_confirmation_gate",
+      "description": "Treats vol_ratio_5_20 strictly as a confirmation modifier on momentum candidates. Volume contributes positive weight only when mom_20>0.10 AND px_vs_ma50>0 AND vol_ratio_5_20>1.0; blowoff penalty at vol_ratio_5_20>1.5; no protective floor at <1.0. Falsifies whether weekly_volume carries independent information or is redundant with momentum/tempo B0 terms.",
+      "research_origin": "mechanism_falsification__q006",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "identity",
+          "weight": 4.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 3.0
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "identity",
+          "weight": 2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "mom_20",
+              "op": "gt",
+              "value": 0.1
+            },
+            {
+              "feature": "px_vs_ma50",
+              "op": "gt",
+              "value": 0
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.0
+            }
+          ],
+          "add": 1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.5
+            }
+          ],
+          "add": -2.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 3
+        }
+      },
+      "spec_hash": "0f0486bda179051a645b438053ccbafe2d6be5a58bdd23feda8e24a2963c761c"
+    },
+    {
+      "policy_id": "divergence_triage_signal",
+      "description": "Routes high-vol + low-mom divergence quadrants through a separate scoring channel. Adds positive weight in vol>1.4 AND mom<0.05 zone (entity_2f86543bf6 archetype); penalizes the late-acceleration zone (vol>1.2 AND 0.15<mom<0.25) per failure_archaeology signature. Tests whether the divergence quadrant carries orthogonal information or is bundle-inflated collinearity.",
+      "research_origin": "mechanism_falsification__q006 + failure_archaeology__q012",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "identity",
+          "weight": 5.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.4
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.05
+            }
+          ],
+          "add": 2.5
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.2
+            },
+            {
+              "feature": "mom_20",
+              "op": "gt",
+              "value": 0.15
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.25
+            }
+          ],
+          "add": -1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 2,
+          "gap": 1.5
+        }
+      },
+      "spec_hash": "cb35df8cfe0675734f610a8891dc937d3762fcf9662c6e996b6589cae4d5e26c"
+    },
+    {
+      "policy_id": "adaptive_capacity_abstention",
+      "description": "Tiered capacity via top1_confidence with high min_score: implicitly allows capacity=0 abstain when no candidate clears the threshold; capacity=1-3 fills by gap. Blowoff-veto penalty (vol>1.5 AND up_day<0.5) enforces explicit ruin-cluster detection. Falsifies whether 0/1/2/3 adaptive slotting beats always-fixed-3 under ruin-cluster risk.",
+      "research_origin": "capacity_abstention__q003",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 3.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 2.0
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "zscore",
+          "weight": 2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.5
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.5
+            }
+          ],
+          "add": -3.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 1.0,
+          "min_score": 5.0
+        }
+      },
+      "spec_hash": "b887bddbe76c271006b9cb40865044659adf805699a085ec8e3a62f1e538de64"
+    },
+    {
+      "policy_id": "evidence_risk_two_tier_decomposition",
+      "description": "Decomposes evidence_risk into first-tier interaction composite (vol_ratio_5_20 * (1-up_day_ratio_20)) plus second-tier residual flag for divergence (vol>1.5 AND mom<0.10, mirrors entity_2c58cebc59 archetype). Tier-1 alone is the redundancy claim; tier-2 captures potentially unique risk signal. Falsifies whether evidence_risk provides unique variance beyond vol*up_day composite.",
+      "research_origin": "mechanism_falsification__q019",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "identity",
+          "weight": 3.0
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "up_day_ratio_20",
+          "transform": "neg_abs",
+          "weight": 4.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.5
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.1
+            }
+          ],
+          "add": -2.5
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "identity",
+          "weight": 2.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 3,
+          "min_score": 1.0
+        }
+      },
+      "spec_hash": "273632fa563b4774ed730500d88f1db4767621422c57e97b6b77d866f4056cc1"
+    },
+    {
+      "policy_id": "entry_volume_demand_conviction_test",
+      "description": "Tests whether entry-day volume adds demand-conviction information beyond prevailing volume regime by activating a joint interaction score; this is a shadow score, not a production weight reallocation.",
+      "research_origin": "mechanism_falsification/q007",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 0.2
+        },
+        {
+          "type": "linear",
+          "feature": "ibd_entry_volume_ratio",
+          "transform": "zscore",
+          "weight": 0.2
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "ibd_entry_volume_ratio",
+          "transform": "zscore",
+          "weight": 0.6
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 2,
+          "gap": 0.25
+        }
+      },
+      "spec_hash": "ce1f9f42cacea45c53c34ae365d1ca7840d52be9b3a7a6a41d937e9a57e90be9"
+    },
+    {
+      "policy_id": "ruin_guard_two_stage",
+      "description": "Operationalizes failure_archaeology__q001 WEAK mechanism with two-stage filter and continuous vol_ratio penalty: clear-reject cell (vol_ratio_5_20 > 1.50 AND up_day_ratio_20 < 0.55) hard-filtered; borderline cell (0.50 <= up_day_ratio_20 <= 0.60 AND mom_20 < 0.20) penalized; soft continuous penalty on high vol_ratio. Distinct from P1 because it tests the q001 ruin-precursor hypothesis directly rather than the override-content hypothesis.",
+      "research_origin": "failure_archaeology__q001",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.5
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.55
+            }
+          ],
+          "add": -8.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "up_day_ratio_20",
+              "op": "gte",
+              "value": 0.5
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lte",
+              "value": 0.6
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.2
+            }
+          ],
+          "add": -4.0
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": -1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 1,
+          "gap": 1.0
+        }
+      },
+      "spec_hash": "92b28567b5c49424157a157bcf8fffef504274b30a3c4b4ec0d78ea9f8eb1e38"
+    },
+    {
+      "policy_id": "b0_continuous_breadth_rank",
+      "description": "Replaces binary dry_false_penalty with continuous within-snapshot rank_pct of up_day_ratio_20, isolating the ranking-mechanism hypothesis (q010). Tests Falsifier-1 by preserving winner/non-winner separation without imposing a brittle threshold; satisfies design principle of decoupling ranking from risk control.",
+      "research_origin": "mechanism_falsification__q010",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "rank_pct",
+          "weight": 1.5
+        },
+        {
+          "type": "interaction",
+          "left": "up_day_ratio_20",
+          "right": "px_vs_ma20",
+          "transform": "rank_pct",
+          "weight": 0.6
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 3
+        }
+      },
+      "spec_hash": "cf8c3673fe6e94b8d6a527c15c492b699c19063af4bf234627afcff7cb8d8b33"
+    },
+    {
+      "policy_id": "vol_regime_quality_gate_no_dry_filter",
+      "description": "Falsifier-5 test for q010: removes dry penalty entirely; in high-vol regimes (vol_ratio_5_20>1.3) penalizes candidates failing EITHER mom_20 OR px_vs_ma50 thresholds (joint depletion proxy for absent post-entry stop). Tests whether downside control is achievable without pre-entry dry filter, addressing entity_3472243e0c/entity_4fdc3699fd-type ruins the penalty missed.",
+      "research_origin": "mechanism_falsification__q010",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.3
+            }
+          ],
+          "add": -1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.1
+            },
+            {
+              "feature": "px_vs_ma50",
+              "op": "lt",
+              "value": 0.08
+            }
+          ],
+          "add": -2.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 3,
+          "gap": 0.5
+        }
+      },
+      "spec_hash": "7f1bee62eeff452673a0aea4591f5891bcf19798f7fc4435c310a8740dc89554"
+    },
+    {
+      "policy_id": "three_slot_crowding_quality_gated",
+      "description": "Two-gate allocation for q007: uniform quality scoring inputs (mom_20, vol_ratio_5_20, up_day_ratio_20) for all slots, plus distinct_1 industry mode forces slot-3 cash abstention when slots 1+2 share GICS sub-industry. top1_confidence capacity preserves cash option value; addresses entity_3adc078f01-type deep-pullback winners by requiring strong mom/vol as quality floor.",
+      "research_origin": "capacity_abstention__q007",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "identity",
+          "weight": 2.0
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": 1.2
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 1.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 1.0,
+          "min_score": 0.5
+        }
+      },
+      "spec_hash": "1bae8c4b77a50b492aaf647674e09b3c686670a4c291bed7602338e1846b1491"
+    },
+    {
+      "policy_id": "structural_loser_soft_reject_v1",
+      "description": "Soft-reject B0 picks in the unstable-quadrant (low extension + weak internal strength) per failure_archaeology__q004. Continuous ranking via linear terms on px_vs_ma50 and up_day_ratio_20; asymmetric penalty added when BOTH fall below empirically observed ruin-cluster thresholds (px_vs_ma50<0.08, up_day_ratio_20<0.55). Preserves override capability by reducing score rather than hard-excluding.",
+      "research_origin": "failure_archaeology__q004",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "identity",
+          "weight": 5.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 4.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "px_vs_ma50",
+              "op": "lt",
+              "value": 0.08
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.55
+            }
+          ],
+          "add": -3.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 1,
+          "min_score": 0.0
+        }
+      },
+      "spec_hash": "7bae84096de427f298bfd523ea57876e528ec47f1ca923fcc108fc25c737db01"
+    },
+    {
+      "policy_id": "trigger_compression_rescue_v1",
+      "description": "Rescue false-negative non-picks under near-buy-point geometry per failure_archaeology__q017. Dual-stratum policy on base=zero: rewards compressed ibd_entry_close_vs_trigger_pct paired with adequate up_day_ratio_20; caps intake at 2 positions to limit exposure to a mechanism that is directionally suggestive but empirically UNRESOLVED. Distinct from policy 1 by addressing the opposite failure mode (missed winners) and using a different base + selector regime.",
+      "research_origin": "failure_archaeology__q017",
+      "base": "zero",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "ibd_entry_close_vs_trigger_pct",
+          "transform": "identity",
+          "weight": -6.0
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 3.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 2
+        }
+      },
+      "spec_hash": "63c5bceccc92dd0852780695aa1b7944507088ba7a6bd65d3a47ed3d270c1158"
+    },
+    {
+      "policy_id": "recent_momentum_ranking",
+      "description": "Replaces the ambiguous 'freshness' label with its empirically dominant mechanism: a soft-additive recent-thrust ranking score using up_day_ratio_20, vol_ratio_5_20, mom_20, ma20_slope_5. This tests PRINCIPLE-1 (orthogonal decomposition) and PRINCIPLE-6 (KPI bifurcation) by isolating the ranking axis from any gate function. Falsified if quintile-5 vs quintile-1 median W4 return gap is <3pp with rank-sum |z|<1.5 on a frozen holdout.",
+      "research_origin": "mechanism_falsification__q012",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 1.2
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": 0.8
+        },
+        {
+          "type": "linear",
+          "feature": "ma20_slope_5",
+          "transform": "zscore",
+          "weight": 0.6
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 0.5,
+          "min_score": 0.0
+        }
+      },
+      "spec_hash": "460a77f179a6fb4641069afd68e1780c2ed7244568eb55264f08ead85576f61f"
+    },
+    {
+      "policy_id": "downside_distress_hard_gate",
+      "description": "Hard binary OR-gate across PIT-observable downside proxies (ma20_slope_5<0, deep pullback, high rv_20, large distance below 52w high). Tests PRINCIPLE-2 (rank vs gate asymmetry) and PRINCIPLE-5 (PIT-only audit). Falsified if applying this gate to the B0 candidate pool reduces false_positive_ruin count by <10% while preserving selected_winner median W4 return — proving no gate mechanism operates regardless of intent.",
+      "research_origin": "mechanism_falsification__q012",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "ma20_slope_5",
+              "op": "lt",
+              "value": 0.0
+            },
+            {
+              "feature": "rv_20",
+              "op": "gt",
+              "value": 0.45
+            },
+            {
+              "feature": "dist_to_52w_high_pct",
+              "op": "lt",
+              "value": -25.0
+            },
+            {
+              "feature": "pullback_pct",
+              "op": "lt",
+              "value": -20.0
+            }
+          ],
+          "add": -10.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 0.5,
+          "min_score": 0.0
+        }
+      },
+      "spec_hash": "51e5248a3befdd80cfa1266cd93babd188a31dd6ba771f39eb453c3036084f69"
+    },
+    {
+      "policy_id": "trigger_position_calibration",
+      "description": "Tests the mechanical top-capture hypothesis: reject picks where ibd_entry_close_vs_trigger_pct fires in the top quartile of its 20-day rolling distribution, unless mom_20 is exceptionally high. This directly probes whether trigger proximity mediates ruin outcomes (entity_84824e6a20 = 0.074, entity_ccc90a671f = 0.070 vs winner entity_2f86543bf6 = 0.025). Falsified if this simple position rule does not outperform the multi-feature failure_archaeology model on a held-out B0 sample.",
+      "research_origin": "failure_archaeology__q005",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "ibd_entry_close_vs_trigger_pct",
+              "op": "gt",
+              "value": 0.06
+            }
+          ],
+          "add": -3.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "ibd_entry_close_vs_trigger_pct",
+              "op": "gt",
+              "value": 0.06
+            },
+            {
+              "feature": "mom_20",
+              "op": "gt",
+              "value": 0.2
+            }
+          ],
+          "add": 2.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 3,
+          "gap": 0.5,
+          "min_score": 0.0
+        }
+      },
+      "spec_hash": "aa4b6f8ee1355ceec4bdb83b3eae00db1ef92a4ac28f1cd83979cb73f77855f3"
+    },
+    {
+      "policy_id": "ruin_suppression_layer_v1",
+      "description": "Conditional ruin-suppression layer keyed to conditional ruin features actually visible in archaeology (low up_day_ratio_20 + positive mom_20; high px_vs_ma50 + high vol_ratio_5_20). TRUE downside filter, not eps_preference in disguise.",
+      "research_origin": "mechanism_falsification__q013 / failure_archaeology__q006",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 3.0
+        },
+        {
+          "type": "interaction",
+          "left": "up_day_ratio_20",
+          "right": "mom_20",
+          "transform": "zscore",
+          "weight": -2.5
+        },
+        {
+          "type": "interaction",
+          "left": "px_vs_ma50",
+          "right": "vol_ratio_5_20",
+          "transform": "zscore",
+          "weight": -2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.55
+            },
+            {
+              "feature": "mom_20",
+              "op": "gt",
+              "value": 0.05
+            }
+          ],
+          "add": -5.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 2
+        }
+      },
+      "spec_hash": "939b088667e17369c0f695c3c3265c3508fa97d1760bde84242d96ec3facfec5"
+    },
+    {
+      "policy_id": "dual_mode_coil_candidate_v1",
+      "description": "Dual-mode candidate encoding explosive vs coil buckets from vol_ratio_5_20 regime with pre-committed differential scoring (coil mode receives penalty reflecting lower observed precision in q019 archaeology).",
+      "research_origin": "failure_archaeology__q019",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "zscore",
+          "weight": 2.0
+        },
+        {
+          "type": "linear",
+          "feature": "px_vs_ma50",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "zscore",
+          "weight": 2.0
+        },
+        {
+          "type": "interaction",
+          "left": "vol_ratio_5_20",
+          "right": "mom_20",
+          "transform": "zscore",
+          "weight": 1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "lt",
+              "value": 1.0
+            },
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 0.9
+            }
+          ],
+          "add": -1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "min_score",
+          "max_positions": 2,
+          "min_score": 0.5
+        }
+      },
+      "spec_hash": "c05489666471375b278177235c36fd3232b734405fca04a3cafd81f3b433497e"
+    }
+  ],
+  "schema_rejected": [
+    {
+      "batch": 2,
+      "policy_id": "dry_false_penalty_residualized",
+      "reason": "linear feature 'penalty_residual_score' is not numeric PIT-allowed"
+    },
+    {
+      "batch": 4,
+      "policy_id": "freshness_residual_orthogonal_test",
+      "reason": "linear feature 'time_since_pivot_weeks' is not numeric PIT-allowed"
+    },
+    {
+      "batch": 5,
+      "policy_id": "eps_pref_gate_v1",
+      "reason": "condition feature 'eps_rank_pct' is not PIT-allowed"
+    },
+    {
+      "batch": 7,
+      "policy_id": "regime_conditional_freshness",
+      "reason": "linear feature 'trading_days_since_ibd_trigger_entry' is not numeric PIT-allowed"
+    },
+    {
+      "batch": 7,
+      "policy_id": "stealth_nonpick_surveillance_queue",
+      "reason": "condition feature 'is_b0_pick' is not PIT-allowed"
+    },
+    {
+      "batch": 9,
+      "policy_id": "sector_conditioned_entry_extension_gate",
+      "reason": "linear feature 'sector_RS_quartile' is not numeric PIT-allowed"
+    },
+    {
+      "batch": 9,
+      "policy_id": "regime_switched_lane_probe",
+      "reason": "condition feature 'snapshot_realized_rv_20' is not PIT-allowed"
+    },
+    {
+      "batch": 13,
+      "policy_id": "eps_revision_breadth_zscore",
+      "reason": "linear feature 'analyst_revision_breadth_8w' is not numeric PIT-allowed"
+    }
+  ],
+  "exact_spec_duplicates": [],
+  "adversarial_reviews": [
+    {
+      "reviews": [
+        {
+          "policy_id": "lane_x_slope_sign_probe",
+          "concerns": [
+            "The claimed interaction test is not actually conditioned on MA20 slope sign despite the description: the term uses px_vs_ma20 multiplied by ma20_slope_5, which is a continuously signed interaction, not a sign-conditioned operator.",
+            "Raw px_vs_ma20 and slope-derived features can share trend and price-level information, so an interaction coefficient or small AUC increment may reflect collinearity or nonlinear model fit rather than new predictive information.",
+            "A single global interaction can cancel across positive- and negative-slope regimes, making the directional hypotheses specified in prose invisible to the frozen score.",
+            "The min_score=0.5 and max_positions=2 combination creates a stringent activation hurdle: in a small or weak cross-section this policy will abstain even when candidates are positively ranked.",
+            "The fixed max_positions of two also truncates information content unless this capacity is identical to B0; otherwise the claimed interaction gain is entangled with portfolio breadth."
+          ],
+          "novelty_0_100": 42,
+          "mechanism_clarity_0_100": 48
+        },
+        {
+          "policy_id": "vol_ratio_regime_gate",
+          "concerns": [
+            "The policy directly embeds the same low-volatility downside mechanism later represented by volume_dryup_filter, creating strong conceptual and empirical duplication.",
+            "'Low vol' and 'negative slope' are used as a discretionary liquidity veto without an operational definition of liquidity, so the gate can behave as a generic downtrend filter and proxy for future returns.",
+            "The threshold of vol_ratio_5_20 < 0.9 plus ma10_slope_5 < 0 may be either densely populated or nearly empty depending on feature scaling, but either outcome makes the mechanism difficult to falsify.",
+            "The linear vol term and vol-by-slope interaction overlap mathematically with the conditional threshold, so the three terms are not cleanly identifiable mechanisms.",
+            "The fixed max_positions=2 without a minimum-score rule does not provide a deterministic activation requirement; if the universe is small or base scores are concentrated, low scores can still force abstention.",
+            "The liquidity narrative is implausible as stated because a low short-to-medium realized-volatility ratio is not itself a measure of market liquidity."
+          ],
+          "novelty_0_100": 35,
+          "mechanism_clarity_0_100": 58
+        },
+        {
+          "policy_id": "volume_dryup_filter",
+          "concerns": [
+            "The low-vol branch substantially duplicates the low-vol/negative-slope veto in vol_ratio_regime_gate, while the high-vol/low-momentum branch overlaps snapshot_norm_vol_with_slope_trap.",
+            "The description says it penalizes low-vol entries, but the frozen condition is vol_ratio_5_20 < 1.3, a broad range that includes ordinary and even somewhat elevated volatility; this weakens the stated dry-up mechanism.",
+            "The high-vol distribution condition uses mom_20 < 0.1, but the same positive threshold appears in the pivot-confirmation policy, so a feature threshold rather than an independent market mechanism may drive selection.",
+            "Calling the two penalties 'entries' is misleading because they are score adjustments applied across all ranked candidates; entry eligibility and portfolio inclusion are determined downstream.",
+            "The score-gap capacity rule with gap=0.3 and max_positions=2 is an unusually strong selectivity filter. It can manufacture abstention whenever the second qualifying name is close to the first or the top score is weak.",
+            "The requested pre-registered hold-out is a validation requirement, not part of the frozen score; treating it as evidence for this exact mechanism would introduce validation-selection risk."
+          ],
+          "novelty_0_100": 31,
+          "mechanism_clarity_0_100": 63
+        },
+        {
+          "policy_id": "volume_conditional_pivot_confirmation",
+          "concerns": [
+            "The three pivot thresholds are largely hard-coded momentum, volume, and price-trend rules, so this is close to a composite rule-based strategy rather than an independently identified contribution from ibd_entry_volume_ratio.",
+            "The positive award requires all three conditions, while the negative penalty fires if any one condition fails. This is not a symmetric treatment of evidence and can make the three-feature bundle behave like an all-or-nothing veto.",
+            "The linear and interaction uses of ibd_entry_volume_ratio conflict with the description of volume as passive confirmation: standalone volume still contributes outside the awarded region, and its interaction is not restricted to the simultaneous pivot state.",
+            "The positive interaction can assign a large bonus to high volume paired with high momentum, potentially double-counting both vol_ratio_5_20 and mom_20 through correlated volume signals.",
+            "The all-negative region and max_positions=1 create a severe abstention funnel. Any weakness in momentum, volume, or price trend can remove otherwise ranked candidates, after which a top-score gap of 0.2 can suppress the sole remaining position.",
+            "The term 'three strongest pivot signals' is not established within the normalized spec; it adds a discretionary ranking claim that may be unstable across regimes."
+          ],
+          "novelty_0_100": 28,
+          "mechanism_clarity_0_100": 55
+        },
+        {
+          "policy_id": "snapshot_norm_vol_with_slope_trap",
+          "concerns": [
+            "The description says vol_ratio_5_20 is normalized against snapshot context, but the frozen term is only a generic zscore transform with no explicit cross-sectional denominator or snapshot grouping. This is a specification-to-mechanism mismatch.",
+            "High volatility combined with positive short-term slope is treated as an accumulation trap, yet high volatility with positive momentum is commonly consistent with active demand. The stated causal mechanism is therefore economically implausible without a separate flow or issuance interpretation.",
+            "The first penalty overlaps the high-vol/low-momentum filter in volume_dryup_filter, while the second penalty captures a related adverse trend/volatility condition already proxied by the interaction and main effects.",
+            "The raw vol_ratio penalty, continuous vol-by-slope interaction, and two threshold penalties are not separable: collinearity can make it impossible to attribute behavior to the alleged professional accumulation pattern.",
+            "up_day_ratio_20 < 0.5 plus high volatility is a generic distribution/risk proxy and may largely duplicate the information in momentum and trend variables.",
+            "The gap=0.2, max_positions=1 combination is highly abstention-prone: the threshold bonus requires simultaneous momentum, volume, and price confirmation, the penalties can remove marginal names, and the remaining name may be suppressed by a modest score gap.",
+            "With a one-position limit, gains from a more elaborate score are inseparable from the portfolio constraint itself unless the same capacity is used in the comparison base."
+          ],
+          "novelty_0_100": 52,
+          "mechanism_clarity_0_100": 39
+        }
+      ]
+    },
+    {
+      "reviews": [
+        {
+          "policy_id": "orthogonal_breadth_decomposition",
+          "concerns": [
+            "Orthogonality claim is empirically weak: over 20-day windows, up_day_ratio_20 and mom_20 cross-sectionally correlate ~0.7-0.85; they are not candidate-orthogonal sub-features, they are largely the same signal with different normalizations.",
+            "vol_ratio_5_20 is described as having 'different noise floor from mom_20' but mom_20 is a return statistic while vol_ratio is a volatility statistic; calling the volatility term 'orthogonal' to the dropped slope/MA features ignores that B0 already loads vol_ratio_5_20 elsewhere.",
+            "Capacity rule max_positions=1 with gap=0.5 (in z-score units, half a standard deviation) is a structural abstention device: cross-sectional spreads of 0.5 z on a 2-feature linear score occur rarely, so the policy will spend most of its life in cash by construction — not by alpha.",
+            "Dropping px_vs_ma50 is asserted to be 'absorbed by trend_b0/relative_strength_b0' but neither B0 trend nor RS proxies the absolute 50-day price level; the residual content (long-term regime filter) is being discarded without falsification.",
+            "Weight scheme (2.0 vs 1.0) embeds a 2x prior on breadth over vol that has no clear economic justification beyond the description's narrative."
+          ],
+          "novelty_0_100": 38,
+          "mechanism_clarity_0_100": 52
+        },
+        {
+          "policy_id": "tape_volatility_interaction_probe",
+          "concerns": [
+            "Severe conceptual duplication with breadth_bounded_vol: both load mom_20 (1.5) and up_day_ratio_20 (1.0/1.5) additively; the only structural difference is swapping a -0.8 vol linear term for a +1.2 (breadth x vol) interaction. These two policies are near-twins in feature space and will produce near-identical rankings — they cannot independently falsify anything.",
+            "Interaction term z(up_day_ratio_20)*z(vol_ratio_5_20) with positive weight 1.2 rewards stocks that are simultaneously high-breadth AND high-short-vol. The description frames this as 'interactional content' but does not justify why joint elevation is a positive signal — historically high-vol breadth episodes (e.g., distribution days, bear-market rallies) precede ruin, the opposite of what a positive coefficient encodes.",
+            "Cross-term collinearity with the additive mom_20 and up_day_ratio_20 terms makes the interaction weight unidentifiable; OLS would not separate +1.2 interaction from a rescaling of the additive terms. The 'falsifier' test has low power.",
+            "Same max_positions=1 + gap=0.5 abstention trap as Policy 1; the probe is structurally biased toward cash.",
+            "vol_ratio_5_20 in this policy is a positive contribution (via interaction) while in breadth_bounded_vol it is sign-flipped negative — the two policies encode opposite vol-sign stories about the same data. This inconsistency is a red flag, not a falsifier design."
+          ],
+          "novelty_0_100": 25,
+          "mechanism_clarity_0_100": 35
+        },
+        {
+          "policy_id": "breadth_bounded_vol",
+          "concerns": [
+            "Vol-bounding via a single linear sign-flip with weight -0.8 is mechanically weak: a stock with mom_20 z=2 and vol_ratio_5_20 z=2 still scores +1.4 net; the 'bounded vol preference' claim does not actually bound anything in score space.",
+            "Direct feature overlap with tape_volatility_interaction_probe (same mom_20 weight 1.5, same up_day_ratio_20 weight 1.5 vs 1.0) — these are not independent falsifiers of the same hypothesis, they are the same hypothesis tested with a different sign on vol.",
+            "The 'confirmed' framing in the description that 'high-mom + high-vol co-occurs with ruin' is asserted, not demonstrated. Linear scoring with sign-flipped vol is a continuous proxy for what should be a hard threshold; the policy cannot structurally prevent the ruin pattern it claims to address.",
+            "max_positions=1 + gap=0.5 z forces abstention in any market regime where no asset has a 0.5σ lead — a structural rather than alpha-driven constraint.",
+            "Weight asymmetry (1.5/1.5/-0.8) means vol contributes at ~53% of the strongest leg; the 'filter' is barely a filter."
+          ],
+          "novelty_0_100": 42,
+          "mechanism_clarity_0_100": 62
+        },
+        {
+          "policy_id": "slope_ratio_entry_tightness_ruin_gate",
+          "concerns": [
+            "Description claims the spec tests slope_ratio = ma10_slope_5/ma20_slope_5, but the spec contains NO ratio term — only a linear ma10_slope_5 (weight 0.5) gated by a threshold on ma20_slope_5 > 0.01. The advertised mechanism is not implemented in the frozen spec.",
+            "The threshold term has add=0.0 with no other scoring effect: it gates nothing in score space. ma10_slope_5 is added linearly regardless of whether ma20_slope_5 passes the gate, so the 'ruin gate' is a no-op.",
+            "Divider instability (the q010 confounder hypothesis) is named in the research_origin but the spec does NOT divide by ma20_slope_5 — so the very artifact the policy claims to test for cannot manifest, and the test is unrunnable as designed.",
+            "Heavy linear-terms overfitting: 6 linear terms (ma10_slope_5, ibd_entry_close_vs_trigger_pct, mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50) plus 1 interaction. With z-scored inputs on cross-sectional rank data, this is essentially a B0 superset with a 'q010 narrative' bolted on.",
+            "ibd_entry_close_vs_trigger_pct with neg_abs transform: the feature is bounded near zero at trigger, so neg_abs is large-negative everywhere except very close to the trigger; this is a near-binary mask dressed as a continuous term, not a smooth signal.",
+            "Capacity is fixed mode max_positions=3 with no gap or min_score gate — this is the only policy without an abstention device, but the desc/spec mismatch undermines whatever signal it would otherwise produce."
+          ],
+          "novelty_0_100": 20,
+          "mechanism_clarity_0_100": 22
+        },
+        {
+          "policy_id": "gap_gated_continuous_slot_sizing",
+          "concerns": [
+            "Description promises 'continuous slot sizing' but the selector is purely discrete (top1_confidence with binary gap threshold and min_score cutoff). The name is a misnomer; the policy either fills slots 2/3 or doesn't, there is no continuous sizing.",
+            "gap=0.15 + min_score=0.3 + max_positions=3 is engineered to fill slot 1 and routinely cash slots 2/3. This is an abstention policy disguised as a sizing policy. The description admits this ('a large gap permits abstention on slot 2/3') so the policy is intentionally biased toward partial cash deployment, not toward producing falsifying performance.",
+            "Feature set (mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, ma10_slope_5, vol_ratio_5_20 x mom_20) is essentially a 5-way union of features that appear individually in the other four policies. It does not isolate a new causal mechanism — it is a kitchen-sink aggregation with an interaction that repeats the high-mom/high-vol ruin hypothesis from Policy 3.",
+            "vol_ratio_5_20 x mom_20 interaction with weight -0.4 means: penalize (high-vol AND high-mom) jointly — exactly the ruin pattern named in breadth_bounded_vol. Two policies testing the same joint hypothesis with opposite signs on the same interaction is a setup for one to 'falsify' the other by artifact, not by mechanism.",
+            "min_score=0.3 in unspecified units (raw score? z-units?) is opaque; this gate interacts non-trivially with the linear term magnitudes and could effectively zero out the policy in regimes where z-scores cluster."
+          ],
+          "novelty_0_100": 33,
+          "mechanism_clarity_0_100": 48
+        }
+      ],
+      "cross_policy_concerns": [
+        "Across the 5 policies, mom_20 appears in 5/5, vol_ratio_5_20 in 5/5, up_day_ratio_20 in 4/5. The 'falsifier' design pretends these are independent tests but they are heavily collinear in feature space — most policies share >60% of their linear term mass.",
+        "Four of five policies (1, 2, 3, 5) use top1_confidence with gap thresholds; the abstention rate is a function of the gap parameter, not of alpha. Any 'falsification' of one policy vs another will be dominated by gap choice, not by feature engineering.",
+        "Two policies (3 and 5) encode the high-mom + high-vol ruin hypothesis with opposite-signed interactions (Policy 3: implicit via sign-flip; Policy 5: explicit negative interaction). The Track D design does not adjudicate between them because both can be 'right' under different gap/abstention regimes."
+      ]
+    },
+    {
+      "reviews": [
+        {
+          "policy_id": "entry_proximity_two_stage_v1",
+          "concerns": [
+            "Linear weight of -3.0 on `ibd_entry_close_vs_trigger_pct` is partially redundant after the hard lte 0.04 screen — the dynamic range of the linear term is compressed to [0, 0.04], making it behave like a near-binary tiebreaker rather than a continuous signal.",
+            "Interaction term (-2.0) with `ma10_slope_5` uses raw identity on both sides; slope has scale and sign ambiguity (slopes near zero, negative slopes on downtrends), so the interaction term is sign-flippable in regimes that may not be PIT-stable.",
+            "`up_day_ratio_20` weight 0.7 is grafted at sub-threshold magnitude — looks like an inherited B0 residual that has no causal link to the entry-proximity mechanism being tested.",
+            "Capacity mode `score_gap` with gap=0.15 combined with max_positions=2 and industry_mode `max_2_per_ind` will produce routine capacity=1 outcomes whenever top-2 are close in entry-proximity score, manufacturing abstention against the very signal under test.",
+            "Two-stage filter conflates two ruin mechanisms: trigger-proximity (entry timing) and slope bias. The hard screen at 0.04 will discard many candidates whose ruin was driven by something other than trigger distance, biasing the survivor distribution."
+          ],
+          "novelty_0_100": 30,
+          "mechanism_clarity_0_100": 55
+        },
+        {
+          "policy_id": "ccm_gap_abstention_v1",
+          "concerns": [
+            "`gap=0.5` is enormous given feature weights summing to ~2.2 on z-scored inputs — a 0.5 standardized gap is multiple-sigma separation, so the binding constraint is essentially always the gap, not min_score=0.2.",
+            "`min_score=0.2` is dead code in practice — it never binds because the gap threshold supersedes it. This makes the 'tiered capacity' claim misleading; it is effectively single-threshold (gap-only).",
+            "`industry_mode: distinct_1` with `max_positions: 3` is internally inconsistent — distinct_1 caps effective slots at the number of industries represented, so max_positions=3 is aspirational rather than operational in concentrated universes.",
+            "Gap-as-PIT-confidence-proxy is well-known to fail in correlated regimes; when top candidates share a common factor, the gap shrinks for spurious (correlated) reasons, manufacturing abstention exactly when diversification is most needed.",
+            "Heavy feature overlap with sibling policies (mom_20, px_vs_ma50, up_day_ratio_20 all repeated) makes any cross-policy comparison of mechanism attribution unreliable."
+          ],
+          "novelty_0_100": 28,
+          "mechanism_clarity_0_100": 72
+        },
+        {
+          "policy_id": "weekly_volume_confirmation_gate",
+          "concerns": [
+            "Description names `weekly_volume` but the actual feature is `vol_ratio_5_20` (5-day vs 20-day ratio) — naming/semantic mismatch makes the falsification target ambiguous.",
+            "`mom_20` (4.0), `up_day_ratio_20` (3.0), `px_vs_ma50` (2.0) are highly collinear momentum/tempo proxies; together they form a redundant composite where the +1.5 confirmation gate is largely a re-statement of momentum already present in the linear terms.",
+            "The confirmation threshold requires vol>1.0 AND mom>0.10 AND px_vs_ma50>0 — three momentum-related gates stacked, so the 'independent information from volume' hypothesis is structurally untestable since volume contribution only fires after momentum has already won.",
+            "Hardcoded `vol>1.5` blowoff penalty is a magic number without economic justification; in regimes where 1.5 is the new normal, this systematically penalizes healthy breakouts.",
+            "Capacity `fixed: 3` with no abstention mechanism means the policy cannot demonstrate whether volume confirmation actually adds Sharpe or merely ranks within an always-fully-invested sleeve — the falsification design is too constrained."
+          ],
+          "novelty_0_100": 38,
+          "mechanism_clarity_0_100": 62
+        },
+        {
+          "policy_id": "divergence_triage_signal",
+          "concerns": [
+            "Hardcoded reference to 'entity_2f86543bf6 archetype' signals single-name overfitting; the +2.5 in the vol>1.4/mom<0.05 quadrant is being calibrated to one survivor rather than a population-level regularity.",
+            "Mechanism is internally contradictory: `mom_20` weight 5.0 establishes a momentum dominant policy, yet +2.5 is added in a low-momentum quadrant. The two signals are not orthogonal — the high-mom weight is still pulling the score in opposite direction, making the net effect in the divergence zone small and unstable.",
+            "`-1.5` penalty for vol>1.2 AND 0.15<mom<0.25 (the 'late-acceleration zone') and the +2.5 for vol>1.4/mom<0.05 partially cancel across the momentum continuum — the policy is effectively a band-pass filter on momentum with a sharp cliff at mom=0.05.",
+            "`gap=1.5` with `max=2` and `distinct_1` industry mode means this policy almost never fills its capacity — combined with mom_20 weight 5.0 (which has wide dynamic range), the gap threshold will routinely bind, manufacturing capacity<max outcomes.",
+            "Score gap of 1.5 on a scale where mom_20 alone has weight 5.0 means top1 must exceed top2 by 30% of a one-sigma momentum unit just to fill one slot — economically implausible precision requirement."
+          ],
+          "novelty_0_100": 48,
+          "mechanism_clarity_0_100": 45
+        },
+        {
+          "policy_id": "adaptive_capacity_abstention",
+          "concerns": [
+            "`min_score: 5.0` on z-scored features with weights summing to ~7 is at or above the empirical maximum of typical score distributions — this almost certainly forces capacity=0 in the majority of periods, making the '0/1/2/3 adaptive' framing false in practice (it is effectively an abstention-only policy).",
+            "The falsification target ('does 0/1/2/3 beat always-fixed-3') is rigged: by setting min_score at the extreme tail, the policy is structurally biased toward abstention, so the comparison becomes 'abstain often' vs 'always invested' — not a test of adaptive capacity but of cash drag.",
+            "Blowoff veto (-3.0 at vol>1.5 AND up_day<0.5) is a near-duplicate of weekly_volume_confirmation_gate's penalty (-2.0 at vol>1.5) — conceptual duplication of ruin-cluster detection without principled differentiation.",
+            "`top1_confidence` capacity mode with min_score gate stacks two abstention mechanisms (gap test AND score threshold) — failure modes compound non-additively, making the policy's abstention behavior hard to attribute.",
+            "Feature set (mom_20, up_day_ratio_20, px_vs_ma50) is the third policy using essentially the same composite, undermining the claim that capacity mechanism is the variable being tested across the Track D suite."
+          ],
+          "novelty_0_100": 32,
+          "mechanism_clarity_0_100": 78
+        }
+      ]
+    },
+    {
+      "reviews": [
+        {
+          "policy_id": "evidence_risk_two_tier_decomposition",
+          "concerns": [
+            "transform='neg_abs' on the vol_ratio_5_20 * up_day_ratio_20 interaction is a sign-agnostic magnitude penalty — it rewards large |product| regardless of sign, which is mechanistically opaque and can invert intuition about what 'high vol × high up_day' means",
+            "Selector mode 'min_score' with min_score=1.0 will filter out most universe candidates; combined with max_positions=3 this is a high-abstention default unless tier weights reliably clear 1.0",
+            "px_vs_ma50 (weight 2.0) is a trend proxy that largely duplicates mom_20 information already captured at weight 3.0 — classic feature duplication inflating the apparent signal count without adding variance",
+            "Tier-2 threshold penalty is only -2.5 versus tier-1 positive weights summing to ~9.0 — tier-2 is largely vestigial and will rarely flip an outcome, so the 'tiered' framing is mostly cosmetic",
+            "vol_ratio × up_day_ratio interaction is mirrored in ruin_guard_two_stage and override_interaction_probe — high cross-policy redundancy"
+          ],
+          "novelty_0_100": 32,
+          "mechanism_clarity_0_100": 50
+        },
+        {
+          "policy_id": "entry_volume_demand_conviction_test",
+          "concerns": [
+            "All weights are ≤0.6 with total max contribution ≈1.0 — the 'shadow score' framing means this policy cannot materially shift rank or clear any meaningful min_score; if it is treated as production it is a near-no-op, if it is truly shadow it does not belong in selector evaluation",
+            "zscore transforms on both linear terms AND the interaction introduce cross-sectional noise that washes out level-of-volatility information; an interaction of two z-scored features is non-monotonic and hard to interpret directionally",
+            "ibd_entry_volume_ratio and vol_ratio_5_20 are likely mechanically correlated (entry-day volume lifts short-term vol) — proxy risk: the interaction is partially an identity",
+            "Selector max_positions=2 with top1_confidence + gap=0.25 is restrictive; if top1_confidence collapses to 1 effective slot, this policy also defaults toward abstention",
+            "Calling itself a 'test' while still using the same b0_rank base and selector gating as production policies creates ambiguity about whether abstention here is meant to be counted"
+          ],
+          "novelty_0_100": 58,
+          "mechanism_clarity_0_100": 35
+        },
+        {
+          "policy_id": "override_interaction_probe",
+          "concerns": [
+            "max_positions=1 with gap=1.0 and top1_confidence is a near-certain abstention default; even a strong cross-sectional winner must beat the runner-up by a full score unit to clear",
+            "mom_20 × up_day_ratio_20 interaction (weight 3.5) is duplicated almost verbatim in consistency_agreement_scorer (weight 1.5) — these two policies are largely the same signal at different intensities, with the duplication unaccounted for",
+            "Penalty cell (mom_20 ≥ 0.2 AND up_day_ratio_20 < 0.5) is claimed to be a 'divergence cell' from specific ruin entities, but up_day<0.5 with positive momentum is a plausible early-trend regime, not a guaranteed ruin — the -3.0 penalty is asymmetric against this case without symmetric reward for the opposite (low mom + high up_day)",
+            "Threshold logic uses 'all' but with only two conditions and no other gating; the policy is small (max 1 position) and can be dominated by tier-1 interaction at weight 3.5"
+          ],
+          "novelty_0_100": 28,
+          "mechanism_clarity_0_100": 68
+        },
+        {
+          "policy_id": "ruin_guard_two_stage",
+          "concerns": [
+            "max_positions=1 + gap=1.0 + score_gap mode is the most abstention-prone selector in the set; even good candidates must separate by 1.0 score from the field to clear a single position",
+            "Linear vol_ratio_5_20 penalty at -1.5 is a constant drag that does not gate — it lowers every score uniformly and biases the ranking toward low-vol names without ever producing a hard reject on its own, which is a hidden proxy for risk-aversion rather than an explicit ruin-guard",
+            "Hard threshold -8.0 for vol>1.5 AND up_day<0.55 is severe: this combination is not rare in mid-cap universes and will zero out a large fraction of candidates, after which the gap=1.0 requirement further suppresses position count",
+            "Borderline cell (up_day in [0.50, 0.60] AND mom<0.20) is an extremely narrow and arbitrary window that adds -4.0; this looks curve-fit to specific ruin entities rather than a robust regime",
+            "Thresholds overlap heavily with evidence_risk_two_tier_decomposition's tier-2 penalty (vol>1.5 / mom<0.1) — the same ruin logic is implemented twice with different magnitudes, creating double-counted suppression"
+          ],
+          "novelty_0_100": 40,
+          "mechanism_clarity_0_100": 62
+        },
+        {
+          "policy_id": "consistency_agreement_scorer",
+          "concerns": [
+            "max_positions=1 with mode='fixed' means the policy emits exactly one position when it emits any; combined with the 'agreement' requirement this is a single-name policy, not a portfolio policy — abstention risk is the modal outcome",
+            "industry_mode='distinct_1' is rendered moot by max_positions=1 — the industry constraint never binds, which suggests the constraint was set without checking consistency",
+            "up_day_ratio_20 (4.0) + mom_20 (2.5) + interaction (1.5) is essentially the same feature stack used in override_interaction_probe and ruin_guard_two_stage, just with different weight ratios; 'consistency' is operationalized as 'use the same features again' rather than a distinct mechanism",
+            "Threshold 'any' with a single condition is functionally identical to a one-condition threshold — the 'any' logic is decorative here",
+            "The penalty -3.5 for up_day<0.4 is asymmetric: there is no corresponding penalty for mom_20<0 with high up_day_ratio, even though the description claims symmetry of 'agreement' — this re-introduces the divergence the policy is supposed to discourage"
+          ],
+          "novelty_0_100": 22,
+          "mechanism_clarity_0_100": 60
+        }
+      ],
+      "cross_policy_observations": {
+        "abstention_manufacture": "Three of five policies (override_interaction_probe, ruin_guard_two_stage, consistency_agreement_scorer) set max_positions=1; combined with gap≥0.25 and min_score=1.0 in the remaining two, the ensemble has a strong structural prior toward abstention. A 'failure' outcome here is partially a designed property of the selector rules, not evidence of the underlying hypotheses.",
+        "feature_concentration": "vol_ratio_5_20 appears in all 5 policies; mom_20 + up_day_ratio_20 (often as an interaction) appears in 4 of 5. The policy set is functionally a perturbation around one feature cluster, not 5 independent tests.",
+        "proxy_risk_concentration": "mom_20, px_vs_ma50, up_day_ratio_20 are all trend/direction proxies; vol_ratio_5_20 and ibd_entry_volume_ratio are volatility/liquidity proxies. The set does not have an independent valuation, quality, or fundamental axis — proxy collapse risk is high.",
+        "interaction_transform_inconsistency": "neg_abs (policy 1), zscore (policy 2), identity (policies 3-5) on the same or analogous interaction terms make cross-policy comparison of magnitudes meaningless."
+      }
+    },
+    {
+      "reviews": [
+        {
+          "policy_id": "b0_continuous_breadth_rank",
+          "concerns": [
+            "up_day_ratio_20 appears both as the primary linear term (weight 1.5) AND as the left side of the interaction (weight 0.6), so the feature is doubly represented in the score — partial duplication inside the policy itself, and again across all five policies (feature concentration).",
+            "rank_pct bounds everything to [0,1], which is numerically clean but means the 'continuous' ranking experiment has lower dynamic range than the description implies — the test of q010 may have weak statistical power vs. the binary-penalty baseline it replaces.",
+            "No penalty mechanism at all: abstention behavior here depends entirely on fixed=3 capacity + distinct_1 crowding, making this policy unable to falsify risk-control questions despite claiming to decouple ranking from risk control — the decoupling is one-sided.",
+            "No min_score floor; under weak breadth regimes rank_pct scores compress toward 0, so the policy silently degenerates toward an unranked deterministic ordering at the cap. Mechanism clarity is good but the 'ranking hypothesis' is partly confounded with capacity."
+          ],
+          "novelty_0_100": 55,
+          "mechanism_clarity_0_100": 78
+        },
+        {
+          "policy_id": "vol_regime_quality_gate_no_dry_filter",
+          "concerns": [
+            "vol_ratio_5_20 > 1.3 trigger condition is empirical and not calibrated in spec; if this regime is rare in-sample, the policy is essentially dormant outside of stress windows — the 'falsifier-5' test will have very low effective sample size.",
+            "The -2.5 penalty on (mom_20<0.1 OR px_vs_ma50<0.08) with 'any' logic is broadly triggered because high vol regimes almost mechanically depress mom_20 — the two predicates are partly co-correlated, making the 'either' gate closer to a single condition in practice.",
+            "score_gap with gap=0.5 + dual penalty layer can manufacture wholesale abstention on vol-spike days when both predicates fire (penalty stack to -4.0) AND score separation fails — three independent abstention channels compounding.",
+            "Thresholds (0.1, 0.08) appear hand-tuned with no stated empirical derivation; this risks encoding prior in-sample observations back into the policy in a way that falsifier logic requires to be held out."
+          ],
+          "novelty_0_100": 52,
+          "mechanism_clarity_0_100": 68
+        },
+        {
+          "policy_id": "three_slot_crowding_quality_gated",
+          "concerns": [
+            "Triple abstention stack: min_score=0.5 hard floor + gap=1.0 between slots + distinct_1 industry mode forcing slot-3 cash on crowding. Any one of these gates manufactures abstention; the conjunction likely yields near-permanent cash states whenever scoring inputs are heterogeneous.",
+            "Severe feature scale mismatch: mom_20 (identity, unbounded %), up_day_ratio_20 (identity, bounded [0,1]), vol_ratio_5_20 (identity, unbounded ratio) — weighted sum has no interpretable scale, so the min_score=0.5 floor is effectively an arbitrary threshold on a non-calibrated aggregate.",
+            "Proxy risk: vol_ratio_5_20 is being used both as a 'quality' signal (linear +1.2) and conventionally represents risk/regime — collapsing quality and risk into one feature is the same conflation the policy supposedly decouples.",
+            "Conceptual duplication with policy 2: both use linear scoring on mom/vol/up_day_ratio_20 with threshold penalties and distinct_1 mode; policy 3's only structural innovation is the top1_confidence gap rule, which is capacity-infrastructure not a distinct mechanism.",
+            "description claims 'uniform quality scoring' but capacity rules are the dominant selector — this policy tests capacity rules more than it tests the quality features."
+          ],
+          "novelty_0_100": 25,
+          "mechanism_clarity_0_100": 45
+        },
+        {
+          "policy_id": "structural_loser_soft_reject_v1",
+          "concerns": [
+            "Naming is internally contradictory: 'soft reject' pairs with max_positions=1 and high positive weights (5.0, 4.0) on identity-scaled unbounded features — the linear positives push scores upward and the -3.0 penalty is the only brake, so on any non-ruin candidate the policy always picks. The 'soft' framing overstates how much this policy actually abstains.",
+            "Identity transform on px_vs_ma50 (a percentage often ranging widely) combined with weight 5.0 means a moderate extension produces huge positive score deltas; the asymmetric penalty is the only mechanism preventing binge-picking, which is structurally fragile.",
+            "min_score=0.0 means there is effectively no score floor, so the policy has no abstention regime except via the -3.0 cluster penalty and the max=1 cap. Combined with max=1, the policy will pick whichever candidate has the highest px_vs_ma50×up_day_ratio_20 product — this is a momentum-tilting policy disguised as a ruin-avoidance policy.",
+            "Ruined cluster thresholds (0.08, 0.55) are stated as empirically observed but used here as live filters without held-out validation; overfitting risk is high given 'failure_archaeology' origin.",
+            "max_positions=1 is the most aggressive abstention constraint across the portfolio of policies, yet with positive linear weights the 'abstention' is conditional on ranking only — interaction between these two rules is underspecified."
+          ],
+          "novelty_0_100": 48,
+          "mechanism_clarity_0_100": 55
+        },
+        {
+          "policy_id": "trigger_compression_rescue_v1",
+          "concerns": [
+            "weight -6.0 on ibd_entry_close_vs_trigger_pct is the largest-magnitude coefficient in the entire portfolio, and the negative sign means the score drops as the absolute value of the feature grows — the magnitude and sign convention for 'compressed' must be documented or this policy's behavior is opaque (positive near-trigger → rewards; far-from-trigger → penalizes, or the reverse, depending on sign).",
+            "Mechanism is explicitly tagged as 'empirically UNRESOLVED' in description — this is a probe, not a falsifier, and is structurally distinct from the other four (base=zero) but risks confounding if evaluated alongside them.",
+            "max_2_per_ind industry mode with only max_positions=2 is loose: under clustered signals, this policy permits more concentration than distinct_1 peers, which is the opposite crowding behavior the rest of the portfolio constrains.",
+            "Proxy risk: ibd_entry_close_vs_trigger_pct is a tightly constructed near-buy-point geometry feature; combined with up_day_ratio_20, this is essentially a 'fresh breakout + healthy tape' signal that may correlate strongly with already-tested momentum proxies in other policies.",
+            "Cap of 2 with no min_score means abstention risk is moderate, but the policy could over-pick when rescue signals cluster (e.g., breakout days), which is the opposite failure mode from policies 2-4."
+          ],
+          "novelty_0_100": 80,
+          "mechanism_clarity_0_100": 60
+        }
+      ],
+      "cross_policy_notes": [
+        "Feature concentration: up_day_ratio_20 appears in all 5 policies; mom_20 in 2 of 5; distinct_1 in 4 of 5. The 'falsifier' claims cannot be fully independent given this overlap — most pairwise comparisons will be dominated by shared features rather than orthogonal mechanism tests.",
+        "Capacity-driven abstention manufacturing: policies 3 and 4 have explicit abstention architectures (min_score + gap, max=1), policy 2 has implicit abstention under regime stress, policy 1 is abstention-cushioned by fixed=3. The portfolio as a whole does not isolate capacity effects from feature/method effects.",
+        "Three of five policies (2, 3, 4) implement the same template: b0_rank + linear scoring on bounded quality features + asymmetric threshold penalty + distinct_1. Mechanism novelty within that template is low; the portfolio is heavily clustered around one archetype plus one outlier (policy 5)."
+      ]
+    },
+    {
+      "reviews": [
+        {
+          "policy_id": "recent_momentum_ranking",
+          "concerns": [
+            "Feature cluster is essentially four collinear momentum proxies: mom_20, ma20_slope_5, and up_day_ratio_20 all encode near-identical recent-thrust information; only vol_ratio_5_20 is genuinely orthogonal. Effective dimensionality ≈1.5, not 4.",
+            "Linear z-score sum with positive-only weights and min_score=0.0 means the selector never abstains on score grounds — any abstention comes purely from top1_confidence gap threshold, which is underspecified (gap=0.5 in what units?).",
+            "top1_confidence mode with max_positions=3 and a 0.5 z-score-unit gap on correlated features will routinely fail the gap test and manufacture abstention when candidate scores cluster (which they will, given feature collinearity).",
+            "Falsification bar (quintile-5 minus quintile-1 <3pp with |z|<1.5) is not power-justified against expected holdout size for top-decile universe — likely set such that the policy trivially 'survives' even if the underlying signal is weak."
+          ],
+          "novelty_0_100": 28,
+          "mechanism_clarity_0_100": 72
+        },
+        {
+          "policy_id": "downside_distress_hard_gate",
+          "concerns": [
+            "Term label 'hard binary OR-gate' is contradicted by implementation: -10 additive penalty is not a gate (it never sets score to -∞ or excludes the candidate). Selector still ranks survivors — gate is functionally soft, not hard.",
+            "Four OR-triggered distress proxies are highly collinear: ma20_slope_5<0, dist_to_52w_high_pct<-25, and pullback_pct<-20 all encode 'price below recent reference.' A single trigger fires in near-lockstep with others, so OR logic adds no marginal coverage.",
+            "rv_20 is included under 'PIT-observable' label but rv_20 is a return-derived statistic whose lookback construction must be PIT-verified — no construction rule is given; proxy risk is high (look-ahead via centered or non-PIT windowing).",
+            "Compound falsification bar requires simultaneous (a) ≥10% reduction in false_positive_ruin AND (b) preservation of selected_winner median W4 return — this is a conjunction that is very hard to meet; if either side fails the policy is falsified, giving a sharply biased survival prior.",
+            "top1_confidence + max_positions=3 + min_score=0.0: when the gate removes the top-ranked candidate, the recovery rank may not satisfy gap=0.5, manufacturing abstention that is attributed to the selector rather than to the (intended) gate."
+          ],
+          "novelty_0_100": 38,
+          "mechanism_clarity_0_100": 42
+        },
+        {
+          "policy_id": "trigger_position_calibration",
+          "concerns": [
+            "Self-canceling structure: -3.0 penalty on ibd_entry_close_vs_trigger_pct>0.06 is offset by +2.5 conditional carve-out when mom_20>0.2, leaving a net -0.5 for the only scenario where the penalty was actually meant to bite. Mechanism therefore barely fires on its target population.",
+            "Description says 'reject picks' but spec is a score adjustment; this is a description-vs-implementation mismatch that will be tested on soft-additive semantics, not rejection semantics.",
+            "ibd_entry_close_vs_trigger_pct is referenced as a known failure feature with quoted entity-level W4 returns (0.074, 0.070 vs 0.025 winner) — the cutoff 0.06 is silent on which entity-derived distribution it corresponds to. If the cited pair averages 0.072, the 0.06 threshold catches only one of them, biasing the test toward the wrong half of the archaeology sample.",
+            "Conditional exception (mom_20>0.2) reintroduces the proxy momentum has been previously falsified as a failure mode elsewhere — risk of re-coding the very signal that archaeology found to be non-causal.",
+            "Capacity identical to P1 (top1_confidence, max=3, gap=0.5): any abstention in evaluation cannot be cleanly attributed to this policy's mechanics versus selector mechanics."
+          ],
+          "novelty_0_100": 58,
+          "mechanism_clarity_0_100": 32
+        },
+        {
+          "policy_id": "ruin_suppression_layer_v1",
+          "concerns": [
+            "Severe conceptual duplication within the spec itself: the linear up_day_ratio_20 term (+3.0), the up_day_ratio_20 × mom_20 interaction (-2.5), and the threshold penalty (-5 for low up_day_ratio_20 AND positive mom_20) all act on the same up_day_ratio_20 × mom_20 quadrant. Net effect is opaque; the marginal contribution of each layer is not separable on holdout.",
+            "px_vs_ma50 × vol_ratio_5_20 interaction (-2.0) is the only term not duplicated elsewhere in the term set, yet it shares vol_ratio_5_20 with the threshold band — feature reuse within a single policy inflates effective term count.",
+            "Capacity is fixed max_positions=2 with industry_mode=distinct_1 — this is the most aggressive abstention-manufacturing profile in the bundle. Any failure-to-fill in evaluation will be confounded with the policy's actual ruin-suppression mechanism, undermining falsifiability.",
+            "min_score not present (fixed mode bypasses it), but max_positions=2 + distinct_1 will produce many empty/underfilled portfolios by construction, not by signal — outcome metrics (e.g., median W4 return over selected_winners) will be estimated on tiny samples with wide CIs.",
+            "Eps_preference-disguise risk: px_vs_ma50 and up_day_ratio_20 jointly track 'is the stock in a confirmed uptrend' — this is functionally a quality/momentum filter, exactly the pattern previously flagged as a proxy for the rejected eps_preference baseline."
+          ],
+          "novelty_0_100": 45,
+          "mechanism_clarity_0_100": 28
+        },
+        {
+          "policy_id": "dual_mode_coil_candidate_v1",
+          "concerns": [
+            "Threshold band 0.9 < vol_ratio_5_20 < 1.0 is mechanically the noisiest region of the vol-ratio distribution (mean-reverting at unity), not what 'coil' usually denotes (low realized vol). The label 'coil' is misnamed; the penalty hits near-baseline regime, not compressing/consolidating setups.",
+            "Penalty band width (0.1 in vol_ratio units) means the -1.5 term will fire on a minority of candidates; most of the policy's behavior is driven by the linear + interaction terms, so the 'dual-mode' framing is largely cosmetic.",
+            "min_score=0.5 with max_positions=2 combines an above-median score gate with restricted capacity — both conditions must pass simultaneously, doubling the abstention surface relative to either alone. Eval will likely show systematic abstention misattributed to weak signal.",
+            "vol_ratio_5_20 × mom_20 interaction (+1.5) crosses a regime indicator with a momentum feature, but z-score-transformed both sides — interpretation of a zscore×zscore interaction is non-identifiable without anchoring to the original scale. Causal mechanism is underspecified.",
+            "Cross-policy duplication: this policy reuses mom_20, up_day_ratio_20, px_vs_ma50, and vol_ratio_5_20 already deployed in P1 and P4 — comparative falsification across the bundle collapses because policies aren't mechanistically orthogonal."
+          ],
+          "novelty_0_100": 62,
+          "mechanism_clarity_0_100": 22
+        }
+      ]
+    }
+  ],
+  "request_budget": {
+    "hard_limit": 650,
+    "attempts_used": 543,
+    "remaining": 107,
+    "successful_calls": 331,
+    "failed_attempts": 212
+  },
+  "pre_behavioral_count": 30,
+  "behavioral_duplicates": [
+    {
+      "policy_id": "override_interaction_probe",
+      "duplicate_of": "entry_proximity_two_stage_v1",
+      "mean_jaccard": 1.0
+    },
+    {
+      "policy_id": "consistency_agreement_scorer",
+      "duplicate_of": "entry_proximity_two_stage_v1",
+      "mean_jaccard": 1.0
+    }
+  ]
+}

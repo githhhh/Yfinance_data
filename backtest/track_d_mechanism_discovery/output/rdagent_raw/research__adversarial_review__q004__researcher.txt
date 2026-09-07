@@ -1,0 +1,25 @@
+
+```json
+{
+  "mechanism_claim": "Dry pullback semantics are not a causal mechanism but a noisy, partly-undefined readout of underlying volatility/momentum regime; the apparent pullback signal is epiphenomenal to vol_ratio_5_20, mom_20, and base_duration_weeks, which carry 1.5-2x the standardized contrast of pullback features.",
+  "evidence_for": [
+    "Standardized deltas rank pullback_pct at only 0.64 and pullback_duration_weeks at -0.73, well below vol_ratio_5_20 (-1.05), mom_20 (-1.00), and up_day_ratio_20 (-1.19), so the pullback features are mid-pack at best.",
+    "Among the 6 selected_winners with B0=true, half (entity_ead73f4390, entity_b00579f203, entity_28a6ec4601, entity_90a828939a) have NULL pullback fields — the semantic is structurally undefined for the strongest winners, undermining any claim that observing the pullback is required for edge.",
+    "Conditional direction is counter to the 'healthy shallow base' thesis: false_negatives have a SHALLOWER pullback_pct (-7.3%) than selected_winners (-15.9%), i.e., winners pull back HARDER, so a 'dry' shallow pullback actually correlates with the wrong outcome class.",
+    "False_positive_ruins also split: 4 of 8 have null pullback (entity_3472243e0c, entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b), and the 3 with non-null pullbacks span -12.3% to -16.2% over 7 weeks — indistinguishable in magnitude from the 2c58cebc59 selected_winner at -25.1%/6w and 3adc078f01 at -42.3%/9w, so pullback depth alone does not separate ruin from large_win."
+  ],
+  "evidence_against": [
+    "pullback_duration_weeks does show a moderate negative contrast (-0.73 std) suggesting shorter pullbacks trend toward false_negatives, which is at least directionally consistent with one version of the thesis; this is the strongest single counter-example and must be tested jointly with base_duration_weeks (which has -0.42 std, likely collinear).",
+    "The numeric_contrasts table is truncated; cannot rule out that pullback features in interaction (e.g., pullback_pct × up_day_ratio_20) carry joint signal not visible in marginal deltas."
+  ],
+  "falsifiable_predictions": [
+    "Regressing W4 forward return on (vol_ratio_5_20, mom_20, ma10_slope_5, base_duration_weeks, up_day_ratio_20) and then adding pullback_pct and pullback_duration_weeks will increase out-of-sample R² by <2% and leave ruin-vs-large_win AUC unchanged within ±0.01; if pullback semantics are causal the marginal R² should exceed 5%.",
+    "Stratifying B0 picks by vol_ratio_5_20 quintile, the partial effect of pullback_pct on ruin probability will flip sign across at least two quintiles (interaction with vol regime), confirming pullback is a vol-regime marker rather than an independent signal.",
+    "Within the pullback_null B0 subset, win rate will be statistically indistinguishable (binomial test, p>0.2) from the pullback_observed B0 subset once base_duration_weeks is matched, falsifying any claim that 'observing a defined dry pullback' is itself informative."
+  ],
+  "policy_implications": [
+    "Drop pullback_pct and pullback_duration_weeks from the B0 scoring model; reallocate their weight to vol_ratio_5_20, mom_20, and up_day_ratio_20, whose standardized contrasts are 1.5-1.9x larger and directionally cleaner.",
+    "Treat the pullback feature as a diagnostic overlay (for post-hoc explanation of why a B0 pick with strong vol/momentum failed) rather than a gating input; this preserves interpretability without letting a weak, partially-undefined feature suppress otherwise valid high-vol/momentum setups."
+  ]
+}
+```

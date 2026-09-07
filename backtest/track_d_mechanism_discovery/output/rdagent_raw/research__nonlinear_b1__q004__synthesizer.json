@@ -1,0 +1,54 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 35,
+  "mechanism_summary": "There is partial support for an interaction in which a dry pullback (pullback-leg median volume below uptrend-leg median) is a continuation signal only when the breakout print itself is volume-confirmed by ibd_entry_volume_ratio above an arm-specific threshold. The ruins-with-pullback cluster (entity_8f0df3d38e, entity_ccc90a671f, entity_55c2da490e) does sit in a 1.2-1.45 VR band that is sub-confirmation, and a comparable large winner (entity_2c58cebc59: -25.1%/6wk) sits at VR=1.62. However, the interaction is not robust: (a) three pullback-context winners sit below any reasonable VR floor (entity_8ad5cd4795 VR=0.996, entity_bec51a4227 VR=1.007, entity_05b4c6b1f7 VR=0.964 — the latter a false_negative_big_winner), (b) the no-pullback arm is empirically unfixed (entity_84824e6a20 VR=1.625 ruins), and (c) pullback_v_is_dry is undefined for 14 of 27 entities, so on 52% of the candidate set the 'piecewise' structure collapses to a single VR cut on a minority remainder. The mechanism is therefore better described as: VR below ~1.3 inside a pullback-leg is a soft warning of distribution, but VR does not independently carry the cross-confirmation role — it is correlated with mom_20, ma10_slope_5, and up_day_ratio_20, which are the strongest univariate separators in the contrast table.",
+  "falsifiers": [
+    "On a frozen out-of-sample period that is not snap_71486ed83c- or snap_d0d57b1e40-dominated, the dry-pullback+high-VR arm does not improve B0 large-win rate by >5 percentage points over an up_day_ratio_20 (>=0.55) + mom_20 (>=0.10) baseline — showing the piecewise adds no independent information over already-available momentum features.",
+    "When the test is restricted to the 14 null-pullback entities, a univariate ibd_entry_volume_ratio cut (e.g. >=1.5) produces the same ruin/large-win separation as the full piecewise rule applied to the remaining 13 entities — meaning the arm-conditioning is doing no work and the rule is effectively univariate VR on the full universe.",
+    "Within the dry-pullback arm on holdout, mean VR of selected_winners fails to exceed mean VR of false_positive_ruins by >=0.15 (the researcher's stated falsifiable prediction) — directly falsifying the cross-confirmation necessity claim.",
+    "A matched-pairs test that holds pullback depth and duration fixed while varying VR shows no ruin-rate gradient within either arm — falsifying the volume-confirmation mechanism as opposed to a depth/duration effect.",
+    "Cross-snapshot replication in a different regime (e.g. snap_b8420124eb or snap_3fc4068e83 isolated, not pooled with snap_71486ed83c) reverses the sign of the VR effect inside the dry-pullback arm — indicating snapshot artifact rather than mechanism.",
+    "Cases like entity_84824e6a20 (no-pullback, VR=1.625, ruin) replicate at >30% frequency in the next 50 B0 candidates with no-pullback state and VR in [1.5,1.7], showing the non-dry arm threshold is not stable."
+  ],
+  "actionable_design_principles": [
+    "Encode the rule strictly as a post-B0 ranking/confirmation stage; never let pullback_v_is_dry or ibd_entry_volume_ratio add a new entity to the B0 eligible universe. This satisfies the no-universe-expansion constraint by construction.",
+    "Treat the piecewise structure as two separate filters joined by OR with explicit null handling: (i) pullback_v_is_dry=true AND ibd_entry_volume_ratio >= some-arm-threshold -> full B0 conviction; (ii) pullback_v_is_dry=false AND [ibd_entry_volume_ratio >= some-other-threshold AND ma10_slope_5 > 0] -> full B0 conviction; (iii) pullback_v_is_dry=null -> apply a single conservative VR cut (e.g. >=1.5) with mom_20 and up_day_ratio_20 jointly gating; (iv) everyone else -> demoted to B1/watchlist tier. Demotion, not elimination, preserves universe size.",
+    "Anchor the dry-pullback VR threshold near 1.5 (the empirical ruins-with-pullback cluster sits at 1.2-1.45; large-winners cluster at 1.6+), but do not lock the threshold until the volume_ratio_only_baseline test in the experimental designer's plan shows >=5pp improvement AND the null-arm sensitivity test shows the same direction on the 14 null entities.",
+    "Because VR is correlated with mom_20 and up_day_ratio_20 (the strongest contrast features), do not run the piecewise rule without also computing its incremental value over a mom_20 + up_day_ratio_20 baseline. If mom_20 + up_day_ratio_20 alone matches the piecewise separation, the piecewise structure is redundant and should be deprecated.",
+    "Separate the predictive gate from position sizing: candidates that pass the dry-pullback+VR-confirmed arm can carry full B0 weight, candidates that fail the arm but still pass a univariate VR cut should be sized at the B1 level. This separates mechanism from portfolio construction and prevents over-weighting a marginal signal.",
+    "Do not tune arm thresholds jointly across the 27-case archaeology because snapshot concentration (5 cases in snap_71486ed83c, 4 in snap_d0d57b1e40) and small N (~20 features vs 27 cases) create multiple-comparison overfit risk; require at least one frozen out-of-sample period before adopting thresholds operationally."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "b0_piecewise_volume_confirmation_demote: For each B0-eligible entity, compute pullback_v_is_dry (boolean; null = explicit UNKNOWN state) and ibd_entry_volume_ratio (continuous). Apply the piecewise rule to assign a tier_rank tag (full, half, demoted) within B0; never modify the B0 eligible set. Demoted entities are routed to B1/watchlist behavior at the execution layer.",
+      "why_distinct": "Unlike a hard filter, this rule preserves the universe size exactly and only reorders conviction. Unlike a single VR threshold, it conditions the VR cut on pullback-leg volume state, which the evidence suggests has weak but non-zero additional information. The null state is a third first-class slot rather than an imputation, which avoids the silent-failure mode where null pullbacks are assigned to the dry or non-dry arm arbitrarily.",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Three feature lookups per B0 entity per evaluation, all point-in-time, no joins to forward outcomes. Capacity impact is negligible at typical B0 sizes (dozens to low hundreds of entities); the rule adds at most one boolean and one tier tag to the candidate record. The cost is dominated by the requirement to compute pullback_v_is_dry for entities that currently lack it (14 of 27 in the archaeology), which is a one-time feature-engineering addition rather than a per-decision cost."
+    },
+    {
+      "idea": "b0_volume_baseline_audit: Alongside any piecewise rule, emit a parallel univariate VR cut (e.g. ibd_entry_volume_ratio >= 1.5) and a momentum baseline (mom_20 >= 0.10 AND up_day_ratio_20 >= 0.55). Track per-tier large-win and ruin counts for all three rules. Promote the piecewise rule to active policy only if it improves B0 large-win rate by >5pp over the better of the two baselines; otherwise default to the simpler rule.",
+      "why_distinct": "This is a meta-policy rather than a feature rule: it prevents the piecewise structure from being adopted when a simpler rule dominates. The skeptic's strongest counterclaim is that VR is a proxy for momentum extension; the only way to refute that counterclaim operationally is to require the piecewise rule to beat the momentum baseline on a frozen holdout. Encoding the audit as a DSL-level gate makes the falsification automatic rather than discretionary.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Zero additional feature cost beyond what is already computed for B0 evaluation; the rule is purely a comparison of three existing per-entity tier counts. Operationally it adds one aggregation step per evaluation cycle."
+    },
+    {
+      "idea": "b0_null_pullback_conservative_arm: When pullback_v_is_dry is UNKNOWN, apply a strict conjunction: require ibd_entry_volume_ratio >= 1.5 AND ma10_slope_5 > 0 AND up_day_ratio_20 >= 0.55 to grant full B0 conviction. Otherwise demote to B1. This isolates the null-state entities from the dry and non-dry arms so that arm-specific thresholds are not contaminated by null classifications.",
+      "why_distinct": "The standard naive approach is to treat null pullback as either dry or non-dry by default, which silently biases the arm thresholds. The archaeology shows 14 of 27 entities are null, so the choice of default materially shifts the apparent interaction. By giving null its own conservative arm, this rule separates the question 'does pullback volume matter?' from 'is missing pullback data itself informative?', which is the actual confounding variable in the data.",
+      "features": [
+        "pullback_v_is_dry",
+        "ibd_entry_volume_ratio",
+        "ma10_slope_5",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Same per-entity feature cost as the main piecewise rule; the difference is a single conditional branch. Capacity-neutral."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "mechanism_claim": "False-negative non-picks that become large winners are distinguished by a stealth momentum profile: low short‑term momentum (mom_20 ~0.05‑0.12), modest up‑day fraction (up_day_ratio_20 ≤0.55), subdued short‑term volume (vol_ratio_5_20 <1.30), price close to moving averages (px_vs_ma20 0.04‑0.08, px_vs_ma50 0.06‑0.13), a shallow pullback (‑5% ≥ pullback_pct ≥ ‑15%) lasting 4‑8 weeks, and a tight IBD entry trigger (ibd_entry_close_vs_trigger_pct <0.025). When these conditions are met, the stock is likely to either consolidate through a pullback and then resume higher, or to break out without a recorded pullback, delivering a large win. The same profile observed in a breakout context (no pullback recorded) also predicts a large win, but the presence of a shallow pullback identifies the ‘pullback‑accumulation’ path.",
+  "evidence_for": [
+    "False‑negative big‑winner entity_535a1beed7 (null pullback) has up_day_ratio_20 = 0.50, vol_ratio_5_20 = 1.174, mom_20 = 0.028, px_vs_ma20 = 0.032, ibd_entry_close_vs_trigger_pct = 0.009 – all below the selected‑winner medians yet it delivers a large win.",
+    "False‑negative big‑winner entity_de1c657364 (pullback 8 weeks, ‑7.3%) has up_day_ratio_20 = 0.65, vol_ratio_5_20 = 1.147, mom_20 = 0.058, px_vs_ma20 = 0.045, ibd_entry_close_vs_trigger_pct = 0.012 – consistent with the low‑momentum, low‑volume, shallow‑pullback profile.",
+    "False‑negative big‑winner entity_05b4c6b1f7 (null pullback) shows up_day_ratio_20 = 0.50, vol_ratio_5_20 = 0.964, mom_20 = 0.070, px_vs_ma20 = 0.052, ibd_entry_close_vs_trigger_pct = 0.024 – again matching the pattern.",
+    "The numeric contrasts show false‑negative medians for up_day_ratio_20 (0.50), vol_ratio_5_20 (1.179), mom_20 (0.058), px_vs_ma50 (0.056), pullback_pct (‑7.3) and ibd_entry_close_vs_trigger_pct (0.019) are systematically lower than selected‑winner medians, indicating the pattern is a common property of false‑negative large winners."
+  ],
+  "evidence_against": [
+    "False‑negative entity_df5478102d (pullback ‑5%, 4 weeks) has up_day_ratio_20 = 0.60, vol_ratio_5_20 = 1.405, mom_20 = 0.125, yet its outcome is a small win, not a large win – suggesting that a higher vol_ratio (>1.3) can degrade the stealth‑momentum effect.",
+    "False‑negative entity_bfb308b24a (pullback ‑12.1%, 4 weeks) has up_day_ratio_20 = 0.45, vol_ratio_5_20 = 1.187, mom_20 = 0.027, but its outcome is a loss, indicating that very low momentum (mom_20 <0.03) combined with a deeper pullback may be insufficient for a large win.",
+    "Selected‑winner entity_3adc078f01 (pullback ‑42.3%, 9 weeks) has up_day_ratio_20 = 0.65, vol_ratio_5_20 = 1.140, mom_20 = 0.172, and is a large winner, but its pullback depth (‑42%) is far deeper than the shallow‑pullback range identified, implying that deep pullbacks can also produce large wins when other factors (e.g., stronger mom_20) dominate."
+  ],
+  "falsifiable_predictions": [
+    "In a future validation set, false‑negative candidates with up_day_ratio_20 ≤0.55, vol_ratio_5_20 <1.30, mom_20 between 0.05 and 0.12, pullback_pct in [‑15%, ‑5%] (or null pullback), and ibd_entry_close_vs_trigger_pct <0.025 will become large‑win outcomes (W4 return bucket ≥large_win) in at least 60% of cases.",
+    "If a false‑negative candidate exhibits vol_ratio_5_20 ≥1.40 and mom_20 <0.05, the probability of a large win drops below 30% (i.e., it will more often be a small win or loss).",
+    "When the same low‑momentum, low‑volume profile appears but the stock has no recorded pullback, the large‑win hit rate will be comparable to the shallow‑pullback subgroup, confirming that the breakout path is equally viable.",
+    "Adjusting the B0 selection threshold to accept candidates with ibd_entry_close_vs_trigger_pct <0.025 and up_day_ratio_20 ≤0.55 will increase the capture rate of false‑negative large winners by ≥15% without a proportional rise in false‑positive ruin, provided vol_ratio_5_20 stays below 1.30."
+  ],
+  "policy_implications": [
+    "Introduce a secondary filter in the B0 pipeline that flags low‑momentum, low‑volume candidates with tight entry distances; these are currently missed but exhibit a distinguishable PIT‑visible signature for large‑win outcomes.",
+    "When backtesting, separate false‑negative outcomes into pullback‑accumulation vs. breakout sub‑regimes using pullback_duration_weeks (non‑null) to evaluate whether the predictive signal differs across the two paths.",
+    "Consider weighting the B0 score with a modest positive adjustment for stocks where up_day_ratio_20 <0.55 and vol_ratio_5_20 <1.30, while applying a negative adjustment for stocks with vol_ratio_5_20 >1.40, to reduce the false‑negative rate without inflating false‑positives."
+  ]
+}

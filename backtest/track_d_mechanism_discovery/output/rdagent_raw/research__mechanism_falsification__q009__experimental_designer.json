@@ -1,0 +1,76 @@
+{
+  "tests": [
+    {
+      "name": "counterfactual_risk_weight_sweep",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "rv_20",
+        "pullback_pct",
+        "base_depth_pct",
+        "atr_14_pct",
+        "dist_to_52w_high_pct"
+      ],
+      "comparison": "Within the B0-pick subset (is_b0_pick=true), construct lane_score_R(k) = sum_i z(x_i) for return-axis x in {mom_20, ma10_slope_5, px_vs_ma50, vol_ratio_5_20, up_day_ratio_20} MINUS k*z(-pullback_pct) for k in the pre-specified grid {0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0}. Within-snapshot z-standardization to prevent cross-regime leakage. Extend to lane_score_RR(k, k') with an additive k'*z(rv_20) term on the same grid. For each (k, k') pair, compute AUROC of separating selected_winner from false_positive_ruin labels and the DeLong 95% CI against the k=0, k'=0 baseline. Track the minimum (k, k') at which AUROC first matches the global maximum within one SE.",
+      "success_criterion": "Minimum sufficient k <= 0 AND minimum sufficient k' <= 0 — i.e., the best winner-vs-ruin separation is achieved with zero or negative risk weighting, and adding risk features cannot improve the AUROC by >= 0.05 (or breaks the DeLong CI overlap). This corroborates the researcher's strong-form return-ranking claim.",
+      "failure_criterion": "Minimum sufficient k >= 0.25 OR minimum sufficient k' >= 0.25 with AUROC improvement >= 0.05 over the (0,0) baseline (DeLong p<0.10). This falsifies pure return-ranking and shows risk features carry non-redundant signal — confirming downside-risk-control is operative in lane's residual differentiation."
+    },
+    {
+      "name": "regime_decomposed_axis_dominance_test",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "rv_20",
+        "pullback_pct",
+        "base_depth_pct",
+        "dist_to_52w_high_pct",
+        "atr_14_pct"
+      ],
+      "comparison": "Pre-specify snapshot (snap_*) as the regime stratum — not a feature. Within each stratum that contains >=1 selected_winner AND >=1 false_positive_ruin (or analog with non-B0-pick false_negatives), compute the standardized winner-vs-ruin effect (rank-biserial correlation, Fisher-z transformed) for each of the 10 listed features. For each populated stratum, compute median |effect| on the return-axis subset {mom_20, vol_ratio_5_20, up_day_ratio_20, ma10_slope_5, px_vs_ma50} and median |effect| on the risk-axis subset {rv_20, pullback_pct, base_depth_pct, dist_to_52w_high_pct, atr_14_pct}. Pre-specify the comparison: per-stratum return-axis median vs risk-axis median, and the fraction of strata where return > 1.5 * risk.",
+      "success_criterion": "Return-axis median |effect| exceeds 1.5x risk-axis median |effect| in >= 80% of populated strata. This would corroborate that the return-ranking verdict is regime-robust, refuting the skeptic's regime-confounding objection.",
+      "failure_criterion": "In >= 2 populated strata the risk-axis median |effect| exceeds 1.5x the return-axis median |effect| (i.e., lane's discriminant surface flips on regime). This would invalidate any global 'dominated by return-ranking' verdict and is consistent with downside-risk-control being the operative gate in choppy regimes."
+    },
+    {
+      "name": "pit_risk_event_relabel_separation_test",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "rv_20",
+        "pullback_pct",
+        "base_depth_pct",
+        "atr_14_pct",
+        "dist_to_52w_high_pct",
+        "pullback_duration_weeks"
+      ],
+      "comparison": "Construct a PIT-only risk_event label decoupled from W4 forward return: within each snapshot, flag a case as risk_event if it triggers >=2 of {rv_20 in upper tercile, pullback_pct <= -15, atr_14_pct in upper tercile, dist_to_52w_high_pct >= 0}. This label uses ONLY PIT features and excludes the return-defined false_negative construction. Within the is_b0_pick=true subset, compute per-feature rank-biserial separation of risk_event vs non-risk_event. Compare return-axis vs risk-axis median |effect| (same axis definitions as Test 2). Repeat within the is_b0_pick=false subset as a falsification control.",
+      "success_criterion": "Within B0 picks, return-axis median |effect| on the PIT risk_event label is comparable (within 0.2 standardized units) to the risk-axis median |effect|. This means return features DOUBLE as risk-event predictors, vindicating the skeptic's dual-purpose-feature confound and rejecting the researcher's strong-form return-ranking claim.",
+      "failure_criterion": "Within B0 picks, risk-axis median |effect| on the PIT risk_event label is >= 2x the return-axis median |effect|. This would mean when asked a return-independent risk question, the lane-accepted subpopulation is differentiated primarily on risk features — confirming the original researcher's verdict was driven by a tautological contrast and lane IS primarily downside-risk-control."
+    }
+  ],
+  "leakage_checks": [
+    "All listed features are PIT-observable at snapshot date: mom_20 / ma*-slope / px_vs_ma* / vol_ratio / up_day_ratio / rv_20 / atr_14_pct / pullback_* / base_* / dist_to_52w_high_pct. No use of forward W4 returns, max-drawdown beyond PIT window, or any outer-forward outcome as a model input.",
+    "Snapshot identifier (snap_*) is used ONLY as a stratification/grouping variable in Test 2 and as the within-snapshot z-standardization unit in Test 1 — never as a model feature.",
+    "Ticker-level identifiers (entity_anon) are NOT features anywhere; they appear only to reference individual cases.",
+    "Composite risk_event label in Test 3 is built from within-snapshot feature terciles — no leakage from one snapshot's distribution into another's label thresholds.",
+    "AUROC comparisons in Test 1 use the DeLong variance estimator with pre-specified k and k' grids; no post-hoc grid refinement permitted after observing per-k results.",
+    "Stratum-eligibility rule (>=1 winner AND >=1 ruin, or >=1 B0-pick risk_event AND >=1 non-event) is pre-specified to prevent empty-cell artifacts from being silently dropped.",
+    "Label-vs-feature separation: outcome_label and w4_return_bucket are evaluation labels only; they never enter any z-score or AUROC input set.",
+    "No calendar identity (year, month, weekday, FOMC date) used as a feature in any test."
+  ],
+  "priority_order": [
+    "counterfactual_risk_weight_sweep",
+    "regime_decomposed_axis_dominance_test",
+    "pit_risk_event_relabel_separation_test"
+  ]
+}

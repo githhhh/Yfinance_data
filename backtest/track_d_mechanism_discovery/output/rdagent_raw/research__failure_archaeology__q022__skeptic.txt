@@ -1,0 +1,64 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The 'coherent quiet-base signature' is an overfit artifact of n=2 cases whose two members disagree on key claimed features (ma10_slope_5 differs by 7×, one has null pullback fields while the other shows an 8-week pullback), and the same 'muted-individual-momentum + moderate-up-day' profile is shared by several confirmed false-positive ruins (entity_40ea0cfb3b: vol_ratio_5_20=0.91, up_day=0.5, mom_20=0.024; entity_55c2da490e: up_day=0.65, vol=1.27), so the proposed composite cannot distinguish latent big winners from latent ruins at the signal level. The snapshot concentration in snap_71486ed83c is a sampling artifact of having only 2 big-winner false negatives in the data — it cannot be distinguished from 'we happened to draw one snapshot twice' — and 'industry concentration' is a latent, never-measured variable whose existence is inferred only from the same two cases that supposedly evidence it.",
+  "attacks": [
+    {
+      "issue": "n=2 cannot establish a coherent signature; the two big-winner false negatives are not actually similar on the proposed features.",
+      "why_it_matters": "entity_535a1beed7 has ma10_slope_5=0.0044, ma20_slope_5=−0.0050, and NULL pullback fields; entity_de1c657364 has ma10_slope_5=0.0301 (almost 7× larger), ma20_slope_5=+0.0089, pullback_duration_weeks=8, pullback_pct=−7.3. These cases satisfy the composite by differing margins on opposite sides of every threshold, which is the definition of an overfit rule rather than a coherent profile."
+    },
+    {
+      "issue": "Null pullback fields are being interpreted as 'no detectable pullback / extended quiet base', but null is missing data, not a positive signal.",
+      "why_it_matters": "Three of the five false-negative relatives have null pullback fields (entity_d8e8e7b814, entity_535a1beed7, entity_ad2bfdee3f). Treating null as 'quiet' lets the researcher classify any weak-momentum non-pick as a candidate. This biases the discovery toward the proposed signature by data-quality attrition, not by evidence."
+    },
+    {
+      "issue": "The 'industry concentration / sector tide' mechanism is unfalsifiable from PIT data — no sector ETF, GICS, or relative-strength proxy appears in the frozen features.",
+      "why_it_matters": "The narrative requires that capital 'be absorbed industry-wide rather than by the single name', but none of the listed features (mom_20, px_vs_ma50, vol_ratio_5_20, up_day_ratio_20, base_mbox_count) measure industry flow. The mechanism is therefore indistinguishable from 'these names quietly drifted up regardless of sector context.' Any policy that 'relaxes filters when sector concentration is high' requires measuring sector concentration, which the data does not provide."
+    },
+    {
+      "issue": "Snapshot concentration is a sample artifact: both false-negative big winners come from snap_71486ed83c because the case count is n=2, so they must share a snapshot.",
+      "why_it_matters": "With n=2, the probability both cases land in the same snapshot under random allocation is 1/(number of snapshots with false negatives). The researcher treats co-location as evidence of a regime, but it is mechanically guaranteed by small sample size. The falsifiable prediction 'snapshot-level selected_winner density ≥3' is therefore unfalsifiable when the candidate set for that test is itself drawn from the snapshot that satisfies it."
+    },
+    {
+      "issue": "The selected_winner in the same 'concentrated' snapshot (entity_2c58cebc59) has mom_20=0.32 and a 6-week −25.1% pullback — the polar opposite of the proposed quiet-base profile.",
+      "why_it_matters": "If industry concentration were the mechanism, B0-picked winners in the same snapshot should ALSO exhibit the quiet-base structure (the sector tide should lift quiet names too). Instead, the picked winner shows vigorous momentum after a deep correction. The two coexisting winners in the same snapshot have incompatible signatures, which contradicts the claim that 'sector flow drives homogeneous quiet-base behavior.'"
+    },
+    {
+      "issue": "The composite screen cannot separate winners from ruins at the signal level — ruins that share the proposed profile outnumber the big-winner cases.",
+      "why_it_matters": "Applying mom_20<0.10 AND vol_ratio_5_20<1.30 AND up_day_ratio_20 in [0.5,0.7] AND ibd_entry_close_vs_trigger_pct<0.05 captures entity_535a1beed7 and entity_de1c657364 (winners) AND entity_40ea0cfb3b, entity_55c2da490e, entity_ad2bfdee3f (ruin/loss outcomes with overlapping but 'quiet' metrics). A precision claim cannot be supported when the rule's hit set is dominated by adverse outcomes."
+    },
+    {
+      "issue": "The numeric contrasts are unstandardized by sample-size weight and use medians from a 5-vs-11 cell comparison where the discovery data is itself the training set.",
+      "why_it_matters": "Standardized deltas near −1 on mom_20, vol_ratio_5_20, up_day_ratio_20 are computed on 5 false-negative cases vs 11 selected-winner cases drawn from the same discovery sample. With n=5, the false-negative median is a single order statistic and can flip sign with one re-labeled case. The 'statistical separation' is not statistically significant at any conventional level."
+    },
+    {
+      "issue": "The 'pullback_pct sign-flipped' claim (median −7.3 vs −15.9, standardized delta +0.64) is the strongest quantitative argument, but it relies on the three nulls being imputed as 'shallow pullback' rather than excluded.",
+      "why_it_matters": "If nulls are excluded from the pullback_pct median (proper treatment of missing data), only 2 of 5 false negatives contribute (entity_df5478102d, entity_bfb308b24a, entity_de1c657364 — 3 cases actually) versus 2 of 11 selected winners (entity_8ad5cd4795, entity_55c2da490e, entity_2c58cebc59 — actually 3). The apparent shallow-pullback advantage collapses to a 3-vs-3 comparison on a noisy field."
+    },
+    {
+      "issue": "The 'base_mbox_count higher (4.0 vs 3.5)' and 'base_duration_weeks shorter (44 vs 52)' features are claimed as evidence of extended bases but are inconsistent with each other.",
+      "why_it_matters": "Higher box count with shorter duration means denser but shorter bases, not 'time-extended' bases. The researcher characterizes this as 'extended shallow base' but the data shows neither extension nor shallowness on a consistent sample. The narrative contradicts the metrics."
+    },
+    {
+      "issue": "The policy implication 'relax B0 mom_20/vol_ratio thresholds when sector concentration is high' inverts the natural false-positive/false-negative tradeoff without measuring ruin rate impact.",
+      "why_it_matters": "Lowering mom_20 and vol_ratio thresholds uniformly admits more weak-momentum names. The frozen data already shows this population is ruin-prone (entity_40ea0cfb3b, entity_55c2da490e). Without a held-out validation set, the proposed relaxation cannot be shown to improve net expected value."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A false-negative_relative with mom_20<0.06 AND vol_ratio_5_20<1.20 AND ibd_entry_close_vs_trigger_pct<0.02 that became a loss (already present: entity_bfb308b24a has pullback_duration=4, pullback_pct=−12.1 and is_b0_pick=false with w4=loss) — destroys the 'quiet-base predicts winners' claim.",
+    "A selected_winner in snap_71486ed83c (entity_2c58cebc59) that contradicts the quiet-base narrative — already present: mom_20=0.32, 6-week −25.1% pullback shows the snapshot contains incompatible winner profiles.",
+    "A false_positive_ruin (entity_40ea0cfb3b) that satisfies the proposed composite — already present: mom_20=0.024, vol_ratio_5_20=0.91, up_day_ratio_20=0.5.",
+    "A false-negative big winner with ma20_slope_5 negative and pullback fields null vs one with positive ma20_slope_5 and 8-week pullback — already present (entity_535a1beed7 vs entity_de1c657364) — proves the 'coherent' signature is heterogeneous.",
+    "A snapshot outside snap_71486ed83c containing ≥1 false-negative big winner, which would test the 'industry concentration regime' claim — currently absent from the data, which is the strongest reason to call the mechanism unfalsifiable.",
+    "A false-negative relative in a snapshot with zero B0 winners (low 'industry concentration'), which would refute the regime hypothesis — required to falsify the sector-tide claim."
+  ],
+  "what_would_change_my_mind": [
+    "An out-of-sample test set with ≥20 false-negative big winners showing the proposed composite's precision materially exceeds the unconditional false-negative base rate, AND a ruin-matched counter-population showing the composite does not capture ruins at similar rates.",
+    "An independent measurement of industry concentration (sector ETF relative strength, GICS-level breadth, or equal-weight industry index return) at the snapshot date, showing the false-negative big winners cluster in objectively high-concentration regimes rather than only in the snapshot already over-represented in the discovery sample.",
+    "A falsifiable demonstration that among false negatives satisfying the composite, large_win share exceeds loss share by a margin that is statistically significant under a bootstrap or binomial test, and that this margin inverts when the composite is applied to false positives.",
+    "Replication of the signature in a different market regime (e.g., a bear-market discovery sample) where 'industry concentration' would be expected to operate differently — the same quiet-base profile producing the same outcome would establish generalizability rather than regime-specific overfit.",
+    "Removal of the two cases from the discovery set and reproduction of the standardized-delta contrast with effect size still exceeding −0.5 standard deviations — establishing that the signature is not driven by the n=2 subset."
+  ]
+}
+```

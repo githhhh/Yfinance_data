@@ -1,0 +1,49 @@
+{
+  "tests": [
+    {
+      "name": "within_momentum_quintile_conditional_discrimination",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Compute the rank-correlation (Spearman) and AUC of vol_ratio_5_20 against the outcome label (selected_winner vs {false_positive_ruin ∪ false_negative_*}) UNCONDITIONALLY, then recompute within each mom_20 quintile (q1=lowest momentum through q5=highest) using only case-level PIT features. The contrast between unconditional AUC and the volume-weighted mean of within-quintile AUCs is the test statistic. up_day_ratio_20 is the matched-tempo control feature whose within-quintile AUC acts as the redundancy benchmark.",
+      "success_criterion": "Mean within-quintile AUC of vol_ratio_5_20 ≥ 0.60 AND (within-quintile AUC) / (unconditional AUC) ≥ 0.70. A genuine independent mechanism must continue to rank-order winners from losers AFTER the dominant price-tempo axis is held fixed by stratification.",
+      "failure_criterion": "Mean within-quintile AUC of vol_ratio_5_20 ≤ 0.52 AND the ratio (within-quintile / unconditional) ≤ 0.50, while up_day_ratio_20 retains a comparable or larger within-quintile AUC. This pattern means vol_ratio_5_20's signal is entirely explained by the price-tempo bin it falls into, and it should be dropped as a redundant encoding of momentum."
+    },
+    {
+      "name": "sign_disagreement_divergence_quadrant_test",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Cross-tabulate the 27 archaeology cases into four quadrants defined by thresholds vol_ratio_5_20 = 1.2 and mom_20 = 0.05: Q1={high_vol, high_mom}, Q2={high_vol, low_mom}, Q3={low_vol, high_mom}, Q4={low_vol, low_mom}. For each quadrant, compute the empirical outcome distribution (selected_winner rate vs false_positive_ruin rate). Apply Fisher's exact test on the 2x2 of Q2 vs Q4 (the two quadrants where mom_20 is held at 'low' but vol_ratio_5_20 differs). Repeat for Q1 vs Q3 (the 'high-mom' counterpart).",
+      "success_criterion": "Within the low-mom stratum, Q2 (high volume) outcome rate differs from Q4 (low volume) outcome rate by ≥ 25 percentage points AND Fisher p < 0.15. This would demonstrate that vol_ratio_5_20 carries orthogonal information when momentum is silent — supporting the independent-acceleration mechanism and falsifying pure redundancy.",
+      "failure_criterion": "Within the low-mom stratum, Q2 and Q4 outcome rates differ by ≤ 10pp (Fisher p ≥ 0.40), AND within the high-mom stratum Q1 vs Q3 differ by ≤ 10pp. This means vol_ratio_5_20 never changes the outcome conditional on momentum sign, confirming it is a redundant momentum proxy regardless of which way momentum is signed."
+    },
+    {
+      "name": "up_day_ratio_stratified_volume_mechanism_decomposition",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Stratify cases by up_day_ratio_20 into tight bands (e.g., [0.40-0.50], [0.55-0.65], [0.65-0.75]). Within each band, compute Spearman rank correlation of vol_ratio_5_20 against w4_return_bucket rank (ruin < loss < small_win < large_win) AND against outcome_label binarized as {selected_winner, not}. Compare to the same statistic computed within ma10_slope_5 strata as a secondary control. If vol_ratio_5_20 within up_day_ratio_20 strata still discriminates, it is encoding something beyond 'number of green days in 20d'.",
+      "success_criterion": "Mean within-band Spearman ρ(vol_ratio_5_20, outcome) ≥ 0.25 with the sign matching the unconditional direction. This indicates vol_ratio_5_20 carries information beyond the up-day-count tempo axis — i.e., 'pure volume acceleration' rather than 'tempo-confirmation' — and the B0 component has a separable mechanism.",
+      "failure_criterion": "Mean within-band Spearman ρ ≤ 0.10 (and not significantly different from zero), while the analogous ρ for up_day_ratio_20 within ma10_slope_5 strata remains ≥ 0.20. This would confirm vol_ratio_5_20 is a tempo-confirmation re-encoding of up_day_ratio_20, and the cleaner replacement is to drop vol_ratio_5_20 and let up_day_ratio_20 carry the tempo signal alone."
+    }
+  ],
+  "leakage_checks": [
+    "Outcome variables (w4_return_bucket, outcome_label, is_b0_pick) must never appear in feature lists; is_b0_pick is the selection label itself and using it would be target leakage.",
+    "snapshot_anon must be excluded as a feature — it is a calendar/regime proxy and would let the model exploit look-ahead market context; it can only be used as a stratification axis for the conditional tests, never as a predictor.",
+    "entity_anon must be excluded — using entity identity as a feature would constitute identity leakage across cases.",
+    "All volume and price features must be point-in-time: vol_ratio_5_20 must be computed from intraday/daily data available strictly before the IBD entry timestamp; any feature computed using post-entry bars is forward leakage and invalidates the test.",
+    "ibd_entry_close_vs_trigger_pct and pullback_duration_weeks must be confirmed PIT (anchored to the IBD entry date) before inclusion in any control regression; if either embeds post-entry lookback it cannot be used as a sibling-conditional control.",
+    "Test 1's unconditional AUC and Test 3's within-band correlation must be computed on the SAME case set under the SAME PIT cutoff; reporting a stronger unconditional AUC on a wider window and a weaker conditional AUC on a narrower window would invalidate the comparison."
+  ],
+  "priority_order": [
+    "sign_disagreement_divergence_quadrant_test",
+    "within_momentum_quintile_conditional_discrimination",
+    "up_day_ratio_stratified_volume_mechanism_decomposition"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "purpose_id": "research__capacity_abstention__q004__researcher",
+  "prompt_hash": "b424af722d5985007f6b293716e87a5a61714f5d8c48a973851b843953342a7f",
+  "response_hash": "f3e935948afc63a03d9846bfc948ba0ca6bb102f2b866d077ecfe4fe33662375",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1
+}

@@ -1,0 +1,37 @@
+{
+  "strongest_counterclaim": "The px_vs_ma50 mechanism is a post-hoc artifact of differential move maturity, not a causal structural filter. B0 signals that fire at lower px_vs_ma50 values simply occur earlier in emerging bases—whereas signals firing at higher px_vs_ma50 are late-stage breakouts from extended bases that have already proven strength. The 'structural altitude' interpretation confuses correlation with the true driver: stocks that have already demonstrated sustained internal strength (measured by up_day_ratio) tend to have drifted further from the MA50 before breaking out. The mechanism confuses this natural co-occurrence with a protective effect of altitude.",
+  "attacks": [
+    {
+      "issue": "Circular mechanism construction: px_vs_ma50 and up_day_ratio_20 are not independent inputs—they are both outcomes of the same underlying process (prior price strength). The mechanism claims altitude protects against pullback, but altitude is simply the accumulated result of the prior strength that up_day_ratio also measures. Testing whether px_vs_ma50 adds predictive power beyond up_day_ratio within strata would require conditioning on up_day_ratio first, which the numeric_contrasts do not perform.",
+      "why_it_matters": "If the true predictor is only up_day_ratio (or momentum quality), then px_vs_ma50 is a spurious proxy that will fail out-of-sample when base-building patterns vary. The mechanism attributes protective power to altitude that actually resides in the prior momentum that produced the altitude."
+    },
+    {
+      "issue": "The unstable-equilibrium zone [0.08, 0.15] for px_vs_ma50 is not a natural regime—it is a measurement artifact of when B0 signals tend to fire. Most valid B0 picks will naturally fall in this range because the IBD entry framework triggers on pullback-to-base patterns that produce moderate extension. The ruin rate difference may reflect that moderate extension picks are simply more common, not that they are structurally unstable.",
+      "why_it_matters": "The zone boundaries are derived from the sample distribution, not from an independent structural threshold. If the true base-failure mechanism is something else (e.g., base depth, mbox count), then px_vs_ma50 stratification is capturing nothing but a sampling artifact of signal frequency."
+    },
+    {
+      "issue": "The labeling of entity_6618d3e80c as both 'false_positive_ruin|selected_winner' invalidates treating outcome labels as clean binary partitions. If a single entity can carry both labels, the feature-outcome associations computed from labeled groups are contaminated by internal label inconsistency.",
+      "why_it_matters": "Any statistical comparison between false_positive_ruin and selected_winner groups is undermined when the group memberships themselves are uncertain. The median contrasts and standardized deltas may be comparing apples to oranges."
+    },
+    {
+      "issue": "up_day_ratio_20 measures directional frequency, not magnitude. A stock with 7 up days of +0.3% each and 3 down days of -0.1% each would have up_day_ratio=0.70 but negligible actual momentum. The mechanism assumes this metric captures 'internal strength' without accounting for the magnitude asymmetry that determines whether pullbacks are survivable.",
+      "why_it_matters": "Two stocks with identical up_day_ratio can have radically different pullback tolerance. The mechanism will misclassify stocks with high frequency but low magnitude (false positive) and low frequency but high magnitude (false negative). The numeric_contrasts do not include magnitude measures, so this confound cannot be detected."
+    },
+    {
+      "issue": "The vol_ratio_5_20 standardized_delta of -1.0455 (3rd strongest differentiator) is dismissed as a confound, but the researcher provides no analysis of whether it mediates, moderates, or is spurious relative to the proposed mechanism. The rule says to avoid using vol_ratio for this failure mode, but this decision is asserted, not demonstrated.",
+      "why_it_matters": "If vol_ratio is a mediator (high vol → larger pullbacks → higher ruin probability given moderate extension), then filtering on vol_ratio would improve the mechanism's accuracy. The dismissal of vol_ratio is not falsifiable from the provided evidence."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Cases where px_vs_ma50 > 0.15 AND up_day_ratio_20 < 0.55 but outcome = selected_winner (large_win), to test whether altitude alone predicts survival without internal momentum quality",
+    "Cases where px_vs_ma50 < 0.08 AND up_day_ratio_20 > 0.65 but outcome = false_positive_ruin, to test whether low altitude is sufficient to cause ruin regardless of internal quality",
+    "Cases where vol_ratio_5_20 is very low (<1.0) and px_vs_ma50 is in the 'danger zone' but outcome = selected_winner, to test whether low volatility eliminates the ruin effect",
+    "Within a single snapshot, compare B0 picks with identical px_vs_ma50 but different up_day_ratio_20 values—if the mechanism holds, up_day_ratio should predict ruin conditional on altitude, but if the effect disappears, altitude is doing all the work"
+  ],
+  "what_would_change_my_mind": [
+    "A conditional analysis showing that within px_vs_ma50 quartiles, up_day_ratio_20 retains independent predictive power after residualizing out px_vs_ma50—this would establish up_day_ratio as a genuine moderator rather than a co-conspirator in a single underlying factor",
+    "A time-split validation: if the px_vs_ma50/up_day_ratio thresholds derived from one time period predict ruin rates in a held-out period at above-chance rates, this would falsify the sampling-artifact hypothesis",
+    "Evidence that px_vs_ma50 thresholds map to distinct base geometries (e.g., flat bases vs. ascending bases) rather than merely reflecting how far along the prior move had progressed—this would establish the mechanism as structurally meaningful",
+    "A demonstration that the ibd_entry_close_vs_trigger_pct > 0.06 ruin cases are explained by the two-factor mechanism and not by a third unmeasured variable (e.g., sector rotation, market cap, relative strength rank)"
+  ]
+}

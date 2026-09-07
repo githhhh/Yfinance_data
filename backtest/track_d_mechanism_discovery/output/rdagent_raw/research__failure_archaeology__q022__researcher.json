@@ -1,0 +1,32 @@
+{
+  "mechanism_claim": "Under industry concentration, false-negative large winners display a coherent PIT-observable signature: a quiet, time-extended base (high base_mbox_count, shallow pullback under 10% stretching 6+ weeks, or no detectable pullback at all) with muted individual momentum (mom_20 <0.06, vol_ratio_5_20 <1.20, up_day_ratio_20 between 0.50–0.65) and minimal extension above the trigger level (ibd_entry_close_vs_trigger_pct <0.015). The stock's own metrics have not yet activated because capital inflow is being absorbed industry-wide rather than by the single name; B0's relative-strength filter rejects these latent laggards even though they share the sector tide that drives selected winners in the same snapshot.",
+  "evidence_for": [
+    "Both big-winner false negatives share mom_20 ≤0.058 and vol_ratio_5_20 ≤1.175, well below the selected_winner medians of 0.163 and 1.424 respectively (standardized deltas −1.00 and −1.05).",
+    "entity_535a1beed7 (large_win, snap_71486ed83c) shows null pullback fields, ibd_entry_close_vs_trigger_pct=0.0091, up_day_ratio_20=0.50 — a quiet drift signature with no breakout footprint.",
+    "entity_de1c657364 (large_win, snap_71486ed83c) shows an 8-week pullback of only −7.3% with ibd_entry_close_vs_trigger_pct=0.0123 and up_day_ratio_20=0.65 — an extended shallow base.",
+    "Snapshot snap_71486ed83c concentrates the activity: it contains both false-negative big winners, multiple non-pick false negatives (entity_df5478102d, entity_d8e8e7b814, entity_bfb308b24a), AND the selected big winner entity_2c58cebc59 (mom_20=0.32, 6-week −25.1% pullback) — consistent with a shared underlying sector move lifting names with heterogeneous individual strength.",
+    "Numeric contrast shows false_negatives carry higher base_mbox_count median (4.0 vs 3.5), shorter base_duration_weeks (44 vs 52), higher volume_ratio (1.652 vs 1.555), and smaller |dist_to_52w_high_pct| (−0.91 vs −1.50), i.e. they sit mid-base rather than near pivot highs.",
+    "ibd_entry_breakout_range_ratio is higher for false_negatives (0.581 vs 0.515), indicating a tighter recent range — a structural feature of the consolidation phase preceding a sector-led breakout."
+  ],
+  "evidence_against": [
+    "entity_ad2bfdee3f is a false_negative that became a small_win despite mom_20=−0.046 and ma20_slope_5=−0.015 — the same muted signature applies but the rejection reason was weakness, not quietness, so the proposed signature is not exclusive to latent laggards.",
+    "entity_bfb308b24a is a false_negative that became a loss (not a winner) with a comparable shallow-pullback profile (4-week −12.1% pullback, up_day_ratio_20=0.45), so the PIT signature also fits false alarms.",
+    "The contrast shows false_negatives carry slightly higher rv_20*0.0152 vs 0.0198 — i.e. some are quieter but not all; heterogeneity exists within the bucket.",
+    "Sample size is n=2 for the big-winner subset; the mechanism is consistent but not statistically corroborated.",
+    "False-positive ruins (e.g. entity_3472243e0c, entity_8f0df3d38e) overlap the selected_winner range on many metrics, showing the B0 filter does not perfectly segregate winners from ruins on individual signals alone — the sector-tide overlay is only one of several confounders."
+  ],
+  "falsifiable_predictions": [
+    "If snapshot-level selected_winner density proxies industry concentration, then false-negative big winners should cluster disproportionately in snapshots where selected_winner_count ≥3 and the median selected_winner mom_20 ≥0.20 (joint sector-tide + active-name signature).",
+    "A composite screen requiring mom_20<0.06 AND vol_ratio_5_20<1.20 AND 0.50≤up_day_ratio_20≤0.70 AND (pullback_pct between −10% and 0% OR null) AND ibd_entry_close_vs_trigger_pct<0.02 should identify false-negative large winners with hit-rate materially above the unconditional false-negative base rate.",
+    "Adding a base_mbox_count≥4 condition to the composite should improve precision because long consolidation structures are the substrate on which sector flows convert to large moves.",
+    "Among false negatives satisfying the composite, large_win share should exceed loss share; among those failing the composite, loss share should exceed large_win share.",
+    "Increasing the B0 universe scan to include mid-base, low-volatility names during snapshots with elevated sector breadth should reduce the false-negative big-winner rate without materially inflating false-positive ruin rate (because ruin names tend to have higher mom_20 and steeper ma10_slope_5)."
+  ],
+  "policy_implications": [
+    "Augment B0 with a regime overlay: when a snapshot exhibits high cross-sectional selected_winner density and elevated sector-ETF relative strength, relax the mom_20 and vol_ratio_5_20 thresholds and admit names matching the quiet-base signature.",
+    "Treat base_mbox_count and pullback_duration_weeks as primary structure features in concentrated regimes rather than as filters against entry; shallow extended bases appear to be a leading indicator of sector-led breakouts for individual names.",
+    "Track the false_negative_big_winner / selected_winner ratio per snapshot as a live diagnostic of model mis-specification under industry concentration — a rising ratio signals the need for the regime overlay.",
+    "Separate the predictive mechanism (quiet-base + muted individual momentum + shared snapshot wave) from portfolio-construction effects: position sizing for these names should remain smaller than for confirmed-breakout winners because their PIT profile offers less individual confirmation.",
+    "Flag any false_negative that subsequently becomes a ruin (e.g. entity_bfb308b24a pattern) as evidence that the quiet-base signature alone is necessary but not sufficient — require a sector-tide confirmation gate before relaxing the filter."
+  ]
+}

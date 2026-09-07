@@ -1,0 +1,50 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "WithinSnapshotRankPersistence",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "For each snapshot_anon stratum with >=3 cases, compute Spearman rank correlation between chase_score = max(0, ibd_entry_close_vs_trigger_pct - 0.045) * (1.4 - min(vol_ratio_5_20, 1.4)) and W4_return_bucket ordinal; compare mean within-snapshot rho to pooled rho across all 27 cases. Also test sign consistency: fraction of within-snapshot rho that share the pooled sign.",
+      "success_criterion": "Mean within-snapshot |rho| >= 0.6 * pooled |rho| AND sign-consistency >= 70% across snapshots with n>=3. Effect must survive snapshot-clustering.",
+      "failure_criterion": "Pooled |rho| > 1.5 * mean within-snapshot |rho| OR sign-consistency < 50%, indicating the signal is regime-driven rather than cross-sectional."
+    },
+    {
+      "name": "VolumeConstructAblation",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Build chase_score_5_20 using vol_ratio_5_20 as in Test 1, and chase_score_entry using ibd_entry_volume_ratio with breakpoints {0.045, median of ibd_entry_volume_ratio in sample}. Compare (a) Spearman rank correlation between the two chase_score variants, (c) per-feature IC vs W4 bucket.",
+      "success_criterion": "Spearman(chase_score_5_20, chase_score_entry) >= 0.65 AND both chase_score variants show within-snapshot IC directionally consistent with chase interpretation.",
+      "failure_criterion": "Spearman < 0.40 OR chase_score_entry shows opposite sign in >=50% of snapshots, indicating the volume leg is construct-specific and the encoding choice is arbitrary."
+    },
+    {
+      "name": "LowLowCornerNegativeControl",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Partition all 27 cases into 4 quadrants using medians of close_vs_trigger (~0.030) and vol_ratio_5_20 (~1.40). Compare ruin+loss rate in Q1 (high-close, low-vol, the researcher-flagged toxic zone) vs Q3 (low-close, low-vol, the symmetric negative control). Also compute Q2 and Q4 as reference.",
+      "success_criterion": "Q1 ruin+loss rate exceeds Q3 ruin+loss rate by >=25 percentage points AND Q1 rate >= 55%. Symmetry between extremes is required for the chase mechanism.",
+      "failure_criterion": "Q3 ruin+loss rate >= Q1 rate, OR Q1 rate < 35%. If low-low corner is not protective, the chase mechanism is asymmetric in a way the data does not support, and the high-close-low-vol rule is one-tailed noise."
+    }
+  ],
+  "leakage_checks": [
+    "All features must be point-in-time computable from the snapshot date: confirm ibd_entry_close_vs_trigger_pct, vol_ratio_5_20, ibd_entry_volume_ratio are defined using data available at or before the entry signal without using post-W4 returns.",
+    "No use of snapshot_anon, ticker identity, or calendar features as predictive inputs in any test; they appear only as stratification/clustering variables.",
+    "Verify the deferred-entry override does not implicitly reference W4 outcomes; any wait rule can only use pre-entry chase_score threshold.",
+    "Confirm pullback_pct and pullback_duration_weeks are not used as predictors (they are outcome-adjacent and would leak post-entry path information)."
+  ],
+  "priority_order": [
+    "LowLowCornerNegativeControl",
+    "WithinSnapshotRankPersistence",
+    "VolumeConstructAblation"
+  ]
+}
+```

@@ -1,0 +1,44 @@
+
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 42,
+  "mechanism_summary": "The 'stealth momentum' profile (low mom_20 ~0.05-0.12, up_day_ratio_20 ≤0.55, vol_ratio_5_20 <1.30, ibd_entry_close_vs_trigger_pct <0.025, shallow pullback -5% to -15%) characterizes a non-trivial fraction of false-negative large winners in the discovery sample. However, this pattern is identified on a winner-biased sample (27 cases) with no failure denominator, no holdout validation, and uncertain orthogonality to B0's existing filters. The profile plausibly describes a resting-phase stock state that can transition to large wins, but the same profile appears in ruin outcomes (entity_84824e6a20: ruin with mom_20=0.067, up_day_ratio_20=0.40). The mechanism is plausible but unproven; it describes observed winners without establishing that the profile discriminates winners from non-winners in the full non-pick universe.",
+  "falsifiers": [
+    "A stealth-profile non-pick subset (up_day_ratio_20 ≤0.55, vol_ratio_5_20 <1.30, mom_20 ∈ [0.05,0.12], ibd_entry_close_vs_trigger_pct <0.025) achieves large-win rate <2× the baseline non-pick large-win rate in a holdout period",
+    "Spearman correlation between is_b0_pick and any stealth feature exceeds 0.30, confirming B0 already filters these properties",
+    "False-negative big winners and false-positive ruin cases are equidistant from the stealth-profile centroid; no single feature achieves AUC >0.65 for distinguishing them",
+    "NULL pullback cases (entity_535a1beed7, entity_05b4c6b1f7) concentrate in ≤2 snapshots, indicating the null state is a data artifact rather than a distinct breakout path",
+    "Applying the stealth profile to a time-period after the discovery sample selects a subgroup with large-win rate not significantly different from baseline non-picks"
+  ],
+  "actionable_design_principles": [
+    "Do not implement stealth-momentum filtering as a B0 override without first establishing the baseline hit rate: sample ≥100 non-picks with the stealth profile that did NOT become large winners to compute the true conditional probability P(large_win | stealth_profile, non_pick)",
+    "Test B0 orthogonality before any policy change: if B0 already excludes these stocks because of their low-momentum/low-volume signature, reintroducing them as a secondary filter is circular and will dilute B0's precision",
+    "Distinguish NULL pullback from recorded pullback as separate data-generating processes, not interchangeable signals; NULL pullback requires independent validation (e.g., chart review or confirmed no-base status) before treating it as a 'breakout path' indicator",
+    "Run the ruin_overlap_test to quantify Mahalanobis distance: if false-positive ruin cases are not significantly farther from the stealth centroid than false-negative big winners, the profile cannot safely separate winners from catastrophes",
+    "Reserve any stealth-momentum signal as a surveillance flag in a secondary non-pick queue rather than modifying B0 selection directly; this preserves B0's false-positive discipline while enabling future signal evaluation"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "A non-pick surveillance queue that flags stealth-profile candidates (up_day_ratio_20 ≤0.55 AND vol_ratio_5_20 <1.30 AND mom_20 ∈ [0.05, 0.12] AND ibd_entry_close_vs_trigger_pct <0.025 AND pullback_pct ∈ [-15%, -5%] OR pullback_duration_weeks IS NULL) for post-snapshot monitoring, without modifying B0 selection criteria",
+      "why_distinct": "Operates as a parallel watchlist rather than a B0 override, preserving false-positive discipline while enabling prospective validation of the stealth pattern on held-out non-pick outcomes",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "pullback_pct", "pullback_duration_weeks"],
+      "capacity_relevance": "Enables a secondary signal pathway for non-picks that exhibit a repeatable PIT-visible signature without compromising B0's primary selection logic; requires prospective hit-rate tracking before capacity allocation"
+    },
+    {
+      "idea": "A B0 orthogonality audit layer that computes Spearman correlations between is_b0_pick and each stealth feature across all snapshots; flags any feature with |rho| >0.30 as B0-redundant and excludes it from any future non-pick filter design",
+      "why_distinct": "Prevents circular logic where B0's exclusion criteria are re-imported as non-pick rescue criteria; ensures any new signal is additive to, not redundant with, B0's existing filters",
+      "features": ["is_b0_pick", "up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "px_vs_ma20", "px_vs_ma50"],
+      "capacity_relevance": "Quality-control checkpoint for signal development pipeline; prevents wasted capacity on signals already embedded in B0's selection logic"
+    },
+    {
+      "idea": "A stratified failure-denominator sampling protocol that, for each stealth-profile false-negative big winner identified, randomly selects 3-5 time-matched non-picks from the same snapshot window with similar feature profiles that did NOT become large winners, to compute the true hit rate conditional on the profile",
+      "why_distinct": "Addresses the critical gap (no failure denominator) by constructing a time-matched control set; this is the minimal evidence required before any stealth-momentum signal can be used for portfolio construction",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "pullback_pct", "snapshot_anon"],
+      "capacity_relevance": "Essential calibration step for capacity sizing; without the true hit rate, position sizing and risk limits cannot be responsibly set for any stealth-profile non-pick allocation"
+    }
+  ]
+}
+```

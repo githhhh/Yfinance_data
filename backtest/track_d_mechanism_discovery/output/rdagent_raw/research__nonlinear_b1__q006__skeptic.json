@@ -1,0 +1,63 @@
+{
+  "strongest_counterclaim": "The proposed pullback_v_is_dry × ibd_entry_volume_ratio conditional is functionally a re-labelled vol-targeting/sizing rule whose marginal contribution to within-B0 selection is statistically indistinguishable from zero once one accounts for sample size, the NULL-pullback selection bias, and the features already inside B0; the 'institutional accumulation' narrative is a post-hoc story for a univariate difference whose standardized delta (≈ −0.50σ for ibd_entry_volume_ratio, ≈ −0.58σ for pullback features) lies inside the bootstrapped noise band of a 27-case archaeology dominated by a single snapshot cluster.",
+  "attacks": [
+    {
+      "issue": "Statistical power collapse across the proposed 3×2 contingency",
+      "why_it_matters": "With N=27 split across 3 row states (dry / wet / NULL) × 2 column states (entry-vol ≥1.5 / <1.5) = 6 cells, expected cell sizes are 1–8 cases. The researcher claims a 'pre-registered action per cell' but with these counts each cell's outcome distribution is dominated by 0/1 outcomes (e.g., the only NULL-pullback ruin with vol_ratio_5_20 ≥1.4 — entity_3472243e0c — would single-handedly define the 'no-pullback fallback' policy). The 3×2 table is overfitting architecture, not auditable signal."
+    },
+    {
+      "issue": "Selection bias from conditioning pullback_v_is_dry on a non-random subset",
+      "why_it_matters": "pullback_v_is_dry is only defined when pullback_pct is non-null. ~50% of B0 picks (entities ead73f4390, 4fdc3699fd, 3472243e0c, 84824e6a20, b6bcccdf6a, 6618d3e80c, 90a828939a, b00579f203, bec51a4227, d2ca7853ba, 40ea0cfb3b, 28a6ec4601, ad2bfdee3f, 05b4c6b1f7, etc.) are excluded from the dry/wet partition by construction. The 'fallback' for this cohort is a pure ibd_entry_volume_ratio + vol_ratio_5_20 rule — which means the conditional is silently reduced to a univariate volume rule on the larger subsample, and the dry-pullback signal is being asked to do work on a non-random 50% slice of the data where the failure mode (no measured basing) is structurally different."
+    },
+    {
+      "issue": "Internal contradiction in the recovery claim",
+      "why_it_matters": "Falsifiable prediction #4 asserts the re-rank will 'recover ≥60% of false_negative_relative large_winners,' yet the same researcher's evidence_for states 'false_negatives look like shallow, brief dips.' entity_de1c657364 (the false_negative_big_winner archetype: pullback_duration_weeks=8, pullback_pct=−7.3%) is the canonical shallow-but-winning case. A conditional that up-weights deep, dry pullbacks cannot simultaneously down-rank shallow pullbacks AND recover a shallow-pullback winner. The two claims are mutually exclusive; the researcher is hedging by talking about 'probabilistic' gates without specifying the threshold that resolves the contradiction."
+    },
+    {
+      "issue": "Deep-pullback counterexamples directly within the archaeology",
+      "why_it_matters": "entity_ccc90a671f (pullback_pct=−14.4%, ruin), entity_55c2da490e (pullback_pct=−12.3%, ruin), entity_8f0df3d38e (pullback_pct=−16.2%, false_positive_ruin) all sit in the 'deep + has-measured-pullback' regime — the very cells the researcher claims should be up-weighted. The mechanism story ('deep pullback on dry volume = supply absorption') cannot explain why three of the eight ruins come from exactly this archetype. The 'dry' qualifier is doing all the work, but vol_ratio_5_20 does not reliably distinguish these ruins from winners (ccc90a671f=1.449 vs winner 440e297253=1.588 — winners have HIGHER recent relative vol than this ruin)."
+    },
+    {
+      "issue": "ibd_entry_volume_ratio is a proxy already partially captured by existing B0 features",
+      "why_it_matters": "px_vs_ma50 (winners 0.127 vs FN 0.056, −0.85σ), mom_20 (−1.00σ), and vol_ratio_5_20 (−1.05σ) are all in the existing B0 stack and move in the same direction as ibd_entry_volume_ratio. Adding ibd_entry_volume_ratio as an independent within-B0 rank risks double-counting a signal already priced into B0; the 'incremental Sharpe' after orthogonalisation is plausibly zero. The researcher has not shown partial-correlation or Shapley decomposition evidence."
+    },
+    {
+      "issue": "Position-size scaler is vol-targeting in disguise, not signal",
+      "why_it_matters": "Scaling position by min(ibd_entry_volume_ratio, 2.5) is approximately scaling by the breakout day's volume relative to a baseline. High-volume breakouts have wider intraday ranges; equal-dollar positions are therefore smaller-vol positions. Any standard vol-targeting scheme (risk-parity, ATR-scaling) already does this. The claim that this scaler improves Sharpe 'at the same gross exposure' is therefore either tautological or under-specified — the relevant comparison is Sharpe at the same RISK exposure, where the scaler may add nothing."
+    },
+    {
+      "issue": "Cluster/multi-snapshot contamination of the 27-case count",
+      "why_it_matters": "snap_71486ed83c contributes 6 of 27 cases; if the same entities appear across multiple snapshots, the effective N is smaller than 27 and the median contrasts are computed on partially overlapping observations. The 'standardized_delta' values in numeric_contrasts assume i.i.d. sampling; with snapshot clusters, the effective degrees of freedom are reduced and the deltas reported (−0.50σ, −0.58σ) may not clear a multi-comparison-corrected significance bar."
+    },
+    {
+      "issue": "Mixed-outcome case refutes the high-vol+high-entry-vol cell",
+      "why_it_matters": "entity_6618d3e80c is dual-labelled false_positive_ruin|selected_winner with vol_ratio_5_20=1.446 and high entry metrics — the prototype 'volatility-on-the-trigger' pattern the researcher claims is constructive. If the same feature vector produces both ruin and winner outcomes, the cell-level action cannot be a single multiplier; the researcher's 'shorter review horizon + half size' patch is a hand-wave that does not solve the underlying signal-to-noise problem."
+    },
+    {
+      "issue": "The 'regime-aware override' is unfalsifiable post-hoc policy",
+      "why_it_matters": "Adding 'in low-vol regimes raise the threshold by 0.3' without archaeological evidence on cross-sectional regime interactions is exactly the kind of policy patch that looks rigorous but is unconstrained by the frozen evidence. entity_40ea0cfb3b (low-vol, low-vol-ratio ruin) is a single case being used to justify an entire regime-conditional layer."
+    },
+    {
+      "issue": "The 'institutional accumulation' mechanism is a narrative, not a tested transmission",
+      "why_it_matters": "No footprint data (13F, block trades, dark-pool prints, ETF creations) is in the archaeology; the 'supply absorption without capitulation' story cannot be distinguished from half a dozen equally plausible alternative stories (mean-reversion from oversold, short-covering, sector rotation, options-dealer hedging). The researcher treats a stylized mechanism as load-bearing, but the frozen evidence is purely correlational on price/volume aggregates."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with pullback_v_is_dry=True AND ibd_entry_volume_ratio ≥ 1.5 that nonetheless produced a ruin — would prove the cell is not constructive on its own terms (look for vol_ratio_5_20 ≥ 1.4 AND deep pullback_pct ≤ −15%, e.g., the entity_ccc90a671f / 55c2da490e archetype where vol_ratio_5_20 ≈ 1.27–1.45).",
+    "A false_negative_relative case with pullback_v_is_dry=True AND ibd_entry_volume_ratio ≥ 1.8 — would show the rule should have caught it, but if no such case exists in the archaeology, the recovery claim fails.",
+    "A no-pullback (NULL pullback_pct) B0 pick with low ibd_entry_volume_ratio (<1.2) that nonetheless was a large_winner — would expose the 'fallback' rule as over-aggressive on the no-pullback cohort (entity_90a828939a with vol_ratio_5_20=1.402 is borderline; need a cleaner low-entry-vol winner).",
+    "A pair of B0 picks in the same sector and snapshot, matched on mom_20, px_vs_ma50, and vol_ratio_5_20, differing ONLY in pullback_v_is_dry status, where outcomes are identical — would refute the conditional as a within-B0 discriminator once matched on existing features.",
+    "A bootstrap of the 27-case archaeology (resampling at the snapshot level) showing that the median contrast for ibd_entry_volume_ratio has a 95% CI that crosses zero — would push the claim to UNRESOLVED.",
+    "A counterfactual: run the existing B0 rank with and without the proposed re-rank on the same archaeology; show the re-rank's incremental lift in hit-rate on large_winners is ≤ the lift from random reshuffling within B0.",
+    "An out-of-time test: pull a fresh snapshot not in the frozen evidence, compute pullback_v_is_dry and ibd_entry_volume_ratio, and show the conditional cell ranking matches or underperforms a vol-targeting-only baseline."
+  ],
+  "what_would_change_my_mind": [
+    "A partial-correlation or Shapley analysis on the archaeology showing ibd_entry_volume_ratio contributes ≥5% incremental rank-IC after B0's existing features are conditioned on — currently absent from the evidence.",
+    "Bootstrap CIs (resampling at the snapshot level, not the case level) that exclude zero for the within-cell win-rate differential between (dry, high-entry-vol) and (wet, high-entry-vol) cells — i.e., the interaction term is statistically credibly non-zero, not just a point estimate from 27 cases.",
+    "Evidence that the proposed 3×2 cell actions produce monotonic ordering of ruin rates: rank-up cell ruin rate < neutral < rank-down cell, with ≥ 2× separation and each cell containing ≥ 5 independent observations.",
+    "A demonstration that scaling position size by ibd_entry_volume_ratio improves Sharpe vs an ATR-14 vol-targeting baseline at the SAME risk budget (not the same gross exposure) — this would prove the scaler is signal, not risk management.",
+    "A mechanism test: footprint / Level-2 / options-OI data showing actual institutional accumulation patterns consistent with the 'supply absorption without capitulation' narrative in the cells the rule up-weights; absence of such evidence reduces the mechanism to a story.",
+    "An out-of-sample snapshot (not in the frozen evidence) showing the recovery rate on false_negative_relative large_winners is ≥ 60% as predicted, and the ruin rate in the (wet, low-entry-vol) cell exceeds 25% as predicted — currently the falsifiable predictions are untested within the available archaeology.",
+    "Replication of the signal across at least 3 distinct snapshot clusters (not just snap_71486ed83c which contributes 6/27 cases) with consistent cell-level ruin-rate ordering."
+  ]
+}

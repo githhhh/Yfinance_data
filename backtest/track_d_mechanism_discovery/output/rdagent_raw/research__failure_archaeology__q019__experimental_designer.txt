@@ -1,0 +1,76 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "T1_within_FN_class_lift_test",
+      "features": ["vol_ratio_5_20", "mom_20", "pullback_pct"],
+      "comparison": "Among is_b0_pick=false entities only, partition by quiet-coil composite (vol_ratio_5_20 in [0.9,1.2], mom_20 in [0.02,0.08], pullback_pct in [-10%,-3%]). Compare W4 large_win rate of in-bucket FN vs out-of-bucket FN. Baseline is the operationally relevant arm: FN-loss (e.g., entity_bfb308b24a), not SW.",
+      "success_criterion": "In-bucket FN W4 large_win rate exceeds out-of-bucket FN W4 large_win rate by >=15pp with bootstrap 95% CI on the difference excluding zero (n_resamples>=1000, stratified by snapshot).",
+      "failure_criterion": "Lift <=5pp or CI includes zero, OR the in-bucket FN-loss rate equals or exceeds the FN large_win rate (precision<=50%)."
+    },
+    {
+      "name": "T2_snapshot_stratified_replication",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "ma10_slope_5"],
+      "comparison": "Recompute FN-vs-SW median deltas and standardized deltas on (a) the full sample, (b) snap_71486ed83c excluded, (c) snap_71486ed83c only. Check whether the 'calm cluster' loading on the contrast axis persists outside the dominant snapshot.",
+      "success_criterion": "Standardized delta on up_day_ratio_20 and vol_ratio_5_20 retains |dz|>=0.5 with sign preserved when snap_71486ed83c is excluded. Cross-snapshot FN-large sample n>=3.",
+      "failure_criterion": "|dz| drops below 0.3 OR sign flips OR cross-snapshot FN-large n<2. If any of these hold, the 'repeated precursor' claim is single-regime artifact."
+    },
+    {
+      "name": "T3_threshold_perturbation_falsifier",
+      "features": ["mom_20", "vol_ratio_5_20", "px_vs_ma50"],
+      "comparison": "Re-label FN-big-winner at W4 thresholds of 6%, 8% (current), and 10%, and at relative thresholds of 3pp and 5pp above B0 selected median. For each perturbation, recompute median feature contrast (FN-large vs FN-loss and FN-large vs SW) on the same three features.",
+      "success_criterion": "The qualitative ordering (FN-large lower on mom_20, vol_ratio_5_20, px_vs_ma50 than SW) is preserved at every threshold perturbation, with monotonic sign.",
+      "failure_criterion": "Sign flips or magnitude shrinks below |dz|=0.3 at any perturbation. If fragile, the mechanism claim is threshold-defined and should be reported as UNRESOLVED."
+    },
+    {
+      "name": "T4_volume_regime_directionality",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "comparison": "Within FN class, bin by vol_ratio_5_20 into <0.9, [0.9,1.0), [1.0,1.1), [1.1,1.2), [1.2,1.3), >=1.3 and report W4 large_win rate per bin. Test monotonicity (Spearman rho) and the categorical 'dry-up' hypothesis (peak at 0.9-1.2).",
+      "success_criterion": "Either (a) monotonic decreasing relationship with rho<=-0.6, OR (b) categorical peak in [0.9,1.2] bin with large_win rate at least 2x the surrounding bins. Must hold separately for snap_71486ed83c subset and non-dominant snapshots.",
+      "failure_criterion": "Large_win rate is non-monotonic and not peaked in [0.9,1.2], OR the relationship inverts across snapshots. This invalidates both 'volume confirms' and 'volume dry-up' as monotonic rules."
+    },
+    {
+      "name": "T5_slope_sign_precondition_filter",
+      "features": ["ma10_slope_5", "ma20_slope_5", "mom_20"],
+      "comparison": "Within the quiet-coil bucket, stratify by slope-sign class: (i) both positive, (ii) both negative, (iii) mixed. Compare W4 large_win and W4 loss rates. Tests whether 'constructive slope precondition' is operationalizable.",
+      "success_criterion": "Class (i) shows >=20pp higher large_win rate than class (ii) or (iii), AND class (i) n>=3 with at least 1 large_win.",
+      "failure_criterion": "Class (i) and mixed-sign classes produce similar large_win rates (within 10pp), indicating the slope-sign precondition is discretionary rather than empirically pinned."
+    },
+    {
+      "name": "T6_pullback_null_imputation_sensitivity",
+      "features": ["pullback_pct", "pullback_duration_weeks", "base_duration_weeks"],
+      "comparison": "Re-impute null pullback_pct under three rules: (a) drop nulls (current), (b) impute 0 (no pullback observed), (c) impute -25 (deep correction assumption). Recompute FN-vs-SW median delta on pullback_pct for each.",
+      "success_criterion": "Direction of the median delta (FN larger / shallower than SW) is preserved across all three imputations, with magnitude >=5pp.",
+      "failure_criterion": "Direction flips or magnitude shrinks below 2pp under any imputation rule. The shallow-basing claim is artifact of selective missingness."
+    },
+    {
+      "name": "T7_lookback_horizon_separability",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "comparison": "If 'absorption' is the mechanism, dry-up should be stronger at longer-term relative-volume horizons (5d/60d) than at the short 5d/20d horizon currently used. Recompute dry-up signal using a longer-horizon analog if available, OR test whether 5d/20d dry-up names also exhibit low up_day_ratio_20 and low realized volatility features consistent with orderly absorption rather than random noise.",
+      "success_criterion": "Dry-up bucket names have atr_14_pct and rv_20 below the SW median (constructive compression), with dry-up names showing |z|<=0.5 on both. This separates absorption from random-walk noise.",
+      "failure_criterion": "Dry-up names show atr_14_pct and rv_20 at or above the FN-loss median, indicating the 'calm tape' is indistinguishable from low-information noise rather than constructive compression."
+    }
+  ],
+  "leakage_checks": [
+    "Verify every feature in the test allowlist is computable from price/volume series at or before the snapshot timestamp only. Reject any feature that uses post-snapshot W4 return, post-snapshot IBD entries, or future-window aggregations.",
+    "Verify 'is_b0_pick' is treated as a class label, not a feature, in discrimination tests T1, T4, T5, T7. It must not enter the composite score or precondition logic.",
+    "Verify 'w4_return_bucket' and 'outcome_label' are used only as evaluation labels, never as inputs to the quiet-coil composite or any precondition.",
+    "Verify snapshot_anon is used only for stratification in T2, never as a model input or as a substitute for date/ticker identity.",
+    "Verify no test uses 'pullback_duration_weeks' and 'pullback_pct' together when either is null for >50% of the comparison arm, unless null handling is the explicit object of the test (T6).",
+    "Verify entity_anon is never used as a grouping key beyond snapshot stratification; cross-entity pooling must respect snapshot independence.",
+    "Verify T3 perturbations do not introduce a new feature set, only re-label existing entities; if any perturbation creates an empty arm, the test must report UNRESOLVED for that arm rather than silently passing.",
+    "Verify T7 does not request a new feature absent from the allowlist; if the longer-horizon vol_ratio is unavailable, the test must degrade to a within-feature consistency check on existing features and report this as a limitation."
+  ],
+  "priority_order": [
+    "T1_within_FN_class_lift_test",
+    "T4_volume_regime_directionality",
+    "T2_snapshot_stratified_replication",
+    "T3_threshold_perturbation_falsifier",
+    "T7_lookback_horizon_separability",
+    "T5_slope_sign_precondition_filter",
+    "T6_pullback_null_imputation_sensitivity"
+  ]
+}
+```

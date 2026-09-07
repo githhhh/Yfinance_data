@@ -1,0 +1,25 @@
+
+
+{
+  "mechanism_claim": "The 'evidence_risk' component is a redundant proxy for other B0 signals, primarily reflecting volatility (vol_ratio_5_20), momentum (mom_20) and short‑term trend quality (up_day_ratio_20) rather than providing independent risk information.",
+  "evidence_for": [
+    "In the numeric contrasts, vol_ratio_5_20 (standardized Δ = ‑1.0455), up_day_ratio_20 (Δ = ‑1.1882) and mom_20 (Δ = ‑1.0005) are the top three discriminators between false negatives and selected winners, matching the likely inputs of evidence_risk.",
+    "Selected winners (e.g., entity_440e297253, entity_ead73f4390) exhibit high up_day_ratio_20 (0.5‑0.7) and moderate vol_ratio_5_20 (~1.4‑1.8), while false‑positive ruination cases (e.g., entity_4fdc3699fd, entity_3472243e0c) show elevated vol_ratio_5_20 (>1.2) and lower up_day_ratio_20 (0.4‑0.65).",
+    "The pullback_pct and pullback_duration_weeks fields are missing in many cases but when present they co‑vary with vol_ratio_5_20 and mom_20, suggesting these are already captured by risk proxies."
+  ],
+  "evidence_against": [
+    "No explicit orthogonal risk metric (e.g., realized volatility, ATR, drawdown) appears in the top numeric contrasts; evidence_risk may therefore capture something not fully represented by the listed features, but this cannot be verified without its definition.",
+    "A minority of false‑negative cases with high vol_ratio_5_20 still become winners (e.g., entity_2c58cebc59 has vol_ratio_5_20 = 1.619 and is a selected_winner), indicating that a simple combination of volatility and momentum alone does not fully explain the risk signal."
+  ],
+  "falsifiable_predictions": [
+    "A model that excludes evidence_risk but includes vol_ratio_5_20, up_day_ratio_20, and mom_20 will reproduce the same out‑of‑sample Sharpe (±0.05) and maximum drawdown distribution as the full model.",
+    "If evidence_risk is truly redundant, adding it to a model that already contains those three features will yield no statistically significant improvement in bootstrap tests (p > 0.25).",
+    "Evidence_risk will have no incremental predictive power for 4‑week drawdown beyond vol_ratio_5_20 and up_day_ratio_20 when both are included as linear predictors (coefficient not significant at α = 0.10).",
+    "If evidence_risk is replaced by a direct combination of vol_ratio_5_20 and up_day_ratio_20 (e.g., risk_score = vol_ratio_5_20 × (1 − up_day_ratio_20)), the classification accuracy on the 27‑case set will remain ≥ 85%."
+  ],
+  "policy_implications": [
+    "If the redundancy hypothesis holds, evidence_risk can be dropped to reduce model dimensionality and over‑fitting risk, with a net reduction in feature count of at least one B0 component.",
+    "A cleaner replacement would be a simple composite risk score (e.g., vol_ratio_5_20 × (1 − up_day_ratio_20)) that directly encodes the trade‑off between volatility and short‑term trend quality, making the model more interpretable.",
+    "If evidence_risk is found to add unique information, the model should retain it but treat it as a higher‑order interaction term (e.g., volatility × momentum) rather than a standalone signal."
+  ]
+}

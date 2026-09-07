@@ -1,0 +1,50 @@
+
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "ibd_entry_close_vs_trigger_pct has real predictive signal for false_positive_ruin vs selected_winner at the sample level (median delta ~0.015-0.040 between groups), but the causal mechanism is unresolved. The feature likely captures entry timing relative to base completion, yet whether this mechanically causes insufficient pullback absorption or is a proxy for upstream sector/institutional deterioration is not disambiguated by current evidence. The same-snapshot contrasts (entity_3472243e0c vs entity_2c58cebc59) suggest entry quality can differentiate within snapshot clusters, but counterexamples (entity_3adc078f01 surviving -42.3% pullback with ibd_entry_close_vs_trigger_pct=0.034) indicate absorption capacity depends on unmeasured compensating factors. The missing pullback_pct in 7/8 ruin cases is a genuine selection artifact risk that cannot be dismissed as random unavailability.",
+  "falsifiers": [
+    "Find B0 picks with ibd_entry_close_vs_trigger_pct > 0.050 and w4_return_bucket = large_win in a held-out sample—this directly challenges the proposed entry-quality gate threshold",
+    "Replicate the ibd_entry_close_vs_trigger_pct > 0.050 → >30% ruin rate claim on external data (n >= 100) without sector conditioning; failure to replicate would confirm the skeptic's regime-dependency claim",
+    "Demonstrate that ruin vs win outcomes can be predicted by within-snapshot relative ranking of ibd_entry_close_vs_trigger_pct at >65% accuracy, holding sector regime constant—this would support the causal (not merely correlational) status of entry extension",
+    "Confirm via trade logs that the 7 missing pullback_pct ruin cases exited via stop-loss before pullback completion (selection artifact); if confirmed, the apparent extension-ruin correlation is methodological, not causal",
+    "Test whether high ibd_entry_close_vs_trigger_pct picks in top-sector-RelStrength quartile have ruin rates comparable to low ibd_entry_close_vs_trigger_pct picks—if so, sector regime is the true driver, not entry geometry"
+  ],
+  "actionable_design_principles": [
+    "Use ibd_entry_close_vs_trigger_pct as a conditional severity flag, not a standalone rejection gate: the feature predicts ruin better in combination with low vol_ratio_5_20 or weak sector conditions than in isolation",
+    "Treat up_day_ratio_20 as a pre-screening covariate only (below 0.45 excludes candidates before evaluating extension features), not as post-hoc confirmation of entry quality—its collider risk under sector breadth common causes is unresolved",
+    "Require sector or market-regime stratification when evaluating ibd_entry_close_vs_trigger_pct thresholds; applying a universal cutoff risks over-rejecting in strong-sector regimes and under-rejecting in weak-sector regimes",
+    "Do not use pullback_pct or pullback_duration_weeks as predictive features—they are post-snapshot outcomes unavailable at PIT; missingness in ruin cases should be logged as a structural data-quality flag, not treated as a feature itself",
+    "Acknowledge the residual gap: same-snapshot pairs with near-identical PIT features can have opposite outcomes (entity_3472243e0c vs entity_2c58cebc59), indicating additional PIT-observable features (base depth symmetry, sector relative strength, institutional sponsorship proxies) are required to close the prediction boundary"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Sector-Conditioned Entry Extension Gate: Reject B0 candidates where ibd_entry_close_vs_trigger_pct > 0.045 AND sector_RS_quartile <= 2, but allow candidates with ibd_entry_close_vs_trigger_pct > 0.045 when sector_RS_quartile >= 3",
+      "why_distinct": "Separates the causal role of entry geometry from regime confounding—the researcher treats ibd_entry_close_vs_trigger_pct as universally causal, while this design conditions the gate on sector context, directly testing the skeptic's regime-dependency claim",
+      "features": ["ibd_entry_close_vs_trigger_pct", "sector_relative_strength_or_quartile", "px_vs_ma50", "vol_ratio_5_20"],
+      "capacity_relevance": "Reduces false-positive ruin rate in weak sectors where late entries are genuinely higher-risk; preserves legitimate late entries in strong sectors where absorption capacity is institutionally buffered"
+    },
+    {
+      "idea": "Pullback-Absorption Composite Filter: Score candidates on a two-factor composite (ibd_entry_close_vs_trigger_pct normalized by snapshot median + px_vs_ma50 normalized by snapshot median); reject if composite > 0.85 AND vol_ratio_5_20 < 1.30",
+      "why_distinct": "Addresses the missing_pullback_pct artifact concern by reconstructing a proxy for 'structurally late without pullback buffer' from PIT-observable features, rather than treating high ibd_entry_close_vs_trigger_pct as sufficient cause",
+      "features": ["ibd_entry_close_vs_trigger_pct", "px_vs_ma50", "vol_ratio_5_20", "up_day_ratio_20"],
+      "capacity_relevance": "Explicitly models the interaction between entry extension and volume sponsorship that determines whether a pullback becomes destructive; the vol_ratio_5_20 condition acts as a buffer-test for institutional absorption capacity"
+    },
+    {
+      "idea": "Within-Snapshot Rank-Weighted Selection: For each snapshot, rank B0 candidates by ibd_entry_close_vs_trigger_pct; apply a maximum drawdown rule (do not select any candidate in the top ibd_entry_close_vs_trigger_pct quartile if a bottom-quartile candidate exists in the same snapshot)",
+      "why_distinct": "Controls for cross-snapshot regime variation by using intra-snapshot relative ranking rather than absolute thresholds; tests the experimental designer's entry_extension_holds_across_sector_regimes hypothesis directly",
+      "features": ["ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Operationalizes the within-snapshot ranking test for ruin prediction; if this rule reduces ruin rate by >25% in held-out data, it supports ibd_entry_close_vs_trigger_pct as a causal (not merely correlational) entry quality signal"
+    },
+    {
+      "idea": "False-Negative Informed Recovery Layer: Flag B0 candidates that are excluded by high ibd_entry_close_vs_trigger_pct but have up_day_ratio_20 >= 0.65 AND mom_20 >= 0.15; route these to a monitoring queue for manual review rather than hard rejection",
+      "why_distinct": "Directly addresses the researcher's evidence that up_day_ratio_20 deficit separates false_negative from selected_winner—candidates with strong up_day_ratio_20 may deserve conditional reconsideration even when entry extension is elevated, preventing systematic false negatives",
+      "features": ["up_day_ratio_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "vol_ratio_5_20"],
+      "capacity_relevance": "Adds a recovery layer for high-conviction candidates that might otherwise be rejected by a strict entry-quality gate; tests whether up_day_ratio_20 acts as a compensating signal (supporting the researcher's pre-treatment covariate claim) or is merely confounded (supporting the skeptic's collider concern)"
+    }
+  ]
+}
+```

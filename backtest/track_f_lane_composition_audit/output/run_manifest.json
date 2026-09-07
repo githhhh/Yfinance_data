@@ -1,0 +1,91 @@
+{
+  "experiment": "track_f_lane_composition_audit",
+  "protocol_version": "track_f_v1_lane_taxonomy_composition",
+  "source_git_sha": "a51fa510dabfadcca9ae86bea23076711799212e",
+  "panel_hash": "d95ab4ba21831f72fdc2e434c49a42e6164d7fde6f72d187ad758f996347b5b5",
+  "production_b0_hash": "115387c9861f7202c0f6b3c89fe2d2ff594544de93264901ee6d2f72e930c477",
+  "panel_snapshot_count": 42,
+  "panel_max_snapshot": "2026-08-07",
+  "evidence_status": "All currently materialized panel outcomes are retrospective for Track F because the Lane-composition hypotheses were formulated after observing prior Track C/D/E results. Track-D segment labels are reused only for regime consistency, not as untouched OOS.",
+  "orthogonal_taxonomy": {
+    "setup_route": [
+      "non_pullback",
+      "pullback"
+    ],
+    "quality_state": [
+      "confirmed",
+      "standard",
+      "incomplete",
+      "failure"
+    ],
+    "confirmed_definition": "near_buy_point AND entry_volume>=1.5 AND (EPS>=25 OR weekly_volume>=1.3)",
+    "standard_definition": "near_buy_point AND entry_volume>=1.5 AND NOT follow_through",
+    "failure_definition": "Production clear_geometry_failure"
+  },
+  "baseline": {
+    "policy_id": "B0_ORIGINAL",
+    "semantics": "Exact Production B0: hard current Lane + symmetric dry + distinct_1"
+  },
+  "policies": [
+    {
+      "policy_id": "CONFIRMED_PARITY_FALLBACK",
+      "mode": "parity_fallback",
+      "industry_policy": "distinct_1",
+      "role": "primary"
+    },
+    {
+      "policy_id": "CONFIRMED_ONLY_TOP3",
+      "mode": "confirmed_only",
+      "industry_policy": "distinct_1",
+      "role": "primary"
+    },
+    {
+      "policy_id": "FCS_MAX1",
+      "mode": "fcs_max1",
+      "industry_policy": "distinct_1",
+      "role": "primary"
+    },
+    {
+      "policy_id": "CONFIRMED_PARITY_FALLBACK_NO_IND",
+      "mode": "parity_fallback",
+      "industry_policy": "pure_top3",
+      "role": "secondary"
+    },
+    {
+      "policy_id": "CONFIRMED_ONLY_TOP3_NO_IND",
+      "mode": "confirmed_only",
+      "industry_policy": "pure_top3",
+      "role": "secondary"
+    },
+    {
+      "policy_id": "FCS_MAX1_NO_IND",
+      "mode": "fcs_max1",
+      "industry_policy": "pure_top3",
+      "role": "secondary"
+    }
+  ],
+  "historical_support_gate": {
+    "min_full_support": 30,
+    "min_locked_support": 15,
+    "min_mean_spread": 0.0,
+    "min_median_spread": 0.0,
+    "min_cvar_delta": -0.5,
+    "max_stop_delta_pct": 3.0,
+    "max_ruin_delta_pct": 5.0,
+    "min_ci_low": -1.0
+  },
+  "primary_question": "Does non-pullback route deserve unconditional priority over equally confirmed pullback route, and does explicit Lane/route composition improve Top3 portfolio quality?",
+  "artifacts": {
+    "policy_evaluations_csv": "03b14d3fbd075f6a10c90ef1437b4fb46fc970cb3147cac509975e7e6fac019a",
+    "policy_evaluations_json": "b43efd12966b857191e19fefffff1555df36fd98f185ce12aa3f057c11f2cfee",
+    "lane_taxonomy_rows": "0ad543a49715b78a736249276341c60833228a967c5cf17adfabd42567a2d2fe",
+    "lane_taxonomy_matrix": "1e60db53ed5c51a79c57b89b66ff1ecb037dccc8b009aa3eb487c0d2f70950e8",
+    "lane_taxonomy_summary": "50e61bfe56be3239ea51344e3fae4aa2843bca38dd0348ba74b0841d38da4e91",
+    "weekly_selection_composition": "6e595c5e04dc5ee1edc8ed5fc390968f8b17afdcee3c45741bd50223af98b85b",
+    "route_bucket_weekly": "d43c671b6b82fd7db3bcee00b25cf5fdb46d0ca183925475ac26085b134f5f07",
+    "route_pair_summary": "19f5922de699240741364e10995d931f23d120e00560a55864632479d22652a5",
+    "parity_anchor": "139bf1f54a87f34076b54fe076fa61f0cb9c733230b1ae0a72f305509e5319b1",
+    "decision": "5c55067c469876a54a3fd922e8d349c10094e82270fd7f0b4d2c945a533d1fd0",
+    "report": "ede2c3efdaabee3122eeab11db6b75b524b7bca4ad5be875ca02b83d82294469"
+  }
+}

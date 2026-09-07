@@ -1,0 +1,69 @@
+{
+  "reviews": [
+    {
+      "policy_id": "lane_x_slope_sign_probe",
+      "concerns": [
+        "The claimed interaction test is not actually conditioned on MA20 slope sign despite the description: the term uses px_vs_ma20 multiplied by ma20_slope_5, which is a continuously signed interaction, not a sign-conditioned operator.",
+        "Raw px_vs_ma20 and slope-derived features can share trend and price-level information, so an interaction coefficient or small AUC increment may reflect collinearity or nonlinear model fit rather than new predictive information.",
+        "A single global interaction can cancel across positive- and negative-slope regimes, making the directional hypotheses specified in prose invisible to the frozen score.",
+        "The min_score=0.5 and max_positions=2 combination creates a stringent activation hurdle: in a small or weak cross-section this policy will abstain even when candidates are positively ranked.",
+        "The fixed max_positions of two also truncates information content unless this capacity is identical to B0; otherwise the claimed interaction gain is entangled with portfolio breadth."
+      ],
+      "novelty_0_100": 42,
+      "mechanism_clarity_0_100": 48
+    },
+    {
+      "policy_id": "vol_ratio_regime_gate",
+      "concerns": [
+        "The policy directly embeds the same low-volatility downside mechanism later represented by volume_dryup_filter, creating strong conceptual and empirical duplication.",
+        "'Low vol' and 'negative slope' are used as a discretionary liquidity veto without an operational definition of liquidity, so the gate can behave as a generic downtrend filter and proxy for future returns.",
+        "The threshold of vol_ratio_5_20 < 0.9 plus ma10_slope_5 < 0 may be either densely populated or nearly empty depending on feature scaling, but either outcome makes the mechanism difficult to falsify.",
+        "The linear vol term and vol-by-slope interaction overlap mathematically with the conditional threshold, so the three terms are not cleanly identifiable mechanisms.",
+        "The fixed max_positions=2 without a minimum-score rule does not provide a deterministic activation requirement; if the universe is small or base scores are concentrated, low scores can still force abstention.",
+        "The liquidity narrative is implausible as stated because a low short-to-medium realized-volatility ratio is not itself a measure of market liquidity."
+      ],
+      "novelty_0_100": 35,
+      "mechanism_clarity_0_100": 58
+    },
+    {
+      "policy_id": "volume_dryup_filter",
+      "concerns": [
+        "The low-vol branch substantially duplicates the low-vol/negative-slope veto in vol_ratio_regime_gate, while the high-vol/low-momentum branch overlaps snapshot_norm_vol_with_slope_trap.",
+        "The description says it penalizes low-vol entries, but the frozen condition is vol_ratio_5_20 < 1.3, a broad range that includes ordinary and even somewhat elevated volatility; this weakens the stated dry-up mechanism.",
+        "The high-vol distribution condition uses mom_20 < 0.1, but the same positive threshold appears in the pivot-confirmation policy, so a feature threshold rather than an independent market mechanism may drive selection.",
+        "Calling the two penalties 'entries' is misleading because they are score adjustments applied across all ranked candidates; entry eligibility and portfolio inclusion are determined downstream.",
+        "The score-gap capacity rule with gap=0.3 and max_positions=2 is an unusually strong selectivity filter. It can manufacture abstention whenever the second qualifying name is close to the first or the top score is weak.",
+        "The requested pre-registered hold-out is a validation requirement, not part of the frozen score; treating it as evidence for this exact mechanism would introduce validation-selection risk."
+      ],
+      "novelty_0_100": 31,
+      "mechanism_clarity_0_100": 63
+    },
+    {
+      "policy_id": "volume_conditional_pivot_confirmation",
+      "concerns": [
+        "The three pivot thresholds are largely hard-coded momentum, volume, and price-trend rules, so this is close to a composite rule-based strategy rather than an independently identified contribution from ibd_entry_volume_ratio.",
+        "The positive award requires all three conditions, while the negative penalty fires if any one condition fails. This is not a symmetric treatment of evidence and can make the three-feature bundle behave like an all-or-nothing veto.",
+        "The linear and interaction uses of ibd_entry_volume_ratio conflict with the description of volume as passive confirmation: standalone volume still contributes outside the awarded region, and its interaction is not restricted to the simultaneous pivot state.",
+        "The positive interaction can assign a large bonus to high volume paired with high momentum, potentially double-counting both vol_ratio_5_20 and mom_20 through correlated volume signals.",
+        "The all-negative region and max_positions=1 create a severe abstention funnel. Any weakness in momentum, volume, or price trend can remove otherwise ranked candidates, after which a top-score gap of 0.2 can suppress the sole remaining position.",
+        "The term 'three strongest pivot signals' is not established within the normalized spec; it adds a discretionary ranking claim that may be unstable across regimes."
+      ],
+      "novelty_0_100": 28,
+      "mechanism_clarity_0_100": 55
+    },
+    {
+      "policy_id": "snapshot_norm_vol_with_slope_trap",
+      "concerns": [
+        "The description says vol_ratio_5_20 is normalized against snapshot context, but the frozen term is only a generic zscore transform with no explicit cross-sectional denominator or snapshot grouping. This is a specification-to-mechanism mismatch.",
+        "High volatility combined with positive short-term slope is treated as an accumulation trap, yet high volatility with positive momentum is commonly consistent with active demand. The stated causal mechanism is therefore economically implausible without a separate flow or issuance interpretation.",
+        "The first penalty overlaps the high-vol/low-momentum filter in volume_dryup_filter, while the second penalty captures a related adverse trend/volatility condition already proxied by the interaction and main effects.",
+        "The raw vol_ratio penalty, continuous vol-by-slope interaction, and two threshold penalties are not separable: collinearity can make it impossible to attribute behavior to the alleged professional accumulation pattern.",
+        "up_day_ratio_20 < 0.5 plus high volatility is a generic distribution/risk proxy and may largely duplicate the information in momentum and trend variables.",
+        "The gap=0.2, max_positions=1 combination is highly abstention-prone: the threshold bonus requires simultaneous momentum, volume, and price confirmation, the penalties can remove marginal names, and the remaining name may be suppressed by a modest score gap.",
+        "With a one-position limit, gains from a more elaborate score are inseparable from the portfolio constraint itself unless the same capacity is used in the comparison base."
+      ],
+      "novelty_0_100": 52,
+      "mechanism_clarity_0_100": 39
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+
+
+```json
+{
+  "mechanism_claim": "In fresh breakout weeks, if Lane (B0_LANE / LANE_NEUTRAL / SCORE_BEFORE_LANE) is merely a re-encoding of freshness (up_day_ratio_20), geometry (mom_20, px_vs_ma20, base shape), and volume (vol_ratio_5_20, ibd_entry_volume_ratio), then conditioning on those three axis-features, Lane bin assignments must carry near-zero W4 return differential and SCORE_BEFORE_LANE must retain essentially all of SCORE_AFTER_LANE's predictive variance.",
+  "evidence_for": [
+    "Frozen contrasts rank up_day_ratio_20 (std delta -1.19), vol_ratio_5_20 (-1.05), and mom_20 (-1.00) as the three largest separators between selected_winners and false_negatives, while px_vs_ma20/ma20_slope_5 also show mid-sized deltas; this leaves little residual axis for Lane to occupy that is not already in those proxies."
+  ],
+  "evidence_against": [
+    "Multiple false_positive_ruin B0 picks (entity_8f0df3d38e, entity_3472243e0c, entity_84824e6a20, entity_ccc90a671f) display proxy readings that match or exceed winners (mom_20 0.18, up_day_ratio_20 0.65, vol_ratio_5_20 1.21-1.63), indicating residual risk that up_day_ratio_20 + vol_ratio_5_20 + mom_20 cannot fully localize and that a Lane-style assessment of entry context could plausibly capture."
+  ],
+  "falsifiable_predictions": [
+    "P1 (proxy holds): within fresh-breakout-week triples matched on up_day_ratio_20 (±0.05), vol_ratio_5_20 (±0.10), mom_20 (±0.05), the W4 return gap B0_LANE minus LANE_NEUTRAL is <1.0pp and SCORE_BEFORE_LANE explains ≥90% of SCORE_AFTER_LANE's W4-return cross-sectional R^2; also, the false_positive_ruin rate in LANE_NEUTRAL rows that pass on the proxy composite equals the B0_LANE ruin rate within ±1pp.",
+    "P2 (proxy refuted): under the same matched triples, B0_LANE minus LANE_NEUTRAL W4 return exceeds 2.0pp, OR SCORE_BEFORE_LANE explains <70% of SCORE_AFTER_LANE R^2, OR false_positive_ruins cluster disproportionately in a single Lane bin independent of the composite — any one of these rejects the pure-proxy hypothesis."
+  ],
+  "policy_implications": [
+    "If P1 holds in the next discovery-cycle matched triple test, retire Lane and replace it with an explicit composite z(up_day_ratio_20) + z(vol_ratio_5_20) + z(mom_20) in the B0 selector; if P2 holds, keep Lane as an orthogonal residual and re-weight SCORE_AFTER_LANE so the fresh-breakout-week B0 priority list downweights Lane-Neutral rows that otherwise screen clean on the proxy composite."
+  ]
+}
+```

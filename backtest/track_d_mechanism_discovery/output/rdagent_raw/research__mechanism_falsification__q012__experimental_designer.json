@@ -1,0 +1,73 @@
+{
+  "tests": [
+    {
+      "name": "pre_selection_freshness_floor_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Pool ALL labeled entities in failure_archaeology (false_positive_ruin + selected_winner + false_negative_*) and run a rank-sum test of the freshness z-sum (z-up_day_ratio_20 + z-vol_ratio_5_20 + z-mom_20) between ruin vs non-ruin cohorts. This is the only test that escapes the Berkson/collider conditioning the researcher identified as fatal — because false_negatives are by construction pre-selection.",
+      "success_criterion": "Rank-sum z ≤ -1.5 AND AUC(pre-selection ruin vs non-ruin on freshness-only logistic) ≥ 0.60 → freshness is a downside-risk floor/gate pre-selection.",
+      "failure_criterion": "Rank-sum |z| < 0.5 AND AUC ≤ 0.55 → freshness does NOT separate ruin from non-ruin in the unconditioned universe; pure ranking claim survives."
+    },
+    {
+      "name": "within_B0_freshness_quintile_monotonicity_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Restrict to is_b0_pick == true. Bin B0 picks into freshness quintiles. Compute ruin-rate (false_positive_ruin / B0_picks) per quintile. Apply Cochran-Armitage trend test across quintiles. This is the direct test of the researcher's prediction #2.",
+      "success_criterion": "Monotonically decreasing ruin rate from Q1 to Q5 (trend z ≤ -1.5) → supports floor-gate interpretation even conditional on selection.",
+      "failure_criterion": "No monotonic trend (|trend z| < 0.8) OR U-shape → falsifies gate claim; only consistent with ranking interpretation OR with no freshness role at all."
+    },
+    {
+      "name": "recency_of_base_vs_momentum_proxy_specification_test",
+      "features": [
+        "base_duration_weeks",
+        "base_mbox_count",
+        "pullback_pct"
+      ],
+      "comparison": "Build two parallel freshness proxies: (Proxy A) up_day_ratio_20 + vol_ratio_5_20 + mom_20 z-sum (current implementation) vs (Proxy B) base_duration_weeks + base_mbox_count + pullback_pct z-sum (literal recency-of-base). Compute pseudo-R² of a logistic regression on outcome_label ∈ {false_positive_ruin, selected_winner} for each proxy. This directly resolves the skeptic's attack #5 (whether the conceptual role is 'recency-of-base' or 'recent-thrust' and which is the mis-specified one).",
+      "success_criterion": "Proxy B pseudo-R² exceeds Proxy A by ≥ 0.02 absolute → original freshness was mis-specified as momentum when conceptual role is recency-of-base; cleaner replacement is Proxy B.",
+      "failure_criterion": "Proxy A pseudo-R² ≥ Proxy B → current specification is correctly aligned with intent; no spec revision needed."
+    },
+    {
+      "name": "matched_pair_freshness_marginal_effect_test",
+      "features": [
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within snapshots, find pairs of entities matched on the NON-freshness B0 inputs (px_vs_ma20, px_vs_ma50, ma20_slope_5 within ±0.01) but differing on freshness z-sum by ≥ 1σ. Compare ruin/winner rates between the high-freshness and low-freshness member of each pair. This isolates freshness from confounding by other B0 components (skeptic's attack #2).",
+      "success_criterion": "McNemar odds ratio ≥ 2.0 in favor of high-freshness avoiding ruin → freshness has independent information beyond other components.",
+      "failure_criterion": "McNemar |OR-1| < 0.5 OR p > 0.3 → freshness is redundant; its observed effect is fully mediated by other B0 inputs."
+    },
+    {
+      "name": "drawdown_proxy_risk_control_discrimination_test",
+      "features": [
+        "base_depth_pct",
+        "dist_to_52w_high_pct",
+        "atr_14_pct"
+      ],
+      "comparison": "Compute AUC of a logistic regression using ONLY downside-risk proxies (base_depth_pct, dist_to_52w_high_pct, atr_14_pct) to separate ruin from winner. Then add the freshness z-sum and check whether AUC rises significantly (DeLong test). This separates the 'freshness as risk control' claim from 'freshness as ranking' claim — if risk proxies alone do most of the work, freshness adds little as a gate.",
+      "success_criterion": "AUC(risk-only) ≥ 0.65 AND adding freshness raises AUC by < 0.03 → risk proxies already do the gating; freshness is NOT the mechanism of downside control.",
+      "failure_criterion": "AUC(risk-only) < 0.55 AND freshness addition raises AUC by ≥ 0.08 → freshness IS contributing to downside-risk separation, consistent with gate role."
+    }
+  ],
+  "leakage_checks": [
+    "Verify each feature name resolves to a PIT-observable at snapshot t: confirm up_day_ratio_20, vol_ratio_5_20, mom_20, ma10/20_slope_5, ma50_slope_10, px_vs_ma20, px_vs_ma50, pullback_pct, pullback_duration_weeks, base_duration_weeks, base_mbox_count, base_depth_pct, atr_14_pct, dist_to_52w_high_pct, ibd_entry_* all use only data available at or before the snapshot timestamp. Reject any test that requires post-snapshot data.",
+    "Confirm snapshot_anon and entity_anon are the only join keys — no calendar date, no ticker, no industry classification should be used as a feature or stratification variable. If regime stratification is attempted, use rv_20 or atr_14_pct at snapshot t as the regime proxy, not date.",
+    "For matched-pair test (test 4): enforce that pair members come from the SAME snapshot_anon to avoid cross-regime confounding masquerading as freshness effect. Pairs crossing snapshots are rejected.",
+    "Confirm no feature in any test is a transformation that uses the outcome label (e.g., 'rank among winners' is forbidden). The labels false_positive_ruin, selected_winner, false_negative_relative may appear ONLY on the LHS, never on the RHS.",
+    "For test 3 (specification comparison): verify that base_duration_weeks, base_mbox_count, pullback_pct are measured at the SAME snapshot t as up_day_ratio_20 / vol_ratio_5_20 / mom_20 — otherwise the comparison conflates measurement timing with mechanism."
+  ],
+  "priority_order": [
+    "pre_selection_freshness_floor_test",
+    "within_B0_freshness_quintile_monotonicity_test",
+    "recency_of_base_vs_momentum_proxy_specification_test",
+    "matched_pair_freshness_marginal_effect_test",
+    "drawdown_proxy_risk_control_discrimination_test"
+  ]
+}

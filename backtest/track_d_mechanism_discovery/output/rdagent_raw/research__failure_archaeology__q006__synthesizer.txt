@@ -1,0 +1,52 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The proposed mechanism—that B0 picks with weak pre-entry accumulation (up_day_ratio_20 ≤ 0.65) combined with mediocre momentum (0.05 < mom_20 < 0.25) are vulnerable to pullback-induced ruination—is directionally supported by the numeric contrasts (up_day_ratio_20 standardized delta = -1.19 is the strongest PIT feature separator), but the causal attribution is confounded. The mechanism conflates stock-level accumulation quality with snapshot-level market regime: ruin cases in the sample (entity_8f0df3d38e, entity_4fdc3699fd, entity_3472243e0c) cluster in snapshots that also produce false_negative_relative cases, suggesting the snapshot itself is a confounding variable. The two confirmed large_win violations of the proposed hard filter (entity_2f86543bf6: up_day_ratio_20=0.35, mom_20=-0.008; entity_90a828939a: up_day_ratio_20=0.45, mom_20=0.036) demonstrate the conjunctive filter is not necessary for success. The vol_ratio_5_20 feature shows complete overlap between ruin and winner strata (1.1–1.8), providing no independent discriminative power. Without residualizing on sector-level market returns during the 4–8 week post-entry window, the mechanism cannot be distinguished from a market-regime proxy.",
+  "falsifiers": [
+    "snapshot_regime_inheritance_test fails: Within-snapshot matched pairs (matched on up_day_ratio_20 ±0.05 and mom_20 ±0.03) show ruin_rate_delta ≥ 0.15—ruin cases concentrated in specific snapshots regardless of matched PIT features would implicate regime as primary driver",
+    "filter_boundary_violation_test failure threshold met: ≥20% of selected_winners violate both filter conditions (up_day_ratio_20 < 0.60 AND mom_20 < 0.15)—currently 2 of 11 (18%) selected_winners are violations, near the threshold",
+    "Cross-snapshot regime analysis: Finding that snapshots contributing multiple ruin cases (e.g., snap_d0d57b1e40) correspond to periods where the relevant sector ETF declined >8% in the 4–8 week post-entry window would confirm market regime as the driver",
+    "Strong-accumulation ruin case: A B0 pick with up_day_ratio_20 ≥ 0.75, mom_20 ≥ 0.20, vol_ratio_5_20 ≥ 1.4 that experiences ruin (w4_return_bucket = 'ruin') despite neutral-to-positive sector ETF returns in the same window would directly falsify accumulation-vulnerability as the mechanism",
+    "Same-snapshot winner-within-ruin-range: A B0 pick from a snapshot containing ruin cases, with up_day_ratio_20 in 0.40–0.55 range and mom_20 in 0.05–0.15 range, that produces selected_winner outcome—would falsify the necessity of strong accumulation within adverse regimes",
+    "momentum_regime_stability_test failure: Sign-concordant picks (ma10_slope_5, ma20_slope_5, mom_20 all positive) have ruin_rate ≥ 0.25—would falsify accumulation stability as protective mechanism"
+  ],
+  "actionable_design_principles": [
+    "Do NOT use the conjunctive hard filter (up_day_ratio_20 < 0.60 AND mom_20 < 0.15) as an outright rejection rule—two confirmed large_win outcomes would have been excluded, demonstrating the filter is not necessary for success",
+    "Use snapshot-level context as a mandatory stratification variable before interpreting PIT feature predictive power; if a snapshot produces >50% ruin rate across all accumulation strata, that snapshot's regime is the operative variable",
+    "Implement position-size modulation (not rejection) based on accumulation quality: reduce initial position size for weak-accumulation picks rather than filtering them out entirely, allowing cost-averaging if pullback materializes",
+    "Never use post-snapshot features (pullback_pct, pullback_duration_weeks) as policy inputs; these are outcome-correlated variables that cannot predict the outcome they help create",
+    "Restrict stop-loss rules to pre-defined percentage thresholds set at entry, not reactive to observed drawdown; a -12% stop triggered only after -12% is reached is a damage-capper, not a ruin-preventer",
+    "The vol_ratio_5_20 feature should be treated as a regime volatility indicator (high values = elevated market noise) rather than a stock-picking discriminator, given complete overlap between winner and ruin strata",
+    "Reserve the right to escalate to regime-adjusted analysis when the snapshot_regime_inheritance_test indicates snapshot-level confounding is present"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Snapshot-regime-adjusted accumulation score (SRA-score) = weighted composite of up_day_ratio_20, mom_20, and vol_ratio_5_20, where the weights are determined after residualizing on snapshot-level outcome rates",
+      "why_distinct": "This addresses the core confound: the standard composite would double-count snapshot regime effects. SRA-score residualizes snapshot influence before computing the accumulation metric, providing a stock-specific rather than regime-contaminated signal",
+      "features": ["up_day_ratio_20", "mom_20", "vol_ratio_5_20", "snapshot_anon (for outcome rate calibration only, not as feature input)"],
+      "capacity_relevance": "Position sizing module uses SRA-score to allocate capacity; high SRA-score gets standard position, low SRA-score gets reduced initial position (≤40% of standard), allowing cost-averaging if pullback occurs"
+    },
+    {
+      "idea": "Snapshot survival rate gate: compute the historical ruin_rate for B0 picks within each snapshot's cohort; if a given snapshot's cohort ruin_rate > 0.50, apply uniform position-size reduction across all B0 picks from that snapshot regardless of individual accumulation metrics",
+      "why_distinct": "This directly addresses the regime confounding without requiring external market data; it treats the snapshot as a regime proxy and adjusts position sizing accordingly, rather than attempting to explain outcomes via stock-specific features that may be confounded",
+      "features": ["snapshot_anon (outcome-rate calibration)", "w4_return_bucket historical distribution per snapshot"],
+      "capacity_relevance": "Risk management module applies snapshot-level position cap; if snapshot cohort ruin_rate exceeds threshold, all positions from that snapshot are capped at maximum 30% of standard size"
+    },
+    {
+      "idea": "Tight-entry compensation rule: when ibd_entry_close_vs_trigger_pct < 0.015 (very tight entry), allow up to 1.5x standard position size ONLY if SRA-score is ≥ 0.60; loose entries (>0.05) with weak accumulation (SRA-score < 0.40) trigger automatic exit if drawdown exceeds -8% within first 3 weeks",
+      "why_distinct": "This separates entry quality from accumulation quality rather than conflating them; it acknowledges that tight entries can compensate for moderate accumulation only when accumulation is not severely weak, and that loose entries require stronger accumulation to justify holding through drawdowns",
+      "features": ["ibd_entry_close_vs_trigger_pct", "SRA-score (composite)", "up_day_ratio_20", "mom_20"],
+      "capacity_relevance": "Entry validation module checks entry-tightness against SRA-score thresholds before position sizing; loose-entry-with-weak-accumulation triggers enhanced monitoring with pre-defined exit criteria"
+    },
+    {
+      "idea": "Near-buy-point geometry filter for extended-price entries: B0 picks with px_vs_ma20 > 0.12 AND mom_20 < 0.20 are flagged as geometrically extended; these require up_day_ratio_20 ≥ 0.70 OR ibd_entry_close_vs_trigger_pct < 0.02 to qualify for standard position size, otherwise subject to 50% position reduction",
+      "why_distinct": "This directly addresses the near-buy-point geometry hypothesis using only PIT features, without using post-snapshot pullback data; it conditions position size on the geometric relationship rather than predicting whether a pullback will occur",
+      "features": ["px_vs_ma20", "px_vs_ma50", "mom_20", "up_day_ratio_20", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Entry geometry module applies conditional sizing rule; extended entries with weak accumulation receive reduced initial position, with option to add on pullback if accumulation quality improves post-entry"
+    }
+  ]
+}
+```

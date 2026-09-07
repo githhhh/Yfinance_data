@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "The researcher's falsification framing is itself tautological: they test whether the penalty's signal collapses into four already-discriminative features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) by computing *pooled, cross-snapshot* univariate medians between two non-comparable error cohorts (false_negatives vs selected_winners). But the penalty is a snapshot-conditional, joint-regime detector, so this pooled analysis destroys exactly the structure that would prove or disprove independence. A more honest test would orthogonalize penalty values against the residual of the four features *within snapshot* and ask whether the within-snapshot rank-ordering still tracks ruin probability. The prior researcher never did that, so the 'probably redundant' conclusion is unfalsified, not falsified.",
+  "attacks": [
+    {
+      "issue": "Wrong control cohort. The numeric contrasts compare false_negatives to selected_winners, but dry_false_penalty is designed to penalize false_positives. The two error modes are mirror images on different B0 features: false_negatives have LOW up_day_ratio/mom/vol, false_positives have HIGH entry_close_vs_trigger with mixed slope signs. Using the wrong contrast understates the penalty's incremental lift against the error mode it actually targets.",
+      "why_it_matters": "If you regress 'penalty = f(features)' using false_negative residuals, you fit the wrong loss surface. The penalty could be 100% redundant for false_negatives yet still carry exclusive signal for false_positives — and the researcher's headline claim ('little incremental information') would be wrong precisely when it matters."
+    },
+    {
+      "issue": "Snapshot heterogeneity is ignored. Of the 27 cases, at least 9 distinct snapshots appear (snap_724342c280, snap_287267e812, snap_eb3d8128cc, snap_c7fa0b9bb6, snap_12ebd0d057, snap_71486ed83c, snap_ad495b6705, snap_39b6f2c49e, snap_3fc4068e83, snap_8aa9111909, snap_edaba651c2, snap_d0d57b1e40, snap_01d3e2483b, snap_b8420124eb). Pooling across snapshots is a known confound when features have regime-conditional distributions; the 'overlap in vol_ratio_5_20 between ruins and winners' finding is partly an artifact of mixing sub-distributions.",
+      "why_it_matters": "A penalty calibrated per-snapshot could discriminate cleanly even when pooled distributions overlap. The researcher treats overlap as redundancy; that's a category error."
+    },
+    {
+      "issue": "Selection bias in the archaeology set. The 27 cases are discovered precisely because they share the predictive vocabulary B0 uses — they were flagged by the same primitives. The penalty cannot appear independent of those primitives in this sample, because the sample was constructed by them. The researcher has not bootstrapped the penalty against randomly-sampled non-flagged cases.",
+      "why_it_matters": "Any 'redundancy' finding is mechanically guaranteed. A real independence test requires (a) all B0 candidates in the snapshot universe, not just error cases, and (b) an injected placebo penalty. Neither was done."
+    },
+    {
+      "issue": "Pullback-null handling conflates two hypotheses. Six of eight ruin cases have null pullback fields. The researcher reads this as 'penalty firing on incomplete state' (a defect). Alternative reading: the penalty correctly *refrains* from using pullback and instead relies on a regime indicator that is complete — meaning the null-pullback cases are the cleanest test set, not the dirtiest.",
+      "why_it_matters": "If the penalty is robust to missing pullback and still discriminates on those 6 cases, that is evidence of an independent channel, not a defect."
+    },
+    {
+      "issue": "The entity_6618d3e80c 'mix-label' case is misread as evidence against the penalty. This case has px_vs_ma50 = 0.337, mom_20 = 0.251, up_day_ratio_20 = 0.55 — strong trend — yet is labeled false_positive_ruin|selected_winner. The researcher calls this 'inconsistent with a clean penalty trigger.' But a correctly-designed penalty should *not* fire on this case (it isn't dry). The fact that ruin still occurred is a label-noise / market-regime issue, not a penalty-design failure. Citing it as counter-evidence reverses the inference.",
+      "why_it_matters": "This single case could be the strongest defense of the penalty's selectivity — it correctly stayed quiet on a non-dry setup that happened to ruin anyway. The researcher inverts this."
+    },
+    {
+      "issue": "Falsifiable predictions are symmetric rather than asymmetric. The researcher's 'partial dependence flat = falsifies incremental info' test would also fire if the penalty operates through a thresholded interaction (e.g., mom_20 > 0.15 AND vol_ratio_5_20 < 1.1 AND ma20_slope_5 < 0). Such interactions show flat marginals but sharp conditional effects. The proposed test cannot distinguish redundancy from non-linear interaction.",
+      "why_it_matters": "The proposed falsifier is too weak — it would falsely reject a legitimately informative non-linear component."
+    },
+    {
+      "issue": "The 'high mom ruins' complaint is selection-driven, not a mechanism failure. entity_4fdc3699fd, entity_3472243e0c, entity_b6bcccdf6a show high mom_20 in ruin cases. But these are conditional on already being B0 candidates — i.e., they passed the base entry filter. The penalty's job is to penalize *residual risk* after base entry, not to override the entry. High mom in ruins is expected; the relevant question is whether the penalty correctly down-weights them relative to equally-high-mom winners, which requires within-bucket comparison.",
+      "why_it_matters": "The researcher is implicitly asking the penalty to reject entries that B0 itself approved. That's a scope-mismatch critique, not a redundancy critique."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A pair of cases within the same snapshot where mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50 are within 5% of each other, but penalty_value differs by >1 std and the higher-penalty case ruins while the lower-penalty case wins. Existence of such a pair would prove conditional independence directly.",
+    "Snapshot-level Spearman correlation between orthogonalized-penalty-residual and ruin indicator, computed within snapshot and then meta-analyzed across snapshots. If Fisher-combined p < 0.05 in the within-snapshot analysis but not in the pooled analysis, the pooled 'redundancy' finding is an aggregation artifact.",
+    "A placebo penalty constructed by permuting penalty_values across cases within snapshot. Compare its ruin-association strength to the real penalty. If the real penalty is no stronger than the placebo, redundancy holds; if it is, independence holds. This is the cleanest falsifier and was not run.",
+    "Cases where the four 'redundant' features are missing or NaN (true data outage) but the penalty is still computable and still tracks outcome. Existence of these would prove an independent channel.",
+    "Knockoff-style test: for each ruin case, find the closest non-ruin B0 candidate in feature space and check whether penalty rank-ordering still picks the ruin case. If yes, redundancy is refuted."
+  ],
+  "what_would_change_my_mind": [
+    "A within-snapshot, partial-dependence analysis showing that, holding mom_20, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, and ibd_entry_close_vs_trigger_pct at their actual observed values, the penalty's partial contribution to ruin probability is statistically indistinguishable from zero (p > 0.20) on a held-out sample — AND this holds under both linear and tree-based conditional models. The researcher's proposed test used pooled data and a single model class; both would need to be addressed.",
+    "A leave-one-out refit where dropping the penalty changes the within-snapshot ruin-selection AUC by less than 0.005 (i.e., well inside bootstrap noise). Anything larger would establish real incremental signal and refute redundancy.",
+    "A demonstration that the 6 pullback-null ruin cases show penalty values statistically indistinguishable from the 2 pullback-non-null ruin cases — i.e., the penalty carries no signal in the subset where it could be an independent channel. If penalty values differ systematically between null and non-null pullback ruins, an independent 'volume-only' channel exists.",
+    "Replication of the contrast analysis on a randomly-sampled control set of B0 candidates that were NOT flagged as errors (i.e., typical winners and typical losers). If the four features still show large standardized deltas and the penalty is fully absorbed, the redundancy finding generalizes; if the deltas shrink, the original 27-case set was artifactually inflated.",
+    "Honest reporting that a non-linear interaction (e.g., hinge on mom_20 > 0.15 ∧ vol_ratio_5_20 < 1.1) explains the ruin pattern better than any linear combination — if this is shown, the penalty as currently formulated (likely linear or additive) is indeed defective, but the underlying regime is real and the right replacement is a hinge/interaction term, not removal."
+  ]
+}

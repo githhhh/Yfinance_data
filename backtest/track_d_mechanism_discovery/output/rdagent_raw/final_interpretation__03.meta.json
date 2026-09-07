@@ -1,0 +1,12 @@
+{
+  "purpose_id": "final_interpretation__03",
+  "prompt_hash": "f1b8380b711b64b67c86a4f9dd6d938c567ebdf2fe4499f146ebca507f11b428",
+  "response_hash": "7cd835e4d47f1227fca2241c8f38f3a7c88dcabe81beefa0fa8fb306051afdbe",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

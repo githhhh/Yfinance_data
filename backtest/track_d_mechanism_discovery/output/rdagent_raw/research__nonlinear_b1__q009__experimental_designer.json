@@ -1,0 +1,46 @@
+{
+  "tests": [
+    {
+      "name": "test_mom20_monotonic_within_b0",
+      "features": [
+        "mom_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Within B0 picks only, stratify into mom_20 quintiles (Q1 lowest, Q5 highest) and compute ruin_rate per quintile. Apply a one-sided Jonckheere-Terpstra trend test for monotonic ruin_rate Q1->Q5; require >=10 B0 picks per quintile as cell-stability gate.",
+      "success_criterion": "Monotonic ruin_rate (Q5>Q4>Q3>Q2>Q1, ties allowed) with trend p<0.05 frozen in advance; this would establish mom_20 as a within-B0 discriminator independent of the interaction.",
+      "failure_criterion": "Non-monotonic (Q5 not strictly above Q1) OR trend p>=0.05 — refutes mom_20 as a within-B0 ruin driver and supports Mechanism A (mom_20 is a selection/proxy axis, not a late-stage exhaustion marker)."
+    },
+    {
+      "name": "test_interaction_vs_proxy_horse_race",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "On B0 picks, apply two soft-penalty encodings with identical floors (0.5) and frozen params: (A) mom_20 x |base_depth_pct| interaction, (B) vol_ratio_5_20 x (1-up_day_ratio_20). Measure ruin_count_reduction and selected_winner_count_retention vs unshrunk B0 baseline; compare via paired test on binary ruin outcome.",
+      "success_criterion": "Encoding A reduces ruin count >=30% with <=10% winner loss AND beats encoding B by >=2pp on composite (ruin_reduction - 2*winner_loss) — would establish the interaction as the genuine channel beyond known proxies.",
+      "failure_criterion": "Encoding A does not outperform B by >=2pp (or sign-reversed) — supports Mechanism C: mom_20/base_depth_pct interaction is a proxy artifact for vol/distribution signal already available in PIT."
+    },
+    {
+      "name": "test_base_depth_sign_and_soft_vs_hard",
+      "features": [
+        "base_depth_pct",
+        "mom_20",
+        "is_b0_pick"
+      ],
+      "comparison": "Two-part: (1) within B0, regress outcome-rank on base_depth_pct with mom_20 controls; test sign against mechanism's prediction (deeper base => better, negative coefficient); (2) compare soft capacity multiplier (penalty w/ floor=0.5) vs hard exclude (drop bottom-quartile by penalty score) on ruin count and winner retention.",
+      "success_criterion": "(1) Coefficient on base_depth_pct negative with p<0.10, reconciling the discovery sign-reversal; (2) soft multiplier achieves >=80% of hard-exclude's ruin reduction with strictly fewer winner losses — confirms adaptive-capacity encoding over binary filter.",
+      "failure_criterion": "(1) Coefficient positive or insignificant (base_depth_pct is noise, Mechanism B refuted); (2) hard-exclude matches soft multiplier on ruin reduction with <=same winner loss — soft multiplier is unnecessary complexity and the encoding collapses to a filter, expanding effective B0 selectivity."
+    }
+  ],
+  "leakage_checks": [
+    "Verify all features are timestamped at-or-before the B0 entry decision date; explicitly exclude pullback_pct and pullback_duration_weeks (post-trigger) — these would be look-ahead bias.",
+    "Confirm is_b0_pick status and mom_20/base_depth_pct snapshots share the same decision timestamp per entity-snapshot pair; reject any case where feature snapshot post-dates B0 inclusion or where the same entity appears with conflicting labels across snapshots."
+  ],
+  "priority_order": [
+    "test_interaction_vs_proxy_horse_race",
+    "test_mom20_monotonic_within_b0",
+    "test_base_depth_sign_and_soft_vs_hard"
+  ]
+}

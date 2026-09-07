@@ -1,0 +1,36 @@
+{
+  "mechanism_claim": "Single-industry crowding inflates apparent independence among B0 candidates. A PIT-only statistic that captures confidence without future leakage is the cross-sectional dispersion (e.g., standard deviation or interquartile range) of the composite signal {up_day_ratio_20 + z(vol_ratio_5_20) + z(mom_20)} across the same-industry candidate cluster at snapshot time — call it 'cluster_dispersion'. When cluster_dispersion is LOW, candidates are redundant expressions of the same industry factor, so slot 2 and slot 3 contribute near-zero marginal diversification; when cluster_dispersion is HIGH, candidates carry idiosyncratic alpha and additional slots are genuinely additive.",
+  "evidence_for": [
+    "Numeric contrast table shows up_day_ratio_20 (std Δ −1.19), vol_ratio_5_20 (std Δ −1.05) and mom_20 (std Δ −1.00) as the three largest discriminators between selected_winner and false_negative classes — all PIT-observable at snapshot, no future leakage.",
+    "Label distribution (11 selected_winner vs 8 false_positive_ruin) shows the model already admits substantial ruin risk on B0 picks despite positive PIT features, consistent with feature agreement being necessary but not sufficient under crowding.",
+    "entity_3472243e0c (false_positive_ruin, w4=ruin) has mom_20=0.242, up_day_ratio_20=0.65, vol_ratio_5_20=1.21 — all 'good' individually but cluster likely shared these levels with same-industry peers, illustrating why absolute features mislead under crowding.",
+    "entity_6618d3e80c carries dual label 'false_positive_ruin|selected_winner' on the SAME snapshot with mom_20=0.251, px_vs_ma50=0.337 — the strongest absolute features in the set still produce heterogeneous outcomes, evidencing that redundancy within a cluster inflates single-name confidence incorrectly.",
+    "Pullback_duration_weeks median delta of −1.5 weeks (std Δ −0.73) and pullback_pct reversed delta (+0.64) indicate base-formation heterogeneity IS captured PIT, meaning dispersion-style statistics are constructible without future info.",
+    "Entity_2f86543bf6 (winner) has ma20_slope_5 = −0.0078 yet won — supports the claim that ABSOLUTE single-name signals are noisy; what matters is whether the candidate DIFFERS from its industry peers at snapshot.",
+    "False_negative cases show systematically lower vol_ratio_5_20 (−0.24 median delta) — a low-vol candidate embedded in a high-vol industry cluster is exactly the redundancy signal cluster_dispersion would expose PIT."
+  ],
+  "evidence_against": [
+    "Cluster dispersion is NOT directly observable in the provided feature set — we only see per-entity snapshots, not peer-group composition or industry tags, so the proposed statistic requires construction that this evidence alone cannot validate.",
+    "Some ruin cases (entity_84824e6a20, entity_b6bcccdf6a) carry high ma10_slope_5 (>0.06) AND high mom_20 (>0.17) yet failed, suggesting even DIVERSE-looking candidates within a cluster can co-fail — cluster_dispersion may UNDERSTATE true same-industry correlation.",
+    "pullback_pct has POSITIVE standardized delta (+0.64), meaning selected_winners had DEEPER pullbacks than false_negatives — opposite of naive intuition; this complicates any linear composite and warns that simple z-score addition may mis-rank under regime shifts.",
+    "False_negative_big_winner|false_negative_relative label exists (n=2), showing missed big upside on PIT-fuzzy candidates — abstention cost is real and asymmetric, so aggressive 1-slot-only policy under crowding has opportunity cost.",
+    "The data contains no explicit 'industry_group' or 'cluster_id' field; identifying 'same-industry' clustering itself requires an auxiliary PIT mapping (e.g., IBD sector tags) that is not validated within this frozen evidence.",
+    "Case count is only 27 with mixed snapshot IDs — statistical power to detect dispersion thresholds is limited; the claim is mechanistic rather than empirically confirmed."
+  ],
+  "falsifiable_predictions": [
+    "If cluster_dispersion (std of {up_day_ratio_20, vol_ratio_5_20, mom_20}) across same-industry candidates at snapshot is computed PIT, then candidates with cluster_dispersion below the 25th percentile will exhibit pairwise 4-week return correlation ≥0.6, versus <0.3 for candidates above the 75th percentile.",
+    "Under fixed 3-slot capital and same-industry cluster_dispersion < 0.3 (z-units), portfolio Sharpe ratio for N=3 slots will be ≤0.95× the Sharpe for N=1 slot — i.e., adding slots 2 and 3 will NOT improve risk-adjusted return despite adding expected gross exposure.",
+    "If cluster_dispersion > 0.7, then N=3 will deliver ≥1.15× the N=1 Sharpe, validating that slot diversification is only additive when cluster members are genuinely heterogeneous.",
+    "P(IT (≥1 of 3 same-industry candidates hits W4 ≥ +8%)) will be ≤1.5× P(single best candidate hits), versus the independence benchmark of 2.37× under p≈0.6 — measurable deviation from independence confirms the crowding penalty.",
+    "A composite PIT confidence score combining (candidate_rank_within_industry × cluster_dispersion) will separate selected_winners from false_positive_ruin with AUC > 0.65, outperforming any single raw feature alone.",
+    "When cluster_dispersion is low AND all 3 candidates have mom_20 > 0.15 simultaneously (industry-mania signature), the conditional ruin rate will exceed 50%, versus <20% when only one candidate in the cluster has high mom_20."
+  ],
+  "policy_implications": [
+    "Replace flat 3-slot deployment with a cluster-aware rule: when cluster_dispersion is below a PIT-calibrated threshold, treat the effective independent bet count as 1 and either (a) size a single concentrated position or (b) abstain until a heterogeneous cluster emerges.",
+    "Use cluster_dispersion as the gating statistic for whether to fill slot 2 or slot 3 — do not fill them mechanically. Slot 1 is taken on candidate-level signal; slots 2 and 3 require cluster-level dispersion evidence.",
+    "Separate the candidate-quality signal (up_day_ratio_20, vol_ratio_5_20, mom_20) from the portfolio-construction signal (cluster_dispersion). Candidate signal drives ENTRY; cluster signal drives SIZING and SLOT COUNT. This separation prevents the false inference that 'three good candidates = three good bets.'",
+    "Because evidence on cluster_dispersion's empirical distribution is UNRESOLVED within the frozen 27 cases, deployment should initially be paper-traded with explicit logging of cluster composition to accumulate PIT-labeled same-industry return correlation data.",
+    "Impose a max single-industry exposure cap derived from cluster_dispersion: when low, allow only 1 slot; when moderate, allow 2; only allow full 3 slots when high dispersion confirms true idiosyncratic alpha across names.",
+    "Confidence reporting should be DUAL: report per-candidate confidence AND cluster-level redundancy factor, so the operator can distinguish 'one strong name in a crowded industry' from 'three correlated names that look strong but co-fail.'"
+  ]
+}

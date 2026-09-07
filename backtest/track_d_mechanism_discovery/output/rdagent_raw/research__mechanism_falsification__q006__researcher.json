@@ -1,0 +1,30 @@
+{
+  "mechanism_claim": "The 'weekly_volume' B0 component as instantiated (likely vol_ratio_5_20 and/or ibd_entry_volume_ratio) does NOT draw predominantly on predictive information independent of neighboring B0 terms (mom_20, up_day_ratio_20, ma10_slope_5). Its incremental signal is confined to the short-window ratio (5d/20d), while broader 'volume_ratio' shows near-zero discrimination (+0.23 std delta), indicating most of the apparent volume contribution is a redundant encoding of recent up-day intensity and short-horizon momentum rather than independent institutional-flow information.",
+  "evidence_for": [
+    "vol_ratio_5_20 ranks #2 in standardized contrast between selected_winners and false_negatives at -1.0455 (median 1.424 vs 1.179), the strongest volume-related signal in the contrast table.",
+    "Selected winners cluster vol_ratio_5_20 above 1.4 in 8/11 cases (e.g., entity_440e297253=1.588, entity_ead73f4390=1.772, entity_b00579f203=1.576), while 5/7 false_negatives sit below 1.2 (e.g., entity_535a1beed7=1.174, entity_bfb308b24a=1.187, entity_de1c657364=1.147).",
+    "ibd_entry_volume_ratio carries a moderate -0.5013 standardized delta, suggesting that a *different* volume measurement (likely entry-day vs trailing average) does carry non-trivial signal that is not fully captured by price/momentum terms.",
+    "The directional sign is consistent with the weak-form claim: winners need rising, above-average volume confirmation."
+  ],
+  "evidence_against": [
+    "volume_ratio (a third volume metric, undefined window) shows standardized delta +0.229, meaning the bulk of volume measurements add zero marginal information — only the short-window ratio works. This is a smoking gun for redundancy, not for an independent volume mechanism.",
+    "vol_ratio_5_20 and up_day_ratio_20 are mechanically co-monotone: a 5-day window with more up-days and larger up-moves will mechanically exhibit higher 5d/20d volume ratio. The two features share the same top standardized delta magnitude (-1.05 and -1.19), implying they are tracking overlapping information.",
+    "Distribution overlap is severe: false_positive_ruin cases span vol_ratio_5_20 = 0.906 (entity_40ea0cfb3b) to 1.625 (entity_84824e6a20), fully enclosing the selected_winner range. The feature does not stratify the ruin vs winner decision boundary cleanly.",
+    "Case entity_8ad5cd4795 (selected_winner) has vol_ratio_5_20 = 0.996 — below 1.0 — yet mom_20 = 0.0037 and up_day_ratio_20 = 0.70, showing winners can arise when volume is *not* confirming; volume is necessary for some picks but insufficient as a standalone axis.",
+    "No correlation matrix or partial-dependence output between weekly_volume and neighboring B0 terms is provided in frozen evidence — the independence question cannot be settled from contrast medians alone."
+  ],
+  "falsifiable_predictions": [
+    "FALSIFICATION TEST 1 (independence): Regress vol_ratio_5_20 on {mom_20, up_day_ratio_20, ma10_slope_5, px_vs_ma20}; if R^2 > 0.55, the B0 component is dominated by redundant price/tempo information and should be down-weighted.",
+    "FALSIFICATION TEST 2 (marginal AUC): Compute AUC of selected_winner vs {false_positive_ruin ∪ false_negative_relative} using only weekly_volume features; expect AUC < 0.62. If AUC ≥ 0.70, the claim of redundancy is rejected and weekly_volume is genuinely independent.",
+    "FALSIFICATION TEST 3 (ablation): Remove weekly_volume from the B0 scorecard and recompute selected_winner rate on the 27 archaeology cases. A drop > 5pp falsifies redundancy; a drop < 2pp confirms the feature is replaceable.",
+    "FALSIFICATION TEST 4 (regime split): If the vol_ratio_5_20 win/loss contrast inverts sign across sub-periods (e.g., pre-2020 bull vs 2022 bear), the 'institutional accumulation' narrative is wrong and the signal is just a regime-conditioned momentum proxy.",
+    "PREDICTIVE PREDICTION: A sector-relative volume z-score (weekly_volume vs sector median, 13-week window) will outperform the absolute vol_ratio_5_20 by ≥ 0.04 AUC because it strips out the market-beta component that overlaps with mom_20."
+  ],
+  "policy_implications": [
+    "Replace raw weekly_volume with a sector-relative volume z-score to remove correlation with market-wide mom_20; this is the 'cleaner replacement' the question requests.",
+    "If sector-relative data is unavailable, drop the 20-day or longer volume_ratio entirely (since it has +0.23 std delta — it adds noise) and keep ONLY vol_ratio_5_20 with a cap at 1.5 to prevent ruin-prone high-volume blowoff tops (e.g., entity_84824e6a20 ruin at 1.625).",
+    "Treat weekly_volume strictly as a *confirmation filter* on momentum candidates, never as a primary axis. Require mom_20 ≥ some threshold BEFORE applying the volume gate.",
+    "Audit ibd_entry_volume_ratio separately — its -0.50 std delta is not negligible and may be capturing breakout-day institutional flow that weekly_volume misses; consider promoting it to a distinct B0 term rather than collapsing into weekly_volume.",
+    "UNRESOLVED: Without an explicit correlation matrix between weekly_volume and its siblings, the independence coefficient cannot be quantified. Recommend running a frozen-evidence extension that exposes pairwise Spearman/Bhatt coefficients before final policy decisions."
+  ]
+}

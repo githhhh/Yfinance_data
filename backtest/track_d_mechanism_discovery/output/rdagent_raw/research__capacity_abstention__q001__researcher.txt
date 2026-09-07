@@ -1,0 +1,35 @@
+
+
+```json
+{
+  "mechanism_claim": "Under fixed 3-slot capital, a large Top1-vs-Top2 quality gap implies that Top1 carries an asymmetric, concentrated alpha payload (high mom_20, px_vs_ma50, vol_ratio_5_20, ma10_slope_5), while Top2's expected return collapses toward the false_negative_relative distribution (median mom_20 ≈ 0.058, vol_ratio_5_20 ≈ 1.18, up_day_ratio_20 = 0.5, w4_return_bucket = small_win/loss). Marginal slot-filling with Top2 (and Top3) imposes a ruin-risk cost (8/27 ≈ 30% false_positive_ruin rate among B0-style triggers) without compensating expected value, so cash dominates the marginal slot when the Top1-Top2 gap exceeds the realized median feature delta between selected_winner and false_negative archetypes (standardized_delta < -0.5 cluster on mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50).",
+  "evidence_for": [
+    "Selected_winner archetype vs false_negative archetype shows consistent, multi-feature quality gaps: mom_20 median 0.163 vs 0.058 (delta -0.105), vol_ratio_5_20 1.42 vs 1.18, up_day_ratio_20 0.625 vs 0.50, px_vs_ma50 0.127 vs 0.056 — all PIT-observable at entry and all pointing to a 'quality gradient' that maps to large_win vs small_win/loss buckets.",
+    "Among the 19 B0-pick (is_b0_pick=true) cases in archaeology, 8 became false_positive_ruin (42% ruin rate), indicating that even threshold-passing entries carry non-trivial ruin tails; Top2 candidates are typically closer to the false_negative distribution and thus inherit non-trivial ruin probability without the upside payload.",
+    "false_negative_relative cases (5) all clustered into small_win or loss w4 buckets with mid-range mom_20 (median 0.058) and lower vol confirmation — economically, these are the 'filler' trades that consume slot capacity for negligible expectancy.",
+    "Top-pick extension cases (e.g., entity_2c58cebc59 with mom_20=0.32, vol_ratio_5_20=1.62 → large_win; entity_3adc078f01 with deep pullback -42.3% but mom_20=0.17, vol_ratio_5_20=1.14 → large_win) show that concentrated high-momentum/volume Top1s deliver outsized contribution; this is the alpha that gets diluted by slot-spreading.",
+    "Mixed case entity_6618d3e80c (false_positive_ruin|selected_winner) demonstrates that a single position can simultaneously realize ruin and selection pay, reinforcing that slot allocation is a portfolio-construction layer separate from per-name signal accuracy."
+  ],
+  "evidence_against": [
+    "No direct evidence in this evidence slice quantifies the realized w4 P&L delta between a 1-position, 2-position, and 3-position portfolio built from the same candidate list — the portfolio-construction effect must be inferred indirectly.",
+    "Diversification argument: across the 11 selected_winner cases, median mom_20 = 0.163 and not all winners are concentrated mega-wins; some are 'moderate' large_wins, suggesting that even a 2nd-slot position at moderate quality could contribute non-zero expected return in benign regimes.",
+    "base_duration_weeks and base_depth_pct show smaller deltas (standardized_delta ≈ -0.42 and +0.19) — base-quality features do not discriminate as cleanly as momentum/volume, so the 'quality gap' may be feature-dependent and not universally large.",
+    "The single mixed case (1/27) hints that ruin and winner outcomes can co-occur; this complicates a clean 'Top2 = pure noise' claim and suggests regime-dependent behavior."
+  ],
+  "falsifiable_predictions": [
+    "Within the same snapshot, when Top1_mom_20 - Top2_mom_20 > 0.10 AND Top1_vol_ratio_5_20 - Top2_vol_ratio_5_20 > 0.25, the W4 return of a 1-slot portfolio (Top1 only) exceeds the W4 return of a 2-slot portfolio (Top1+Top2) in >60% of matched historical episodes.",
+    "When Top1 up_day_ratio_20 ≥ 0.65 and Top2 up_day_ratio_20 ≤ 0.50, the conditional ruin probability of the Top2 slot over a 4-week horizon is at least 25% (anchored to the 8/27 false_positive_ruin baseline).",
+    "Cash allocation to the marginal 2nd or 3rd slot yields higher Sharpe than deploying Top2 when the standardized Top1-Top2 gap on the {mom_20, vol_ratio_5_20, px_vs_ma50} triplet exceeds 0.5 standard deviations.",
+    "Regime test: in episodes where the snapshot's median selected_winner mom_20 > 0.20 (strong-trend regime), the alpha concentration of Top1 is even higher, and the cost of slot-spreading (measured as Top2 contribution / Top1 contribution) falls below 0.3.",
+    "Falsifier: if a 2-slot portfolio's median W4 return consistently exceeds the 1-slot portfolio's median by >3pp across the archaeology snapshots, the 'cash dominates marginal slot' claim is invalidated."
+  ],
+  "policy_implications": [
+    "Define a pre-entry 'Quality Gap Score' = weighted z-score on {mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, ma10_slope_5} between Top1 and Top2; when this exceeds a calibrated threshold (e.g., +0.5σ cluster), allocate slot 2 to cash.",
+    "Treat N=1 as 'high-conviction concentration' (alpha capture mode), N=2 as 'core-satellite' (Top1 + minimal hedge or pure cash), and N=3 as 'full deployment' reserved for regimes where Top1-Top2-Top3 gaps are all sub-threshold — preserving optionality when the candidate list is shallow in quality.",
+    "Do not mechanically fill all 3 slots; the 30%+ ruin rate among B0-pick-triggered entries implies that adding a Top2 that does not clear the same trigger threshold is expected-negative in expectancy terms.",
+    "The economic meaning: N=1 maximizes per-slot alpha but maximizes variance; N=3 minimizes variance but forces inclusion of false_negative_relative-style positions; the optimal N is gap-conditional, not fixed.",
+    "Implementation: log the Top1-Top2 feature gap at every entry decision; use this gap as a switch between 'concentrate' and 'deploy' modes rather than as a soft weighting — this converts a continuous quality gradient into a discrete capacity decision.",
+    "Re-evaluate when base_duration_weeks improves (winners median 52 vs FN 44): longer bases partially compensate for lower momentum, so the abstention rule should weight momentum/volume gaps more heavily than base-quality gaps."
+  ]
+}
+```

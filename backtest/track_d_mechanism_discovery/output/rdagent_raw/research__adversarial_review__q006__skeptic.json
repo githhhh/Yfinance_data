@@ -1,0 +1,39 @@
+{
+  "strongest_counterclaim": "The 'adaptive-capacity' cluster is not a latent factor — it is IBD's own relative-strength / breakout-compliance filter, restated. Because the 'selected_winner' label is defined conditional on B0 having picked the name and 'false_negative_relative' is defined conditional on B0 NOT having picked it, any feature IBD's B0 already uses (px_vs_ma50, mom_20, up_day_ratio_20, vol_ratio_5_20, base_duration) will mechanically separate the two groups by construction. The 0.5–1.2σ median deltas are the expected footprint of selection-on-labels bias plus pullback MNAR (missing-not-at-random pullback fields concentrated in false_negatives), not evidence of an independent capacity construct.",
+  "attacks": [
+    {
+      "issue": "Label-construction selection bias: 'capacity' cluster is B0's filter, not a new signal",
+      "why_it_matters": "Every feature in the proposed cluster (mom_20, px_vs_ma50, px_vs_ma20, ma10/20_slope_5, up_day_ratio_20, vol_ratio_5_20, base_duration_weeks, base_mbox_count) is a textbook IBD-style relative-strength / momentum-thrust ingredient. The two outcome classes are conditioned on B0 pick status itself, so they are guaranteed to differ on B0's inputs. Regressing mom_20 or px_vs_ma50 on is_b0_pick alone across the 27 cases will absorb most of the cross-bucket separation; whatever residual remains is not 'capacity' but unexplained B0 noise. The direction is therefore not adding information — it is rediscovering the filter that defines the labels."
+    },
+    {
+      "issue": "Within-snapshot heterogeneity refutes cross-bucket capacity claims",
+      "why_it_matters": "snap_71486ed83c alone contains entity_2c58cebc59 (selected_winner, large_win, mom_20=0.32) sitting next to entity_bfb308b24a (false_negative_relative, loss, mom_20=0.027) and entity_de1c657364 (false_negative_big_winner, large_win, mom_20=0.058). If capacity were the operative axis, these should not coexist at overlapping feature levels inside one regime. They do. The cross-bucket deltas are dominated by between-snapshot regime (bull vs bear / sector rotation), not by an entity-level capacity factor. Any capacity model trained on this set will mostly be fitting snapshot_anon under a different name."
+    },
+    {
+      "issue": "Pullback_pct / pullback_duration_weeks are MNAR — the 8.6pp delta is partly 'pullbacks that get recorded get selected'",
+      "why_it_matters": "Selected_winners show populated pullback fields with deeper medians (-15.9%); many false_negatives have null pullback_pct / pullback_duration_weeks (entity_ead73f4390, 4fdc3699fd, 2f86543bf6, etc.). Stocks that never corrected meaningfully do not generate a pullback observation, so they are absent from the pullback comparison by construction. The 'deeper pullback = capacity' interpretation collapses if a pullback_present_indicator alone predicts the outcome label — i.e., if the mechanism is 'having a recorded pullback stage gates selection,' not 'depth of pullback = capacity to extend.' No imputation sensitivity (multiple plausible values for the nulls) has been reported."
+    },
+    {
+      "issue": "Mixed-label case entity_6618d3e80c is data-quality failure, not capacity non-monotonicity",
+      "why_it_matters": "entity_6618d3e80c (snap_d0d57b1e40) carries BOTH 'false_positive_ruin' AND 'selected_winner' — same entity, same W4 window, opposite outcomes under the labeling sub-rule. At px_vs_ma50 = 0.337 (the dataset maximum) the label is structurally ambiguous, and using this row as 'evidence that capacity is non-monotonic at extreme extension' is misreading a labeling bug as a theoretical finding. Any model that takes capacity seriously must first resolve or exclude this point; the researcher cited it in the opposite direction without auditing the sub-label time-resolution."
+    },
+    {
+      "issue": "Multiple-testing inflation on a 27-case, 11-vs-7 comparison",
+      "why_it_matters": "Twenty-plus features are reported; the top standardized delta is 1.19σ on up_day_ratio_20 with n=18 vs n=7. After Bonferroni over 20 tests the effective threshold is roughly 2.5σ — none of the reported deltas clear it. The '10 features move in the same direction' claim is precisely what you expect when features are correlated and you report the consistent subset. With this sample size and this feature count, the cluster is statistically indistinguishable from correlated noise around the B0 filter."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within snap_71486ed83c and snap_d0d57b1e40, find any pair (one selected_winner, one false_negative_relative) whose mom_20 differs by <0.05 AND px_vs_ma50 differs by <0.03 — these are within-snapshot matched pairs that falsify 'capacity separates winners.'",
+    "Run pullback_present_indicator → outcome_label as a single-feature model; if AUC > 0.65 the pullback depth delta is just an MNAR proxy for 'having a recorded base,' not a capacity signal.",
+    "Decompose entity_6618d3e80c's W4 sub-path: what fraction of the four weeks triggered ruin vs winner sub-rules? If the mixed label is a time-resolution artifact (week-by-week reversal), the entire high-extension tail of the dataset is unreliable.",
+    "Regress each of the 10 cluster features on is_b0_pick alone across the 27 cases. If the marginal R² of the cluster exceeds 0.5, the direction is empirically redundant with B0 and adds nothing the model doesn't already have.",
+    "For each false_negative_relative entity, look up the IBD 'near-pick' from the same snapshot — does capacity discriminate between the picked and un-picked name within the snapshot? If not, capacity is between-snapshot regime in disguise."
+  ],
+  "what_would_change_my_mind": [
+    "A within-snapshot, Mahalanobis-matched analysis showing the capacity cluster still separates selected_winners from false_negative_relatives at p < 0.05 after stratifying by snapshot_anon and using only snapshot-internal variance — this would rule out the regime-confound explanation.",
+    "Identification of even one predictive feature that is NOT in IBD's B0 toolkit (e.g., sector-relative RS, options skew, share-turnover percentile, institutional-flow divergence) showing a >0.7σ Bonferroni-corrected delta — this would prove capacity is not just B0's filter restated.",
+    "A multiple-imputation sensitivity analysis on the null pullback fields showing the 8.6pp pullback_pct delta survives under at least three plausible imputation models (e.g., MAR with base_depth_pct as predictor, worst-case flat imputation, hot-deck by sector).",
+    "A label-decomposition audit of entity_6618d3e80c and any other mixed-label rows demonstrating the W4 sub-rule conflict is a time-resolution artifact resolvable by weekly re-labeling — without this, the high-extension tail of every capacity claim is contaminated.",
+    "Replication on a held-out snapshot set (not in the 27 discovery rows) where the capacity composite's AUC for winner-vs-ruin within the extended bucket exceeds 0.60 — the researcher's own falsifiable prediction #1 stated ≤0.55, so seeing >0.60 out-of-sample would force retraction of this counterclaim."
+  ]
+}

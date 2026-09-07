@@ -1,0 +1,24 @@
+
+
+```json
+{
+  "mechanism_claim": "In mixed breakout/pullback weeks, Lane assignment encodes distinct market-state information (continuation vs mean-reversion regime) that adds predictive lift beyond SCORE_BEFORE_LANE; B0_LANE captures momentum-confirmed breakouts while LANE_NEUTRAL captures ambiguous regimes with higher failure risk.",
+  "evidence_for": [
+    "Selected_winners vs false_negatives show largest standardized gaps in momentum/trend features (mom_20 -1.00, ma10_slope_5 -0.68, px_vs_ma50 -0.85) which are precisely the features Lane boundaries typically discretize, suggesting Lane partitions capture meaningful state transitions rather than pure noise.",
+    "false_positive_ruin cases (8 of 27) frequently show mismatched state: high mom_20 (>0.15) but weak up_day_ratio_20 (entity_8f0df3d38e mom=0.176, up_day=0.65→ruin; entity_3472243e0c mom=0.242→ruin), indicating Lane mis-classification of pullback-as-breakout drives ruin outcomes.",
+    "B0 picks with neutral-lane characteristics (low slope despite momentum) like entity_55c2da490e (ma10_slope=0.020, mom=0.036→ruin) and entity_40ea0cfb3b (ma10_slope=0.025, mom=0.024→ruin) cluster in ruin, suggesting Lane filters remove ambiguous B0 candidates."
+  ],
+  "evidence_against": [
+    "Several false_positive_ruin cases have strong B0_LANE-consistent signatures (entity_b6bcccdf6a: ma10_slope=0.067, mom=0.176, px_vs_ma20=0.124 yet ruin), implying Lane state alone is insufficient—execution/timing risk remains.",
+    "SCORE_BEFORE_LANE components (mom, slope, volume) already encode most discriminating power per numeric_contrasts, so marginal Lane contribution in mixed weeks may be small."
+  ],
+  "falsifiable_predictions": [
+    "Within matched SCORE_BEFORE_LANE quintiles in mixed weeks, B0_LANE W4-return distribution should exceed LANE_NEUTRAL median by ≥2pp and have ruin rate <20%, while LANE_NEUTRAL should show ruin rate ≥35%.",
+    "Conditional independence test: regressing W4 return on SCORE_BEFORE_LANE, the residual Lane coefficient should be statistically significant (p<0.05) with sign consistent (B0_LANE positive, LANE_NEUTRAL negative) after partialling out mom_20, slope, and vol_ratio."
+  ],
+  "policy_implications": [
+    "In mixed weeks, apply Lane as a hard filter: suppress LANE_NEUTRAL B0 candidates unless SCORE_BEFORE_LANE exceeds a tightened threshold (e.g., +1σ above neutral-lane ruin baseline).",
+    "Track Lane reassignment rate week-over-week as a regime-stability feature; frequent Lane flipping may indicate the score lacks persistence and should trigger position-size reduction independent of Lane label."
+  ]
+}
+```

@@ -1,0 +1,29 @@
+{
+  "mechanism_claim": "The 'dry_false_penalty' B0 component penalizes entries with low conviction characteristics (weak up-day ratio, muted volume expansion, low momentum), targeting false-positive ruin cases. However, its three primary signal inputs—up_day_ratio_20, vol_ratio_5_20, and mom_20—exhibit standardized deltas of -1.19, -1.05, and -1.00 respectively, indicating high redundancy and likely construct collinearity rather than independent mechanism coverage.",
+  "evidence_for": [
+    "Selected winners show median up_day_ratio_20=0.625 vs false negatives=0.5 (Δ=-0.125, standardized=-1.19), confirming the up-day conviction signal",
+    "Selected winners show median vol_ratio_5_20=1.42 vs false negatives=1.18 (Δ=-0.245, standardized=-1.05), confirming volume expansion signal",
+    "Selected winners show median mom_20=0.163 vs false negatives=0.058 (Δ=-0.105, standardized=-1.00), confirming momentum signal",
+    "False-positive ruin cases (n=8) cluster with low values across all three dimensions (e.g., entity_84824e6a20: up_day_ratio=0.4, vol_ratio=1.63, mom_20=0.067)",
+    "The penalty appears to work: entity_6618d3e80c with moderate conviction scores (up_day=0.55, mom=0.251) achieved 'selected_winner' outcome despite 'false_positive_ruin|selected_winner' label, suggesting partial penalty intervention"
+  ],
+  "evidence_against": [
+    "Standardized deltas of -1.19, -1.05, -1.00 for three separate features indicate multicollinearity (r>0.8 likely), suggesting 'dry_false_penalty' may be triple-counting the same underlying conviction construct",
+    "pullback_duration_weeks shows standardized delta of -0.73 (FN median=4.0 vs SW=5.5), indicating pullback behavior is NOT penalized but rather LACKING in false negatives—a different mechanism",
+    "Feature 'ma10_slope_5' has standardized delta=-0.68, suggesting short-term slope acceleration is not captured by current dry_false_penalty inputs but is correlated with winner outcomes",
+    "Entity entity_2f86543bf6 with up_day_ratio_20=0.35 (lowest conviction) still achieved 'selected_winner' outcome, indicating the penalty is not deterministically protective",
+    "False-positive ruin cases include entity_b6bcccdf6a with up_day_ratio=0.4, vol_ratio=1.31, mom_20=0.176—moderate conviction but high ma10_slope_5=0.067, suggesting short-term velocity trap not captured by long-window conviction signals"
+  ],
+  "falsifiable_predictions": [
+    "If 'dry_false_penalty' is replaced with a single conviction index (mean of z-scores for up_day_ratio_20, vol_ratio_5_20, mom_20), out-of-sample false-positive rate should not increase by more than 5% relative to current multi-feature implementation",
+    "If ma10_slope_5 (standardized Δ=-0.68) is added to the penalty while dropping redundant long-window features, precision on 'false_positive_ruin' detection should improve by detecting short-term velocity exhaustion cases like entity_b6bcccdf6a",
+    "If the component is truly independent, conditioning on each input feature individually should yield similar mutual information with outcome labels (currently violated: MI(up_day_ratio) >> MI(pullback_pct))",
+    "A cleaner single-factor conviction score would show >0.85 correlation with each of the three constituent features, confirming redundancy, while holding <0.5 correlation with pullback_duration_weeks, confirming orthogonal coverage"
+  ],
+  "policy_implications": [
+    "Consolidate up_day_ratio_20, vol_ratio_5_20, and mom_20 into a single 'conviction_score' input to eliminate triple-counting while preserving penalty signal",
+    "Add ma10_slope_5 as orthogonal short-term velocity signal to capture velocity-trap false positives missed by long-window conviction measures",
+    "Separate pullback-duration penalty into distinct 'dry_depth_penalty' component—current data suggests pullback_absent correlates with false_negatives, not false_positive_ruin, indicating different causal pathway",
+    "Consider threshold-based rather than continuous penalty to reduce sensitivity to measurement noise in correlated feature clusters"
+  ]
+}

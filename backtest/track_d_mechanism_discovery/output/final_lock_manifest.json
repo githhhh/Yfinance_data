@@ -1,0 +1,17 @@
+{
+  "protocol_version": "track_d_v1_focused",
+  "run_id": "track_d_20260902T050758Z_5a1dca13",
+  "source_git_sha": "5edb5660e615dae02abd2783351b8b4b7e95a3f2",
+  "phase0_hash": "14cd7e8542f06c6ab5996fc77185aa311b0d87123a0ca7b7001486685a5fafee",
+  "policy_freeze_hash": "b2cdd95f071b9c7b5779e824ebb917c7c7138aee4aacfcb499f3d7ade992235b",
+  "artifacts": {
+    "policy_freeze": "b2cdd95f071b9c7b5779e824ebb917c7c7138aee4aacfcb499f3d7ade992235b",
+    "forward_results": "11be7808f0d599434ea0be17455edd5c88dd9cdde5e3f11456d3401875923f44",
+    "decision": "e17f4f560dfdadca5a8d6b47e67dd0373d700c3f4c1724aeb5b239798dd6dced",
+    "component_verdicts": "6644ac6c0600c104e38eda7deab7df0ba8dca63abad1756bf474931848408007",
+    "final_interpretations": "f25e4f9905f1c3045a74068cc13ad5c1717405879d441d538da85d481199572f",
+    "final_report": "d754f3f67854ee5f3176262a65eb75ae4bb4a8b57458daa2cdd8eadf4371ae68"
+  },
+  "final_request_ledger_hash": "7670138de286c2456b1d3eb4ea8b9c68db6298358801ee70633e2da6ae241078",
+  "final_raw_llm_tree_hash": "75c62911ca0ee130b1bbb180ba81e85556e0447f522f09247b0436072a2f627e"
+}

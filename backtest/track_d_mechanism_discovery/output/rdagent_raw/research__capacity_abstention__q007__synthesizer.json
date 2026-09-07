@@ -1,0 +1,87 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The synthesis reconciles three layers. Layer 1 (well-supported by archaeology): under fixed 3-slot capital, the third slot inherits a structurally weaker candidate pool because selection-from-rank depletes mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50 and inflates the proportion of immature bases — the slot-N marginal information ratio is mechanically lower than slot-1's. Layer 2 (mechanismally conflated in researcher output): the additional claim that single-industry crowding specifically destroys slot-3 diversification benefit via ρ→1 is not directly measured in the 27-case archaeology; the observed feature deltas are consistent with both an industry-correlation mechanism AND a pure rank-order mechanism. Layer 3 (asymmetric slot economics, analytically defensible): slot 1 buys concentrated Kelly exposure; slot 2 buys variance reduction proportional to (1−ρ) only when cross-industry; slot 3 buys convexity that requires ρ<1 to clear the cash hurdle. Under single-industry crowding, ρ→1 implies slot 3's variance reduction approaches zero while its candidate-pool quality is already degraded — the two penalties compound, which is the novel economic finding beyond either layer alone. The verdict is CONTEXT_DEPENDENT because Layer 1 is empirically grounded, Layer 3 is economically rigorous but parametrically untested, and Layer 2 conflates them — policy can be drafted from Layer 1+3 but should not claim Layer 2 as proven until the experimental designer's interaction tests are executed.",
+  "falsifiers": [
+    "If the experimental designer's slot_position × overlap interaction test returns a coefficient indistinguishable from zero after controlling for absolute feature level (p > 0.10 on the overlap_2 × slot_3 term), the industry-specific crowding mechanism is REFUTED and only the generic 'slot 3 is weaker' effect remains — policy should then reframe as a uniform rank-depletion rule independent of industry structure.",
+    "If forward measurement of realized intra-industry pairwise correlation across held positions shows ρ < 0.5 in same-sub-industry 3-slot portfolios, the ρ→1 hypothesis is REFUTED and cash dominance under crowding is no longer categorically supported.",
+    "If the pairwise_base_similarity_co_ruin test shows co-ruin rate statistically indistinguishable across distance quartiles (chi-square p > 0.20), the claim that base similarity proxies for shared downstream vulnerability fails and the abstention rule loses its industry-specific foundation.",
+    "If a same-industry 3-slot portfolio in historical backtest shows ruin rate ≤ 55% (i.e., not appreciably above the 40% single-position ruin rate × independence adjustment), the compounding penalty thesis is REFUTED and cash's expected-loss advantage disappears.",
+    "If entity-class counterexamples (deep-pullback winners like entity_3adc078f01 with -42.3% pullback delivering large_win) accumulate to >10% of same-industry slot-3 cases, the pullback-depth filter as a feature-superiority requirement is OVERFIT and the policy should drop pullback_pct as a binary gate, retaining it only as a soft scoring input.",
+    "If the pre_specified_abstention_rule_targeted_stratum_test shows improvement in 2-shared stratum matched or exceeded in 0-shared stratum, the rule is industry-blind and the 'crowding triggers abstention' causal chain is REFUTED.",
+    "If false-negative rate in a larger sample (>200 cases) drops below 20%, the 'slot-3 pool is structurally weaker' claim loses its option-cost framing because the rejected pool contains too many winners to justify treating unfilled slots as positive option value.",
+    "If the ruin-rate label definition (per-position vs portfolio-level) cannot be reconciled for the mixed-label entity_6618d3e80c case in a consistent accounting framework, all P(ruin)-driven thresholds in the policy become numerically undefined and cash-dominance arithmetic collapses."
+  ],
+  "actionable_design_principles": [
+    "Reframe the 3-slot capital allocation as three distinct economic instruments rather than three symmetric bets: slot 1 = concentrated Kelly exposure (priority: max expected return), slot 2 = variance-reduction slot (priority: cross-industry ρ reduction), slot 3 = convexity option (priority: positive option value conditional on candidate-pool quality AND industry orthogonality). This is the core analytical contribution and survives whether Layer 2 is later confirmed or refuted.",
+    "Decouple the policy into two independent gates: (a) a quality gate that applies to all three slots uniformly using selected-winner medians as soft thresholds (mom_20 > 0.163, vol_ratio_5_20 > 1.42, up_day_ratio_20 > 0.625, pullback_pct < -15.9% as scoring inputs not binary cutoffs), and (b) a crowding gate that applies only to slot 3 and triggers cash abstention when slots 1+2 share GICS sub-industry AND slot-3 candidate fails the quality gate on ≥2 features. The two-gate structure ensures that the generic rank-depletion effect is enforced even when industry data is unavailable.",
+    "Treat slot-3 abstention as a state-dependent option whose strike price is the candidate's marginal expected return minus cash yield plus a crowding premium: cash dominates when E[R₃] < r_f + λ·P(ruin|crowded)·L_max, where λ scales with the empirical same-industry ruin penalty (currently unmeasured, treat as a free parameter until calibrated).",
+    "Enforce a measurement prerequisite before deploying any same-industry slot-3 rule: require N ≥ 30 same-industry 3-slot portfolio outcomes with realized W4 returns and intra-portfolio pairwise correlations to calibrate ρ̂ and the ruin multiplier, otherwise default to the conservative position of abstaining from slot 3 when slots 1+2 share sub-industry.",
+    "Preserve the option value of unfilled slots explicitly in the policy: a cash slot in a crowded 3-slot configuration should be logged with its option value estimated as max(0, E[R|marginal_candidate] - r_f) conditional on the candidate pool at decision time, so that abstention is not treated as a free action but priced against the foregone convexity.",
+    "Avoid the overfit trap flagged by entity_3adc078f01: deep pullback_pct is evidence of base maturity but not a sufficient cause of large_win — therefore pullback_pct enters the policy as one input among several, never as a standalone disqualifier, and the threshold direction (more negative = better) should be tested against tail behavior, not just median contrasts.",
+    "Separate the predictive mechanism (Layer 1: slot-3 pool is weaker) from the portfolio-construction effect (Layer 2: crowding compounds the penalty) so that policy updates to one layer do not contaminate the other — the quality gate can be recalibrated on outcome data without disturbing the crowding-gate structure.",
+    "Build the abstention trigger around observable, point-in-time features only (mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, GICS overlap) and exclude any feature that embeds forward return information, snapshot identity, calendar variables, or the is_b0_pick decision variable, per the experimental designer's leakage checks.",
+    "Parameterize the policy so that the industry-specificity coefficient is a tunable input rather than a fixed assumption: the rule fires when overlap_count × quality_failure_count ≥ k, where k is calibrated on out-of-sample data; this preserves the analytical claim while preventing overcommitment to a specific overlap threshold.",
+    "Maintain a continuous audit of the ruin label definition (per-position vs portfolio-level) and resolve the entity_6618d3e80c ambiguity before deploying the policy at scale, because mixed labels corrupt the empirical ruin rate that anchors the cash-dominance arithmetic."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "AsymmetricSlotAllocator: a stateful policy that classifies each candidate into one of three slot roles (anchor, diversifier, option) and applies role-specific quality thresholds rather than a uniform 3-position filter. The anchor role inherits the standard selected-winner median thresholds with no quality discount; the diversifier role applies a 10% discount on mom_20 and vol_ratio_5_20 to allow cross-industry variance reduction; the option role applies a 25% discount on all four core features but additionally requires either cross-industry orthogonality to slots 1+2 OR simultaneous superiority on ≥3 of 4 features. If neither condition holds, the option role is set to cash.",
+      "why_distinct": "This differs from the researcher's uniform threshold proposal by encoding slot-asymmetric economics directly: the diversifier gets a relaxed threshold because its purpose is variance reduction not return maximization, while the option gets a stricter threshold because its expected return must clear both the rank-depletion hurdle AND the crowding hurdle. The researcher's policy would treat all three slots identically and therefore either over-filter slot 2 (killing legitimate variance-reduction candidates) or under-filter slot 3 (allowing weak candidates through). The experimental designer's within_portfolio_rank_decay test would be the validation instrument for the role-specific discount magnitudes.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "gics_sub_industry_overlap_count",
+        "slot_role_assigned"
+      ],
+      "capacity_relevance": "Directly encodes the abstention logic: capacity is preserved by allowing slot 1 to deploy at full quality, slot 2 to deploy at relaxed quality when cross-industry, and slot 3 to abstain (cash) when both quality and orthogonality fail. The policy's abstention frequency is a learnable parameter that should decrease as candidate pool quality improves and increase as crowding intensifies."
+    },
+    {
+      "idea": "CrowdingPenaltyMultiplier: a continuous abstention-score modifier that computes slot-3 expected value as E[R₃] = base_3_return_estimate − κ · (overlap_count²) · quality_failure_magnitude, where κ is calibrated from same-industry ruin-rate data and quality_failure_magnitude is the standardized distance below selected-winner medians. Cash dominates when this adjusted E[R₃] falls below cash_yield + transaction_cost_buffer. The policy abstains from slot 3 when the multiplier-adjusted score is non-positive, regardless of absolute feature levels.",
+      "why_distinct": "This differs from a binary industry-overlap threshold (researcher's proposal) by making the abstention decision continuous in both overlap depth and feature weakness. It directly addresses the skeptic's mechanism-conflation concern by not claiming a specific ρ value but instead letting the empirical ruin-rate calibration drive κ. This avoids the overfit trap of hard-coding 'overlap ≥ 2 = abstain' while still penalizing crowding proportionally. It also operationalizes the researcher's cash-dominance threshold formula (P(ruin) × max_loss > E[return] - cash_yield) in a learnable, point-in-time form.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "gics_sub_industry_overlap_count",
+        "slot3_z_quality_score",
+        "same_industry_ruin_rate_estimate"
+      ],
+      "capacity_relevance": "Enables graduated abstention: in mild crowding (overlap_count=1) with high slot-3 quality, the policy still deploys; in severe crowding (overlap_count=2) with marginal slot-3 quality, it abstains; this preserves more capacity than a binary rule. The same_industry_ruin_rate_estimate should be updated periodically from realized outcomes to keep κ calibrated."
+    },
+    {
+      "idea": "ConvexityOptionGate: a policy that explicitly prices the option value of holding slot 3 unfilled (cash) versus filled (risky asset), and abstains only when the marginal candidate's expected information ratio fails to clear the convexity hurdle under the specific crowding state. The gate computes option_value_filled = E[R₃] − VaR_0.05(filled) and option_value_cash = r_f − VaR_0.05(cash) ≈ r_f, then abstains when option_value_filled < option_value_cash AND overlap_count ≥ 1. The key novelty is the explicit pricing of the unfilled slot as a positive option rather than zero-value cash drag.",
+      "why_distinct": "This differs from the researcher's option-cost framing (which treats abstention as a foregone bet) by inverting the valuation: abstention itself is the position with measurable expected return (r_f) and zero variance, and the question is whether filling slot 3 produces positive risk-adjusted value above that baseline. This is the economically rigorous form of the 'cash dominates' claim and avoids the binary framing of threshold rules. It also addresses the skeptic's endogeneity concern: the operator who would otherwise substitute a cross-industry candidate into slot 2 is implicitly captured because such substitution changes overlap_count and therefore the gate's decision.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "gics_sub_industry_overlap_count",
+        "candidate_expected_return_estimate",
+        "candidate_var_estimate",
+        "risk_free_rate_point_in_time"
+      ],
+      "capacity_relevance": "Maximizes capacity utilization by deploying slot 3 whenever its risk-adjusted information ratio exceeds cash, even under moderate crowding, while abstaining when crowding is severe enough that the option value of cash exceeds any plausible slot-3 deployment. This is the most capacity-preserving of the three policies because it abstains only when economically justified."
+    },
+    {
+      "idea": "RankDecayEligibilityFilter: a policy that bypasses the crowding question entirely and instead enforces a uniform rank-decay filter: across all three slots, require candidate quality score (z-score composite of 4 features) to exceed max(0, top_candidate_score − decay_factor × slot_index), where decay_factor is calibrated to the empirical slot-1-vs-slot-3 quality gap from archaeology. If slot 3's candidate falls below this decaying threshold, abstain to cash regardless of industry overlap.",
+      "why_distinct": "This is the skeptic-aligned policy: it accepts Layer 1 (rank-depletion) as the operative mechanism and rejects Layer 2 (crowding-specific penalty) until empirically validated. It differs from the researcher's crowding-triggered abstention by treating the abstention as a quality-decay phenomenon rather than an industry phenomenon. The advantage is robustness: the policy works even when industry classification is unavailable or noisy, and it makes no claim about ρ values. The disadvantage is that it may over-abstain in cross-industry configurations where slot-3 candidates are legitimately strong.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "slot_index_in_portfolio",
+        "rank_decay_factor"
+      ],
+      "capacity_relevance": "Industry-blind abstention: abstention frequency depends only on the candidate pool's quality distribution across slots, not on industry structure. This is the conservative baseline against which the crowding-aware policies should be benchmarked; if a crowding-aware policy cannot outperform this baseline in out-of-sample tests, the crowding mechanism is REFUTED and this becomes the deployed policy."
+    }
+  ]
+}

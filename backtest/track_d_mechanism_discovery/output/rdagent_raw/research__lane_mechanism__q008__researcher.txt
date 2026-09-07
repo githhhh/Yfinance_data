@@ -1,0 +1,35 @@
+
+
+```json
+{
+  "mechanism_claim": "In mixed breakout/pullback weeks, B0_LANE reordering is functionally equivalent to a non-linear composite of freshness (base_duration_weeks, pullback_duration_weeks), geometry (ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50), and volume (vol_ratio_5_20, up_day_ratio_20) — it carries no orthogonal information once those proxies are controlled, and LANE_NEUTRAL stocks cluster exactly where these proxy z-scores cross zero or conflict.",
+  "evidence_for": [
+    "The 5 largest standardized deltas separating selected_winners from false_negatives are all freshness/geometry/volume proxies: up_day_ratio_20 (-1.19σ), vol_ratio_5_20 (-1.05σ), mom_20 (-1.00σ), px_vs_ma50 (-0.85σ), pullback_duration_weeks (-0.73σ) — Lane components if Lane were merely a composite should show up here, and they do, exhaustively.",
+    "False_positive_ruin cases (e.g., entity_8f0df3d38e, entity_4fdc3699fd, entity_3472243e0c, entity_b6bcccdf6a) systematically exhibit extreme proxy readings (high mom_20 0.17-0.23, steep ma10_slope_5 0.05-0.09, high ibd_entry_close_vs_trigger_pct 0.03-0.07) — Lane promotes them because the proxies say 'fresh and accelerating' but they are late-stage blow-offs.",
+    "entity_535a1beed7 (false_negative_big_winner) shows all proxies in negative territory: up_day_ratio 0.5, vol_ratio 1.17, mom_20 0.028, ma10_slope 0.004, px_vs_ma50 0.024 — Lane correctly demotes it on the proxy composite, yet it produces large_win, demonstrating the composite underweights a real edge.",
+    "entity_6618d3e80c carries the dual label false_positive_ruin|selected_winner with extreme proxies (mom_20=0.25, vol_ratio=1.45, px_vs_ma50=0.34) — Lane reordering is unstable precisely where the proxy composite saturates at the upper bound.",
+    "In pullback-coincedent winners (entity_2c58cebc59 -25.1%/6w, entity_3adc078f01 -42.3%/9w) the breakout-side proxies (mom_20 0.32, 0.17; steep ma10_slope) carry the selection while pullback geometry is ignored — Lane acts as a momentum-dominant proxy, not a balanced blend."
+  ],
+  "evidence_against": [
+    "entity_de1c657364 is a false_negative_big_winner with mom_20=0.058 (below B0 threshold) but pullback_duration_weeks=8, pullback_pct=-7.3, and base_duration evidence — a Lane rank that incorporated pullback-quality as a distinct axis (not merely as a freshness proxy) would have caught this.",
+    "entity_bfb308b24a (false_negative_relative, w4=loss) shares near-identical proxy profile to entity_de1c657364 (vol_ratio 1.19 vs 1.15, mom_20 0.027 vs 0.058, ma10_slope 0.012 vs 0.030) yet diverges in outcome — pure proxy composition cannot explain this discriminator gap; either Lane noise or a non-proxied factor differentiates them.",
+    "entity_2f86543bf6 (selected_winner, large_win) has near-zero mom_20 (-0.008), slightly negative ma20_slope (-0.0078), up_day_ratio 0.35 (lowest in set), and px_vs_ma20 0.025 — if Lane were strictly a proxy composite, this stock should sit in LANE_NEUTRAL or lower; its B0 selection implies Lane is reading a non-proxied state (possibly base tightness or relative-strength vs sector not captured in the listed features).",
+    "The numeric_contrasts list includes features like base_mbox_count (+0.34σ for false_negatives) and ibd_entry_breakout_range_ratio (+0.12σ) where false_negatives score HIGHER than winners — a purely proxy-based Lane would penalize these, yet they don't fully suppress selection, suggesting Lane weighting is non-monotonic in a way not captured by linear proxy blend."
+  ],
+  "falsifiable_predictions": [
+    "B0_LANE hit-rate within matched proxy-quintile buckets (binned on vol_ratio_5_20, mom_20, ma10_slope_5 jointly) should be statistically indistinguishable from the median pick in the same quintile; observed gap >2pp (one-sided, alpha=0.05) falsifies the pure-proxy claim.",
+    "In mixed weeks (defined as weeks where median pullback_pct across B0 candidates < -10% AND median mom_20 > 0.10), SCORE_BEFORE_LANE and the post-Lane B0 score should produce Spearman rank correlation > 0.92 across the candidate universe; correlation < 0.85 indicates Lane contributes independent signal.",
+    "LANE_NEUTRAL stocks (Lane signal within ±0.5σ of zero) should concentrate in the joint region where proxy z-scores have conflicting signs (e.g., high mom_20 + deep pullback_pct, OR low ma10_slope + low pullback_duration); if LANE_NEUTRAL is instead uniformly distributed across the proxy feature space, Lane is doing something other than reporting proxy conflict.",
+    "B0_LANE stocks that are false_positive_ruins should have proxy profiles statistically indistinguishable from selected_winners on (mom_20, vol_ratio_5_20, ma10_slope_5, px_vs_ma50) — observed Mahalanobis distance < 0.5 supports the proxy-collapse interpretation; distance > 1.5 indicates Lane is selecting on something the proxies miss.",
+    "Holding constant the (mom_20, vol_ratio_5_20, ma10_slope_5) triple, B0_LANE selected_winner rate should NOT vary with pullback_duration_weeks beyond what the proxies predict; a residual pullback-duration effect >3pp hit-rate differential falsifies the proxy-only reading.",
+    "If Lane is purely proxied, then a logistic regression of W4 return bucket on the listed proxy features alone should match the B0_LANE ordering AUC within 0.02; AUC gap > 0.05 confirms Lane carries orthogonal information."
+  ],
+  "policy_implications": [
+    "If predictions 1, 2, 6 hold: Lane reordering can be replaced by a calibrated proxy-composite score, freeing the Lane slot for an experiment that injects a genuinely orthogonal signal (e.g., pullback-quality as a distinct axis, or sector-relative strength).",
+    "If predictions 3, 4 falsify the proxy claim: Lane should be re-engineered to use a wider proxy panel and a non-linear interaction term (e.g., mom_20 × pullback_duration_weeks), because the current linear-blend behavior is mistaking proxy extremes for conviction.",
+    "Regardless of mechanism, the false_positive_ruin cluster at high proxy readings implies a regime-dependent filter is needed: cap proxy z-scores or apply a mean-reversion haircut when mom_20 > 0.20 AND ibd_entry_close_vs_trigger_pct > 0.04 simultaneously, since this combination is over-represented in ruins (entity_8f0df3d38e, entity_6618d3e80c, entity_b00579f203 borderline).",
+    "The false_negative_big_winner cases (entity_535a1beed7, entity_de1c657364) suggest a separate 'low-proxy-but-deep-base' lane should be carved out as a side bet, decoupled from B0_LANE — this is a portfolio-construction response to a mechanism-level finding, not a mechanism claim.",
+    "Do NOT use Lane rank alone as a sizing input in mixed weeks until falsifiable_predictions 1 and 6 are tested on out-of-sample data; the evidence here is discovery-train only and the false_negative | false_positive asymmetry is itself a sign that the current ordering is miscalibrated at the proxy extremes."
+  ]
+}
+```

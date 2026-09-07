@@ -1,0 +1,63 @@
+{
+  "tests": [
+    {
+      "name": "Slot 1 — Within-snapshot orthogonal-residual meta-analysis",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "penalty_value"
+      ],
+      "comparison": "Within each snapshot separately, fit OLS: penalty_value ~ mom_20 + up_day_ratio_20 + vol_ratio_5_20 + px_vs_ma50 + ma10_slope_5 + ibd_entry_close_vs_trigger_pct; take the residual. Compute Spearman( residual, is_ruin ) within that snapshot using only cases with all six predictors non-null. Fisher-combine per-snapshot p-values (exclude snapshots with n_ruin < 2). Build a within-snapshot permutation null by shuffling penalty values within snapshot 1000 times and recomputing the Spearman distribution; compare observed combined χ² against the permuted combined χ² distribution.",
+      "success_criterion": "Observed Fisher-combined χ² exceeds the 95th percentile of the permuted combined-χ² distribution, meta p < 0.05, AND ≥ 60% of usable snapshots show ρ of the same sign as the combined effect. This would confirm penalty carries residual signal beyond the five B0 neighbors.",
+      "failure_criterion": "Observed combined χ² ≤ 50th percentile of the permuted null, OR per-snapshot ρ signs are inconsistent (no consistent direction in >50% of snapshots). On failure, declare redundancy at the within-snapshot level — escalate to Slot 3 for replacement."
+    },
+    {
+      "name": "Slot 2 — Within-snapshot 1:1 matched-pair nearest-neighbor test",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "penalty_value"
+      ],
+      "comparison": "For each ruin case, find its nearest non-ruin B0 candidate in standardized 6-feature Euclidean distance within the same snapshot (ties broken by Mahalanobis distance using the snapshot's empirical covariance). Form one matched pair per ruin case. Compute Δpenalty = penalty_ruin − penalty_control. Run a one-sided sign test on Δpenalty > 0; build permutation null by swapping ruin/control labels within each pair across 1000 iterations. As a robustness secondary, recompute with pullback_duration_weeks and pullback_pct added to the distance metric for snapshots where both members are non-null.",
+      "success_criterion": "≥ 70% of matched pairs show Δpenalty > 0 AND one-sided permutation p < 0.05. Establishes that the penalty ranks an indistinguishable-from-feature-space twin lower than the actual ruin case, i.e., conditional independence exists.",
+      "failure_criterion": "Sign rate ≤ 55% (indistinguishable from coin flip) OR mean Δpenalty lies inside the permutation-derived 95% CI of zero. On failure, the penalty contains no conditional information even after exact-feature matching, supporting redundancy."
+    },
+    {
+      "name": "Slot 3 — Additive-vs-tree interaction ablation to specify the cleaner replacement",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "ma20_slope_5",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "penalty_value"
+      ],
+      "comparison": "Within each snapshot with ≥ 3 ruin and ≥ 3 non-ruin cases, fit three ruin classifiers using only cases with all six predictors non-null: (a) logistic regression on the six features (additive baseline); (b) logistic regression on the six features + penalty_value (tests linear-conditional additive lift); (c) depth-3 GBM on the six features only (tests tree-based interaction lift without penalty). Compute per-snapshot AUC for each, then average across snapshots. Run DeLong test pairwise (a) vs (b) and (b) vs (c) on the pooled within-snapshot predictions.",
+      "success_criterion": "Two distinct wins are valid: (i) (b) AUC − (a) AUC > 0.02 with non-overlapping DeLong 95% CIs ⇒ additive-conditional signal exists, keep penalty as linear correction; (ii) (c) AUC − (b) AUC > 0.02 with non-overlapping CIs ⇒ underlying regime is real but non-additive, replace penalty with a depth-3 tree / explicit hinge (e.g., mom_20 > 0.15 ∧ vol_ratio_5_20 < 1.1).",
+      "failure_criterion": "All pairwise AUC gaps ≤ 0.01 with fully overlapping 95% CIs ⇒ neither formulation beats baseline; declare UNRESOLVED and require out-of-sample holdout before any production swap."
+    }
+  ],
+  "leakage_checks": [
+    "Audit penalty_value computation against every feature field in the archaeology set — reject any code path referencing outcome_label, w4_return_bucket, pullforward W4 close, or any post-snapshot return field. If found, flag the penalty as forward-leaking and exclude Slot 1/2/3 results.",
+    "Verify pullback_duration_weeks end-date and pullback_pct reference date are ≤ snapshot_anon date for every case; drop any snapshot-row where the pullback window closes after the decision snapshot.",
+    "Confirm snapshot_d0d57b1e40 (contains entity_6618d3e80c mixed-label plus several high-px_vs_ma50 winners and ruins) is treated as a sanity slice: re-run Slot 1 and Slot 2 with and without it; large Δ in either result indicates snapshot-driven artifacts and triggers snapshot stratification.",
+    "Re-run Slot 2 with the matching-distance restricted to mom_20, up_day_ratio_20, vol_ratio_5_20 only (the four 'most redundant' features from the researcher's contrasts) to confirm that adding the extra dimensions does not flip the sign-rate — if it does, the conditional-independence finding depends on the matching metric and is non-robust.",
+    "Block any test from using ticker identity or calendar features (week-of-year, month, day-of-week) in the matching distance, classifier features, or permutation strata — these are explicitly disallowed per the PIT allowlist.",
+    "Drop cases where snapshot_anon appears in fewer than 2 ruin and 2 non-ruin rows from Slot 1 and Slot 3 estimators (insufficient within-snapshot sample for stable Spearman / AUC); report which snapshots are excluded and why in the result write-up.",
+    "Run all three slots on entity_6618d3e80c as a held-out single case: the penalty should NOT fire (case is not dry). If penalty_value for this case is in the upper tercile of ruin-case penalty values, the gating condition is broken and all three slot results are tainted."
+  ],
+  "priority_order": [
+    "Slot 2 — Within-snapshot 1:1 matched-pair nearest-neighbor test",
+    "Slot 1 — Within-snapshot orthogonal-residual meta-analysis",
+    "Slot 3 — Additive-vs-tree interaction ablation to specify the cleaner replacement"
+  ]
+}

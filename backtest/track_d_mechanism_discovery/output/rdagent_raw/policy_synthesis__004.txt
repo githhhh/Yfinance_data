@@ -1,0 +1,67 @@
+
+```json
+{
+  "policies": [
+    {
+      "policy_id": "freshness_residual_orthogonal_test",
+      "description": "Tests whether B0 'freshness' carries information orthogonal to the entry-extension neighbor trio. Freshness is encoded as a (time_since_pivot_weeks, setup_state_indicator) pair plus a freshness_status categorical, so the upstream detection filter is an explicit feature. Vol-regime banded coefficients and the entry-extension trio sit in the linear block as controls. A non-positive time_since_pivot weight or a within-band coefficient delta <0.01 AUC would falsify freshness as an independent mechanism (q004 substitution test).",
+      "research_origin": "mechanism_falsification__q004",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 1.0},
+        {"type": "linear", "feature": "ma10_slope_5", "transform": "zscore", "weight": 0.5},
+        {"type": "linear", "feature": "px_vs_ma20", "transform": "zscore", "weight": 0.4},
+        {"type": "linear", "feature": "px_vs_ma50", "transform": "zscore", "weight": 0.4},
+        {"type": "linear", "feature": "ibd_entry_close_vs_trigger_pct", "transform": "neg_abs", "weight": -1.0},
+        {"type": "linear", "feature": "vol_ratio_5_20", "transform": "zscore", "weight": 0.3},
+        {"type": "linear", "feature": "time_since_pivot_weeks", "transform": "neg_abs", "weight": 0.4},
+        {"type": "threshold", "logic": "any", "conditions": [{"feature": "freshness_status", "op": "eq", "value": "fresh_breakout"}], "add": 0.5},
+        {"type": "threshold", "logic": "any", "conditions": [{"feature": "freshness_status", "op": "eq", "value": "no_qualifying_setup"}], "add": -0.4}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "fixed", "max_positions": 3}
+      }
+    },
+    {
+      "policy_id": "slope_ratio_entry_tightness_ruin_gate",
+      "description": "Tests the q010 confounder hypothesis: whether slope_ratio (ma10_slope_5/ma20_slope_5) is an independent ruin precursor or an artifact of entry tightness and denominator instability. The threshold term gates slope_ratio computation on ma20_slope_5 > 0.01, and the interaction term between slope_ratio and ibd_entry_close_vs_trigger_pct exposes whether slope_ratio adds information conditional on entry tightness. A near-zero or sign-reversing interaction weight would falsify slope_ratio as separable from the entry-extension trio (q010 confounder decomposition).",
+      "research_origin": "failure_archaeology__q010",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "threshold", "logic": "all", "conditions": [{"feature": "ma20_slope_5", "op": "gt", "value": 0.01}], "add": 0.0},
+        {"type": "linear", "feature": "ma10_slope_5", "transform": "zscore", "weight": 0.5},
+        {"type": "linear", "feature": "ibd_entry_close_vs_trigger_pct", "transform": "neg_abs", "weight": -1.0},
+        {"type": "interaction", "left": "ma10_slope_5", "right": "ibd_entry_close_vs_trigger_pct", "transform": "zscore", "weight": -0.6},
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 0.6},
+        {"type": "linear", "feature": "vol_ratio_5_20", "transform": "zscore", "weight": 0.3},
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 0.3},
+        {"type": "linear", "feature": "px_vs_ma50", "transform": "zscore", "weight": 0.3}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "fixed", "max_positions": 3}
+      }
+    },
+    {
+      "policy_id": "gap_gated_continuous_slot_sizing",
+      "description": "Tests the q001 capacity-abstention claim: whether the Top1-Top2 quality gap should govern 3-slot capital allocation. Uses top1_confidence selector with explicit gap threshold so a large gap permits abstention (cash) on slot 2/3, while the vol-momentum interaction term prevents abstention during benign low-vol regimes. A negative shadow-PnL of the policy versus a forced-3-slot baseline would falsify the abstention claim.",
+      "research_origin": "capacity_abstention__q001",
+      "base": "b0_rank",
+      "terms": [
+        {"type": "linear", "feature": "mom_20", "transform": "zscore", "weight": 1.0},
+        {"type": "linear", "feature": "vol_ratio_5_20", "transform": "zscore", "weight": 0.5},
+        {"type": "linear", "feature": "up_day_ratio_20", "transform": "zscore", "weight": 0.5},
+        {"type": "linear", "feature": "px_vs_ma50", "transform": "zscore", "weight": 0.5},
+        {"type": "linear", "feature": "ma10_slope_5", "transform": "zscore", "weight": 0.3},
+        {"type": "interaction", "left": "vol_ratio_5_20", "right": "mom_20", "transform": "zscore", "weight": -0.4}
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {"mode": "top1_confidence", "max_positions": 3, "gap": 0.15, "min_score": 0.3}
+      }
+    }
+  ],
+  "batch_rationale": "Three non-redundant mechanisms test distinct falsifiable claims from the synthesis: (1) freshness_residual_orthogonal_test operationalizes the construct-laundering falsifier from q004 by including the entry-extension trio as explicit controls and treating the setup-state categorical as a first-class feature rather than a null column; (2) slope_ratio_entry_tightness_ruin_gate tests the q010 confounder decomposition by gating the ratio on denominator stability and adding an interaction with entry tightness so any non-additive contribution is exposed; (3) gap_gated_continuous_slot_sizing tests the q001 abstention economics by coupling a top1_confidence gap threshold to a vol-momentum interaction, so cash deployment is regime-conditional. Each policy answers a separate research question (feature orthogonality, ruin-signal independence, slot-allocation economics) and would yield an interpretable null if its underlying claim is false."
+}
+```

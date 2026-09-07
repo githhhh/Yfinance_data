@@ -1,0 +1,115 @@
+{
+  "tests": [
+    {
+      "name": "top2_feature_overlap_with_fn_distribution",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within each archaeology snapshot, the second-ranked B0-passing candidate (Top2) is projected onto the same 7-feature feature vector; the joint empirical CDF of Top2 across all 27 snapshots is compared against the empirical CDF of the false_negative_relative cases (the researcher's claimed proxy) using a 2-sample KS-style distance per feature. The test resolves which of (i) Top2 and FN come from the same distribution, (ii) Top2 sits between Top1 and FN, or (iii) Top2 sits closer to Top1 than FN. Pre-specify the rule: if median standardized per-feature distance between Top2 and FN is <0.30σ across all 7 features AND < the Top1-to-FN median distance, then researcher's conflation is supported; if Top2-to-FN distance is > Top1-to-FN distance, the conflation is refuted and the mechanism claim collapses.",
+      "success_criterion": "Top2-to-FN empirical distance (median across 7 features) is < Top1-to-FN distance AND <0.30σ, validating the researcher's claim that Top2 inherits FN-like expectancy.",
+      "failure_criterion": "Top2-to-FN distance is ≥ Top1-to-FN distance on ≥5 of 7 features, refuting the conflation and supporting the skeptic's claim that rank-2 ≠ rejected-by-screen."
+    },
+    {
+      "name": "variance_reduction_capacity_test_within_snapshot",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ma10_slope_5"
+      ],
+      "comparison": "Compute the implied per-slot W4 return for every (Top1, Top2) pair in the archaeology using each case's own w4_return_bucket midpoint (large_win=+10%, small_win=+3%, loss=-5%, ruin=-15%, pre-specified map). For each snapshot containing ≥2 B0-pick selected_winner OR false_positive_ruin cases, form the implied 1-slot portfolio (Top1 only) and 2-slot portfolio (Top1 mean+Top2 mean, equal-weighted). The variance-reduction capacity test computes the within-snapshot correlation implied by sharing different cases across slots; since we only observe one slot per realized entity, use the cross-name W4 bucket contingency across paired cases to estimate the upper bound on independent variation. Pre-specify: a 2-slot portfolio's implied variance (over matched cases) ≤ 0.7× the 1-slot variance supports the skeptic's variance-reduction mechanism; ≥0.9× variance leaves only the mean channel active for the researcher.",
+      "success_criterion": "Implied 2-slot variance ≤ 0.7× 1-slot variance across ≥60% of multi-case snapshots, supporting the skeptic's diversification channel.",
+      "failure_criterion": "Implied 2-slot variance ≥ 0.9× 1-slot variance across ≥60% of multi-case snapshots, isolating the mean-return channel as the only operative one and keeping the researcher's mechanism live."
+    },
+    {
+      "name": "gap_metric_regime_proxy_discriminator",
+      "features": [
+        "vol_ratio_5_20",
+        "rv_20",
+        "atr_14_pct",
+        "mom_60",
+        "ma50_slope_10",
+        "px_vs_ma50",
+        "dist_to_52w_high_pct"
+      ],
+      "comparison": "Decompose the researcher's proposed gap score (weighted z on {mom_20, vol_ratio_5_20, up_day_ratio_20, px_vs_ma50, ma10_slope_5}) into (a) a 'momentum-quality' component and (b) a 'regime-volatility' component using PCA or sign-restricted decomposition on the 7 auxiliary features above. Test whether the gap score co-varies with the regime component across the 6 distinct snapshots (snap_724342c280, snap_287267e812, snap_eb3d8128cc, snap_c7fa0b9bb6, snap_12ebd0d057, snap_71486ed83c, snap_ad495b6705, snap_39b6f2c49e, snap_3fc4068e83, snap_8aa9111909, snap_edaba651c2, snap_d0d57b1e40, snap_01d3e2483b, snap_b8420124eb). Pre-specify: if correlation between gap-score variance and regime-component variance across snapshots is >0.5, the gap metric is acting as a regime filter (skeptic wins); if <0.2, the gap is a true cross-sectional quality discriminator (researcher wins).",
+      "success_criterion": "Cross-snapshot correlation(gap_score, regime_component) < 0.20 → gap metric is cross-sectional quality, not regime.",
+      "failure_criterion": "Cross-snapshot correlation(gap_score, regime_component) > 0.50 → gap metric is a regime proxy in disguise and binary policy will fail when gap and regime diverge."
+    },
+    {
+      "name": "concentration_ruin_leak_test",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "Compute the unconditional W4 ruin rate (false_positive_ruin outcome) among ALL B0-pick cases in the archaeology (n=19), then stratify by Top1 feature quintile. Pre-specify: if Top1 ruin rate in the highest-quality quintile (top quintile of composite mom_20+vol_ratio_5_20+px_vs_ma50) is still ≥25%, then 'concentration in Top1' inherits substantial ruin risk that the cash-on-slot-2 policy does nothing to mitigate (skeptic's point that abstention ignores the dominant ruin source). The researcher wins only if Top1 ruin rate in the top quintile drops below 10% AND the absolute rate is materially below the 19-case aggregate of 42%.",
+      "success_criterion": "Top1 W4 ruin rate in top-feature-quintile ≤ 10% (alpha is captured cleanly without comparable ruin tail).",
+      "failure_criterion": "Top1 W4 ruin rate in top-feature-quintile ≥ 25% (concentration does not eliminate ruin risk; the policy leaves the dominant ruin source untouched)."
+    },
+    {
+      "name": "binary_policy_vs_continuous_sizing_w4_sim",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "comparison": "Within each archaeology case, compute the implied W4 return for three portfolio constructions: (P1) N=1, Top1 only with full slot weight; (P2) N=2, equal-weight Top1+Top2; (P3) N=2-continuous, Top1 with weight = 1/(1+gap), Top2 with weight = gap/(1+gap) where gap is the researcher's standardized score on the 5-feature triplet. W4 returns are mapped from w4_return_bucket midpoints. Compare median portfolio W4 across all 27 cases for each construction. Pre-specify: if continuous-sizing median W4 return > binary-cash median W4 return by >1pp in >60% of cases, the skeptic's continuous-policy dominance claim is supported; if binary-cash wins by >1pp in >60%, the researcher's abstention rule is supported (cash is not dominated).",
+      "success_criterion": "Continuous-sizing portfolio median W4 return exceeds binary-cash (N=1) by >1pp in >60% of matched cases.",
+      "failure_criterion": "Binary-cash (N=1) portfolio median W4 return exceeds continuous-sizing by >1pp in >60% of matched cases, validating the gap-conditional abstention rule."
+    },
+    {
+      "name": "cash_carry_break_even_proxy",
+      "features": [
+        "vol_ratio_5_20",
+        "rv_20",
+        "atr_14_pct"
+      ],
+      "comparison": "The researcher's mechanism implies 'Top2 EV ≤ 0' for the cash rule to dominate. The skeptic argues cash carry is negative (~0.15-0.25% per 4 weeks in real terms). Without a direct inflation rate feature in the allowlist, proxy cash carry cost by realized cross-sectional W4 volatility bucket: high-volatility windows (top tertile of vol_ratio_5_20) imply higher cash opportunity cost via the inflation-vol relation. Pre-specify: estimate the minimum-EV threshold for Top2 needed to dominate cash as f(W4 cross-sectional vol) using the empirical distribution of small_win/loss/selected_winner gaps. Test whether the Top2 implied EV (mapped from w4_return_bucket midpoints of the rank-2-distribution analog) clears this threshold. If Top2 implied median EV is positive across the archaeology, the cash rule fails on carry grounds; if Top2 implied median EV is ≤0, the researcher's rule holds in the carry sense.",
+      "success_criterion": "Top2 implied median W4 EV (across archaeology) is ≤ 0, validating the cash-side dominance on carry grounds.",
+      "failure_criterion": "Top2 implied median W4 EV is > cash-carry-cost proxy in >60% of archaeology cases, meaning the cash rule sacrifices positive expected return and is dominated even before risk-adjustment."
+    },
+    {
+      "name": "slot3_monotonicity_breaker",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "comparison": "The researcher's gap-conditional abstention rule implicitly assumes rank ordering translates to quality ordering. Within snapshots that contain ≥3 B0-pick cases, compare the W4 bucket of the 3rd-ranked (by feature composite) candidate vs the 2nd-ranked candidate. Pre-specify: if ≥40% of 3rd-ranked cases deliver a strictly better W4 bucket (large_win vs small_win/loss/ruin) than the 2nd-ranked case in the same snapshot, the monotonic ranking assumption breaks and the binary 'start abstention at slot 2' rule is undermined — the optimal deployment point may be slot 3, not slot 2. If 3rd-ranked cases deliver strictly worse W4 buckets in ≥70% of matched snapshots, rank monotonicity holds and the abstention-from-slot-2 framing is defensible.",
+      "success_criterion": "3rd-ranked W4 bucket > 2nd-ranked W4 bucket in ≥40% of matched multi-snapshot cases → monotonic rank→quality assumption is violated.",
+      "failure_criterion": "3rd-ranked W4 bucket ≤ 2nd-ranked W4 bucket in ≥70% of matched cases → rank monotonicity holds and slot-2-as-abstention-trigger is coherent."
+    }
+  ],
+  "leakage_checks": [
+    "Verify every feature in every test is point-in-time at the IBD entry decision — no pe-ahead into W4 outcome, no use of w4_return_bucket itself as an input feature, and no use of outcome_label/pulldown characteristics as predictors.",
+    "Verify all comparisons use only entity- and snapshot-anonymized joins; no ticker-equivalent identifier is constructed from feature combinations (e.g., a fingerprint of (mom_20, vol_ratio_5_20, px_vs_ma50) that uniquely identifies an entity is excluded from the test as identity leakage).",
+    "Verify the W4 bucket mapping is fixed in advance: large_win=+10pp, small_win=+3pp, loss=-5pp, ruin=-15pp — and that NO post-W4 fields (W8/W12 recovery, terminal return, max drawdown beyond W4) are queried, used, or inferred as evidence in any test.",
+    "Verify no calendar feature (week-of-year, month, quarter, year, day-of-week, holiday-proximity, earnings-proximity in calendar terms) enters any test — only PIT-observable price/volume/volatility/momentum/slope/structure features from the supplied allowlist.",
+    "Verify that position-sizing policies compared in test 5 (binary vs continuous) and concentration rules in test 4 use only entry-time features; the W4 outcomes are evaluated only as outcomes, never reused in sizing decisions.",
+    "Verify that regime-proxy decomposition in test 3 uses only PIT-computable features (rv_20, atr_14_pct, ma50_slope_10, dist_to_52w_high_pct, mom_60) and not implied regime labels derived from forward-outcome clustering."
+  ],
+  "priority_order": [
+    "top2_feature_overlap_with_fn_distribution",
+    "gap_metric_regime_proxy_discriminator",
+    "variance_reduction_capacity_test_within_snapshot",
+    "binary_policy_vs_continuous_sizing_w4_sim",
+    "concentration_ruin_leak_test",
+    "cash_carry_break_even_proxy",
+    "slot3_monotonicity_breaker"
+  ]
+}

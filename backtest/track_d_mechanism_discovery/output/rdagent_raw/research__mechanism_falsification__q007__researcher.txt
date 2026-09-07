@@ -1,0 +1,35 @@
+
+
+```json
+{
+  "mechanism_claim": "The B0 'entry_volume' term (ibd_entry_volume_ratio: entry-day volume vs ~50-day baseline) captures day-of-breakout demand intensity, providing incremental discriminatory signal beyond neighboring B0 terms (vol_ratio_5_20, ibd_entry_breakout_range_ratio, ibd_entry_close_position). It is hypothesized to reflect the conviction behind the breakout event itself rather than the prevailing volume regime.",
+  "evidence_for": [
+    "Standardized delta of -0.5013 between false_negative_median (1.5987) and selected_winner_median (1.8134) shows selected winners have meaningfully higher entry-day volume ratios, consistent with a demand-conviction mechanism.",
+    "Direction asymmetry vs. general volume_ratio: ibd_entry_volume_ratio has negative delta (-0.5013) while volume_ratio has positive delta (+0.229). This sign disagreement indicates entry_volume is not a monotone proxy for recent volume regime and likely captures a distinct, event-anchored phenomenon.",
+    "Internal coherence with other entry-quality B0 terms: ibd_entry_close_vs_trigger_pct (-0.6952) and ibd_entry_close_position (-0.464) also show winners above losers, forming a mutually consistent 'breakout conviction' cluster.",
+    "Entity_ead73f4390 (large_win, vol_ratio_5_20=1.77, entry implied high) and entity_2c58cebc59 (large_win, vol_ratio_5_20=1.62) illustrate cases where both regime and entry-day volume are aligned with the claim.",
+    "Within false_positive_ruin set, several cases (entity_4fdc3699fd, entity_8f0df3d38e) show high regime vol_ratio_5_20 but moderate entry_day volume_ratio, suggesting entry volume may add corrective information."
+  ],
+  "evidence_against": [
+    "Entry_volume's standardized delta (-0.5013) is materially weaker than vol_ratio_5_20 (-1.0455), implying the latter may subsume much of the former's variance; partial independence is plausible but full independence is not supported.",
+    "Small archaeology sample (n=27, with only 5 false_negatives) lacks statistical power to reject collinearity with breakout_range_ratio (+0.1186 delta) or close_position (-0.464 delta) — these are the most plausible neighbors to absorb entry_volume signal.",
+    "Cases like entity_6618d3e80c (false_positive_ruin|selected_winner, vol_ratio_5_20=1.45, mom_20=0.25) achieved a large_win despite ambiguous entry_volume behavior, weakening the necessity of entry_volume as an independent gate.",
+    "No conditional or partial-correlation evidence is available in the frozen set to demonstrate that entry_volume's effect survives conditioning on vol_ratio_5_20 and breakout_range_ratio; the univariate contrast alone is insufficient for an independence claim.",
+    "volume_ratio (general recent volume) has a near-zero and positively-signed delta (+0.229), which complicates interpretation: if 'volume regime' is confounded across these features, the apparent entry_volume signal may be partially an artifact of definition rather than mechanism."
+  ],
+  "falsifiable_predictions": [
+    "If entry_volume is truly independent, then within fixed vol_ratio_5_20 quintiles, the w4_return spread between high vs. low ibd_entry_volume_ratio bins should remain statistically significant (p < 0.05) on a held-out sample of at least 200 B0 candidates.",
+    "In a logistic regression of w4_win on [vol_ratio_5_20, ibd_entry_breakout_range_ratio, ibd_entry_close_position, up_day_ratio_20], the marginal partial R² contributed by ibd_entry_volume_ratio should exceed 0.005 if the component carries independent signal; below this threshold, the component should be retired.",
+    "A residualized 'volume thrust' feature defined as ibd_entry_volume_ratio / vol_ratio_5_20 (event-specific volume in excess of regime) should show a higher standardized delta than raw ibd_entry_volume_ratio if entry_volume's mechanism is genuinely breakout-anchored demand rather than regime.",
+    "If entry_volume is collinear with breakout_range_ratio, then cases where the two disagree (high entry_volume but tight range, or vice versa) should show no differential performance — falsifying entry_volume as a standalone predictor.",
+    "Across snapshots with consistent market regime (e.g., grouped by snapshot_anon), the rank correlation between ibd_entry_volume_ratio and ibd_entry_breakout_range_ratio should be below 0.5 for the mechanism to be considered independent."
+  ],
+  "policy_implications": [
+    "If the residualized volume-thrust test (entry_volume / vol_ratio_5_20) outperforms raw entry_volume, replace the B0 term with the ratio form to remove regime confounding and improve signal-to-noise.",
+    "Consider collapsing the four IBD entry features (close_vs_trigger, volume_ratio, close_position, breakout_range_ratio) into a single composite 'breakout conviction' z-score, since their deltas are individually modest and likely carry overlapping information.",
+    "Pending a conditional independence test, do not over-weight entry_volume in the B0 composite; cap its contribution at the rank-equivalent of vol_ratio_5_20's observed effect size until independence is established.",
+    "If the falsification tests fail (entry_volume adds no incremental partial R² beyond its neighbors), retire entry_volume from B0 entirely and redistribute its weight to vol_ratio_5_20 and mom_20, which dominate the contrast ranking.",
+    "Track entry_volume separately as a 'shadow feature' in production for one quarter: if its realized IC is below 0.02 while vol_ratio_5_20 IC exceeds 0.04, this is actionable evidence for removal."
+  ]
+}
+```

@@ -1,0 +1,42 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 55,
+  "mechanism_summary": "The strongest alternative to the industry-allocation advantage is a three-layer confound: (1) B0-style leadership selection is, by construction, an industry-clustering screen — leadership names concentrate in 1-3 GICS sectors per macro regime, so the 'industry tilt' is a label applied to a portfolio that B0 already concentrated by sector. (2) Within those concentrated picks, the archaeology's discriminating signal is the seven-feature vector (mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, ma10_slope_5, ma20_slope_5), not the sector tag. Winners and false_positive_ruins cluster within similar late-stage entry signatures (e.g., entity_6618d3e80c winner and entity_4fdc3699fd ruin both have ma10_slope_5 ~0.075-0.090 and px_vs_ma50>0.10), and the discriminating residual is feature-based, not industry-based. (3) The dominant cross-strata variance comes from regime (snapshot_anon clustering), which is calendar-driven and shifts industry leadership — explaining why snapshot_anon concentrates cases (snap_71486ed83c=6/27, snap_d0d57b1e40=4/27) more than any sector variable. Industry is therefore the shadow cast by (B0 selection × regime × momentum-stage factor); it is not an independent lever. The skeptic's valid endogeneity caveat tempers confidence: the seven features are themselves industry-conditioned in second moments, so quintile-matching on them is tautological. Direct adjudication requires sector-tagged archaeology, which this evidence lacks.",
+  "falsifiers": [
+    "Within an absolute-threshold (not quintile) matched-pair test across ≥4 GICS sectors, where pairs are matched on |Δmom_20|≤0.05, |Δma10_slope_5|≤0.01, |Δvol_ratio_5_20|≤0.20, |Δup_day_ratio_20|≤0.10, and |Δibd_entry_close_vs_trigger_pct|≤0.02, adding a sector dummy to a W4-return regression on those five features increases adjusted R² by more than 1 percentage point and the sector coefficient is significant at |t|>2.0 across at least 3 non-overlapping snapshot_anon strata. A positive finding here falsifies the feature-only mechanism and re-opens industry as a residual lever.",
+    "A sector-neutralized portfolio that matches each B0 winner on (mom_20, up_day_ratio_20, vol_ratio_5_20, ibd_entry_close_vs_trigger_pct) retains less than 70% of the un-neutralized W4 alpha, and the lost alpha is distributed across ≥3 distinct sectors rather than concentrated in one regime. This would demonstrate industry as a real factor exposure that the features do not subsume.",
+    "In a within-snapshot_anon regression with sector fixed effects, the seven-feature vector's standardized coefficients each shift by more than 25% (in magnitude) when sector dummies are added, indicating that the feature coefficients were silently absorbing an industry component. Stable coefficients refute this falsifier.",
+    "Cross-snapshot_anon variance in industry HHI of B0 winners minus B0 ruins explains more than 15% of W4-return variance in a hierarchical regression, after the seven-feature vector is conditioned on. This would re-open industry leadership shifts as a within-snapshot mechanism distinct from regime."
+  ],
+  "actionable_design_principles": [
+    "Treat industry as a derived, observable label rather than a primitive input — compute sector tag at PIT but do not use it as a feature in any selection or scoring model. Report it post-hoc for attribution only.",
+    "Mandate that any industry-tilt policy be expressed as a feature-reducible rule (e.g., 'we tilt away from biotech because the seven-feature vector's typical biotech reading fails the ma10_slope_5 > 0.05 + ibd_entry_close_vs_trigger_pct > 0.05 gate'); raw sector return differentials are not admissible as a policy lever without such a reducible mechanism.",
+    "Stratify every reported performance number by snapshot_anon (regime) BEFORE stratifying by industry. If regime explains the within-industry return spread, industry is a label not a lever. Report both stratifications and a partial-correlation table.",
+    "Separate predictive-mechanism gates (per-name feature conditions: ma10_slope_5, ibd_entry_close_vs_trigger_pct, up_day_ratio_20) from portfolio-construction constraints (industry caps, exposure limits). Removing an industry tilt without replacing its factor exposure is a mechanical alpha loss, not a refutation — design the replacement, then remove the original.",
+    "Refuse industry-based allocation unless the absolute-feature matched-pair diagnostic passes the falsifier bar above. Until it does, treat the industry-allocation advantage claim as an unproven post-hoc narrative that conflates B0 selection bias, regime timing, and momentum-stage factors."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Momentum-stage penalty gate: skip or down-weight entries where (ma10_slope_5 > 0.05 AND ibd_entry_close_vs_trigger_pct > 0.05) — directly attacks the largest false_positive_ruin signature in the archaeology without invoking industry. Applied at PIT, no forward look.",
+      "why_distinct": "This is the smallest, most directly archaeology-supported rule. It targets the actual failure mode (entity_8f0df3d38e, entity_84824e6a20, entity_b6bcccdf6a) rather than a sector aggregate. Industry cannot explain why a stock with steep late-stage slope fails while one with shallow slope succeeds, but this rule can.",
+      "features": ["ma10_slope_5", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Two-feature, single-comparison gate — O(1) per pick at PIT, trivially O(N) across a universe. No calendar, no ticker, no forward look. Fits inside any scoring layer without portfolio-construction overhead."
+    },
+    {
+      "idea": "Regime/snapshot tag as a stratification variable, not a feature — compute snapshot_anon at PIT using only pre-entry information, tag every pick with it, and require that any sector-stratified performance report first condition on snapshot_anon. Industry-stratified claims that do not condition on regime are inadmissible as policy inputs.",
+      "why_distinct": "Separates the predictive layer (per-name feature gates) from the attribution/portfolio-construction layer (regime + industry stratification). This prevents the common error of attributing regime-driven returns to industry. Also prevents calendar identity from leaking as a predictive feature.",
+      "features": ["snapshot_anon"],
+      "capacity_relevance": "Snapshot_anon is a categorical label, not a numeric feature; it cannot drive a forward prediction on its own. Used only as a stratification axis for reporting and partial-correlation diagnostics. Zero predictive capacity cost."
+    },
+    {
+      "idea": "Industry exposure cap with feature-reducibility justification: cap any sector concentration at the B0-screen's pre-entry sector HHI plus a documented epsilon, and require each cap be expressed as a feature-reducible constraint (e.g., 'cap biotech at HHI+5% because biotech systematically shows up_day_ratio_20 < 0.50 and the entry-gate above already excludes 70% of biotech names'). If the constraint cannot be reduced to a feature rule, it is removed.",
+      "why_distinct": "Operationalizes the 'portfolio-construction effect vs predictive mechanism' separation. Industry caps are allowed as portfolio-construction artifacts only when they are explicit substitutions for the factor exposure the industry tag was harvesting — preventing silent double-counting and the mechanical alpha loss that pure removal would cause.",
+      "features": ["sector_hhi_pit", "up_day_ratio_20", "ma10_slope_5", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Cap is a portfolio-level constraint, not a per-pick feature — runs once after the universe is scored. Feature-reducibility justification is a documentation gate, not a runtime cost. Capacity: O(1) post-screening."
+    }
+  ]
+}
+```

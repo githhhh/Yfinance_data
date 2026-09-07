@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__lane_mechanism__q005__synthesizer",
+  "prompt_hash": "c54125fe3d1402b9a70cfd358e96eec5c983607d038f8b879348de31ee0c403b",
+  "response_hash": "dd9f7b025cd26632fc6ea90dea88d40092661319b06b737747d7c6658017716e",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

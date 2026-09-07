@@ -1,0 +1,19 @@
+
+```json
+{
+  "conclusion": "Only evidence_risk is ESSENTIAL; its removal collapses the strategy on every metric (mean spread -3.249, median -2.9845, stop delta +11.11%, positive block ratio 0.0, cvar -0.7478). lane, freshness, and distinct1 are HELPFUL but each carries a directional contradiction inside the component itself, and the remaining four (dry_false_penalty, eps_preference, weekly_volume, entry_volume) are UNCERTAIN zeros. No B1 / single-rule-repair / pre-screened Minimal-B0 passed its confirmation gate, so the actionable deliverable is the mechanism map with B0 retained, not a B1 winner. The map implies: keep evidence_risk unconditionally, keep distinct1 for tail (cvar) protection, keep freshness and lane for confirmation support, and treat the four UNCERTAIN components as low-cost carry-overs rather than load-bearing.",
+  "strongest_evidence": [
+    "evidence_risk knockout is unanimous across all five statistics: knockout_cvar_delta -0.7478, knockout_mean_spread -3.249, knockout_median_spread -2.9845, knockout_stop_delta_pct +11.11, positive_block_ratio 0.0 — no block benefited from its removal.",
+    "distinct1 is the only component whose presence delivers a large downside-tail reduction (knockout_cvar_delta -2.3401 when removed) while leaving mean_spread positive (+0.5259), making it the cleanest HELPFUL signal for tail protection.",
+    "downside_distress_hard_gate confirmation is internally consistent on the kept horizon: confirmation_mean_spread 1.2787, confirmation_full_top3_rate_pct 100.0, confirmation_slot_coverage_pct 100.0, confirmation_risk_noninferior true, and compression_gate_pass true — the policy behaves as designed once it is running, even though b1_gate_pass is false."
+  ],
+  "contradictions": [
+    "lane is classified HELPFUL yet contains a sign conflict inside its own component: knockout_mean_spread +0.0788 (helpful) coexists with knockout_median_spread -2.8251 and knockout_stop_delta_pct +5.55 (harmful). The HELPFUL label rides on the mean, while central tendency and stop frequency both worsen when lane is removed — i.e., lane's value may be concentrated in a small right tail rather than broad support.",
+    "downside_distress_hard_gate flips sign between screen and confirmation: screen_mean_spread -1.1963 / screen_cvar_delta -1.3633 / screen_positive_block_ratio 0.0 versus confirmation_mean_spread 1.2787 / confirmation_cvar_delta 3.7332 / confirmation_positive_block_ratio 0.5. The reversal is driven entirely by FWD_5 (cvar +3.7332, mean +1.8089) and FWD_6 (cvar +6.9574, mean +3.3058) rescuing FWD_1 (mean -1.9382, median -4.0596) and FWD_2 (cvar -1.3633, mean -0.4544) — pooled_jaccard_vs_b0 0.6611 sits between the screen 0.5833 and confirmation 0.7000, indicating regime mixing, not stable outperformance.",
+    "b1_gate_pass is false despite compression_gate_pass true and confirmation top-3 rate 100%, so the strongest available forward policy cannot be promoted; the system explicitly forbids calling B0 beaten even where confirmation numbers look decisive."
+  ],
+  "unresolved": [
+    "Is the FWD_5 / FWD_6 cvar lift in downside_distress_hard_gate (+3.7332 then +6.9574) a genuine distress-regime mechanism, or a screen-period artifact that compensates for FWD_1 / FWD_2 damage? A forward-shadow decomposition should split the policy's payoff into a 'distress-only' sub-period and a 'baseline' sub-period and test whether removing distinct1 from the agent recovers the FWD_5 / FWD_6 cvar gain on baseline weeks; if the cvar lift vanishes off-distress, distinct1's HELPFUL status is regime-conditional rather than structural."
+  ]
+}
+```

@@ -1,0 +1,48 @@
+{
+  "strongest_counterclaim": "The proposed close_position × volume interaction is not a real cross-sectional discriminator but a snapshot-regime artifact amplified by sample clustering. Only ~3 cases actually occupy the strict {close_vs_trigger > 0.05 AND vol_ratio_5_20 < 1.4} zone that the claim says drives ruin; the threshold values 0.045 and 1.4 are hand-picked to fit those 3 points. Meanwhile low-close + low-volume picks (entity_bec51a4227 at 0.010/1.01, entity_8ad5cd4795 at 0.009/1.00, entity_90a828939a at 0.026/1.40) routinely win large, directly refuting the 'chase = toxic' causal story. The composite f = close × vol therefore encodes noise rather than signal, and a within-snapshot demeaning test would likely collapse it.",
+  "attacks": [
+    {
+      "issue": "Severe snapshot confounding: 15/27 cases (≈56%) come from just two snapshots (snap_71486ed83c with 7 cases, snap_d0d57b1e40 with 5 cases). The interaction pattern is therefore partly a market-regime-day effect masquerading as a per-stock feature interaction.",
+      "why_it_matters": "Any cross-sectional claim built on this archaeology must be snapshot-cluster-robust. The numeric_contrasts do not condition on snapshot, so the standardized deltas for ibd_entry_close_position (-0.46) and vol_ratio_5_20 (-1.05) are likely inflated by regime heterogeneity. The 'interaction' may be picking up 'which snapshot' more than 'which stock'."
+    },
+    {
+      "issue": "Sample-size collapse in the supposed toxic zone. The researcher claims '6/8 cluster at close_vs_trigger_pct >= 0.05 with vol_ratio_5_20 in 0.91-1.63' but does not enforce the conjunctive condition vol_ratio < 1.4. Strict intersection {close > 0.05 AND vol < 1.4} yields only 3 cases (entity_8f0df3d38e 0.069/1.24, entity_4fdc3699fd 0.069/1.38, entity_40ea0cfb3b 0.061/0.91). Fitting a hand-engineered penalty with two breakpoints on 3 points is p-hacking, not mechanism discovery.",
+      "why_it_matters": "With n=3 in the operational region, every threshold choice is overfit by construction. Any 'IC > marginal' claim for the composite f cannot be statistically distinguished from a chance ordering under bootstrap on this subsample."
+    },
+    {
+      "issue": "Direct counterexamples to the 'chase = late-day thin buying' mechanism: multiple selected_winners have low close_position AND low-to-mid volume (entity_bec51a4227 close=0.010/vol=1.01, entity_8ad5cd4795 close=0.009/vol=1.00, entity_90a828939a close=0.026/vol=1.40, entity_ad2bfdee3f close=0.002/vol=1.18). If the toxic story were 'high close without volume', low close without volume should be benign, but these cases span ruin to large_win across the same feature region.",
+      "why_it_matters": "The proposed mechanism fails its own negative-control test. Low values on both inputs produce the full outcome distribution, so the interaction cannot be the underlying causal channel — at best it captures one corner of a multivariate surface and leaves the rest unmodeled."
+    },
+    {
+      "issue": "Feature conflation: ibd_entry_volume_ratio (median delta -0.21, std delta -0.50) and vol_ratio_5_20 (median delta -0.24, std delta -1.05) are listed as separate features but the researcher uses vol_ratio_5_20 as a proxy for the 'volume' side of the interaction. These are different constructs (entry-day volume vs short-vs-medium-term volume ratio). The composite f therefore mixes two unnormalized scales and may double-count or conflict.",
+      "why_it_matters": "Encoding the interaction without reconciling which volume measure is the confirmatory one introduces hidden degrees of freedom. The 'chase_score' could equivalently be built on either measure and yield different rankings, making the B0 in-universe penalty sensitive to an arbitrary modeling choice rather than an economic mechanism."
+    },
+    {
+      "issue": "entity_2c58cebc59 is selected_winner with close=0.034/vol=1.62 yet suffered a -25.1% pullback over 6 weeks before resolving large_win. entity_6618d3e80c is double-labeled selected_winner|false_positive_ruin. The 'hazard' framing treats these as binary but outcome_label reflects W4, not max drawdown or tail risk. A B0 pick can be a 'winner' by 4-week return yet destroy capital via path.",
+      "why_it_matters": "If the interaction is meant to protect against ruin, equating 'winners' with 'safe' is a label-construction error. The proposed policy may filter out names that look dangerous but actually have high-W4 + manageable drawdown, while retaining names that win on the W4 metric but execute the -25% path."
+    },
+    {
+      "issue": "Multiplicative encoding amplifies weak marginals. Both standardized deltas are already modest (-0.46 and -1.05); multiplying them does not increase signal-to-noise — it can only reduce it because each marginal's standard error compounds. The claim that 'f = close × vol delivers higher IC than either marginal' is unfalsified here and conflicts with basic error propagation.",
+      "why_it_matters": "A composite that is statistically weaker than either input cannot be used as an in-universe penalty without net IC drag. The researcher proposes subtracting chase_score from B0 composite, but if chase_score is noise, this subtraction actively degrades the existing ranking."
+    },
+    {
+      "issue": "Policy leaks via 'wait-for-pullback' override. The proposal to defer entry one bar when chase_score is high adds a temporal decision rule. With only 3 cases in the trigger zone and unknown forward overlap across snapshots, this rule is unobservable in the archaeology and cannot be validated without outer-forward outcomes, which the rules forbid inferring.",
+      "why_it_matters": "This makes the policy unfalsifiable within the current evidence and risks adding lookahead through 'deferred entry' logic that implicitly assumes a path not visible in the snapshot."
+    }
+  ],
+  "counterexamples_to seek": [
+    "Within-snapshot test: compute the proposed chase_score for all stocks within snap_71486ed83c alone and check whether the high-close-low-vol subset ranks worse than low-close-low-vol subset on W4 — if the interaction is genuine, this should hold *within* the snapshot.",
+    "Randomization-style audit: permute the snapshot labels across the 27 cases and recompute the numeric_contrasts; if the standardized deltas for close_position and vol_ratio_5_20 collapse toward zero, the original signal is a snapshot artefact.",
+    "Sensitivity to breakpoints: evaluate chase_score under all 4 breakpoint combinations of {0.04, 0.045, 0.05} × {1.3, 1.4, 1.5}; if the 'toxic' subset membership changes by >30% under any adjacent threshold, the rule is overfit to the specific 3-case cluster.",
+    "Counterfactual using ibd_entry_volume_ratio (not vol_ratio_5_20): does the same interaction pattern hold when the volume leg is the alternative volume measure? If not, the researcher has been measuring a different construct than the one in the composite.",
+    "Outcome-by-path check: for the 8 false_positive_ruin cases, plot individual weekly return paths (if derivable) to see if the -16%, -14%, -12% drawdowns cluster in weeks 2-3 vs weeks 3-4 — this tests whether high-close-low-vol ruins are about entry-timing vs regime-rotation.",
+    "Conditional-on-momentum: subset to mom_20 > 0.15 and check whether close × vol still discriminates winners from ruins. If mom absorbs the signal, the interaction is a proxy for momentum, not an independent mechanism."
+  ],
+  "what_would_change_my_mind": [
+    "A walk-forward OOS replication showing the strict {close > 0.05 AND vol_ratio_5_20 < 1.4} region has ruin rate ≥55% across at least 5 disjoint snapshots not in the archaeology, with the effect surviving within-snapshot ranking.",
+    "Demonstration that after snapshot-demeaning or fixed-effects regression, the close × vol term has a statistically significant coefficient (p < 0.05) with a sign and magnitude consistent with the chase-score encoding.",
+    "An ablation showing chase_score computed on ibd_entry_volume_ratio (the alternative measure) produces a within-snapshot-robust IC > the B0 composite by at least 0.02 in absolute IC, with the gain stable across bootstrap resamples.",
+    "A larger sample (n ≥ 100) where the low-close-low-vol corner also shows ruin concentration — i.e., evidence that low values are protective, not just evidence that high values without volume confirmation are toxic. Without this, the mechanism is one-tailed and asymmetric in a way the data does not yet support.",
+    "Identification of an economic channel (e.g., order-flow imbalance, options OI skew, short-interest data) that independently predicts the high-close-low-vol regime, distinguishing it from a mere snapshot-cluster artifact."
+  ]
+}

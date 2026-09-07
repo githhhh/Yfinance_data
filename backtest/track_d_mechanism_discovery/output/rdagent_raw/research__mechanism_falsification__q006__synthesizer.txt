@@ -1,0 +1,52 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 35,
+  "mechanism_summary": "The 'weekly_volume' B0 component as currently instantiated (most likely vol_ratio_5_20, possibly with ibd_entry_volume_ratio support) cannot be cleanly classified as either independent of or redundant with the surrounding momentum/tempo B0 terms on the available frozen evidence. Three competing interpretations remain live: (a) redundancy — the standardized contrast deltas of vol_ratio_5_20 (-1.05), up_day_ratio_20 (-1.19), and mom_20 (-1.00) cluster so tightly that they are tracking overlapping information, and the long-window volume_ratio shows near-zero discrimination (+0.23) consistent with most of the apparent volume signal collapsing into short-horizon price tempo; (b) partial independence — divergence cases such as entity_2f86543bf6 (vol_ratio=1.558, mom_20=-0.008, large_win) and the sub-1.0-volume winners (entity_8ad5cd4795) demonstrate configurations where volume and momentum carry non-overlapping information; (c) regime-conditioned signal — the 9+ snapshot IDs in the archaeology span materially different market regimes, and a single redundancy verdict averaged across regimes may invert in any sub-period. The Synthesizer rules UNRESOLVED because the empirical conditional tests designed by the Experimental Designer (within-momentum-quintile AUC, divergence quadrants, up-day-ratio stratification) have not yet been executed, the sample is outcome-conditioned (n=27 failure-archaeology cases) which inflates apparent predictor correlation by range-restriction, and no pairwise Spearman/Bhatt matrix between weekly_volume and its sibling B0 terms is exposed in frozen evidence. The mechanism lean is toward 'mostly redundant confirmation filter with a small, possibly sector/regime-gated residual' but this is not sufficient for policy commitment.",
+  "falsifiers": [
+    "REFUTES INDEPENDENCE (supports redundancy): Regress vol_ratio_5_20 on {mom_20, up_day_ratio_20, ma10_slope_5, px_vs_ma20} across the unconditional B0 universe (not the n=27 outcome-conditioned archaeology); R^2 ≥ 0.55 with VIF > 4 indicates dominant collinearity, in which case weekly_volume should be down-weighted to a confirmation filter.",
+    "REFUTES INDEPENDENCE (supports redundancy): Mean within-mom_20-quintile AUC of vol_ratio_5_20 ≤ 0.52 AND ratio (within-quintile AUC / unconditional AUC) ≤ 0.50 across the unconditional universe; this is the experimental designer's Test 1 failure criterion and confirms price-tempo bin carries the signal.",
+    "SUPPORTS INDEPENDENCE (falsifies redundancy): Within the low-mom_20 stratum (mom_20 < 0.05), high-volume vs low-volume quadrants differ in selected_winner rate by ≥ 25pp with Fisher p < 0.15 across the unconditional universe — the experimental designer's Test 2 success criterion, demonstrating orthogonal information when momentum is silent.",
+    "SUPPORTS INDEPENDENCE (falsifies redundancy): Mean within up_day_ratio_20 band Spearman ρ(vol_ratio_5_20, w4_return_bucket) ≥ 0.25 with sign matching unconditional direction — the experimental designer's Test 3 success criterion, indicating separable 'pure volume acceleration' rather than tempo-confirmation.",
+    "REGIME-DEPENDENT FALSIFIER: Pre-2020 vs post-2022 sub-period sign-inversion in the vol_ratio_5_20 win/loss contrast (the researcher's Test 4 anticipation). If the contrast inverts, the 'institutional accumulation' mechanism is wrong and weekly_volume is a regime-conditioned momentum proxy rather than a structural B0 input.",
+    "SELECTION-ARTIFACT FALSIFIER: An unconditional sample (all B0 candidates at each snapshot, not just outcome-divergent cases) showing vol_ratio_5_20 partial-correlation with mom_20 dropping below 0.30 compared to ≥ 0.60 on the archaeology subset would confirm the apparent redundancy is a range-restriction artifact, not a structural relationship."
+  ],
+  "actionable_design_principles": [
+    "Do NOT drop weekly_volume from the B0 scorecard at this evidence stage. The counter-cases (entity_2f86543bf6, entity_8ad5cd4795) establish that winners exist in configurations where volume disagrees with momentum, which a redundancy claim cannot accommodate.",
+    "Do NOT promote weekly_volume to a primary B0 axis either. The standardized contrast deltas cluster tightly with up_day_ratio_20 and mom_20, indicating shared information content; using weekly_volume as a primary gate would double-count tempo.",
+    "Treat weekly_volume strictly as a confirmation modifier on momentum candidates — apply the volume gate only AFTER mom_20 passes a primary threshold. This is the cheapest policy that respects both the redundancy-leaning evidence and the divergence counter-cases.",
+    "Cap vol_ratio_5_20 at 1.5 to suppress blowoff-top ruins (entity_84824e6a20 at 1.625 → ruin) but DO NOT cap from below at 1.0 — entity_40ea0cfb3b (vol=0.906) was a ruin, demonstrating low volume is not protective and a floor would mis-rank.",
+    "Audit ibd_entry_volume_ratio as a SEPARATE B0 term from weekly_volume. Its standardized delta (-0.50) is non-trivial and may capture breakout-day institutional flow that the rolling 5d/20d ratio misses; collapsing the two into one B0 slot is an unsupported conflation.",
+    "Run all three Experimental Designer tests on the UNCONDITIONAL B0 universe (not the n=27 archaeology subset) before any replace/drop decision. The selection-on-dependent-variable bias (Skeptic attack #2) makes archaeology-only verdicts unreliable for policy.",
+    "Pool snapshots into regime buckets (pre-2020 bull, 2022 bear, 2023 chop, post-AI-rally) and report vol_ratio_5_20 conditional statistics within each. A single redundancy verdict pooled across regimes is not actionable."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Conditional volume-gate DSL: weekly_volume_gate activates only when mom_20 > threshold_t and px_vs_ma50 > 0; below the gate, vol_ratio_5_20 contributes zero weight to the B0 composite. Above the gate, it contributes as a confirmation multiplier capped at 1.5.",
+      "why_distinct": "Unlike a static drop-in or static cap, this DSL makes volume a regime-conditional modifier rather than a primary or peer feature, which is the minimal change that respects both the redundancy-leaning evidence (don't double-count tempo) and the divergence counter-cases (volume can matter when momentum is silent).",
+      "features": ["mom_20", "px_vs_ma50", "vol_ratio_5_20"],
+      "capacity_relevance": "Moderate: gates prevent over-trading in low-momentum universes where volume is noise, but require the gate threshold itself to be calibrated — arbitrary thresholds are the failure mode."
+    },
+    {
+      "idea": "Divergence-flag DSL: produce a binary 'volume-momentum divergence' feature that fires when vol_ratio_5_20 > 1.4 and mom_20 < 0.05 (high-vol + low-mom), routing these cases into a separate outcome bucket for outcome-conditioned analysis rather than collapsing them into the same B0 composite.",
+      "why_distinct": "Entity_2f86543bf6 (vol=1.558, mom=-0.008, large_win) is the existence proof that this divergence quadrant carries non-redundant information. A divergence flag operationalizes the experimental designer's Test 2 quadrant structure as a first-class signal rather than a hidden interaction.",
+      "features": ["vol_ratio_5_20", "mom_20"],
+      "capacity_relevance": "High diagnostic value but low standalone capacity — the divergence quadrant is rare in the unconditional universe, so it functions as an exception handler rather than a primary edge source."
+    },
+    {
+      "idea": "Sector-relative volume z-score DSL: replace absolute vol_ratio_5_20 with a 13-week sector-relative z-score, intended to strip out the market-beta component that co-varies with mom_20.",
+      "why_distinct": "Hypothesized by the researcher as a cleaner replacement, but explicitly UNVALIDATED — the Skeptic correctly notes no evidence in frozen data confirms it is computable for IBD-style entries, no backtest shows it outperforms absolute vol_ratio_5_20. Include as an experimental DSL slot for backtest, NOT as a policy commitment.",
+      "features": ["vol_ratio_5_20", "sector_volume_median_13w", "sector_volume_std_13w"],
+      "capacity_relevance": "Unknown — depends on whether sector decomposition is available in production data and whether the unconditional universe shows better orthogonal discrimination. Cannot be capacity-rated without empirical test."
+    },
+    {
+      "idea": "Regime-conditional volume bands DSL: segment snapshots into regime tags (post-COVID-rally, 2022-bear, 2023-chop, post-AI-rally) and apply regime-specific vol_ratio_5_20 weights within each band rather than a single global weight.",
+      "why_distinct": "Addresses the snapshot heterogeneity (Skeptic attack #9) and the researcher's Falsification Test 4 directly. Rather than averaging volume signal across regimes — which produces the apparent redundancy — this preserves regime-specific discriminative power and lets the B0 scorecard adapt.",
+      "features": ["vol_ratio_5_20", "snapshot_regime_tag"],
+      "capacity_relevance": "Capacity risk: regime tags themselves become a leakage vector if used as predictors rather than stratification axes. Must be enforced as a stratification layer only, per the experimental designer's leakage checks."
+    }
+  ]
+}
+```

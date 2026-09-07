@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "mechanism_claim": "The 'freshness' component is redundant with existing momentum/time features (mom_20, ma10_slope_5, up_day_ratio_20) and captures no independent signal; it is a relabeled proxy for recent price action quality that is already encoded in the selected_winner profile.",
+  "evidence_for": [
+    "Selected winners show mom_20 median of 0.163 vs false negatives 0.058 (standardized_delta=-1.0005), directly encoding 'how much recent acceleration occurred'",
+    "Selected winners show up_day_ratio_20 median of 0.625 vs false negatives 0.50 (standardized_delta=-1.1882), encoding 'freshness of directional bias'",
+    "Selected winners show ma10_slope_5 median of 0.027 vs false negatives 0.012 (standardized_delta=-0.6815), encoding 'current momentum velocity'",
+    "Cases like entity_ead73f4390 (selected_winner, mom_20=0.320, up_day_ratio_20=0.70) and entity_2f86543bf6 (selected_winner, mom_20=-0.008, up_day_ratio_20=0.35) show winners span a range that 'freshness' would flatten, suggesting the feature aggregates rather than distinguishes",
+    "The base_duration_weeks contrast (median_delta=-8.0) implies setups that consolidate longer are worse—a temporal effect already partially captured by ma_slope features during the base period"
+  ],
+  "evidence_against": [
+    "entity_8ad5cd4795 (selected_winner, mom_20=0.004, ma10_slope_5=-0.006, up_day_ratio_20=0.70) is a winner despite weak momentum, possibly indicating a distinct 'freshness' signal from a new base start rather than momentum magnitude",
+    "pullback_pct standardized_delta=+0.6404 (false negatives less deep) suggests 'time since pullback' may encode recovery freshness not fully captured by forward-looking slope features",
+    "ruin outcomes include cases like entity_6618d3e80c (selected_winner|false_positive_ruin, mom_20=0.251) where high momentum coexists with ruin, implying momentum and freshness may operate in different causal pathways",
+    "The feature set lacks an explicit 'days since breakout trigger' variable, which could be the unique 'freshness' signal distinct from ongoing momentum measures"
+  ],
+  "falsifiable_predictions": [
+    "If freshness is redundant: regression of outcome on (mom_20 + ma10_slope_5 + up_day_ratio_20) will absorb >90% of the variance explained by any freshness proxy constructed from these features",
+    "If freshness is unique: adding a 'days_since_ibd_entry_trigger' variable (PIT-observable) will significantly improve classification AUC beyond the existing feature set, with effect size >0.03",
+    "If freshness proxies freshness: among entities with identical mom_20 and up_day_ratio_20, those with lower base_duration_weeks will show higher selected_winner rate (specificity test for temporal independence)",
+    "Falsification criterion: if Pearson correlation between freshness_score and first principal component of (mom_20, ma10_slope_5, ma20_slope_5, up_day_ratio_20) exceeds 0.85, declare redundancy confirmed"
+  ],
+  "policy_implications": [
+    "If redundancy confirmed: drop freshness as an independent component; weight its proxy features individually to allow heterogeneous contribution to portfolio construction",
+    "If freshness is unique: replace with a cleaner metric: 'trading_days_since_ibd_trigger_entry' (integer, PIT-observable, no lookback bias) rather than a composite of lagged features",
+    "If ambiguous: use freshness as a secondary filter (e.g., freshness_score < threshold) rather than a primary feature, reducing its leverage on model decisions while preserving optionality",
+    "Avoid 'freshness_score' as a derived composite; instead require PIT-observable atomic features that independently pass the redundancy test"
+  ]
+}
+```

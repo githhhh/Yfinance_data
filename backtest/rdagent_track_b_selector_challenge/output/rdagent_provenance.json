@@ -1,0 +1,44 @@
+{
+  "rdagent_version": "0.8.0",
+  "run_id": "run_20260901_120531",
+  "command": "rdagent fin_factor --step-n=1",
+  "chat_model": "deepseek/deepseek-v4-pro",
+  "embedding_model": "deepseek/deepseek-v4-pro",
+  "step_n": 1,
+  "start_time": "2026-09-01T12:05:31.673830",
+  "end_time": "2026-09-01T12:11:31.265512",
+  "exit_code": 0,
+  "task_injection_mode": "generic_financial_factor_generator_evaluated_externally",
+  "task_spec_read_verified": false,
+  "train_data_boundary": "<= 2026-05-22",
+  "leakage_columns_excluded": true,
+  "captured_factors": [
+    {
+      "factor_name": "factor_198f5d40",
+      "source_artifact_path": "git_ignore_folder/RD-Agent_workspace/5c3bd989c8d24c5a963a8e6b433d80bd/factor.py",
+      "source_artifact_hash": "198f5d408477858bca46cfa5494446d221dc2c956ba54fff738700a626278ec7",
+      "captured_factor_path": "raw_rdagent/run_20260901_120531/factors/factor_198f5d40.py",
+      "captured_factor_hash": "198f5d408477858bca46cfa5494446d221dc2c956ba54fff738700a626278ec7",
+      "verified_match": true,
+      "origin": "rdagent_original"
+    },
+    {
+      "factor_name": "factor_2aca99fe",
+      "source_artifact_path": "git_ignore_folder/RD-Agent_workspace/7e5444955adf42ea88577d6c4d65780d/factor.py",
+      "source_artifact_hash": "2aca99fe796af3472623f4be225e8a46d372f2dd1db888b97447de199745f3f0",
+      "captured_factor_path": "raw_rdagent/run_20260901_120531/factors/factor_2aca99fe.py",
+      "captured_factor_hash": "2aca99fe796af3472623f4be225e8a46d372f2dd1db888b97447de199745f3f0",
+      "verified_match": true,
+      "origin": "rdagent_original"
+    },
+    {
+      "factor_name": "factor_a0e8acc1",
+      "source_artifact_path": "git_ignore_folder/RD-Agent_workspace/b80f3ab718714c62bebea6c79601f8a7/factor.py",
+      "source_artifact_hash": "a0e8acc1b48ba38243dc2c9ebd002f0bce8a2b63ead35566d4c91216e94ffdfa",
+      "captured_factor_path": "raw_rdagent/run_20260901_120531/factors/factor_a0e8acc1.py",
+      "captured_factor_hash": "a0e8acc1b48ba38243dc2c9ebd002f0bce8a2b63ead35566d4c91216e94ffdfa",
+      "verified_match": true,
+      "origin": "rdagent_original"
+    }
+  ]
+}

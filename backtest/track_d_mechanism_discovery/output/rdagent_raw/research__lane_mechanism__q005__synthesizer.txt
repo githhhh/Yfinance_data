@@ -1,0 +1,52 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 35,
+  "mechanism_summary": "The hypothesis 'Lane is only a proxy for freshness/geometry/volume in constructive pullback weeks' cannot be cleanly accepted or rejected on the supplied evidence. Three structural problems prevent resolution: (a) definitional circularity — 'constructive pullback weeks' is operationally defined by the same pullback/momentum/slope/up-day features the proxy basket contains, so conditioning on this subset by construction removes the orthogonal-variation needed to test the claim; (b) severe collinearity across 8+ proxy features with |std_delta|>0.5 against only ~27 cases (effective independent N ≈ 8-12 after snapshot de-duplication of snap_71486ed83c, snap_d0d57b1e40, snap_b8420124eb), making partial-correlation t-values and per-feature coefficients numerically uninterpretable; (c) no clean counterexample exists in the table — every cited B0 winner sits on a stack of favorable proxies, and every cited false_positive_ruin shows at least one weak proxy (entity_3472243e0c weak up_day_ratio_20, entity_b6bcccdf6a weak up_day_ratio_20, entity_40ea0cfb3b weak slopes and low up_day_ratio_20). The proxy hypothesis is the more parsimonious explanation and is consistent with all supplied cases, but a residual orthogonal Lane component of small magnitude (e.g., 0.5-1.5pp W4 IC) cannot be ruled out at this sample size. The Researcher's 'shallow-pullback winners' (entity_440e297253, entity_8ad5cd4795) are predicted by a momentum+slope composite, not refutations of the proxy claim; the Researcher's 'false positives at low up_day_ratio_20' argument is itself circular because up_day_ratio_20 IS in the proxy basket. The honest reading is that Lane is plausibly a labeled/thresholded version of the proxy composite, with the orthogonal-mechanism claim remaining an open empirical question that requires out-of-sample ablation with snapshot-clustered CV and a synthetic-Lane baseline.",
+  "falsifiers": [
+    "Out-of-sample (held-out snapshot cluster, ≥10 independent market weeks) macro-AUC of a proxy-only model (logistic regression over pullback_pct, pullback_duration_weeks, mom_20, vol_ratio_5_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, up_day_ratio_20) reaches within 0.02 of the B0 full model (Lane + proxies) — falsifies Lane as orthogonal mechanism.",
+    "Synthetic-Lane ablation: a deterministic monotone transform of the proxy composite (e.g., percentile rank of standardized proxies) reproduces Lane's slot assignments with ≥95% agreement and matches its W4 IC within bootstrap CI — falsifies Lane as carrying information beyond proxies.",
+    "Discovery of even one case where B0_LANE is positive while ≥7 of 9 proxies are negative and W4 outcome is large_win (or the symmetric: B0_LANE negative with ≥7 of 9 proxies positive and W4 outcome is ruin) — would prove Lane captures information orthogonal to the basket.",
+    "Decile entropy test within constructive-pullback subset: mean Shannon entropy of {B0_LANE, LANE_NEUTRAL, SCORE_BEFORE_LANE} assignments across deciles of the proxy composite exceeds 0.80 nats — falsifies Lane-as-monotone-proxy.",
+    "Snapshot fixed-effects regression: after absorbing snapshot_anon dummies and the 9 proxy features, Lane's coefficient on W4 return has |t|<1 with coefficient magnitude <0.3pp — falsifies residual Lane signal after regime and proxy control.",
+    "Reverse-causality audit reveals that removing any single proxy feature from the proxy basket degrades Lane reconstruction AUC by ≥0.08 — confirms Lane is that single feature under another name (definitional proxy)."
+  ],
+  "actionable_design_principles": [
+    "Treat Lane as a possibly-redundant labeled composite of proxies until out-of-sample, snapshot-clustered ablation evidence proves otherwise; default to parsimony (proxy-only model) when Lane and proxy-composite agree.",
+    "Any future Lane-vs-proxy test MUST cluster CV folds by snapshot_anon to avoid regime-leakage inflation; effective sample size after de-duplication is ~8-12, so plan power calculations accordingly (do not demand >2pp IC spreads).",
+    "Adopt the synthetic-Lane baseline as a standard validation step: build a deterministic monotone transform of the proxy composite, compare its W4 IC to real Lane's W4 IC in constructive-pullback buckets; differences <bootstrap-CI-half-width are uninformative and Lane should be flagged for retirement review.",
+    "Pre-register the disagreement set: cases where B0_LANE slot and proxy-composite decile disagree by ≥3 deciles. These are the only cases that carry discriminative information; analyze them separately from the agreement set.",
+    "Track Lane-marginal-contribution (delta-IC = IC_full − IC_proxyonly) by regime (constructive-pullback vs not, deep-pullback vs shallow, high-vol vs low-vol). Honest reporting requires regime-stratified marginal contribution, not unconditional Lane-vs-no-Lane spread.",
+    "If Lane-marginal-contribution is <1pp W4 IC in the constructive-pullback regime after snapshot-clustered validation, retire Lane as a separate feature and replace with the proxy composite; the labeling overhead is not justified.",
+    "Build a 'Lane redundancy dashboard' that monitors live correlation between Lane slot and proxy composite decile; sustained correlation >0.85 across rolling windows triggers a retirement review."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Constructive-pullback gate requires BOTH Lane and proxy-composite agreement: only enter B0_LANE when the candidate also sits in the top-3 deciles of the standardized proxy composite (pullback_pct, pullback_duration_weeks, mom_20, vol_ratio_5_20, slopes, up_day_ratio_20). Disagreement cases are downgraded to half-size or skipped.",
+      "why_distinct": "Forces explicit redundancy check between Lane and the proxy basket at the policy level, rather than relying on a single composite signal. Reduces exposure to the regime where Lane says yes but proxies say no (entity_3472243e0c archetype: favorable slopes yet ruin).",
+      "features": ["lane_slot", "proxy_composite_decile", "pullback_pct", "pullback_duration_weeks", "mom_20", "vol_ratio_5_20", "ma10_slope_5", "ma20_slope_5", "px_vs_ma20", "px_vs_ma50", "up_day_ratio_20"],
+      "capacity_relevance": "Directly constrains capacity in constructive-pullback regimes where Lane-proxy disagreement is most likely to be a regime artifact rather than a genuine orthogonal signal; should reduce false_positive_ruin rate without large loss of selected_winners."
+    },
+    {
+      "idea": "Synthetic-Lane ablation as a live shadow model: every week, compute a synthetic_Lane = percentile-rank(proxy_composite) and compare its slot assignments and forward IC against real Lane. Report rolling 13-week delta-IC; trigger policy review if delta-IC < 0.005 in absolute value for 8+ consecutive weeks.",
+      "why_distinct": "Operationalizes the falsification test as a continuous monitoring signal rather than a one-off validation; converts the unresolved mechanism question into a tractable, observable, regime-aware KPI.",
+      "features": ["lane_slot", "synthetic_lane_slot", "proxy_composite", "w4_return", "snapshot_anon"],
+      "capacity_relevance": "Does not directly change capacity but provides the empirical signal needed to decide whether Lane should continue to consume a feature slot in the model and influence position sizing."
+    },
+    {
+      "idea": "Snapshot-clustered bootstrap CI for Lane marginal IC: report bootstrap 90% CI of (IC_full − IC_proxyonly) in the constructive-pullback bucket, resampling at the snapshot level (not the case level) to respect pseudo-replication structure. If CI lower bound is negative or below 0.5pp for two consecutive quarter-ends, flag Lane for retirement.",
+      "why_distinct": "Honest uncertainty quantification given the snapshot-clustered data structure; avoids the over-precision of case-level bootstrap that ignores regime repetition.",
+      "features": ["snapshot_anon", "w4_return", "lane_slot", "proxy_composite"],
+      "capacity_relevance": "Informs capacity allocation indirectly: a Lane signal that cannot clear a 0.5pp marginal-IC bar with snapshot-respecting CIs should not be allowed to influence position sizing in constructive-pullback regimes."
+    },
+    {
+      "idea": "Disagreement-set position sizing: when real Lane and synthetic-Lane (proxy composite rank) disagree on whether a name is a 'Lane positive' candidate, restrict position size to ≤50% of normal B0 size and tag the case for post-mortem review.",
+      "why_distinct": "Treats Lane-proxy disagreement as a regime of elevated uncertainty deserving smaller bets and explicit learning, rather than implicitly averaging over it.",
+      "features": ["lane_slot", "synthetic_lane_slot", "disagreement_flag", "pullback_pct", "pullback_duration_weeks"],
+      "capacity_relevance": "Caps capacity in exactly the regime where Lane's information content is most uncertain, converting an epistemic unknown into a bounded risk exposure."
+    }
+  ]
+}
+```

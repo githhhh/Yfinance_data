@@ -1,0 +1,35 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 25,
+  "mechanism_summary": "Base_depth_pct and mom_20 may co-moderate ruin risk for a SUBSET of B0 picks: specifically, high-mom_20 (>0.15) parabolic extensions in shallow bases (>-25%) cluster with false_positive_ruin (entity_8f0df3d38e, 4fdc3699fd, 3472243e0c, b6bcccdf6a, and dual-labelled 6618d3e80c). However, 3/8 ruin cases (entity_ccc90a671f mom_20=0.074, 84824e6a20 mom_20=0.067, 55c2da490e mom_20=0.036, 40ea0cfb3b mom_20=0.024) are LOW-momentum events the rule cannot address, and 5 selected_winners have mom_20>0.15 (entity_ead73f4390=0.320, 2c58cebc59=0.321, b00579f203=0.230, 3adc078f01=0.171, bec51a4227=0.166). Standardized delta for base_depth_pct is only 0.19 (weakest signal in the contrast table), versus up_day_ratio_20 (-1.19), vol_ratio_5_20 (-1.05), and mom_20 (-1.00). The piecewise rule therefore covers only the parabolic-ruin sub-regime and cannot be the sole filter.",
+  "falsifiers": [
+    "If held-out B0 cohort shows ruin-rate contrast between (mom_20>0.15 & base_depth_pct>-25%) and (mom_20>0.15 & base_depth_pct<-30%) below 0.30 absolute, or if accept-set ruin rate exceeds 0.30 (per T1 failure criterion), the interaction is not stable.",
+    "If slopes+volatility model reaches within 0.02 AUC of the full piecewise model (per T2), base_depth_pct adds no incremental discrimination beyond MA slopes and volatility — mom_20 is partially a proxy for ma10_slope_5 (correlation visible in cases: entity_6618d3e80c ma10=0.075, ma20=0.020).",
+    "If non-parabolic ruins (mom_20<0.10, e.g., entity_ccc90a671f, 40ea0cfb3b, 55c2da490e) dominate new held-out ruin mass, the rule's recall on the ruin class is insufficient regardless of precision."
+  ],
+  "actionable_design_principles": [
+    "Encode the threshold as an INTERNAL re-ranking filter over the existing B0 top-3 (no universe expansion). Only intervene if a flagged candidate sits in slot 1, 2, or 3 of the PIT base ranking; compute the swap against the original slot's w4 outcome to measure net slot-quality change.",
+    "Pair the parabolic-rejection rule with a SEPARATE filter for non-parabolic ruins using the stronger univariate signals (up_day_ratio_20<0.55, vol_ratio_5_20<1.2, or ma20_slope_5<0.01) — these address the ruin cases the mom_20/base_depth_pct rule misses (ccc90a671f, 40ea0cfb3b, 55c2da490e, 84824e6a20)."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "b0_parabolic_reject: drop candidate iff mom_20>0.15 AND base_depth_pct>-25% AND ma10_slope_5>0.04 (triple conjunction: parabolic momentum + shallow base + steep short-term slope). Otherwise pass through. Applied as swap-into-slot logic, not universe expansion.",
+      "why_distinct": "Adds ma10_slope_5 conjunct because mom_20 alone is correlated with slope; the conjunction isolates true parabolic extensions (entity_3472243e0c ma10=0.030 misses, entity_b6bcccdf6a ma10=0.067 hits — calibration needed in held-out). Pure mom_20 + base_depth_pct would also reject entity_2c58cebc59 (winner, mom_20=0.321) needlessly.",
+      "features": [
+        "mom_20",
+        "base_depth_pct",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Treats base_depth_pct as a moderator on a momentum-slope condition rather than as a standalone filter, reducing false-rejection of legitimate high-momentum breakouts from deep bases."
+    },
+    {
+      "idea": "b0_low_mom_shallow_reject: drop candidate iff mom_20<0.05 AND base_depth_pct>-25% (catches demand-failure shallow-base setups that the parabolic rule misses, e.g., entity_40ea0cfb3b mom_20=0.024, entity_55c2da490e mom_20=0.036).",
+      "why_distinct": "Mirrors the researcher's second clause but limits it to shallow bases to avoid killing low-mom deep-base winners (entity_8ad5cd4795 mom_20=0.004 with deep base context passed through; entity_90a828939a mom_20=0.036 also passed). Distinct from parabolic rule because it operates on opposite momentum tail.",
+      "features": [
+        "mom_20",
+        "base_depth_pct"
+      ],
+      "capacity_relevance": "Covers a ruin sub-regime the parabolic-reject filter cannot see; together the two clauses address both tails of the ruin distribution while preserving mid-momentum winners and steep-base deep-base breakouts."
+    }
+  ]
+}

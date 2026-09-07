@@ -1,0 +1,79 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 42,
+  "mechanism_summary": "The univariate false_negative-vs-selected_winner contrast (standardized delta -0.5013) is consistent with the claim that ibd_entry_volume_ratio carries some signal, but no conditional or partial-correlation evidence has been generated to demonstrate that this signal is incremental over the neighboring B0 volume regime term (vol_ratio_5_20, delta -1.0455) or the breakout-magnitude terms (ibd_entry_breakout_range_ratio, ibd_entry_close_position, ibd_entry_close_vs_trigger_pct). The mechanisms claim — that entry_volume captures day-of-breakout demand conviction distinct from prevailing volume regime and breakout mechanics — is plausible but neither supported nor refuted by the frozen evidence. The skeptic's definitional-overlap objection (entry_volume_ratio and volume_ratio share arithmetic structure via overlapping baselines) and snapshot-cluster confound (4/5 false negatives from a single snapshot) jointly prevent any independence claim from being defensible at this stage. Verdict must be UNRESOLVED until the experimental-designer battery is executed.",
+  "falsifiers": [
+    "Refutation #1 — Definitional redundancy: After standardizing both ibd_entry_volume_ratio and vol_ratio_5_20 on the archaeology set, the absolute Pearson |r| exceeds 0.7 across snapshots. If so, the two are effectively one feature with two windows and the slot is mis-named.",
+    "Refutation #2 — Magnitude-collapsing partial residual: The Test 2 OLS residual r_i of ibd_entry_volume_ratio regressed on (ibd_entry_breakout_range_ratio, ibd_entry_close_position, ibd_entry_close_vs_trigger_pct) has |standardized_delta(r)| < 0.40 vs the unselected false_negative/selected_winner contrast. This proves entry_volume is an upcoded breakout-magnitude proxy.",
+    "Refutation #3 — Pre-entry placebo parity: A strictly pre-entry (t-2, t-1) volume ratio produces |standardized_delta(v_placebo)| ≥ 0.70 × |standardized_delta(ibd_entry_volume_ratio)|. This shows the information is pre-event regime thrust, not entry-day conviction, and the slot label is false.",
+    "Refutation #4 — Within-quintile null: Within each vol_ratio_5_20 quintile, the high-minus-low entry_volume win-rate sign is positive in ≤2 of 5 slices across the archaeology set. Independence of the two volume features is rejected at the conditioning level.",
+    "Refutation #5 — Slot-swap non-improvement: The thrust-normalized definition t_i = ibd_entry_volume_ratio_i / vol_ratio_5_20_i does NOT show |standardized_delta(t)| ≥ |standardized_delta(ibd_entry_volume_ratio)| + 0.10, indicating regime normalization destroys rather than enhances signal — the slot's content does not behave as a regime-demeaned thrust should.",
+    "Refutation #6 — Cohort transfer failure: Train on non-archaeology snapshots and predict false_negative/selected_winner status on the archaeology sample using ibd_entry_volume_ratio alone (logistic, IC, or decile monotone test); out-of-sample AUROC < 0.52. Generalization is required for the mechanism to be considered real.",
+    "Refutation #7 — Snapshot clustering confound: A leave-one-snapshot-out re-fit of the false_negative vs selected_winner median delta yields sign inversion or magnitude collapse when the snap_71486ed83c-dominated false-negative cohort is removed. The original delta was an artifact of snapshot-level regime, not a feature-level mechanism."
+  ],
+  "actionable_design_principles": [
+    "Execute the experimental-designer test battery in a fixed pre-registered order on the archaeology set before any production re-weighting of ibd_entry_volume_ratio; do not back-fit thresholds based on this run.",
+    "Treat ibd_entry_volume_ratio as a SLOT LABEL QUESTION rather than a feature question: the slot must be filled by whichever (raw event volume, regime-normalized thrust, pre-entry placebo, breakout-orthogonal residual) maximizes out-of-sample information. Pick the winner; do not provision all four simultaneously.",
+    "Pre-compute and freeze q05(vol_ratio_5_20), the inter-snapshot fixed effect, and the leave-one-snapshot-out OLS coefficients BEFORE looking at residuals; this prevents post-hoc tuning and aligns with the time-stamp discipline of the B0 selection chain.",
+    "Quarantine snapshot_71486ed83c as a calibration/stratification variable — never a feature — because the false-negative cohort is over-concentrated there; require ≥2 independent snapshots to confirm any sign claim about entry_volume.",
+    "If the conditional tests fail, retire entry_volume as a standalone slot and replace it with the best of (residualized event volume, regime-normalized thrust, composite z-score over all four IBD entry features); redistribute the freed weight to vol_ratio_5_20 and mom_20 which dominate the contrast ranking.",
+    "Add a one-quarter shadow-tracking policy: alongside the production B0, log ibd_entry_volume_ratio's realized IC in decile sorts and compare to vol_ratio_5_20's IC; a gap > 0.02 standard deviations favors retirement of the entry_volume slot.",
+    "Distinct from prior outputs: explicitly test INTERACTION (vol_ratio_5_20 × ibd_entry_volume_ratio) rather than only conditional main effects — a demand-conviction mechanism predicts synergy, not just independence, so the interaction term's delta is the cleanest single-number test of the demand-conviction narrative."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Define a 'volume isolation' feature set: {ibd_entry_volume_ratio, vol_ratio_5_20, up_day_ratio_20} and require that within a frozen 3-fold split the conditional partial correlation of entry_volume with the W4 label, given vol_ratio_5_20 + up_day_ratio_20, satisfy |r_partial| ≥ 0.10 to keep the slot. Below this the slot auto-retires and the policy reverts to vol_ratio_5_20 alone.",
+      "why_distinct": "Adds an explicit non-linearity check via partial correlation and an auto-retire threshold; prior outputs framed this only as 'partial R² contribution' which is not policy-executable. This idea gives the slot a falsifiable numeric gate rather than a researcher's qualitative judgment.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Selects whether the 'volume regime + entry-day event' two-slot architecture is justified or collapses to one slot. Drives the B0 z-weight allocation between regime and event."
+    },
+    {
+      "idea": "Add a 'thrust-quotient' slot swap policy: if the slot-swap test yields |standardized_delta(t_i)| ≥ |standardized_delta(raw)| + 0.10, the DSL rule rewrites B0 so the entry_volume term becomes t_i = ibd_entry_volume_ratio / max(vol_ratio_5_20, q05_frozen). Same data, different algebra; the policy encodes the regime-demeaning automatically.",
+      "why_distinct": "Provides a single deterministic rewriter rather than a research open question. Prior outputs treated raw vs thrust as competing candidates; this idea elevates the test result to a runtime branch in the B0 expression.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Determines the slot arithmetic. If thrust wins, the B0 becomes more regime-invariant and should generalize across macro regimes better; if raw wins, the entry-anchored narrative survives but independence is still questioned."
+    },
+    {
+      "idea": "Implement a placebo-pre-entry gate: for any production B0 candidate, compute v_placebo from days t-2 and t-1; require |standardized_delta(entry_volume)| ≥ 1.40 × |standardized_delta(v_placebo)| on the rolling 90-day history before allowing entry_volume to enter the composite. Otherwise drop it and emit a 'pre_event_only' flag.",
+      "why_distinct": "Operationalizes the placebo test as a runtime data-quality filter rather than a one-off research diagnostic. This is a per-candidate gate that protects against the simplest falsifier (pre-event information being labeled as entry-anchored).",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Adds a per-candidate scoring rule and a flag channel. Useful for downstream portfolio sizing which must distinguish between 'high entry conviction' and 'high pre-event thrust mislabeled as entry'"
+    },
+    {
+      "idea": "Define a 'breakout-orthogonal event volume' feature r_i from Test 2's OLS residual (entry_volume ~ breakout_range_ratio + close_position + close_vs_trigger), and add a stipulation that the B0 component 'entry_volume' be either r_i or zero — never the raw feature. This forces partial independence into the production input space.",
+      "why_distinct": "Reframes entry_volume's role: rather than asking whether the raw feature is independent (a research question), the DSL declares the slot to BE the independent component. Effect: the slot cannot be redundant by construction, and the magnitude-partialing test becomes a release gate rather than a diagnostic.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "ibd_entry_breakout_range_ratio",
+        "ibd_entry_close_position",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Reshapes the B0 slot algebra: a candidate without breakout context cannot contribute event-volume signal at all. Useful as a primitive for downstream z-composites that want interpretable partial contributions."
+    },
+    {
+      "idea": "Add an INTERACTION term slot: vol_ratio_5_20 × ibd_entry_volume_ratio enters the B0 only if its decile-monotonic win-rate slope exceeds the sum of the two main-effect slopes by ≥ 1 standard error. A demand-conviction mechanism predicts synergy; its absence is the strongest single falsifier for the demand-conviction narrative.",
+      "why_distinct": "Prior tests focused on conditional independence and partial residual. An interaction test targets synergy rather than independence, which is the mechanistic content of the 'demand conviction' claim. This is a new layer of evidence the prior roles did not explicitly design.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "capacity_relevance": "Determines whether the B0 needs a cross-term slot or stays additive. If synergy holds, a multiplicative architecture is supported; if not, additive is sufficient and entry_volume's slot value is bounded by vol_ratio_5_20's signal."
+    }
+  ]
+}
+```

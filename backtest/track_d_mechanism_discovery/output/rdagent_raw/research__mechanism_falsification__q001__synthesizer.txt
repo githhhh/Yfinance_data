@@ -1,0 +1,60 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 48,
+  "mechanism_summary": "Within B0's linear-additive composite framing (mom_20 + ma20_slope_5 + px_vs_ma50 + up_day_ratio_20), lane (px_vs_ma20) is largely redundant: its standardized discriminative contrast (|Δ|=0.584) is strictly smaller than its named neighbors' (mom_20: 1.001, ma20_slope_5: 0.682, up_day_ratio_20: 1.188), and case-level concordance within snapshot_71486ed83c shows lane fails to disambiguate siblings whose slope/mom quintiles already separate winners from ruins. However, this falsification is conditional on linear-additive separability and on adequate power. Lane's 20-day SMA applies uniform smoothing across the lookback window, while mom_20 is an endpoint ratio — these are distinct functionals of the same return path that retain different intraperiod volatility and serial-correlation signatures. The sample's effective N is closer to ~7 (Kish-weighted across 7+ shared snapshots clustering 27 entities) than to 27, so a modest non-linear residual effect cannot be distinguished from zero at conventional power. The researcher's proposed 'cleaner replacement' (px_vs_ma20 − α·mom_20 − β·ma20_slope_5) is engineered to live in the same linear span as the rejected feature and therefore cannot distinguish 'lane is degenerate' from 'lane's mechanism is non-linear'. Lane is redundant in the restricted B0 linear-additive sense that the model uses; it is unresolved whether lane carries information through channels B0 does not access (volatility regime, slope-sign interaction, ruin-cohort gating).",
+  "falsifiers": [
+    "F1 — Within-snapshot partialled residual: pool snapshot-level Spearman(rho_residual, w4_ordinal) via Fisher-z across 500 snapshot-stratified bootstraps; pool |rho| > 0.25 with CI excluding zero in >=70% of replicates confirms lane carries orthogonal information to mom_20 + ma20_slope_5. (designer's test 1, hardened)",
+    "F2 — Basis-augmented partialling: regress lane on mom_20 + ma20_slope_5 + rv_20 + vol_ratio_5_20 within-snapshot; if residual variance co-varies with vol_ratio_5_20 bands (Kruskal-Wallis p<0.05), lane is a volatility-regime indicator and the linear-additive redundancy claim fails. (skeptic's basis-conditioned test)",
+    "F3 — Red-noise ablation: AUC(lane_real) − AUC(lane_within_snapshot_rednoise) > 0.020 in snapshot-blocked 5-fold CV (50 reps) confirms lane carries non-redundant information; AUC gap < 0.005 confirms researcher's claim. Permutation must be within-snapshot, not pooled. (designer's test 3)",
+    "F4 — Cohort-specific ablation in ruin cluster: among is_b0_pick=true cases with ruin-class outcome (n>=8), partial Spearman of lane vs w4_ordinal (controlling for mom, slope, vol_ratio) must exceed the 95th percentile of within-snapshot permutation null to reject redundancy at the cohort level. (designer's test 6)",
+    "F5 — Tied-strata monotonicity: within (mom_20 quintile × ma20_slope_5 quintile) cells with N>=3, weighted-mean |delta| in win-rate across lane-median split > 0.20 OR sign-test p<0.05 rejects the redundancy claim. Note this test is underpowered given effective N — absence of effect is not proof of absence. (designer's test 4)",
+    "F6 — Slope-sign interaction: Fisher-z difference between Spearman(lane, w4_ordinal) in positive-slope vs negative-slope cells > 2.0 (Bonferroni-corrected over 4 regime cells) confirms lane is an interaction term invisible to linear-additive framing. (designer's test 5 + skeptic's interaction hypothesis)",
+    "F7 — Power floor: if Kish effective N < 12 OR minimum detectable |rho| > 0.40 at 80% power, declare UNRESOLVED regardless of point estimate; current data likely fails this floor.",
+    "F8 — Counterfactual ablation asymmetry: dropping lane reduces false_positive_ruin count by >=2 while dropping mom_20 reduces it by 0 falsifies researcher's cohort-level claim; symmetric reduction supports it."
+  ],
+  "actionable_design_principles": [
+    "Report Kish effective N (snapshot-clustered) alongside raw case count for every inferential claim; flag effective N < 12 as underpowered and refuse to claim direction-of-effect from such samples.",
+    "Partialling for feature independence must include a realized-volatility/serial-correlation basis (rv_20, vol_ratio_5_20), not only the immediately-named neighbors; otherwise 'redundancy' is a property of the basis chosen, not of the feature.",
+    "Red-noise and permutation ablations must operate within-snapshot to preserve market-regime covariance structure; pooled permutation destroys the very signal being tested.",
+    "Test non-linear interactions (lane × slope-sign, lane × vol-band) before declaring a feature redundant in main-effect framing; non-redundant interaction terms are common in price-path features.",
+    "When proposing a 'cleaner replacement', evaluate it in BOTH the proposed form AND its natural non-linear extensions; rigged replacements that live in the rejected feature's linear span bias the conclusion toward redundancy.",
+    "Distinguish 'lane adds no value in B0's current linear-additive composite' from 'lane is a degenerate projection of price'; only the former is falsifiable by the available data.",
+    "Treat snapshot identity as a blocking/stratification variable only; never encode it as a predictor, and report any within-snapshot test's N explicitly so cluster-driven spurious concordance can be detected."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "lane_drop",
+      "why_distinct": "Pure subtractive test of whether lane carries any signal in B0's current framing; redistributes weight to higher-contrast neighbors without changing feature geometry. Smallest perturbation — establishes the 'zero-information' baseline.",
+      "features": ["px_vs_ma20 (removed)", "mom_20", "ma20_slope_5", "px_vs_ma50", "up_day_ratio_20"],
+      "capacity_relevance": "low — diagnostic only; if Spearman(B0_score, w4_ordinal) changes by less than 0.02 after removal, the linear-additive redundancy claim is supported at the level B0 actually operates."
+    },
+    {
+      "idea": "lane_residual_basis_augmented",
+      "why_distinct": "Replaces raw lane with the within-snapshot residual after regressing on mom_20 + ma20_slope_5 + rv_20 + vol_ratio_5_20 — directly addresses the skeptic's challenge that the researcher's partialling omitted the vol basis. If this residual still fails to predict, the redundancy claim survives its strongest defense.",
+      "features": ["px_vs_ma20 (transformed: residual)", "mom_20", "ma20_slope_5", "rv_20", "vol_ratio_5_20"],
+      "capacity_relevance": "high — accommodates the volatility-regime channel the skeptic identifies; if this replacement beats the original lane in AUC by >=0.01, B0 was discarding orthogonal information."
+    },
+    {
+      "idea": "lane_x_slope_sign",
+      "why_distinct": "Multiplicative interaction term that targets the skeptic's extended-and-rolling-over vs extended-and-trending distinction (entity_b6bcccdf6a vs entity_6618d3e80c vs entity_ead73f4390 form the motivating near-trio). Tests whether lane's information is genuinely non-linear rather than absent.",
+      "features": ["px_vs_ma20 * sign(ma20_slope_5)", "ma20_slope_5", "mom_20", "up_day_ratio_20"],
+      "capacity_relevance": "medium — explicit interaction term; if sign-restricted Spearman diverges across slope-sign cells by >=0.30, lane is an interaction operator and B0's linear composite structurally cannot see it."
+    },
+    {
+      "idea": "lane_trap_binary",
+      "why_distinct": "Operationalizes the researcher's own suggested 'lane-trap' replacement (px_vs_ma20 > 60d_p90 AND ma20_slope_5 < 0) as a binary gate. Makes the regime-specific information lane might carry into an explicit, falsifiable composite feature rather than a continuous smoother.",
+      "features": ["px_vs_ma20 (binary, percentile-gated)", "ma20_slope_5 (binary, sign-gated)", "mom_20"],
+      "capacity_relevance": "medium — orthogonalizes the channel; tests whether lane's information is threshold-based (consistent with trap/risk interpretation) rather than continuous (consistent with momentum re-encoding)."
+    },
+    {
+      "idea": "lane_within_snapshot_permutation_null",
+      "why_distinct": "Does not modify B0's feature set but generates the appropriate permutation distribution against which lane's actual predictive content is measured. Establishes the statistical baseline that the researcher's hand-waved concordance claims implicitly assume but do not compute.",
+      "features": ["px_vs_ma20 (real)", "mom_20", "ma20_slope_5", "rv_20", "snapshot_anon (blocking only)"],
+      "capacity_relevance": "high — meta-policy: provides the rigorous null that all four feature-level policies above should be benchmarked against; without it, no policy decision is statistically grounded given the cluster structure."
+    }
+  ]
+}
+```

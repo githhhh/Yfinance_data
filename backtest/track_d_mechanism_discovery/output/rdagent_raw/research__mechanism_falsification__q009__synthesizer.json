@@ -1,0 +1,61 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 32,
+  "mechanism_summary": "The archaeological evidence shows that B0-pick winners exhibit higher median mom_20, vol_ratio_5_20, up_day_ratio_20, ma10_slope_5, and px_vs_ma50 than false-negatives (standardized deltas roughly -1.0 to -1.2), which the researcher reads as return-ranking dominance. However, three structural issues prevent adjudication: (i) the false_negative labels are defined by forward W4 return thresholds, so any return-feature divergence is partly tautological; (ii) every canonical 'return' feature also doubles as a downside-risk proxy in at least some regimes (low-mom_20 = continuation-of-decline risk; vol_ratio_5_20 < 1 = liquidity/thin-tape risk; up_day_ratio_20 = distribution-day avoidance; px_vs_ma50 = trend-failure proxy); (iii) the ruin-vs-winner separation within accepted picks is not materially driven by any risk feature — vol_ratio_5_20 medians are 1.42 (winners) vs ~1.37 (ruin), pullback_pct medians are -15.9% vs -12.3%, and entity_6618d3e80c (top-decile mom_20 = 0.251, vol_ratio 1.45) ruins. The dataset shows only survivors of an unseen upstream filter and lacks a base-rate (lane-accept ruin rate vs random-pick ruin rate), so we cannot distinguish a momentum-rank gate, a risk-floor gate, or a regime-switching hybrid gate. The honest verdict is that the existing frozen evidence is structurally insufficient to falsify either interpretation; the three pre-specified experiments would resolve it but their outputs are not present in the frozen evidence.",
+  "falsifiers": [
+    "FALSIFIES pure-return-ranking interpretation: If lane were pure return ranking, ruination probability should be monotone non-increasing in mom_20 quartile within B0 picks; entity_6618d3e80c (mom_20=0.251, top quartile) being ruin-flagged AND entity_2f86543bf6 (mom_20=-0.008, bottom quartile) being a selected_winner already violates this in the archaeological sample — verify this on the wider discovery-train set.",
+    "FALSIFIES pure-downside-risk-control interpretation: If lane were pure risk control, all 8 false_positive_ruin cases should violate at least one risk-axis feature (rv_20 top-tercile, pullback_pct <= -15, atr_14_pct top-tercile, or dist_to_52w_high_pct >= 0); at least 3 of the 8 have modest pullbacks (-14.4%, -12.3%, -16.2%) but still ruined, indicating risk feature violations are not the binding constraint — re-run with explicit risk-axis violation counts.",
+    "FALSIFIES the dual-purpose-feature confound (skeptic's central claim): Within-snapshot z-standardized moments and vol features must NOT separate winners from ruins beyond what PIT-only risk features (rv_20, pullback_pct, base_depth_pct, atr_14_pct, dist_to_52w_high_pct) explain. Partial correlation holding the risk-axis fixed should drop the apparent dominance of mom_20 / up_day_ratio_20. If those partial correlations remain significant, dual-purpose is true and the researcher's reading is partly vindicated.",
+    "FALSIFIES regime-switching hypothesis: If lane is regime-switching (return-rank in trending regimes, risk-control in choppy), then the within-snapshot winner-vs-ruin sign of risk-axis features should flip across snapshots classified by realized RV regime. Pool the snapshot-level Fisher-z effects on rv_20 and pullback_pct and test sign-flip vs uniform sign (binomial p<0.10 against uniform). The experimental designer's Test 2 directly executes this.",
+    "FALSIFIES the entire construct (lane is a real gate): If lane were a real gate, the false_negative_rate among rejected candidates should be lower than the W4>=8% rate among accepted picks. Without base-rate comparison the gate could just be sorting noise — Test 3's PIT-only risk_event relabel is the cleanest way to test whether lane ITSELF produces a non-random PIT-observable separation.",
+    "FALSIFIES the policy proposal in researcher's bullets: The continuous lane_score z(mom_20)+z(ma10_slope_5)+z(px_vs_ma50)+z(vol_ratio_5_20)-k*max(0,-pullback_pct-10)/10-k'*max(0,rv_20-median_rv) implies ruin-worthy cases carry extreme positive rv_20 OR deep pullbacks; several ruin cases (entity_b6bcccdf6a pullback_pct=null, entity_84824e6a20 pullback_pct=null) have no recorded pullback, so the penalty term is undefined for them — any policy built on this score must handle missing-pullback cases explicitly, otherwise the policy masks its own failure mode."
+  ],
+  "actionable_design_principles": [
+    "Treat 'lane' as an unverified-mechanism component for at least one more cycle; do NOT promote it to a documented risk filter or a documented momentum ranker until Test 1 / Test 2 / Test 3 outputs are available.",
+    "Every feature is dual-purpose until proven otherwise: when reporting feature importance for lane, always pair it with the within-snapshot partial correlation holding the complementary axis (return or risk) fixed; raw deltas are confounded.",
+    "Maintain upstream-filter visibility: log the rejection-rate and rejection-feature distribution at every snapshot so future archaeology includes the population, not just the survivors — without this, any 'what is the mechanism' question is structurally unanswerable.",
+    "Build a base-rate oracle: track the unconditional W4>=8% and ruin rates across the full candidate universe per snapshot. Without that, the 42% ruin-in-positive-bucket is uninterpretable as evidence of absent risk filtering.",
+    "Encode missing-data rules for pullback_pct/pullback_duration_weeks (currently null for breakout-style entries); any continuous lane scoring that depends on pullback penalties must explicitly handle this state, e.g., treat null pullback as 'no penalty applied' AND log the imputation choice.",
+    "Separate mechanism testing from policy deployment: do not deploy the proposed two-gate or continuous lane_score until the experimental_designer tests have produced their actual outputs; deployment before falsification risks overfit policies to a mechanism that was never validated.",
+    "Track per-feature within-snapshot rank-biserial effect on PIT risk_event (Test 3) as a routine diagnostic — this is the only label construction that is not contaminated by forward return and therefore the only valid mechanistic probe of lane."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "lane_score_v2_pit: z(mom_20) + z(ma10_slope_5) + z(px_vs_ma50) + z(vol_ratio_5_20) - 0.25*max(0, -pullback_pct - 10)/10 - 0.10*max(0, z(rv_20) - 0)",
+      "why_distinct": "Implements the researcher's proposed continuous score with small (k=0.25, k'=0.10) risk penalties — the smallest non-zero weights that would, per Test 1 success criterion, still satisfy 'return ranking dominates.' Risks explicit: missing pullback_pct cases get zero pullback penalty (no imputation), and k'=0 is a deliberate falsification-friendly choice that can be increased if Test 1 shows risk features carry non-redundant signal.",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "vol_ratio_5_20",
+        "pullback_pct",
+        "rv_20"
+      ],
+      "capacity_relevance": "Implementation cost is low: six z-standardized features, two asymmetric penalties, no interaction terms. PIT-pure (no forward returns). Suitable as a fast-iteration candidate replacement for the binary lane while experimental tests run."
+    },
+    {
+      "idea": "pit_risk_event_gate: ONLY_IF z(rv_20) > 1.0 AND (pullback_pct IS NULL OR pullback_pct >= -25.0) AND dist_to_52w_high_pct < 5.0",
+      "why_distinct": "Is the engineer's pure downside-risk-control alternative in DSL form. This is the design that, if it MATCHES the lane's accept/reject decisions on the archaeological set, confirms the skeptic's risk-floor interpretation; if it DIVERGES systematically (lane rejects some risk-clean, lane accepts some risk-dirty), confirms the return-ranking interpretation. It is a falsification probe, not a production policy.",
+      "features": [
+        "rv_20",
+        "pullback_pct",
+        "dist_to_52w_high_pct"
+      ],
+      "capacity_relevance": "Three-feature conjunctive gate; trivial implementation cost. Designed to be compared against lane's binary output in a shadow-mode audit — does not enter the production ranker until the comparison resolves the mechanism question."
+    },
+    {
+      "idea": "regime_switched_lane: IF (snapshot_realized_rv_20 > median_realized_rv) THEN apply lane_score_v2_pit WITH k=1.0, k'=1.0 ELSE apply lane_score_v2_pit WITH k=0, k'=0",
+      "why_distinct": "The skeptic's regime-switching hypothesis encoded as policy. Implements 'when market is choppy, lane weights risk features heavily; when trending, lane ignores risk features and ranks on momentum.' This is the most direct empirical test of CONTEXT_DEPENDENT verdict — if it outperforms either fixed-policy pole in walk-forward validation, the regime hypothesis is supported.",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "vol_ratio_5_20",
+        "pullback_pct",
+        "rv_20",
+        "snapshot_realized_rv_20"
+      ],
+      "capacity_relevance": "Adds one regime-detection input (snapshot-level realized RV, computed once per snapshot, no per-name leakage); otherwise identical to lane_score_v2_pit. Slightly higher implementation cost due to regime classification but well within current DSL expressiveness; suitable as a primary hypothesis-test candidate."
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "tests": [
+    {
+      "name": "Within-B0-pick ruin-vs-winner quadrant monotonicity test",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Restrict to is_b0_pick=true cases (n=16 in archaeology). Compute a composite proxy_score = z(mom_20) + z(up_day_ratio_20) + z(vol_ratio_5_20) per case. Stratify into quartiles of proxy_score. Compute ruin_rate and median w4 outcome-rank per quartile. Also compute Spearman(proxy_score, ruin_indicator) within this subset, with snapshot-blocked permutation p-value.",
+      "success_criterion": "Downside-risk-control interpretation supported if: (a) ruin_rate decreases monotonically across proxy_score quartiles with top-vs-bottom quartile drop >=25pp, AND (b) Spearman(proxy_score, ruin) <= -0.30 with snapshot-blocked p < 0.15. A clear monotone protection signature within already-selected names is what risk-control would predict.",
+      "failure_criterion": "Ranking-proxy interpretation supported if: ruin_rate varies by <10pp across proxy_score quartiles OR Spearman(proxy_score, ruin) > -0.10 with snapshot-blocked p > 0.30. Equal ruin exposure across the proxy signature within B0 picks means eps_preference did not protect the names it scored highest."
+    },
+    {
+      "name": "Synthetic-reconstruction redundancy test under 3-slot budget",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within each snapshot with >=4 cases, regress the eps_preference proxy signal on the 3 candidate slot features. Compute per-snapshot adjusted R^2 and the per-name reconstruction residual. Aggregate across snapshots using snapshot-weighted means. Separately, replace eps_preference in B0 composite with the 3-feature linear reconstruction and recompute the B0 rank ordering; measure Spearman rank correlation between original and reconstructed B0 ranks.",
+      "success_criterion": "Ranking-proxy/redundancy interpretation supported if median per-snapshot adjusted R^2 > 0.75 AND Spearman(original B0 rank, reconstructed B0 rank) > 0.85. eps_preference is then a near-deterministic repackaging of 3 slot features and earns no independent slot.",
+      "failure_criterion": "Risk-control / independent information supported if median per-snapshot adjusted R^2 < 0.50 OR Spearman rank correlation < 0.55. A reconstruction that fails to reproduce B0 ordering proves eps_preference carries information outside the 3-slot proxy budget."
+    },
+    {
+      "name": "Berkson-conditioning independence test via base-feature stratification",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "base_depth_pct"
+      ],
+      "comparison": "Partition the 27 cases into subset P = {cases with documented pullback base (non-null pullback_pct and pullback_duration_weeks)} and subset N = {cases with null pullback features, i.e., no pullback base documented}. For each subset compute Spearman(eps_proxy_score, outcome_rank) and the proxy-score distribution of selected_winners vs false_positive_ruin. If the eps_preference lift is concentrated in only one subset, Berkson-style upstream filtering is the operative mechanism.",
+      "success_criterion": "Independent mechanism supported if |Spearman(proxy, outcome_rank)_P - Spearman(proxy, outcome_rank)_N| < 0.15 AND KS distance between selected_winner proxy distributions across P and N < 0.30. Survival of the signal across both conditioning states rules out Berkson bias.",
+      "failure_criterion": "Berkson/upstream-filter mechanism supported if Spearman(proxy, outcome_rank) differs by >0.40 across subsets, OR the lift vanishes entirely in one subset. eps_preference then operated upstream of IBD-pullback qualification and its in-sample signature is selection-artifact."
+    }
+  ],
+  "leakage_checks": [
+    "Verify every feature used is PIT-observable at snapshot_anon timestamp: explicitly exclude w4_return_bucket, any forward return, any analyst revision dated after snapshot, and any post-snapshot earnings print from the feature lists.",
+    "All inference must use snapshot-blocked resampling (block-bootstrap over snapshot_anon, never case-level bootstrap) to prevent within-snapshot correlation from inflating significance.",
+    "Dual-labeled cases (entity_6618d3e80c carries both false_positive_ruin and selected_winner) must be analyzed under two protocols - (i) duplicate the row per label and (ii) drop entirely - and the mechanism claim is robust only if both protocols agree; otherwise flag UNRESOLVED.",
+    "Pullback_pct and pullback_duration_weeks have null values in ~14 of 27 cases; analyses using these must report results under (a) complete-case, (b) null-as-distinct-category, and (c) multiple-imputation, with the mechanism claim valid only if all three agree.",
+    "No use of entity_anon, snapshot_anon, pullback-pattern-shape text, or any other ID/calendar field as a predictive feature.",
+    "The 3-slot budget must be respected: no test may incorporate a 4th candidate feature into the proxy signal even if it appears more diagnostic in archaeology, because the point of the test is to determine whether eps_preference earns its slot against the 3-feature alternative.",
+    "Sensitivity check: rerun each test after removing the snapshot with the single highest ruin count (snap_d0d57b1e40 or snap_71486ed83c) to verify that no single snapshot's regime drives the conclusion."
+  ],
+  "priority_order": [
+    "Within-B0-pick ruin-vs-winner quadrant monotonicity test",
+    "Synthetic-reconstruction redundancy test under 3-slot budget",
+    "Berkson-conditioning independence test via base-feature stratification"
+  ]
+}

@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "mechanism_claim": "The B0 'weekly_volume' feature (operationalized here as vol_ratio_5_20, 5-day avg volume / 20-day avg volume) functions primarily as a return-ranking / participation-confirmation filter, not as a downside-risk-control gate. Its selection signal separates selected_winners (median 1.42) from false_negatives (median 1.18, standardized delta -1.05), but it fails to separate selected_winners from false_positive_ruins, where ruin cases occupy essentially the same volume-ratio band (0.91–1.63) as winners (1.00–1.77). If weekly_volume were truly a downside-risk guardrail, ruins should be statistically distinguishable from winners on this axis; they are not.",
+  "evidence_for": [
+    "vol_ratio_5_20 is the third-strongest discriminator (std delta -1.05) between selected_winners and false_negatives in the numeric_contrasts table, indicating genuine predictive information for RETURN RANKING.",
+    "False_negative_median vol_ratio_5_20 = 1.179 vs selected_winner_median = 1.424 — entities with sub-1.2 volume ratios are systematically under-selected even when other features (px_vs_ma20, ma10_slope_5, mom_20) look constructive (e.g., entity_d8e8e7b814, entity_bfb308b24a, entity_de1c657364).",
+    "ibd_entry_volume_ratio also shows a directional selection signal (winner 1.81 vs FN 1.60, std delta -0.50), reinforcing that liquidity/participation at the IBD pivot matters for identifying winners.",
+    "Mechanistically, low recent volume relative to baseline is consistent with weak institutional accumulation — a momentum/quality proxy, not a tail-risk proxy."
+  ],
+  "evidence_against": [
+    "false_positive_ruin cases span nearly the full vol_ratio_5_20 distribution: entity_40ea0cfb3b ruins at 0.906 (volume DRY-UP preceding ruin) while entity_84824e6a20 ruins at 1.625 (volume SPIKE preceding ruin). A downside-risk filter would need to flag both tails; the current single-threshold weekly_volume cannot.",
+    "Six of eight false_positive_ruins have vol_ratio_5_20 ≥ 1.20 (entity_8f0df3d38e=1.24, entity_4fdc3699fd=1.38, entity_3472243e0c=1.21, entity_ccc90a671f=1.45, entity_84824e6a20=1.63, entity_b6bcccdf6a=1.31), overlapping heavily with selected_winners in the 1.2–1.6 band. Volume alone does NOT veto these entries.",
+    "Raw volume_ratio shows the OPPOSITE direction (FN 1.65 vs winner 1.55, std delta +0.23), suggesting weekly_volume is picking up a specific short-window acceleration pattern rather than a generic liquidity property — and that pattern is being read as 'strength' even when the price action preceding ruin is divergent.",
+    "The contrast between ruin entity_40ea0cfb3b (vol_ratio=0.906, mom_20=0.024, ma10_slope=0.025) and ruin entity_84824e6a20 (vol_ratio=1.625, mom_20=0.067, ma10_slope=0.062) shows that ruins cluster at LOW-momentum / low-volume AND HIGH-volume / divergent-price regimes — neither is captured by a monotonic weekly_volume contribution."
+  ],
+  "falsifiable_predictions": [
+    "If weekly_volume is reinterpreted as return-ranking only (not risk control), then on the held-out cohort, adding a vol_ratio_5_20 ≥ 1.2 filter should NOT reduce ruin frequency among B0 picks beyond what is already achieved by removing sub-1.0 cases — i.e., the lift should be ~0pp for the upper tail and ~1–2pp only because it removes a handful of low-volume picks like entity_40ea0cfb3b.",
+    "If weekly_volume WERE a genuine downside-risk control, then conditioning on ruin vs winner among B0 picks, the vol_ratio_5_20 distribution should show KS-test p < 0.05 separation; current archaeology shows the medians are indistinguishable (~1.35 vs ~1.42). Falsification: a future sample where ruins and winners remain statistically indistinguishable on vol_ratio_5_20 would confirm the return-ranking-only reading.",
+    "A two-regime replacement (volume-spike-AND-price-weakness = distribution; volume-dry-up-AND-flat-momentum = late-stage churn) should reduce false_positive_ruin rate by ≥ 30% relative to the single-threshold weekly_volume, because it would correctly tag entity_84824e6a20 (spike+weak slope divergence) and entity_40ea0cfb3b (dry-up+flat momentum) without penalizing the genuine winners in the 1.2–1.6 band.",
+    "Among B0 picks that are filtered OUT by a tightened weekly_volume threshold (e.g., vol_ratio_5_20 < 1.0), the W4 return distribution should be LEFT-censored (median W4 < 0) — this is the falsifiable test of whether the filter is doing real downside work or just trading away winners."
+  ],
+  "policy_implications": [
+    "Re-classify weekly_volume internally from a 'risk control' feature to a 'participation/quality' feature in the B0 documentation; this prevents over-reliance on it as a tail-risk guardrail during drawdown periods.",
+    "Replace single-threshold weekly_volume with a conditional two-axis feature: vol_ratio_5_20 × sign(price_vs_ma20_change). High volume + price above MA + rising MA = confirmation; high volume + price diverging below MA = distribution veto; low volume + flat momentum = liquidity-risk veto.",
+    "Stop using raw vol_ratio_5_20 as a portfolio-level exposure scaler; instead use it only at the ENTRY decision boundary, because in the archaeology it does not predict post-entry ruin trajectory once a position is on.",
+    "Add a tracked counterfactual: track how many ruins were NOT filtered by the current weekly_volume threshold on a weekly basis. If the count remains > 50% of total ruins across cycles, escalate replacement of the feature rather than continuing to tune its coefficient.",
+    "Because the volume_ratio direction is reversed from vol_ratio_5_20, investigate whether weekly_volume is silently averaging or weighting multiple volume inputs; if so, audit the aggregation to ensure the short-window signal (which carries the selection info) is not being diluted by the long-window signal."
+  ]
+}
+```

@@ -1,0 +1,57 @@
+
+
+
+```json
+{
+  "verdict": "REFUTED",
+  "confidence_0_100": 68,
+  "mechanism_summary": "The proposed mechanism—false-negative large winners distinguished by extended pullback duration (≥8 weeks) combined with elevated vol_ratio_5_20 (>1.4) indicating shakeout volatility—is directly contradicted by the dataset's central tendencies. False-negative big winners (entity_535a1beed7, vol_ratio=1.17; entity_de1c657364, vol_ratio=1.15) have BELOW-median volatility ratios, shallower pullbacks (-7.3% vs selected_winner -15.9%), and only 2 of 27 cases meet the ≥8-week duration threshold. The core claim conflates volume ratio with directional accumulation without specifying causal pathway. The B0 selection proxy claim is undermined by entity_2f86543bf6 (selected_winner with mom_20=-0.008, up_day_ratio=0.35—below false_negative_median values). Snapshot-level clustering (5 of 7 false_negative_relative cases from snap_71486ed83c) introduces temporal confound that the researcher does not address.",
+  "falsifiers": [
+    "Any false_negative_big_winner with vol_ratio_5_20 >1.5 would support the shakeout hypothesis; none observed (FN big winner max vol_ratio = 1.17)",
+    "If pullback_duration_weeks ≥8 predicts large_win within FN cohort, the FN median duration should exceed SW median; observed FN median = 4.0 vs SW median = 5.5 (opposite direction)",
+    "If up_day_ratio_20 and mom_20 constitute a correlated proxy filtering FN cohort, then B0 selection should never admit negative-momentum winners; entity_2f86543bf6 (mom_20=-0.008) violates this",
+    "If snap_71486ed83c concentration is regime artifact, then non-picks from other snapshots with high mom_20/high up_day_ratio should produce similar false_negative profiles; current data cannot test this but the skew is noted",
+    "The researcher claims vol_ratio measures 'transient volatility' but provides no mechanistic pathway from 5-day/20-day volume ratio to mean-reversion opportunity independent of price momentum"
+  ],
+  "actionable_design_principles": [
+    "Do not use vol_ratio_5_20 >1.4 as a standalone entry signal for non-pick re-entry; FN big winners have below-median vol_ratio values",
+    "Pullback duration is NOT a reliable discriminator between FN winners and losers; the FN cohort has SHORTER median duration than selected winners",
+    "Pullback magnitude is inversely related to outcome—deeper pullbacks correlate with selected_winner outcomes, not false-negative outcomes; avoid magnitude-based entry signals",
+    "The up_day_ratio_20/mom_20 proxy hypothesis for B0 selection is unproven; entity_2f86543bf6 demonstrates B0 admits negative-momentum stocks",
+    "Snapshot-level temporal clustering must be controlled before attributing FN patterns to stock-specific features",
+    "Any 'volatility track' pipeline separated from 'momentum track' must define vol_ratio mechanism explicitly (direction, magnitude, timing) without circular reasoning from outcomes"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Post-hoc regime filter: require that FN re-entry candidates originate from ≥2 distinct snapshots to mitigate temporal confound",
+      "why_distinct": "Current FN cohort is heavily clustered in snap_71486ed83c; if regime drives outcomes rather than stock features, uniform application of FN screening to a single-snapshot cohort produces false confidence",
+      "features": ["snapshot_anon (as grouping variable, not predictor)", "entity_anon"],
+      "capacity_relevance": "Prevents overfitting to snapshot-specific conditions; requires cross-regime validation before deployment"
+    },
+    {
+      "idea": "Invert the pullback hypothesis: test whether deep pullbacks (pullback_pct < -15%) in is_b0_pick=false cohort predict large_win at higher rate than shallow pullbacks, reversing the researcher's direction",
+      "why_distinct": "Numeric contrast shows selected winners have deeper pullbacks; if this pattern holds for non-picks, the mechanism is 'consolidation depth signals base quality' rather than 'shakeout creates opportunity'",
+      "features": ["pullback_pct", "is_b0_pick", "w4_return_bucket"],
+      "capacity_relevance": "Clarifies whether depth is a positive signal (base-building) or negative signal (distribution) across both cohorts"
+    },
+    {
+      "idea": "Proxy decomposition test: within is_b0_pick=false cohort, test whether vol_ratio_5_20 × mom_20 interaction predicts large_win better than either alone",
+      "why_distinct": "The skeptic's strongest attack is that vol_ratio is not measuring shakeout but some correlated-but-distinct phenomenon; interaction testing reveals whether vol_ratio adds signal only when momentum is present",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "capacity_relevance": "Distinguishes vol_ratio as independent mechanism vs. correlated proxy for momentum regime"
+    },
+    {
+      "idea": "Duration-relative threshold: replace absolute 8-week cutoff with stock-specific duration relative to its own historical pullback distribution (e.g., ≥75th percentile of that stock's pullback durations)",
+      "why_distinct": "An absolute cutoff may conflate market conditions (sector rotation speed) with stock-specific behavior; relative threshold controls for this confound",
+      "features": ["pullback_duration_weeks", "base_duration_weeks", "entity_anon historical pullback distribution"],
+      "capacity_relevance": "More robust across market regimes; requires historical data per entity but avoids cross-sectional confounds"
+    },
+    {
+      "idea": "B0 override detection: identify which non-momentum features in B0 selection override negative mom_20/up_day_ratio (e.g., entity_2f86543bf6 case) and test whether these overrides correlate with FN outcomes",
+      "why_distinct": "The researcher claims B0 proxies momentum, but entity_2f86543bf6 shows B0 admits negative-momentum stocks; understanding what overrides this proxy clarifies the actual selection mechanism",
+      "features": ["is_b0_pick", "mom_20", "up_day_ratio_20", "ma10_slope_5", "ma20_slope_5", "px_vs_ma20", "px_vs_ma50"],
+      "capacity_relevance": "Prevents false assumption that B0 selection equals momentum confirmation; informs when non-pick re-entry is or is not justified"
+    }
+  ]
+}
+```

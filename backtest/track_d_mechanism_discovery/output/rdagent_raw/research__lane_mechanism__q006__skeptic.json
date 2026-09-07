@@ -1,0 +1,51 @@
+{
+  "strongest_counterclaim": "Lane's behavior in 'constructive pullback' weeks is not a pure risk-overlay because (a) the 'pullback' label is contaminated — the evidence pool mixes shallow 5-15% base pullbacks (-1.5%, -5%, -7.3%, -12.1%) with deep crash-style drawdowns (-25.1%, -42.3%) that are not constructive; (b) the mom_20 -1.00σ and vol_ratio_5_20 -1.05σ standardized deltas between FN and SW capture return-relevant signals (momentum and short-term volatility mean reversion), not just downside risk; and (c) the two false_negative_big_winner cases prove Lane actively destroys upside in this regime, not merely redistributes variance. The researcher's 'near-zero net-label balance' is a misleading aggregate that hides asymmetric right-tail truncation.",
+  "attacks": [
+    {
+      "issue": "Pullback cohort contamination / label heterogeneity",
+      "why_it_matters": "Calling a -42.3% drawdown a 'constructive pullback' mixes two structurally different regimes (healthy base-building within uptrend vs. trend-failure breakdowns that reverse). The evidence pool's pullback rows span -1.5% to -42.3%, so any aggregate statistic across this group is meaningless. Lane decisions in the deep-pullback cases (e.g., entity_3adc078f01 at -42.3% with large_win) may not generalize to the shallow constructive cases the question is actually about."
+    },
+    {
+      "issue": "mom_20 differential is a return signal, not a risk signal",
+      "why_it_matters": "20-day momentum has well-documented forward-return predictability. Lane reducing exposure when mom_20<0.10 in pullback weeks is filtering on a return predictor. The researcher claims Lane 'doesn't materially shift median forward return,' but mom_20 median delta of -0.105 between FN and SW (with SW mom_20=0.16) implies Lane is selecting lower-momentum names when mom_20 is moderate — a return-destroying choice if momentum persists."
+    },
+    {
+      "issue": "vol_ratio_5_20 is a mean-reversion return channel, not pure risk",
+      "why_it_matters": "Short-term/long-term volatility ratios >1.0 typically predict subsequent vol normalization and positive drift in trend-following contexts. Lane filtering vol_ratio_5_20>1.2 in pullback weeks may be systematically rejecting the highest conditional expected-return setups, dressed up as 'risk reduction.' The -1.05σ standardized delta is too large for a pure risk proxy."
+    },
+    {
+      "issue": "false_negative_big_winner cases directly contradict risk-only framing",
+      "why_it_matters": "Two cases carry the explicit label 'false_negative_big_winner' (entities entity_535a1beed7 and entity_de1c657364) — both is_b0_pick:false, both w4_return_bucket:large_win. Lane rejected names that subsequently produced outsized gains. This is alpha destruction, not variance redistribution. A pure risk overlay would reject names that subsequently fall, not names that subsequently rise."
+    },
+    {
+      "issue": "Median-equality prediction is internally inconsistent with binary selection",
+      "why_it_matters": "If Lane makes binary include/exclude decisions based on any signal with non-zero correlation to returns (even via a risk channel with risk premium), expected W4 return of B0_LANE must differ from LANE_NEUTRAL in expectation, not just in tails. The researcher's prediction |Δmedian|<0.5pp plus 1.3-1.8× tail tightening can only hold simultaneously if Lane's signal is return-orthogonal — which the mom_20/vol_ratio deltas contradict."
+    },
+    {
+      "issue": "Sample size and statistical power collapse in pullback subset",
+      "why_it_matters": "Only ~11 of 27 archaeology cases have populated pullback_duration_weeks. Predictions about 5th-percentile tail compression (1.3-1.8×) require power that n<15 cannot deliver — standard error on a 5th-percentile estimator with n=11 exceeds 30% of the estimate. The 'constructive pullback' cohort is too small for the researcher's quantitative predictions to be meaningful, regardless of truth value."
+    },
+    {
+      "issue": "Corner-concentration prediction ignores pullback_duration=null cases",
+      "why_it_matters": "Several false_positive_ruin rows (entity_4fdc3699fd, entity_3472243e0c, entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b) have pullback_duration_weeks=null yet still ruin. Lane's marginal decisions clearly extend outside the predicted 7w/1.2 vol-ratio/mom_20<0.10 corner. The >70% concentration claim is therefore an over-specification — Lane is acting on multiple regimes, not a single corner."
+    },
+    {
+      "issue": "base_duration_weeks differential reveals a return-relevant, not risk-relevant, channel",
+      "why_it_matters": "Selected_winners have median base_duration 52w vs FN 44w (standardized delta -0.42). Longer bases are well-known return enhancers in IBD-style momentum strategies. If Lane systematically favors longer bases in pullback weeks, it's acting on a known alpha factor, not on risk — even if the researcher frames it as 'base-maturity risk filter.'"
+    }
+  ],
+  "counterexamples_to_find": [
+    "A pullback-week setup with mom_20>0.15 AND vol_ratio_5_20>1.4 that Lane REJECTS but that produces >8% W4 return with max-drawdown <4% — would prove Lane is simultaneously destroying alpha AND failing to reduce risk",
+    "A pullback-week setup in the 7w/1.2/mom_20<0.10 corner that Lane KEEPS but that ruins — would falsify the corner-concentration prediction and show Lane's signal is asymmetric",
+    "Pullback rows with pullback_pct<-20% (deep crashes) where Lane's decisions do not match shallow-pullback decisions — tests whether 'pullback' is even a coherent regime for Lane",
+    "Names where Lane decision flips between consecutive pullback weeks for the same entity with similar features — would expose signal instability rather than risk discipline",
+    "Cases where B0_LANE selects a name but the SCORE_BEFORE_LANE for the rejected alternatives was materially higher — would show Lane is actively downranking on alpha, not just on risk"
+  ],
+  "what_would_change_my_mind": [
+    "A matched-name counterfactual (same universe of candidates, Lane applied vs Lane masked) showing W4 median return delta <0.3pp AND identical right-tail (not just left-tail) behavior — would require Lane signal to be truly return-orthogonal, which the current mom_20/vol_ratio deltas contradict",
+    "A pullback-only cohort with shallow base-building (pullback_pct in -8% to -15%, base_duration>40w) showing false_negative_big_winner rate <5% over n>=30 — current evidence has 2/27 ≈7% which is already non-trivial in this small sample",
+    "Demonstration via partial correlation or residualization that mom_20 and vol_ratio_5_20 contribute zero independent return signal after conditioning on the others — would show they are pure risk proxies, not alpha factors",
+    "An out-of-sample test where Lane-filtered pullback portfolios show Sharpe ratio improvement driven primarily by tail compression (Sortino > Sharpe improvement) rather than by mean preservation across regime shifts — currently the evidence supports a left-tail story but the right-tail truncation is unaddressed",
+    "Replication of the FN/SW mom_20 and vol_ratio deltas with the same magnitude in a regime where Lane decisions are randomized — would show the deltas are intrinsic to base/pullback characteristics rather than Lane-induced, but this is a hard experiment to design and would actually undermine Lane's mechanism claim"
+  ]
+}

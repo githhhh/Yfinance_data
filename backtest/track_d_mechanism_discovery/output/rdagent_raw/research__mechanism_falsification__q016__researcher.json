@@ -1,0 +1,32 @@
+{
+  "mechanism_claim": "The 'distinct1' component in B0 operates as an aggressive return-ranking signal rather than a downside-risk control. It selects entities with elevated momentum, volatility expansion, and price-above-MA characteristics, effectively surfacing high-beta momentum plays but failing to filter those that subsequently crater.",
+  "evidence_for": [
+    "Numeric contrasts show selected_winner median mom_20=0.163 vs false_negative median=0.058 (standardized delta=-1.00), indicating the component strongly favors price momentum.",
+    "Selected winners exhibit higher vol_ratio_5_20 (median=1.42) versus false_negatives (median=1.18), standardized delta=-1.05, confirming the component selects volatility expansion.",
+    "up_day_ratio_20 shows the strongest discrimination: selected_winner median=0.625 vs false_negative median=0.500 (standardized delta=-1.19), suggesting the component ranks by consistent positive-day frequency rather than risk-adjusted returns.",
+    "px_vs_ma50 separates winners from misses (selected=0.127 vs false_neg=0.056, delta=-0.85), confirming position-relative-to-moving-average is a primary selection driver.",
+    "Of 27 cases, 8 are false_positive_ruin (30%) and all share high momentum attributes (mom_20 range 0.07-0.25) despite catastrophic outcomes, indicating momentum signals override risk filters.",
+    "pullback_pct is null for 15/27 cases, suggesting the component lacks a robust mechanism to penalize large drawdowns in the selection logic."
+  ],
+  "evidence_against": [
+    "Three false_positive_ruin cases have pullback_pct recorded: -16.2%, -14.4%, -12.3% (entity_8f0df3d38e, entity_ccc90a671f, entity_55c2da490e), yet were still selected, indicating downside-risk signals exist in the data but are not being weighted sufficiently.",
+    "entity_3adc078f01 achieved selected_winner status despite pullback_pct=-42.3%, demonstrating the component tolerates extreme drawdowns as long as other return-ranking features dominate.",
+    "The component has a 0% true-negative rate for ruin outcomes: 8/8 ruin cases are b0_pick=true, confirming it does not filter catastrophic downside.",
+    "False negatives (5 cases) include entity_de1c657364 with mom_20=0.058 and pullback_pct=-7.3% (relatively low momentum, moderate drawdown), suggesting the component ignores safer profiles when momentum is insufficient.",
+    "vol_ratio_5_20 for selected_winner with large_win (median~1.4) is higher than for selected_winner with ruin (no consistent pattern), indicating volatility is used for return amplification not risk signaling."
+  ],
+  "falsifiable_predictions": [
+    "If distinct1 is return-ranking only, then restricting selection to entities where pullback_pct >= -15% (from frozen evidence: smallest ruin drawback was -12.3%) should eliminate at least 3/8 ruin false positives while retaining >=50% of selected_winner cases.",
+    "If distinct1 lacks downside-risk control, then a composite where vol_ratio_5_20 is rank-inverted (selecting low volatility within momentum cohort) should reduce ruin rate by >30% without reducing win-rate below 60%.",
+    "Adding a penalty term for pullback_duration_weeks > 6 weeks (selected_winner median=5.5 vs false_negative median=4.0) would filter slow-recovery candidates and should reduce false_positive_ruin by >20% based on observed case distribution.",
+    "A falsification test: if distinct1 were truly a downside-risk controller, selected_winner median pullback_pct should be less negative than false_positive_ruin median. Observed: selected_winner pullback_pct available cases show -25.1%, -42.3%, -6.7% (mixed extremes), disproving pure risk-control role.",
+    "The component will continue producing false_positive_ruin cases whenever mom_20 > 0.15 AND vol_ratio_5_20 > 1.3 simultaneously, based on case pattern analysis."
+  ],
+  "policy_implications": [
+    "Replace distinct1 with a dual-threshold mechanism: (a) momentum floor mom_20 >= 0.10 for return potential, (b) drawdown ceiling pullback_pct <= -20% OR pullback_duration_weeks <= 4 weeks as risk gate. This preserves return-ranking intent while adding structural downside control.",
+    "A cleaner replacement would use up_day_ratio_20 as the primary ranker (standardized delta=-1.19 is strongest discriminator) but apply a risk-adjusted version: up_day_ratio_20 * (1 - |pullback_pct|/100) to penalize high-drawdown candidates.",
+    "Consider swapping vol_ratio_5_20 from direct inclusion to conditional use: include only when mom_20 >= 0.15 AND pullback_pct > -10% to avoid amplifying volatility in already-risky momentum stocks.",
+    "Implement a 'ruin guard' post-filter: any candidate with w4_return_bucket='ruin' probability estimate > 0.2 (based on mom_20 * vol_ratio_5_20 interaction) should be rejected regardless of return-ranking score.",
+    "The current distinct1 configuration adds no incremental downside-risk value over a naive momentum screener; adding explicit drawdown duration and depth thresholds would align the component with downside-risk control without abandoning its return-ranking function."
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "strongest_counterclaim": "The 'quiet-coil / volume-dry-up absorption' signature is a label-threshold artifact, not a reproducible PIT precursor. The false-negative-to-large-winner cohort is defined by an ex-post W4 outcome threshold (>=8% AND >=5pp above B0 median) that mechanically guarantees the discovered features (low mom_20, shallow pullback, low vol_ratio) load onto a contrast axis; when compared against the operationally relevant baseline (false_positive_ruin and FN→loss), the 'calm tape' cluster fails to discriminate. The pattern is also dominated by a single snapshot date (snap_71486ed83c), so 'repeated PIT precursors' is a within-date artifact masquerading as a structural rule.",
+  "attacks": [
+    {
+      "issue": "Wrong baseline: the prior claim contrasts FN-large-winners against selected_winners (SW). The informative comparison is FN-large-win vs FN-loss (entity_bfb308b24a). On that axis, the discriminating gap collapses: mom_20 is 0.027 (FN-loss) vs 0.028–0.070 (FN-large-win), vol_ratio_5_20 is 1.187 (FN-loss) vs 0.964–1.174 (FN-large-win), ma10_slope is 0.012 (FN-loss) vs 0.004–0.030 (FN-large-win). The loss case sits inside the large-win feature box. 'Quiet coil' does not separate win from loss within the FN class.",
+      "why_it_matters": "Policy implication #2 ('risk-size quiet-coil smaller because precision is lower') concedes the feature box is contaminated; the proposed two-bucket generator therefore has near-zero separation power on the only margin a portfolio can exploit (FN-large vs FN-loss)."
+    },
+    {
+      "issue": "Label is threshold-defined ex post: FN-big-winner requires W4 >= 8% AND >= 5pp above B0 selected median. By construction, mom_20, px_vs_ma20, and px_vs_ma50 (features known to correlate with forward returns) are guaranteed to load negatively in the FN direction. The standardized deltas (-1.0, -0.85, -0.58) are therefore not 'discoveries' but tautologies of the threshold against the same forward-return-correlated inputs.",
+      "why_it_matters": "Any feature with even weak serial correlation in 4-week returns will appear 'discriminating.' The claim has not separated a predictive mechanism from the mathematical consequence of thresholding the dependent variable against features that are forward-return proxies."
+    },
+    {
+      "issue": "Single-snapshot domination: snap_71486ed83c supplies >= 6 of 27 cases spanning FN-large-win, FN-loss, FN-small-win, SW, and FPR. The 'repeated PIT precursors' are largely a market-regime signature (one date, one tape state) reproduced across multiple entities, not an entity-level repeatable pattern. Cross-snapshot generalization is unsupported because only 2–3 snapshots contribute meaningful FN cases.",
+      "why_it_matters": "A 'PIT-visible precursor' claim requires the precursor to recur across independent market states. Concentrating evidence in one date invalidates the generalization step and leaves the 'absorption' narrative undertested against alternative regimes (e.g., rising-rate environments, narrow breadth)."
+    },
+    {
+      "issue": "Null handling biases the contrast upward: pullback_duration_weeks and pullback_pct are null for >50% of FN cases and most SW cases. The medians reported (-7.3%, 4 weeks for FN; -15.9%, 5.5 weeks for SW) are computed on a much smaller effective sample and on a non-random subset (non-nulls likely correlate with longer-tenured entities that entered base, biasing toward constructive pullback signatures).",
+      "why_it_matters": "Selective missingness inflates the apparent gap on pullback-based features. The 'shallow-basing' claim is fragile to any re-imputation that assigns nulls plausibly (e.g., short-history entities that never had a pullback)."
+    },
+    {
+      "issue": "Absence of momentum is not evidence of absorption: mom_20 in [0.02, 0.08] combined with vol_ratio near 1.0 is equally consistent with a stock that is simply uncorrelated with the market over a 4-week window — i.e., a zero-mean noise process. The base rate of small positive W4 returns is high in any broad cross-section; 'quiet' names will occasionally print +8% by chance. The 'absorption → breakout' mechanism is unfalsified but also unsupportable from 2–3 cases.",
+      "why_it_matters": "Without a defined null (what fraction of quiet names randomly achieve W4 >= 8%?), the conditional probability claims ('40% large_win rate in the quiet-coil slice') are not meaningful. 2/7 = 28.6% in this slice is statistically indistinguishable from the unconditional FN rate."
+    },
+    {
+      "issue": "The 'calm tape' cluster is shared with false_positive_ruin: entity_3472243e0c (FPR) has mom_20=0.242, vol_ratio=1.21, up_day=0.65; entity_b6bcccdf6a (FPR) has mom_20=0.176, vol_ratio=1.31. Several FPR cases have higher momentum and volume than the FN-large-win cases. If 'volume confirmation' can't separate winner from ruin within B0 picks (as the researcher concedes), then 'volume dry-up' cannot reliably separate FN-large from FN-loss; the volume feature is demonstrably non-monotonic and regime-dependent.",
+      "why_it_matters": "This contradicts the clean 'calm cluster separates FN from SW' framing. It also undermines the proposed categorical treatment of volume regime (policy #4), because volume within the FN class has no demonstrated directionality."
+    },
+    {
+      "issue": "Ma20_slope_5 sign flip across the cohort: entity_535a1beed7 (FN-big-winner) has ma20_slope=-0.005 and ma10_slope=0.004 (mixed signs), and entity_ad2bfdee3f (FN-small-win) has both negative. 'Near-flat slopes' is a verbal smoothing of genuinely contradictory subcases; the proposed precondition 'constructive ma10/ma20 slopes' is not empirically pinned down.",
+      "why_it_matters": "A precondition that admits sign-mismatched slopes is not operationalizable. The bucket cannot be implemented without arbitrary sign thresholds, which reintroduces discretion."
+    },
+    {
+      "issue": "Standardized deltas of -1.0 in a 7-vs-11 comparison: with n=7 false_negatives and n=11 selected_winners, the standard error of a rank-based standardized difference is large enough that the reported deltas are consistent with no effect. No confidence intervals, no permutation p-values, no bootstrap are reported; the rank is presented as if it implied statistical confidence.",
+      "why_it_matters": "An honest read of '|standardized delta| ≈ 1.0 in n≈10 per arm' is 'suggestive but unconfirmed.' Stating falsifiable predictions like '40% large_win rate' from this evidence overstates certainty and risks capital deployment on noise."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "False-negative cases outside snap_71486ed83c that achieved W4 large_win and test whether the 'calm coil' features recur in an independent tape state. Currently the cross-snapshot FN-large sample is ~1–2 cases.",
+    "FN→loss cases with shallower pullback and lower momentum than the FN→large-win cases (i.e., look-alikes that failed). If entity_bfb308b24a has near-twins with mom_20<0.02 or pullback_pct>-5% that still lost, the absorption mechanism is falsified.",
+    "Selected_winners with vol_ratio_5_20 < 1.0 and mom_20 < 0.05 — these would contradict the 'SW requires momentum/vol confirmation' dichotomy. Existing data already shows entity_2f86543bf6 (SW, large_win) has mom_20=-0.008, undermining the dichotomy.",
+    "A matched cohort of B0-non-picked names with identical quiet-coil features that did NOT break out within 4 weeks. If the quiet-coil feature box has many FN-loss or FN-flat names, precision is single-digit and the bucket is un-tradeable.",
+    "False_positive_ruin cases with low vol_ratio and low mom_20 — if ruins can be quiet too, then 'quiet' is not constructive absorption; it is just low-information tape.",
+    "Snapshot-by-snapshot re-computation of the medians excluding snap_71486ed83c. If the standardized deltas collapse outside that date, the 'repeated precursor' claim is invalidated."
+  ],
+  "what_would_change_my_mind": [
+    "Out-of-sample replication: a held-out discovery set (no snapshot overlap with the train evidence) where the quiet-coil bucket produces a large_win rate statistically distinguishable (p < 0.05 with bootstrap CI excluding zero) from the unconditional non-pick rate. Current 2/7 is indistinguishable from noise.",
+    "FN-large-win vs FN-loss separation on the same feature set using only features available at snapshot. Currently the within-FN discrimination gap is smaller than the between-cohort gap; I would need a classifier that ranks FN names by W4 return with monotonic lift across quiet-coil score deciles.",
+    "Demonstration that the 'absorption' mechanism is not a restatement of the outcome threshold: e.g., a contemporaneous third variable (order-flow imbalance, short-interest change, sector rotation) that explains both the calm tape and the forward return, with the calm-tape features losing significance once it is conditioned out.",
+    "Robustness to alternative FN definitions. If W4 >= 6% or W4 >= 10% (perturbing the threshold) eliminates the 'quiet coil' cluster, the signature is threshold-fragile and should be labeled UNRESOLVED rather than mechanistically named.",
+    "Evidence that the pattern holds when null pullback values are imputed under multiple reasonable rules (e.g., median, zero, base-duration-conditional mean). If the median pullback_pct gap flips sign under any plausible imputation, the shallow-basing claim is artifact, not signal.",
+    "A clearly defined quiet-coil bucket with documented precision and recall against FN-large-win and against the universe of non-picks. Without these two numbers, the bucket cannot be evaluated as either a filter or a parallel input."
+  ]
+}

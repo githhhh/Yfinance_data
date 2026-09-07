@@ -1,0 +1,56 @@
+{
+  "tests": [
+    {
+      "name": "Absolute-feature near-twin discordance test",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within each snapshot_anon bucket, pair observations whose absolute feature vectors are near-identical: |Δmom_20|≤0.05 AND |Δma10_slope_5|≤0.01 AND |Δibd_entry_close_vs_trigger_pct|≤0.02 (with up_day_ratio_20 and px_vs_ma50 reported as covariates, not gating). For each near-twin pair, record whether outcome_label is concordant (both selected_winner, both false_positive_ruin, etc.) or discordant. Aggregate discordance rate across all snapshot_anon strata and tabulate discordance pattern by feature-residual gap (the residual vector in the four non-gating features).",
+      "success_criterion": "Near-twin concordance ≥80% across all snapshot_anon strata, and the residual feature vector in discordant pairs does not exhibit a coherent non-gating signature (i.e., adding up_day_ratio_20 / px_vs_ma50 / vol_ratio_5_20 to the matching rule pushes concordance toward 100%). This confirms the seven-feature set (including ma20_slope_5) is sufficient and no industry residual is required.",
+      "failure_criterion": "Concordance <65% with discordance concentrated in a feature-residual signature that survives the gating rule (e.g., discordant pairs consistently differ in up_day_ratio_20 by ≥0.10 OR in px_vs_ma50 by ≥0.05 even when the gating features match). A residual that survives is admissible evidence of a non-feature mechanism consistent with the skeptic's industry-conditioning claim. Also FAIL if concordance is high but driven by a single snapshot_anon stratum — that indicates the match collapsed into a trivial sub-sample rather than discriminating."
+    },
+    {
+      "name": "Cross-snapshot stage-score concordance stability",
+      "features": [
+        "mom_20",
+        "ma10_slope_5",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within each snapshot_anon, z-score mom_20, ma10_slope_5, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20 using that snapshot's own mean/SD (intra-snapshot standardization, not pooled). Construct a composite stage_score = unweighted mean of the five z-scores. Compute Spearman rank correlation between stage_score and an ordinal outcome severity ladder (large_win > small_win > loss > ruin), restricted to cases within that snapshot. Compare ρ across all snapshot_anon strata that have ≥3 cases.",
+      "success_criterion": "Spearman ρ ≥ 0.55 in at least 3 non-overlapping snapshot_anon strata AND sign of ρ is consistent across all strata with ≥3 cases AND the cross-snapshot dispersion of ρ (max−min) ≤ 0.4. Stable cross-snapshot ρ supports a regime-/stage-driven mechanism that travels with the features themselves.",
+      "failure_criterion": "ρ varies by ≥0.6 across strata (sign flip or near-zero ρ in ≥2 strata). Failure indicates that the same feature composite predicts opposite outcomes in different snapshots, which is the signature of an industry-leadership-shift mechanism — i.e., the features are picking up the industry of the regime rather than the stage of the stock. Also FAIL if only one snapshot_anon has ≥3 cases (insufficient cross-regime evidence to support either claim — mark UNRESOLVED)."
+    },
+    {
+      "name": "Snapshot-feature-dispersion vs outcome-variance coupling",
+      "features": [
+        "mom_20",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "ma20_slope_5"
+      ],
+      "comparison": "Within each snapshot_anon, compute the coefficient of variation (CV) of mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma20, and ma20_slope_5 across the snapshot's entities, and independently compute the variance of an ordinal w4_return_bucket encoding (large_win=4, small_win=3, loss=2, ruin=1). Test the rank correlation between per-snapshot feature-CV and per-snapshot outcome-variance. Then, conditional on is_b0_pick=true subset, recompute. If a snapshot happens to be industry-concentrated, the feature vector is expected to be bimodal and outcome-variance elevated; a regime-only mechanism predicts no such coupling.",
+      "success_criterion": "Spearman ρ between feature-CV and outcome-variance across snapshot_anon strata is |ρ| ≤ 0.25 (no coupling) AND the conditional distribution of outcomes within each snapshot is consistent with a unimodal 'stage' rather than a bimodal 'industry' composition. This would indicate that snapshot-level outcome heterogeneity is not driven by feature-distribution heterogeneity, undercutting the industry-concentration explanation.",
+      "failure_criterion": "ρ ≥ 0.55 between feature-CV and outcome-variance, OR outcome distribution within ≥2 snapshots is bimodal (Hartigan dip test on ordinal outcome, or simply two clusters separated by ≥2 levels). Bimodal within-snapshot outcomes co-located with elevated feature-CV is direct evidence that snapshot composition (industry leadership shift) — not stage — drives dispersion. Also FAIL if most snapshot_anon strata have <3 cases; the test is undefined."
+    }
+  ],
+  "leakage_checks": [
+    "Verify that mom_20, ma10_slope_5, ma20_slope_5, px_vs_ma20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20, pullback_duration_weeks, pullback_pct, ibd_entry_close_vs_trigger_pct, and ibd_entry_volume_ratio are all computed using data strictly at-or-before the IBD entry trigger timestamp for each entity — reject the test if any rolling-window end date extends past entry. This is the primary PIT gate.",
+    "Confirm snapshot_anon is a calendar/regime tag assigned using only information available pre-entry for the entities in that snapshot, not a post-hoc label assigned using the outcome distribution. If snapshot_anon construction is opaque, demote any test that conditions on it and report UNRESOLVED.",
+    "Confirm w4_return_bucket and outcome_label are frozen at the archaeology timestamp (do not require an outer-forward 4-week window beyond the archaeology date). No test in this design requests any new forward measurement.",
+    "Verify is_b0_pick is computed deterministically from a published, pre-entry rule (e.g., IBD-style leadership screen) and is not retroactively flipped after outcome is known.",
+    "Check that pullback_duration_weeks and pullback_pct are not missing-not-at-random in a way that correlates with outcome (currently several false_negative_relative cases have nulls while several false_positive_ruin cases have values — pattern is suspicious and must be tabulated before relying on these features in any test). If MNAR is detected, restrict the matched-pair test to features with complete data.",
+    "Confirm that the entity-level archaeology table is a strict subset of the universe evaluated at the same PIT — no survivorship bias introduced by dropping delisted entities pre-emptively."
+  ],
+  "priority_order": [
+    "Absolute-feature near-twin discordance test",
+    "Cross-snapshot stage-score concordance stability",
+    "Snapshot-feature-dispersion vs outcome-variance coupling"
+  ]
+}

@@ -1,0 +1,72 @@
+
+```json
+{
+  "reviews": [
+    {
+      "policy_id": "evidence_risk_two_tier_decomposition",
+      "concerns": [
+        "transform='neg_abs' on the vol_ratio_5_20 * up_day_ratio_20 interaction is a sign-agnostic magnitude penalty — it rewards large |product| regardless of sign, which is mechanistically opaque and can invert intuition about what 'high vol × high up_day' means",
+        "Selector mode 'min_score' with min_score=1.0 will filter out most universe candidates; combined with max_positions=3 this is a high-abstention default unless tier weights reliably clear 1.0",
+        "px_vs_ma50 (weight 2.0) is a trend proxy that largely duplicates mom_20 information already captured at weight 3.0 — classic feature duplication inflating the apparent signal count without adding variance",
+        "Tier-2 threshold penalty is only -2.5 versus tier-1 positive weights summing to ~9.0 — tier-2 is largely vestigial and will rarely flip an outcome, so the 'tiered' framing is mostly cosmetic",
+        "vol_ratio × up_day_ratio interaction is mirrored in ruin_guard_two_stage and override_interaction_probe — high cross-policy redundancy"
+      ],
+      "novelty_0_100": 32,
+      "mechanism_clarity_0_100": 50
+    },
+    {
+      "policy_id": "entry_volume_demand_conviction_test",
+      "concerns": [
+        "All weights are ≤0.6 with total max contribution ≈1.0 — the 'shadow score' framing means this policy cannot materially shift rank or clear any meaningful min_score; if it is treated as production it is a near-no-op, if it is truly shadow it does not belong in selector evaluation",
+        "zscore transforms on both linear terms AND the interaction introduce cross-sectional noise that washes out level-of-volatility information; an interaction of two z-scored features is non-monotonic and hard to interpret directionally",
+        "ibd_entry_volume_ratio and vol_ratio_5_20 are likely mechanically correlated (entry-day volume lifts short-term vol) — proxy risk: the interaction is partially an identity",
+        "Selector max_positions=2 with top1_confidence + gap=0.25 is restrictive; if top1_confidence collapses to 1 effective slot, this policy also defaults toward abstention",
+        "Calling itself a 'test' while still using the same b0_rank base and selector gating as production policies creates ambiguity about whether abstention here is meant to be counted"
+      ],
+      "novelty_0_100": 58,
+      "mechanism_clarity_0_100": 35
+    },
+    {
+      "policy_id": "override_interaction_probe",
+      "concerns": [
+        "max_positions=1 with gap=1.0 and top1_confidence is a near-certain abstention default; even a strong cross-sectional winner must beat the runner-up by a full score unit to clear",
+        "mom_20 × up_day_ratio_20 interaction (weight 3.5) is duplicated almost verbatim in consistency_agreement_scorer (weight 1.5) — these two policies are largely the same signal at different intensities, with the duplication unaccounted for",
+        "Penalty cell (mom_20 ≥ 0.2 AND up_day_ratio_20 < 0.5) is claimed to be a 'divergence cell' from specific ruin entities, but up_day<0.5 with positive momentum is a plausible early-trend regime, not a guaranteed ruin — the -3.0 penalty is asymmetric against this case without symmetric reward for the opposite (low mom + high up_day)",
+        "Threshold logic uses 'all' but with only two conditions and no other gating; the policy is small (max 1 position) and can be dominated by tier-1 interaction at weight 3.5"
+      ],
+      "novelty_0_100": 28,
+      "mechanism_clarity_0_100": 68
+    },
+    {
+      "policy_id": "ruin_guard_two_stage",
+      "concerns": [
+        "max_positions=1 + gap=1.0 + score_gap mode is the most abstention-prone selector in the set; even good candidates must separate by 1.0 score from the field to clear a single position",
+        "Linear vol_ratio_5_20 penalty at -1.5 is a constant drag that does not gate — it lowers every score uniformly and biases the ranking toward low-vol names without ever producing a hard reject on its own, which is a hidden proxy for risk-aversion rather than an explicit ruin-guard",
+        "Hard threshold -8.0 for vol>1.5 AND up_day<0.55 is severe: this combination is not rare in mid-cap universes and will zero out a large fraction of candidates, after which the gap=1.0 requirement further suppresses position count",
+        "Borderline cell (up_day in [0.50, 0.60] AND mom<0.20) is an extremely narrow and arbitrary window that adds -4.0; this looks curve-fit to specific ruin entities rather than a robust regime",
+        "Thresholds overlap heavily with evidence_risk_two_tier_decomposition's tier-2 penalty (vol>1.5 / mom<0.1) — the same ruin logic is implemented twice with different magnitudes, creating double-counted suppression"
+      ],
+      "novelty_0_100": 40,
+      "mechanism_clarity_0_100": 62
+    },
+    {
+      "policy_id": "consistency_agreement_scorer",
+      "concerns": [
+        "max_positions=1 with mode='fixed' means the policy emits exactly one position when it emits any; combined with the 'agreement' requirement this is a single-name policy, not a portfolio policy — abstention risk is the modal outcome",
+        "industry_mode='distinct_1' is rendered moot by max_positions=1 — the industry constraint never binds, which suggests the constraint was set without checking consistency",
+        "up_day_ratio_20 (4.0) + mom_20 (2.5) + interaction (1.5) is essentially the same feature stack used in override_interaction_probe and ruin_guard_two_stage, just with different weight ratios; 'consistency' is operationalized as 'use the same features again' rather than a distinct mechanism",
+        "Threshold 'any' with a single condition is functionally identical to a one-condition threshold — the 'any' logic is decorative here",
+        "The penalty -3.5 for up_day<0.4 is asymmetric: there is no corresponding penalty for mom_20<0 with high up_day_ratio, even though the description claims symmetry of 'agreement' — this re-introduces the divergence the policy is supposed to discourage"
+      ],
+      "novelty_0_100": 22,
+      "mechanism_clarity_0_100": 60
+    }
+  ],
+  "cross_policy_observations": {
+    "abstention_manufacture": "Three of five policies (override_interaction_probe, ruin_guard_two_stage, consistency_agreement_scorer) set max_positions=1; combined with gap≥0.25 and min_score=1.0 in the remaining two, the ensemble has a strong structural prior toward abstention. A 'failure' outcome here is partially a designed property of the selector rules, not evidence of the underlying hypotheses.",
+    "feature_concentration": "vol_ratio_5_20 appears in all 5 policies; mom_20 + up_day_ratio_20 (often as an interaction) appears in 4 of 5. The policy set is functionally a perturbation around one feature cluster, not 5 independent tests.",
+    "proxy_risk_concentration": "mom_20, px_vs_ma50, up_day_ratio_20 are all trend/direction proxies; vol_ratio_5_20 and ibd_entry_volume_ratio are volatility/liquidity proxies. The set does not have an independent valuation, quality, or fundamental axis — proxy collapse risk is high.",
+    "interaction_transform_inconsistency": "neg_abs (policy 1), zscore (policy 2), identity (policies 3-5) on the same or analogous interaction terms make cross-policy comparison of magnitudes meaningless."
+  }
+}
+```

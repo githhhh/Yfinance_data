@@ -1,0 +1,44 @@
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The slope_ratio (ma10_slope_5 / ma20_slope_5 > 1.5) shows descriptive separation between false_positive_ruin and selected_winner cases in this 27-case discovery sample, but the evidence does not support it as an independent causal mechanism. Three critical confounds undermine the claim: (1) Denominator instability—several ruin cases have near-zero or negative ma20_slope_5 (entity_55c2da490e: -0.0049, entity_40ea0cfb3b: 0.0018), making the ratio an arithmetic artifact rather than a meaningful divergence signal; (2) IBD entry tightness collinearity—the ibd_entry_close_vs_trigger_pct range for ruin cases (0.028–0.074) overlaps with selected_winners, and the confounder decomposition test has not yet been run to separate their independent contributions; (3) Pullback duration artifact—6 of 8 ruin cases have pullback_duration_weeks = 7.0 or null, suggesting the classification may encode a temporal threshold rather than a PIT-visible precursor. The probabilistic retreat by the researcher is unfalsifiable without a documented conditional analysis. The mechanism is better characterized as a hypothesis warranting validation than a supported finding.",
+  "falsifiers": [
+    "The denominator_stability_filter_test fails: if slope_ratio loses statistical significance (p >= 0.05) after excluding |ma20_slope_5| < 0.01 cases, the mechanism is arithmetic noise.",
+    "The confounder_decomposition_test fails: if conditioning on ibd_entry_close_vs_trigger_pct eliminates slope_ratio's coefficient significance (p >= 0.10) or adds < 0.02 AUC, the mechanism is redundant with entry tightness.",
+    "The pullback_artifact_check fails: if pullback_duration_weeks = 7.0/null cases have significantly higher slope_ratio (p < 0.05), the ruin label encodes a temporal threshold rather than measuring a precursor.",
+    "A held-out validation test on 50+ independent B0 picks where slope_ratio > 1.5 does not produce ruin probability > 30%.",
+    "Negative ma20_slope_5 denominators (entity_55c2da490e) included in the ratio calculation produce physically meaningless negative ratios that should be excluded, but removing them leaves insufficient sample to establish the mechanism.",
+    "Entity_6618d3e80c (slope_ratio = 3.71x, outcome = selected_winner with large_win) remains unexplained under any variant of the mechanism, indicating non-determinism that the researcher has not quantified."
+  ],
+  "actionable_design_principles": [
+    "RULE-OUT BEFORE RULE-IN: The denominator_stability_filter_test and confounder_decomposition_test must be executed and published before the slope_ratio enters any production scoring model. Neither has been run.",
+    "TREAT PULLBACK_DURATION AS SUSPECT: Treat pullback_duration_weeks = 7.0 as a potential classification artifact until proven otherwise. Exclude null and 7.0 values from any feature engineering pipeline that feeds into the ruin outcome variable.",
+    "REQUIRE SYMMETRIC SIGN HANDLING: Any ratio-based feature must document behavior when the denominator is negative or near-zero. The current mechanism implicitly assumes positive denominators, which is violated in at least one case.",
+    "DEMAND PROBABILISTIC QUANTIFICATION: If the mechanism is probabilistic, it must specify P(ruin | slope_ratio > 1.5, mom_20, vol_ratio_5_20, up_day_ratio_20) from a conditional model—not just assert it. Without this, 'probabilistic' is a hedge, not a scientific claim.",
+    "MINIMUM VALIDATION THRESHOLD: No slope_ratio-based filter should be deployed unless demonstrated on a held-out set of >= 50 cases not used in hypothesis generation. The current n=27 discovery sample is below the threshold for confirmatory inference."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage filter: require slope_ratio > 1.5 AND ibd_entry_close_vs_trigger_pct <= 0.045 as a combined condition for flagging potential ruin, with a documented justification for why entry tightness should be inverted in this context.",
+      "why_distinct": "This addresses the confounder concern by explicitly conditioning on entry tightness rather than treating slope_ratio as a standalone signal. It also forces the analyst to articulate why tight entries in high-ratio stocks are acceptable (if they are) or dangerous (if they compound the ruin signal).",
+      "features": ["ma10_slope_5", "ma20_slope_5", "ibd_entry_close_vs_trigger_pct"],
+      "capacity_relevance": "Prevents deployment of slope_ratio as an independent ruin signal when its apparent predictive power may be an artifact of entry tightness stratification."
+    },
+    {
+      "idea": "Denominator stability gate: compute ma20_slope_5 as a rolling 5-day standard error estimate, and only compute slope_ratio when |ma20_slope_5| > 0.01 AND ma20_slope_5 > 0. Exclude negative-denominator ratios from all downstream models.",
+      "why_distinct": "This directly addresses the denominator instability attack by establishing a mechanical rule for when the ratio is computable, rather than relying on post-hoc exclusion that could introduce selection bias.",
+      "features": ["ma20_slope_5", "ma10_slope_5"],
+      "capacity_relevance": "Ensures the slope_ratio feature meets the interval-scale requirement for division operations before entering any model. Without this, the feature has no mechanical interpretation."
+    },
+    {
+      "idea": "Temporal hold-out validation protocol: require that any slope_ratio threshold proposed for production be tested on snapshots from a non-adjacent time period that was not used in hypothesis generation, with a pre-specified success criterion (e.g., ruin rate in high-ratio stratum exceeds 25% vs. < 15% in low-ratio stratum, p < 0.05).",
+      "why_distinct": "This addresses the 'discovery-train-only' limitation by requiring temporal out-of-sample validation, which is distinct from random hold-out validation and more appropriate for time-series trading signals.",
+      "features": ["ma10_slope_5", "ma20_slope_5", "snapshot_anon"],
+      "capacity_relevance": "Prevents deployment of features that overfit to the discovery sample's temporal structure. With 27 cases and 20+ features, multiple testing risk is non-trivial; temporal hold-out is a conservative control."
+    }
+  ]
+}
+```

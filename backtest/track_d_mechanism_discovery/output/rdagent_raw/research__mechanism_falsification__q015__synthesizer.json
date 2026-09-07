@@ -1,0 +1,59 @@
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 62,
+  "mechanism_summary": "The B0 entry_volume component (ibd_entry_volume_ratio) is unlikely to function as an independent downside-risk control. The evidence directly contradicts the protective-threshold interpretation: at least four false_positive_ruin cases have elevated vol_ratio_5_20 (1.38-1.63) despite being top-volume entries, and the standardized delta (-0.5013) is weaker than five other PIT-observable pivot features (up_day_ratio_20=-1.19, vol_ratio_5_20=-1.05, mom_20=-1.00, px_vs_ma50=-0.85, ibd_entry_close_vs_trigger_pct=-0.70). Furthermore, volume_ratio (the 5/20-day volume ratio) goes in the OPPOSITE direction (+0.23 standardized), indicating internal incoherence if both purport to measure the same 'volume' property. The entry-volume contrast is consistent with a weak return-ranking signal where high-volume entries coincidentally accompany stronger pivots, but this contribution is subsumed by momentum, recent volatility, and price-location features. The downside-risk-control hypothesis cannot be falsified or supported with binary win/loss labels alone—no direct measure of MAE, drawdown magnitude, stop distance, or ruin probability is present in the frozen evidence.",
+  "falsifiers": [
+    "Run volume_ratio_internal_consistency test: if within-snapshot Spearman correlation between ibd_entry_volume_ratio and volume_ratio is <0.3, the two features are incoherent and neither captures general 'volume' as a distinct construct. This directly attacks the coherence of the component definition.",
+    "Run high_volume_ruin_counterexample_tabulation: if ≥3 cases exist with ibd_entry_volume_ratio in top decile AND ruin outcome AND vol_ratio_5_20 >1.3 AND mom_20 >0.1, the downside-risk-control interpretation is refuted. Four such cases are already visible in the frozen data (vol_ratio 1.377, 1.449, 1.312, 1.625 with ruin outcomes).",
+    "Run low_volume_large_win_counterexample_tabulation: if ≥3 cases exist with ibd_entry_volume_ratio in bottom tertile producing large_win without materially worse pullback_pct (≥5pp more negative), volume is not a necessary condition for quality outcomes. At least three cases with vol_ratio ~1.01-1.19 produced selected_winner/large_win outcomes.",
+    "Run within_snapshot_volume_partial_effect: if pooled partial correlation of ibd_entry_volume_ratio against outcome_ordinal is not significantly >0 after regressing out mom_20, vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, and ibd_entry_close_position, the component adds no independent ranking information beyond pivot features.",
+    "Run snapshot_regime_stratified_contrast: if the volume gap direction reverses in ≥30% of multi-case snapshots or is driven entirely by a single snapshot contributing >40% of the delta, the pooled effect is a regime artifact, not a stable signal.",
+    "Downside-risk-control is unfalsifiable with current data: the mechanism requires testing whether entry_volume predicts reduced MAE, smaller maximum drawdown, or lower ruin probability conditional on momentum and price location—none of which are present in the frozen evidence. The absence of these measurements defaults to UNRESOLVED for the risk-control claim rather than SUPPORTED."
+  ],
+  "actionable_design_principles": [
+    "Do not treat ibd_entry_volume_ratio as an independent downside-risk filter or position-size amplifier. High-volume entries can and do produce ruin outcomes at non-trivial rates (ruin rate in top vol_ratio tertile appears to exceed 5% based on visible false_positive_ruin cases).",
+    "Replace the standalone volume component with a conditional confirmation rule: entry_volume should be evaluated only when mom_20 > 0.10, vol_ratio_5_20 > 1.3, and px_vs_ma50 > 0.08 simultaneously. Under these conditions, elevated volume may confirm breakout legitimacy, but it does not independently guarantee risk control.",
+    "Do not use ibd_entry_volume_ratio and volume_ratio as interchangeable volume features. Their opposite directional contrast (+0.23 vs -0.50) indicates they capture different properties—ibd_entry_volume_ratio is entry-bar-specific while volume_ratio reflects multi-week trend. Choose one or explicitly model their interaction.",
+    "Implement the two-layer marginal increment test before including entry_volume in the production model. Layer 1 (all PIT features except entry_volume) vs Layer 2 (with entry_volume) should show ≥0.05 delta in C-statistic for the component to warrant inclusion as an independent signal.",
+    "If marginal increment is <0.02, deprecate the component and replace with a composite that explicitly captures the observed co-occurrence pattern: strong_momentum_plus_established_advance (mom_20 > median AND px_vs_ma50 > median) as a return-ranking proxy, since entry_volume appears to tag this pattern rather than add independent information."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Composite momentum-confirmation signal: require ibd_entry_volume_ratio > snapshot-tertile-2 threshold ONLY when mom_20 > 0.10 AND vol_ratio_5_20 > 1.30 AND px_vs_ma50 > 0.08 simultaneously. This restricts volume to confirming already-strong pivots rather than acting as a standalone filter.",
+      "why_distinct": "Unlike the current single-feature entry_volume component, this composite explicitly conditions volume on the presence of stronger pivot signals. It addresses the collider concern by not treating entry-volume as an independent cause while preserving any marginal confirmation value. The three-way intersection is chosen because these three features have the largest standardized deltas in the false-negative contrast.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "snapshot_anon (for threshold derivation only)"
+      ],
+      "capacity_relevance": "LOW-MARGINAL. This composite is unlikely to add >0.02 C-statistic over a model using mom_20 + vol_ratio_5_20 + px_vs_ma50 alone. If the incremental contribution is confirmed to be negligible, this composite should be dropped from the model and replaced with a pure momentum-price-location formulation."
+    },
+    {
+      "idea": "Explicit downside-proxy component: replace the untestable downside-risk-control claim with a directly measurable alternative—base_depth_pct (median -29.5 for selected winners vs -25.8 for false negatives, standardized +0.19) or a reconstructed pullback_pct model using available pullback_duration_weeks as a prior. This addresses the measurement gap that prevents falsification of the risk-control mechanism.",
+      "why_distinct": "Current evidence cannot test downside control because MAE, drawdown magnitude, and ruin probability are not in the frozen data. Using base_depth_pct as a proxy for accumulation quality and stop-distance provides an empirically grounded risk-control feature that can actually be falsified with available variables.",
+      "features": [
+        "base_depth_pct",
+        "pullback_duration_weeks",
+        "mom_20",
+        "vol_ratio_5_20",
+        "snapshot_anon (for regime stratification)"
+      ],
+      "capacity_relevance": "POTENTIALLY HIGH. base_depth_pct has a visible (though modest) contrast in the data. If a future component explicitly models accumulation depth and holding-period drawdown, it would directly address the risk-control question that ibd_entry_volume_ratio cannot answer."
+    },
+    {
+      "idea": "Dimensionality-reduction ranking score: replace entry_volume with a rank-based composite of the top-5 pivot features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct) using their standardized deltas as weights. The composite rank score would capture the full pivot-strength signal that entry_volume appears to proxy.",
+      "why_distinct": "Rather than treating entry_volume as an independent signal, this approach explicitly models entry_volume's apparent role as a passive marker of pivot strength. The composite score subsumes the entry_volume information while being directly interpretable and testable as a return-ranking signal.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct",
+        "snapshot_anon (for within-snapshot ranking)"
+      ],
+      "capacity_relevance": "HIGH. This composite would likely have a stronger ordinal correlation with outcome than any single feature, including entry_volume. The marginal contribution of ibd_entry_volume_ratio on top of this composite can then be precisely quantified via the Layer-1 vs Layer-2 C-statistic comparison."
+    }
+  ]
+}

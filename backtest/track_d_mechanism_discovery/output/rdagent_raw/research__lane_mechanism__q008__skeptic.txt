@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "strongest_counterclaim": "Lane is NOT a proxy composite in mixed breakout/pullback weeks. It functions as a regime-conditioned non-linear re-ranker that injects at least one orthogonal axis (most plausibly a base-tightness × momentum-saturation interaction, a sector-relative rotation signal, or an inter-base correlation factor) not represented in the listed proxy panel. The prior 'evidence_for' is misleading because (a) conditioning on 'mixed' weeks is itself a Berkson-style selection that makes proxy discordance mechanically appear as Lane = proxy, (b) the falsifiable predictions (Spearman > 0.92, AUC gap < 0.02) are calibrated for a LINEAR proxy blend and are trivially passed by any non-linear Lane re-ranker, and (c) several features in numeric_contrasts move the WRONG direction for a pure freshness/geometry/volume reading.",
+  "attacks": [
+    {
+      "issue": "Berkson/selection bias in the 'mixed breakout/pullback' conditioning. The very regime selected for the test is defined by proxy divergence — by construction, weeks where proxies disagree are over-sampled, mechanically inflating the apparent explanatory power of proxies and suppressing any orthogonal signal that may exist elsewhere in the calendar.",
+      "why_it_matters": "If Lane carries an orthogonal signal that is ONLY active in non-mixed weeks (e.g., regime detection, sector tailwind), the proxy-collapse theory will be incorrectly confirmed on this slice while failing out-of-sample. The test is structurally incapable of falsifying the proxy claim on its own chosen data."
+    },
+    {
+      "issue": "Non-monotonic feature directions refute a pure proxy blend. base_mbox_count (+0.34σ) and ibd_entry_breakout_range_ratio (+0.12σ) are HIGHER for false_negatives than for selected_winners. A pure freshness proxy would monotonically penalize more boxes / tighter breakout range; the sign reversal indicates Lane applies non-monotonic weighting that no linear proxy composite can reproduce.",
+      "why_it_matters": "If Lane were 'just' proxy, it should select AGAINST high box-count stocks. The data show Lane occasionally does NOT select them (correctly: false_negatives) but also that the proxy blend alone cannot reproduce Lane's selection surface. This is direct evidence of non-linear interaction, not mere proxy aggregation."
+    },
+    {
+      "issue": "The falsifiable_predictions are calibrated too loosely to bite. Spearman > 0.92 between SCORE_BEFORE_LANE and post-Lane B0 is easily satisfied by ANY monotonic re-ranker, including one that injects a single non-linear interaction term (e.g., mom_20 × pullback_duration_weeks). The AUC gap < 0.02 is similarly lax: a logistic regression on 8 proxies with even mild interaction terms fits Lane's ordering closely. These thresholds cannot distinguish 'Lane = proxy' from 'Lane = proxy + small non-linear correction'.",
+      "why_it_matters": "The hypothesis test as written has near-zero power against the alternative the prior role is implicitly defending. A skeptic cannot reject the proxy claim with these tests even if Lane carries genuine orthogonal information."
+    },
+    {
+      "issue": "The entity_6618d3e80c dual label (false_positive_ruin|selected_winner) is methodologically incoherent under the proxy-collapse theory. A pure-proxy Lane that mechanically promotes mom_20=0.251, vol_ratio=1.45, px_vs_ma50=0.337 stocks cannot simultaneously be 'correctly selected' and 'a ruin' — both labels require the same entity to sit in both the winner and the loss bucket. Either the label schema is leaking (look-ahead, base-period mismatch, or double-counting), or Lane's reordering carries variance the proxy composite cannot account for.",
+      "why_it_matters": "A single entity holding contradictory outcome labels is a smoking gun for either label leakage or unmodeled heterogeneity. Either explanation directly undermines the proxy-collapse theory."
+    },
+    {
+      "issue": "Survivorship / look-ahead in deep-pullback winners. entity_2c58cebc59 (pullback_pct=-25.1%, duration=6w) and entity_3adc078f01 (pullback_pct=-42.3%, duration=9w) were selected as winners. The 'w4' outcome bucket necessarily reflects the recovery AFTER the pullback completed. If Lane selected these during the pullback trough, freshness/geometry proxies should have demoted them — yet Lane promoted them. This implies Lane reads base depth / structural tightness, not just fresh-proxy momentum.",
+      "why_it_matters": "Two of the strongest 'selected_winner' cases physically cannot be freshness-proxy-driven. They are evidence for a non-proxied 'deep-base' lane operating inside B0_LANE."
+    },
+    {
+      "issue": "Discovery-train-only circularity: the 27 cases are drawn from the same data the Lane was constructed on. The proxy-collapse hypothesis is being tested on the very sample that gave rise to the proxy weights. Out-of-sample validation is absent, and the false_negative | false_positive asymmetry is itself a sign of in-sample overfitting rather than a robust mechanism finding.",
+      "why_it_matters": "The researcher explicitly flags this ('discovery-train only') yet the mechanism_claim is stated as if it generalized. Without out-of-sample data, neither Lane = proxy nor Lane = orthogonal can be confirmed."
+    },
+    {
+      "issue": "The proxy panel itself is incomplete. It contains no sector-relative-strength feature, no ETF-rotation feature, no inter-base correlation (correlation of pullback timing with sector peers), no earnings/revision surprise, and no relative-volume-vs-sector. Any of these could be the actual Lane axis; their absence means the 'proxy' definition is artificially narrow and Lane is being compared to a straw-man proxy set.",
+      "why_it_matters": "If Lane is built on sector-relative features (a common institutional pattern), the listed proxies are confounders, not the true Lane axes. The numeric_contrasts would then show spurious associations."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A LANE_NEUTRAL stock (Lane signal within ±0.5σ of zero) with mom_20 > 0.20 AND vol_ratio_5_20 > 1.4. Under the proxy-collapse theory, this entity should be near the top of B0; under orthogonal theory it should exist as a deliberate non-selection.",
+    "A B0_LANE selected_winner with pullback_pct < -20% AND pullback_duration_weeks < 4. A pure momentum proxy would demote this; a non-proxied 'deep-base-tightly-formed' signal would elevate it.",
+    "An entity with identical proxy quintile placement to entity_6618d3e80c (mom_20 ~0.25, vol_ratio ~1.45, px_vs_ma50 ~0.33) but classified as selected_winner without the false_positive_ruin component — i.e., the dual-label case is not idiosyncratic but reflects a systematic Lane non-monotonicity.",
+    "A held-out week (post discovery-train) where SCORE_BEFORE_LANE ranks a deep-pullback winner above a fresh-breakout loser, and Lane CORRECTLY inverts it. If proxy-collapse is true, Lane should NOT invert proxy order; if orthogonal, it should.",
+    "Sector-level clustering: do false_positive_ruins concentrate in specific sectors / regimes (e.g., late-cycle tech, post-FOMC week)? If yes, Lane is encoding regime, not proxy."
+  ],
+  "what_would_change_my_mind": [
+    "Out-of-sample replication on held-out weeks (not in the 27-case archaeology) showing B0_LANE hit-rate is statistically indistinguishable from a calibrated proxy-only composite (logistic regression on mom_20, vol_ratio_5_20, ma10_slope_5, px_vs_ma50, up_day_ratio_20, pullback_duration_weeks with at most one quadratic term). AUC gap < 0.01 with p > 0.10 for the equivalence test.",
+    "A formal conditional-independence test: Lane ⊥ W4_return_bucket | (mom_20, vol_ratio_5_20, ma10_slope_5, px_vs_ma50, pullback_duration_weeks, up_day_ratio_20). Failing to reject H0 (i.e., Lane adds nothing beyond the listed proxies) would support the proxy claim.",
+    "Demonstration that in UNCONDITIONED weeks (not just 'mixed breakout/pullback'), the same proxy dominance holds. If Lane looks proxy-driven ONLY in mixed weeks but orthogonal elsewhere, the regime-specific reading is the correct mechanism and the 'mixed week' framing is the artifact.",
+    "Reconciling entity_6618d3e80c's dual label by showing the label schema is unambiguous (no look-ahead, no base-period mismatch). If reconciliation requires non-proxy features, the proxy claim fails.",
+    "A formal feature-importance decomposition of Lane showing the cumulative importance of all listed proxies (linear + first-order interactions) is ≥ 95% of total explained variance. The prior role's evidence_for exhaustively lists the top 5 proxies but never sums their importance."
+  ]
+}
+```

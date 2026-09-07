@@ -1,0 +1,157 @@
+{
+  "policies": [
+    {
+      "policy_id": "override_interaction_probe",
+      "description": "Probes mechanism_falsification__q008 override/interaction hypothesis: the cross-pattern signature (wins at near-zero AND high momentum; ruins at high momentum) is incompatible with pure redundancy. Explicitly models mom_20 x up_day_ratio_20 interaction and penalizes the specific divergence cell (high mom_20 + low up_day_ratio_20) seen in entity_6618d3e80c / entity_3472243e0c ruins.",
+      "research_origin": "mechanism_falsification__q008",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "interaction",
+          "left": "mom_20",
+          "right": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 3.5
+        },
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 2.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "mom_20",
+              "op": "gte",
+              "value": 0.2
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.5
+            }
+          ],
+          "add": -3.0
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "top1_confidence",
+          "max_positions": 1
+        }
+      }
+    },
+    {
+      "policy_id": "ruin_guard_two_stage",
+      "description": "Operationalizes failure_archaeology__q001 WEAK mechanism with two-stage filter and continuous vol_ratio penalty: clear-reject cell (vol_ratio_5_20 > 1.50 AND up_day_ratio_20 < 0.55) hard-filtered; borderline cell (0.50 <= up_day_ratio_20 <= 0.60 AND mom_20 < 0.20) penalized; soft continuous penalty on high vol_ratio. Distinct from P1 because it tests the q001 ruin-precursor hypothesis directly rather than the override-content hypothesis.",
+      "research_origin": "failure_archaeology__q001",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "vol_ratio_5_20",
+              "op": "gt",
+              "value": 1.5
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.55
+            }
+          ],
+          "add": -8.0
+        },
+        {
+          "type": "threshold",
+          "logic": "all",
+          "conditions": [
+            {
+              "feature": "up_day_ratio_20",
+              "op": "gte",
+              "value": 0.5
+            },
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lte",
+              "value": 0.6
+            },
+            {
+              "feature": "mom_20",
+              "op": "lt",
+              "value": 0.2
+            }
+          ],
+          "add": -4.0
+        },
+        {
+          "type": "linear",
+          "feature": "vol_ratio_5_20",
+          "transform": "identity",
+          "weight": -1.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "max_2_per_ind",
+        "capacity": {
+          "mode": "score_gap",
+          "max_positions": 1,
+          "gap": 1.0
+        }
+      }
+    },
+    {
+      "policy_id": "consistency_agreement_scorer",
+      "description": "Inverts failure_archaeology__q014 falsification into a positive signal: the proposed FN-re-entry mechanism (high vol_ratio, long pullback duration) is contradicted by data, BUT the dominant surviving pattern is that winners show metric agreement between mom_20 and up_day_ratio_20. Up-weights both metrics jointly with a smaller reinforcement interaction; penalizes extreme divergence on either axis alone.",
+      "research_origin": "failure_archaeology__q014",
+      "base": "b0_rank",
+      "terms": [
+        {
+          "type": "linear",
+          "feature": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 4.0
+        },
+        {
+          "type": "linear",
+          "feature": "mom_20",
+          "transform": "identity",
+          "weight": 2.5
+        },
+        {
+          "type": "interaction",
+          "left": "mom_20",
+          "right": "up_day_ratio_20",
+          "transform": "identity",
+          "weight": 1.5
+        },
+        {
+          "type": "threshold",
+          "logic": "any",
+          "conditions": [
+            {
+              "feature": "up_day_ratio_20",
+              "op": "lt",
+              "value": 0.4
+            }
+          ],
+          "add": -3.5
+        }
+      ],
+      "selector": {
+        "industry_mode": "distinct_1",
+        "capacity": {
+          "mode": "fixed",
+          "max_positions": 1
+        }
+      }
+    }
+  ],
+  "batch_rationale": "Three non-redundant policies, each addressing a distinct falsifiable research question with a distinct decision mechanism. P1 (override_interaction_probe) tests the falsification hypothesis by modeling the interaction term explicitly and penalizing the divergence cell that produced ruin cases at high momentum; it answers 'does override content exist beyond neighbor redundancy?' P2 (ruin_guard_two_stage) operationalizes the q001 ruin-precursor mechanism with a two-stage threshold structure that separates clear-reject from borderline-override zones; it answers 'do vol_ratio + up_day_ratio thresholds reduce ruin exposure?' P3 (consistency_agreement_scorer) inverts the q014 falsification into a positive signal: rather than acting on vol_ratio or pullback duration (both falsified as FN-re-entry triggers), it rewards agreement between mom_20 and up_day_ratio_20; it answers 'is metric consistency the surviving clean discriminator?' Each uses different term types (interaction-only vs. threshold-heavy vs. linear+interaction), different selector strategies (top1_confidence vs. score_gap vs. fixed), and different penalty structures (divergence penalty vs. hard-reject cells vs. floor threshold). Coefficients differ but more importantly the mechanisms, feature combinations, and testable claims are non-overlapping."
+}

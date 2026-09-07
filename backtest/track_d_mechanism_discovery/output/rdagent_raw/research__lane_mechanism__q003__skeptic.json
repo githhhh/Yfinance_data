@@ -1,0 +1,25 @@
+{
+  "strongest_counterclaim": "Lane is a magnitude/momentum filter, not a risk-shifter: the same features (mom_20, px_vs_ma50, ma10_slope_5) that elevate winners above rejected names also drive ruin tails, so decomposing mean and tail as independent is invalid. The 50% ruin share among B0 picks and the parallel -0.10/+0.10 mom_20 gap to false_negatives are two faces of one factor loading, not separate 'risk vs alpha' effects.",
+  "attacks": [
+    {
+      "issue": "Circular selection in failure_archaeology: the 8/16 (50%) B0→ruin count is conditioned on already being a ruin; the unconditional B0 ruin rate is unobserved, and the symmetric LANE_NEUTRAL false_negative 'big_winner' count is only 2/27 (7%), making Lane's apparent ruin concentration an artifact of how the labels are defined, not a genuine tail-loading signal.",
+      "why_it_matters": "If LANE_NEUTRAL names in the same snapshots (entity_df5478102d, entity_bfb308b24a) also have ruin potential that is just not labeled because they weren't B0, the 'Lane loads tail risk' claim collapses to a conditioning artifact. The contrast should be unconditional ruin rates across all pickable names, not B0-conditioned archaeology."
+    },
+    {
+      "issue": "Snapshot confound dominates: most snapshots (snap_d0d57b1e40, snap_71486ed83c, snap_b8420124eb) appear across both B0 and non-B0 rows, but pairs are not contemporaneously matched by date; the 'Lane risk-loading' signal is really 'snapshot-week risk regime' because snapshots cluster ruin winners and false_negatives into separate calendar contexts.",
+      "why_it_matters": "Without snapshot-week fixed effects, the predicted B0_LANE > LANE_NEUTRAL ruin gap could vanish once snapshot dummies absorb the regime. The discriminating prediction must compare B0_LANE vs LANE_NEUTRAL inside the SAME snapshot week before any risk-shift claim is licensed."
+    },
+    {
+      "issue": "up_day_ratio_20 and vol_ratio_5_20 are confound proxies for pre-entry regime, not Lane-specific tail behavior: low up_day_ratio simply tags choppy/range-bound names whose W4 distribution has lower mean AND lower variance; calling this 'tail risk' conflates absence of continuation with left-tail loading.",
+      "why_it_matters": "If Lane-accepted low-up_day_ratio names have narrower W4 dispersion overall (not just fatter left tail), the Sharpe-gap prediction in the researcher's falsifiable test reverses: B0_LANE could be lower-Sharpe DESPITE similar mean precisely because mean is lower too, invalidating the 'similar mean, different tail' decomposition."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Fresh breakout weeks where B0_LANE and LANE_NEUTRAL within the same snapshot week show ruin rates within 5pp AND mean returns within 1pp, falsifying the 'risk-only' decomposition and supporting a coupled factor-loading view.",
+    "B0 picks with high mom_20 (>0.20) AND high up_day_ratio_20 (>0.65) that nevertheless become false_positive_ruin (entity_6618d3e80c is suggestive but mixed-label) — a clean ruin among 'safe-looking' Lane names would prove Lane picks load tail risk independent of feature magnitude, the core claim."
+  ],
+  "what_would_change_my_mind": [
+    "A within-snapshot-week paired comparison of B0_LANE vs LANE_NEUTRAL showing ruin-rate gap ≥10pp with mean-return gap <0.5pp and equal sample sizes per cell (n≥20 each); absent snapshot-fixed-effects regression showing Lane coefficient significant only on ruin indicator and not on mean, the mechanism claim should be downgraded to UNRESOLVED.",
+    "Decomposition of W4 return dispersion into variance vs excess kurtosis components showing B0_LANE higher kurtosis but not higher variance relative to LANE_NEUTRAL — a result that would rescue the risk-only framing; current archaeology data cannot distinguish these two channels."
+  ]
+}

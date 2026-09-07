@@ -1,0 +1,58 @@
+{
+  "tests": [
+    {
+      "name": "Within-snapshot tight-matched cohort W4 separation",
+      "features": [
+        "ma10_slope_5",
+        "mom_20",
+        "up_day_ratio_20",
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "px_vs_ma20"
+      ],
+      "comparison": "Constructive-pullback cases split by B0_LANE vs LANE_NEUTRAL, matched within the same snapshot_id on tight tolerances (ma10_slope_5 |delta|<0.01, mom_20 |delta|<0.03, up_day_ratio_20 |delta|<0.05, pullback_duration_weeks |delta|<1wk, pullback_pct |delta|<3pp). Compare within-pair W4 return distribution using Wilcoxon signed-rank on paired differences and hit-rate gap on W4>=8%.",
+      "success_criterion": "Median paired W4 gap |delta| <1.5pp AND hit-rate gap <3pp with sign-rank p>0.4 across n>=10 pairs (Lane redundant within snapshot-controlled matched cohort).",
+      "failure_criterion": "Hit-rate gap >6pp with sign-rank p<0.10 on n>=10 pairs (Lane carries snapshot-controlled independent information)."
+    },
+    {
+      "name": "SCORE_BEFORE_LANE dominance vs PC1-orthogonal Lane residual",
+      "features": [
+        "SCORE_BEFORE_LANE",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "mom_60",
+        "up_day_ratio_20",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Compute first principal component of the seven technical/momentum features, project Lane assignment onto PC1, derive Lane residual (Lane | PC1-orthogonal). Test Spearman(SCORE_BEFORE_LANE, W4_bucket) against partial Spearman(Lane_residual, W4_bucket | SCORE_BEFORE_LANE) within constructive-pullback subsample. Restricted to within-snapshot variation to strip regime.",
+      "success_criterion": "rho(SCORE_BEFORE_LANE, W4) > 0.55 AND partial rho(Lane_residual | SCORE_BEFORE_LANE) < 0.20 (Lane information is restatement, pre-Lane composite dominates).",
+      "failure_criterion": "partial rho(Lane_residual | SCORE_BEFORE_LANE) > 0.40 with bootstrap CI excluding zero (Lane residual carries independent orthogonal signal)."
+    },
+    {
+      "name": "Sub-regime interaction: shallow-base (3-5wk) vs deep-base (7-9wk) Lane effect",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "ma10_slope_5",
+        "mom_20",
+        "B0_LANE",
+        "LANE_NEUTRAL"
+      ],
+      "comparison": "Within constructive pullback, bin by pullback_duration_weeks into shallow (3-5) vs deep (7-9). Stratify B0_LANE vs LANE_NEUTRAL W4 hit-rate within each bin and test for interaction via Breslow-Day / logistic interaction term (Lane x base_depth_bin).",
+      "success_criterion": "Lane effect homogeneous across bins: |hit-rate gap shallow - hit-rate gap deep| < 3pp and interaction p>0.3 (Lane uniformly redundant).",
+      "failure_criterion": "Lane effect concentrated in one bin with |gap| > 8pp and interaction p<0.10 (Lane informative in a sub-regime the prior researcher would have flagged for removal)."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm every B0_LANE / LANE_NEUTRAL / SCORE_BEFORE_LANE value is computed strictly from features observable at or before the constructive-pullback snapshot timestamp, with no peeking at post-pullback W4 data in construction of the Lane label.",
+    "Verify tight-tolerance matching never crosses snapshot_id boundaries and excludes pairs where pullback_pct or pullback_duration_weeks is null (non-pullback regime contamination), since those rows are not in the constructive-pullback scope by definition.",
+    "Confirm SCORE_BEFORE_LANE is computed without Lane inputs in its formula; re-derive from base feature set and check Spearman against the supplied value >0.95 before treating it as an exogenous pre-Lane composite."
+  ],
+  "priority_order": [
+    "Within-snapshot tight-matched cohort W4 separation",
+    "SCORE_BEFORE_LANE dominance vs PC1-orthogonal Lane residual",
+    "Sub-regime interaction: shallow-base (3-5wk) vs deep-base (7-9wk) Lane effect"
+  ]
+}

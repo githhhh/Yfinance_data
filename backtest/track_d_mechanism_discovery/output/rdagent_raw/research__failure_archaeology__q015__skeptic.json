@@ -1,0 +1,42 @@
+{
+  "strongest_counterclaim": "The embedded-strength pullback mechanism is a post-hoc rationalization of a selection artifact: false-negative big winners are identified AFTER their outcomes are known, so the 'distinguishing features' (pullback depth, up_day_ratio_20, mom_20) are confounded with the outcome rather than causing it. The mechanism cannot explain why entity_535a1beed7 and entity_05b4c6b1f7 achieve large_win despite having null pullback data, nor why entity_bfb308b24a with nearly identical pullback characteristics (-12.1% over 4 weeks, up_day_ratio_20=0.45) produces a loss. The apparent pattern is a statistical mirage from small-sample selection on the dependent variable.",
+  "attacks": [
+    {
+      "issue": "Endogenous selection: false negatives are defined by their outcomes, not pre-specified criteria",
+      "why_it_matters": "The researcher labels entities 'false_negative_big_winner' only if they achieve W4 returns >=8% above selected_winner median. This creates look-ahead bias: features like up_day_ratio_20=0.50 and mom_20=0.028 are not predictors—they are artifacts of selecting entities that happened to win. The mechanism cannot be falsified because any entity that fits the thresholds AND produces a large win is classified as confirming evidence; any that fits but fails is not called a false_negative_big_winner. The classification is circular."
+    },
+    {
+      "issue": "Null pullback data violates the mechanism's premise for 2 of 2 false_negative_big_winner cases",
+      "why_it_matters": "entity_535a1beed7 (up_day_ratio_20=0.50, mom_20=0.028, vol_ratio_5_20=1.174) and entity_05b4c6b1f7 (up_day_ratio_20=0.50, mom_20=0.070, vol_ratio_5_20=0.964) are labeled false_negative_big_winner but have null pullback_duration_weeks and null pullback_pct. The mechanism explicitly claims these entities 'missed by B0 due to low trigger proximity while in pullback consolidation,' yet no pullback is observed. Either (a) the pullback occurred before the snapshot and was not recorded, making the feature unobservable at snapshot time (violating the 'do not use information unavailable at snapshot time' rule), or (b) the mechanism is wrong and large_win outcomes occur without pullback."
+    },
+    {
+      "issue": "Threshold inconsistency between evidence_for cases and falsifiable predictions",
+      "why_it_matters": "The falsifiable prediction requires up_day_ratio_20 >= 0.55, mom_20 >= 0.12, vol_ratio_5_20 >= 1.40. But the actual false_negative_big_winner cases have: entity_de1c657364 (up_day_ratio_20=0.65, mom_20=0.058, vol_ratio_5_20=1.147), entity_535a1beed7 (up_day_ratio_20=0.50, mom_20=0.028, vol_ratio_5_20=1.174), entity_05b4c6b1f7 (up_day_ratio_20=0.50, mom_20=0.070, vol_ratio_5_20=0.964). Zero of three meet the mom_20 >= 0.12 threshold. The mechanism claims these features explain the outcome, but the evidence contradicts the stated thresholds."
+    },
+    {
+      "issue": "Contradictory pullback cases with identical profiles produce different outcomes",
+      "why_it_matters": "entity_bfb308b24a (pullback_pct=-12.1%, pullback_duration_weeks=4, up_day_ratio_20=0.45, mom_20=0.027) produces 'loss' but is labeled false_negative_relative (not false_negative_big_winner). entity_de1c657364 (pullback_pct=-7.3%, pullback_duration_weeks=8, up_day_ratio_20=0.65, mom_20=0.058) produces 'large_win' and is labeled false_negative_big_winner. The feature differences (longer duration, higher up_day_ratio_20, higher mom_20) are invoked as explanations, but entity_df5478102d (pullback_pct=-5.0%, pullback_duration_weeks=4, up_day_ratio_20=0.60, mom_20=0.125) with similar-or-better features produces only 'small_win'. The mechanism cannot explain why better features sometimes produce smaller wins."
+    },
+    {
+      "issue": "Up_day_ratio_20 is a lagging indicator that proxies for recent price history, not future direction",
+      "why_it_matters": "up_day_ratio_20 measures the fraction of up days in the prior 20 trading days. This is mechanically correlated with recent price trajectory but contains no independent information about future returns. A stock that went up 13 of 20 days (up_day_ratio_20=0.65) is simply a stock that has already gone up recently. The mechanism is claiming that 'recent winners continue to win' dressed in technical analysis language. This is a well-known mean-reversion trap in the opposite direction: high up_day_ratio_20 often precedes reversal, not continuation."
+    },
+    {
+      "issue": "The vol_ratio_5_20 threshold (>=1.40) contradicts the false_negative median (1.179)",
+      "why_it_matters": "The falsifiable prediction requires vol_ratio_5_20 >= 1.40 for the mechanism to predict large_win. But the false_negative_median for this feature is 1.179, which is 0.221 below the stated threshold. This means the typical false negative does NOT meet the mechanism's own vol_ratio criterion. The mechanism cannot explain its own canonical cases."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A non-pick at snapshot time with up_day_ratio_20 >= 0.55, mom_20 >= 0.10, vol_ratio_5_20 >= 1.40, pullback_pct between -5% and -10%, pullback_duration_weeks >= 5, ibd_entry_close_vs_trigger_pct < 0.02 that produces w4_return_bucket = 'ruin' or 'loss'. This directly falsifies the embedded-strength mechanism by satisfying all preconditions yet failing the predicted outcome.",
+    "A false_negative_relative entity (not selected by B0) with up_day_ratio_20 >= 0.60, mom_20 >= 0.12, vol_ratio_5_20 >= 1.50, but null pullback data (no recorded pullback) that produces only 'small_win' or 'loss' despite strong snapshot features. This would invalidate the claim that these snapshot features are the mechanism by which false negatives become winners.",
+    "A period or snapshot cohort where broad market (e.g., SPY) declined >5% in the 20 days prior to snapshot, within which non-picks matching the embedded-strength criteria (up_day_ratio_20 >= 0.50, mom_20 >= 0.06, pullback_pct -5% to -10%) uniformly produce 'loss' or 'ruin'. This would reveal that the mechanism is a proxy for market tailwind rather than stock-specific embedded strength.",
+    "A selected_winner entity (is_b0_pick=true) with up_day_ratio_20 <= 0.40, mom_20 <= 0.03, vol_ratio_5_20 <= 1.00, and no pullback that produces 'large_win' — demonstrating that the B0 selector captures winners using the inverse of the false-negative mechanism's features, which would undermine the claim that those features are necessary for embedded strength."
+  ],
+  "what_would_change_my_mind": [
+    "Demonstrate that the mechanism's features (pullback_pct, pullback_duration_weeks, up_day_ratio_20, mom_20) are observable and consistently recorded for ALL false_negative_big_winner cases, with no null values and no post-snapshot inference required.",
+    "Show that the proposed thresholds (up_day_ratio_20 >= 0.55, mom_20 >= 0.12, vol_ratio_5_20 >= 1.40, pullback_pct -5% to -10%, pullback_duration_weeks >= 4) were specified BEFORE examining outcomes, not derived from the evidence_for cases post-hoc.",
+    "Provide out-of-sample validation: test the mechanism on a separate holdout set of non-picks where the features are pre-specified and the outcome is not used to classify the entity as false_negative_big_winner. Show the mechanism predicts large_win at above-chance rates.",
+    "Find at least one entity with null pullback data that is correctly excluded from false_negative_big_winner classification despite having up_day_ratio_20 and mom_20 values consistent with the mechanism's feature profile — demonstrating that the mechanism does not overfit to outcomes.",
+    "Identify a causal mechanism (e.g., institutional accumulation detected via specific order flow signatures, options positioning data, sector rotation timing) that links the observable features to the outcome, rather than relying on correlation between snapshot features and future returns."
+  ]
+}

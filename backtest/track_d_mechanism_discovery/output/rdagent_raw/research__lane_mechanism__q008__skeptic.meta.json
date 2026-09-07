@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__lane_mechanism__q008__skeptic",
+  "prompt_hash": "dc2dda65d39427bccf3c16202d5f14fb1787bdd6db9700dea1ff1d6d41a9af65",
+  "response_hash": "ce0f70cde1ef4e589a6a63beea7343427622c71901be7ac0e9ab3eda50f4ed49",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1,
+  "compact_json_retry": false
+}

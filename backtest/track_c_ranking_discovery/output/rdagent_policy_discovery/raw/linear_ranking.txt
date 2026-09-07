@@ -1,0 +1,116 @@
+
+
+{
+  "proposals": [
+    {
+      "family": "linear_ranking",
+      "name": "breakout_momentum_volume",
+      "hypothesis": "Near IBD trigger with strong 5-day momentum and elevated volume ratio suggests institutional accumulation during breakout setup.",
+      "params": {
+        "feature_subset": ["current_vs_ibd_candidate_pct", "mom_5", "volume_ratio"],
+        "regularization": 1.5,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "earnings_quality_momentum",
+      "hypothesis": "Known EPS with strong YoY growth combined with 20-day momentum captures fundamentally-driven uptrends.",
+      "params": {
+        "feature_subset": ["eps_known", "eps_yoy_growth", "mom_20"],
+        "regularization": 2.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "relative_strength_momentum",
+      "hypothesis": "60-day relative strength vs SPY indicates market-leading stocks with sector rotation tailwinds.",
+      "params": {
+        "feature_subset": ["rel_spy_60", "mom_20", "dist_to_52w_high_pct"],
+        "regularization": 1.0,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "pullback_recovery_setup",
+      "hypothesis": "Shallow pullback with dried volume and positive momentum off lows captures mean reversion with institutional confirmation.",
+      "params": {
+        "feature_subset": ["pullback_pct", "pullback_v_is_dry", "mom_10"],
+        "regularization": 2.5,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "tight_consolidation_uptrend",
+      "hypothesis": "Moderate base depth with extended duration forms stable bases; short momentum confirms launch readiness.",
+      "params": {
+        "feature_subset": ["base_depth_pct", "base_duration_weeks", "mom_5"],
+        "regularization": 1.25,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "high_close_breakout_quality",
+      "hypothesis": "High close position within breakout bar range with tight ATR indicates strong commitment and contained risk.",
+      "params": {
+        "feature_subset": ["ibd_entry_close_position", "atr_14_pct", "mom_5"],
+        "regularization": 3.0,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "low_volatility_growth",
+      "hypothesis": "Lower realized volatility with positive momentum and positive price relative to MAs filters smooth uptrends.",
+      "params": {
+        "feature_subset": ["rv_20", "mom_20", "px_vs_ma20"],
+        "regularization": 1.75,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "ma_uptrend_confluence",
+      "hypothesis": "Positive MA slopes across multiple timeframes with price above MAs indicates durable structural uptrend.",
+      "params": {
+        "feature_subset": ["ma10_slope_5", "ma20_slope_5", "px_vs_ma50"],
+        "regularization": 1.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "actionable_ibd_quality",
+      "hypothesis": "ACTIONABLE status with near 52-week high and strong volume on entry captures IBD-validated breakout candidates.",
+      "params": {
+        "feature_subset": ["is_actionable", "dist_to_52w_high_pct", "ibd_entry_volume_ratio"],
+        "regularization": 0.75,
+        "selector_mode": "distinct_1"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "momentum_acceleration",
+      "hypothesis": "Improving up-day ratio with positive short-term momentum acceleration captures increasing buying pressure.",
+      "params": {
+        "feature_subset": ["up_day_ratio_20", "mom_5", "mom_20"],
+        "regularization": 2.25,
+        "selector_mode": "pure_top3"
+      }
+    },
+    {
+      "family": "linear_ranking",
+      "name": "conservative_quality_composite",
+      "hypothesis": "Lower vol, positive relative strength, and known earnings with moderate momentum balances risk and opportunity.",
+      "params": {
+        "feature_subset": ["rv_20", "rel_spy_60", "eps_known", "mom_10"],
+        "regularization": 4.0,
+        "selector_mode": "max_2_per_ind"
+      }
+    }
+  ]
+}

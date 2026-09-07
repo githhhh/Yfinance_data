@@ -1,0 +1,98 @@
+
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 82,
+  "mechanism_summary": "A provisional pattern exists among false-negative large winners: muted 20-day momentum, below-average short-term volume expansion, and modest extension above the trigger. One case resembles a quiet drift with missing pullback fields, while the other shows an eight-week shallow pullback, so the cases share some state features but not a clearly coherent structural profile. The frozen data contains no industry-membership, sector-flow, sector-relative-strength, or portfolio-capacity variables, so industry concentration cannot be identified as the causal mechanism. Repeatedness is also unestablished because only two entities meet the explicit false-negative-big-winner definition, and the broader false-negative group contains losses and small winners. Any policy should therefore be framed as a constrained out-of-sample experiment, not as evidence that a sector-driven quiet-base precursor has been discovered.",
+  "falsifiers": [
+    "On a chronological held-out sample, the proposed low-momentum and low-volume precursor does not achieve a large-win rate or lift above the unconditional non-pick large-win base rate at a prespecified coverage level.",
+    "Within the same held-out snapshots, adding industry-concentration or sector-relative-strength confirmation does not improve ranking, coverage, calibration, or large-win precision beyond the stock-level precursor variables alone.",
+    "After null pullback fields are excluded, the three observed false-negative big winners do not form a more coherent base structure than matched non-pick controls.",
+    "Prospectively relaxing the B0 thresholds captures the expected additional winners but produces a statistically or economically material increase in losses, ruins, or drawdowns that offsets the recovered winners.",
+    "The apparent signature disappears when snapshot clustering, regime, industry, or exposure concentration is added as a fixed effect or when the comparison is restricted to contemporaneous candidates.",
+    "A materially larger discovery set contains no recurring cell characterized by low mom_20, low vol_ratio_5_20, and small extension above the trigger among false-negative large winners.",
+    "Capacity-aware backtests show that the proposed candidates cannot be entered or exited at the modeled prices after spreads, liquidity constraints, position limits, and turnover are applied."
+  ],
+  "actionable_design_principles": [
+    "Treat null pullback observations as unknown rather than evidence of a quiet or extended base; preserve missingness and use null-aware branches or explicit non-null analyses.",
+    "Define industry concentration prospectively using only PIT-available industry classification and contemporaneous sector breadth, flow, dispersion, or relative-strength measures; do not infer it from a selected-winner count alone.",
+    "Use chronological, snapshot-grouped validation to prevent the two large-winner false negatives in snap_71486ed83c from determining rules that are then evaluated on the same snapshot.",
+    "Evaluate the stock-level precursor jointly against matched non-picks and false-positive ruins, reporting large-win lift, loss capture, precision, coverage, and calibration rather than case anecdotes.",
+    "Require sector confirmation before relaxing B0 momentum thresholds; do not deploy the relaxation as an unconditional low-momentum screen.",
+    "Separate stock-selection rules from portfolio construction by testing expected alpha and hit rate first, then applying liquidity, participation, volatility, correlation, and capacity constraints in a second stage.",
+    "Prefer continuous ranking or partial dependence analysis over a hard composite whose thresholds can be satisfied on opposite sides of nearly every cutoff.",
+    "Freeze all features, transformations, null handling, snapshot definitions, and candidate-universe rules before examining the held-out outcomes."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Define a null-aware quiet-drift candidate branch requiring low mom_20, low vol_ratio_5_20, and small ibd_entry_close_vs_trigger_pct, but only permit relaxed eligibility when a contemporaneous PIT sector-confirmation condition is active.",
+      "why_distinct": "This captures the recurring weak individual-confirmation pattern without converting missing pullback data into a positive structural signal and without asserting that industry concentration is already measured.",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct",
+        "pullback_pct_observed_indicator",
+        "snapshot_anon",
+        "PIT_industry_membership",
+        "sector_relative_strength_20",
+        "sector_breadth_20"
+      ],
+      "capacity_relevance": "Initially cap exposure using existing liquidity and volatility limits; sector confirmation must not bypass capacity checks. Estimate impact and achievable position size in the execution-stage backtest."
+    },
+    {
+      "idea": "Create a shallow-pullback branch for candidates with observed pullback data and prohibit inference when pullback_duration_weeks or pullback_pct is null.",
+      "why_distinct": "The observed eight-week, minus-7.3% pullback is one of the few concrete structural precedents, but another big winner has no observed pullback record, making null-sensitive branching essential.",
+      "features": [
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "base_mbox_count",
+        "base_depth_pct",
+        "pullback_fields_observed"
+      ],
+      "capacity_relevance": "Use branch-specific position limits because shallow, longer-duration structures may carry different gap, turnover, and exit-liquidity behavior from confirmed breakouts."
+    },
+    {
+      "idea": "Run an out-of-sample regime-overlay experiment that compares relaxed and baseline B0 rules within strata defined by contemporaneous sector breadth, sector dispersion, and sector relative strength.",
+      "why_distinct": "This tests whether any incremental value is genuinely attributable to an industry-concentration regime rather than merely replicating a stock-level quiet-drift effect.",
+      "features": [
+        "sector_breadth_20",
+        "sector_relative_strength_20",
+        "sector_return_dispersion_20",
+        "sector_flow_proxy_20",
+        "snapshot_anon",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Measure whether the overlay changes portfolio concentration, turnover, and drawdown after industry and position caps; predictive lift alone is insufficient for deployment."
+    },
+    {
+      "idea": "Replace the hard composite with a monotonic precursor score validated for incremental lift over snapshot, industry, momentum, and volatility baselines.",
+      "why_distinct": "A continuous score avoids dependence on arbitrary joint cutoffs and directly tests whether the apparent pattern generalizes beyond two heterogeneous big winners.",
+      "features": [
+        "mom_20",
+        "mom_60",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Translate scores into positions only after applying liquidity, participation, volatility, and concentration constraints; keep score generation independent of portfolio-size rules."
+    },
+    {
+      "idea": "Add a ruin-contamination gate that requires the candidate to beat matched weak-momentum ruins on structure, breadth, or sector confirmation before inclusion.",
+      "why_distinct": "The frozen ruins overlap the proposed quiet signature, so the gate tests whether structural or regime information can distinguish latent large winners from adverse low-momentum names rather than celebrating winner recall alone.",
+      "features": [
+        "base_mbox_count",
+        "base_duration_weeks",
+        "base_depth_pct",
+        "up_day_ratio_20",
+        "sector_relative_strength_20",
+        "sector_breadth_20",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Require lower turnover and smaller initial sizing for any branch that remains materially exposed to ruin outcomes, with promotion based on incremental risk-adjusted capacity rather than hit rate."
+    }
+  ]
+}

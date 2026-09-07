@@ -1,0 +1,53 @@
+
+
+{
+  "strongest_counterclaim": "The volume-ratio and slope-ratio signatures are epiphenomenal correlates of momentum baseline rather than mechanistically causal precursors. False-positive ruin occurs when institutional distribution coincides with B0 trigger timing, not because volume confirmation was insufficient or slope ratios fell below 2.0. The observed 1.24 vs 1.42 median vol_ratio_5_20 gap reflects the absence of genuine accumulation (which would produce winners) rather than predicting failure conditional on the trigger event itself.",
+  "attacks": [
+    {
+      "issue": "The slope ratio (ma10_slope_5/ma20_slope_5) is a mathematical artifact of momentum baseline, not an independent predictor",
+      "why_it_matters": "When mom_20 is lower in false positives (~0.07-0.18 vs 0.16-0.32 in winners), the short-term price velocity mechanically decelerates toward the already-slower medium-term trend. This produces a lower ratio post-hoc without causal force. The ratio does not tell us whether the price will reaccumulate—it merely records that the current momentum cycle is weaker. Testing the ratio as a prospective classifier without conditioning on mom_20 conflates what predicts the label from what causes the outcome."
+    },
+    {
+      "issue": "up_day_ratio_20 is a symmetry measure, not a momentum filter, yet is treated as if it predicts directional conviction",
+      "why_it_matters": "Both false-positive ruin (median 0.5-0.65) and selected_winner (0.625) overlap substantially. A stock gaining +8% on up-days and -1% on down-days yields the same ratio as one gaining +1% on up-days and losing -0.5% on down-days. The prior research explicitly warns against using it as a momentum filter but then uses it to construct the falsifiable prediction, creating an internal contradiction."
+    },
+    {
+      "issue": "Pullback_duration_weeks nulls in 4 of 8 false_positive_ruin cases directly contradict the proposed 'volume confirmation then dry-up' mechanism",
+      "why_it_matters": "The mechanism requires a observable pullback phase where volume confirms support before drying. When pullback_duration_weeks is null, ruin occurs without a gradual drawdown phase—the price simply fails. This suggests the primary mechanism is instantaneous distribution or trigger at a local-top coincidence, not the gradual process the volume-ratio signature assumes. The null cases cannot be reconciled with the mechanism without auxiliary assumptions about 'fast ruin' that are not formalized."
+    },
+    {
+      "issue": "The comparison class (selected_winner) is not held-out from the B0 selection process, creating circularity",
+      "why_it_matters": "'Selected_winner' means IBD's B0 system chose it AND it performed well. False-positive ruin means B0 chose it AND it failed. Both groups passed the B0 filter. The comparison is therefore between B0 picks that happened to work vs. those that did not—a survivorship comparison within the signal itself. The vol_ratio_5_20 difference (1.24 vs 1.42) does not tell us what volume characteristic causes ruin; it only tells us that the winning subset had stronger volume. This is tautological if volume confirms accumulation."
+    },
+    {
+      "issue": "Snapshot heterogeneity is uncontrolled: multiple distinct snap_* values span different market regimes",
+      "why_it_matters": "The cases come from at least 8 distinct snapshots (snap_724342c280, snap_287267e812, snap_eb3d8128cc, snap_ad495b6705, etc.). A breakout trigger at the start of a rotation sector move has different base rates for success than one near sector exhaustion. The vol_ratio_5_20 and mom_20 differences between groups could reflect snapshot-specific regime effects (e.g., some snapshots captured early-cycle breakouts with better fundamentals) rather than feature predictiveness."
+    },
+    {
+      "issue": "Entity_6618d3e80c labeled both 'false_positive_ruin' AND 'selected_winner' signals classification ambiguity that propagates to all median comparisons",
+      "why_it_matters": "This hybrid label suggests the labeling schema conflates multi-phase outcomes or has resolution errors. When 1 of 27 cases cannot be cleanly categorized, and the mechanism requires distinguishing specific causal pathways, the median comparisons across categories inherit this contamination. The numeric contrasts assume clean categorical separation that the data does not support."
+    },
+    {
+      "issue": "The vol_ratio_5_20 threshold of 1.35 is not derived from a density analysis or ROC optimization on held-out data",
+      "why_it_matters": "The standardized delta between false-positive ruin and selected_winner medians is 1.05—a meaningful separation—but this does not establish that 1.35 is the optimal threshold. With only 8 ruin cases, any threshold in the 1.24-1.42 range will have wide confidence intervals. The proposed prediction that vol_ratio_5_20 < 1.30 predicts ≥12% drawdown at >60% frequency is not validated; it is a hypothesis derived from the same 8 cases used to motivate it."
+    },
+    {
+      "issue": "px_vs_ma20 overlap between false positives and winners is extreme (0.07-0.09 vs 0.07-0.18 medians)",
+      "why_it_matters": "The prior research cites px_vs_ma20 as indicating insufficient distance from moving averages to absorb pullbacks. However, the interquartile ranges almost certainly overlap heavily. A stock at px_vs_ma20=0.18 (winner) and one at 0.07 (false positive) are both 'above the MA' by modest amounts. The claim that distance predicts survival is not supported by any analysis of the distribution overlap."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0 picks with vol_ratio_5_20 > 1.50 AND slope_ratio < 1.5 that still resulted in selected_winner, demonstrating that high volume does not require high slope ratio to produce winners",
+    "B0 picks with vol_ratio_5_20 < 1.20 AND up_day_ratio_20 > 0.70 that were selected_winner, contradicting the volume-dry-up-is-necessary-for-ruin narrative",
+    "Cases where pullback_duration_weeks null co-occurs with vol_ratio_5_20 > 1.40, demonstrating that null pullback duration does not imply low volume confirmation",
+    "Cross-snapshot validation: do the same vol_ratio and slope-ratio thresholds trained on snap_724342c280 failures predict ruin in snap_71486ed83c with comparable precision? If not, snapshot-specific base rates are the true driver",
+    "Momentum-matched counterexamples: among B0 picks with mom_20 in the 0.15-0.25 range (overlapping the winner distribution), do the volume and slope features still separate ruin from winners? If the separation vanishes when conditioning on momentum, the slope ratio is a proxy for momentum baseline"
+  ],
+  "what_would_change_my_mind": [
+    "A hold-out validation (not derived from these 27 cases) where the slope_ratio threshold of 2.0 applied to vol_ratio_5_20-gated B0 picks produces ruin at >60% frequency within 6 weeks, with the prediction made before outcome observation",
+    "A formal mechanism demonstration: show that in false-positive ruin cases, the volume on the B0 entry day is disproportionately from provider/hedge sources (e.g., ITG PIN < 0.3 or equivalent) versus institutional accumulation, separating the vol_ratio signal into its constituent flow types",
+    "A conditioning analysis: after matching false-positive ruin and selected_winner cases on mom_20 (±0.02), demonstrate that the slope_ratio or vol_ratio_5_20 retains significant classification discriminability (AUC > 0.70) independent of the momentum baseline",
+    "A temporal analysis of pullback_duration_weeks null cases: if null indicates fast ruin (< 1 week to max drawdown), demonstrate that the PIT-observable features at snapshot time distinguish fast-ruin from slow-ruin within the false_positive_ruin group, rather than pooling mechanistically distinct outcomes",
+    "Replication across an independent B0 selection universe (different time period or screening criteria) with comparable feature distributions, ruling out snapshot-specific or labeling-algorithm artifacts as the source of the observed contrasts"
+  ]
+}

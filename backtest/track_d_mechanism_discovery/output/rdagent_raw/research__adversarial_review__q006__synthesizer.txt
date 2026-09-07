@@ -1,0 +1,58 @@
+
+
+```json
+{
+  "verdict": "REFUTED",
+  "confidence_0_100": 68,
+  "mechanism_summary": "The proposed 'adaptive-capacity' direction does not survive adversarial review as an independent latent factor. Across three independent lines of attack — (1) label-construction circularity: 'selected_winner' is defined conditional on B0 having picked the entity while 'false_negative_relative' is defined conditional on B0 not having picked it, and every feature in the proposed cluster (mom_20, px_vs_ma50, px_vs_ma20, ma10/20_slope_5, up_day_ratio_20, vol_ratio_5_20, base_duration) is a textbook IBD relative-strength / breakout-compliance ingredient already used by B0; (2) within-snapshot heterogeneity: snap_71486ed83c contains entity_2c58cebc59 (selected_winner, mom_20=0.321) and entity_bfb308b24a (false_negative_relative, loss, mom_20=0.027) — if capacity separated winners from non-picked-winners, these two should not coexist at overlapping feature levels inside a single regime; (3) MNAR pullback confound: the –8.6pp pullback_pct delta is partially an artifact of 'having a recorded base stage gates B0 selection,' not 'depth = capacity to extend' — entity_ead73f4390, 4fdc3699fd, 2f86543bf6 and other false_negatives have null pullback fields by construction because their bases never registered a qualifying pullback. The cross-bucket discrimination is real but is the empirical footprint of B0's filter operating twice (once as label, once as feature), plus a regime-confound that snapshot_anon absorbs but no per-row feature can decompose. The 'capacity' framing collapses into 'extension-tilted breakout' once the label-construction and MNAR confounds are accounted for.",
+  "falsifiers": [
+    "Within-snapshot matched pairs: locate pairs (one selected_winner, one false_negative_relative) inside the same snap_anon whose mom_20 differs by <0.05 AND px_vs_ma50 differs by <0.03 — entity_2c58cebc59 (mom_20=0.321) vs entity_bfb308b24a (mom_20=0.027) inside snap_71486ed83c already provides this falsifier; replicate across at least 3 snapshots (success would refute capacity as within-regime discriminator).",
+    "B0-filter redundancy audit: regress the z-scored capacity cluster on is_b0_pick alone across 27 rows. Adjusted R² ≥ 0.50 would show the cluster is empirically restating B0's filter; residual AUC after partialling out is_b0_pick dropping by ≥0.10 would confirm the cluster adds no orthogonal information.",
+    "Mixed-label entity decomposition: Weekly re-label entity_6618d3e80c (snap_d0d57b1e40, px_vs_ma50=0.337) by sub-week. If the 'false_positive_ruin|selected_winner' label is a time-resolution artifact where different weeks trigger different sub-rules, the entire high-extension tail of any capacity claim is contaminated — and the claim must be retired until clean labels exist.",
+    "Pullback_present_indicator single-feature AUC: compute AUC of pullback_present_indicator (=1 if pullback_pct is non-null) alone predicting selected_winner vs false_negative_relative. AUC ≥ 0.65 refutes the depth interpretation: the delta is MNAR proxy, not capacity. Multiple imputation under MAR (base_depth_pct as predictor), worst-case flat (=0), and hot-deck by base_depth quartile must all preserve the depth delta within ±3pp — otherwise the delta is imputation-fragile and unusable.",
+    "Interaction refutation: within the extended bucket (mom_20>0.15, px_vs_ma50>0.10), deeper pullbacks should correlate with BETTER outcomes if capacity = 'absorbed supply.' If the within-bucket correlation between pullback_pct and W4 return is non-positive (or non-significant at n=10), the capacity mechanism is falsified even though the cross-bucket signal survives.",
+    "Out-of-sample replication: apply the 3-feature capacity composite (mom_20, px_vs_ma50, vol_ratio_5_20) to a held-out snapshot set not in the 27 discovery rows. AUC for winner-vs-ruin within the extended bucket >0.60 would force retraction of this counterclaim; ≤0.55 would lock the refutation.",
+    "Sign-reversal across regimes: if 'capacity' were a stable entity-level factor, the cluster coefficients should have consistent sign across bullish (large_win-skewed) and bearish (ruin-skewed) snapshots. If a sign reversal appears between snap_d0d57b1e40 (large_win-dominant) and snap_b8420124eb (ruin-dominant), the cluster is regime-noise rather than entity-capacity."
+  ],
+  "actionable_design_principles": [
+    "Treat snapshot_anon as a hard stratification variable in every capacity-feature computation; never aggregate across snapshots before partialling out snapshot-fixed effects. n=27 across ≥6 snapshots leaves ≈4 cases per cell, so any aggregate that ignores snapshot_anon is regime-confounded by construction.",
+    "Resolve mixed-label entities (entity_6618d3e80c is the prototype) by weekly sub-decomposition before any model touches them; treating 'both winner and ruin' as informative evidence of non-monotonicity misreads a labeling bug as a theoretical finding.",
+    "Audit pullback_present_indicator as a leakage proxy before doing any pullback analysis — the field is MNAR conditional on B0 selection, and any cross-class pullback_pct comparison on raw values is selection-biased. Apply three-scenario sensitivity (worst-case flat, MAR with base_depth_pct, hot-deck by base_depth quartile) and report the range, not the point estimate.",
+    "Maintain a strict feature-origin ledger: tag every feature as either (a) IBD B0 input, (b) extension proxy, (c) pullback/base descriptor, (d) novel. Capacity claims built from categories (a)–(c) under B0-conditional labels are not new signals and must be flagged as filter-restatement in any model documentation.",
+    "Specify capacity as a TRANSFORMATION of existing features (e.g., extension-z-score), not as an additional feature family — incremental slope/momentum variants of mom_20 are correlated noise around the same axis and consume feature budget without adding discrimination beyond what the composite already captures.",
+    "Separate capacity's SIGNAL role from its RISK-MANAGEMENT role. Even if the cluster adds nothing to entry decisions beyond B0, it may carry orthogonal information for sizing/stop placement; subject this narrower claim to a dedicated test rather than carrying the full 'adaptive-capacity' framing forward."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "extension_pullback_gate: allow entries only when mom_20 > 0.10 AND pullback_pct is non-null (record exists).",
+      "why_distinct": "Reframes capacity as a presence-conditional eligibility filter rather than a magnitude score, neutralizing the MNAR pullback confound while still requiring extension above the same-snapshot median.",
+      "features": ["mom_20", "pullback_pct", "pullback_present_indicator"],
+      "capacity_relevance": "Tests the weaker claim 'recorded-pullback capacity gates B0-compliance wins' without invoking depth as a continuous capacity proxy; falsified if pullback_present_indicator AUC > 0.65 alone."
+    },
+    {
+      "idea": "same_snapshot_tertile_capacity: only permit a candidate when its 3-feature composite (mom_20, px_vs_ma50, vol_ratio_5_20) lands in the top tertile of THAT snapshot's candidate distribution.",
+      "why_distinct": "Neutralizes between-regime bias by conditioning on snapshot-internal variance; eliminates the cross-snapshot aggregate confound that currently inflates the apparent capacity signal.",
+      "features": ["mom_20", "px_vs_ma50", "vol_ratio_5_20", "snapshot_anon"],
+      "capacity_relevance": "Directly tests whether capacity is a within-regime latent factor or a regime-projection in disguise; success requires ≥3 snapshots contributing and stratified AUC ≥0.65."
+    },
+    {
+      "idea": "capacity_aware_sizing: keep B0's entry signal unchanged, but modulate position size by capacity composite z-score — larger size when the entity sits in the top quartile of its snapshot's capacity distribution, smaller (or skip) when in the bottom quartile.",
+      "why_distinct": "Decouples capacity from signal-generation; isolates whether the cluster carries any information orthogonal to B0's pick decision by measuring realized-W4 return differential across size buckets holding entry fixed.",
+      "features": ["mom_20", "px_vs_ma50", "vol_ratio_5_20", "up_day_ratio_20"],
+      "capacity_relevance": "Tests the weakest surviving claim — 'capacity does not change WHICH entries B0 picks, only HOW MUCH to bet on them' — and reports the marginal return per unit capacity z-score after partialling out B0."
+    },
+    {
+      "idea": "weekly_sublabel_cleaning_pass: decompose any row with a 'A|B' composite label (entity_6618d3e80c is the canonical example) into weekly sub-outcomes and re-derive the capacity composite using only weeks where the sub-label is unambiguous.",
+      "why_distinct": "Treats label-quality as a first-class pipeline stage rather than a footnoted data-cleanup issue; prevents high-extension mixed-label rows from contaminating either side of the winner/ruin frontier.",
+      "features": ["snapshot_anon", "pullback_duration_weeks", "outcome_label"],
+      "capacity_relevance": "Required precondition for any defensible capacity claim in the high-extension tail; without it, the entire >0.20 px_vs_ma50 region is unreliable and any capacity-as-non-monotonic claim from it is invalid."
+    },
+    {
+      "idea": "regime_stratified_capacity_test: compute the capacity composite separately within each snapshot_anon cell, rank candidates within cell, then aggregate ranks across cells — never aggregate raw features across cells.",
+      "why_distinct": "Standard ML convention (aggregate-rank) rather than raw-value aggregation, which is the standard error in this evidence pack; eliminates the regime-confound at the data-transformation level rather than at the modeling level.",
+      "features": ["mom_20", "px_vs_ma50", "px_vs_ma20", "ma10_slope_5", "ma20_slope_5", "up_day_ratio_20", "vol_ratio_5_20"],
+      "capacity_relevance": "Provides the cleanest possible test of within-regime capacity discrimination; failure criterion is rank-correlation AUC ≤0.55 across at least 3 strata — directly addresses the researcher's falsifiable prediction #1 without the cross-bucket inflation."
+    }
+  ]
+}
+```

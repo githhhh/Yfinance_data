@@ -1,0 +1,55 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The 'evidence_risk is redundant with neighbors' claim is methodologically untestable from the supplied archaeology because (a) the diagnostic used — univariate numeric contrasts between selected_winner and false_negative groups — measures marginal association, not conditional independence; (b) the within-bar feature up_day_ratio_20 is a fundamentally different statistic from net-price mom_20 and is NOT a proxy for it even when they correlate; (c) snapshot-level clustering inflates apparent feature co-movement without implying redundancy; and (d) the single mixed-outcome case (entity_6618d3e80c carries BOTH 'false_positive_ruin' and 'selected_winner' labels) is direct evidence that evidence_risk is missing a temporal/path-dependent dimension, not that it is duplicative. The redundancy conclusion is almost certainly false on closer inspection.",
+  "attacks": [
+    {
+      "issue": "Wrong counterfactual: marginal contrasts do not establish conditional redundancy",
+      "why_it_matters": "Showing that selected_winners sit above false_negatives on {up_day_ratio_20, vol_ratio_5_20, mom_20, ...} only proves these features share a common cause. To claim evidence_risk is absorbed by neighbors you must compare cases bucketed on equal neighbor values and ask whether evidence_risk still discriminates within the bucket. The archaeology provides exactly zero within-bucket evidence. A feature can be 95% redundant in expectation yet carry 100% of the signal in the tails — that tail content is what matters for ruin avoidance."
+    },
+    {
+      "issue": "up_day_ratio_20 is NOT a proxy for mom_20 — different information channel",
+      "why_it_matters": "mom_20 measures net log-return over 20 sessions; up_day_ratio_20 counts the fraction of up-close sessions. A stock can have mom_20 ≈ 0 with up_day_ratio_20 = 0.7 (choppy net-flat grind higher) or mom_20 = 0.3 with up_day_ratio_20 = 0.5 (one-gap melt-up). The two statistics have different noise floors, different sensitivities to overnight gaps, and different decay profiles. Treating them as redundant because they correlate in-sample ignores that up_day_ratio_20 is closer to a breadth/tape-strength latent while mom_20 is closer to drift. Conflating correlated with redundant is the central methodological error."
+    },
+    {
+      "issue": "Snapshot clustering inflates cross-feature correlation without implying redundancy",
+      "why_it_matters": "Multiple cases share snapshot_anon IDs (e.g., snap_71486ed83c carries 6 cases; snap_d0d57b1e40 carries 5). Within a single snapshot, all stocks experienced the same regime, the same breadth, the same liquidity. This forces every feature in that snapshot toward mutual correlation through a shared regime factor. Numeric contrasts computed across pooled snapshots are therefore biased toward high cross-feature correlation, which the researcher then misreads as redundancy. Snapshot-stratified contrasts would shrink every standardized delta substantially — likely by 40–60% — and the entire redundancy argument collapses on rescaling."
+    },
+    {
+      "issue": "Standardized deltas computed on n=7–11 are unstable and the ordering is an artifact",
+      "why_it_matters": "With 7 false_negative cases and 11 selected_winner cases, the median difference has a bootstrap CI width that easily spans 0.5σ. The researcher reports up_day_ratio_20 as 'largest single standardized delta at -1.19σ' — but with so few observations, swapping one entity's label would reorder the top three. The claim that 'evidence-style features rank at the top' is therefore a labeling-robustness claim that has not been validated. Even more importantly, rank-order of standardized deltas is not evidence of redundancy; it's evidence of univariate separation."
+    },
+    {
+      "issue": "The mixed-outcome case (entity_6618d3e80c) is a smoking gun for the OPPOSITE conclusion",
+      "why_it_matters": "entity_6618d3e80c carries 'false_positive_ruin|selected_winner' — meaning at some horizon it was picked and won, at another it was picked and ruined. A purely point-in-time evidence_risk cannot produce two contradictory outcomes for the same entity unless either (i) the feature panel changed between the two snapshots (it didn't — same feature set), or (ii) the feature failed to capture the path-dependent structure that determined the divergent outcomes. This is direct evidence that evidence_risk is UNDER-SPECIFIED, not over-specified. The clean replacement would be a path-dependent or regime-conditional feature, not removal."
+    },
+    {
+      "issue": "Pullback dimensions appearing in archaeology but absent from evidence_risk's feature list implies MISSING orthogonal content, not redundancy",
+      "why_it_matters": "pullback_duration_weeks (-0.73σ) and pullback_pct (+0.64σ) are top discriminators in the false_negative vs selected_winner contrast, yet they are not enumerated among evidence_risk's constituents. If evidence_risk is currently absorbing pullback information incidentally, then evidence_risk is functioning as a hidden pullback proxy — orthogonal to momentum/trend/volume. Dropping it would delete pullback signal. The researcher notes this possibility in passing but does not let it falsify the redundancy claim; instead they propose adding it back as a 'cleaner replacement,' which concedes that evidence_risk was doing real work."
+    },
+    {
+      "issue": "false_positive_ruin definition is path-dependent but the feature panel is snapshot-fixed — measurement mismatch is being misattributed to redundancy",
+      "why_it_matters": "A false_positive_ruin label requires the stock to be selected, then to decline. This depends on features observed AFTER the snapshot (post-entry trajectory) combined with features at the snapshot. Any feature that doesn't capture post-entry dynamics will look 'redundant' — not because it is, but because the diagnostic conflates 'predicts at t' with 'predicts over t→t+W'. Evidence_risk features are computed at snapshot time; the ruin label depends on a window AFTER. The redundancy claim is partially an artifact of testing a static feature against a dynamic outcome."
+    },
+    {
+      "issue": "The 'nonlinear interaction' alternative was dismissed as a residual option but is actually the strongest competitor explanation",
+      "why_it_matters": "vol_ratio_5_20 × up_day_ratio_20 jointly may carry product-moment information that no linear combination of the constituent terms captures. If momentum_b0 = w1·mom_20, trend_b0 = w2·px_vs_ma50, and volume_b0 = w3·vol_ratio_5_20, none of them can reproduce the interaction surface evidence_risk may be estimating. The researcher's policy implication lists 'evidence_risk × vol_regime' as a residual — but this is the natural conclusion if redundancy is rejected. The replacement they recommend is functionally evidence_risk under another name."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within snapshot_anon = snap_71486ed83c, compare entity_ead73f4390 (B0-pick, selected_winner) against entity_de1c657364 (B0-reject, false_negative_big_winner) on the conditional distribution of evidence_risk given identical (mom_20, ma10_slope_5, vol_ratio_5_20). If evidence_risk still separates them, redundancy is rejected in its strongest test.",
+    "Find cases where mom_20 and vol_ratio_5_20 are both above the selected_winner median but evidence_risk is below — these are the 'neighbors say yes, evidence_risk says no' counterexamples. The archaeology does not contain any, but extending the snapshot window should reveal some. Their absence would support redundancy; their presence would kill it.",
+    "Re-run the numeric contrasts after replacing evidence_risk with a random permutation of itself (same marginal distribution, no real content). If the standardized deltas barely move, evidence_risk is contributing nothing. If they collapse to ~0, evidence_risk was the load-bearing feature. This is the cheapest available placebo test.",
+    "Compute the rank correlation between evidence_risk and a synthetic 'redundant aggregator' constructed as a weighted sum of the three neighbor features. If rank correlation is <0.85, evidence_risk is not redundant. If >0.95, redundancy is empirically supported. The test takes five minutes and was not run.",
+    "Examine the within-bar distribution conditional on outcome: for false_positive_ruin cases, is up_day_ratio_20 high but with low average up-day magnitude (narrow bars, high count) vs for selected_winner high with high magnitude? If the moment structure differs, up_day_ratio_20 is carrying genuinely different content than mom_20."
+  ],
+  "what_would_change_my_mind": [
+    "An OOS test (held-out discovery-train) where W4 return is regressed on (momentum_b0, trend_b0, volume_b0) versus (+ evidence_risk), and the Δadjusted-R² is below 0.5% AND the OOS IC decay profile of evidence_risk matches the slowest neighbor to within 1 day. Both conditions are required; one is insufficient.",
+    "Snapshot-stratified numeric contrasts (computed within snap_71486ed83c alone, then within snap_d0d57b1e40 alone) showing that within-snapshot evidence_risk signal collapses to <0.3σ standardized delta — i.e., the apparent evidence_risk content was a snapshot confound, not a real feature.",
+    "A rank-correlation matrix showing corr(evidence_risk, momentum_b0) > 0.92 AND corr(evidence_risk, trend_b0) > 0.85 AND corr(evidence_risk, volume_b0) > 0.80 in held-out data. Only if all three exceed these thresholds does redundancy become the most parsimonious model.",
+    "Demonstration that the mixed-outcome case (entity_6618d3e80c) is an artifact of overlapping snapshot windows — i.e., the two outcome labels were assigned at non-comparable time points, and at any single consistent timestamp only one outcome applies. If path-dependence can be ruled out, the strongest objection to the redundancy claim is defanged.",
+    "Replication on a temporally disjoint sample (different macro regime, different breadth regime) showing the same co-monotonic feature ranking and the same within-bucket evidence_risk non-discrimination. The current n=27 sample is regime-concentrated and may not generalize."
+  ]
+}
+```

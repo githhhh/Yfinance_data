@@ -1,0 +1,23 @@
+{
+  "mechanism_claim": "In fresh breakout weeks Lane shifts the conditional return distribution's left tail more than its mean: B0_LANE names should have W4 mean return similar to LANE_NEUTRAL but materially higher ruin rate, because Lane scores momentum persistence proxies (up_day_ratio_20, mom_20) that correlate weakly with mean but better with eventual continuation; SCORE_BEFORE_LANE baseline should sit between them on dispersion.",
+  "evidence_for": [
+    "Numeric contrasts: false_negatives (Lane missed winners) have median up_day_ratio_20=0.5 vs selected_winners=0.625 (std_delta -1.19) and vol_ratio_5_20=1.18 vs 1.42 (std_delta -1.05), indicating Lane is filtering on persistence/volume-strength features that map to continuation probability, not raw magnitude",
+    "Among B0 picks, 8/16 became 'false_positive_ruin' (50% ruin share in archaeology) while LANE_NEUTRAL picks in same snapshots (e.g., entity_d8e8e7b814, entity_bfb308b24a) show only small_win/loss outcomes with no ruinline; ruin concentration in B0 indicates tail-risk loading rather than mean uplift",
+    "B0 winners that became 'false_positive_ruin|selected_winner' (entity_6618d3e80c: ma10_slope_5=0.075, mom_20=0.25, up_day_ratio_20=0.55) show strong slopes but mid-range up_day_ratio - Lane accepted slope-driven names that subsequently failed, consistent with risk asymmetry not mean filtering"
+  ],
+  "evidence_against": [
+    "Selected_winner medians exceed false_negatives on mom_20 (+0.10), px_vs_ma50 (+0.07), ma10_slope_5 (+0.015) - these are magnitude features that would shift mean, not just tail, contradicting pure risk-shift framing",
+    "pullback_pct contrast (-15.9 winners vs -7.3 false_negatives) and pullback_duration_weeks (5.5 vs 4.0) suggest Lane-favored names had deeper/longer prior bases, a structural mean predictor",
+    "IBD_entry_close_vs_trigger_pct median 0.030 winners vs 0.019 false_negatives (std_delta -0.70) indicates Lane names entered closer to trigger - a systematic mean-affecting entry timing bias"
+  ],
+  "falsifiable_predictions": [
+    "In a fresh breakout week, mean 4-week return rank should be B0_LANE ≈ LANE_NEUTRAL ≈ SCORE_BEFORE_LANE (no significant mean separation, paired t-test p>0.2), while ruin-rate (>15% drawdown) rank should be B0_LANE > SCORE_BEFORE_LANE > LANE_NEUTRAL with absolute gap ≥10pp",
+    "Conditional on up_day_ratio_20 ≤ 0.45 at entry, B0_LANE ruin rate should exceed LANE_NEUTRAL ruin rate by ≥15pp in the same snapshot week, confirming Lane loads tail risk specifically in low-persistence names it still accepts on slope",
+    "Sharpe-like ratio (mean / std of W4 return) should be lower for B0_LANE than LANE_NEUTRAL despite similar means, with the gap driven by kurtosis/excess tail mass not variance"
+  ],
+  "policy_implications": [
+    "If mechanism holds, replacing B0_LANE with LANE_NEUTRAL in fresh breakout weeks improves risk-adjusted return without sacrificing alpha; position sizing should be inversely proportional to B0_LANE share when ruin-rate proxy (up_day_ratio_20<0.5) is elevated",
+    "Lane should be re-tuned to penalize low up_day_ratio_20 more aggressively in breakout weeks (current scoring admits slope-only momentum that produces ruin tail), or paired with a hard filter before B0 allocation",
+    "SCORE_BEFORE_LANE dispersion test: if SCORE_BEFORE_LANE ruin rate matches B0_LANE ruin rate (rather than sitting between), Lane adds no risk-shift value and should be deprecated"
+  ]
+}

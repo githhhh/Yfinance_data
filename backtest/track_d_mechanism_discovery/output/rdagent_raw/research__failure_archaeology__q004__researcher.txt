@@ -1,0 +1,40 @@
+
+
+```json
+{
+  "mechanism_claim": "False-positive B0 picks occur when price is moderately extended above the 50-day moving average (px_vs_ma50 in 0.07-0.12 range) while internal momentum quality is mediocre (up_day_ratio_20 ≤ 0.55). This creates an unstable equilibrium where the stock has drifted up enough to trigger a breakout signal but lacks the sustained internal strength to survive the inevitable pullback near the buy point. Winners show px_vs_ma50 > 0.12 with up_day_ratio_20 ≥ 0.60, giving them structural altitude to absorb pullbacks without violating stop-loss geometry.",
+  "evidence_for": [
+    "entity_8f0df3d38e: px_vs_ma50=0.088 (moderately extended), up_day_ratio_20=0.65 (borderline), outcome=false_positive_ruin with -16.2% pullback over 7 weeks",
+    "entity_4fdc3699fd: px_vs_ma50=0.102 (moderate), up_day_ratio_20=0.60, outcome=ruin despite positive momentum",
+    "entity_3472243e0c: px_vs_ma50=0.075 (low-moderate), up_day_ratio_20=0.65, outcome=ruin, confirming px_vs_ma50 < 0.08 is dangerous even with decent up_day_ratio",
+    "entity_ccc90a671f: px_vs_ma50=0.090, up_day_ratio_20=0.50 (weak), outcome=ruin with -14.4% pullback",
+    "entity_84824e6a20: px_vs_ma50=0.068, up_day_ratio_20=0.40 (very weak), outcome=ruin; dual-weakness case",
+    "In contrast, entity_ead73f4390: px_vs_ma50=0.185 (high), up_day_ratio_20=0.70 → large_win",
+    "entity_3adc078f01: px_vs_ma50=0.131, up_day_ratio_20=0.65 → large_win despite -42.3% pullback (sustained structural altitude)",
+    "The numeric_contrasts table confirms this: false_negative median px_vs_ma50=0.056 versus selected_winner median=0.127, standardized_delta=-0.8545, the 4th strongest differentiator",
+    "up_day_ratio_20 has standardized_delta=-1.1882 (strongest differentiator): false_negative median 0.50 versus selected_winner median 0.625"
+  ],
+  "evidence_against": [
+    "entity_b6bcccdf6a: px_vs_ma50=0.182 (high), up_day_ratio_20=0.40 (weak) → outcome=loss, suggesting up_day_ratio alone has predictive floor",
+    "entity_2c58cebc59: px_vs_ma50=0.170 (high), up_day_ratio_20=0.60, pullback_pct=-25.1% → still selected_winner (large_win), consistent with mechanism but shows high-extension winners can still have large pullbacks before recovering",
+    "entity_40ea0cfb3b: px_vs_ma50=0.014 (very low), up_day_ratio_20=0.50 → ruin, fits mechanism but also suggests extremely compressed price action (near MA50) can fail differently (no momentum at all)",
+    "The mechanism does not fully explain entity_2f86543bf6: up_day_ratio_20=0.35 (weak), px_vs_ma50=0.017 (very low) → selected_winner (large_win); this case suggests alternative pathway where low expectations create low-risk entries",
+    "Pullback depth alone is not predictive: entity_3adc078f01 had -42.3% pullback but won; entity_8f0df3d38e had -16.2% pullback but ruined. The critical variable is price altitude relative to MAs at entry, not pullback magnitude."
+  ],
+  "falsifiable_predictions": [
+    "In a forward B0 sample, stocks with px_vs_ma50 < 0.08 AND up_day_ratio_20 ≤ 0.55 will have >60% false-positive-ruin rate versus baseline B0 ruin rate",
+    "Stocks with px_vs_ma50 > 0.15 AND up_day_ratio_20 ≥ 0.60 will have <15% false-positive-ruin rate versus baseline",
+    "The zone px_vs_ma50 ∈ [0.08, 0.15] AND up_day_ratio_20 ∈ [0.55, 0.65] will show non-linear ruin probability, higher than both the low-extension and high-extension zones, confirming the unstable-equilibrium hypothesis",
+    "vol_ratio_5_20 will NOT independently predict false-positive-ruin within px_vs_ma50/up_day_ratio_20 strata (mechanism is structural, not volatility-driven)",
+    "If a snapshot shows ibd_entry_close_vs_trigger_pct > 0.06 AND the two core predictors are in the danger zone, ruin probability should exceed 70%"
+  ],
+  "policy_implications": [
+    "Add px_vs_ma50 and up_day_ratio_20 as mandatory pre-trade filters; reject B0 picks when both are in the moderate-weak zone",
+    "Do NOT use vol_ratio_5_20 as a filter for this failure mode—it is a confound, not a cause",
+    "Consider a three-tier classification: (1) structural winners: px_vs_ma50 > 0.15, up_day_ratio > 0.60 → proceed; (2) unstable zone: px_vs_ma50 0.08-0.15, up_day_ratio 0.55-0.65 → require additional confirmation; (3) structural losers: px_vs_ma50 < 0.08 or up_day_ratio < 0.55 → auto-reject or reduce position size",
+    "For existing positions near buy points, if px_vs_ma50 drops below 0.08 while up_day_ratio falls below 0.55, tighten stops preemptively—this is a PIT-observable deterioration pattern",
+    "Pullback_duration_weeks and pullback_pct should NOT be used at snapshot time to predict ruin—they are post-entry labels. Use only pre-entry structural metrics.",
+    "The ibd_entry_close_vs_trigger_pct threshold of ~0.07 appears in multiple ruin cases (entity_8f0df3d38e: 0.069, entity_4fdc3699fd: 0.069, entity_84824e6a20: 0.074, entity_40ea0cfb3b: 0.061)—consider combining this with the structural metrics as a composite filter"
+  ]
+}
+```

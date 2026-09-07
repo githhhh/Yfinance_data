@@ -1,0 +1,39 @@
+
+
+```json
+{
+  "mechanism_claim": "Under fixed 3-slot capital with single-industry crowding, cash dominates filling slot N+1 when the marginal candidate's expected information ratio falls below the risk-free baseline because (a) industry beta forces effective correlation toward 1, negating diversification benefit of additional slots, and (b) the surviving pool after slot 1 and 2 selection is biased toward less-mature bases (lower mom_20, shallower pullback_pct, lower px_vs_ma50, lower vol_ratio_5_20) that the historical record shows convert to wins at sub-baseline rates. The economic meaning is not 'more positions = more diversification' but rather: slot 1 = full concentrated Kelly exposure; slot 2 = pseudo-diversification whose variance reduction is ~industry_correlation²·σ²; slot 3 = option-cost-only addition whose expected return is dominated by selection-pool decay, not by independence.",
+  "evidence_for": [
+    "Selected pool ruin rate is 8/20 (40%) plus 1 mixed = 45% non-pure-winner, meaning the marginal slot carries significant loss-of-capital probability independent of slot count.",
+    "False-negative set (rejected candidates that won) median mom_20 = 0.058 vs selected-winner 0.163 — survivors after the first two slots show degraded momentum signal, indicating the slot-3 pool is structurally weaker than the slot-1 pool.",
+    "False-negative median pullback_pct = -7.3% vs selected-winner -15.9% (delta +8.6pp) — shallower bases in the rejected-but-winning cohort confirm that 'looks weaker at snapshot' is not equivalent to 'will underperform', so the slot-3 filter inherits false-negative risk on top of single-industry correlation.",
+    "False-negative median px_vs_ma50 = 0.056 vs selected-winner 0.127 — candidates farther below the 50-day MA are more frequently rejected, meaning the surviving slot-3 candidates in a crowded industry tend to be price-action weaker, not stronger.",
+    "False-negative median up_day_ratio_20 = 0.50 vs selected-winner 0.625 — internal barometric pressure is lower in the rejected-winners cohort, supporting the claim that slot-3 marginal candidates carry inferior tape characteristics.",
+    "vol_ratio_5_20 standardized_delta of -1.05 between false-negative (1.18) and selected-winner (1.42) shows volume-confirmation decay in the post-selection pool.",
+    "Numeric contrast base_duration_weeks median 44 (FN) vs 52 (SW) indicates younger bases disproportionately populate the rejection pool, so the slot-3 marginal candidate is more likely to be in an earlier-stage base that the rules are structurally biased against."
+  ],
+  "evidence_against": [
+    "Sample size of 27 is too small to estimate slot-3-specific ruin rates with statistical confidence.",
+    "Direct industry-correlation coefficient between simultaneous positions is not measured in this dataset, so the claim that 'effective correlation → 1' is mechanism-level inference, not empirical.",
+    "11 of 20 selected winners did produce large_win outcomes, so the slot-1 pool is not ruin-dominated — the framework must not imply 'never deploy' but 'deploy only when marginal conditions hold'.",
+    "false_positive_ruin cases (e.g., entity_40ea0cfb3b) had relatively low momentum/vol signals too (mom_20 = 0.024, vol_ratio = 0.91), suggesting some rejected-pool features are also present in ruins — features are not cleanly separable into 'slot-3 good' vs 'slot-3 bad' buckets.",
+    "No direct slot-N marginal-elasticity calculation is possible from this archaeology alone because cases are single-entity snapshots, not paired slot-add comparisons."
+  ],
+  "falsifiable_predictions": [
+    "In backtests of 3-slot portfolios, when slots 1 and 2 share a GICS sub-industry, the realized return variance of slot 3 will be at least 70% of single-position variance (correlation > 0.84), falsifying the assumption that '3 positions = diversification' under crowding.",
+    "The conditional expected 4-week return of slot-3 candidates with up_day_ratio_20 < 0.55 AND vol_ratio_5_20 < 1.3 will be statistically indistinguishable from zero or negative, after controlling for industry exposure — supporting cash dominance.",
+    "When the best two available candidates share industry, the expected return of substituting cash for slot 3 will exceed the median large_win bucket return by ≥2pp on a risk-adjusted basis, because industry-correlation destroys the convexity benefit of the third bet.",
+    "The ruin probability of a 3-slot single-industry portfolio will be ≥ 1 - (1 - 0.40)^3 ≈ 78% if ruin events are industry-correlated, versus ~64% if independent — this gap is the quantified cost of crowding and is the threshold above which cash strictly dominates.",
+    "If industry beta is introduced as a feature, the coefficient on slot-3 dummy will be negative and significant in a return regression, whereas slot-1 dummy will be positive and significant, confirming slot-asymmetric information content."
+  ],
+  "policy_implications": [
+    "Treat the 3-slot architecture as 1 concentrated slot + 1 partial-diversification slot + 1 option slot whose expected value depends on industry-orthogonality, not as '3 independent bets'.",
+    "When slots 1 and 2 are in the same industry, hard-rule slot 3 = cash unless the marginal candidate simultaneously exceeds selected-winner medians on at least three of: up_day_ratio_20 (>0.625), vol_ratio_5_20 (>1.42), mom_20 (>0.163), and pullback_pct (<-15.9%).",
+    "Define cash dominance threshold as: P(ruin|marginal) × max_loss > E[return|marginal] - cash_yield. With observed P(ruin) ≈ 0.40 in selected pool, the threshold for cash is triggered when marginal expected return falls below roughly cash_yield + 0.40 × tail_loss.",
+    "Use the standardized_deltas in this archaeology to construct a slot-3 eligibility score that explicitly penalizes industry crowding (e.g., requires industry-orthogonality or feature-superiority), and backtest whether abstention from slot 3 under crowding improves Sharpe vs full deployment.",
+    "Because false-negative rate appears high (7/7 in this sample, though small-N), the policy should treat the option value of unfilled slots as non-zero and explicitly price the cost of forcing slot 3 in crowded conditions.",
+    "Reframe '1, 2, or 3 positions' as a convexity question: slot 1 buys market exposure + Kelly upside; slot 2 buys modest variance reduction if cross-industry; slot 3 buys only convexity, which is destroyed under single-industry crowding.",
+    "If UNRESOLVED on the exact correlation coefficient: require forward measurement of intra-industry pairwise correlation of held positions before relying on diversification math."
+  ]
+}
+```

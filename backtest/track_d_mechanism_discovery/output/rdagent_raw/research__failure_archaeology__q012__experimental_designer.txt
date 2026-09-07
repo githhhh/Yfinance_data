@@ -1,0 +1,65 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "cross_snapshot_temporal_stability",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "Apply researcher-derived signature cutoffs (up_day_ratio_20 <= 0.65 AND vol_ratio_5_20 >= 1.2 AND mom_20 0.02-0.25) to snapshots not used in signature derivation, compute ruin rate differential",
+      "success_criterion": "Signature-defined subset shows P(ruin) >= 2x baseline P(ruin) in holdout snapshots with n >= 5 ruin cases per snapshot",
+      "failure_criterion": "No significant ruin rate differential in holdout snapshots, OR signature holds only in discovery snapshots"
+    },
+    {
+      "name": "collinearity_decomposition",
+      "features": ["mom_20", "vol_ratio_5_20", "up_day_ratio_20"],
+      "comparison": "Test each feature individually and pairwise for ruin discrimination; compare joint 3-way interaction vs best single feature",
+      "success_criterion": "A single feature achieves >= 80% of the ruin discrimination power of the 3-feature bundle (i.e., bundle is not multiplicatively more predictive)",
+      "failure_criterion": "Joint signature achieves >95% of ruin discrimination that no individual feature reaches; confirms bundle inflation rather than genuine signal"
+    },
+    {
+      "name": "null_pullback_mechanism_test",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "comparison": "Ruin cases with null pullback vs non-null pullback: test whether nulls show faster pre-entry price acceleration or lower volatility that would mechanically prevent pullback observation",
+      "success_criterion": "Null pullback cases have (a) higher vol_ratio_5_20 AND shorter base_duration_weeks OR (b) lower mom_20 in the 5 days pre-entry, explaining null as mechanical rather than outcome-dependent",
+      "failure_criterion": "Null and non-null ruin cases are indistinguishable on snapshot-time features; nulls reflect outcome-dependent tracking termination, not a distinct mechanism"
+    },
+    {
+      "name": "falsifiable_prediction_replication",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "Search for entity_3adc078f01 analog: B0 pick with up_day_ratio_20 < 0.7 AND vol_ratio_5_20 < 1.5 AND mom_20 < 0.20 that produces selected_winner outcome; test whether this pattern recurs in holdout snapshots",
+      "success_criterion": "In holdout data, >= 30% of B0 picks matching the signature (up_day_ratio_20 <= 0.65, vol_ratio_5_20 >= 1.2, mom_20 0.02-0.25) produce selected_winner or false_negative outcomes",
+      "failure_criterion": "Signature holds with < 15% exception rate across all snapshots, validating the mechanism claim"
+    },
+    {
+      "name": "base_rate_incremental_value",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "comparison": "Compare P(ruin) for signature B0 picks vs non-signature B0 picks vs non-B0 picks within same snapshots",
+      "success_criterion": "Signature B0 picks have P(ruin) that is statistically distinguishable (p < 0.05) from both non-signature B0 and non-B0 subsets",
+      "failure_criterion": "P(ruin) is indistinguishable across all three subsets; signature adds no incremental predictive value beyond B0 selection itself"
+    },
+    {
+      "name": "low_vol_ruin_counterexample",
+      "features": ["vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Search for ruin cases with vol_ratio_5_20 < 1.1 AND mom_20 < 0.10; test whether these cases share a different mechanism (e.g., high ibd_entry_close_vs_trigger_pct indicating late-stage consolidation)",
+      "success_criterion": "Low-vol ruin cases (n >= 3) exist and show high ibd_entry_close_vs_trigger_pct (> 0.04) and lower px_vs_ma20, indicating a distinct 'failed breakout' mechanism separate from acceleration-based ruin",
+      "failure_criterion": "All ruin cases have vol_ratio_5_20 >= 1.1 OR mom_20 >= 0.10; acceleration signature captures the full ruin population"
+    }
+  ],
+  "leakage_checks": [
+    "Ensure snapshot_anon is used only for train/test splitting, never as a feature",
+    "Verify w4_return_bucket and outcome_label are never used as inputs to feature computation; they are terminal outcomes only",
+    "Confirm pullback_duration_weeks and pullback_pct are not used to predict themselves (no autogenic leakage)",
+    "Check that ibd_entry_close_vs_trigger_pct is computed from pre-entry data only, not post-entry price action",
+    "Validate that the 3-feature limit per test is enforced; no feature bundles larger than 3 are evaluated"
+  ],
+  "priority_order": [
+    "cross_snapshot_temporal_stability",
+    "falsifiable_prediction_replication",
+    "collinearity_decomposition",
+    "base_rate_incremental_value",
+    "null_pullback_mechanism_test",
+    "low_vol_ruin_counterexample"
+  ]
+}
+```

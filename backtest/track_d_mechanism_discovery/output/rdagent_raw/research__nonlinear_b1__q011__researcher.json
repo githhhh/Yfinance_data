@@ -1,0 +1,18 @@
+{
+  "mechanism_claim": "ibd_entry_close_position × ibd_entry_volume_ratio acts as a chase-vs-conviction discriminator: a high close_position (close near top of trigger range) without proportional volume expansion (vol_ratio <~1.4) flags thin late-day buying that resolves into mean reversion, while high close_position paired with vol_ratio >=1.5 indicates genuine breakout continuation. The multiplicative interaction is non-linear: marginal high close_position is only toxic when volume fails to confirm.",
+  "evidence_for": [
+    "Among B0 picks labeled false_positive_ruin, 6/8 cluster at close_vs_trigger_pct >= 0.05 with vol_ratio_5_20 in 0.91-1.63 (e.g., entity_8f0df3d38e 0.069/1.24, entity_4fdc3699fd 0.069/1.38, entity_ccc90a671f 0.070/1.45, entity_40ea0cfb3b 0.061/0.91), whereas selected_winners with close_vs_trigger >0.04 generally carry vol_ratio >=1.45 (entity_440e297253 0.050/1.59, entity_b00579f203 0.047/1.58).",
+    "False-negative_relative cases sit at low-to-moderate close_vs_trigger (<=0.04) with mid-range vol_ratio (1.15-1.40), suggesting the current B0 filter underweights the combination rather than penalizing it - the signal exists in eligible candidates, not in a missing universe."
+  ],
+  "evidence_against": [
+    "entity_6618d3e80c carries close_vs_trigger 0.051 with vol_ratio 1.45 and is double-labeled selected_winner|false_positive_ruin, showing the interaction is probabilistic, not deterministic, and entity_2c58cebc59 wins large despite close_vs_trigger 0.034 - so the regime, not the point estimate, drives the hazard."
+  ],
+  "falsifiable_predictions": [
+    "Within the frozen B0 universe, the subset {close_vs_trigger_pct > 0.05 AND vol_ratio_5_20 < 1.4} will exhibit ruin+loss rate >=55% OOS, vs <=25% for the complementary subset with vol_ratio_5_20 >=1.4.",
+    "The composite rank feature f = close_vs_trigger_pct * vol_ratio_5_20 will deliver higher cross-sectional IC against W4 return than either marginal alone, with the gain concentrated in the top quartile of close_vs_trigger."
+  ],
+  "policy_implications": [
+    "Encode as an in-universe penalty rather than a universe expansion: chase_score = max(0, close_vs_trigger_pct - 0.045) * (1.4 - min(vol_ratio_5_20, 1.4)); subtract chase_score from the B0 composite so high-close-low-volume picks are demoted but not excluded, preserving eligible-universe size and avoiding leakage from the false-negative pool.",
+    "Add a 'wait-for-pullback' override: when chase_score exceeds a threshold, defer entry one bar rather than skip, capturing the false-negative_relative entities that became winners after a controlled pullback."
+  ]
+}

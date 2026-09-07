@@ -1,0 +1,32 @@
+{
+  "mechanism_claim": "A piecewise regime on (pullback_v_is_dry, current_vs_ibd_candidate_pct) isolates the highest-quality basing-then-pivot entries within the existing B0 set. The mechanism: 'pullback_v_is_dry=True' certifies that the basing drawdown occurred on volume contraction rather than distribution, signaling supply exhaustion; 'current_vs_ibd_candidate_pct' in a mid-band (~1.5 to ~2.5, i.e., near-but-not-far-above the IBD candidate pivot) certifies that the stock is resolving the base in the buyable zone rather than extended. The interaction matters because dry pullbacks that are still far below pivot (x<1.3) are unresolved basing candidates that may never reclaim structure, while dry-pullback setups that are already >3x the pivot are late-stage momentum chases where the dry volume signature is stale. The sweet spot is the diagonal: dry pullback + modest extension into the pivot zone.",
+  "evidence_for": [
+    "Selected winners median current_vs_ibd_candidate_pct = 1.98 vs false_negative median = 1.69 (delta -0.29), indicating the false negatives cluster either too close to pivot (not enough follow-through confirmation) or outside the buyable band.",
+    "False_positive_ruin cases with NULL pullback fields (entity_4fdc3699fd, entity_3472243e0c, entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b) consistently show high ma10_slope_5 (0.054–0.091) and elevated ibd_entry_close_vs_trigger_pct (0.061–0.074), i.e., they entered on no-pullback momentum extensions, exactly the regime the dry-pullback filter is designed to exclude.",
+    "Among ruin cases WITH a pullback, pullback_duration_weeks is 7 (entity_8f0df3d38e, entity_ccc90a671f, entity_55c2da490e) — the long, grinding base signature rather than a sharp V dry-up — consistent with the hypothesis that 'dry' short bases (3–5 weeks) behave differently from long corrective bases.",
+    "Selected winners with pullback data show pullback_duration_weeks of 3, 5, 6, 9 (entity_440e297253, entity_8ad5cd4795, entity_2c58cebc59, entity_3adc078f01) covering the legitimate base-length range, with current_vs_ibd_candidate_pct signal intact.",
+    "Numeric contrast shows mom_20, vol_ratio_5_20, up_day_ratio_20 all higher for winners — the dry-pullback + pivot-zone regime correlates with the momentum/quality cluster winners sit in.",
+    "False_negative_relative case entity_df5478102d (pullback -5.0%, 4 weeks) is shallow-pullback territory where current_vs_ibd_candidate_pct likely sits below the buyable threshold — the regime correctly excludes it from B0 even though it eventually worked."
+  ],
+  "evidence_against": [
+    "entity_2c58cebc59 is a selected_winner with a deep -25.1% pullback over 6 weeks (not a 'shallow dry-up') — shows the dry-volume signature is not strictly required for outsized wins, only for reducing ruin rate.",
+    "entity_6618d3e80c carries the dual label false_positive_ruin|selected_winner with very high px_vs_ma50 = 0.337 — demonstrates that high current_vs_ibd_candidate_pct can still produce large winners, so an upper bound cut too tight will drop alpha.",
+    "Sample of only 27 cases with overlapping snapshot contamination (multiple cases per snap like snap_71486ed83c) means the apparent regime boundary is underpowered; the 1.5–2.5 band is illustrative, not statistically pinned.",
+    "pullback_v_is_dry itself is not directly visible in the case JSON — the mechanism is inferred from NULL vs non-NULL pullback fields plus duration distributions, so the dry-volume label is a proxy, not a direct measurement.",
+    "entity_de1c657364 (false_negative_big_winner) has pullback -7.3% over 8 weeks — a long corrective base that the dry-pullback filter would still flag as valid, showing the regime does not separate all winners from non-winners."
+  ],
+  "falsifiable_predictions": [
+    "Within the B0-eligible set on a forward snapshot, candidates with pullback_v_is_dry=True AND 1.5 ≤ current_vs_ibd_candidate_pct ≤ 2.5 will show W4 ruin rate ≤ 1/3 of the unconditional B0 ruin rate observed in this archaeology (8/27 ≈ 30%).",
+    "B0 candidates with pullback_v_is_dry=False (or pullback fields NULL) AND current_vs_ibd_candidate_pct > 2.5 will concentrate ruin outcomes: ruin rate ≥ 50% in any sample ≥ 20 such candidates.",
+    "Dry-pullback entries with current_vs_ibd_candidate_pct < 1.3 (still well below pivot resolution) will skew toward false_negative_relative: ≤ 20% large-win rate, validating the lower-bound cut.",
+    "Position-sizing test: scaling B0 picks in the sweet-spot band 1.0–1.5x while halving size on out-of-band dry-pullback entries will improve risk-adjusted return even if hit rate is unchanged, because ruin magnitude is the asymmetric tail.",
+    "If the mechanism is wrong, splitting on pullback_v_is_dry alone (ignoring current_vs_ibd_candidate_pct) will show no differential ruin rate across dry vs non-dry within B0."
+  ],
+  "policy_implications": [
+    "Encode as a two-axis score applied AFTER the B0 universe is fixed: compute a 'base_quality_regime' flag = (pullback_v_is_dry AND 1.5 ≤ current_vs_ibd_candidate_pct ≤ 2.5). Do NOT widen the B0 screener to include borderline names — instead, modulate position size or hold-period rules by regime.",
+    "Use the regime as a confidence weight in a model ensemble or as a tie-breaker among similar-scoring B0 candidates, not as a hard exclusion (which would re-introduce the false_negative_relative problem visible in entities like entity_df5478102d and entity_05b4c6b1f7).",
+    "Tighter stop or earlier re-evaluation window for non-dry B0 entries with high current_vs_ibd_candidate_pct, since this archaeology shows the momentum-chase sub-regime is where the bulk of false_positive_ruin clusters.",
+    "Track regime prevalence over time: if the sweet-spot band thins (<10% of B0 candidates), the signal is in a non-trending market and overall sizing should shrink — regime is a participation gate, not a per-trade alpha source.",
+    "Do not promote this from a within-B0 conviction filter to a screening rule, because the 27-case evidence is sufficient for relative ranking but underpowered to justify expanding the eligible universe."
+  ]
+}

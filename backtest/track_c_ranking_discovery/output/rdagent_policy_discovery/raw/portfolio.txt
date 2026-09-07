@@ -1,0 +1,97 @@
+
+
+
+{
+  "proposals": [
+    {
+      "family": "portfolio",
+      "name": "ibd_actionable_vol_concentrator",
+      "hypothesis": "Concentrate in ACTIONABLE IBD setups with confirmed volume breakouts; the volume ratio spike signals institutional accumulation at the precise entry trigger, improving risk-adjusted outcomes.",
+      "params": {
+        "concentration_lambda": 2.5,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "momentum_first_concentrator",
+      "hypothesis": "Prioritize recent price momentum as the primary quality signal; stocks with sustained 20-day uptrends and relative strength versus SPY exhibit better continuation characteristics.",
+      "params": {
+        "concentration_lambda": 3.0,
+        "stock_quality_metric": "momentum_first"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "dry_pullback_balanced",
+      "hypothesis": "Target pullbacks where volume has dried up, indicating supply absorption; combined with moderate pullback depth, this captures accumulation during normal correction phases.",
+      "params": {
+        "concentration_lambda": 1.5,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "near_52w_high_concentrator",
+      "hypothesis": "Stocks within 1% of 52-week highs with confirmed breakouts represent the strongest momentum profiles; proximity to highs signals ongoing institutional buying pressure.",
+      "params": {
+        "concentration_lambda": 2.0,
+        "stock_quality_metric": "momentum_first"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "tight_base_quality_selector",
+      "hypothesis": "Prefer consolidation bases with tight depth (less than 20% decline) and limited micro-box formation; structured bases reduce noise and indicate coherent supply-demand equilibrium.",
+      "params": {
+        "concentration_lambda": 1.8,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "low_volatility_concentrator",
+      "hypothesis": "Lower realized volatility stocks may offer better risk-adjusted exposure; tighter price ranges reduce tail risk while maintaining participation in uptrends.",
+      "params": {
+        "concentration_lambda": 2.2,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "eps_quality_momentum_hybrid",
+      "hypothesis": "Combine EPS growth availability with positive momentum; earnings quality provides fundamental catalyst while momentum confirms market recognition of the improvement.",
+      "params": {
+        "concentration_lambda": 2.0,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "rel_spy_leader_momentum",
+      "hypothesis": "Stocks outperforming SPY over 60 days demonstrate sector rotation favorability; relative strength leaders capture market beta shifts and institutional sector allocation.",
+      "params": {
+        "concentration_lambda": 2.5,
+        "stock_quality_metric": "momentum_first"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "entry_proximity_strict_selector",
+      "hypothesis": "Stocks trading within 3% of their IBD candidate trigger price are at optimal entry points; deviation beyond this range increases slippage risk and reduces immediate upside.",
+      "params": {
+        "concentration_lambda": 1.5,
+        "stock_quality_metric": "balanced"
+      }
+    },
+    {
+      "family": "portfolio",
+      "name": "moderate_concentration_momentum",
+      "hypothesis": "A balanced approach using moderate concentration with momentum-first ranking captures trending opportunities while maintaining diversification across signals.",
+      "params": {
+        "concentration_lambda": 1.2,
+        "stock_quality_metric": "momentum_first"
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "strongest_counterclaim": "The pullback_v_is_dry × ibd_entry_volume_ratio interaction is an artifact of three confounding layers: (a) ibd_entry_volume_ratio and vol_ratio_5_20 are conflated in the narrative but measure different things (entry-day vol vs. 5/20-day short/long vol ratio), (b) 'dry' is undefined for the substantial subset of B0 picks with null pullback fields, meaning the encoding silently degrades into a NaN-handling rule rather than a real interaction, and (c) the regime where dry-pullback co-occurs with low entry volume is too thin (≤8 false_positive_ruin cases, several of which had null pullbacks anyway) to support a precision claim. The prior mechanism story ('supply absorbed off-exchange') is unfalsifiable narrative, and the n=27 discovery sample provides no held-out evidence that the interaction generalizes beyond the snapshot window it was excavated from.",
+  "attacks": [
+    {
+      "issue": "Feature conflation: the case examples report vol_ratio_5_20 (5-day vs 20-day volume ratio) while the numeric contrasts cite ibd_entry_volume_ratio (entry-day volume normalized). These are distinct features; the 'evidence' is mixing them as if equivalent, so the interaction claim is built on a proxy variable rather than the named feature.",
+      "why_it_matters": "If ibd_entry_volume_ratio measures a single entry-day print vs vol_ratio_5_20 measures a smoothed short/long ratio, the sign-flip mechanism ('expanding entry volume = accumulation') applies only to the latter, not the former. Encoding on ibd_entry_volume_ratio specifically, as the question demands, has no direct support from the shown cases."
+    },
+    {
+      "issue": "Null pullback fields dominate the false_positive_ruin bucket: entity_4fdc3699fd, entity_3472243e0c, entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b all have null pullback_pct/pullback_duration_weeks, meaning pullback_v_is_dry is undefined for them — yet they are ruins the interaction is supposedly explaining.",
+      "why_it_matters": "Half the false_positive_ruin sample cannot be tagged with the dry flag, so the interaction cannot mechanistically cause these ruins; the residual that CAN be tagged is too small (≤4 cases) to power a precision claim. Encoding the interaction as a soft reweight forces arbitrary NaN handling that effectively decides outcomes for half the universe."
+    },
+    {
+      "issue": "Direct counterexample to the mechanism: entity_3adc078f01 had a 9-week -42.3% pullback with vol_ratio_5_20=1.14 (low) and mom_20=0.17, which by the dry×low-volume mechanism should be a high-ruin regime, yet it produced large_win. The prior researcher dismisses this as 'extreme depth can still resolve bullishly' — pure special pleading.",
+      "why_it_matters": "A single confirmed counterexample in the discovery sample means the interaction's ruin-classification accuracy is <100%; combined with 8 false_positive_ruin cases, the precision of the dry×low rule is bounded above by ~73% on in-sample data, with unknown recall. This is not a 'precision lever' — it is a heuristic with a documented failure in the regime it claims to flag."
+    },
+    {
+      "issue": "The ibd_entry_volume_ratio contrast has standardized_delta = -0.50, which is the weakest of the top-five numeric contrasts in the archaeology. Combining a weak marginal with a noisy interaction term on n=27 cases is statistically reckless; even a small amount of sample noise flips the sign of the interaction coefficient.",
+      "why_it_matters": "With 8 false_positive_ruin cases and ~11 selected_winners, splitting each group by 'dry' (≤4 per cell) gives effective df≈3 per cell. Any conditional comparison has a p-value >0.05 by construction. The 'interaction effect' is not statistically distinguishable from zero in the discovery set."
+    },
+    {
+      "issue": "Mechanism is unfalsifiable: 'supply absorbed off-exchange' cannot be observed, only inferred post-hoc. The same low-vol data is equally consistent with (a) illiquidity vacuum where buyers also left, (b) institutional dark-pool accumulation, (c) index reconstitution noise. All three produce identical surface features but opposite return implications.",
+      "why_it_matters": "Without a stated causal chain that is independently testable (e.g., dark-pool print data, options flow), the mechanism cannot be falsified, which means it also cannot be validated — and encoding it into a scoring stack bakes narrative bias into the model."
+    },
+    {
+      "issue": "Multi-snapshot confounding: the 27 cases span at least 9 different snapshot IDs (snap_724342c280, snap_287267e812, snap_eb3d8128cc, snap_c7fa0b9bb6, snap_12ebd0d057, snap_71486ed83c, snap_ad495b6705, snap_39b6f2c49e, snap_3fc4068e83, snap_8aa9111909, snap_edaba651c2, snap_d0d57b1e40, snap_01d3e2483b, snap_b8420124eb). Each snapshot is a different market regime; pooling them assumes the interaction is regime-invariant.",
+      "why_it_matters": "If the dry×low-volume ruin pattern is concentrated in 1-2 snapshots (e.g., a low-volatility 2017-style regime), the encoding captures a market-regime artifact, not a structural feature of how pullbacks resolve. Out-of-sample, when regimes shift, the interaction reverses sign."
+    },
+    {
+      "issue": "The constraint 'without expanding B0 eligible universe' is treated as a feature, but it is actually a hard ceiling: a within-B0 modifier can only demote, never promote. The model's recall is bounded by B0 precision; the interaction claim of '≥30% ruin reduction with <10% winner change' is in-sample and cannot be verified without out-of-sample testing.",
+      "why_it_matters": "If out-of-sample testing shows the interaction reduces both ruin AND winners by similar amounts, it becomes a uniform down-weight, not a precision lever — net neutral on Sharpe. The within-B0 framing hides this risk."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A B0 pick with pullback_v_is_dry=true, ibd_entry_volume_ratio<1.3, that wins (large_win) — this exists already: entity_3adc078f01 is the cleanest case (deep pullback, low short-term vol, large_win). Re-running it through the interaction veto would demote a real winner.",
+    "A B0 pick with pullback_v_is_dry=false, ibd_entry_volume_ratio>1.8, that ruins — search the labeled false_positive_ruin set for cases where the interaction flags 'safe' but the outcome is ruin. If found, the interaction has inverse precision in the complement regime.",
+    "A B0 pick with null pullback fields AND high ibd_entry_volume_ratio, that ruins — e.g., entity_4fdc3699fd (high ma10_slope, high mom_20, null pullback, ruin). This tests whether the NaN-handling rule silently maps to a different failure mode.",
+    "A held-out snapshot (post-discover-train window) where the interaction's predicted ruin set actually underperforms — i.e., the model demotes winners it should have kept. Without this, the claim is unfalsified in-sample only.",
+    "Sector/time clustering: are the dry×low-volume ruins concentrated in 1-2 sectors or in a single calendar window? If yes, the interaction is a regime artifact and not a structural B0 modifier."
+  ],
+  "what_would_change_my_mind": [
+    "A pre-registered test on ≥2 holdout snapshots (not in the discovery 27) showing that the interaction veto reduces ruin rate by ≥25% while keeping ≥90% of large_wins, with a documented NaN-handling rule for null pullbacks.",
+    "A monotonic dose-response: ruin rate should decrease as ibd_entry_volume_ratio increases within the dry-pullback subset across all snapshots, not just the discovery ones. A non-monotonic or single-snapshot effect is regime noise.",
+    "An out-of-sample falsification of the alternative mechanisms (illiquidity, dark-pool accumulation) via independent data (e.g., short interest change, options skew, 13F delta) that pins down the supply-absorption story.",
+    "A replication of the ibd_entry_volume_ratio median gap (1.813 vs 1.599) on a different cohort where pullback_v_is_dry is fully populated (not null), with a confidence interval that excludes parity.",
+    "An explicit ablation showing the interaction term adds precision over a baseline that already includes ibd_entry_volume_ratio as a marginal — if marginal ibd_entry_volume_ratio already captures the signal, the interaction is redundant and just adds overfitting surface."
+  ]
+}

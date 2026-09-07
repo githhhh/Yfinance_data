@@ -1,0 +1,62 @@
+
+
+{
+  "tests": [
+    {
+      "name": "ablation_independence_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "marginal_contribution_by_feature",
+      "success_criterion": "Removing any single feature from the penalty scoring function increases false_positive_ruin classification error by >5% relative to full model, AND this error increase is significant at p<0.05 via McNemar test across the 27-case archaeological set",
+      "failure_criterion": "Ablation of any single feature changes false_positive_ruin classification by <2% (relative), indicating true redundancy rather than independent contribution"
+    },
+    {
+      "name": "consolidation_equivalence_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "single_factor_vs_multi_feature",
+      "success_criterion": "Replacing three separate features with their equal-weighted z-score mean (conviction_index) maintains false_positive_ruin precision within ±3% of original, with no significant increase in false_negative_relative rate—proving the features were redundant",
+      "failure_criterion": "Consolidated conviction_index degrades false_positive_ruin precision by >5% OR doubles false_negative_relative rate—proving the features capture non-overlapping variance"
+    },
+    {
+      "name": "velocity_divergence_test",
+      "features": ["ma10_slope_5", "ma20_slope_5", "up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "divergent_signal_cases",
+      "success_criterion": "Among entities where ma10_slope_5 > ma20_slope_5 by >0.02 AND up_day_ratio_20 < 0.5 AND mom_20 > 0.15 (momentum present but short-term velocity diverging), >60% achieve selected_winner outcome—falsifying that low conviction features deterministically predict ruin",
+      "failure_criterion": "All velocity-divergent cases with low up_day/momentum still result in false_positive_ruin, confirming the penalty mechanism captures what conviction features miss"
+    },
+    {
+      "name": "regime_stability_test",
+      "features": ["vol_ratio_5_20", "up_day_ratio_20", "mom_20", "px_vs_ma20"],
+      "comparison": "snapshot_cross_validation",
+      "success_criterion": "Standardized deltas for up_day_ratio_20, vol_ratio_5_20, mom_20 against false_positive_ruin remain within ±0.3 of each other across the 5+ distinct snapshot IDs in the dataset—proving stable mechanism rather than regime artifact",
+      "failure_criterion": "Standardized deltas vary by >0.5 across snapshots, or the direction of the delta reverses in any snapshot—proving the apparent redundancy is snapshot-contingent"
+    },
+    {
+      "name": "orthogonality_to_pullback_test",
+      "features": ["pullback_duration_weeks", "pullback_pct", "up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "mechanism_pathway_separation",
+      "success_criterion": "pullback_duration_weeks shows correlation <0.4 with each of up_day_ratio_20, vol_ratio_5_20, mom_20, confirming orthogonal coverage—AND conditioning on pullback_duration_weeks adds >10% incremental AUC to false_positive_ruin prediction beyond conviction features alone",
+      "failure_criterion": "pullback_duration_weeks correlates >0.6 with any conviction feature (suggesting same construct) OR adds <3% incremental AUC—indicating current penalty double-counts patience and conviction"
+    },
+    {
+      "name": "mutual_information_test",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20"],
+      "comparison": "information_theoretic_independence",
+      "success_criterion": "I(outcome_label; up_day_ratio_20) ≈ I(outcome_label; vol_ratio_5_20) ≈ I(outcome_label; mom_20) within ±20%—proving equal marginal information and supporting redundancy hypothesis",
+      "failure_criterion": "MI differs by >40% between any pair of features, with the highest-MI feature alone accounting for >50% of total mutual information—proving unequal and potentially non-redundant contributions"
+    }
+  ],
+  "leakage_checks": [
+    "All 27 cases are discovery-train artifacts; tests must use only frozen evidence features without accessing post-snapshot outcomes beyond the outcome_label field provided",
+    "snapshot_id grouping must be preserved—no cross-snapshot leakage when computing per-snapshot standardized deltas",
+    "w4_return_bucket and outcome_label are label fields, not features; they cannot be used as inputs to the predictive mechanism under test",
+    "Consolidation test must not use the same 27 cases for both training the conviction_index and evaluating equivalence (use split-half or leave-one-snapshot-out)"
+  ],
+  "priority_order": [
+    "ablation_independence_test",
+    "mutual_information_test",
+    "consolidation_equivalence_test",
+    "regime_stability_test",
+    "velocity_divergence_test",
+    "orthogonality_to_pullback_test"
+  ]
+}

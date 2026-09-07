@@ -1,0 +1,242 @@
+{
+  "protocol_version": "track_c_v1",
+  "created_at": "2026-09-01T15:40:00Z",
+  "description": "Pre-registered Point-in-Time (PIT) Feature Allowlist for Track C Blind Discovery. Outcome and future label columns are strictly forbidden from discovery access.",
+  "features": {
+    "current_vs_ibd_candidate_pct": {
+      "as_of_semantics": "Price distance to candidate trigger at snapshot date",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "dist_to_52w_high_pct": {
+      "as_of_semantics": "Percentage distance from 52-week high at snapshot date",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "eps_yoy_growth": {
+      "as_of_semantics": "YoY quarterly EPS growth available as of snapshot date",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "eps_growth_type": {
+      "as_of_semantics": "EPS growth categorization (e.g. ACCELERATION, POSITIVE)",
+      "allowed_for_discovery": true,
+      "data_type": "string"
+    },
+    "eps_known": {
+      "as_of_semantics": "Boolean flag indicating EPS data availability at snapshot",
+      "allowed_for_discovery": true,
+      "data_type": "bool"
+    },
+    "ibd_entry_volume_ratio": {
+      "as_of_semantics": "Breakout day volume ratio vs 50-day average",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "volume_ratio": {
+      "as_of_semantics": "Recent 5-day vs 20-day volume ratio",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "vol_ratio_5_20": {
+      "as_of_semantics": "Short term volume ratio",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ibd_entry_close_position": {
+      "as_of_semantics": "Close position within daily high-low range on entry day",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ibd_entry_breakout_range_ratio": {
+      "as_of_semantics": "Breakout bar range vs 20-day average true range",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ibd_entry_close_vs_trigger_pct": {
+      "as_of_semantics": "Close relative to trigger price on breakout day",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "base_depth_pct": {
+      "as_of_semantics": "Depth of consolidation base in percentage",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "base_duration_weeks": {
+      "as_of_semantics": "Duration of consolidation base in weeks",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "base_mbox_count": {
+      "as_of_semantics": "Number of micro-boxes formed in base structure",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "pullback_pct": {
+      "as_of_semantics": "Depth of pullback from local high in percentage",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "pullback_duration_weeks": {
+      "as_of_semantics": "Duration of pullback in weeks",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "pullback_v_is_dry": {
+      "as_of_semantics": "Binary indicator if pullback volume dried up below average",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "pullback_pct_off_peak": {
+      "as_of_semantics": "Pullback percentage off peak",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "rv_20": {
+      "as_of_semantics": "20-day realized volatility annualized",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "atr_14_pct": {
+      "as_of_semantics": "14-day average true range as percentage of price",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "mom_5": {
+      "as_of_semantics": "5-day price momentum",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "mom_10": {
+      "as_of_semantics": "10-day price momentum",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "mom_20": {
+      "as_of_semantics": "20-day price momentum",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "mom_60": {
+      "as_of_semantics": "60-day price momentum",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "rel_spy_20": {
+      "as_of_semantics": "20-day relative strength vs SPY",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "rel_spy_60": {
+      "as_of_semantics": "60-day relative strength vs SPY",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "up_day_ratio_20": {
+      "as_of_semantics": "Proportion of positive return days over past 20 days",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "px_vs_ma10": {
+      "as_of_semantics": "Price relative to 10-day moving average percentage",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "px_vs_ma20": {
+      "as_of_semantics": "Price relative to 20-day moving average percentage",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "px_vs_ma50": {
+      "as_of_semantics": "Price relative to 50-day moving average percentage",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ma10_slope_5": {
+      "as_of_semantics": "Slope of 10-day moving average over 5 days",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ma20_slope_5": {
+      "as_of_semantics": "Slope of 20-day moving average over 5 days",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "ma50_slope_10": {
+      "as_of_semantics": "Slope of 50-day moving average over 10 days",
+      "allowed_for_discovery": true,
+      "data_type": "float"
+    },
+    "industry": {
+      "as_of_semantics": "IBD / GICS Industry group classification",
+      "allowed_for_discovery": true,
+      "data_type": "string"
+    },
+    "sector": {
+      "as_of_semantics": "Sector classification",
+      "allowed_for_discovery": true,
+      "data_type": "string"
+    },
+    "ibd_candidate_rule": {
+      "as_of_semantics": "Candidate setup rule (pivot, ceiling_pullback, ma10_touch_confirm, etc.)",
+      "allowed_for_discovery": true,
+      "data_type": "string"
+    },
+    "ibd_entry_status": {
+      "as_of_semantics": "IBD status (ACTIONABLE, RADAR, EXTENDED)",
+      "allowed_for_discovery": true,
+      "data_type": "string"
+    },
+    "is_actionable": {
+      "as_of_semantics": "Binary indicator if entry status is ACTIONABLE",
+      "allowed_for_discovery": true,
+      "data_type": "int"
+    },
+    "b0_eligible": {
+      "as_of_semantics": "Pre-screened eligibility flag (no clear failure, not below buy point)",
+      "allowed_for_discovery": true,
+      "data_type": "bool"
+    },
+    "w1_return_pct": {
+      "as_of_semantics": "1-week forward outcome return",
+      "allowed_for_discovery": false,
+      "data_type": "float"
+    },
+    "w2_return_pct": {
+      "as_of_semantics": "2-week forward outcome return",
+      "allowed_for_discovery": false,
+      "data_type": "float"
+    },
+    "w3_return_pct": {
+      "as_of_semantics": "3-week forward outcome return",
+      "allowed_for_discovery": false,
+      "data_type": "float"
+    },
+    "w4_return_pct": {
+      "as_of_semantics": "4-week forward outcome return",
+      "allowed_for_discovery": false,
+      "data_type": "float"
+    },
+    "w1_stop8": {
+      "as_of_semantics": "1-week stop-loss outcome",
+      "allowed_for_discovery": false,
+      "data_type": "bool"
+    },
+    "w2_stop8": {
+      "as_of_semantics": "2-week stop-loss outcome",
+      "allowed_for_discovery": false,
+      "data_type": "bool"
+    },
+    "w3_stop8": {
+      "as_of_semantics": "3-week stop-loss outcome",
+      "allowed_for_discovery": false,
+      "data_type": "bool"
+    },
+    "w4_stop8": {
+      "as_of_semantics": "4-week stop-loss outcome",
+      "allowed_for_discovery": false,
+      "data_type": "bool"
+    }
+  }
+}

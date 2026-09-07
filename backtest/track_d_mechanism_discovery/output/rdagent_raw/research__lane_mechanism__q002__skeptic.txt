@@ -1,0 +1,53 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The proxy hypothesis is methodologically untestable in this evidence base: the false_negative sample is constructed by selecting on future W4 returns (>=8% and >=5pp above B0 median, or >=5pp above worst B0 pick), which makes ANY correlation between feature axes and 'false_negative' status a tautology of future returns — not evidence that the features 'cause' winners versus losers. Lane cannot be reduced to proxies when the proxies themselves were fished from a forward-selected sample. Furthermore, the matched-triple design the prior role proposes is statistically dead: with N=27 cases and the request to match on three continuous features at ±0.05/±0.10/±0.05 tolerances, expected cell occupancy is well below 1 per stratum, so neither P1 nor P2 can be reached at conventional power.",
+  "attacks": [
+    {
+      "issue": "False_negative sample is constructed using FUTURE W4 returns, biasing every feature coefficient",
+      "why_it_matters": "The method_note explicitly states false negatives require future W4 >=8% and >=5pp above B0 selected median. Selecting on the dependent variable produces spurious feature separation. The 'top three separators' (up_day_ratio_20, vol_ratio_5_20, mom_20) are not 'proxies for Lane' — they are features correlated with momentum that will also correlate with any future-return-weighted label. The proxy hypothesis becomes circular: if Lane is correlated with momentum (which it plausibly is in fresh-breakout weeks), Lane would also separate false_negatives purely because the label is future-return-based."
+    },
+    {
+      "issue": "Matched-triple test has effectively zero statistical power at N=27",
+      "why_it_matters": "Matching three continuous features at ±0.05/0.10/0.05 tolerances over a 27-case archaeology yields near-empty cells. Even if Lane is purely a proxy, sampling noise in W4 returns (which can be ±10pp for individual 4-week windows) will swamp any 1.0pp or 2.0pp differential the predictions reference. The researcher sets thresholds without any power calculation, so P1 and P2 are unfalsifiable in either direction — any outcome is consistent with 'not enough data.'"
+    },
+    {
+      "issue": "The three proxy features are near-collinear and proxy for one latent momentum factor, not three independent axes",
+      "why_it_matters": "up_day_ratio_20, vol_ratio_5_20, and mom_20 are mechanically linked: rising prices (mom_20) produce more up days (up_day_ratio_20) on higher relative volume (vol_ratio_5_20). Matching on all three is matching on essentially one dimension. If Lane captures an orthogonal axis — e.g., base quality, distribution-day count in the breakout week, sector RR, sponsorship flow, or close position relative to the breakout range — these collinear proxies cannot substitute for it, and the matched test will falsely conclude 'no Lane effect' because the matched triples all share the same momentum level."
+    },
+    {
+      "issue": "Proxy triple is cherry-picked from ~20 features with non-zero standardized deltas",
+      "why_it_matters": "The contrast table lists 20+ features with |std delta| between 0.10 and 1.19. The researcher elevates three and dismisses Lane as redundant, but ignores ibd_entry_close_vs_trigger_pct (-0.70), px_vs_ma50 (-0.85), pullback_pct (+0.64), ma20_slope_5 (-0.60), ibd_entry_volume_ratio (-0.50), and ibd_entry_close_position (-0.46). A 'pure proxy' claim must explain away ALL residual axes, not just three. If Lane correlates with even one of these (e.g., ibd_entry_close_position, which is geometric and not in the triple), the proxy hypothesis is already falsified."
+    },
+    {
+      "issue": "Sample labels are noisy: entity_6618d3e80c is dual-labeled 'false_positive_ruin|selected_winner'",
+      "why_it_matters": "A single case is simultaneously a selected winner AND a ruin flag. This single contradiction shows the outcome taxonomy has overlap and noise that contaminates the proxy analysis. The proxies (mom_20=0.25, px_vs_ma50=0.34, up_day_ratio_20=0.55) for entity_6618d3e80c look unambiguously like a winner — yet it was ruined. If the proxies can't discriminate within their top decile even when labeled 'winner', the proxy hypothesis is undermined at its own ground truth."
+    },
+    {
+      "issue": "Lane is never defined operationally in the prior output",
+      "why_it_matters": "Without a definition of B0_LANE, LANE_NEUTRAL, and SCORE_BEFORE_LANE, the falsifiable predictions are vacuous. 'Lane' could mean IBD Breakout Lane grade, supply/demand count, or a proprietary composite. If it includes any factor not in {up_day_ratio_20, vol_ratio_5_20, mom_20} — even something as simple as 'close in upper third of day's range' or 'distribution days in prior 5 sessions' — the proxy hypothesis is false by construction. The prior role assumed Lane = momentum recoding without evidence."
+    },
+    {
+      "issue": "Mechanism vs portfolio confound: Lane may not improve edge but reduce variance, improve exit discipline, or improve sizing",
+      "why_it_matters": "Even if W4 returns for matched B0_LANE vs LANE_NEUTRAL triples are within 1pp on average, Lane might still be economically valuable by shifting the distribution (lower left tail, fewer ruin cases). The prior predictions ignore distributional shape and rely on mean W4 gaps. The eight false_positive_ruin cases suggest ruin is the binding constraint — not mean return — and the prior role's mean-only test cannot detect a Lane benefit that operates through ruin suppression."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "B0_LANE rows with low up_day_ratio_20 (<0.45) AND low vol_ratio_5_20 (<1.1) AND modest mom_20 (<0.10) that nonetheless produce large_win W4 outcomes — these cases would be winners the proxy composite would have rejected, demonstrating Lane adds information the proxies cannot.",
+    "LANE_NEUTRAL rows with up_day_ratio_20 >0.65, vol_ratio_5_20 >1.5, AND mom_20 >0.15 that produced ruin or loss — these are proxy-confident failures that show the proxies over-promise and Lane-neutral flags correctly reject them.",
+    "Within the snap_71486ed83c cluster (the densest in the sample), identify any triple of B0_LANE / LANE_NEUTRAL / SCORE_BEFORE_LANE cases matched on up_day_ratio_20±0.05, vol_ratio_5_20±0.10, mom_20±0.05 whose W4 outcomes diverge by >3pp — even a handful of these refutes the proxy hypothesis and the prior role's P1 directly.",
+    "Cases where ibd_entry_close_vs_trigger_pct is small (<0.02) but Lane is favorable AND mom_20 is large (>0.20) — if these win while identical-feature cases with low Lane lose, Lane is encoding freshness-entry precision the proxy triple misses.",
+    "Entity_6618d3e80c analogues: cases where the proxies say 'clear winner' but the outcome was ruin or loss — count these and compare B0_LANE vs LANE_NEUTRAL prevalence; if they concentrate in LANE_NEUTRAL, Lane is suppressing proxy-blind ruin, not redundant with proxies.",
+    "Entity-level time-series check: for each entity with multiple snapshots, observe whether Lane bin assignment flips while proxies stay constant — these are within-stock matched cases that bypass cross-sectional confounding and directly test whether Lane changes the call relative to the proxy triple."
+  ],
+  "what_would_change_my_mind": [
+    "A matched-triple test on a sample of N>=500 fresh-breakout weeks drawn WITHOUT selecting on future returns (i.e., a random or rule-based cross-section, not a forward-return-weighted archaeology), with Lane operationally defined and the proxies measured contemporaneously to the Lane call (not backward-looking).",
+    "A regression of W4 return on a SCORE_BEFORE_LANE-only specification versus a SCORE_AFTER_LANE-only specification in held-out data, where both models use identical proxy features and identical training window — if SCORE_BEFORE_LANE explains >=90% of SCORE_AFTER_LANE's out-of-sample R^2 AND the coefficient on the Lane-residual component is statistically zero, the proxy hypothesis holds.",
+    "An ablation where Lane is removed from the B0 selector and the resulting portfolio is compared on (i) mean W4 return, (ii) left-tail (ruin) rate, AND (iii) cross-sectional dispersion of W4 returns — Lane removal should be tested on all three axes, not just mean. If ruin rate increases by >=2pp when Lane is removed, Lane has a non-proxy mechanism.",
+    "Evidence that the three proxy features together capture >=95% of the variance of any defensible operational definition of Lane in-sample AND out-of-sample — currently no such definition exists.",
+    "A demonstration that for every entity with multiple snapshots, when proxies are held constant Lane assignment also stays constant — i.e., Lane is a deterministic function of the proxies with no additional inputs. If Lane uses ANY non-proxied input (close position, base count, sector RS, distribution count), the proxy hypothesis is falsified.",
+    "If the matched-triple test at N>=500 still shows <1pp B0_LANE vs LANE_NEUTRAL mean W4 gap AND ruin rates equal within ±1pp AND left-tail equal, I will concede the proxy hypothesis. Until then the evidence is insufficient to retire Lane."
+  ]
+}
+```

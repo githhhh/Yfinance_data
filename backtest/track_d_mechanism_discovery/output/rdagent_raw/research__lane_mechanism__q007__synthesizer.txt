@@ -1,0 +1,26 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 28,
+  "mechanism_summary": "Lane appears to be a discretization of the same continuous features (mom_20, ma10_slope_5, px_vs_ma50, vol_ratio_5_20) that SCORE_BEFORE_LANE already encodes, not an independent state signal. In the discovery-train mixed-week archaeology, 8 false_positive_ruin cases include multiple with textbook B0_LANE-consistent signatures (entity_b6bcccdf6a ma10_slope=0.067/mom=0.176; entity_4fdc3699fd ma10_slope=0.091/mom=0.185; entity_3472243e0c mom=0.242; entity_84824e6a20 ma10_slope=0.062), directly contradicting the researcher's claim that B0_LANE suppresses ruin. Numeric_contrasts presented as evidence FOR Lane are univariate selected_winner vs false_negative gaps on the very inputs Lane buckets, making the argument partially circular. The conditional-independence test (residualized Lane dummy after partialling continuous features + snapshot FEs) has not been executed on this sample; with n=27 and heavy snap_d0d57b1e40 / snap_71486ed83c clustering, power is too low to support either verdict, and ruin cases cluster in the snapshots most likely to drive any apparent Lane effect.",
+  "falsifiers": [
+    "Within-quintile comparison (min n=15 per Lane slot per SCORE_BEFORE_LANE quintile, mixed weeks only): B0_LANE median W4 return minus LANE_NEUTRAL median < +1pp OR sign reversal in >=2 of 4 non-singleton quintiles OR leave-one-snapshot bootstrap CI crosses 0.",
+    "Residualized regression W4_return ~ mom_20 + ma10_slope_5 + px_vs_ma50 + vol_ratio_5_20 + up_day_ratio_20 + Lane_dummy + snapshot_FE: Lane_dummy p>0.10 OR incremental R^2<0.005 OR sign flip when snapshot_FE added.",
+    "Snap-conditioned ruin analysis: if >50% of ruin cases are concentrated in <=2 snapshots, any pooled Lane signal is a regime artifact, not a Lane effect, and the test is uninterpretable."
+  ],
+  "actionable_design_principles": [
+    "Do NOT implement a hard LANE_NEUTRAL suppression filter in mixed weeks; the 8 B0_LANE-consistent ruin cases predict such a filter would retain or worsen losses while excluding genuine winners (entity_535a1beed7, entity_de1c657364, entity_8ad5cd4795 are LANE_NEUTRAL-style cases that won large).",
+    "Treat Lane as exploratory metadata until (a) within-quintile matched test on >=30 mixed-week cases per slot succeeds AND (b) Lane temporal stability within the 4-week hold is empirically validated (no within-window flips)."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Lane-stability-weighted override: rather than hard-filtering LANE_NEUTRAL, compute Lane_reassignment_count over the prior 3 weeks; if Lane is stable AND mom_20>0.10 AND ma10_slope_5>0.03, allow the B0 slot; otherwise require SCORE_BEFORE_LANE to clear +1σ above neutral-lane ruin baseline before sizing.",
+      "why_distinct": "Addresses the skeptic's reverse-causation and selection-conditioning attacks simultaneously: Lane is used as a stability/diagnostic feature, not a binary filter, and the binary filter is replaced by a tighter continuous threshold conditional on Lane state.",
+      "features": ["mom_20", "ma10_slope_5", "px_vs_ma50", "lane_reassignment_count_3w", "score_before_lane_z"],
+      "capacity_relevance": "Lane_reassignment_count is a regime/volatility feature orthogonal to the snapshot clustering confound, helping separate true Lane-state signal from snapshot-driven artifacts."
+    }
+  ]
+}
+```

@@ -1,0 +1,103 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "within_portfolio_rank_decay_by_overlap_stratum",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "pullback_pct"
+      ],
+      "comparison": "Within each 3-slot portfolio compute (slot_1_feature - slot_3_feature) and (slot_2_feature - slot_3_feature). Stratify portfolios by industry-overlap count (0, 1, 2 shared GICS sub-industry among the three candidates). Compare the within-portfolio rank-decay gaps across strata.",
+      "success_criterion": "Industry-crowding mechanism supported if the within-portfolio slot_1-to-slot_3 feature gap widens monotonically with overlap stratum (median gap in 2-shared stratum ≥ 0.5 standardized units larger than 0-shared stratum, on at least 3 of the 5 features).",
+      "failure_criterion": "Generic rank-order mechanism supported if the gap is approximately constant across strata (delta < 0.2 standardized units), indicating slot 3 is uniformly weaker regardless of industry structure."
+    },
+    {
+      "name": "slot_position_dummy_with_overlap_interaction",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20",
+        "pullback_pct",
+        "pullback_duration_weeks"
+      ],
+      "comparison": "Fit W4 outcome (large_win / small_win / loss / ruin buckets as ordered) on slot_position dummy (slot_1, slot_2, slot_3) plus slot-3 absolute feature level plus overlap × slot_position interaction. The interaction coefficient isolates industry-specific marginal contribution after stripping rank and quality effects.",
+      "success_criterion": "Industry mechanism supported if the slot_3 × overlap_2 coefficient is significantly negative (p < 0.10) AFTER controlling for slot-3 absolute feature level, meaning crowding adds penalty beyond feature decay.",
+      "failure_criterion": "Generic mechanism supported if the interaction coefficient is statistically indistinguishable from zero, meaning slot-3 weakness is fully explained by absolute feature level with no industry-specific contribution."
+    },
+    {
+      "name": "absolute_threshold_failure_odds_ratio_by_overlap",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "pullback_pct"
+      ],
+      "comparison": "Define binary indicator I_thresh = 1 if slot-3 candidate falls below selected-winner median on ≥2 of 4 features. Compute odds ratio of ruin outcome (w4_return_bucket == 'ruin') given I_thresh=1 vs I_thresh=0, separately for crowded (overlap=2) and uncrowded (overlap=0) portfolios.",
+      "success_criterion": "Industry mechanism supported if OR_crowded ≥ 2 × OR_uncrowded, i.e., absolute-quality failure is doubly destructive under crowding because the high industry correlation prevents offsetting winners elsewhere in the portfolio.",
+      "failure_criterion": "Generic mechanism supported if OR_crowded ≈ OR_uncrowded (within 25% relative tolerance), indicating quality failure hurts the same regardless of crowding."
+    },
+    {
+      "name": "pairwise_base_similarity_co_ruin_test",
+      "features": [
+        "base_depth_pct",
+        "base_duration_weeks",
+        "base_mbox_count",
+        "px_vs_ma20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Within each 3-slot portfolio, compute pairwise Mahalanobis-style distance in base-feature space between all (i,j) candidate pairs. Test whether low-distance pairs (bottom quartile) co-ruin (both w4_return_bucket == 'ruin') more often than high-distance pairs (top quartile). Base features are pre-snapshot and not contaminated by W4 timing.",
+      "success_criterion": "Industry mechanism supported if co-ruin rate in low-distance pairs ≥ 2× co-ruin rate in high-distance pairs, consistent with shared base structure implying shared downstream vulnerability.",
+      "failure_criterion": "Generic mechanism supported if co-ruin rate is statistically indistinguishable across distance quartiles, indicating base similarity is not a usable proxy for return co-movement."
+    },
+    {
+      "name": "pre_specified_abstention_rule_targeted_stratum_test",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "pullback_pct",
+        "px_vs_ma50"
+      ],
+      "comparison": "Pre-specify abstention rule R: if slots 1 and 2 share GICS sub-industry AND slot-3 candidate fails ≥2 of 4 selected-winner median thresholds, replace slot 3 with cash. Apply R to historical 3-slot portfolios. Compare per-portfolio W4 outcome distribution under R vs full-deployment baseline, stratified by overlap.",
+      "success_criterion": "Policy supported if R improves per-portfolio ruin rate by ≥10 percentage points in the 2-shared stratum AND does not degrade ruin rate by more than 5 percentage points in the 0-shared stratum (asymmetric benefit is the signature of crowding-specific value).",
+      "failure_criterion": "Policy not supported if improvement in 2-shared stratum is matched or exceeded in 0-shared stratum (i.e., abstention helps regardless of crowding), in which case the rule is industry-blind and the 'crowding triggers abstention' claim is spurious."
+    },
+    {
+      "name": "snapshot_level_controlled_rank_ablation",
+      "features": [
+        "mom_20",
+        "vol_ratio_5_20",
+        "px_vs_ma50",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Within each snapshot, rank the top-3 candidates by feature composite (z-score average of 4 features). Track whether the selected 3-slot portfolio follows rank-order exactly. Test: among snapshots where the actual 3-slot selection deviates from rank-order (e.g., slot 3 holds a higher-feature candidate than slot 2), is W4 outcome better or worse than rank-ordered selection? This separates 'slot position is causal' from 'slot position is just an index of quality'.",
+      "success_criterion": "Slot-position-asymmetry mechanism supported if rank-order violation yields NO W4 improvement (i.e., swapping a higher-feature candidate into slot 3 does not raise slot-3's W4 outcome), meaning slot position carries independent cost under crowding.",
+      "failure_criterion": "Quality-only mechanism supported if rank-order violation improves slot-3 W4 outcome, indicating slot position is purely a quality index and not an independent state."
+    }
+  ],
+  "leakage_checks": [
+    "Verify w4_return_bucket is computed strictly from post-snapshot W4 prices and never enters any feature derivation; it is the outcome label only.",
+    "Verify snapshot_anon is used solely as a grouping key for paired-within-snapshot tests and is never included as a model feature or proxy.",
+    "Verify is_b0_pick is treated as a policy decision (selection outcome) and excluded from feature set; it is not a market-state descriptor.",
+    "Verify ibd_entry_close_vs_trigger_pct, ibd_entry_volume_ratio, ibd_entry_close_position, ibd_entry_breakout_range_ratio, current_vs_ibd_candidate_pct are confirmed point-in-time at snapshot date and do not embed any post-snapshot return information.",
+    "Verify base_depth_pct, base_duration_weeks, base_mbox_count, dist_to_52w_high_pct are pre-snapshot base descriptors and not contaminated by intra-base forward return.",
+    "Verify no test derives a feature from a function of two snapshots' W4 buckets simultaneously (would leak cross-snapshot outcome structure into a single-snapshot feature).",
+    "Verify the abstention rule R uses only point-in-time features (no peeking at W4 bucket to tune thresholds); thresholds are taken from selected-winner medians disclosed in the archaeology and frozen before outcome evaluation.",
+    "Verify no feature is calendar-derived (e.g., year, quarter, month) in violation of the calendar-identity ban."
+  ],
+  "priority_order": [
+    "within_portfolio_rank_decay_by_overlap_stratum",
+    "slot_position_dummy_with_overlap_interaction",
+    "absolute_threshold_failure_odds_ratio_by_overlap",
+    "snapshot_level_controlled_rank_ablation",
+    "pairwise_base_similarity_co_ruin_test",
+    "pre_specified_abstention_rule_targeted_stratum_test"
+  ]
+}
+```

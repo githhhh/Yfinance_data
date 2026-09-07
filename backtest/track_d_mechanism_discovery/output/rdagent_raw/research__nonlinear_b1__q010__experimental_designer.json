@@ -1,0 +1,36 @@
+{
+  "tests": [
+    {
+      "name": "Within-snapshot incremental-information test",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio",
+        "up_day_ratio_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "comparison": "Compare two nested logistic specifications on the discovery set stratified by snapshot: (A) baseline = up_day_ratio_20 + mom_20 + px_vs_ma50 + ma10_slope_5; (B) baseline + ibd_entry_close_position + ibd_entry_volume_ratio + ibd_entry_close_position*ibd_entry_volume_ratio. Compute likelihood-ratio chi-square and per-snapshot sign concordance of the interaction term across >=2 non-discovery snapshots in the validation window.",
+      "success_criterion": "Interaction term is positive in >=3 of 4 within-snapshot fits AND LR test p<0.05 AND AUC uplift >=0.03 over baseline.",
+      "failure_criterion": "Interaction term flips sign across folds OR LR test p>=0.10 OR AUC uplift <0.01, indicating the gate is a recoded proxy."
+    },
+    {
+      "name": "Leave-one-snapshot-out threshold stability",
+      "features": [
+        "ibd_entry_close_position",
+        "ibd_entry_volume_ratio"
+      ],
+      "comparison": "For each snapshot in {snap_71486ed83c, snap_d0d57b1e40, others}, fit a grid of (volume_ratio, close_position) thresholds on the remaining snapshots and compute optimal W4 ruin-rate separation on the held-out snapshot. Compare optimal volume floor distribution and close_position cut distribution across folds.",
+      "success_criterion": "Optimal volume floor lies in [1.4, 1.8] and optimal close_position cut lies in [0.82, 0.88] in >=3 of 4 folds (stability band).",
+      "failure_criterion": "Optimal thresholds span >0.4 in either dimension across folds, or collapse to a single-feature rule, indicating the proposed 1.3/1.7/0.80/0.85 cells are discovery-set artefacts."
+    }
+  ],
+  "leakage_checks": [
+    "Verify ibd_entry_close_position and ibd_entry_volume_ratio are computed using only data available at the IBD entry decision timestamp (no peeking at post-entry close or post-entry volume prints).",
+    "Confirm that the proposed gate is applied as a hard post-B0 filter on the eligible B0 set only — no implicit universe expansion via relaxed B0 criteria.",
+    "Audit that snapshot id is not used as a feature in either test and that fold assignment is on snapshot identity alone, not on outcome label."
+  ],
+  "priority_order": [
+    "Within-snapshot incremental-information test",
+    "Leave-one-snapshot-out threshold stability"
+  ]
+}

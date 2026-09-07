@@ -1,0 +1,41 @@
+
+
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 47,
+  "mechanism_summary": "The exhaustion-signal mechanism (tight IBD entry + depleted momentum + weak up-day ratio → ruin) is structurally plausible and internally consistent. The composite counterexample test (researcher) found zero large_win cases meeting the full threshold, providing weak support. However, the mechanism faces three compounding weaknesses: (1) 5 of 8 ruin cases have null pullback_pct, making the 'pullback-to-ruin' causal pathway unverifiable for the majority of target outcomes; (2) ibd_entry_close_vs_trigger_pct is a lagged-entry artifact that correlates with distance-to-resistance, failing the tight_entry_confound_test in at least one case (entity_2c58cebc59 has ibd_entry_close_vs_trigger_pct=0.034 yet achieves large_win); (3) the 27-case discovery sample does not support confident threshold calibration, and standardized deltas of -1.0 at n=27 are consistent with random variation. The evidence supports a weak, context-dependent signal rather than a stable mechanism.",
+  "falsifiers": [
+    "Composite counterexample: A B0 pick with ibd_entry_close_vs_trigger_pct > 0.030 AND mom_20 < 0.10 AND up_day_ratio_20 < 0.50 AND vol_ratio_5_20 > 1.30 AND px_vs_ma50 < 0.08 achieving w4_return_bucket=large_win. This would directly falsify the exhaustion-signal mechanism. Currently zero such cases exist in-sample.",
+    "Cross-snapshot ruin-rate invariance: If B0 picks meeting exhaustion thresholds show ruin rates varying by >2x across snapshot_anon cohorts (e.g., 40% ruin at snap_71486ed83c vs 8% at snap_287267e812), regime effects dominate stock-level features, invalidating the mechanism.",
+    "Null-pullback structural divergence: If ruin cases with null pullback_pct differ significantly from non-null-pullback ruin cases on snapshot-time features (mom_20, up_day_ratio_20, ibd_entry_close_vs_trigger_pct), the mechanism operates through different causal pathways and the unified claim is false.",
+    "Time-to-event falsification: If null-pullback ruin cases resolve in <2 weeks from entry versus 7+ weeks for observed pullback cases, the null cases reflect catalyst events (earnings, news) not entry-quality exhaustion.",
+    "Tight-entry survival with depleted momentum: A B0 pick with ibd_entry_close_vs_trigger_pct > 0.040, mom_20 < 0.08, and up_day_ratio_20 < 0.45 achieving w4_return_bucket=large_win would falsify the composite threshold claim at stricter bounds."
+  ],
+  "actionable_design_principles": [
+    "Require non-null pullback_pct for mechanism-based filtering; exclude null-pullback cases from exhaustion-signal logic and treat them as separate risk category (potential catalyst failures)",
+    "Prefer ibd_entry_close_vs_trigger_pct < 0.020 as necessary condition for confidence in B0 picks; tighter entries require proportionally stronger momentum buffer (mom_20 > 0.20) to compensate",
+    "Do not apply up_day_ratio_20 as a standalone filter; it is confounded with market regime and should only be used within snapshot-stratified analysis",
+    "Tight-entry B0 picks (ibd_entry_close_vs_trigger_pct > 0.025) require stop-loss discipline at entry - 8%, as pullback-to-ruin appears to crystallize at -12% to -16% for this cohort",
+    "Do not use composite thresholds derived from n<50 without out-of-sample validation; the current threshold calibration (ibd_entry > 0.030, mom < 0.10, up_day < 0.50, vol > 1.30, px_ma50 < 0.08) is likely overfitted"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Exhaustion Composite Pre-Filter with Mandatory Pullback Confirmation",
+      "why_distinct": "This is the only policy that explicitly addresses the skeptic's null-pullback attack. Prior designs treat null-pullback cases as missing data; this policy quarantines them as a distinct risk class requiring separate handling.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "mom_20", "up_day_ratio_20", "vol_ratio_5_20", "pullback_pct (non-null required)"],
+      "capacity_relevance": "Capacity-based position sizing: apply exhaustion pre-filter only to cases with observable pullback trajectory; null-pullback cases receive capacity-weighted reduction regardless of other features"
+    },
+    {
+      "idea": "Momentum-Buffffered Entry Proximity Rule",
+      "why_distinct": "Instead of rejecting tight entries outright, this policy scales momentum buffer requirements inversely with entry proximity—addressing the skeptic's concern that ibd_entry_close_vs_trigger_pct is a lagged-entry proxy rather than a causal signal.",
+      "features": ["ibd_entry_close_vs_trigger_pct", "mom_20", "px_vs_ma50"],
+      "capacity_relevance": "Capacity allocation: assign higher capacity to tight-entry picks with strong momentum buffer (mom_20 > 0.20) or sufficient distance to resistance (px_vs_ma50 > 0.12); reduce capacity for tight-entry picks with low momentum AND low resistance distance"
+    },
+    {
+      "idea": "Snapshot-Stratified Exhaustion Threshold",
+      "why_distinct": "This directly tests the skeptic's regime-confound hypothesis by deriving separate exhaustion thresholds per snapshot_anon. If thresholds are stable across snapshots, regime concern is minimal; if thresholds diverge substantially, the mechanism is regime-dependent.",
+      "features": ["snapshot_anon", "ibd_entry_close_vs_trigger_pct", "mom_20", "up_day_ratio_20"],
+      "capacity_relevance": "Cross-snapshot capacity balancing: if exhaustion thresholds are tighter in certain snapshots (higher ruin rates), reduce capacity allocation to tight-entry picks in those regimes"
+    }
+  ]
+}

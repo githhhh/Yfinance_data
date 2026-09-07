@@ -1,0 +1,67 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 28,
+  "mechanism_summary": "The proposed (pullback_v_is_dry, current_vs_ibd_candidate_pct) regime is internally inconsistent on three independent grounds: (a) pullback_v_is_dry appears operationally defined as the presence/non-presence of a detected base, conflating 'no base detected' (NULL pullback fields, common in the FP_ruin cluster) with 'volume contracted during a base' — these are not the same regime and the filter cannot address the very cases it claims to target; (b) the false-negative median current_vs_ibd_candidate_pct = 1.69 sits inside the proposed [1.5, 2.5] sweet spot, so the regime's lower bound is structurally below the cluster it claims to exclude; (c) winners pull back DEEPER (median -15.9%) than false negatives (-7.3%), inverting the 'shallow dry-up wins' narrative. What survives is a weaker, real signal: a pivot-zone + quality cluster (current_vs_ibd_candidate_pct in mid-band AND high up_day_ratio_20/vol_ratio_5_20/mom_20) is consistent with winners, but current_vs_ibd_candidate_pct is the second-weakest separator (std delta -0.20), and effective sample is ~8 independent market contexts after snapshot de-duplication. The specific encoding is refuted; the directional intuition is preserved but under-resolved.",
+  "falsifiers": [
+    "If on a held-out snapshot with n >= 30 B0 cases, ruin_rate(sweet_spot=[1.5,2.5] AND pullback_v_is_dry=True) is NOT <= 1/3 of unconditional B0 ruin rate, the mechanism is refuted for production use.",
+    "If directly-measured base features (base_duration_weeks in [3,7] AND base_mbox_count >= 3) reproduce the winner-vs-ruin separation (std delta >= 0.40) that the dry-pullback proxy claims, then the proxy is junk and the regime is replaceable by honest measurement.",
+    "If within joint-momentum quartile bins, ruin_rate(sweet_spot) < ruin_rate(outside) holds in fewer than 2 of 4 quartiles, the regime is a redundant re-encoding of mom_20/vol_ratio_5_20 and adds zero marginal information.",
+    "If current_vs_ibd_candidate_pct band ordering (win rate monotonically increasing across <1.30 / [1.30,1.69) / [1.69,2.50) / >=2.50) is not monotone WITHIN at least 3 independent snapshots, the band boundary is a single-cluster artifact.",
+    "If cases with NULL pullback fields (i.e., never detected a base) have ruin_rate materially lower than cases with non-NULL pullback fields in [3,7] weeks, then the 'dry pullback = safety' frame is fully inverted and the filter is harmful.",
+    "Entity_6618d3e80c-style cases (high current_vs_ibd_candidate_pct AND selected_winner AND false_positive_ruin) appear at >= 10% frequency in a forward sample: any upper bound below their median is dropping alpha and the band should be widened or abandoned."
+  ],
+  "actionable_design_principles": [
+    "Treat pullback_v_is_dry as SUSPECT pending the Proxy Validity Test: do not deploy it in production without the within-B0 NULL/non-NULL vs directly-measured base comparison showing the proxy carries information beyond the base-detection event itself.",
+    "Reject the specific band [1.5, 2.5] as currently specified — the 1.69 false-negative median contradiction makes it unfit. If the regime concept is retained, set the lower bound ABOVE 1.69 (e.g., [1.75, 2.50]) and document that this explicitly trades some FN_relative retention for lower-bound safety.",
+    "Apply the regime as a WITHIN-B0 conviction weight, never as an eligibility filter — this matches the researcher's policy_implications and avoids the universe-expansion trap the question explicitly forbids.",
+    "Mandate snapshot-stratified validation: any reported win/ruin rate for this regime must show consistency across at least 3 non-overlapping snapshots, otherwise the band is overfit to 1-2 date clusters.",
+    "Block the regime from being promoted to a screening feature; restrict it to sizing/hold-period modulation until effective-sample >= 30 independent cases per band cell.",
+    "Audit features entering the model: current_vs_ibd_candidate_pct, up_day_ratio_20, vol_ratio_5_20, and mom_20 are collinear enough to require joint-bin stratification (per Confound Independence test) before claiming incremental value of any one of them."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "B0ConvictionRegime_v0 — within-B0 confidence score = w1*I(current_vs_ibd_candidate_pct in [1.75, 2.50]) + w2*I(base_duration_weeks in [3,7]) + w3*I(base_mbox_count >= 3) + w4*up_day_ratio_20_normalized + w5*vol_ratio_5_20_normalized, applied as a position-size scalar (0.5x to 1.5x) without changing the B0 universe.",
+      "why_distinct": "Drops the broken pullback_v_is_dry proxy entirely. Uses directly-measured base features plus current_vs_ibd_candidate_pct in a band shifted above the FN median (1.75 instead of 1.5). Functions as a sizing modulation, not a filter — preserves the universe constraint from the question.",
+      "features": [
+        "current_vs_ibd_candidate_pct",
+        "base_duration_weeks",
+        "base_mbox_count",
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Capacity-irrelevant: this is a conviction/positioning policy over an existing B0 candidate set. Output is a scalar per B0 pick; portfolio construction then sizes by this scalar. No impact on the eligible universe cardinality, so no capacity ceiling on B0 itself."
+    },
+    {
+      "idea": "PivotExtensionGuard_v0 — pre-trade veto rule: if current_vs_ibd_candidate_pct >= upper_thr AND vol_ratio_5_20 <= lower_thr (i.e., high extension into the candidate pivot on contracting volume), require explicit confirmation (fresh breakout volume or base re-detection) before allowing the B0 pick to size normally. Otherwise cap at 0.5x.",
+      "why_distinct": "Targets the FP_ruin regime the Researcher correctly identified (NULL pullback + high ma10_slope + elevated ibd_entry_close_vs_trigger_pct), but does so via extension-quality joint condition rather than the broken dry-pullback proxy. The joint condition prevents dropping alpha from cases like entity_6618d3e80c where high extension still produced a large win.",
+      "features": [
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20",
+        "ma10_slope_5",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Capacity-neutral guard: it constrains a subset of B0 picks to half size, not their eligibility. Aggregate portfolio capacity unchanged; per-trade liquidity demand reduced in the flagged subset."
+    },
+    {
+      "idea": "SnapshotRegimeAudit_v0 — meta-policy: at every evaluation, compute win-rate ordering across the four current_vs_ibd_candidate_pct bands PER SNAPSHOT (within-snapshot only), then sign-test across snapshots. If sign-test p >= 0.20 OR fewer than 3 independent snapshots contribute, the B0ConvictionRegime policy auto-downgrades to 0.75x default size and emits a regime-quality warning.",
+      "why_distinct": "Directly addresses the snapshot contamination / cluster artifact problem the Skeptic identified. Treats the regime policy itself as a monitored object with its own quality gate, rather than trusting the within-B0 archaeology to generalize. Allows the policy to remain live but at reduced conviction during cluster-artifact risk.",
+      "features": [
+        "snapshot_anon",
+        "current_vs_ibd_candidate_pct",
+        "w4_return_bucket",
+        "outcome_label"
+      ],
+      "capacity_relevance": "Meta-policy; no direct capacity effect. Indirect: when active, it reduces sizing across all regime-aware trades, which can lower capacity pressure in stressed regimes."
+    },
+    {
+      "idea": "BaseQualityDirect_v0 — alternative conviction feature usable in place of (not in addition to) the pullback_v_is_dry proxy: base_quality_direct_score = sigmoid(base_duration_weeks/8 - |pullback_pct|/30 + base_mbox_count/5), a continuous scalar derived from directly-measured base features only. If this score's within-B0 winner-vs-ruin standardized delta exceeds 0.35, promote it to replace pullback_v_is_dry in the regime policy.",
+      "why_distinct": "Implements the Direct Replacement test as a deployable policy, not just an offline check. If the proxy is shown to be a missingness artifact, this rule provides a clean replacement built on PIT-clean base measurements. The sigmoid form keeps the score in a bounded, interpretable range.",
+      "features": [
+        "base_duration_weeks",
+        "pullback_pct",
+        "base_mbox_count"
+      ],
+      "capacity_relevance": "Capacity-neutral replacement feature for an existing regime filter. Same cardinality, same universe. No capacity shift."
+    }
+  ]
+}

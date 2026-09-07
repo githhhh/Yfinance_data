@@ -1,0 +1,73 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The hypothesized interaction claims that a B0 candidate's volume profile during pullback (pullback_v_is_dry) modulates whether extension above the original IBD pivot (current_vs_ibd_candidate_pct) is healthy continuation or distribution-into-strength. The mechanism story is internally coherent: dry-volume consolidation after extension is consistent with institutional accumulation resetting the base; elevated-volume consolidation after extension is consistent with rotation/distribution. However, three independent analytical layers (researcher evidence, skeptic counterexamples, designer leakage checks) collectively weaken the claim from 'supported' to 'conditional': (1) the marginal discriminative power of current_vs_ibd_candidate_pct itself is third-quartile weak in the archaeology (std_delta -0.1984); (2) pullback_v_is_dry is operationally a windowed binarization of vol_ratio_5_20, which already shows the strongest false-negative contrast (std_delta -1.0455), creating severe construct redundancy; (3) at least two labeled cases (entity_ead73f4390, entity_440e297253) are direct counterexamples to the 'extended + non-dry = ruin' quadrant yet are large_win winners. The most defensible reading is that the interaction captures a real but narrow regime that is partially aliased onto the existing vol_ratio_5_20 + mom_20 × px_vs_ma50 signal cluster, and any operationalization must be tested as a TRUE cross-term (additive interaction in the linear predictor), not as multiplicative marginals on B0_score.",
+  "falsifiers": [
+    "On an out-of-sample holdout (>=100 B0 candidates not in the 27 archaeology cases), a generalized additive model containing pullback_v_is_dry * current_vs_ibd_candidate_pct as an explicit cross-term shows parallel partial-dependence curves (slope difference < 0.2pp per 1pp of extension, with overlapping 95% CIs), demonstrating no statistical interaction — the apparent effect is a re-binarization of vol_ratio_5_20.",
+    "After including vol_ratio_5_20 and mom_20 as continuous covariates in a held-out model, adding the proposed interaction term fails to reduce brier score by >=1% relative and fails to improve log-loss at the 5% level on a likelihood-ratio test — confirming the interaction is fully absorbed by continuous main effects.",
+    "Stratifying by snapshot_id, the four-quadrant ruin-rate ordering holds in only one snapshot (e.g., snap_d0d57b1e40) and inverts or flattens in the others — falsifying the feature-level mechanism and replacing it with a snapshot-regime story.",
+    "Among B0 picks with pullback_v_is_dry = 1 and current_vs_ibd_candidate_pct > 3.0%, the ruin rate is NOT lower than the unconditional baseline by >=10pp on holdout data — refuting the directional 'dry rescues extension' claim.",
+    "Pullback_v_is_dry computed using a lookback window truncated to end >=5 trading days before the W4 anchor shows substantially weaker association with W4 bucket than the unrestricted version (Spearman drop >=0.15) — exposing forward-contamination in the original archaeology feature.",
+    "Matched-pair test: pairs of B0 candidates matched on vol_ratio_5_20, mom_20, px_vs_ma50, and snapshot_id but differing only in pullback_v_is_dry show no significant difference in W4 return (paired t-test p > 0.3) — proving the binarization adds no information once the continuous volume ratio is known.",
+    "A B0 candidate with pullback_v_is_dry = 0, current_vs_ibd_candidate_pct = 5.0%, mom_20 = 0.05, vol_ratio_5_20 = 1.4 produces a large_win on holdout — directly refuting the hard-veto quadrant.",
+    "Bootstrap-resampled ruin rates in the 'extended-with-no-dry-reset' (pullback_v_is_dry null AND current_vs_ibd_candidate_pct > 2%) cell have 95% CI that overlaps the unconditional B0 ruin rate — showing the predicted 'highest sub-regime ruin' is not statistically distinguishable from baseline."
+  ],
+  "actionable_design_principles": [
+    "Encode the interaction as a TRUE cross-term in the linear/predictor space (e.g., score += beta_int * pullback_v_is_dry * current_vs_ibd_candidate_pct), not as multiplicative marginals on B0_score — multiplicative marginals are mathematically equivalent to independent rank shifts and cannot represent interaction.",
+    "Hard-cap the universe modification: any policy derived from the interaction must not exclude more than 5% of the B0 eligible set in expectation; if the four-quadrant veto would breach this, downgrade the rule to a rank penalty (>=0.7x multiplier) instead of a binary drop.",
+    "Pre-register the lookback: pullback_v_is_dry must be computed from a window ending at least 5 trading days before the W4 measurement anchor, and the same truncation must be applied at evaluation time — otherwise the policy is non-deployable on forward data.",
+    "Control for continuous confounders at design time: any reported effect of the interaction must be conditional on vol_ratio_5_20, mom_20, and px_vs_ma50 being in the model as continuous terms; otherwise the apparent interaction is a confounded re-binarization.",
+    "Separate the regime-eligible subset from the full B0 universe in evaluation: report the interaction effect on (a) the pullback-defined subset and (b) the pullback-null subset independently; do not pool — this prevents sample-selection-driven overfitting.",
+    "For the pullback-null subset (no consolidation observed), define a separate guardrail (e.g., vol_ratio_5_20 < 1.0 confirmation) rather than borrowing the dry-pullback arm of the interaction — the mechanism does not transfer cleanly.",
+    "Snapshot-stratify all evaluations: if the interaction effect is concentrated in one snapshot or one calendar quarter, treat it as a regime artifact and withhold deployment until it replicates across at least three independent snapshots.",
+    "Track realized capacity impact: if the interaction-induced re-ranking shifts more than 20% of the candidate slots relative to the B0 prior, the policy is effectively redefining the candidate set — flag this for explicit B0-contract review even if the formal eligible universe is unchanged."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Define a policy `interaction_dry_x_extension` that emits a continuous interaction score = pullback_v_is_dry * current_vs_ibd_candidate_pct and adds it to the linear predictor with a single learnable coefficient, rather than two separate multiplicative modifiers on the base score.",
+      "why_distinct": "Prior proposed encoding used score *= (1 + a)*(1 + b), which is mathematically two independent multipliers and cannot represent interaction; this design forces the coefficient to be learned jointly and exposes whether the cross-term is statistically distinguishable from main effects.",
+      "features": [
+        "pullback_v_is_dry",
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma50"
+      ],
+      "capacity_relevance": "Adds one continuous feature (the cross-product) and one learnable weight; does not expand the eligible universe; capacity impact is negligible (single scalar addition)."
+    },
+    {
+      "idea": "Define a policy `dry_extension_quadrant_guard` that applies a soft rank penalty (multiplier in [0.5, 1.0], continuous in current_vs_ibd_candidate_pct) only when pullback_v_is_dry = 0 AND current_vs_ibd_candidate_pct > threshold, with the penalty magnitude calibrated to avoid excluding >5% of B0 candidates.",
+      "why_distinct": "Converts the 'extended-without-dry-reset = ruin' rule from a hard binary drop into a smooth, capacity-bounded penalty; preserves the eligible universe while still allowing the hypothesis to express itself; explicitly bounds the universe-shrinkage contract.",
+      "features": [
+        "pullback_v_is_dry",
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Does not add candidates; may reorder existing candidates within a bounded rank window; capacity-neutral by construction."
+    },
+    {
+      "idea": "Define a policy `null_pullback_separate_path` that routes pullback_v_is_dry = null candidates into a separate evaluation track requiring vol_ratio_5_20 < 1.0 confirmation, rather than treating the null case as equivalent to either dry or non-dry.",
+      "why_distinct": "Acknowledges that ~half of the archaeology sample is null-pullback, that the interaction hypothesis does not naturally extend to this subset, and that pooling it with the defined cases is a sample-selection bias; the policy isolates the bias rather than averaging over it.",
+      "features": [
+        "pullback_v_is_dry_is_null",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Does not expand B0; instead applies a stricter confirmation requirement within the existing eligible set; may reduce effective candidate count but does so transparently rather than via an interaction artifact."
+    },
+    {
+      "idea": "Define a policy `leak_safe_pullback_dry` that recomputes pullback_v_is_dry using a lookback window whose end is parametrically tied to the W4 anchor minus a buffer (e.g., end = W4_anchor - 5 trading days), and asserts that this recomputed feature shows the same quadrant ordering as the original archaeology — otherwise fall back to using only vol_ratio_5_20.",
+      "why_distinct": "Operationalizes the experimental designer's leakage check as a runtime policy: if the forward-safe version of the feature does not preserve the interaction signal, the policy self-disables rather than deploying a contaminated feature.",
+      "features": [
+        "pullback_v_is_dry_leaksafe",
+        "current_vs_ibd_candidate_pct",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Pure guardrail; capacity-neutral, may disable the interaction policy entirely if leakage is detected."
+    }
+  ]
+}
+```

@@ -1,0 +1,90 @@
+{
+  "tests": [
+    {
+      "name": "T1_within_snapshot_peer_match",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "mom_20"
+      ],
+      "comparison": "Within each snapshot, construct matched pairs of (penalty_triggered, penalty_not_triggered) candidates where |percentile(up_day_ratio_20 within snapshot)| ≤ 0.10 and |percentile(px_vs_ma20 within snapshot)| ≤ 0.10. Compare the W4 ruin rate and large_win rate between the two members of each matched pair. Repeat across all 12+ snapshots and aggregate via paired sign test.",
+      "success_criterion": "Triggered-pair ruin rate is ≥10pp lower than non-triggered pair across ≥60% of snapshots with binomial p < 0.10. Supports downside-risk-control mechanism once breadth confounding is removed.",
+      "failure_criterion": "Triggered-pair ruin rate is within ±5pp of non-triggered pair in ≥60% of snapshots OR paired sign test p > 0.30. Falsifies the risk-control claim; ranking mechanism becomes default, but T3 must still run before final verdict."
+    },
+    {
+      "name": "T2_position_size_decoupling",
+      "features": [
+        "ibd_entry_close_vs_trigger_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "rv_20",
+        "atr_14_pct"
+      ],
+      "comparison": "Construct a position-size proxy = clip(rank_within_snapshot(B0_composite_excluding_penalty) / sqrt(rv_20), 0.5, 2.0). Stratify all B0 picks into tertiles of this proxy. Within each tertile, compare ruin rate of penalty_triggered vs untriggered. If the ruin gap between triggered/untriggered is concentrated in the HIGH position-size tertile and absent in the LOW tertile, the penalty's apparent ruin-correlation is portfolio-construction mediated, not predictive.",
+      "success_criterion": "Triggered-vs-untriggered ruin gap ≥15pp in highest position-size tertile AND ≤5pp in lowest tertile — confirms position-size confound; penalty is inert as a risk-control feature.",
+      "failure_criterion": "Triggered-vs-untriggered ruin gap ≥10pp in BOTH top and bottom position tertiles OR interaction test (tertile × penalty) p > 0.20 — penalty retains independent predictive content; mechanism question remains open and proceeds to T1, T3."
+    },
+    {
+      "name": "T3_liquidity_proxy_partition",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "volume_ratio",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "rv_20"
+      ],
+      "comparison": "Estimate two nested logistic models on the 27 cases: (a) ruin ~ up_day_ratio_20 + vol_ratio_5_20, (b) ruin ~ up_day_ratio_20 + vol_ratio_5_20 + ibd_entry_volume_ratio + volume_ratio. Compare standardized coefficient on up_day_ratio_20 between models. If (b) attenuates up_day_ratio_20's coefficient to |β|<0.3 with p>0.40, the penalty is a liquidity-proxy, not a ranking or risk-control feature. Pre-register: liquidity proxy mechanism is declared dominant if attenuation ≥50%.",
+      "success_criterion": "Coefficient on up_day_ratio_20 attenuates ≥50% AND drops to |β|<0.3 with p>0.40 after adding liquidity proxies. Verdict: penalty operates as liquidity/information-asymmetry proxy; neither ranking nor risk-control.",
+      "failure_criterion": "Coefficient attenuation <30% OR up_day_ratio_20 remains |β|>0.5 with p<0.10 after liquidity adjustment. Proceed to T1 to discriminate ranking vs risk-control; declare UNRESOLVED on mechanism if T1 also inconclusive."
+    },
+    {
+      "name": "T4_replacement_holdout_validation",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "atr_14_pct",
+        "rv_20",
+        "px_vs_ma50",
+        "mom_20",
+        "mom_60"
+      ],
+      "comparison": "Order the 12+ snapshots chronologically by snapshot_anon hash rank as proxy (pre-registered ordering rule). Hold out the last 4 snapshots as the test set. Train the researcher's proposed replacement — a continuous, snapshot-relative percentile rank of up_day_ratio_20 combined with an rv_20-scaled position-size multiplier — on the first 8 snapshots only. Apply replacement to the held-out 4 snapshots. Compare (i) ruin count and (ii) large_win count vs original B0 dry_false_penalty scoring on the SAME held-out snapshots. Pre-registered decision rule: replacement is accepted only if it improves BOTH metrics simultaneously on held-out data.",
+      "success_criterion": "On held-out 4 snapshots, replacement yields ruin_count ≤ original AND large_win_count ≥ original + 1 (both directions required). Accepts replacement; falsifies original penalty's necessity.",
+      "failure_criterion": "Either condition fails on held-out data. Falsifies replacement's out-of-sample viability; the in-sample archaeology (researcher's F3) is shown to be a refit artifact, and the original dry_false_penalty structure is preserved pending further decomposition tests."
+    },
+    {
+      "name": "T5_pullback_severity_stress_partition",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "base_depth_pct"
+      ],
+      "comparison": "Restrict to the 13 of 27 cases where pullback_pct is non-null. Split into shallow (pullback_pct > -10%) and deep (pullback_pct ≤ -10%) halves. Within each half, test whether up_day_ratio_20 still distinguishes ruin from winner (Mann-Whitney U, pre-registered α=0.10 two-sided). Pre-register: if up_day_ratio_20 discriminates only in deep-pullback half, the penalty is acting as a tail-risk filter on already-stressed names; if it discriminates only in shallow half, it is a generic ranking tool unrelated to base depth.",
+      "success_criterion": "Discrimination (|U-statistic z| > 1.5) in deep-pullback half AND no discrimination (|z| < 0.5) in shallow half — supports downside-control mechanism conditional on prior drawdown severity.",
+      "failure_criterion": "Discrimination present in shallow half only — supports ranking mechanism. Discrimination absent in both halves — supports skeptic's UNRESOLVED verdict; penalty has no mechanism-specific role. Mixed / both halves significant — declare UNRESOLVED and escalate to larger-sample protocol before claiming any mechanism."
+    }
+  ],
+  "leakage_checks": [
+    "Verify snapshot_anon ordering is determined by a pre-registered hash rule applied identically across all five tests; no analyst override of which snapshots form the held-out set in T4.",
+    "Confirm every feature listed is PIT (computed on dates ≤ entry date): up_day_ratio_20 must use trading days t-20..t, vol_ratio_5_20 must use rolling windows ending at t, pullback_* must be backward-looking trough measurements.",
+    "Confirm outcome labels used as dependent variables (w4_return_bucket → ruin/loss/small_win/large_win) are taken verbatim from the frozen archaeology; no recomputation, no extension window beyond the already-frozen W4 horizon.",
+    "Confirm sector assignment used in T1 matching (if invoked) comes from a snapshot-date sector table, not from current sector classification that could reflect post-entry drift.",
+    "For T4, verify the replacement rule's coefficients are frozen at training-time values before held-out evaluation; no peeking at held-out labels to tune percentile cutoffs.",
+    "For T3, verify ibd_entry_volume_ratio and volume_ratio are NOT themselves downstream of B0 scoring (i.e., they are raw PIT features not recomputed using B0 weights).",
+    "For T5, confirm pullback_pct and pullback_duration_weeks null-handling rule is pre-specified (complete-case analysis on n=13, not available-case pooling across all 27).",
+    "Document entity_6618d3e80c's double-label anomaly: pre-register whether it counts as ruin, winner, both, or is excluded; the choice must be fixed before any test statistic is computed.",
+    "Confirm no test uses ticker identity, calendar date, or analyst-generated sector narrative as a feature — only the PIT numeric features enumerated above."
+  ],
+  "priority_order": [
+    "T2_position_size_decoupling",
+    "T3_liquidity_proxy_partition",
+    "T1_within_snapshot_peer_match",
+    "T4_replacement_holdout_validation",
+    "T5_pullback_severity_stress_partition"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 30,
+  "mechanism_summary": "ibd_entry_volume_ratio and ibd_entry_close_position show only moderate univariate separation (std deltas -0.50 and -0.46) between false-negatives and selected-winners, well below up_day_ratio_20 (-1.19), mom_20 (-1.00), and px_vs_ma50 (-0.85). The apparent interaction is consistent with a recoded proxy for short-term price extension plus participation momentum that B0 already partially captures; the 'institutional commitment' narrative is equally consistent with the textbook one-day reversal / exhaustion microstructure. Six of eight ruins and all five false-negatives cluster in two snapshots (snap_71486ed83c, snap_d0d57b1e40), and every proposed cell admits counterexamples (entity_bec51a4227 wins at vol=1.007; entity_2f86543bf6 wins with negative slopes and low up_day_ratio; entity_b6bcccdf6a ruins in the high-volume neighborhood). The 1.3/1.7/0.80/0.85 thresholds are round-number defaults without optimization. Status: conditional signal plausibly exists but cannot be disentangled from confounding, snapshot regime, and the existing B0 controls on the current 27-case single-window discovery sample.",
+  "falsifiers": [
+    "Leave-one-snapshot-out CV: optimal volume floor outside [1.4, 1.8] in >=2 of 4 folds, OR optimal close_position cut outside [0.82, 0.88] in >=2 of 4 folds, falsifies the proposed cells as discovery artefacts.",
+    "Within-snapshot logistic with the gate added to a baseline of up_day_ratio_20 + mom_20 + px_vs_ma50 + ma10_slope_5 yields LR test p >= 0.10 OR AUC uplift < 0.01, falsifying the claim that the piecewise interaction is incremental information rather than a recoded proxy for B0's existing features.",
+    "Backtest of the low-volume-extended demote cell (volume_ratio < 1.3 AND close_vs_trigger_pct > 0.04) shows large_win rate reduction >= 50% of the ruin-rate reduction, falsifying the claim that the gate improves conditional expected value rather than merely shrinking exposure."
+  ],
+  "actionable_design_principles": [
+    "Encode the gate as a soft position-size multiplier keyed to the four cells (full / discount / half / zero), not a hard binary selector, because the cell misclassification rate among the 11 selected-winners is non-trivial and the policy must survive label noise.",
+    "Volume ratio must be regime-conditioned (realized-vol or VIX bin) before any threshold is applied, since a fixed 1.7 floor misfires in low-volatility regimes where typical volume_ratio is ~1.0-1.2.",
+    "Never apply the close_position x volume_ratio gate without jointly controlling for up_day_ratio_20, mom_20, and px_vs_ma50 in the same model — treating it as incremental over B0's existing feature set is what prevents it from collapsing into a recoded proxy."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "piecewise_volume_close_softgate(ibd_entry_volume_ratio, ibd_entry_close_position, base_size) -> size_multiplier in {0.0, 0.5, 0.75, 1.0} based on a four-cell partition with regime-conditioned thresholds (volume bands shifted by realized_vol_bin).",
+      "why_distinct": "Differs from a hard filter by preserving exposure in ambiguous mid-cells and from a universe expansion by only modulating size on the B0-eligible set; the regime conditioner separates it from naive round-number cutoffs.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "realized_vol_bin"
+      ],
+      "capacity_relevance": "Computes only at the B0 admit timestamp using data on the eligible B0 set; no new names are admitted, so the eligible universe size is preserved by construction."
+    },
+    {
+      "idea": "volume_close_residual(interaction_term, controls={up_day_ratio_20, mom_20, px_vs_ma50, ma10_slope_5}) -> orthogonalized score used to demote or shrink only when the residual is materially negative, ensuring the gate adds information beyond the existing B0 feature set.",
+      "why_distinct": "Differs from the raw piecewise cell by first regressing out the four strongest standardized-delta separators, so the policy acts only on the orthogonal component; this is the only construction that can falsify the 'recoded proxy' attack.",
+      "features": [
+        "ibd_entry_volume_ratio",
+        "ibd_entry_close_position",
+        "up_day_ratio_20",
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5"
+      ],
+      "capacity_relevance": "Still operates as a post-B0 filter; the regression coefficients are fit once on the discovery window and frozen, so live scoring is a fixed linear transform plus a cell lookup with no universe expansion."
+    }
+  ]
+}

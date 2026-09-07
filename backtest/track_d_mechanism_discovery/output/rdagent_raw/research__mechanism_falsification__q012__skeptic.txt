@@ -1,0 +1,48 @@
+
+
+```json
+{
+  "strongest_counterclaim": "B0 'freshness' is plausibly a HYBRID recency-of-base + minimum-readiness signal whose downside-risk role is being systematically masked by three structural artifacts in the discovery set: (i) Berkson/collider conditioning — only names that pass B0 can enter the false_positive_ruin cohort, biasing observed ruin-freshness upward; (ii) confounding with other B0 sub-scores that rescue low-freshness names, so 'low-freshness ruins passed' understates any threshold-style gate that freshness enforces pre-selection; and (iii) a forward-looking false-negative definition (future W4 ≥ 8%) that mechanically elevates any contemporaneous feature correlated with subsequent return — including features the modeler intended as risk gates. Until an ablation holds other B0 components fixed, the conclusion that freshness is 'purely' a return-ranking score is not warranted by the evidence shown.",
+  "attacks": [
+    {
+      "issue": "Berkson/collider bias in the ruin cohort construction",
+      "why_it_matters": "False positives are conditional on being a B0 PICK. If freshness has even a weak pre-selection gate (e.g., up_day_ratio < 0.30 → reject), then observed ruins are drawn from a truncated distribution that excludes the very low-freshness cases freshness would have filtered. The researcher observes mixed up_day_ratio values (0.40, 0.50, 0.55, 0.60, 0.65) among ruins and concludes 'freshness does not gate ruin' — but those are exactly the values that SURVIVED the gate. To claim freshness is not gating, one must compare ruin rates across freshness values in the full pre-selection universe, not within B0 picks. The 5 false-negative cases are pre-selection and provide the only unconditioned evidence, and the data shows false_negatives have systematically LOWER up_day_ratio_20 (median 0.50 vs 0.625) — which is consistent with a weak floor-style gate, not pure ranking."
+    },
+    {
+      "issue": "Confounding with other B0 sub-scores invalidates the isolation argument",
+      "why_it_matters": "The researcher explicitly concedes that 'soft-additive blending of freshness with other B0 inputs' may allow low-freshness ruin cases to pass via compensation from other components. But this concession destroys the inference. If entity_84824e6a20 (up_day_ratio 0.40) and entity_40ea0cfb3b (up_day_ratio 0.50, vol_ratio 0.91) reach B0 selection despite low freshness, it could mean (a) freshness is a soft additive that other components overwhelm, OR (b) freshness has no floor at all. Both are consistent with the data. Without ablating other components, the data cannot distinguish 'freshness is irrelevant' from 'freshness is necessary-but-overridable'. The researcher's policy implication to convert to a hard gate is reasonable — but it is also the very experiment needed to falsify the gate claim, which has not been run."
+    },
+    {
+      "issue": "Forward-looking false-negative labeling contaminates 'return ranking' inference",
+      "why_it_matters": "The method note states false negatives are defined as 'future W4 ≥ 8% and ≥ 5pp above B0 selected median'. Any feature measured at snapshot t that correlates with forward return will appear as a 'ranking' discriminator by construction — regardless of whether it was DESIGNED as a ranking signal or as a risk filter. mom_20, up_day_ratio_20, and slope features are forward-predictive partly because they measure persistent drift. The discovery set cannot distinguish 'freshness predicts return because it is a momentum signal' from 'freshness predicts return because names that are quietly base-completing tend to both be safer and to continue higher'. The latter is a risk-control mechanism that ALSO has ranking value."
+    },
+    {
+      "issue": "Counterexample entity_2f86543bf6 contradicts BOTH hypotheses and is not addressed",
+      "why_it_matters": "This selected_winner has up_day_ratio=0.35 (the dataset minimum), negative ma20_slope_5, near-zero mom_20 (-0.008), and px_vs_ma20 only +0.025. If freshness is pure momentum, why did this name win? The researcher's evidence-against cites it as showing 'low freshness can win' (weakening the risk-control story). But the symmetric problem — 'low freshness can rank highly' — weakens the pure-ranking story equally. The honest reading is that freshness, as currently implemented, is NEITHER a tight gate NOR a tight ranker — which suggests it is overweighted by other B0 components, diluted, or being mis-measured. The researcher's binary framing (ranking XOR gating) is itself suspect."
+    },
+    {
+      "issue": "base_duration_weeks and base_mbox_count are conspicuously absent from the freshness cluster",
+      "why_it_matters": "If 'freshness' truly means recency-of-base — the literal IBD-style concept — then base_duration_weeks (std_delta -0.42, winners 52 vs false_negatives 44) and base_mbox_count (+0.34) are the canonical freshness features. They ARE in the data and DO discriminate. The current freshness sub-score appears to use short-window momentum proxies instead. This suggests either (a) the implementation has drifted from the conceptual role, or (b) the conceptual role was always 'recency-of-base' and the proxies are imperfect. Either way, the claim that 'freshness is functioning as momentum' may be a finding about WHAT IS COMPUTED, not about WHAT WAS INTENDED, and these two should not be conflated."
+    },
+    {
+      "issue": "The falsifiable predictions do not actually test the gate hypothesis under Berkson conditioning",
+      "why_it_matters": "The researcher proposes: 'Among B0 picks, freshness should show NO significant difference (|rank-sum z| < 1.0) between false_positive_ruin and selected_winner'. This is the wrong test. Under a floor-gate model, ALL B0 picks are by construction above the floor, so the ruin vs winner comparison within B0 is uninformative about the gate. The right test is ruin rate vs freshness in the PRE-SELECTION universe — and that test requires data not in the failure_archaeology snapshot. The proposed ablation (hard gate reduces ruin by ≥30%) is correct in principle but needs a population that includes rejected names, not just B0 picks."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Rejected (non-B0) names with very low freshness (up_day_ratio < 0.35, vol_ratio < 0.9, mom_20 < -0.05) that subsequently would have ruined — these would CONFIRM a gate role that is invisible inside B0.",
+    "Rejected (non-B0) names with high freshness (up_day_ratio ≥ 0.65, mom_20 ≥ 0.20) that subsequently would have been large winners — these would FALSIFY a pure ranking role (i.e., freshness is missing real winners when low on other components).",
+    "B0 picks with freshness z-score in the top quintile that ruined due to factors orthogonal to freshness (e.g., same-sector cluster ruin on a single date, or a gap-down event unrelated to setup) — these would isolate the portion of ruin that freshness COULD NOT have prevented.",
+    "Within the same snapshot, pairs of names matched on all other B0 components but differing on freshness by > 1σ — to estimate freshness's marginal effect on ruin and rank, removing confounding.",
+    "B0 picks where base_duration_weeks and freshness-cluster features disagree (e.g., long base, weak recent thrust) — to determine whether the model is using recency-of-base or recent-thrust, and which is the better predictor of outcome.",
+    "A held-out period in which market regime shifts (high-vol regime, low-vol regime) — to test whether freshness's relationship to outcome is regime-dependent, which would invalidate any static ranking interpretation."
+  ],
+  "what_would_change_my_mind": [
+    "An ablation in which freshness is HELD CONSTANT at its median while other B0 components vary, AND vice versa, across the full pre-selection universe: if ruin-rate-vs-freshness slope is flat pre-selection, I accept the pure-ranking claim; if ruin-rate rises sharply below a freshness threshold, I accept a hybrid gate+ranker model.",
+    "A pre-selection logistic regression of ruin on freshness alone showing AUC ≥ 0.65 — this would demonstrate freshness is at minimum a useful gate even if not sufficient for ranking. The researcher's predicted AUC < 0.55 threshold is testable but the data presented does not include the pre-selection sample needed to estimate it.",
+    "Replacing the momentum-proxy freshness with base_duration_weeks + base_mbox_count + days_since_last_pivot (true recency-of-base features) and observing whether ruin rate drops and/or hit rate rises in a frozen holdout — if the recency-of-base variant dominates the momentum proxy, the original component was mis-specified and the mechanism claim needs revision toward 'recency-of-base' as the conceptual role.",
+    "Demonstrating that within B0 picks, the conditional ruin rate given (freshness ≥ median AND other components below median) is materially different from (freshness < median AND other components above median), controlling for snapshot — would show freshness has independent information and therefore is not merely redundant with momentum.",
+    "If the discovery sample is expanded to n ≥ 100 picks with non-overlapping snapshots, and the standardized deltas for risk-control proxies (base_depth_pct, dist_to_52w_high_pct, atr_14_pct) remain at |z| < 0.3 while freshness-cluster deltas remain at |z| > 1.0, I would upgrade the researcher's 'freshness is ranking' claim from plausible to probable."
+  ]
+}
+```

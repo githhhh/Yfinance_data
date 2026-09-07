@@ -1,0 +1,25 @@
+{
+  "strongest_counterclaim": "The prior researcher treats the seven discriminating features (mom_20, up_day_ratio_20, vol_ratio_5_20, px_vs_ma50, ibd_entry_close_vs_trigger_pct, ma10_slope_5, ma20_slope_5) as primitive, but these features are computed from price series whose noise structure is itself industry-conditioned (event-driven binary-catalyst sectors vs. commodity/rate-sensitive sectors). Quintile-matching on features matches rank within a pooled, industry-contaminated distribution, not the underlying risk exposure — meaning the matched-pair diagnostic is mathematically incapable of distinguishing 'no industry effect' from 'industry effect that has already been absorbed into the quintile boundaries.' The proposed falsification test therefore cannot falsify the original industry claim; it can only confirm a tautology.",
+  "attacks": [
+    {
+      "issue": "Feature endogeneity under industry conditioning invalidates the matched-pair design.",
+      "why_it_matters": "Two stocks assigned to 'mom_20 quintile 4' may sit there for entirely different absolute reasons — a biotech recovering from a -80% binary drawdown and a staples name grinding up 5% both rank high, but their forward variance, catalyst path, and base-rate of regime shift are categorically different. Quintile matching on a feature whose distribution is industry-shifted is not neutralization; it is partial double-counting. A null result from the proposed test therefore proves nothing about industry."
+    },
+    {
+      "issue": "The archaeology sample (n=27, 5 outcome labels, multiple snapshot_anon strata) is wildly underpowered for any sector-stratified inference; a null is uninformative rather than confirmatory.",
+      "why_it_matters": "Splitting 27 cases across likely 5+ GICS sectors leaves 3-6 observations per cell. A 3pp W4 difference in that regime has a confidence interval easily spanning ±15pp. The researcher proposes |t|<1.0 as the bar, but the realized power to detect a 5pp industry effect at α=0.05 is under 15%. Citing a null here as evidence 'industry is a label, not a lever' inverts the proper statistical reading."
+    },
+    {
+      "issue": "The argument confuses a portfolio-construction effect (factor exposure that happens to load on industry) with a predictive mechanism.",
+      "why_it_matters": "Even if 'industry tilt' is reproducible, removing it without replacing it with an equivalent factor exposure (e.g., explicit value/growth/size/momentum tilts that survive the within-quintile matching) will degrade realized alpha purely as a portfolio-construction artifact. The policy to 'remove industry tilts and replace with feature controls' assumes the features are orthogonal to the factor the industry tilt was harvesting — which is exactly the assumption the endogeneity attack above denies."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Within the archaeology, find a 'selected_winner' from an industry whose feature baselines are structurally low (e.g., biotech or small-cap medical) that nonetheless wins with below-median mom_20 and up_day_ratio_20 — this falsifies 'features alone drive outcomes' and re-opens industry as a residual.",
+    "Find a 'false_positive_ruin' from a sector where comparable feature readings (matched on the seven-feature vector) typically win — a single such case breaks the within-quintile invariance that the prior researcher's mechanism relies on."
+  ],
+  "what_would_change_my_mind": [
+    "A within-quintile matched-pair test using ABSOLUTE (not rank) feature thresholds — e.g., pair only on mom_20 within ±0.05 absolute, not within the same quintile — with at least 50 pairs spanning ≥4 sectors and showing industry dummies add <1pp to R^2 after the seven-feature set. The quintile-based version proposed by the researcher would not move me, for the reasons above.",
+    "A feature-decomposition showing that the seven discriminating variables are themselves industry-invariant in second moments (variance, skew, autocorrelation structure of residuals) across at least 4 sectors. Without this, feature-controlling remains industry-confounded."
+  ]
+}

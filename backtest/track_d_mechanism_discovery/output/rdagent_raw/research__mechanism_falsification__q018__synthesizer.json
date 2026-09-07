@@ -1,0 +1,64 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The 'dry_false_penalty' B0 component's three primary inputs (up_day_ratio_20, vol_ratio_5_20, mom_20) each independently predict false_positive_ruin outcome with standardized deltas of -1.19, -1.05, and -1.00 respectively. This pattern is consistent with either (a) true redundancy through multicollinearity, or (b) three distinct signal surfaces capturing orthogonal facets of institutional accumulation quality. The critical distinction cannot be resolved with the frozen evidence alone. The experimental designer's ablation_independence_test is the essential next experiment: does each feature contribute marginal predictive value when the other two are present, or does any single feature's removal leave false-positive detection statistically unchanged? Until ablation evidence demonstrates near-zero marginal contribution for any single feature, the redundancy hypothesis remains unvalidated. The skeptic's methodological counterpoint is valid: correlated predictions do not prove redundant mechanisms—they may simply reflect a latent construct that loads on multiple observable features.",
+  "falsifiers": [
+    "Ablation test reveals that removing any single feature (up_day_ratio_20, vol_ratio_5_20, or mom_20) does NOT significantly increase false_positive_ruin classification error (<2% relative change) when the other two are retained—proving true redundancy",
+    "Consolidation test shows that replacing three features with a single equal-weighted z-score conviction_index maintains false_positive_ruin precision within ±3% while matching false_negative_relative rate—proving features were capturing the same variance",
+    "Mutual information test demonstrates I(outcome_label; up_day_ratio_20), I(outcome_label; vol_ratio_5_20), and I(outcome_label; mom_20) are within ±20% of each other—proving equal marginal information contribution",
+    "A/B out-of-sample test shows that dropping any single feature does not increase false-positive rate by >5% while consolidated score matches multi-feature performance—direct validation of redundancy",
+    "Regime stability test reveals standardized deltas for all three features remain within ±0.3 across 5+ distinct snapshot IDs without interaction effects—ruling out snapshot-contingent artifacts"
+  ],
+  "actionable_design_principles": [
+    "Do not consolidate to a single conviction_score until ablation evidence confirms near-zero marginal contribution for at least one feature—this is a hypothesis, not an established fact",
+    "Design the ablation experiment first: hold out one feature at a time and measure McNemar-test-significant (p<0.05) degradation in false_positive_ruin precision across the 27-case archaeological set",
+    "If ablation shows significant marginal contribution for ALL three features individually, treat them as orthogonal signal surfaces rather than redundant—consolidation would destroy information",
+    "Add ma10_slope_5 to the ablation pool: standardized delta of -0.68 suggests it captures velocity-trap cases (entity_b6bcccdf6a: ma10_slope=0.067, up_day=0.4, mom=0.176) that the current three-feature set misses, implying the penalty is under-parameterized, not over-parameterized",
+    "Distinguish pullback_duration_weeks (standardized Δ=-0.73, FN<SW) from conviction features—longer pullbacks predict winners, suggesting patience is a separate mechanism from conviction; current 'dry_false_penalty' may be conflating these",
+    "Apply leave-one-snapshot-out cross-validation for any consolidation test to prevent snapshot-regime artifacts from masquerading as generalizable redundancy"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Parameterized conviction_weight vector rather than equal-weighted consolidation",
+      "why_distinct": "Rather than assuming redundancy and averaging, learn feature weights that minimize false_positive_ruin classification error; if weights stabilize near equality, redundancy is confirmed; if they diverge significantly, non-redundancy is confirmed",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Tests whether the redundancy hypothesis is structural (equal contributions) or whether differential weighting preserves information from the three-signal construct"
+    },
+    {
+      "idea": "Velocity-divergence detection layer: ma10_slope_5 minus ma20_slope_5 as orthogonal short-term exhaustion signal",
+      "why_distinct": "Entity_b6bcccdf6a (selected_winner despite up_day=0.4, mom=0.176) had ma10_slope=0.067 vs ma20_slope=0.045—velocity divergence predicts winners that conviction-only models classify as false-positive-risk; this is additive signal, not redundant",
+      "features": [
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "ma10_slope_5 - ma20_slope_5"
+      ],
+      "capacity_relevance": "Captures momentum-trap cases where short-term acceleration exhausts while long-window conviction survives—currently unpenalized by dry_false_penalty"
+    },
+    {
+      "idea": "Patience-reward mechanism separate from conviction-penalty mechanism",
+      "why_distinct": "pullback_duration_weeks correlates with selected_winner (FN median=4.0 vs SW=5.5), opposite of conviction features; this suggests two independent mechanisms: (1) conviction-penalty for entry quality, (2) patience-reward for holding quality—not one redundant component",
+      "features": [
+        "pullback_duration_weeks",
+        "pullback_pct",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "If confirmed orthogonal, splitting into separate penalty components would allow independent calibration rather than conflating entry-quality and holding-patience signals"
+    },
+    {
+      "idea": "Threshold-bucketed conviction rather than continuous z-score",
+      "why_distinct": "Continuous penalty is sensitive to measurement noise in correlated feature clusters; bucketing into LOW/MEDIUM/HIGH conviction tiers reduces overfitting to collinear feature precision while preserving the mechanism's categorical intent",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "capacity_relevance": "Addresses the skeptic's concern that consolidation may amplify measurement error out-of-sample; bucketing is robust to noise while still implementing the conviction-based penalty"
+    }
+  ]
+}

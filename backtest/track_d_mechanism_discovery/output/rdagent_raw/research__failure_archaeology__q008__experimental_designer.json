@@ -1,0 +1,82 @@
+{
+  "tests": [
+    {
+      "name": "within_snapshot_vol_ratio_monotonicity",
+      "features": [
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Within each snapshot containing both false_positive_ruin and selected_winner outcomes, compute Spearman rank correlation between vol_ratio_5_20 and outcome ordinal (ruin=0, winner=1)",
+      "success_criterion": "At least 3 qualifying snapshots with N≥3 per outcome class; pooled Spearman rho > 0.35 indicating higher vol_ratio associates with winner outcomes",
+      "failure_criterion": "Spearman rho ≤ 0.10 OR direction reverses in >50% of qualifying snapshots; this would support the skeptic's snapshot-confounding claim"
+    },
+    {
+      "name": "vol_ratio_momentum_threshold_robustness",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "Compare continuous (logistic regression with splines) vs threshold-based (researcher's 1.20/1.40 cutoffs) fit on ruin vs winner using AICc; test if threshold positions are stable under leave-one-out jackknife",
+      "success_criterion": "Continuous model AICc ≤ threshold model AND jackknife threshold stability within ±0.15 of proposed values; suggests mechanism is not threshold-artifact",
+      "failure_criterion": "Threshold model outperforms continuous by ΔAICc > 4 AND jackknife instability > ±0.30; suggests thresholds are data-snooped artifacts"
+    },
+    {
+      "name": "up_day_vol_ratio_redundancy_test",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Partial correlation of up_day_ratio_20 with outcome (ruin/winner) after residualizing vol_ratio_5_20; test if up_day_ratio provides incremental information beyond vol_ratio",
+      "success_criterion": "Partial correlation coefficient > 0.25 OR nested model test (up_day_ratio adds) yields p < 0.10; supports treating features as orthogonal",
+      "failure_criterion": "Partial correlation < 0.10 AND up_day_ratio non-significant in nested test; supports skeptic's claim of structural correlation"
+    },
+    {
+      "name": "high_vol_ratio_ruin_mechanism_test",
+      "features": [
+        "ma10_slope_5",
+        "ma20_slope_5",
+        "mom_20",
+        "vol_ratio_5_20"
+      ],
+      "comparison": "Compare momentum deceleration profiles (ma10_slope_5 / ma20_slope_5 ratio) between high-vol_ratio ruin cases (entity_ccc90a671f vol_ratio=1.45, entity_84824e6a20 vol_ratio=1.63) vs high-vol_ratio winners",
+      "success_criterion": "High-vol_ratio ruin cases show slope_ratio > 2.0 (sharp short-term acceleration) vs high-vol_ratio winners slope_ratio ≤ 1.5; provides second-order mechanism for counterexamples",
+      "failure_criterion": "No significant difference in slope_ratio between high-vol_ratio ruin and winner groups; high-vol_ratio ruin remains unexplained"
+    },
+    {
+      "name": "vol_ratio_w4_temporal_predictive_test",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20"
+      ],
+      "comparison": "For each snapshot, regress vol_ratio_5_20 on w4_return_bucket ordinal within that snapshot; test if vol_ratio explains within-snapshot variation or only between-snapshot variation",
+      "success_criterion": "Within-snapshot R² > 0.15 from vol_ratio_5_20 alone; confirms vol_ratio has entity-level predictive power not explainable by snapshot base rates",
+      "failure_criterion": "Within-snapshot R² < 0.05; all apparent vol_ratio signal comes from snapshot-level confounding"
+    },
+    {
+      "name": "researcher_policy_hit_rate_validation",
+      "features": [
+        "vol_ratio_5_20",
+        "mom_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Test two researcher proposals: (A) vol_ratio < 1.20 AND mom_20 0.05-0.20 → ruin probability >60%; (B) vol_ratio > 1.40 AND up_day_ratio_20 > 0.60 → selected_winner probability >70%",
+      "success_criterion": "Both conditions hold with observed probabilities meeting or exceeding thresholds; validates policy implications",
+      "failure_criterion": "Either condition fails by >10 percentage points; invalidates specific policy recommendation"
+    }
+  ],
+  "leakage_checks": [
+    "pullback_duration_weeks and pullback_pct are post-entry outcomes and must not appear in any test feature set",
+    "w4_return_bucket is target variable only; never used as input feature",
+    "snapshot_anon not used as predictive feature; only used for grouping in within-snapshot tests",
+    "All features must be computable at snapshot time; no forward-looking information in feature construction",
+    "base_duration_weeks, base_mbox_count, ibd_entry_volume_ratio, ibd_entry_close_position, base_depth_pct not in frozen evidence features for this snapshot set and are excluded",
+    "No ticker identity or calendar identity used in test design"
+  ],
+  "priority_order": [
+    "within_snapshot_vol_ratio_monotonicity",
+    "vol_ratio_w4_temporal_predictive_test",
+    "vol_ratio_momentum_threshold_robustness",
+    "high_vol_ratio_ruin_mechanism_test",
+    "up_day_vol_ratio_redundancy_test",
+    "researcher_policy_hit_rate_validation"
+  ]
+}

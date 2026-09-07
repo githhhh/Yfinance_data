@@ -1,0 +1,32 @@
+
+
+```json
+{
+  "mechanism_claim": "The B0 'lane' component is dominated by a return-ranking logic (momentum + trend extension + volume-confirmation gating) with only weak downside-risk filtering layered secondarily; the lane is NOT primarily a downside-risk control device, despite the presence of 'pullback' and 'base' features in the feature set.",
+  "evidence_for": [
+    "PIT-observable return features dominate the B0 selected-winner vs false-negative gap: mom_20 median gap = 0.1047 (std delta -1.0005), vol_ratio_5_20 gap = 0.245 (std delta -1.0455), up_day_ratio_20 gap = 0.125 (std delta -1.1882), ma10_slope_5 gap = 0.0146 (std delta -0.6815) — all of these are return/trend-predictive inputs, not downside-risk inputs.",
+    "Selected winners have HIGHER vol_ratio_5_20 (1.424 vs 1.179) and HIGHER px_vs_ma50 (+12.7% vs +5.6%); a pure downside-risk control would suppress high-volatility and extended-from-MA names, but lane actually selects FOR them, indicating a return-momentum ranking.",
+    "Lane accepts entries with non-trivial pullback_pct (selected_winner median pullback_pct = -15.9%, selected winner with pullback_duration_weeks up to 9 weeks and pullback_pct = -42.3% in entity_3adc078f01). These are NOT risk-control thresholds — deep/delonged pullbacks are risk events, and the lane still passed them.",
+    "ibd_entry_close_vs_trigger_pct median for selected winners is ~2.99%, implying lane tolerates extension above trigger — typical of a 'pay up for momentum' ranking, not a 'buy tight to limit risk' control.",
+    "The categorical count (11 selected_winner vs 8 false_positive_ruin) shows lane lets through ruin-prone profiles at ~42% of the positive bucket — the ruin rate is far too high if the lane's job were purely downside-risk control; ruin-prone profiles are not being suppressed."
+  ],
+  "evidence_against": [
+    "Downside-risk proxies ARE present in the feature pool (pullback_pct, pullback_duration_weeks, base_depth_pct, dist_to_52w_high_pct, rv_20, atr_14_pct), so lane cannot be pure return ranking — risk features exist as inputs.",
+    "False positives that ruin (e.g., entity_8f0df3d38e with pullback_pct -16.2%, pullback_duration_weeks 7; entity_ccc90a671f with -14.4% over 7 weeks; entity_55c2da490e with -12.3% over 7 weeks) show that pullback/base context is consulted but is not decisive — risk context is read and partially ignored.",
+    "Selected winners have HIGHER base_mbox_count median (3.5 vs 4.0 — note: false negatives have HIGHER base_mbox_count at 4.0), suggesting lane is mildly penalized by long/deep bases (risk-aware), but the effect size is small (std delta +0.344).",
+    "The two pure false_negative_big_winner cases show that some stocks with modest mom_20 (0.058, 0.028) and flat slopes were rejected by lane and subsequently ran — consistent with lane having a momentum threshold that excludes some names which were 'risk-controlled enough' but lacked momentum ranking input."
+  ],
+  "falsifiable_predictions": [
+    "FALSIFIES 'lane = downside-risk control': If lane were a risk filter, lowering the vol_ratio_5_20 threshold and tightening pullback_pct to >= -10% should reduce ruin rate WITHOUT reducing median forward return. Prediction: ruin rate does NOT drop (because ruin cases like entity_8f0df3d38e and entity_3472243e0c already have modest pullbacks/vol, so tightening them would simply exclude winners while ruins persist).",
+    "FALSIFIES 'lane = downside-risk control': If lane were risk-driven, selected winners and false positives should differ on rv_20, atr_14_pct, base_depth_pct, or dist_to_52w_high_pct. Prediction: re-run rank-importance analysis — risk features will rank BELOW mom/slope/price-vs-MA features in separating winners from false-positive ruins.",
+    "FALSIFIES 'lane = return ranking': If lane were pure return ranking, the highest-momentum selected names (mom_20 > 0.25) should be the safest. Prediction: they are NOT — entity_6618d3e80c (mom_20 0.251, vol_ratio 1.45) carries a ruin flag despite top-decile momentum, indicating momentum alone over-selects ruin.",
+    "FALSIFIER FOR THE COMPOSITE CLAIM: Among selected winners, mom_20 quartile vs ruin rate is FLAT (Spearman < 0.1). If true → lane's return ranking is decoupled from ruin, confirming risk filtering is not operative. If ruin rate RISES with mom_20 → lane actively pushes into ruin-prone territory and is anti-risk-control."
+  ],
+  "policy_implications": [
+    "Lane should be re-parameterized as a two-gate: (i) minimum qualifying momentum/trend floor (mom_20 >= 0.10, ma20_slope_5 >= 0, px_vs_ma50 >= 0) AND (ii) maximum acceptable downside-risk score (rv_20 ceiling, pullback_pct not less than -25%, base_duration_weeks not more than 12). Current evidence suggests gate (i) is enforced but gate (ii) is loose enough to let entity_8f0df3d38e, entity_3472243e0c, entity_4fdc3699fd, entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b all through.",
+    "A cleaner replacement: replace the binary lane with a continuous lane score = z(mom_20) + z(ma10_slope_5) + z(px_vs_ma50) + z(vol_ratio_5_20) - k·max(0, -pullback_pct - 10)/10 - k'·max(0, rv_20 - median_rv). Choose k, k' such that the 8 false_positive_ruin cases score BELOW the 11 selected_winners in re-scoring — this would constitute the falsification test for the new component.",
+    "If lane is mostly return-ranking, position sizing should be inverse-volatility AT THE LANE LEVEL (size inversely with rv_20 within accepted names) rather than trusting lane to filter risk. The 42% ruin-in-positive-bucket rate in the archaeological sample makes equal-weight sizing across B0 picks unsafe.",
+    "Treat lane output as a momentum-confirmation signal in a meta-model rather than as a stand-alone risk gate; feed its output into a downstream ruin-probability classifier trained on the rv_20 + pullback + base_depth triples that the archaeology shows are the residual differentiators."
+  ]
+}
+```

@@ -1,0 +1,37 @@
+
+
+{
+  "tests": [
+    {
+      "name": "AUC isolation of B0_LANE flag vs feature families in fresh breakouts",
+      "features": ["is_b0_pick", "mom_20", "px_vs_ma50", "up_day_ratio_20", "vol_ratio_5_20", "ma10_slope_5", "pullback_pct", "pullback_duration_weeks", "base_depth_pct", "base_mbox_count", "ibd_entry_volume_ratio"],
+      "comparison": "Three nested logistic models on fresh-breakout weeks: (A) is_b0_pick alone, (B) SCORE_momentum = {mom_20, px_vs_ma50, up_day_ratio_20, vol_ratio_5_20, ma10_slope_5}, (C) base_pullback = {pullback_pct, pullback_duration_weeks, base_depth_pct, base_mbox_count, ibd_entry_volume_ratio}. Compare AUC(A), AUC(B), AUC(C), AUC(B∪C), AUC(B∪C∪is_b0_pick).",
+      "success_criterion": "AUC(B∪C∪is_b0_pick) − AUC(B∪C) ≤ 0.02 AND AUC(C) ≤ AUC(B) − 0.03: Lane adds nothing beyond primitives and base/pullback family carries no incremental signal.",
+      "failure_criterion": "AUC(B∪C∪is_b0_pick) − AUC(B∪C) ≥ 0.05 OR AUC(C) ≥ AUC(B) + 0.02: Lane (or its base/pullback substrate) is not captured by SCORE momentum primitives."
+    },
+    {
+      "name": "Slope×breadth bull-trap conditional ruin inside B0_LANE only",
+      "features": ["ma10_slope_5", "up_day_ratio_20"],
+      "comparison": "Within B0_LANE picks in fresh breakout weeks, partition into cell (ma10_slope_5 > 0.04 AND up_day_ratio_20 ≤ 0.50) vs complement. Compute w4_return bucket ruin rate per cell. Repeat for SCORE_BEFORE_LANE top quintile.",
+      "success_criterion": "Conditional ruin rate in the cell ≥ 1.8× unconditional B0_LANE ruin rate AND ≥ 1.5× the same cell's ruin rate within SCORE top quintile: Lane-specific bull-trap suppression exists.",
+      "failure_criterion": "Conditional ruin rate in cell ≤ 1.1× unconditional OR ≤ 1.0× SCORE-cell rate: the slope×breadth penalty is not Lane-specific; researcher's mechanism collapses."
+    },
+    {
+      "name": "LANE_NEUTRAL vs SCORE bottom quintile destruction-of-alpha",
+      "features": ["is_b0_pick", "mom_20", "px_vs_ma50", "up_day_ratio_20"],
+      "comparison": "In fresh breakout weeks, compare large_win rate (w4_return ≥ +8pp vs benchmark) for LANE_NEUTRAL names vs the bottom-three SCORE_BEFORE_LANE quintiles. Also compute large_win rate for LANE_NEUTRAL names with px_vs_ma50 ≥ 0.10.",
+      "success_criterion": "LANE_NEUTRAL large_win rate ≤ bottom-quintile large_win rate + 3pp: abstention is informationally equivalent to bottom SCORE — researcher's 'high-variance bucket' reading holds.",
+      "failure_criterion": "LANE_NEUTRAL large_win rate ≥ bottom-quintile large_win rate + 10pp, OR ≥ 18% in the px_vs_ma50 ≥ 0.10 subset: abstention is costly and Lane's neutral state destroys recoverable alpha — skeptic's counterclaim holds."
+    }
+  ],
+  "leakage_checks": [
+    "Cluster cases by snapshot_anon and recompute each test statistic using one-case-per-snapshot jackknife; report range vs point estimate to bound snapshot non-independence inflation.",
+    "Verify ibd_entry_close_vs_trigger_pct is used only as a freshness filter (< 0.07) and never as a predictive regressor in the AUC tests, since it is a trigger-relative metric that can leak editorial timing.",
+    "Hold out the entity_6618d3e80c compound-label case and re-estimate the slope×breadth cell to ensure the bull-trap mechanism is not driven by a single counter-example."
+  ],
+  "priority_order": [
+    "AUC isolation of B0_LANE flag vs feature families in fresh breakouts",
+    "LANE_NEUTRAL vs SCORE bottom quintile destruction-of-alpha",
+    "Slope×breadth bull-trap conditional ruin inside B0_LANE only"
+  ]
+}

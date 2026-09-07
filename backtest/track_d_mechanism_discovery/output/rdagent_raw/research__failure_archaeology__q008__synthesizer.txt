@@ -1,0 +1,51 @@
+
+
+```json
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 45,
+  "mechanism_summary": "Low vol_ratio_5_20 associates with false-positive B0 ruin at the population level (median delta -1.05 standardized vs selected_winner), but the mechanism is not causal and fails for high-vol_ratio counterexamples. The two most damaging counterexamples—entity_ccc90a671f (vol_ratio=1.45) and entity_84824e6a20 (vol_ratio=1.63)—ruin despite exceeding the researcher's proposed winner threshold, indicating vol_ratio alone does not determine outcome. Snapshot contamination is the central vulnerability: the same snapshot (snap_71486ed83c) produces both ruin and winner outcomes, and up_day_ratio_20 shares structural correlation with vol_ratio_5_20 (both computed over the same 20-day window), contradicting the researcher's orthogonal-signal claim. The true signal is probabilistic: vol_ratio is a regime indicator that modulates ruin probability rather than a deterministic filter, and its predictive power may reflect snapshot-level base-rate variation rather than entity-level causal dynamics.",
+  "falsifiers": [
+    "entity_ccc90a671f (vol_ratio=1.45, ruin) directly falsifies the researcher's vol_ratio>1.40 → winner rule; if this case is driven by an exogenous news event causing one-off volume spike, the rule survives but requires a second-order interaction not specified in the mechanism",
+    "entity_84824e6a20 (vol_ratio=1.63, highest in ruin set, ruin) falsifies any monotonic mechanism where higher vol_ratio reduces ruin probability; the experimental designer's high_vol_ratio_ruin_mechanism_test must identify a slope_ratio >2.0 for this entity to rescue the mechanism",
+    "within-snapshot vol_ratio rank-order must correlate monotonically with outcome (ruin→winner) in at least 3 snapshots with N≥3 per class; if Spearman rho ≤0.10 or direction reverses in >50% of qualifying snapshots, the mechanism is confounded by snapshot base rates",
+    "if continuous (spline logistic) model does not outperform threshold model by AICc ≤4 and jackknife threshold stability exceeds ±0.15, the 1.20/1.40 cutoffs are data-snooped artifacts",
+    "if partial correlation of up_day_ratio_20 after residualizing vol_ratio_5_20 is <0.10 and non-significant in nested test, the researcher's composite-score policy implication is invalid",
+    "vol_ratio_5_20 explains <5% within-snapshot variance (R²<0.05) would indicate all apparent signal comes from snapshot-level confounding"
+  ],
+  "actionable_design_principles": [
+    "Treat vol_ratio_5_20 as a soft probabilistic modifier, not a binary gate; any policy using vol_ratio must acknowledge ruin cases at every vol_ratio level",
+    "Require second-order interaction terms (slope_ratio = ma10_slope_5/ma20_slope_5, vol_ratio × mom_20) before deploying vol_ratio thresholds in policy; a slope_ratio >2.0 with high vol_ratio signals potential trap (professional manipulation disguised as institutional accumulation)",
+    "Mandatory within-snapshot hold-out: for any vol_ratio-based policy, report within-snapshot hit rates; policies that only work cross-sectionally but fail within snapshots should not be deployed",
+    "Decompose vol_ratio into sustained vs transient components using volume-at-price distribution or tick rules; transient spikes (single high-volume day) may explain entity_ccc90a671f and entity_84824e6a20 counterexamples",
+    "Do not combine up_day_ratio_20 and vol_ratio_5_20 in a composite score without first orthogonalizing them (e.g., via PCA or residualization); their shared 20-day window creates structural correlation that inflates apparent discriminative power",
+    "Pullback severity (depth, duration) is the likely causal variable downstream of vol_ratio; if vol_ratio merely proxies for how deep the subsequent pullback will be, the mechanism is measurement-of-effect rather than cause, and interventions should target entry timing relative to pullback phase rather than volume filters alone"
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Snapshot-normalized vol_ratio z-score within each snapshot's B0 candidate pool; entry only when entity's vol_ratio exceeds snapshot median by >0.5 SD and slope_ratio ≤1.5",
+      "why_distinct": "Addresses snapshot contamination by making vol_ratio relative to snapshot context rather than absolute; adding slope_ratio interaction addresses high-vol_ratio ruin counterexamples by filtering entities where short-term acceleration is disproportionate to longer-term trend",
+      "features": ["vol_ratio_5_20", "ma10_slope_5", "ma20_slope_5", "snapshot_anon (for grouping only)"],
+      "capacity_relevance": "Prevents systematic over-selection of B0 picks in high-volume snapshots where base rates are favorable; ensures vol_ratio signal is entity-specific, not regime-driven"
+    },
+    {
+      "idea": "Two-tier volume confirmation: (A) vol_ratio > 1.20 required AND (B) 5-day cumulative volume distribution shows >60% of volume occurring on up days within that 5-day window; entities failing condition B are flagged even if condition A passes",
+      "why_distinct": "Distinguishes sustained institutional accumulation (up-day volume concentration) from erratic noise-driven volume spikes that produce false-positive high vol_ratio readings like entity_84824e6a20; decomposes the single scalar ratio into directional and magnitude components",
+      "features": ["vol_ratio_5_20", "up_day_ratio_5 (5-day up-day volume fraction)"],
+      "capacity_relevance": "Addresses the structural correlation problem by using a separate 5-day window rather than the 20-day window shared with up_day_ratio_20, allowing orthogonal measurement of volume quality"
+    },
+    {
+      "idea": "Momentum-volume decoupling score: |mom_20 - median_mom_20_in_vol_quintile| / ATR_14; threshold for concern when score < 0.3 (momentum is typical for volume regime) versus score > 0.6 (momentum diverges from volume regime, potential trap)",
+      "why_distinct": "Tests whether entity's momentum is appropriate for its volume regime; low vol_ratio entities with high momentum scores represent the trap scenario (professional manipulation), while low vol_ratio with low momentum scores may represent genuine accumulation from a lower base",
+      "features": ["vol_ratio_5_20", "mom_20", "atr_14_pct"],
+      "capacity_relevance": "Provides a single scalar that combines volume and momentum interaction without using hard thresholds; allows continuous risk scoring rather than binary accept/reject"
+    },
+    {
+      "idea": "Within-snapshot win-rate calibration: for each snapshot, compute empirical ruin probability given vol_ratio quintile; use snapshot-specific priors rather than global thresholds",
+      "why_distinct": "Explicitly models snapshot as the primary source of outcome variation; vol_ratio becomes a relative rather than absolute predictor, addressing the circularity concern that false_negative groups are defined by future W4 returns that vol_ratio may also predict",
+      "features": ["vol_ratio_5_20", "snapshot_anon (for calibration grouping)"],
+      "capacity_relevance": "Yields adaptive policy that respects snapshot heterogeneity; if within-snapshot calibration reveals no vol_ratio effect, the policy correctly outputs UNRESOLVED rather than forcing a false positive"
+    }
+  ]
+}
+```

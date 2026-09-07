@@ -1,0 +1,11 @@
+{
+  "purpose_id": "research__mechanism_falsification__q020__skeptic",
+  "prompt_hash": "b420498d76bf9265d6c866a740cd499b11f8336b965ea429bb00f60e3d391593",
+  "response_hash": "186fc41e1ddde97c315e3229753a594fd92f7e0e83cc6405c53fc72e43c6a89b",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 1
+}

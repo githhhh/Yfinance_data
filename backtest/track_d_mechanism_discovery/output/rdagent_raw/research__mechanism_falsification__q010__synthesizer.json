@@ -1,0 +1,68 @@
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 38,
+  "mechanism_summary": "The historical value of dry_false_penalty cannot be cleanly partitioned into ranking vs downside-risk control on the available 27-case archaeology. Three competing mechanism hypotheses coexist and are not mutually distinguishable given the data: (i) Return-ranking — penalty prefers candidates with broad daily participation, consistent with the median up_day_ratio_20 gap (0.625 winners vs 0.50 false_negatives, Δ=-1.19σ) but undermined by ruins spanning the full 0.40-0.65 band; (ii) Downside-risk control — penalty filters 'dry' names before ruin materializes, but is falsified on the face of the data (entity_3472243e0c ruined at up_day_ratio=0.65 with mom_20=0.242; entity_6618d3e80c, the strongest setup in the set, carries a ruin/winner double-label); (iii) Liquidity / information-asymmetry proxy — up_day_ratio_20 may simply proxy tradeable depth, which neither Researcher nor the binary threshold formulation addresses and which the Skeptic correctly identifies as a missing third leg. The within-snapshot rank structure, position-size confound, label contamination, and n=27 power deficit (Skeptic) collectively prevent any single mechanism from being confirmed; the Researcher's ranking-only claim is plausible but over-fits to the same training labels it claims to interrogate.",
+  "falsifiers": [
+    "Falsifier-1 (mechanism discrimination): If, on within-snapshot matched pairs (T1) controlling for up_day_ratio_20 and px_vs_ma20 percentile, the penalty_triggered ruin rate is NOT ≥10pp lower than un-triggered in ≥60% of snapshots with binomial p<0.10, the downside-risk-control mechanism is falsified and the question collapses to ranking vs liquidity.",
+    "Falsifier-2 (liquidity third-leg test): If, after adding ibd_entry_volume_ratio and volume_ratio to a ruin logistic model, the up_day_ratio_20 coefficient attenuates ≥50% and drops to |β|<0.30 with p>0.40 (T3 success), the penalty's role is a liquidity/information-asymmetry proxy and BOTH the ranking-only claim AND the risk-control claim are falsified.",
+    "Falsifier-3 (position-size mediation): If the triggered-vs-untriggered ruin gap is ≥15pp in BOTH the top AND bottom position-size tertiles (T2 interaction p>0.20), the ruin correlation is independent of position sizing and the penalty has direct predictive content — mechanism question stays open and T1/T3 are decisive.",
+    "Falsifier-4 (replacement necessity): If, on held-out snapshots per the pre-registered hash-ordering rule (T4), the continuous-rank + rv_20-scaled replacement fails to simultaneously reduce ruin count AND raise large_win count, the Researcher's proposed replacement is in-sample refit noise; original penalty structure persists as default but mechanism remains UNRESOLVED.",
+    "Falsifier-5 (post-entry control dominance): If adding an ATR-relative MAE stop on rv_20 alone (with the penalty held fixed) reduces ruin count ≥30% without changing selection count, downside control is achievable WITHOUT the dry filter — falsifying any necessity claim and confirming the penalty is acting as a ranking/liquidity feature only.",
+    "Falsifier-6 (label integrity gate): If entity_6618d3e80c's double-label (false_positive_ruin AND selected_winner) is not pre-registered as a fixed exclusion/contention-handling rule before any test statistic is computed, every downstream contrast is invalid and the entire 27-case archaeology must be re-labeled before mechanism claims are admissible."
+  ],
+  "actionable_design_principles": [
+    "Decouple pre-entry feature scoring from post-entry risk control: never let a single feature do both jobs; penalty-style components must be continuous ranks, not binary gates, until mechanism is resolved.",
+    "Pre-register snapshot-relative percentile transformations BEFORE computing any cross-snapshot aggregate; never pool across snapshots without explicit within-snapshot rank-conditioning, since up_day_ratio_20 is mechanically a within-snapshot feature.",
+    "Cap any single feature's B0 weight at ≤25% pending T1/T3/T4 resolution, with a pre-specified audit trail of triggered frequency; if >40% of candidates are penalized, the threshold is set for ranking comfort and must be re-justified.",
+    "Add an explicit label-integrity protocol: every case with multi-label or null pullback features must have a pre-registered handling rule (exclusion, single-label assignment, or pooling) fixed BEFORE outcome contrasts are computed.",
+    "Separate feature engineering for rank (breadth percentile) from feature engineering for risk (rv_20-scaled stops); do not reuse up_day_ratio_20 in both branches.",
+    "Treat the penalty's empirical absence of ruin clustering at low up_day_ratio_20 as an OPPORTUNITY, not a falsification: ruin cases carry typical 'normal' B0 states, so risk control should come from position sizing and stops, not from pre-entry feature gates.",
+    "Document every position-size confound explicitly in any ruin-vs-winner contrast; cases the penalty excluded would have carried smaller weights by construction, so 'false_negative big_winner' is not a counterfactual without equal-weight re-evaluation."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Replace binary dry_false_penalty with continuous sector-relative breadth_score = percentile_rank(up_day_ratio_20 within snapshot × sector) feeding ONLY the ranking branch of B0; eliminate the binary gate entirely.",
+      "why_distinct": "Preserves the empirical winner/non-winner separation (Δ=-1.19σ) without imposing a threshold that misfires on entity_3472243e0c-type high-breadth breakdowns; cleanly separates ranking from risk and avoids the label-contamination cycle.",
+      "features": [
+        "up_day_ratio_20",
+        "snapshot_anon",
+        "sector_at_snapshot"
+      ],
+      "capacity_relevance": "Directly improves large_win recall (Researcher's F3 prediction) without changing ruin count in the limit; converts a brittle threshold into a smooth ranking input."
+    },
+    {
+      "idea": "Add a post-entry, ATR-relative max-adverse-excursion stop scaled by rv_20: position_size = clip(B0_rank / sqrt(rv_20), 0.5, 2.0); exit if adverse excursion > k × atr_14_pct where k is a pre-registered function of rv_20 percentile.",
+      "why_distinct": "Addresses the ruin cases the penalty MISSED (entity_4fdc3699fd, entity_84824e6a20, entity_b6bcccdf6a, entity_3472243e0c) without rejecting pre-entry dry-but-winning setups like entity_2f86543bf6 (up_day_ratio=0.35, large_win); satisfies Falsifier-5 and resolves the position-size confound flagged by the Skeptic.",
+      "features": [
+        "rv_20",
+        "atr_14_pct",
+        "vol_ratio_5_20",
+        "entry_price"
+      ],
+      "capacity_relevance": "Captures downside control as a portfolio-construction effect rather than a pre-entry feature, isolating the penalty's true mechanism for cleaner downstream diagnosis."
+    },
+    {
+      "idea": "Add a regime-conditioning flag: when vol_ratio_5_20 > 1.5, halve the breadth_score weight and require both breadth_score AND participation_score (vol_ratio_5_20 percentile) ≥40th percentile as a 2-D gate instead of penalizing either alone.",
+      "why_distinct": "Tests Falsifier-1 directly by encoding the Skeptic's third mechanism (liquidity/information-asymmetry); avoids the 'dry + volatile = danger' implicit hypothesis the Researcher's F5 attacks and accommodates entity_6618d3e80c-type high-vol, high-breadth anomalies without spurious double-counting.",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "ibd_entry_volume_ratio",
+        "px_vs_ma20"
+      ],
+      "capacity_relevance": "Restricts ruin correlation to regimes where it is empirically defensible, leaving the ranking branch untouched in low-vol regimes where the penalty was already an 'everything-strong' filter."
+    },
+    {
+      "idea": "Pre-register a label-integrity hash: for every entity, store (multi_label_flag, null_feature_mask, snapshot_anon) BEFORE any test statistic is computed; require all subsequent analyses to be reproducible from this frozen manifest, with double-labeled entities excluded by default.",
+      "why_distinct": "Directly attacks Falsifier-6 and the Skeptic's circular-label concern; makes the 27-case archaeology auditable and the T4 holdout test legitimate, independent of which mechanism hypothesis is eventually confirmed.",
+      "features": [
+        "snapshot_anon",
+        "outcome_label",
+        "pullback_pct",
+        "pullback_duration_weeks",
+        "is_b0_pick"
+      ],
+      "capacity_relevance": "Foundational rather than performance-changing: enables every downstream ranking/risk-control policy to be validated against a non-circular label set, which is the gating precondition for any mechanism claim."
+    }
+  ]
+}

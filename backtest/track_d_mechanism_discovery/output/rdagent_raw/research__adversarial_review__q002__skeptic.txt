@@ -1,0 +1,25 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The failure archaeology is not measuring industry-group beta; it is measuring a snapshot-cluster / regime confounder. The 27 cases collapse into 1-2 dominant snapshots (snap_71486ed83c alone accounts for >=6 cases, snap_d0d57b1e40 for >=5), and the 'false_negatives that became winners' concentrate in those very snapshots. A snapshot with broad-market rally characteristics (top-decile SPY/QQQ W1 return, VIX contraction, or post-FOMC drift) will produce winners from any reasonable candidate pool regardless of firm-level skill, and a snapshot with a sector-rotation initiation will produce industry-coherent winners regardless of selection. The prior researcher's industry-beta reframe is therefore a special case of a more general sample-artifact problem: the apparent 'within-industry edge' is confounded by snapshot identity, not by industry identity, and the firm-level signal may be doing real, small-sample work that is invisible once you condition on snapshot.",
+  "attacks": [
+    {
+      "issue": "Snapshot clustering dominates case distribution. snap_71486ed83c and snap_d0d57b1e40 together hold >=11 of 27 cases (~41%); the 'industry proxy' hypothesis and the 'within-industry skill' hypothesis are both under-identified because snapshot fixed effects are not partialled out. A concrete diagnostic: compute, within each snapshot, the W4 hit rate of all candidates (selected + rejected) against the median peer and against SPY. If the within-snapshot hit rate of REJECTED candidates equals or exceeds the selected candidates' hit rate, the signal is snapshot-driven, not name-driven or industry-driven.",
+      "why_it_matters": "If rejected candidates in the same snapshot as the false_negatives also became winners at similar rates, then the 'missed winners' were not missed due to firm-signal weakness — they were missed because any name in that snapshot worked. This single test, computed on the existing 27-case data plus the rejected-but-not-winner pool, falsifies the researcher's mechanism claim more directly than any peer-median W1/W4 feature engineering."
+    },
+    {
+      "issue": "The false_negative definition is circular and contaminates the contrast. Per method_note, a false_negative requires future W4 >=5pp above the B0 selected median. Therefore the 'missed winners' are, by construction, the right tail of the candidate-pool W4 distribution; they were never representative of the typical rejected name. The 11 selected_winners vs 8 false_positive_ruins contrast is the only unbiased comparison in the dataset, and on that contrast the win rate is 11/19 = 58% with the rest being ruin — a coin-flip-with-tails, not a clean edge. The 'industry beta' reframe cannot rescue a sample whose positive class is defined relative to itself.",
+      "why_it_matters": "The researcher treats the 7 false_negatives as a uniform counterfactual ('these names would have won'). They are not — they are a selected-on-outcome subsample. The honest comparison is selected (11 W, 8 R, 1 mixed) vs all-other-rejected (must be reconstructed), and until that comparison is run, every downstream attribution to industry momentum is built on a tautology."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A selected winner in a snapshot whose SPY W1 return is bottom-decile AND whose industry-peer-median W4 return is bottom-decile, yet the name returns top-decile W4 — this isolates firm alpha from both market beta and industry beta. Conversely, a false_positive_ruin in a snapshot where peer-median W4 is top-decile would falsify firm-level discrimination.",
+    "A rejected candidate in the same snapshot as a false_negative that ALSO became a W4 large_win with similar mom_20 / slope / vol_ratio — this directly shows the 'missed winner' was not signal-weak, only snapshot-lucky."
+  ],
+  "what_would_change_my_mind": [
+    "If, within each snapshot, selected candidates' W4 hit rate conditional on snapshot fixed effects is statistically distinguishable from the rejected-pool hit rate (bootstrap p<0.05 on a per-snapshot basis), the firm-level signal is real and the industry-beta reframe collapses.",
+    "If the snapshot-cluster pattern disappears after restricting to snapshots with neutral market-regime dummies (SPY W1 in [40th, 60th] percentile, VIX change |dVIX|<5%), AND the selected-vs-rejected gap survives that restriction, then within-industry selection skill is supported and the researcher's mechanism claim is wrong."
+  ]
+}
+```

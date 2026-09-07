@@ -1,0 +1,29 @@
+{
+  "mechanism_claim": "B0 component 'distinct1' is largely a relabeling of the momentum/relative-strength cluster {mom_20, px_vs_ma50, ma10_slope_5, up_day_ratio_20, vol_ratio_5_20}; its historical contribution to selection is mechanically confounded with neighboring terms rather than carrying independent predictive information.",
+  "evidence_for": [
+    "All five momentum-cluster features load together with large negative standardized deltas between false_negatives and selected_winners (up_day_ratio_20: -1.19, vol_ratio_5_20: -1.05, mom_20: -1.00, px_vs_ma50: -0.85, ma10_slope_5: -0.68), consistent with a single latent 'trend-strength' factor, not five independent signals.",
+    "False-positive ruins sit at high momentum values (entity_6618d3e80c: mom_20=0.251, px_vs_ma50=0.337; entity_3472243e0c: mom_20=0.242; entity_b6bcccdf6a: mom_20=0.176; entity_4fdc3699fd: mom_20=0.185) — if distinct1 echoed these it would have actively *endorsed* traps that the B0 outcome label then destroyed, the signature of a non-discriminating duplicate.",
+    "False-negative missed winners cluster at uniformly low momentum (entity_de1c657364: mom_20=0.058, ma10_slope_5=0.030, px_vs_ma50=0.054; entity_535a1beed7: mom_20=0.028, px_vs_ma50=0.024), again a block movement — distinct1 cannot break the block if it is itself part of it.",
+    "ibd_entry_close_vs_trigger_pct (std delta -0.70) and pullback_duration_weeks (std delta -0.73) carry directionally similar information, suggesting distinct1 likely also subsumes a 'tightness-of-entry' sub-signal already represented elsewhere.",
+    "Features outside the momentum cluster (base_mbox_count: +0.34, base_duration_weeks: -0.42, base_depth_pct: +0.19) show weaker but orthogonally-signed associations — these are the candidates distinct1 is *not* capturing, reinforcing that its content sits inside the redundant cluster."
+  ],
+  "evidence_against": [
+    "Some ruins occur at modest momentum (entity_55c2da490e: mom_20=0.036, ma10_slope_5=0.020; entity_40ea0cfb3b: mom_20=0.024, ma10_slope_5=0.025) — if distinct1 actually encodes base/quality rather than pure momentum, these could be quality-filtered picks that still fail, leaving room for distinct1 to add info beyond neighbors.",
+    "The 0.34 standardized delta on base_mbox_count (opposite sign from momentum features) indicates a genuine orthogonal axis exists in the feature space; distinct1 could in principle be tapping this axis rather than the momentum axis.",
+    "Case-level outcome heterogeneity (e.g., entity_6618d3e80c carries both 'false_positive_ruin' and 'selected_winner' labels across snapshots) shows the B0 signal is not perfectly stable — distinct1 could be one of the components whose value drifts in ways not fully captured by static neighbor correlations."
+  ],
+  "falsifiable_predictions": [
+    "Variance decomposition: regress distinct1_value on {mom_20, px_vs_ma50, ma10_slope_5, ma20_slope_5, up_day_ratio_20, vol_ratio_5_20}; predicted R² > 0.70 ⇒ distinct1 is largely redundant and its claimed independent role is falsified.",
+    "Partial-correlation test: |corr(distinct1_value, W4_return_bucket | momentum-cluster features)| < 0.05 in a held-out fold ⇒ distinct1 contributes no incremental predictive information once neighbors are conditioned on.",
+    "Disagreement test: bin cases into quartiles of (distinct1_rank − mean(neighbor_ranks)); if W4 outcomes are statistically indistinguishable across these quartiles (KS or AUC ≈ 0.5), distinct1 carries no orthogonal content.",
+    "Ablation test: remove distinct1 from the B0 score and re-tune remaining weights on the same archaeology set; if selection precision@K on selected_winners vs. false_positive_ruin does not degrade beyond bootstrap noise, distinct1 is non-load-bearing.",
+    "Sign-flip stress: if distinct1 is replaced by −distinct1 in the score and selection precision remains unchanged, distinct1 is directionally indistinguishable from noise — a strong falsifier of any claimed causal role."
+  ],
+  "policy_implications": [
+    "Replace distinct1 with its regression residual against the momentum-cluster neighbors (Gram–Schmidt orthogonalization); this preserves any genuine orthogonal content while removing double-counted variance.",
+    "Apply a collinearity penalty (e.g., ridge or soft collinearity prior) during B0 re-fitting so that distinct1 cannot absorb redundant momentum mass; cap effective rank of the B0 design matrix.",
+    "Reallocate freed weight toward base-structure features (base_duration_weeks, base_mbox_count, pullback_pct, base_depth_pct) which display orthogonally-signed associations with outcomes.",
+    "If ablation shows <1pp precision change, schedule distinct1 for deprecation; if ablation shows >3pp degradation, retain but require an interaction term with a base-quality feature to break the collinear structure.",
+    "Add a periodic independence audit: any B0 term whose rolling R² against its k-nearest neighbors exceeds 0.65 should be flagged for review or replacement, preventing future 'distinct*' components from silently duplicating existing signals."
+  ]
+}

@@ -1,0 +1,64 @@
+
+
+
+{
+  "tests": [
+    {
+      "name": "momentum_conditioned_discrimination_test",
+      "features": ["ma10_slope_5", "ma20_slope_5", "vol_ratio_5_20", "mom_20", "up_day_ratio_20"],
+      "comparison": "Within matched pairs of false_positive_ruin and selected_winner cases where mom_20 difference ≤ 0.02, compute AUC for (a) slope_ratio = ma10_slope_5 / ma20_slope_5, (b) vol_ratio_5_20, and (c) up_day_ratio_20 as binary classifiers",
+      "success_criterion": "Any single feature achieves AUC > 0.65 in the momentum-conditioned comparison, confirming discriminability independent of momentum baseline",
+      "failure_criterion": "All features yield AUC ≤ 0.65 when mom_20 is matched, indicating slope_ratio and vol_ratio_5_20 are proxies for momentum baseline rather than independent predictors"
+    },
+    {
+      "name": "pullback_null_subgroup_heterogeneity_test",
+      "features": ["vol_ratio_5_20", "mom_20", "up_day_ratio_20", "px_vs_ma20", "px_vs_ma50", "ma10_slope_5", "ma20_slope_5", "ibd_entry_close_vs_trigger_pct"],
+      "comparison": "Within false_positive_ruin cases only, compare PIT feature distributions between pullback_duration_weeks IS NULL (n=4) vs IS NOT NULL (n=4) subgroups using Mann-Whitney U",
+      "success_criterion": "At least one PIT feature shows p < 0.15 difference between null and non-null subgroups, indicating mechanistically distinct fast-ruin vs slow-ruin pathways",
+      "failure_criterion": "No significant feature differences between null and non-null subgroups (all p ≥ 0.15), confirming the null status reflects measurement absence rather than distinct causal mechanisms"
+    },
+    {
+      "name": "cross_snapshot_holdout_validation_test",
+      "features": ["vol_ratio_5_20", "ma10_slope_5", "ma20_slope_5", "mom_20"],
+      "comparison": "Treat each unique snap_* value as a leave-one-snapshot-out fold. Within each fold, derive thresholds from n-1 snapshots (training set) and apply to held-out snapshot. Use researcher-derived candidate thresholds: vol_ratio_5_20 < 1.30 AND slope_ratio < 2.0 predicts ruin",
+      "success_criterion": "Ruin precision ≥ 0.50 across ≥ 2/3 of held-out snapshots, confirming threshold generalizability beyond discovery snapshot",
+      "failure_criterion": "Ruin precision < 0.50 in ≥ 2/3 of held-out snapshots, indicating snapshot-specific base rates dominate feature effects"
+    },
+    {
+      "name": "volume_dryup_narrative_test",
+      "features": ["vol_ratio_5_20", "mom_20", "pullback_pct", "pullback_duration_weeks"],
+      "comparison": "Examine whether false_positive_ruin cases with vol_ratio_5_20 > 1.35 (above winner median) exist and characterize their distinguishing features vs ruin cases with vol_ratio_5_20 ≤ 1.35",
+      "success_criterion": "At least 2 false_positive_ruin cases show vol_ratio_5_20 > 1.35 but fail anyway, with distinct PIT profiles (e.g., slope_ratio < 1.5 or mom_20 < 0.10) identifying the alternative failure pathway",
+      "failure_criterion": "No false_positive_ruin cases have vol_ratio_5_20 > 1.35, confirming volume confirmation failure is both necessary and sufficient for ruin within this dataset"
+    },
+    {
+      "name": "slope_ratio_mechanical_artifactual_test",
+      "features": ["ma10_slope_5", "ma20_slope_5", "mom_20"],
+      "comparison": "Fit logistic regression: outcome ~ mom_20 + slope_ratio. Test whether slope_ratio coefficient remains significant (p < 0.10) after controlling for mom_20. If not significant, slope_ratio is fully explained by momentum baseline",
+      "success_criterion": "slope_ratio coefficient p < 0.10 after mom_20 control, confirming slope_ratio carries information beyond momentum baseline",
+      "failure_criterion": "slope_ratio coefficient p ≥ 0.10 after mom_20 control, confirming slope_ratio is a mathematical artifact of the momentum baseline (skeptic's counterclaim validated)"
+    },
+    {
+      "name": "updayratio_symmetry_vs_direction_test",
+      "features": ["up_day_ratio_20", "mom_20", "mom_60"],
+      "comparison": "Compute correlation between up_day_ratio_20 and mom_20 across all B0 pick cases. If correlation > 0.30, up_day_ratio_20 partially reflects directional momentum; if < 0.15, it is primarily symmetry",
+      "success_criterion": "Correlation < 0.15, confirming up_day_ratio_20 is a symmetry measure orthogonal to directional conviction, explaining overlap between ruin and winner distributions",
+      "failure_criterion": "Correlation ≥ 0.30, indicating up_day_ratio_20 carries directional information that should be exploited in conjunction with mom_20"
+    }
+  ],
+  "leakage_checks": [
+    "Verify snap_* values used only for fold assignment, never as a feature input to any classification model",
+    "Confirm outcome_label determination uses only forward returns, never contemporaneous PIT features",
+    "Check that threshold derivation for cross_snapshot_test uses training-fold PIT features and outcome labels only",
+    "Ensure matching procedure for momentum_conditioned_test uses only mom_20 for pair matching, not outcome-correlated features",
+    "Verify entity_6618d3e80c (labeled both false_positive_ruin and selected_winner) is excluded from threshold derivation and only used in validation if classification is unambiguous for the specific prediction"
+  ],
+  "priority_order": [
+    "slope_ratio_mechanical_artifactual_test",
+    "momentum_conditioned_discrimination_test",
+    "pullback_null_subgroup_heterogeneity_test",
+    "cross_snapshot_holdout_validation_test",
+    "volume_dryup_narrative_test",
+    "updayratio_symmetry_vs_direction_test"
+  ]
+}

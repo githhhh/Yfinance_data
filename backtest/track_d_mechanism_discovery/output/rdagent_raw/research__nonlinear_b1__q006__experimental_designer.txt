@@ -1,0 +1,39 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "T1_incremental_rank_IC_orthogonality",
+      "features": ["ibd_entry_volume_ratio", "mom_20", "px_vs_ma50", "vol_ratio_5_20"],
+      "comparison": "Within B0 picks, compute Spearman rank-IC of ibd_entry_volume_ratio with w4_return after partialling out mom_20, px_vs_ma50, and vol_ratio_5_20 via OLS residuals, vs the unadjusted rank-IC of each of those three B0 features. Snapshot-level bootstrap (cluster on snapshot_anon, n=27 cases across observed snapshots) supplies the 95% CI.",
+      "success_criterion": "Partial rank-IC of ibd_entry_volume_ratio ≥ 0.10 AND its bootstrap 95% CI excludes zero, AND its absolute value ≥ 50% of the largest unadjusted |rank-IC| among mom_20, px_vs_ma50, vol_ratio_5_20 (proves it adds signal beyond what B0 already prices).",
+      "failure_criterion": "Partial rank-IC bootstrap CI crosses zero OR |partial IC| < 25% of best B0 feature → returns UNRESOLVED on mechanism A vs double-counting."
+    },
+    {
+      "name": "T2_collapsed_3cell_ruin_monotonicity",
+      "features": ["pullback_v_is_dry", "ibd_entry_volume_ratio", "vol_ratio_5_20"],
+      "comparison": "Collapse the proposed 3×2 contingency into 3 pre-registered cells using a single split on ibd_entry_volume_ratio at 1.5 AND pullback_v_is_dry restricted to non-NULL pullback cohort: Cell-A = dry ∧ entry_vol≥1.5 (up-weight), Cell-B = dry ∧ entry_vol<1.5 OR wet ∧ entry_vol≥1.5 (neutral), Cell-C = wet ∧ entry_vol<1.5 (down-weight). Compute ruin_rate per cell on the pullback-defined cohort only. Snapshot-cluster bootstrap provides CI.",
+      "success_criterion": "ruin_rate(Cell-A) < ruin_rate(Cell-B) < ruin_rate(Cell-C) with monotonic ordering AND ≥2× separation between A and C AND each cell ≥4 independent cases. Confirms interaction, not additive features.",
+      "failure_criterion": "Non-monotonic ordering OR A-vs-C separation <1.5× OR any cell <3 cases → interaction hypothesis UNRESOLVED; supports skeptic's 'noise on small N' attack."
+    },
+    {
+      "name": "T3_scaler_vs_ATR_vol_targeting",
+      "features": ["ibd_entry_volume_ratio", "atr_14_pct", "pullback_v_is_dry"],
+      "comparison": "Within B0 picks, construct two position-size schemes at equal RISK budget (not gross): (i) size ∝ min(ibd_entry_volume_ratio, 2.5) when pullback_v_is_dry=True, 1.0 otherwise (researcher's proposal); (ii) size ∝ 1/atr_14_pct (pure ATR vol-targeting baseline). Compute w4 Sharpe of the equal-weighted B0 portfolio re-weighted by each scheme on the archaeology cases. Snapshot-level bootstrap CI on Sharpe difference.",
+      "success_criterion": "Sharpe(scheme-i) − Sharpe(scheme-ii) ≥ 0.10 with bootstrap 95% CI excluding zero → scaler is signal, not risk management.",
+      "failure_criterion": "CI crosses zero OR Sharpe difference <0.05 → scaler is functionally vol-targeting; UNRESOLVED between mechanism A and skeptic's risk-management-in-disguise claim."
+    }
+  ],
+  "leakage_checks": [
+    "Confirm ibd_entry_volume_ratio, pullback_v_is_dry, pullback_pct, pullback_duration_weeks are computed using only data ≤ snapshot_anon timestamp; reject any construction that uses w4_return or outcome_label in feature derivation.",
+    "Cluster-bootstrap at snapshot_anon level (not case level) for all CIs because snap_71486ed83c contributes ~22% of cases and entity_6618d3e80c carries dual labels — case-level resampling would over-state significance.",
+    "Exclude entity_6618d3e80c (mixed false_positive_ruin|selected_winner) from cell-monotonicity numerators; report it only in a robustness appendix to prevent label-arbitrage bias."
+  ],
+  "priority_order": [
+    "T1_incremental_rank_IC_orthogonality",
+    "T2_collapsed_3cell_ruin_monotonicity",
+    "T3_scaler_vs_ATR_vol_targeting"
+  ]
+}
+```

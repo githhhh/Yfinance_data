@@ -1,0 +1,45 @@
+
+
+```json
+{
+  "verdict": "WEAK",
+  "confidence_0_100": 28,
+  "mechanism_summary": "Within the fixed B0 universe, conjunctive re-ranking by (dry_pullback_score = high up_day_ratio + contained vol_ratio) × (room_to_pivot = low current_vs_ibd_candidate_pct near 1.5–2.0x) plausibly down-ranks late-stage, vol-expanding false positives and up-ranks orderly, roomy continuation candidates. The mechanism is theoretically consistent with the SW vs FN medians (up_day_ratio 0.625 vs 0.50, vol_ratio 1.42 vs 1.18, current_vs_ibd_candidate_pct 1.98 vs 1.69), but the pivot-distance axis alone has std_delta only -0.20 and the conjunctive lift has not been demonstrated within snapshot cells where regime is held constant.",
+  "falsifiers": [
+    "Within-snapshot leave-one-out isolation test fails to flip ≥2 of the 3 FP/SW same-snapshot pairs (entity_84824e6a20 vs entity_bec51a4227; entity_6618d3e80c vs entity_bec51a4227; entity_40ea0cfb3b vs entity_d2ca7853ba), indicating the modifier carries no within-regime information beyond existing B0.",
+    "Partial Spearman of current_vs_ibd_candidate_pct vs outcome after partialling out ibd_entry_close_vs_trigger_pct and ibd_entry_close_position falls below 0.05 across leave-one-snapshot-out folds, collapsing the conjunctive rule to dry-pullback alone and exposing it as a redundant reshuffle.",
+    "Null-pullback substitution (base_depth_pct + base_duration_weeks fallback for ~10/27 cases including top SW entity_ead73f4390, entity_28a6ec4601, entity_b00579f203) shifts the B0 scoring surface enough that rank correlation between original B0 and modified B0 on the null subset drops below 0.70, violating the 'no expansion' constraint at the representation layer.",
+    "Three-slot adaptive capacity ordering fails monotonic ruin_rate(low > neutral > high) or extreme-slot ruin spread collapses below 5pp under rv_20-quartile slicing, indicating the signal does not survive regime dispersion."
+  ],
+  "actionable_design_principles": [
+    "Encode dry_pullback_score as z(vol_ratio_5_20, inverse) + z(up_day_ratio_20) using WITHIN-snapshot z-scores only; never pool across snapshots because cross-snapshot dispersion is the primary confounder.",
+    "Treat current_vs_ibd_candidate_pct as a soft pivot-distance band around the empirical SW median (~1.5–2.0x), not as a hard threshold; the std_delta of -0.20 means it is too weak to gate but viable as a continuous modifier term.",
+    "For the null-pullback fallback, define a representation-invariant substitution test (Spearman ≥0.85 vs base B0) BEFORE deployment; if it fails, the 'no expansion' constraint is violated and the modifier must be applied only to the 17/27 non-null subset, accepting reduced coverage as the honest cost.",
+    "Never use entity_anon or snapshot_anon as features; gate the conjunctive modifier on a pre-specified regime flag (e.g., rv_20 < empirical_p75 of the slice) so the modifier either fires or degrades explicitly rather than producing silent anti-signal in choppy regimes."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "b0_rank_modifier_dry_pullback_x_pivot_room",
+      "why_distinct": "Re-ranks within the existing B0 eligible set using a conjunctive product of dry-pullback quality and pivot-distance room; does not add or remove candidates, preserving the B0 universe by construction.",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "current_vs_ibd_candidate_pct",
+        "pullback_duration_weeks",
+        "pullback_pct"
+      ],
+      "capacity_relevance": "Adaptive capacity = ability of recent price action to absorb supply (dry pullback) while still leaving geometric room above pivot; the conjunction isolates continuation candidates from late-stage, vol-expanding false positives."
+    },
+    {
+      "idea": "b0_null_pullback_representation_fallback",
+      "why_distinct": "Handles the ~37% of B0 picks with null pullback fields by substituting base_depth_pct + base_duration_weeks via a pre-tested representation-invariant mapping, explicitly guarding against silent scoring-surface expansion.",
+      "features": [
+        "base_depth_pct",
+        "base_duration_weeks",
+        "base_mbox_count"
+      ],
+      "capacity_relevance": "Preserves B0 universe coverage for IPO/breakout-from-base names (entity_ead73f4390, entity_28a6ec4601, entity_b00579f203) where pullback_v_is_dry is undefined; without it the modifier would silently shrink eligibility and inflate apparent hit rate."
+    }
+  ]
+}
+```

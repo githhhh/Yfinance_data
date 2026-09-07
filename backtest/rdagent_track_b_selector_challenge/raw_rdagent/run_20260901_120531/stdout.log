@@ -1,0 +1,5 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+Terminating subprocess PID 27478 (python3.11)
+Finished terminating subprocesses. Then force killing still alive subprocesses.
+Killing still alive subprocess PID 27478 (python3.11)
+Finished killing subprocesses.

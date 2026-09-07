@@ -1,0 +1,31 @@
+
+
+```json
+{
+  "mechanism_claim": "B0 picks with tight IBD entry proximity (ibd_entry_close_vs_trigger_pct > 0.025) combined with insufficient momentum reserve (mom_20 < 0.14) and weak recent price action (up_day_ratio_20 < 0.60) signal exhaustion rather than continuation. The price is already close to the trigger at entry, momentum is depleted, and weak recent up-day participation indicates distribution—creating conditions where a pullback becomes ruin rather than a rest.",
+  "evidence_for": [
+    "entity_8f0df3d38e (false_positive_ruin): ibd_entry_close_vs_trigger_pct=0.069, mom_20=0.176, up_day_ratio_20=0.65 → pullback -16.2% over 7 weeks",
+    "entity_84824e6a20 (false_positive_ruin): ibd_entry_close_vs_trigger_pct=0.074, mom_20=0.067, up_day_ratio_20=0.40 → ruin outcome",
+    "entity_b6bcccdf6a (false_positive_ruin): ibd_entry_close_vs_trigger_pct=0.032, mom_20=0.176, up_day_ratio_20=0.40, px_vs_ma50=0.182 → ruin despite high mom_20",
+    "entity_2c58cebc59 (selected_winner): ibd_entry_close_vs_trigger_pct=0.034, mom_20=0.321, up_day_ratio_20=0.60 → survived -25.1% pullback over 6 weeks to large_win",
+    "entity_3adc078f01 (selected_winner): mom_20=0.172, up_day_ratio_20=0.65, vol_ratio_5_20=1.14 → survived -42.3% pullback over 9 weeks",
+    "Median mom_20 for false_positive_ruin (0.142) is 13% lower than selected_winner (0.166); up_day_ratio_20 median 0.625 vs 0.65 respectively"
+  ],
+  "evidence_against": [
+    "entity_40ea0cfb3b (false_positive_ruin): mom_20=0.024, ibd_entry_close_vs_trigger_pct=0.061, px_vs_ma50=0.014 → low on all dimensions, yet ruins",
+    "entity_2c58cebc59 (selected_winner): pullback_pct=-25.1% is larger than many false_positive_ruin cases, suggesting pullback magnitude alone is not determinative",
+    "entity_55c2da490e (false_positive_ruin): px_vs_ma50=0.056 (very low), mom_20=0.036 (low), yet pullback_pct=-12.3% is smaller than some winners' drawdowns",
+    "5 of 8 false_positive_ruin cases have null pullback_pct, indicating the ruin mechanism may differ from pullback-based cases in the sample"
+  ],
+  "falsifiable_predictions": [
+    "Condition: B0 pick with ibd_entry_close_vs_trigger_pct > 0.030, mom_20 < 0.10, up_day_ratio_20 < 0.50, vol_ratio_5_20 > 1.30, px_vs_ma50 < 0.08. Prediction: This pick will NOT achieve large_win or selected_winner status within 4 weeks; expected outcome is small_win, loss, or ruin.",
+    "Counterexample that would invalidate: A B0 pick meeting the above tight-entry + momentum-depleted conditions that achieves w4_return_bucket=large_win. This single case would falsify the exhaustion-signal mechanism."
+  ],
+  "policy_implications": [
+    "Pre-filter B0 candidates: reject picks where ibd_entry_close_vs_trigger_pct > 0.025 AND mom_20 < 0.14 AND up_day_ratio_20 < 0.55 simultaneously",
+    "Accept wider-entry B0 picks (ibd_entry_close_vs_trigger_pct < 0.020) even with moderate momentum as they carry less exhaustion risk",
+    "If entering a tight-entry B0 pick, enforce a tight stop: entry price - (entry × 0.08) as ruin-cutoff, since pullback magnitude of -12% to -16% over 7 weeks appears to be the ruin threshold for this cohort",
+    "Distinguish pullback tolerance from pullback cause: large_win cases with deep pullbacks (>20%) have strong prior momentum (mom_20 > 0.17) that provides recovery buffer; the same depth pullback destroys tight-entry exhausted picks"
+  ]
+}
+```

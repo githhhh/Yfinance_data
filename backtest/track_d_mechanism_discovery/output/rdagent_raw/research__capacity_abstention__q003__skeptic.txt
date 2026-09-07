@@ -1,0 +1,58 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The 'high-gap → concentrate to 1 slot' rule rests on a tautological feature comparison (false_negatives look weak on the SAME features B0 used to select winners), ignores that 1-slot concentration triples position size (so ruin severity per dollar is NOT lower than 3-slot), and assumes ruin events are independent across slots when the archaeology shows they cluster by snapshot_anon — meaning a 3-slot allocation in a single bad regime and a 1-slot allocation in that same regime both bear nearly the full ruin tail. The prior claim of 'negative-expectancy marginal alpha' for slots 2/3 is asserted, never derived: the false-negative W4 buckets are large_win, not loss, so the cohort is winners-by-construction rather than losers-by-mechanism.",
+  "attacks": [
+    {
+      "issue": "Selection-on-observables / tautological contrast: the false_negative cohort is defined as B0 REJECTIONS, and the 'numeric contrasts' measure them against selected_winners on the SAME features B0 uses for selection. The standardized deltas of −0.6 to −1.2 are not evidence of degraded alpha — they are the mechanical footprint of the selection rule. Using them to justify abstention from the rejected tier is circular.",
+      "why_it_matters": "The whole falsification logic depends on slots 2/3 being 'structurally weaker.' If that weakness is definitionally guaranteed by what B0 rejects, then any rule that fills slots with B0-rejected stocks will look 'bad' on these features by construction, regardless of whether the stocks actually underperform at W4. The mechanism is not identified."
+    },
+    {
+      "issue": "Position-sizing confound ignored: under 'fixed 3-slot capital,' moving from 3 slots (≈33% each) to 1 slot (100%) triples per-name exposure. The prior argues ruin PROBABILITY per name is 3× higher with 3 slots, but ruin DOLLAR magnitude per dollar deployed is unchanged (independent ruin) or WORSE (correlated ruin). The 1-slot rule therefore does NOT reduce tail-loss per dollar of capital — it concentrates it.",
+      "why_it_matters": "Economic meaning of capacity is conflated with economic meaning of sizing. A 1-slot 100% position and a 3-slot 33% position have identical ruin probability per dollar under independence; under positive correlation the 1-slot is strictly worse. The 'capital preservation' justification collapses once position size is restored."
+    },
+    {
+      "issue": "Ruin clustering by snapshot_anon violates the independence assumption. snap_71486ed83c, snap_b8420124eb, snap_d0d57b1e40 each contain MULTIPLE false_positive_ruin cases (and one snapshot also contains a selected_winner). Ruin is correlated within regime. Diversification across 3 slots within a single regime therefore buys little variance reduction if all candidates share the same macro shock.",
+      "why_it_matters": "If ruin is correlated across slots within a snapshot, then 1-slot concentration in that snapshot actually INCREASES portfolio ruin severity. The archaeology data — not a model assumption — shows the ruins cluster. The adaptive rule needs to throttle by snapshot regime, not by candidate gap, or it misallocates risk."
+    },
+    {
+      "issue": "Labeling asymmetry: false_negative requires W4 ≥8% AND ≥5pp above B0 selected MEDIAN (a strict bar); selected_winner requires only is_b0_pick=true (a permissive label). The two cohorts are not symmetrically constructed, so a head-to-head feature comparison is biased against the rejected tier. entity_535a1beed7 and entity_de1c657364 achieve large_win but only the 'big_winner' sublabel counts toward the contrast — this is conditioning on the outcome that makes the prior claim look strongest.",
+      "why_it_matters": "The prior's claim that 'rare payoff does not compensate systematic quality decay' is partially an artifact of the asymmetric label definition. With a symmetric label (e.g., both require ≥8% W4), the false-negative rate among B0 rejects would rise and the apparent gap would shrink."
+    },
+    {
+      "issue": "B0's own hit rate is weak: 11 selected_winner vs 8 false_positive_ruin among 19 is_b0_pick=true cases → ≈58% win rate, ≈42% ruin rate. If Top1 itself ruins 42% of the time at full position size, then 'concentrating on Top1' in a high-gap regime concentrates a coin with substantial ruin probability. The 'Top1 conviction' narrative is empirically thin.",
+      "why_it_matters": "The adaptive rule assumes Top1 alpha is large enough that concentrating 100% of capital into it is superior to diversification. With a 42% ruin rate at full size, expected-value calculations are dominated by ruin-tail magnitude and need explicit dollar-weighting, which the prior did not perform."
+    },
+    {
+      "issue": "Missing data is MNAR: 11 of 27 cases have null pullback_duration_weeks and pullback_pct (no base yet formed). The numeric contrasts on pullback_pct (Δ=+8.6pp) and pullback_duration_weeks (Δ=−1.5wk) therefore describe a non-random subset — likely the candidates whose bases have already broken out and pulled back, biasing the 'deep base' signature toward B0 picks.",
+      "why_it_matters": "The 'deep base = winner' mechanism is inferred from a sub-sample that excludes stocks currently forming one. A rule that abstains from these stocks will systematically miss fresh breakout candidates whose pullback history has not yet accumulated."
+    },
+    {
+      "issue": "Sample size n=27 is severely underpowered for the claims made. The numeric_contrasts table contains ~24 features; with this n, multiple-comparison corrections would shrink most standardized deltas. A delta of −0.5 to −1.2 σ on individual features is consistent with noise across a 20+ feature screen.",
+      "why_it_matters": "Without a pre-registered feature subset or holdout validation, the 'structural weakness' claim is statistically fragile. A skeptic should demand that the gap-threshold τ be derived on a separate sample before the rule is treated as falsifiable rather than exploratory."
+    },
+    {
+      "issue": "Gap magnitude is post-hoc, not PIT: the 'Top1-Top2 quality gap' is inferred from the false_negative cohort's feature deltas, not from a contemporaneous quality score on the ranked Top2 candidate at the time of selection. There is no measurable τ that an algorithm can apply at decision time without reconstructing the rejection cohort.",
+      "why_it_matters": "An adaptive 0/1/2/3 capacity rule requires a decision-time computable gap. If the gap is only knowable after-the-run, the rule is unfalsifiable in production — every outcome can be reinterpreted as consistent with whatever gap bucket it lands in."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "A high-gap regime where the B0-rejected slot-2 candidate had up_day_ratio_20 > 0.6 AND vol_ratio_5_20 > 1.4 AND mom_20 > 0.15 AND won W4 by ≥10% — entity_535a1beed7 and entity_de1c657364 are near-misses under the strict labeling but should be re-examined under a symmetric label to test whether the gap rule systematically excludes these archetypes.",
+    "A snapshot_anon (e.g., snap_d0d57b1e40) where one B0 pick was a selected_winner AND another was a false_positive_ruin (entity_6618d3e80c carries both labels) — this demonstrates that within-snapshot ruin is not eliminated by Top1 focus; the same Top1 conviction that wins in one window ruins in another.",
+    "A snapshot with ≥3 false_positive_ruin cases (snap_71486ed83c qualifies) where a 3-slot allocation across DIFFERENT sectors within that snapshot would have hedged the regime — proving that within-snapshot diversification can be constructed even when cross-snapshot regime is hostile.",
+    "An out-of-time period where the 1-slot concentration rule produced lower Sharpe than the 3-slot equal-weight rule in a high-gap regime — falsifies the regime-conditional concentration hypothesis directly.",
+    "A case where the 'Top1' pick had shallower pullback (closer to 0%) and shallower base_duration_weeks than the B0-rejected slot-2 candidate — this would show that B0 selection is not strictly dominated on the 'deep base' axis and that the gap-rule misses valid bases still forming.",
+    "A large-gap regime where 3 independent candidates (different sectors, different supply/demand signatures) had ruin probability BELOW the single Top1's ruin probability — i.e., diversification benefit dominates even when individual Top2/Top3 features look weak."
+  ],
+  "what_would_change_my_mind": [
+    "Demonstration that ruin events are statistically independent ACROSS candidates within a snapshot (correlation test within snap_anon) — without this, 3-slot deployment cannot be claimed riskier per dollar than 1-slot.",
+    "A pre-registered, decision-time computable Top1-Top2 quality gap (e.g., a specific z-score on a PIT ranking) that produces higher Sharpe for capacity=1 vs capacity=3 in an out-of-sample test of ≥50 high-gap regime observations.",
+    "Re-analysis with symmetric labeling (both false_negative and selected_winner require W4 ≥8%) showing the standardized feature deltas persist at ≥0.5 σ — currently the asymmetry is a confound.",
+    "Evidence that B0's selected_winner cohort's W4 returns are robust to position-sizing (i.e., a 100% allocation in Top1 doesn't ruin 42% of the time as the raw archaeology suggests), so that concentration is not a tail-risk amplifier.",
+    "A within-snapshot counterfactual showing realized W4 return distribution of the equal-weight-3 portfolio vs the 100%-Top1 portfolio in the SAME snapshot — currently we have no joint outcomes, only marginal labels.",
+    "Multiple-comparison correction applied to the 24-feature contrast table (e.g., Benjamini-Hochberg) leaving at least 5 features with FDR-adjusted q < 0.1 — currently the feature-level deltas are exploratory.",
+    "An MNAR-adjusted analysis of pullback_pct / pullback_duration_weeks that accounts for the 11/27 missing-value cases, showing the +8.6pp delta survives imputation rather than being a selection artifact."
+  ]
+}
+```

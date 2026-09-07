@@ -1,0 +1,12 @@
+{
+  "purpose_id": "research__nonlinear_b1__q005__experimental_designer",
+  "prompt_hash": "fc1e9444b59c80241cfa191a84e386e6124816d67747051c7f38151a33da1a9e",
+  "response_hash": "9931676664a24fa03b9a4245ee7e60ae5e82087568d87ee0f20b6cf4cc2eff1b",
+  "model": "deepseek/deepseek-v4-pro",
+  "api_base_configured": true,
+  "max_tokens": 5000,
+  "reasoning_effort_configured": "high",
+  "reasoning_effort_forwarded": false,
+  "attempt": 2,
+  "compact_json_retry": true
+}

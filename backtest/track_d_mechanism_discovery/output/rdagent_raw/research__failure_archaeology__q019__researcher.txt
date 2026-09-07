@@ -1,0 +1,37 @@
+
+
+```json
+{
+  "mechanism_claim": "False-negative non-picks that become large W4 winners exhibit a 'quiet-coil / volume-dry-up absorption' signature at the PIT snapshot: subdued 20-day momentum (mom_20 ~0.03–0.07), 5d-vs-20d relative volume hovering near or just above 1.0 (~0.96–1.17), shallow recent pullback depth (pullback_pct ≈ -7% vs -16% for selected winners), near-flat ma10/ma20 slopes, and modest price extension above MAs (px_vs_ma50 ≈ 0.02–0.06). This signature reflects supply absorption and constructive basing rather than the explosive momentum/volatility the B0 momentum-threshold filter requires, so these candidates are systematically rejected despite being structurally set up for breakout.",
+  "evidence_for": [
+    "All three false-negative → large_win cases (entity_535a1beed7, entity_de1c657364, entity_05b4c6b1f7) share mom_20 in the 0.028–0.070 band, well below the selected_winner median of 0.163 (standardized delta -1.00).",
+    "vol_ratio_5_20 for FN large winners ranges 0.964–1.174, sitting below the selected_winner median of 1.424 (standardized delta -1.05). entity_05b4c6b1f7 has explicit volume dry-up at 0.964 (<1.0).",
+    "Pullback_pct median for false_negatives is -7.3% vs -15.9% for selected_winners (standardized delta +0.64) — shallow time-based basing rather than deep correction, consistent with absorption.",
+    "entity_de1c657364 shows 8-week pullback duration with only -7.3% depth — time-without-price-decline structure where vol_ratio_5_20 of 1.147 implies orderly absorption, not distribution.",
+    "up_day_ratio_20 for FN large winners = 0.5–0.65 (median 0.5), with ma10_slope_5 and ma20_slope_5 near zero or slightly positive — neutral-to-mildly-bullish tape, neither euphoric nor broken.",
+    "ibd_entry_close_vs_trigger_pct for FN large winners is small positive (0.009–0.024), indicating tight, non-extended entry rather than chase.",
+    "Numeric contrasts ranking confirms the top discriminating features (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) all load on a 'calm tape' cluster that separates FN from SW."
+  ],
+  "evidence_against": [
+    "entity_bfb308b24a is a false_negative → loss with structurally similar features (mom_20=0.027, vol_ratio_5_20=1.187, up_day_ratio=0.45) — the quiet-coil signature contains true decay cases, not just breakouts; precision is low.",
+    "entity_ad2bfdee3f (FN→small_win) has NEGATIVE mom_20 (-0.046) and NEGATIVE px_vs_ma50 (-0.033), showing the dry-up signature is asymmetric and many quietly-rotating names continue sideways rather than break out.",
+    "false_positive_ruin cases (entity_8f0df3d38e, entity_4fdc3699fd, entity_3472243e0c, etc.) sometimes share elevated vol_ratio_5_20 with selected_winners — so elevated volume alone is not a clean discriminator between winner and ruin, undermining a simple 'volume confirms everything' rule.",
+    "entity_2f86543bf6 (selected_winner, large_win) has ma20_slope_5 = -0.0078 and mom_20 = -0.008 with vol_ratio=1.56 — selected_winner cohort includes negative-momentum names, so the 'positive momentum required' frame is already imperfect at the B0 boundary.",
+    "entity_bfb308b24a's loss outcome alongside its base_duration absent data means pullback/volume signatures without confirming base quality produce asymmetric losses, limiting the standalone utility of the quiet-coil filter."
+  ],
+  "falsifiable_predictions": [
+    "Among non-picks with vol_ratio_5_20 in [0.9, 1.2] AND pullback_pct ≥ -10% AND mom_20 in [0.02, 0.08] AND up_day_ratio_20 ≥ 0.5, the conditional W4 large_win rate should exceed 40% (vs unconditional FN rate implied by 2/7 ≈ 29% in this slice).",
+    "Volume dry-up (vol_ratio_5_20 < 1.0) at snapshot combined with shallow recent base depth (pullback_pct > -8%) should produce positive expected forward return over the next 4 weeks, while dry-up with deeper prior drawdowns should NOT.",
+    "Adding a 'quiet-coil' candidate bucket (vol_ratio_5_20 in [0.9,1.2], pullback_pct in [-10%, -3%], ma10_slope_5 in [-0.01, 0.03]) as a parallel input to the existing B0 momentum filter should increase total large_win captures by ≥15% with no more than proportional increase in losses.",
+    "If the mechanism is causal (absorption → breakout), then increasing lookback-window on vol_ratio (e.g., 5d vs 60d) should strengthen the dry-up signal rather than weaken it; falsified if dry-up effect disappears at longer lookbacks.",
+    "Selected_winners should consistently exhibit vol_ratio_5_20 > 1.3 OR mom_20 > 0.10; if SW cohort contains many names with both below these thresholds, the dichotomy framing is invalid."
+  ],
+  "policy_implications": [
+    "Replace the implicit single-mode momentum threshold with a two-bucket candidate generator: (a) existing explosive-momentum mode (mom_20 > 0.10, vol_ratio_5_20 > 1.3) and (b) quiet-coil absorption mode (mom_20 in [0.02,0.08], vol_ratio_5_20 in [0.9,1.2], shallow pullback ≥ -10%, ma10_slope near-flat).",
+    "Risk-size the quiet-coil bucket smaller than the explosive bucket because precision is lower (loss cases like entity_bfb308b24a contaminate the same feature space).",
+    "Use base quality (pullback_duration_weeks ≥ 4 with shallow depth, plus constructive ma10/ma20 slopes) as a precondition for the quiet-coil bucket to suppress rot cases like entity_ad2bfdee3f.",
+    "Avoid using vol_ratio_5_20 as a hard veto in either direction — both 'volume confirmation' (SW median 1.42) and 'dry-up' (entity_05b4c6b1f7 at 0.96) appear in winners; treat volume regime as a categorical feature rather than a monotonic filter.",
+    "Separate the prediction problem (which non-pick has coil-then-break potential) from the portfolio problem (how much size, when to add) — the archaeological evidence supports the predictive claim but does not yet support equal-sizing across the two buckets."
+  ]
+}
+```

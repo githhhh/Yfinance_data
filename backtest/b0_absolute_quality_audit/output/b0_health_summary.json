@@ -1,0 +1,299 @@
+{
+  "summary_policy": "NO_ARBITRARY_PASS_FAIL_THRESHOLD",
+  "absolute": {
+    "entry_aligned": {
+      "n": 40,
+      "mean": 3.472442,
+      "median": 2.958217,
+      "p10": -5.424467,
+      "p25": -1.258208,
+      "p75": 7.109992,
+      "p90": 12.751657,
+      "cvar10": -9.97,
+      "positive_rate": 0.6,
+      "worst": -16.656767,
+      "best": 32.012533
+    },
+    "entry_block_bootstrap": {
+      "n": 40,
+      "mean_ci_low": 0.955876,
+      "mean_ci_high": 5.787493,
+      "median_ci_low": -0.0372,
+      "median_ci_high": 4.367333
+    },
+    "mean_slot_coverage_all_snapshots": 0.7698412698412698,
+    "full3_rate_all_snapshots": 0.5952380952380952,
+    "pick_count_distribution": {
+      "0": 2,
+      "1": 8,
+      "2": 7,
+      "3": 25
+    }
+  },
+  "eligible_ranking_active_choice": {
+    "all_valid_weeks": 38,
+    "no_choice_weeks": 17,
+    "active_choice_weeks": 21,
+    "mean_percentile": 64.65859523809524,
+    "median_percentile": 66.0,
+    "edge": {
+      "support_weeks": 21,
+      "value": {
+        "n": 21,
+        "mean": 4.670006,
+        "median": 3.925733,
+        "p10": -5.476667,
+        "p25": -0.896033,
+        "p75": 7.676833,
+        "p90": 14.597167,
+        "cvar10": -9.909167,
+        "positive_rate": 0.666667,
+        "worst": -16.656767,
+        "best": 32.012533
+      },
+      "benchmark": {
+        "n": 21,
+        "mean": 1.447854,
+        "median": 1.582718,
+        "p10": -4.87832,
+        "p25": -1.863177,
+        "p75": 4.906309,
+        "p90": 12.291243,
+        "cvar10": -9.578451,
+        "positive_rate": 0.571429,
+        "worst": -18.169775,
+        "best": 19.95256
+      },
+      "spread": {
+        "n": 21,
+        "mean": 3.222152,
+        "median": 1.94762,
+        "p10": -4.613729,
+        "p25": 0.21629,
+        "p75": 5.612857,
+        "p90": 7.736042,
+        "cvar10": -5.410811,
+        "positive_rate": 0.761905,
+        "worst": -6.749587,
+        "best": 30.197064
+      },
+      "spread_block_bootstrap": {
+        "n": 21,
+        "mean_ci_low": 0.315619,
+        "mean_ci_high": 6.677096,
+        "median_ci_low": -0.980576,
+        "median_ci_high": 3.19871
+      },
+      "beat_rate": 0.761905
+    },
+    "oracle_capture": {
+      "support_weeks": 21,
+      "aggregate_capture_ratio": 0.249685,
+      "weekly_capture_mean": 0.185766,
+      "weekly_capture_median": 0.196726,
+      "weekly_capture_positive_rate": 0.761905
+    }
+  },
+  "raw_fixed_capacity_next_open": {
+    "support_weeks": 22,
+    "support_fraction_of_snapshots": 0.5238095238095238,
+    "mean_price_coverage_all_weeks": 0.9647387823050535,
+    "mean_percentile": 50.004768181818186,
+    "median_percentile": 53.57145,
+    "edge": {
+      "support_weeks": 22,
+      "value": {
+        "n": 22,
+        "mean": 4.065022,
+        "median": 1.784812,
+        "p10": -6.603311,
+        "p25": -0.63147,
+        "p75": 6.941173,
+        "p90": 12.446507,
+        "cvar10": -7.607239,
+        "positive_rate": 0.636364,
+        "worst": -8.667757,
+        "best": 44.501009
+      },
+      "benchmark": {
+        "n": 22,
+        "mean": 4.365888,
+        "median": 2.939005,
+        "p10": -1.851355,
+        "p25": 0.256364,
+        "p75": 8.309744,
+        "p90": 12.539601,
+        "cvar10": -4.01041,
+        "positive_rate": 0.818182,
+        "worst": -7.801211,
+        "best": 16.938637
+      },
+      "spread": {
+        "n": 22,
+        "mean": -0.300866,
+        "median": 0.242509,
+        "p10": -10.032126,
+        "p25": -5.109349,
+        "p75": 3.363442,
+        "p90": 6.754337,
+        "cvar10": -15.137622,
+        "positive_rate": 0.5,
+        "worst": -19.250516,
+        "best": 27.562372
+      },
+      "spread_block_bootstrap": {
+        "n": 22,
+        "mean_ci_low": -3.743157,
+        "mean_ci_high": 3.172072,
+        "median_ci_low": -3.901497,
+        "median_ci_high": 2.917824
+      },
+      "beat_rate": 0.5
+    },
+    "oracle_capture": {
+      "support_weeks": 22,
+      "aggregate_capture_ratio": -0.010297,
+      "weekly_capture_mean": -0.024364,
+      "weekly_capture_median": 0.009431,
+      "weekly_capture_positive_rate": 0.5
+    },
+    "matched_n_edge": {
+      "support_weeks": 20,
+      "value": {
+        "n": 20,
+        "mean": 4.471525,
+        "median": 2.39819,
+        "p10": -6.864594,
+        "p25": -1.196366,
+        "p75": 7.487575,
+        "p90": 13.095293,
+        "cvar10": -8.00511,
+        "positive_rate": 0.7,
+        "worst": -8.667757,
+        "best": 44.501009
+      },
+      "benchmark": {
+        "n": 20,
+        "mean": 2.853529,
+        "median": 1.710479,
+        "p10": -0.731922,
+        "p25": -0.389366,
+        "p75": 3.95951,
+        "p90": 8.570326,
+        "cvar10": -4.282121,
+        "positive_rate": 0.7,
+        "worst": -7.801211,
+        "best": 16.938637
+      },
+      "spread": {
+        "n": 20,
+        "mean": 1.617996,
+        "median": 2.265128,
+        "p10": -8.228503,
+        "p25": -2.910573,
+        "p75": 4.853785,
+        "p90": 8.131753,
+        "cvar10": -17.547436,
+        "positive_rate": 0.65,
+        "worst": -19.250516,
+        "best": 27.562372
+      },
+      "spread_block_bootstrap": {
+        "n": 20,
+        "mean_ci_low": -1.131542,
+        "mean_ci_high": 4.686899,
+        "median_ci_low": 1.241762,
+        "median_ci_high": 3.679974
+      },
+      "beat_rate": 0.65
+    },
+    "support_dates": [
+      "2025-10-10",
+      "2025-10-24",
+      "2025-11-07",
+      "2025-11-21",
+      "2025-12-12",
+      "2025-12-19",
+      "2025-12-26",
+      "2026-01-02",
+      "2026-01-09",
+      "2026-01-16",
+      "2026-01-23",
+      "2026-01-30",
+      "2026-02-13",
+      "2026-02-20",
+      "2026-02-27",
+      "2026-03-06",
+      "2026-03-13",
+      "2026-03-20",
+      "2026-03-27",
+      "2026-04-10",
+      "2026-07-24",
+      "2026-07-31"
+    ]
+  },
+  "gate": {
+    "support_weeks": 22,
+    "mean_price_coverage_all_weeks": 0.9647387823050535,
+    "raw_candidate_events": 631,
+    "eligible_candidate_events": 88,
+    "accept_rate": 0.13946117274167988,
+    "winner_retention_rate": 0.15671641791044777,
+    "winner_enrichment_vs_random_selectivity": 1.1237279511533242,
+    "bottom_loser_retention_rate": 0.09701492537313433,
+    "loser_retention_vs_random_selectivity": 0.6956411126187245,
+    "b0_winner_capture_rate": 0.1044776119402985,
+    "b0_winner_capture_enrichment_vs_matched_n_random": 1.6160301205944732,
+    "b0_winner_capture_enrichment_vs_fixed3_random": 0.9677363045043935,
+    "mean_gate_lift": 2.004724518531654,
+    "median_gate_lift": 3.834628361823362
+  },
+  "idealized_stop8_execution_semantics": "If a selected name ever triggers next_open_w4_stop8, its scenario return is set to exactly -8%; otherwise terminal next-open W4 is used. This is an optimistic no-slippage scenario, not realized execution.",
+  "momentum_gate": {
+    "all": {
+      "picks": 66,
+      "mean_w4": 11.702516303030304,
+      "median_w4": 3.5740515000000004,
+      "p10_w4": -15.739739,
+      "cvar10_w4": -23.614100428571426,
+      "positive_rate": 0.6060606060606061,
+      "stop8_rate": 0.5909090909090909,
+      "terminal_le_minus8_rate": 0.21212121212121213,
+      "share_of_momentum_picks": 1.0,
+      "selected_by_b0_rate": 0.16666666666666666
+    },
+    "eligible": {
+      "picks": 11,
+      "mean_w4": 20.70829836363636,
+      "median_w4": 13.101983,
+      "p10_w4": -15.72327,
+      "cvar10_w4": -15.739739,
+      "positive_rate": 0.8181818181818182,
+      "stop8_rate": 0.45454545454545453,
+      "terminal_le_minus8_rate": 0.18181818181818182,
+      "share_of_momentum_picks": 0.16666666666666666,
+      "selected_by_b0_rate": 1.0
+    },
+    "gate_outside": {
+      "picks": 55,
+      "mean_w4": 9.901359890909088,
+      "median_w4": 2.204409,
+      "p10_w4": -17.6228016,
+      "cvar10_w4": -24.923749166666667,
+      "positive_rate": 0.5636363636363636,
+      "stop8_rate": 0.6181818181818182,
+      "terminal_le_minus8_rate": 0.21818181818181817,
+      "share_of_momentum_picks": 0.8333333333333334,
+      "selected_by_b0_rate": 0.0
+    }
+  },
+  "ranking_information": {
+    "support_weeks": 38,
+    "weekly_spearman_mean": 0.09425177106970513,
+    "weekly_spearman_median": 0.12972896668548844,
+    "positive_spearman_week_rate": 0.6666666666666666,
+    "selected_minus_eligible_mean": 2.421021492628835,
+    "selected_minus_eligible_median": 0.0
+  },
+  "evidence_boundary": "Retrospective audit. B0 was developed with visibility into this history. Yahoo supplementation is frozen at 2026-09-02 and used only for outcome completion / benchmarks; no future bar after the frozen as-of date is allowed."
+}

@@ -1,0 +1,34 @@
+
+
+```json
+{
+  "mechanism_claim": "B0 'freshness' is functioning as a recent-momentum RETURN-RANKING signal (up_day_ratio_20, vol_ratio_5_20, mom_20, ma10/20_slope_5 cluster) rather than as a DOWNSIDE-RISK CONTROL. The component distinguishes winners from non-selected names via momentum/thrust, but does not reliably suppress picks that subsequently ruin: high-freshness picks can still produce false_positive_ruin, and the worst false positives show that low-freshness cases were not excluded either.",
+  "evidence_for": [
+    "The three largest standardized deltas separating false_negatives from selected_winners are up_day_ratio_20 (std_delta -1.19), vol_ratio_5_20 (-1.05), and mom_20 (-1.00) — all 'freshness/recency' signals, not drawdown or tail-risk metrics.",
+    "px_vs_ma50 (-0.85), ma10_slope_5 (-0.68) and ma20_slope_5 (-0.60) also rank among the top discriminators, consistent with freshness capturing trend acceleration, not risk control.",
+    "Selected_winners have a higher up_day_ratio_20 median (0.625) than false_negatives (0.500), but the false_positive_ruin cohort sits between them with high up_day_ratio values (e.g., entity_8f0df3d38e at 0.65, entity_4fdc3699fd at 0.60, entity_3472243e0c at 0.65, entity_55c2da490e at 0.65) — i.e., freshness admitted them and they still ruined.",
+    "Drawdown/risk proxies that would indicate downside-risk control (base_depth_pct std_delta +0.19, dist_to_52w_high_pct std_delta +0.16, atr_14_pct std_delta -0.28, rv_20 std_delta -0.21) are among the weakest discriminators, confirming risk control is not where the signal lives.",
+    "Volatility-based features (rv_20, atr_14_pct) actually have NEGATIVE standardized deltas — winners tend to be calmer, but the component's contribution is via the momentum cluster, not via penalizing tail risk."
+  ],
+  "evidence_against": [
+    "Three of eight false_positive_ruin picks had LOW up_day_ratio (entity_84824e6a20 = 0.40, entity_b6bcccdf6a = 0.40, entity_40ea0cfb3b = 0.50) AND sub-1.0 vol_ratio_5_20 for entity_40ea0cfb3b (0.906) — these are not 'fresh' names, yet they were not filtered out, undermining any claim that freshness is currently a downside gate.",
+    "entity_8ad5cd4795 is a selected_winner with NEGATIVE ma10_slope_5 (-0.0059), NEGATIVE ma20_slope_5 (-0.0034), and mom_20 ≈ 0.004 (essentially flat) — a counter-example showing low freshness can still win, weakening any tight risk-control interpretation.",
+    "entity_2f86543bf6 won with up_day_ratio=0.35 (the lowest in the dataset) and negative ma20_slope_5, again contradicting a 'freshness filters risk' story.",
+    "Two false_negatives (entity_de1c657364, entity_d8e8e7b814) had high up_day_ratio_20 (0.65 and 0.45) and decent momentum but were not picked — so even as a return-ranking signal, freshness is necessary but not sufficient, and is confounded with other B0 inputs."
+  ],
+  "falsifiable_predictions": [
+    "Replacing the freshness sub-score with a pure 20-day momentum rank (mom_20 + up_day_ratio_20 + vol_ratio_5_20 z-sum) should produce a Spearman correlation > 0.5 with the current B0 freshness contribution across the holdout — confirming it is effectively already a return-ranking score.",
+    "Among B0 picks, the freshness score should show NO significant difference (|rank-sum z| < 1.0) between false_positive_ruin and selected_winner cohorts — falsifying any 'freshness protects against ruin' claim. The visible data already suggests ruin cases include both high and low freshness values, supporting this.",
+    "Adding a HARD downside-risk gate (e.g., reject if ma20_slope_5 < 0 AND pullback_pct < -10% OR up_day_ratio_20 < 0.45 AND vol_ratio_5_20 < 1.0) should reduce the false_positive_ruin count by ≥ 30% in a frozen holdout while leaving the selected_winner median return statistically unchanged — falsifying the existing freshness-as-gate claim.",
+    "If freshness were doing downside-risk control, the false_positive_ruin cohort's freshness z-score should be systematically BELOW the selected_winner cohort's z-score (|mean delta| > 0.5σ). The mixed up_day_ratio distribution (ruins at 0.40, 0.50, 0.55, 0.60, 0.65) already makes this unlikely; a holdout test with n ≥ 50 picks will resolve it.",
+    "A logistic regression of outcome_label on freshness-only features should yield pseudo-R² > 0.10 (return ranking) but AUC for ruin-vs-win separation should be < 0.55 (no downside gating)."
+  ],
+  "policy_implications": [
+    "Re-label 'freshness' as 'recency_momentum' and use it exclusively for cross-sectional ranking, not as a risk filter.",
+    "Add an explicit, separately weighted downside-risk component — candidates that are PIT-observable and not redundant with momentum: negative ma50_slope_10 with high rv_20, deep negative pullback_pct combined with rising vol_ratio_5_20, or dist_to_52w_high_pct > 0 with deteriorating ma20_slope_5.",
+    "Convert the new downside-risk component to a HARD GATE (binary) rather than a soft additive score, so that the 8/27 ruin rate is structurally bounded rather than averaged away by blending with momentum.",
+    "Track two KPIs going forward: (i) median W4 return of B0 picks conditional on freshness rank quintile — to confirm ranking value; (ii) ruin-rate conditional on freshness quintile — to confirm or refute the falsifiable predictions above.",
+    "Investigate whether the soft-additive blending of freshness with other B0 inputs is what allows low-freshness ruin cases (entity_84824e6a20, entity_b6bcccdf6a, entity_40ea0cfb3b) to pass — i.e., other components may be over-compensating, which is a portfolio-construction artifact separate from the predictive mechanism."
+  ]
+}
+```

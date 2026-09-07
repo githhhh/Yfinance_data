@@ -1,0 +1,56 @@
+
+
+```json
+{
+  "strongest_counterclaim": "The claim that Lane carries limited independent information in constructive pullback weeks is essentially unfalsifiable on the evidence presented. The 27-case failure archaeology is a conditional-on-error subset, the constructive-pullback slice inside it is probably n<=15, the proposed quintile-matching protocol has insufficient resolution to detect a 3-6pp effect, and the technical features used as 'controls' are themselves mediators/downstream readouts of the same leadership dimension Lane encodes. The prior researcher has not refuted Lane-independence; they have merely failed to measure it with a design capable of doing so.",
+  "attacks": [
+    {
+      "issue": "Selection-on-error sampling: the entire evidence base is a 'failure archaeology' pool — every case is pre-classified as something the system got wrong or right in an extreme way. Constructing a 'redundancy' claim from a sample where winners and ruin-cases are over-sampled relative to the natural base rate is a textbook conditional-on-outcome bias.",
+      "why_it_matters": "If Lane is calibrated to suppress mid-decile setups, the failure archaeology is by construction enriched for cases at the tails of Lane's discrimination boundary. That is precisely where Lane-noise dominates — the wrong test to ask whether Lane has mean-shift information."
+    },
+    {
+      "issue": "Endogeneity / collider bias: ma10_slope_5, mom_20, up_day_ratio_20, px_vs_ma50, and pullback geometry are not exogenous covariates relative to Lane — they are partial proxies of the same underlying accumulation/leadership state that Lane is designed to read. Conditioning on them and testing Lane's residual is conditioning on mediators of Lane.",
+      "why_it_matters": "If Lane = f(leadership, accumulation, RS-trend, sector-context) and the technicals are g(leadership), then the residual of Lane | technicals is not 'independent Lane information' but 'Lane information not yet captured by a subset of its inputs'. Claiming that residual must be zero is begging the question."
+    },
+    {
+      "issue": "Insufficient power / unstable standardized deltas: numeric_contrasts are computed on n=5 (false_negative) vs n=11 (selected_winner). With these sample sizes, a single case flip changes standardized_delta by ~0.3-0.4. The reported |z|>0.6 deltas are not statistically meaningful; bootstrap CIs would span zero on most features.",
+      "why_it_matters": "The 'directional leadership proxies' the prior researcher concedes Lane 'could encode independently' are exactly the dimensions the noisy contrasts fail to rule out. The hedge in their evidence_against is actually the honest reading of the data."
+    },
+    {
+      "issue": "Quintile-matching is too coarse to test the discrimination claim. ma10_slope_5 spans roughly -0.005 to 0.09 in the sample; quintiles compress ~0.02-wide bands where within-bin residual variation in W4 outcomes is far larger than any plausible Lane effect (3-6pp).",
+      "why_it_matters": "A 3pp hit-rate gap easily drowns in within-quintile outcome noise. The falsifiable_prediction '<3pp means indifference' would be triggered by random within-bin variation, not by true Lane-nullity. The bar is set where any reasonable test would always fail."
+    },
+    {
+      "issue": "Spearman(SCORE_BEFORE_LANE, post-Lane) >0.70 in n<30 is not a discriminative threshold — with that sample size, correlations of 0.65-0.85 arise routinely from noise, especially when both scores share many of the same input features (mom, slope, RS).",
+      "why_it_matters": "This test cannot distinguish 'Lane is redundant' from 'Lane and pre-Lane composite share so many inputs that high correlation is mechanical'. The number is uninformative regardless of which side of 0.70 the data lands."
+    },
+    {
+      "issue": "Omitted-variable bias on sector and market regime: every case in the failure archaeology is associated with a snapshot id, several of which cluster (e.g., snap_71486ed83c has 6 cases; snap_d0d57b1e40 has 5). The shared-snapshot clustering means sector/market-regime effects are confounded with Lane assignment.",
+      "why_it_matters": "If a single snapshot contributes both a B0 constructive-pullback pick and a not-B0 LANE_NEUTRAL pick, and the outcome gap tracks the snapshot, that is regime — not Lane. The prior analysis does not partial out snapshot-fixed-effects, which inflates any apparent Lane-noise reading."
+    },
+    {
+      "issue": "The mixed-label case entity_6618d3e80c (false_positive_ruin|selected_winner, px_vs_ma50=0.337, mom_20=0.251) is direct evidence that Lane correctly identified an extreme-leadership constructive pullback that the standard technical composite would have weighted similarly to entity_3adc078f01 (snap_ad495b6705, mom_20=0.172, large_win). Lane adds the RS-trend read the technicals miss.",
+      "why_it_matters": "The prior researcher's own cited case cuts against their conclusion. They hand-wave it as 'Lane can resolve genuine strong leadership' but then conclude Lane is mostly redundant in this regime — that is internally inconsistent."
+    },
+    {
+      "issue": "The 'constructive pullback' definition itself is partly Lane-derivable: pullback_duration_weeks 3-9 and pullback_pct -5 to -25 with positive slopes and px_vs_ma20>0 is the canonical 'healthy basing' read, which is exactly what Lane is engineered to endorse. Restricting to this band and then testing Lane's independence is a circular conditioning set.",
+      "why_it_matters": "The very filter that defines the regime is the type of pattern Lane is designed to confirm. Any signal Lane adds inside this band will look like restatement, by construction."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Constructive pullback weeks where ma10_slope_5, mom_20, up_day_ratio_20, pullback_duration_weeks, and pullback_pct are matched to <0.005 / <0.01 / <0.05 / <1wk / <1pp tolerance between B0_LANE and LANE_NEUTRAL cases — does W4-return distribution still overlap, or does Lane split them? This is the only design that can answer the question.",
+    "Constructive pullbacks with px_vs_ma50 in the top decile (>0.20) where Lane is the differentiator between entity_6618d3e80c-style extreme-RS and entity_3adc078f01-style moderate-RS cases — does Lane separate them on forward W4 in a held-out window?",
+    "Constructive pullbacks split by pullback_duration_weeks: 3-5wk shallow vs 7-9wk deep — does Lane's information content differ between shallow-base and deep-base subregimes? (The shallow-base Lane calls may be noisier than the deep-base Lane calls, which would actually argue for keeping Lane precisely where the prior researcher says to remove it.)",
+    "Constructive pullbacks conditioned on up_day_ratio_20 above 0.60 — does Lane still separate winners from ruins, or do all high-up-day-ratio constructive pullbacks perform similarly regardless of Lane? If similarly, the prior claim strengthens; if not, Lane is independently informative.",
+    "Constructive pullbacks in which the technical composite scores identically across B0_LANE and LANE_NEUTRAL but the entity has different IBD-style RS-trend trajectory (3-month RS slope) — does Lane's match to RS-trend predict the W4 outcome better than the technical composite alone?",
+    "Cross-snapshot replication: take the snap_71486ed83c cluster (6 cases), hold it out, and re-derive the W4 separation. If the pattern is snapshot-specific, the 'Lane is noise' reading is actually a 'regime is noise' reading."
+  ],
+  "what_would_change_my_mind": [
+    "A matched-cohort test with n>=100 constructive-pullback cases where B0_LANE and LANE_NEUTRAL are matched within tolerance bands of <0.01 on ma10_slope_5, <0.03 on mom_20, <0.05 on up_day_ratio_20, <1wk on pullback_duration, <3pp on pullback_pct — and a Cox/Hazard model with Lane as the only remaining predictor shows hazard-ratio p-value >0.4 in a held-out fold. Anything weaker than this is consistent with my prior that the current evidence is inconclusive.",
+    "A principal-component / factor-loading analysis where Lane collapses onto the first PC of (mom_20, mom_60, ma10_slope_5, ma20_slope_5, up_day_ratio_20, px_vs_ma20, px_vs_ma50, RS-trend) at loading >0.75 AND the residual after projection is orthogonal to W4-return — both conditions must hold for the redundancy claim to be defensible.",
+    "A pre-registered A/B backtest in constructive-pullback weeks showing that the policy 'ignore Lane when constructive-pullback gate fires' improves Sharpe/Sharpe-ratio-of-returns net of slippage by >0.05 over 'keep Lane' on out-of-sample folds, with the gain surviving bootstrap CIs. Backtest-only claims without the matched-cohort step are not sufficient.",
+    "A demonstration that within the constructive-pullback subset, the cases Lane rejects (LANE_NEUTRAL or no-B0) have identical forward W4 distributions to the cases Lane accepts, after controlling for pullback_duration_weeks AND base_depth_pct AND dist_to_52w_high_pct simultaneously — not just the four features the prior researcher listed.",
+    "Until any of the above is produced, the honest verdict is UNRESOLVED, not 'Lane is redundant in constructive pullbacks'."
+  ]
+}
+```

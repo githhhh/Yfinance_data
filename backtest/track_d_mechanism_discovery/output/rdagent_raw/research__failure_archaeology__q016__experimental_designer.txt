@@ -1,0 +1,49 @@
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "geometry_threshold_persistence_across_b0_picks",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "ibd_entry_close_vs_trigger_pct", "px_vs_ma20"],
+      "comparison": "B0 picks sharing tight-base thresholds vs false-negative non-picks sharing same thresholds",
+      "success_criterion": "Large_win rate for tight-base B0 picks is NOT significantly lower than tight-base false-negative winners (p > 0.20 for rate difference). This would support geometry as the driver rather than non-pick status.",
+      "failure_criterion": "Tight-base B0 picks produce large_win rate significantly below tight-base non-picks (p < 0.05), indicating non-pick status confounds the geometry mechanism."
+    },
+    {
+      "name": "within_snapshot_feature_separation_false_negatives",
+      "features": ["up_day_ratio_20", "vol_ratio_5_20", "mom_20", "px_vs_ma20", "px_vs_ma50"],
+      "comparison": "False-negative large_win vs false-negative loss/small_win within same snapshot cohorts",
+      "success_criterion": "At least 3 of 5 features show statistically significant separation (Mann-Whitney p < 0.10) between false-negative winners and non-winners within snapshot groups.",
+      "failure_criterion": "No feature shows significant within-snapshot separation (p > 0.30), indicating the observed medians reflect inter-snapshot variance rather than outcome-predictive signal."
+    },
+    {
+      "name": "pullback_moderation_test",
+      "features": ["pullback_pct", "mom_20", "vol_ratio_5_20"],
+      "comparison": "False-negative large_win with shallow pullback (>-10%) vs false-negative large_win with deep pullback (<=-10%)",
+      "success_criterion": "Shallow-pullback false-negative winners show median mom_20 at least 0.03 lower than deep-pullback false-negative winners, supporting the 'reduced exhaustion' narrative for shallow bases.",
+      "failure_criterion": "No meaningful mom_20 difference between pullback depth groups (delta < 0.01), contradicting the exhaustion-based mechanism explanation."
+    },
+    {
+      "name": "entry_proximity_sufficiency_test",
+      "features": ["ibd_entry_close_vs_trigger_pct", "px_vs_ma20"],
+      "comparison": "False-negative entities with ibd_entry_close_vs_trigger_pct <= 0.020 that became large_win vs loss/small_win",
+      "success_criterion": "Near-trigger entries (ibd_entry_close_vs_trigger_pct <= 0.020) produce large_win rate at least 40% among false negatives with this feature.",
+      "failure_criterion": "Near-trigger entries produce large_win rate below 25%, indicating entry proximity alone is insufficient and additional filters are required."
+    }
+  ],
+  "leakage_checks": [
+    "All feature thresholds must be fixed before outcome inspection; post-hoc threshold adjustment invalidates significance",
+    "Snapshot-level aggregation must prevent entity-level cross-contamination in within-snapshot tests",
+    "Feature distributions must be computed from snapshot_time only, never from forward-return data",
+    "The 27-case discovery set cannot serve as its own validation; external snapshot cohort required",
+    "Outcome label 'false_negative_big_winner' construction criterion (W4 >=8% + relative performance) must not influence feature selection"
+  ],
+  "priority_order": [
+    "within_snapshot_feature_separation_false_negatives",
+    "geometry_threshold_persistence_across_b0_picks",
+    "pullback_moderation_test",
+    "entry_proximity_sufficiency_test"
+  ]
+}
+```

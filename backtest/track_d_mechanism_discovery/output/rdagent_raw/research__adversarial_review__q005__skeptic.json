@@ -1,0 +1,48 @@
+{
+  "strongest_counterclaim": "The base-maturity confound hypothesis is the wrong direction. The data shows base_duration_weeks is only the 12th strongest separator (standardized delta -0.42) while the top four separators (up_day_ratio_20, vol_ratio_5_20, mom_20, px_vs_ma50) are all snapshot-phase descriptors that are themselves downstream of 'first-base emergence.' The null-pullback cluster (6/8 false_positive_ruin with null pullback fields) is the EXACT regime distinct-1 is designed to filter, not the regime it should be judged on. The prior claim reverses causation: shallower subsequent pullbacks in winners are not a cause of correlation reduction, they are a downstream symptom of the same regime (fresh first-base emergence after dormancy/IPO) that drives the diversification. Treating base-depth as the 'true' driver is treating a proxy for a proxy.",
+  "attacks": [
+    {
+      "issue": "Ranking inversion: if base-maturity were the active ingredient, base_duration_weeks and base_depth_pct should be top-3 separators. They rank 12th and 11th respectively. The top four are all point-in-time momentum/participation features that are causally antecedent to base maturity, not downstream of it.",
+      "why_it_matters": "The researcher's whole confound story depends on base features dominating; if they are weaker than snapshot features, the natural alternative is that distinct-1 is a phase/regime label that *contains* the momentum information rather than being explained by base structure."
+    },
+    {
+      "issue": "Survivorship asymmetry: failure archaeology only observes errors. The silent successes (estimated 70-85% of B0 picks) are invisible. Distinct-1's primary benefit may be in the bulk, not in the error tail. A n=27 error sample cannot reject a real but modest effect concentrated in successful names.",
+      "why_it_matters": "A negative finding on the error sample is consistent with distinct-1 working perfectly on the silent majority. The prior treats error archaeology as if it were a random sample of the strategy; it is not."
+    },
+    {
+      "issue": "Null-pullback cases are mis-classified as 'not distinct-1 setups.' Six of eight false_positive_ruin cases have null pullback fields precisely because they are in an 'extended no-base' regime. These are the canonical pattern that distinct-1 SHOULD exclude, and their presence as is_b0_pick=true (7/8) is evidence the system ALREADY had them in — i.e., that distinct-1 filtering is needed but not applied in the failure cases.",
+      "why_it_matters": "The researcher treats the null-pullback cluster as evidence against distinct-1, but it is actually a positive existence proof: the system is failing on the exact regime where distinct-1 is supposed to operate. A correct interpretation is 'distinct-1 was not enforced strictly enough,' not 'distinct-1 does not work.'"
+    },
+    {
+      "issue": "Base_duration is a noisy proxy that conflates structurally different regimes. A 52-week 'maturing base approaching breakout' and a 52-week 'sideways chop that almost-formed-a-base' receive the same label. The +8-week median difference between false negatives and winners is well within this proxy's measurement noise floor.",
+      "why_it_matters": "If the base-duration variable is itself a noisy proxy for 'true' base quality, then using it as the 'controlled-for' feature in the confound argument is not neutral — the confounder absorbs its own noise and the residual can look null even when distinct-1 is doing real work."
+    },
+    {
+      "issue": "Falsifiable prediction #1 (partial R² for distinct-1 dummy < 0.005 with t < 1.0) is calibrated to reject a real but modest effect. A genuine regime indicator in cross-sectional return regressions typically explains 0.3-0.8% of variance — below the proposed threshold. The prediction is structured to pass on a finding of zero rather than to discriminate between competing magnitudes.",
+      "why_it_matters": "The prior's own diagnostic is asymmetric. A skeptic should demand a two-sided test: if the null is R²=0.005-0.01, the prior prediction cannot reject, and the conclusion 'no effect' would itself be poorly supported."
+    },
+    {
+      "issue": "The 'replace distinct-1 with longest-base-wins' proposal is biased toward older/worn-out bases. Fresh first-base breakouts (the very population distinct-1 targets) systematically have SHORTER base durations than second/third-base continuations. A longest-base rule would systematically underweight the distinct-1 population, so even if the proposal 'won' the comparison, it would not isolate the relevant counterfactual.",
+      "why_it_matters": "The proposed counterfactual is not apples-to-apples; it stacks the deck. A proper test would be 'shortest-mature-base-wins' or 'freshest-pattern-wins,' which would also lose to distinct-1 for the same reason but more honestly."
+    },
+    {
+      "issue": "The researcher concedes that selected winners are heterogeneous in pullback depth (-1.5% to -42.3%) and treats this as evidence base quality is multi-dimensional. The alternative reading: these winners are heterogeneous because distinct-1 captures a regime indicator that allows BOTH shallow pullbacks (strong-trend continuation) and deep pullbacks (post-correction first-base). The heterogeneity is the diversification working, not a confound.",
+      "why_it_matters": "If winners cluster into a low-correlation set precisely because they span different pullback regimes, distinct-1 is doing the work the researcher is trying to attribute to base quality. The diversity is the effect, not noise around it."
+    }
+  ],
+  "counterexamples_to_seek": [
+    "Selected winners with base_duration_weeks > 60 (very long base) that underperform — would refute the 'longer base = better' version of the prior's mechanism and force a retreat to 'deeper base = better,' which is even weaker in the data",
+    "False_positive_ruin cases WITH non-null pullback fields (currently 2/8) — let us compare base_depth between failed and winning names within the SAME pullback regime, removing the null-cluster confounder",
+    "Sector/market-cap distribution of distinct-1 winners vs the broader B0 candidate pool. If distinct-1 winners are disproportionately in a sector or cap bucket that has lower correlation with the index, the diversification benefit is real but the prior is mis-attributing it to base features",
+    "Time-series rolling 13-week correlations: distinct-1 cohort vs non-distinct-1 cohort during SPX-trending vs SPX-choppy weeks. A regime indicator predicts lower correlation in choppy regimes; a quality proxy predicts similar correlation in both",
+    "Entity-level base-maturity trajectory: does mom_20 at entry LEAD or LAG base_duration_weeks? If lead, the snapshot features are causal and base features are downstream; if lag, the researcher's directionality might be right",
+    "The two false_negative_big_winner cases (entity_de1c657364, entity_535a1beed7) — both with weak pullback but large wins. Are their base features similar to distinct-1 winners? If yes, they should have been included; the fact they were excluded is the real failure mode, not the distinct-1 rule itself"
+  ],
+  "what_would_change_my_mind": [
+    "A matched-pairs analysis on n≥200 with exact matching on (base_duration_weeks within ±2 weeks, base_depth_pct within ±2pp, base_mbox_count, sector, market_cap_bucket) showing that within matched pairs, distinct-1 vs non-distinct-1 W4 returns are statistically indistinguishable (p > 0.5) AND ruin rates are within bootstrap CI",
+    "Demonstration that the distinct-1 cohort's average pairwise correlation with the non-distinct-1 B0 cohort exceeds 0.70 on rolling 13-week windows, and that the cross-correlation of the distinct-1 cohort with the SPX is NOT statistically different from the non-distinct-1 cohort's beta",
+    "Bootstrap CI on the base_duration standardized delta that excludes the range [-0.6, -0.3] — i.e., evidence the effect is both statistically real and substantially larger than the snapshot-feature effects. Currently the -0.42 estimate is too small and too noisy to dominate",
+    "A finding that within the discovery-train sample, the B0 pick rate conditional on base-quality decile is FLAT across deciles (i.e., base quality is not the selection criterion). This would invalidate the prior's claim that B0 selection is 'really' a base-quality filter",
+    "A backtest showing that a portfolio constructed WITHOUT any distinct-1 constraint but with an explicit base-quality score (depth + duration + mbox_count) achieves a HIGHER information ratio than the current distinct-1 rule over ≥200 trades with realistic transaction costs. Until this is shown, the confound hypothesis remains unproven"
+  ]
+}

@@ -1,0 +1,57 @@
+
+
+
+```json
+{
+  "tests": [
+    {
+      "name": "rank_order_equivalence_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20"
+      ],
+      "comparison": "Composite (vol_ratio_5_20 × (1 − up_day_ratio_20)) vs. evidence_risk B0 selection decisions across all 27 cases",
+      "success_criterion": "Composite reproduces evidence_risk B0 selection decisions with ≥90% concordance (25/27 cases). Kendall's tau between composite score and evidence_risk binary decision ≥0.70.",
+      "failure_criterion": "Composite disagrees with evidence_risk on >3 cases OR Kendall's tau <0.70, indicating evidence_risk captures variance not explained by the two-feature composite alone."
+    },
+    {
+      "name": "incremental_information_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "mom_20",
+        "mom_60"
+      ],
+      "comparison": "Logistic regression predicting outcome_label (selected_winner vs. ruin/false_positive_ruin) with and without evidence_risk indicator",
+      "success_criterion": "Evidence_risk indicator has coefficient not significantly different from zero at α=0.10 (two-sided) AND likelihood-ratio test p-value >0.50 when added to model already containing vol_ratio_5_20, up_day_ratio_20, mom_20. This confirms evidence_risk adds no unique predictive variance beyond the three-feature composite.",
+      "failure_criterion": "Evidence_risk coefficient significant at α<0.10 OR LRT p-value <0.50. Evidence_risk contributes information not captured by the composite, refuting the redundancy hypothesis."
+    },
+    {
+      "name": "cross_snapshot_regime_test",
+      "features": [
+        "vol_ratio_5_20",
+        "up_day_ratio_20",
+        "mom_20",
+        "mom_60",
+        "atr_14_pct"
+      ],
+      "comparison": "Stratified analysis: within each snapshot (snap_724342c280, snap_71486ed83c, snap_d0d57b1e40, snap_b8420124eb, snap_ad495b6705), test whether composite and evidence_risk selection sets are equivalent",
+      "success_criterion": "Within each snapshot containing ≥4 cases, composite selection set equals evidence_risk selection set. Evidence_risk is uniformly redundant across market regimes.",
+      "failure_criterion": "At least one snapshot shows composite and evidence_risk disagreeing on ≥1 pick. Evidence_risk captures regime-conditional signal not present in the composite, refuting uniform redundancy."
+    }
+  ],
+  "leakage_checks": [
+    "The composite formula (vol_ratio_5_20 × (1 − up_day_ratio_20)) must be pre-specified before examining evidence_risk's numeric contrasts or case-level feature values in the 27-case set.",
+    "All three tests must use the same pre-specified composite without iterative refinement on the 27 cases.",
+    "Test significance thresholds (α=0.10, LRT p>0.50, Kendall tau ≥0.70) must be fixed before computing any test statistics on the 27 cases.",
+    "The 27 cases constitute discovery data; tests are diagnostic rather than definitive proof. Positive findings require out-of-sample validation on a minimum 50-case held-out set with the same pre-specified thresholds.",
+    "Cross_snapshot_regime_test must not use snapshot identity as a predictor—only the numeric features available at each snapshot determine selection decisions.",
+    "If any test uses mom_20 or mom_60, these must appear in the PIT feature allowlist; otherwise, replace with available momentum proxy (e.g., px_vs_ma20 or px_vs_ma50) in a pre-specified substitution."
+  ],
+  "priority_order": [
+    "incremental_information_test",
+    "rank_order_equivalence_test",
+    "cross_snapshot_regime_test"
+  ]
+}
+```

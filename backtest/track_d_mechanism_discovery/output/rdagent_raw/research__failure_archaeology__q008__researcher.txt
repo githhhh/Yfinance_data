@@ -1,0 +1,38 @@
+
+
+```json
+{
+  "mechanism_claim": "False-positive B0 ruin occurs when entry coincides with momentum deceleration (low short-term slope) despite prior up-move; the system confuses mean-reversion exhaustion with genuine breakout continuation. Volume ratio distinguishes these: low vol_ratio signals institutional non-confirmation of the pullback entry, whereas moderate-to-high vol_ratio indicates continued participation during the pullback that makes rebound more likely. High-momentum entries (>15% mom_20) survive even without volume confirmation, but moderate-momentum entries (5-15%) require volume confirmation to avoid ruin.",
+  "evidence_for": [
+    "false_negative median vol_ratio_5_20 = 1.18 vs selected_winner median = 1.42 (standardized delta -1.05), indicating low recent volume is associated with missed opportunity, not just low volume causing ruin",
+    "false_positive_ruin cases show concentrated values: entity_4fdc3699fd (mom_20=0.185, vol_ratio=1.38), entity_3472243e0c (mom_20=0.242, vol_ratio=1.21), entity_40ea0cfb3b (mom_20=0.024, vol_ratio=0.91) - low vol_ratio even when momentum appears moderate",
+    "selected_winner entity_440e297253: vol_ratio=1.59 with modest momentum (0.058) but survives; contrast with false_positive_ruin entity_8f0df3d38e: vol_ratio=1.24, momentum=0.176 (higher) but still ruins",
+    "up_day_ratio_20 median delta -1.19 between false_negative and selected_winner: directional conviction matters; low up_day_ratio despite positive momentum suggests volatile reversal rather than sustained advance",
+    "ma10_slope_5 median delta -0.68: false positives enter during short-term deceleration even if longer-term (ma20_slope) remains positive",
+    "pullback_pct and pullback_duration_weeks are NOT PIT-observable (post-entry outcomes) but observed pullback severity correlates with eventual ruin in winners - suggesting the mechanical stress test is necessary but low vol_ratio entries fail the test more often",
+    "entity_2f86543bf6: mom_20=-0.008 (negative momentum), vol_ratio=1.56, selected_winner - negative momentum + high volume indicates fresh accumulation from lower base"
+  ],
+  "evidence_against": [
+    "entity_3adc078f01: vol_ratio=1.14 (below median for winners), mom_20=0.172, selected_winner large_win - exception where low volume did not predict ruin, possibly due to extreme pullback (-42.3%) resetting the base",
+    "entity_8ad5cd4795: vol_ratio=0.996 (sub-1.0, very low), selected_winner - another exception, suggesting vol_ratio is probabilistic not deterministic",
+    "entity_b6bcccdf6a: vol_ratio=1.31, false_positive_ruin but w4_return_bucket=loss (not ruin) - some 'ruin' labels may include losses without true catastrophic failure",
+    "The vol_ratio feature measures 5-day vs 20-day volume, which may not directly capture whether volume is confirming the pullback rebound or just indicating elevated baseline activity; a ratio below 1.0 could indicate calm accumulation rather than institutional abandonment",
+    "mom_20 alone (without vol confirmation) has contradictory signal: both ruin and winner medians overlap in the 0.15-0.18 range"
+  ],
+  "falsifiable_predictions": [
+    "B0 picks with vol_ratio_5_20 < 1.20 AND mom_20 between 0.05-0.20 will ruin (w4_return_bucket='ruin') with probability >60%",
+    "B0 picks with vol_ratio_5_20 > 1.40 AND up_day_ratio_20 > 0.60 will achieve selected_winner outcome with probability >70%",
+    "Adding ma10_slope_5 > 0.04 as secondary filter to the above will increase ruin-prediction precision; entries where ma10_slope_5 < 0.02 (deceleration) are more likely to ruin even with acceptable vol_ratio",
+    "The combination vol_ratio < 1.15 AND ma10_slope_5 > 0.06 (elevated recent slope despite low volume) signals a potential trap: the stock accelerated on thin volume, likely professional manipulation rather than institutional accumulation",
+    "Testing: Stratify B0 picks into vol_ratio quintiles; ruin rate should decrease monotonically from lowest to highest quintile; if non-monotonic, the mechanism requires revision"
+  ],
+  "policy_implications": [
+    "Vol_ratio_5_20 should be elevated to required filter status in B0 entry logic; current threshold may be too permissive (observed ruin cases have ratios 0.91-1.45)",
+    "Consider dual-threshold approach: vol_ratio > 1.30 required for entries with mom_20 < 0.15; vol_ratio > 1.15 acceptable when mom_20 > 0.20",
+    "Up_day_ratio_20 provides orthogonal signal to vol_ratio; a composite score (e.g., vol_ratio_z + up_day_ratio_z) may better separate true signal from correlated proxy",
+    "Pullback entries in the 3-7 week duration range with vol_ratio < 1.25 should be flagged as high-risk; duration itself is post-entry observable but can be estimated from prior base structure at entry",
+    "Avoid using mom_20 alone as momentum filter; it correlates with both ruin and winner outcomes; the mechanism requires vol_ratio interaction to disentangle",
+    "If backtesting confirms the ruin-prediction accuracy of vol_ratio < 1.20 + mom_20 0.05-0.20, consider shorting the subset of B0 picks that pass momentum but fail volume confirmation on the hypothesis that B0 system overweights momentum and underweights participation"
+  ]
+}
+```

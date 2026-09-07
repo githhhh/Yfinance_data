@@ -1,0 +1,44 @@
+{
+  "verdict": "CONTEXT_DEPENDENT",
+  "confidence_0_100": 35,
+  "mechanism_summary": "Single-industry crowding plausibly inflates apparent independence among B0 candidates. The most defensible PIT proxy for confidence without future leakage is the within-snapshot, within-cluster cross-sectional dispersion (std or IQR) of the candidate-level composite {z(up_day_ratio_20)+z(vol_ratio_5_20)+z(mom_20)} at snapshot time, because (a) all three components top the discrimination table and are strictly backward-looking, (b) the dual-label entity_6618d3e80c case shows that strong absolute features still yield heterogeneous outcomes when peers share the same snapshot context, and (c) some false_positive_ruin cases (entity_3472243e0c) carry individually 'good' features consistent with redundant cluster-mate exposure. However, the frozen evidence lacks an industry_group field, the n=27 sample is small, snapshot concentration (8/8 ruins in 4-5 snapshots) is consistent with regime rather than crowding, and pullback_pct's reversed standardized delta warns the momentum composite can mis-rank contrarian winners. Under fixed 3-slot capital: filling 1 slot concentrates exposure but forfeits diversification benefit; filling 2 or 3 slots is only economically additive when cluster_dispersion is high (above the snapshot's intra-cluster PIT-calibrated threshold). When dispersion is low, the effective independent bet count is approximately 1, so additional slots are near-redundant risk, not independent alpha — abstaining on slots 2/3 dominates mechanical deployment only when slot-1 ruin rate is the binding constraint and Policy B's ruin rate equals Policy A's. The claim is mechanistically coherent but not empirically confirmed within the frozen evidence.",
+  "falsifiers": [
+    "After snapshot fixed-effects de-meaning, within-snapshot composite dispersion shows partial rank correlation with per-snapshot ruin rate of |rho| < 0.15, indicating snapshot regime — not cluster crowding — drives ruin (snapshot_concentration_null_for_redundancy test).",
+    "Mahalanobis distance from false_positive_ruin to selected_winner centroid is SMALLER than to false_negative_relative centroid (|delta| < 0.3 std units), meaning B0 is well-calibrated and cluster_dispersion cannot rescue a base-selection failure (b0_selection_calibration_precondition test).",
+    "In the deep-pullback stratum, momentum-composite dispersion does not separate winners while pullback_pct dispersion does (p<0.15), proving the proposed composite systematically mis-ranks contrarian winners (contrarian_pullback_dispersion_confound test).",
+    "Policy C (anti-redundancy slot fill) and Policy A (top-3 by composite) yield statistically indistinguishable per-snapshot ruin rates (overlap of binomial CIs), showing slot-count diversification is not recoverable from PIT features alone (slot_count_marginal_value_under_fixed_three_slot test).",
+    "Observed snapshot-ruin-concentration percentile under 10,000-permutation null falls below the 50th percentile, meaning snapshot identity alone — without any cluster feature — matches the ruin pattern (snapshot_concentration_null_for_redundancy test)."
+  ],
+  "actionable_design_principles": [
+    "Separate candidate-quality signal from portfolio-construction signal: use {up_day_ratio_20, vol_ratio_5_20, mom_20} for ENTRY ranking and a separately-constructed cluster_dispersion statistic (PIT, requires an external industry/peer mapping) for SIZING and SLOT COUNT — never blend the two into a single composite.",
+    "Treat slot count as a function of within-snapshot cluster_dispersion: deploy N=3 only when cluster_dispersion exceeds a PIT-calibrated threshold (e.g., top-tercile of snapshot-relative dispersion); deploy N=1 (concentrated) or abstain on slots 2/3 when dispersion is below the bottom-tercile, because marginal slots are near-redundant under crowding."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage gating policy: Stage 1 ranks candidates by composite quality score Q = z(up_day_ratio_20)+z(vol_ratio_5_20)+z(mom_20) (all PIT at snapshot). Stage 2 computes cluster_dispersion D = std of Q across the same-industry candidate set at snapshot. Slot 1 is taken on the highest Q regardless of D. Slot 2 is filled only if D > D_threshold (PIT-calibrated). Slot 3 is filled only if D > D_threshold_2 with D_threshold_2 > D_threshold, ensuring monotonic dispersion gating.",
+      "why_distinct": "Existing policy deploys 3 slots mechanically on B0 rank; this adds a portfolio-construction gate that explicitly prices crowding without using any forward return or calendar identity. It is the only policy that mechanically distinguishes 'three independent bets' from 'one bet expressed three times'.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "snapshot_anon",
+        "industry_group_external_mapping"
+      ],
+      "capacity_relevance": "Directly enables principled abstention on slots 2 and 3 under detected crowding, which is the abstention-capacity question being asked. Confidence on slot 1 is decoupled from slot-2/3 confidence, so capacity to abstain on marginal slots without forfeiting slot-1 alpha is preserved."
+    },
+    {
+      "idea": "Cluster-conditional ruin probability estimator: estimate P(ruin | slot=1, cluster_dispersion_bucket) and P(ruin | slots=2 or 3, cluster_dispersion_bucket) as PIT functions of within-snapshot feature dispersion only, using snapshot-blocked cross-validation. Report a single per-snapshot capacity decision: 'effective_independent_bets' in {1, 2, 3}. Allocate capital proportional to effective_independent_bets × base position size.",
+      "why_distinct": "Translates the dispersion mechanism into an explicit ruin-probability surface rather than a discrete gate; allows continuous slot-count decisions and provides a calibrated abstention threshold derivable purely from snapshot-local PIT features without industry labels being predictive features themselves.",
+      "features": [
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "mom_20",
+        "px_vs_ma20",
+        "px_vs_ma50",
+        "pullback_pct",
+        "snapshot_anon"
+      ],
+      "capacity_relevance": "Quantifies abstention cost asymmetrically across dispersion regimes, so capacity to act vs abstain is data-driven per snapshot rather than rule-based."
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+
+
+```json
+{
+  "verdict": "UNRESOLVED",
+  "confidence_0_100": 30,
+  "mechanism_summary": "Available archaeology (N=27, with compound labels and selection bias toward failures) is statistically underpowered to discriminate the redundancy hypothesis from an override/interaction hypothesis. The strongest structural argument for SOME redundancy is that the five momentum-cluster features load with same-sign, large-magnitude standardized deltas (up_day_ratio_20: -1.19, vol_ratio_5_20: -1.05, mom_20: -1.00, px_vs_ma50: -0.85, ma10_slope_5: -0.68), which is consistent with a single latent trend-strength factor distinct1 could be tapping. However, the same archaeology contains evidence INCOMPATIBLE with pure redundancy: wins at near-zero momentum (entity_8ad5cd4795 mom_20=0.004, entity_2f86543bf6 mom_20=-0.008) and ruins at high momentum (entity_6618d3e80c mom_20=0.251, entity_3472243e0c mom_20=0.242) are not the predicted signature of a momentum duplicate. A pure duplicate would predict high-momentum wins and low-momentum losses; the observed cross-pattern is the signature of either an override term or an interaction, which the redundancy framing dismisses by construction. Label instability (compound labels on entity_6618d3e80c, and two entities with 'false_negative_big_winner|false_negative_relative') further contaminates any group-mean contrast. The proposed 'cleaner replacement' (Gram–Schmidt residual against the momentum cluster) is itself problematic: by construction it zeroes out the axis along which the winners are actually being separated, so the replacement can only confirm the conclusion it was designed to produce.",
+  "falsifiers": [
+    "R²(distinct1_value ~ momentum-cluster features) > 0.70 in a held-out entity-disjoint fold with N ≥ 150 effective cases AND outcome-disagreement test yields KS AUC ≈ 0.5 across distinct1-rank-vs-neighbor-rank quartiles → redundancy supported.",
+    "Partial Spearman |corr(distinct1_value, W4_return_bucket | momentum-cluster features)| < 0.05 AND bootstrap 95% CI excludes 0.10 in the same held-out fold → independent-information claim falsified.",
+    "Sign-flip stress: replacing distinct1 with −distinct1 leaves selection precision@K unchanged within bootstrap noise (|Δ| < 1pp) → distinct1 is directionally inert, falsifying any load-bearing role regardless of redundancy status.",
+    "Ablation with re-tune: removing distinct1 and re-fitting remaining B0 weights on the same training set produces selection precision@K within bootstrap noise of the full model → distinct1 is non-load-bearing and any apparent information is being double-counted by neighbors.",
+    "The 'override-disagreement' pair test: in cases where distinct1's rank decile diverges from the momentum-cluster consensus by ≥3 deciles, the outcome distribution in the divergence partition is statistically indistinguishable from the no-divergence baseline → distinct1 adds no detectable override content beyond its correlation with neighbors.",
+    "Counter-evidence that would falsify the REDUNDANCY claim instead: finding ≥10 entity-disjoint case pairs with nearly identical momentum-cluster feature vectors but opposite W4 outcomes, where distinct1's value differs across the pair in the direction of the outcome, would constitute direct evidence of independent information content."
+  ],
+  "actionable_design_principles": [
+    "Do not use group-mean standardized deltas as a redundancy test — selection is a within-case ranking problem, and two features with identical group deltas can disagree on every borderline case. Use within-stratum rank correlation and disagreement-decile outcome distributions instead.",
+    "Separate three distinct questions before any 'cleaner replacement': (1) Is distinct1 collinear with neighbors? (2) Does distinct1 carry any predictive content not already in neighbors? (3) Is distinct1 load-bearing in the composite score? Each requires a different test; conflating them produces circular conclusions.",
+    "Refuse to orthogonalize a candidate feature against the very cluster that produced the wins. The replacement candidate must preserve the sign and direction of the original unless ablation proves it is non-load-bearing; otherwise the replacement is a destructive transform dressed as cleanup.",
+    "Treat N=27 as insufficient for any partial-correlation, KS, or ablation-precision conclusion. The archaeology set is a hypothesis-generation surface, not a hypothesis-test surface. Any verdict requiring statistical inference must wait for entity-disjoint N ≥ 150 with label-stability audit.",
+    "Audit label stability before any feature-redundancy analysis. Compound labels on the same entity-snapshot pair (observed: entity_6618d3e80c with both 'false_positive_ruin' and 'selected_winner') mean apparent group contrasts may be partially artifactual; collapse to a single outcome rule before computing deltas.",
+    "Recognize that a feature aligned with neighbors is not automatically redundant. A feature whose values nudge borderline rankings in the correct direction is doing real work even if its group-mean delta is identical to its neighbors'. Test this with a borderline-decile precision comparison, not a global R².",
+    "When the same archaeology shows wins at high momentum, wins at low momentum, AND ruins at high momentum, the explanation is rarely 'everything is the same factor' — it is more often an interaction or override. Treat that cross-pattern as a positive signal to be explained, not noise to be averaged away."
+  ],
+  "dsl_policy_ideas": [
+    {
+      "idea": "Two-stage redundancy gate for any new B0 component: (Stage 1) rolling R² against its k-nearest B0 neighbors over a 252-day window; flag if R² > 0.65. (Stage 2) for flagged components, require a disagreement-decile outcome test where the component ranks cases differently from its neighbor consensus — if outcome distributions in the disagreement deciles are statistically indistinguishable from the no-disagreement baseline, the component is queued for deprecation.",
+      "why_distinct": "Most existing redundancy checks stop at R². Stage 2 forces a direct test of whether the apparent redundancy is hiding orthogonal content on borderline cases, which is where selection actually lives.",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "up_day_ratio_20",
+        "vol_ratio_5_20",
+        "base_mbox_count",
+        "base_duration_weeks"
+      ],
+      "capacity_relevance": "Operates at the B0 component layer; prevents silent double-counting without requiring full model re-fit."
+    },
+    {
+      "idea": "Override-aware ablation protocol: remove a candidate component from B0, re-tune remaining weights on the same training window with the same label set, and compare selection precision@K on (a) the full population and (b) the borderline-decile slice where the candidate's rank disagreed with neighbor consensus. Report both deltas separately.",
+      "why_distinct": "Global ablation hides whether the component matters specifically on borderline cases — exactly where any override content would manifest. The borderline-only delta is the load-bearing test.",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "vol_ratio_5_20",
+        "ibd_entry_close_vs_trigger_pct"
+      ],
+      "capacity_relevance": "Capacity-preserving: does not require expanding the model; tests the existing B0 design."
+    },
+    {
+      "idea": "Label-stability pre-filter: before any feature-redundancy or partial-correlation analysis, collapse compound outcome labels to a single rule and require that no entity carries conflicting labels across snapshots within the analysis window. Cases failing this filter are excluded, not relabeled.",
+      "why_distinct": "Group-mean deltas computed on a label-unstable sample are not interpretable as feature properties; this filter restores interpretability without inflating apparent contradictions.",
+      "features": [
+        "w4_return_bucket",
+        "outcome_label"
+      ],
+      "capacity_relevance": "Pure data-hygiene layer; no model capacity change, prevents artifactual group-mean contrasts."
+    },
+    {
+      "idea": "Cross-pattern diagnostic: flag any B0 component whose archaeology shows wins at BOTH the top and bottom of a neighbor-feature's range, combined with ruins in the middle. This pattern is the empirical signature of an override/interaction term and should be investigated as such rather than treated as evidence of redundancy.",
+      "why_distinct": "Inverts the standard redundancy heuristic. Instead of asking 'does this agree with neighbors on average?', it asks 'does this disagree with neighbors in outcome-predictive ways?' — a question the current redundancy framing cannot ask.",
+      "features": [
+        "mom_20",
+        "px_vs_ma50",
+        "ma10_slope_5",
+        "vol_ratio_5_20"
+      ],
+      "capacity_relevance": "Diagnostic only; no model change, but routes components toward override-aware treatment instead of forced orthogonalization."
+    }
+  ]
+}
+```
