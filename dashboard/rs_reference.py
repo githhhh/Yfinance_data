@@ -149,7 +149,12 @@ def attach_rs_reference(
         return result
 
     ratings = reference.ratings
-    codes = result.get("code", pd.Series(index=result.index, dtype=object)).astype(str).str.upper()
+    codes = (
+        result.get("code", pd.Series(index=result.index, dtype=object))
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
     for field in RS_FIELDS:
         result[field] = codes.map(lambda code: ratings.get(code, {}).get(field))
     return result
