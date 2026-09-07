@@ -64,7 +64,7 @@ def _easter_sunday(year: int) -> date:
     f = (b + 8) // 25
     g = (b - f + 1) // 3
     h = (19 * a + b - d - g + 15) % 30
-    i = c // 4
+    i = b % 4
     k = c % 4
     l = (32 + 2 * e + 2 * i - h - k) % 7
     m = (a + 11 * h + 22 * l) // 451
@@ -97,11 +97,6 @@ def _is_market_trading_day(value: date) -> bool:
     for year in range(value.year - 1, value.year + 2):
         holidays.update(_market_holidays_for_year(year))
     return value not in holidays
-
-
-def is_us_market_trading_day(value: Any) -> bool:
-    """Return whether ``value`` is a regular US equity market trading date."""
-    return _is_market_trading_day(_coerce_date(value))
 
 
 def _complete_market_data_date(value: date) -> bool:
@@ -200,7 +195,6 @@ __all__ = [
     "classify_breakout_follow_pool",
     "complete_snapshot_week",
     "complete_target_week",
-    "is_us_market_trading_day",
     "is_valid_complete_baseline",
     "monday_of_week",
 ]
