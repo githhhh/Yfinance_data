@@ -205,7 +205,7 @@ rs_6m_percentile
 构建规则：
 
 1. 读取 `rs_stocks.csv` 最新 commit metadata；
-2. commit 时间转换为 `America/New_York` 日期，作为 RS market date；
+2. commit timestamp 只是 artifact 时间，不直接当作交易日；将其转换到 `America/New_York` 后映射到**该时点最新已经完成的美股交易日**：周末 / 美股休市日向前回退，若 artifact 在正常收盘前出现也使用前一已完成交易日；
 3. 使用同一 commit SHA 固定读取对应 CSV，避免 metadata / CSV 更新竞态；
 4. 只有 `rs_market_date == pool.snapshot_date` 才 join ticker；
 5. 日期不一致、ticker 缺失、GitHub / rs-log 不可用或 CSV schema 异常时显示 `N/A`；
@@ -275,6 +275,7 @@ python security_scan.py --history
 - 默认 Range 显示当前语境真实边界，完整范围不显示 `Any`；
 - Range 拖动后 active 状态与结果数量一致；
 - Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
+- RS market date 必须映射到实际已完成交易日；周末 / 休市日 artifact 不能冒充交易日；
 - RS 仅在严格交易日匹配时显示，错日、ticker 缺失与外部失败均为 N/A；
 - 周四 / 周六 `03:00 UTC` refresh 只重建当前权威 Pool，不修改 Pool 数据或 `snapshot_date`；
 - 表头排序、Quality / RS tooltip、选行、键盘 ↑↓、Copy 顺序一致；
