@@ -34,7 +34,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
     assert len(payload["views"]["weekend"]["rows"]) == len(normalized)
     assert payload["meta"]["complete_snapshot_date"] is not None
     assert payload["default_period"] in {"WEEKEND", "MIDWEEK"}
-    assert "c_rank" not in payload["views"]
+    assert set(payload["views"]) == {"weekend", "midweek"}
 
     row = payload["views"]["weekend"]["rows"][0]
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
@@ -117,13 +117,13 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
         output / "index.html",
         output / "app.js",
         output / "table_enhancements.js",
-        output / "rs_enhancements.js",
         output / "styles.css",
         output / "manifest.webmanifest",
         output / ".nojekyll",
         output / "data" / "dashboard.json",
     ):
         assert path.exists(), path
+    assert not (output / "rs_enhancements.js").exists()
 
     payload = json.loads((output / "data" / "dashboard.json").read_text(encoding="utf-8"))
     assert payload["views"]["weekend"]["rows"]
@@ -133,19 +133,26 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
             assert "rank_C_continuous" not in row
             assert "C_continuous" not in row
 
-    index = (output / "index.html").read_text(encoding="utf-8").lower()
-    assert "streamlit" not in index
+    index = (output / "index.html").read_text(encoding="utf-8")
+    assert "streamlit" not in index.lower()
     assert "table_enhancements.js" in index
-    assert "rs_enhancements.js" in index
+    assert "rs_enhancements.js" not in index
+    assert "Dashboard mode" not in index
+
+    app = (output / "app.js").read_text(encoding="utf-8")
+    assert "rs_percentile" in app
+    assert "RS Reference" in app
+    assert "Fred6725/rs-log" in app
+    assert "C Rank" not in app
+    assert "rank_C_continuous" not in app
+    assert "C_RANK" not in app
 
     enhancements = (output / "table_enhancements.js").read_text(encoding="utf-8")
     assert "Breakout Price Quality" in enhancements
     assert "Powerful" in enhancements
-    assert "data-sort-field" in enhancements
-
-    rs_enhancements = (output / "rs_enhancements.js").read_text(encoding="utf-8")
-    assert "Fred6725/rs-log" in rs_enhancements
-    assert "Exact trading-date match required" in rs_enhancements
+    assert "rs_percentile" in enhancements
+    assert "C Rank" not in enhancements
+    assert "data-c-rank-table" not in enhancements
 
 
 def test_streamlit_runtime_has_been_removed() -> None:
