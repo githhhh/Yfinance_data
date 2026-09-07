@@ -36,7 +36,6 @@ STATIC_ASSETS = (
     "index.html",
     "app.js",
     "table_enhancements.js",
-    "rs_enhancements.js",
     "styles.css",
     "manifest.webmanifest",
 )
@@ -133,8 +132,6 @@ def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
     result = frame.copy()
     result["review_watch_active"] = result["signal"]
     result["review_effective_entry_status"] = result["ibd_entry_status"]
-    # Weekend review has no transition priority. Keep the public field for a
-    # stable row schema without falling back to the unvalidated C Rank.
     result["review_priority"] = None
     return result
 
@@ -331,9 +328,6 @@ def main() -> int:
     parser.add_argument("--window-date", default=None)
     args = parser.parse_args()
 
-    # RS is deliberately fail-soft. If the public source is unavailable or its
-    # market date does not match a Pool snapshot, the site still builds and RS
-    # is rendered as N/A.
     rs_reference = fetch_latest_rs_reference()
     output = build_site(
         args.output,
