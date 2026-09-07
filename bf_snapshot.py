@@ -99,6 +99,11 @@ def _is_market_trading_day(value: date) -> bool:
     return value not in holidays
 
 
+def is_us_market_trading_day(value: Any) -> bool:
+    """Return whether ``value`` is a regular US equity market trading date."""
+    return _is_market_trading_day(_coerce_date(value))
+
+
 def _complete_market_data_date(value: date) -> bool:
     if value.weekday() not in {3, 4} or not _is_market_trading_day(value):
         return False
@@ -195,6 +200,7 @@ __all__ = [
     "classify_breakout_follow_pool",
     "complete_snapshot_week",
     "complete_target_week",
+    "is_us_market_trading_day",
     "is_valid_complete_baseline",
     "monday_of_week",
 ]
