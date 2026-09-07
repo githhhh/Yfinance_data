@@ -53,17 +53,27 @@
 
     const numericLeft = numericValue(left);
     const numericRight = numericValue(right);
-    if (numericLeft === null && numericRight !== null) return 1;
-    if (numericLeft !== null && numericRight === null) return -1;
-    if (numericLeft !== null && numericRight !== null) {
-      const result = numericLeft - numericRight;
-      return direction === "desc" ? -result : result;
+
+    // RS is optional runtime data, so an unavailable value stays last in both
+    // directions. All other columns retain the pre-RS table sort semantics.
+    if (field === "rs_percentile") {
+      if (numericLeft === null && numericRight !== null) return 1;
+      if (numericLeft !== null && numericRight === null) return -1;
     }
 
-    const result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
+    let result = 0;
+    if (numericLeft !== null && numericRight !== null) {
+      result = numericLeft - numericRight;
+    } else if (numericLeft !== null) {
+      result = -1;
+    } else if (numericRight !== null) {
+      result = 1;
+    } else {
+      result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    }
     return direction === "desc" ? -result : result;
   }
 
