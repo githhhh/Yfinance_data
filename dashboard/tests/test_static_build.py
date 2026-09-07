@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -86,6 +86,38 @@ def test_matching_rs_snapshot_is_joined_without_affecting_pool_rows() -> None:
     assert payload["meta"]["rs_reference"]["matches_complete"] is True
 
 
+def test_wrong_date_rs_snapshot_fails_soft_to_na() -> None:
+    normalized = load_pool_csv(COMPLETE)
+    pool_date = pd.to_datetime(normalized["snapshot_date"].iloc[0]).date()
+    code = str(normalized["code"].iloc[0])
+    reference = RSReferenceSnapshot(
+        market_date=pool_date + timedelta(days=1),
+        ratings={
+            code.upper(): {
+                "rs_percentile": 99,
+                "rs_1m_percentile": 98,
+                "rs_3m_percentile": 97,
+                "rs_6m_percentile": 96,
+            }
+        },
+        commit_sha="wrong-date",
+    )
+
+    payload = build_dashboard_payload(
+        complete_path=COMPLETE,
+        midweek_path=MIDWEEK,
+        window_date=date(2026, 9, 5),
+        rs_reference=reference,
+    )
+
+    assert payload["meta"]["rs_reference"]["matches_complete"] is False
+    for row in payload["views"]["weekend"]["rows"]:
+        assert row["rs_percentile"] is None
+        assert row["rs_1m_percentile"] is None
+        assert row["rs_3m_percentile"] is None
+        assert row["rs_6m_percentile"] is None
+
+
 def test_static_records_fail_closed_on_new_pool_columns() -> None:
     frame = pd.DataFrame(
         [
@@ -151,8 +183,15 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "Breakout Price Quality" in enhancements
     assert "Powerful" in enhancements
     assert "rs_percentile" in enhancements
+    assert 'data-rs-enhanced="true"' in enhancements
+    assert 'title^="RS "' in enhancements
     assert "C Rank" not in enhancements
     assert "data-c-rank-table" not in enhancements
+
+    styles = (output / "styles.css").read_text(encoding="utf-8")
+    assert ".reference-header" not in styles
+    assert ".reference-rule" not in styles
+    assert ".topn-select" not in styles
 
 
 def test_streamlit_runtime_has_been_removed() -> None:
