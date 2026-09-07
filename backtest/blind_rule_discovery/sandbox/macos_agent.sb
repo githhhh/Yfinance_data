@@ -6,6 +6,7 @@
 ;; The research process may read/write only WORKSPACE for experiment data.
 ;; RUNTIME and system locations are read-only so Python/agent binaries can run.
 (version 1)
+(import "system.sb")
 (deny default)
 
 ;; Process execution and normal runtime services.
@@ -14,6 +15,7 @@
 (allow sysctl-read)
 (allow mach-lookup)
 (allow network-outbound)
+(allow file-read-metadata)
 
 ;; System/runtime code and configuration: read-only.
 (allow file-read*
@@ -24,6 +26,7 @@
     (subpath "/Library")
     (subpath "/private/etc")
     (subpath "/private/var/db")
+    (subpath "/private/var/select")
     (subpath "/dev")
     (subpath (param "RUNTIME")))
 

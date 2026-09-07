@@ -83,7 +83,7 @@ def run_research_command(
     if extras:
         raise RuntimeError(f"agent workspace contains unexpected files: {sorted(extras)}")
     with tempfile.TemporaryDirectory(prefix="blind_rule_agent_") as tmp:
-        isolated = Path(tmp) / "workspace"
+        isolated = (Path(tmp) / "workspace").resolve()
         shutil.copytree(workspace, isolated)
         # Keep HOME inside the only user-data tree granted by the sandbox. Some
         # agent CLIs need a writable HOME for caches/config; placing it beside
