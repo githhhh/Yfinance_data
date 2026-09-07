@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pandas as pd
 import pytest
@@ -12,6 +12,7 @@ from dashboard.rs_reference import (
     fetch_latest_rs_reference,
     parse_rs_csv,
     parse_rs_market_date,
+    scheduled_refresh_publishable,
 )
 
 
@@ -42,8 +43,60 @@ def test_preclose_delayed_commit_maps_to_previous_completed_session() -> None:
         '[{"sha":"delayed","commit":{"committer":{"date":"2026-09-08T17:00:00Z"}}}]'
     )
 
-    # 13:00 New York: today's regular session has not completed yet.
+    # 13:00 New York: today's regular session has not completed yet. Monday
+    # 2026-09-07 was Labor Day, so the prior completed session is Friday 09-04.
     assert market_date == date(2026, 9, 4)
+
+
+def test_scheduled_refresh_requires_current_pool_and_rs_market_date() -> None:
+    now = datetime(2026, 9, 5, 3, 0, tzinfo=timezone.utc)
+    payload = {
+        "default_period": "WEEKEND",
+        "meta": {
+            "complete_snapshot_date": "2026-09-04",
+            "midweek_snapshot_date": "2026-09-02",
+            "rs_reference": {"available": True, "market_date": "2026-09-04"},
+        },
+    }
+
+    assert scheduled_refresh_publishable(payload, now) is True
+
+    stale_rs = {
+        **payload,
+        "meta": {
+            **payload["meta"],
+            "rs_reference": {"available": True, "market_date": "2026-09-03"},
+        },
+    }
+    stale_pool = {
+        **payload,
+        "meta": {**payload["meta"], "complete_snapshot_date": "2026-08-28"},
+    }
+    missing_rs = {
+        **payload,
+        "meta": {
+            **payload["meta"],
+            "rs_reference": {"available": False, "market_date": None},
+        },
+    }
+
+    assert scheduled_refresh_publishable(stale_rs, now) is False
+    assert scheduled_refresh_publishable(stale_pool, now) is False
+    assert scheduled_refresh_publishable(missing_rs, now) is False
+
+
+def test_scheduled_midweek_refresh_targets_midweek_snapshot_only() -> None:
+    now = datetime(2026, 9, 3, 3, 0, tzinfo=timezone.utc)
+    payload = {
+        "default_period": "MIDWEEK",
+        "meta": {
+            "complete_snapshot_date": "2026-08-28",
+            "midweek_snapshot_date": "2026-09-02",
+            "rs_reference": {"available": True, "market_date": "2026-09-02"},
+        },
+    }
+
+    assert scheduled_refresh_publishable(payload, now) is True
 
 
 def test_rs_csv_parses_current_and_prior_percentiles() -> None:
