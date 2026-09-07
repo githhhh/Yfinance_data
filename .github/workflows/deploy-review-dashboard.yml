@@ -55,7 +55,6 @@ jobs:
         run: |
           node --check dashboard/app.js
           node --check dashboard/table_enhancements.js
-          node --check dashboard/rs_enhancements.js
           python -m py_compile dashboard/build_static.py dashboard/rs_reference.py
 
       - name: Validate authoritative pool projection
@@ -68,9 +67,6 @@ jobs:
       - name: Build static dashboard
         run: python dashboard/build_static.py --output _site
         env:
-          # Pull-request code runs credential-free. Once code is on main, the
-          # short-lived read token only gives the public GitHub API more rate
-          # limit headroom; rs_reference.py never sends it to the raw host.
           RS_GITHUB_TOKEN: ${{ github.event_name != 'pull_request' && github.token || '' }}
 
       - name: Configure GitHub Pages
