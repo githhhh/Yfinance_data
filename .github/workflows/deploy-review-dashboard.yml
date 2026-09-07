@@ -55,7 +55,8 @@ jobs:
         run: |
           node --check dashboard/app.js
           node --check dashboard/table_enhancements.js
-          python -m py_compile dashboard/build_static.py
+          node --check dashboard/rs_enhancements.js
+          python -m py_compile dashboard/build_static.py dashboard/rs_reference.py
 
       - name: Validate authoritative pool projection
         run: |
@@ -66,6 +67,8 @@ jobs:
 
       - name: Build static dashboard
         run: python dashboard/build_static.py --output _site
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'
