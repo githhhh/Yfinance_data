@@ -464,3 +464,124 @@
       dashboardData = null;
     });
 })();
+
+(() => {
+  "use strict";
+
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  let tooltip = null;
+  let anchor = null;
+  let pinned = false;
+  let refreshQueued = false;
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function positionTooltip() {
+    if (!tooltip || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const tip = tooltip.getBoundingClientRect();
+    const padding = 8;
+    const left = Math.min(
+      Math.max(padding, rect.left),
+      Math.max(padding, window.innerWidth - tip.width - padding),
+    );
+    const below = rect.bottom + 6;
+    const top = below + tip.height <= window.innerHeight - padding
+      ? below
+      : Math.max(padding, rect.top - tip.height - 6);
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+  }
+
+  function hideTooltip(force = false) {
+    if (pinned && !force) return;
+    tooltip?.remove();
+    tooltip = null;
+    anchor = null;
+    if (force) pinned = false;
+  }
+
+  function showTooltip(target, pin = false) {
+    const copy = target.dataset.rsTooltip || "RS reference unavailable";
+    hideTooltip(true);
+    pinned = pin;
+    anchor = target;
+    const node = document.createElement("div");
+    node.setAttribute("role", "tooltip");
+    node.style.cssText = "position:fixed;width:min(310px,calc(100vw - 16px));padding:11px 12px;border-radius:7px;background:#0b1329;color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.45);border:1px solid rgba(148,163,184,.22);z-index:999999;font:11px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;pointer-events:none;white-space:normal;";
+    node.innerHTML = copy.split("\n").map((line, index) => {
+      const tag = index === 0 ? "strong" : "div";
+      return `<${tag}>${escapeHtml(line)}</${tag}>`;
+    }).join("");
+    document.body.appendChild(node);
+    tooltip = node;
+    positionTooltip();
+  }
+
+  function decorateRsReference(target) {
+    if (target.dataset.rsEnhanced === "true") return;
+    const copy = target.getAttribute("title") || "";
+    if (!copy.startsWith("RS ")) return;
+    target.dataset.rsEnhanced = "true";
+    target.dataset.rsTooltip = copy;
+    target.removeAttribute("title");
+    target.setAttribute("tabindex", "0");
+    target.setAttribute("role", "button");
+    target.setAttribute("aria-label", `${target.textContent?.trim() || "RS"}. Tap for RS reference details.`);
+    target.style.cursor = "help";
+
+    target.addEventListener("mouseenter", () => {
+      if (!pinned) showTooltip(target, false);
+    });
+    target.addEventListener("mouseleave", () => hideTooltip(false));
+    target.addEventListener("focus", () => {
+      if (!pinned) showTooltip(target, false);
+    });
+    target.addEventListener("blur", () => hideTooltip(false));
+    target.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (pinned && anchor === target) hideTooltip(true);
+      else showTooltip(target, true);
+    });
+    target.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (pinned && anchor === target) hideTooltip(true);
+        else showTooltip(target, true);
+      }
+      if (event.key === "Escape") hideTooltip(true);
+    });
+  }
+
+  function enhanceRsReferences() {
+    app.querySelectorAll('[title^="RS "]').forEach(decorateRsReference);
+  }
+
+  function scheduleEnhance() {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    requestAnimationFrame(() => {
+      refreshQueued = false;
+      enhanceRsReferences();
+    });
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (pinned && !event.target.closest?.('[data-rs-enhanced="true"]')) hideTooltip(true);
+  });
+  window.addEventListener("resize", positionTooltip);
+  window.addEventListener("scroll", () => hideTooltip(true), true);
+
+  const observer = new MutationObserver(scheduleEnhance);
+  observer.observe(app, { childList: true, subtree: true });
+  scheduleEnhance();
+})();
