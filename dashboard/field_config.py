@@ -46,6 +46,7 @@ DISPLAY_FORMAT_FIELDS = frozenset(DISPLAY_VALUE_MAPS)
 
 
 def format_display_value(field: str, value: Any) -> str:
+    """Return concise display copy without mutating raw dataframe values."""
     if value is None:
         return ""
     text = str(value).strip()
@@ -472,36 +473,230 @@ def _field(
 
 FIELD_CONFIG = OrderedDict(
     [
-        ("code", _field("Code", "text", "Identity", default_table=True)),
-        ("review_change_label", _field("Change", "category", "Review", default_table=False)),
+        (
+            "code",
+            _field(
+                "Code",
+                "text",
+                "Identity",
+                sortable=True,
+                default_table=True,
+                help_text="点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。",
+            ),
+        ),
+        (
+            "review_change_label",
+            _field(
+                "Change",
+                "category",
+                "Review",
+                filterable=True,
+                sortable=True,
+                default_table=False,
+                help_text="Signal origin and effective entry-status transition for this Midweek Review row.",
+            ),
+        ),
         ("review_signal_origin", _field("Origin", "category", "Review", default_table=False)),
         ("review_change_group", _field("Change Group", "category", "Review", default_table=False)),
-        ("review_priority", _field("Review Priority", "number", "Review", default_table=False)),
+        (
+            "review_priority",
+            _field(
+                "Review Priority",
+                "number",
+                "Review",
+                default_table=False,
+                help_text="周中变化的默认复盘顺序；数值越小越应优先检查。",
+            ),
+        ),
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
-        ("ibd_candidate_rule", _field("Setup", "category", "Buy Point", default_table=True)),
-        ("ibd_candidate_price", _field("Buy Point", "number", "Buy Point", default_table=True, fmt="0.00")),
+        (
+            "ibd_candidate_rule",
+            _field(
+                "Setup",
+                "category",
+                "Buy Point",
+                default_table=True,
+                help_text="买点所依据的形态或触发结构。",
+            ),
+        ),
+        (
+            "ibd_candidate_price",
+            _field(
+                "Buy Point",
+                "number",
+                "Buy Point",
+                default_table=True,
+                fmt="0.00",
+                help_text="当前复盘使用的有效买点价格。",
+            ),
+        ),
         ("ibd_candidate_signal_source", _field("IBD Candidate Signal Source", "category", "Candidate")),
-        ("ibd_candidate_extra", _field("IBD Candidate Extra", "text", "Candidate", filterable=False, sortable=False, advanced_filter=False)),
+        (
+            "ibd_candidate_extra",
+            _field(
+                "IBD Candidate Extra",
+                "text",
+                "Candidate",
+                filterable=False,
+                sortable=False,
+                default_table=False,
+                advanced_filter=False,
+            ),
+        ),
         ("ibd_entry_valid", _field("IBD Entry Valid", "boolean", "IBD Entry", default_table=True)),
         ("ibd_entry_date", _field("IBD Entry Date", "date", "IBD Entry", default_table=True)),
         ("ibd_entry_price", _field("IBD Entry Price", "number", "IBD Entry", default_table=True, fmt="0.00")),
         ("ibd_trigger_price", _field("IBD Trigger Price", "number", "IBD Entry", fmt="0.00")),
-        ("ibd_entry_volume_ratio", _field("IBD Entry Volume Ratio", "number", "IBD Entry", default_table=True, fmt="0.00x")),
-        ("ibd_entry_close_vs_trigger_pct", _field("Close vs Trigger", "number", "IBD Entry", default_table=True, fmt="0.00%")),
-        ("ibd_entry_close_position", _field("Close Position", "number", "IBD Entry", default_table=True, fmt="0.00")),
-        ("ibd_entry_breakout_range_ratio", _field("Breakout Range Ratio", "number", "IBD Entry", default_table=True, fmt="0.00x")),
-        ("ibd_entry_vol_or_reject", _field("Entry / Reason", "text", "IBD Entry", filterable=False, sortable=False, default_table=True, advanced_filter=False)),
-        ("ibd_entry_status", _field("Status", "category", "IBD Entry", default_table=True)),
-        ("ibd_breakout_quality", _field("Breakout Price Quality", "category", "IBD Entry", default_table=True)),
-        ("latest_close", _field("Latest", "number", "IBD Entry", filterable=False, default_table=True, advanced_filter=False, fmt="0.00")),
-        ("current_vs_ibd_candidate_pct", _field("Vs Buy Point", "number", "IBD Entry", default_table=True, fmt="0.00%")),
+        (
+            "ibd_entry_volume_ratio",
+            _field(
+                "IBD Entry Volume Ratio",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00x",
+                help_text="Breakout-day volume divided by recent average volume.",
+            ),
+        ),
+        (
+            "ibd_entry_close_vs_trigger_pct",
+            _field(
+                "Close vs Trigger",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00%",
+                help_text="Close confirmation quality versus trigger price.",
+            ),
+        ),
+        (
+            "ibd_entry_close_position",
+            _field(
+                "Close Position",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00",
+                help_text="Relative close position within daily high-low range (0 to 1).",
+            ),
+        ),
+        (
+            "ibd_entry_breakout_range_ratio",
+            _field(
+                "Breakout Range Ratio",
+                "number",
+                "IBD Entry",
+                default_table=True,
+                fmt="0.00x",
+                help_text="Close-to-trigger distance as a proportion of the day's high-low range.",
+            ),
+        ),
+        (
+            "ibd_entry_vol_or_reject",
+            _field(
+                "Entry / Reason",
+                "text",
+                "IBD Entry",
+                filterable=False,
+                sortable=False,
+                default_table=True,
+                advanced_filter=False,
+                help_text="日线突破确认：成功显示日线量比，未确认显示原因。",
+            ),
+        ),
+        (
+            "ibd_entry_status",
+            _field(
+                "Status",
+                "category",
+                "IBD Entry",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                help_text="当前 IBD Review 状态。",
+            ),
+        ),
+        (
+            "ibd_breakout_quality",
+            _field(
+                "Breakout Price Quality",
+                "category",
+                "IBD Entry",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                help_text=(
+                    "Price-action quality based on Close Position and Trigger Clearance.\n"
+                    "Volume confirmation is evaluated separately."
+                ),
+            ),
+        ),
+        (
+            "latest_close",
+            _field(
+                "Latest",
+                "number",
+                "IBD Entry",
+                filterable=False,
+                default_table=True,
+                advanced_filter=False,
+                fmt="0.00",
+                help_text="当前数据快照的最新收盘价，不是实时价格。",
+            ),
+        ),
+        (
+            "current_vs_ibd_candidate_pct",
+            _field(
+                "Vs Buy Point",
+                "number",
+                "IBD Entry",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                fmt="0.00%",
+                help_text="最新收盘价相对 Buy Point 的距离。",
+            ),
+        ),
         ("ibd_entry_rule", _field("IBD Entry Rule", "category", "IBD Entry")),
-        ("ibd_entry_reject_reason", _field("IBD Entry Reject Reason", "text", "IBD Entry", filterable=False, sortable=False, advanced_filter=False)),
-        ("volume_ratio", _field("Weekly Vol", "number", "Volume/Pullback", default_table=True, fmt="0.00x")),
+        (
+            "ibd_entry_reject_reason",
+            _field(
+                "IBD Entry Reject Reason",
+                "text",
+                "IBD Entry",
+                filterable=False,
+                sortable=False,
+                default_table=False,
+                advanced_filter=False,
+            ),
+        ),
+        (
+            "volume_ratio",
+            _field(
+                "Weekly Vol",
+                "number",
+                "Volume/Pullback",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+                fmt="0.00x",
+                help_text="当前周成交量相对 10 周均量的倍数。",
+            ),
+        ),
         ("hold_return", _field("Hold Return", "number", "Volume/Pullback", fmt="0.0%")),
-        ("breakout_date", _field("Breakout Date", "date", "Signal", default_table=True)),
+        (
+            "breakout_date",
+            _field(
+                "Breakout Date",
+                "date",
+                "Signal",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+            ),
+        ),
         ("pct_above_ceiling", _field("Pct Above Ceiling", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("touched_ema10_count", _field("Touched EMA10 Count", "number", "Risk / Structure", default_table=True)),
         ("mbox_count", _field("M Box Count", "number", "Risk / Structure")),
@@ -512,7 +707,16 @@ FIELD_CONFIG = OrderedDict(
         ("base_mbox_count", _field("Base M Box Count", "number", "Risk / Structure")),
         ("base_depth_abs", _field("Base Depth Abs", "number", "Risk / Structure")),
         ("pullback_count", _field("Pullback Count", "number", "Risk / Structure", default_table=True)),
-        ("pullback_duration_weeks", _field("Pullback Duration Weeks", "number", "Risk / Structure", default_table=True)),
+        (
+            "pullback_duration_weeks",
+            _field(
+                "Pullback Duration Weeks",
+                "number",
+                "Risk / Structure",
+                default_table=True,
+                help_text="上游正式产出的回撤/巩固持续时间，用于 Continuation 信号的时长检查。",
+            ),
+        ),
         ("pullback_pct", _field("Pullback Pct", "number", "Risk / Structure", fmt="0.0%")),
         ("pullback_pct_off_peak", _field("Pullback Pct Off Peak", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
@@ -522,16 +726,40 @@ FIELD_CONFIG = OrderedDict(
         ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
         ("price_52_week_high", _field("Price 52 Week High", "number", "Grouping", default_table=True, fmt="0.00")),
         ("dist_to_52w_high_pct", _field("Distance To 52W High", "number", "Grouping", default_table=True, fmt="0.0%")),
-        ("rs_percentile", _field("RS", "number", "Reference", filterable=False, default_table=True, advanced_filter=False)),
-        ("rs_1m_percentile", _field("RS 1M Ago", "number", "Reference", filterable=False, advanced_filter=False)),
-        ("rs_3m_percentile", _field("RS 3M Ago", "number", "Reference", filterable=False, advanced_filter=False)),
-        ("rs_6m_percentile", _field("RS 6M Ago", "number", "Reference", filterable=False, advanced_filter=False)),
+        (
+            "rs_percentile",
+            _field(
+                "RS",
+                "number",
+                "Reference",
+                filterable=False,
+                default_table=True,
+                advanced_filter=False,
+                help_text="Current public IBD-style RS percentile; reference only, not an official IBD rating or strategy gate.",
+            ),
+        ),
+        (
+            "rs_1m_percentile",
+            _field("RS 1M Ago", "number", "Reference", filterable=False, advanced_filter=False),
+        ),
+        (
+            "rs_3m_percentile",
+            _field("RS 3M Ago", "number", "Reference", filterable=False, advanced_filter=False),
+        ),
+        (
+            "rs_6m_percentile",
+            _field("RS 6M Ago", "number", "Reference", filterable=False, advanced_filter=False),
+        ),
     ]
 )
 
 
 def get_custom_mode_fields() -> list[str]:
-    return [field for field in FIELD_CONFIG if FIELD_CONFIG[field].get("custom_mode") and field not in LONG_FIELDS]
+    return [
+        field
+        for field in FIELD_CONFIG
+        if FIELD_CONFIG[field].get("custom_mode") and field not in LONG_FIELDS
+    ]
 
 
 def get_filterable_fields() -> list[str]:
