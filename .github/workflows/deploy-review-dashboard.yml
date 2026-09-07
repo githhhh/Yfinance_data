@@ -63,14 +63,14 @@ jobs:
         run: |
           node --check dashboard/app.js
           node --check dashboard/table_enhancements.js
-          python -m py_compile dashboard/build_static.py dashboard/rs_reference.py
+          python -m py_compile bf_snapshot.py dashboard/build_static.py dashboard/rs_reference.py
 
       - name: Validate authoritative pool projection
         run: |
           python dashboard/self_check.py \
             --csv us/breakout_follow_pool.csv \
             --midweek-csv us/breakout_follow_pool_midweek.csv
-          python -m pytest dashboard/tests -q
+          python -m pytest dashboard/tests tests/test_bf_snapshot.py -q
 
       - name: Build static dashboard
         id: static_build
