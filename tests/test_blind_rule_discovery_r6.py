@@ -224,8 +224,9 @@ def test_official_backend_adapter_counts_each_underlying_completion(tmp_path, mo
             backend.completion(messages=[])
             return backend.completion(messages=[])
     backend.LiteLLMAPIBackend = FakeBackend
+    # Match rdagent==0.8.0 on the data machine: the logger has no `debug` method.
     modules["rdagent.log"].rdagent_logger = SimpleNamespace(
-        **{method: lambda *a, **kw: None for method in ("info", "warning", "error", "debug", "log_object")})
+        **{method: lambda *a, **kw: None for method in ("info", "warning", "error", "log_object")})
     for name, module in modules.items():
         monkeypatch.setitem(sys.modules, name, module)
     agent = RDAgentProposer(ledger_path=tmp_path/"ledger.json", cache_dir=tmp_path/"cache")
