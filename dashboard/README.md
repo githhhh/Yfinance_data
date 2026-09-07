@@ -44,12 +44,16 @@ python security_scan.py --history
 python -m http.server 8000 --directory /tmp/yfinance-dashboard-site
 ```
 
-`build_static.py` 获取 RS 失败、RS 日期不匹配或 ticker 缺失时仍正常构建，对应 RS 显示 `N/A`。
+浏览器访问 `http://localhost:8000` 即可检查与 GitHub Pages 相同的静态产物。`build_static.py` 获取 RS 失败、RS 日期不匹配或 ticker 缺失时仍正常构建，对应 RS 显示 `N/A`。
 
 ## 部署
 
+`.github/workflows/deploy-review-dashboard.yml` 监听 `main` 上权威 BF Pool 的最终提交以及 Dashboard 自身修改：
+
 ```text
 quant_trade scheduled run
+  → Yfinance_data raw-data update
+  → quant_trade BreakoutFollow + IBD enrichment
   → Yfinance_data authority publish / validate
   → pool.commit() pushes breakout_follow_pool*.csv to main
   → Deploy Review Dashboard
@@ -58,7 +62,7 @@ quant_trade scheduled run
   → GitHub Pages
 ```
 
-Pages 没有第二套 weekly/midweek 调度。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署。
+因此 Pages 没有第二套 weekly/midweek 调度，也不会从原始行情下载 workflow 提前发布半成品。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署。
 
 ## Public payload 安全边界
 
@@ -66,6 +70,7 @@ GitHub Pages 是公网资源。`dashboard/build_static.py` 通过 `PUBLIC_DASHBO
 
 - Pool 新增列不会自动进入 `dashboard.json`；
 - RS 只发布当前 percentile 和 1M / 3M / 6M ago percentile；
+- RS 公共数据获取不使用仓库 Token、API Key 或其它凭据；
 - 不得把账户、持仓、成本、订单、broker account hash、API Key、OAuth Token 或其它私有交易数据加入静态 payload。
 
 完整仓库安全约束见 [`SECURITY.md`](../SECURITY.md)。
