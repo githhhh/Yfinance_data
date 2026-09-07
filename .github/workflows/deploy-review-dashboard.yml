@@ -19,6 +19,12 @@ on:
       - 'yfinance_data/**'
       - 'bf_snapshot.py'
       - '.github/workflows/deploy-review-dashboard.yml'
+  # rs-log normally publishes the prior US market day's snapshot around
+  # 01:30 UTC. Rebuild after that publication window so a Pool push that
+  # arrived first can pick up the exact-date RS reference without creating
+  # a second Pool/data schedule.
+  schedule:
+    - cron: '0 3 * * 4,6'
   workflow_dispatch:
 
 env:
