@@ -74,8 +74,10 @@ def rank_stop_risk_rules(scored: pd.DataFrame, *, baseline_persistent_rate: floa
     1. fraction of evaluated training quarters with higher stop-first risk;
     2. median quarter stop-first lift;
     3. aggregate stop-first lift;
-    4. persistent-stop lift;
-    5. support.
+    4. support, then canonical rule JSON for deterministic ties.
+
+    Persistent-stop lift uses 12-week recovery and is descriptive only: the
+    rolling training purge covers W3, so it must never affect rule selection.
     """
     if scored.empty:
         return scored.copy()
@@ -93,10 +95,10 @@ def rank_stop_risk_rules(scored: pd.DataFrame, *, baseline_persistent_rate: floa
             "higher_stop_risk_quarter_fraction",
             "median_quarter_stop_first_lift",
             "stop_first_lift",
-            "persistent_stop_first_lift",
             "evaluable_n",
+            "rule_json",
         ],
-        ascending=[False, False, False, False, False],
+        ascending=[False, False, False, False, True],
         na_position="last",
     ).reset_index(drop=True)
 
@@ -424,6 +426,28 @@ def _pooled_rate(numerator: pd.Series, denominator: pd.Series) -> float | None:
     return float(pd.to_numeric(numerator, errors="coerce").fillna(0).sum() / d)
 
 
+def selection_weighted_baseline(group: pd.DataFrame) -> dict[str, Any]:
+    """Match quarter weights to selected evaluable rows, not universe size.
+
+    This controls quarterly composition only. Equal-snapshot complementary
+    contrasts remain the stock-selection diagnostic.
+    """
+    weights = pd.to_numeric(group["test_evaluable_n"], errors="coerce").fillna(0)
+    baseline_n = pd.to_numeric(group["test_baseline_evaluable_n"], errors="coerce")
+    result = {}
+    for label, numerator in (("stop_first", "stop_first_n"), ("persistent_stop", "persistent_stop_first_n")):
+        baseline_counts = pd.to_numeric(group[f"test_baseline_{numerator}"], errors="coerce")
+        selected_counts = pd.to_numeric(group[f"test_{numerator}"], errors="coerce")
+        usable = (weights > 0) & (baseline_n > 0) & baseline_counts.notna() & selected_counts.notna()
+        total = weights.loc[usable].sum()
+        expected = ((baseline_counts.loc[usable] / baseline_n.loc[usable]) * weights.loc[usable]).sum()
+        result[f"selection_weighted_baseline_{label}_rate"] = float(expected / total) if total > 0 else None
+        result[f"selection_weighted_{label}_lift"] = (
+            float((selected_counts.loc[usable].sum() - expected) / total) if total > 0 else None
+        )
+    return result
+
+
 def summarize_risk_rolling(rolling: pd.DataFrame) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     if rolling.empty:
@@ -450,6 +474,7 @@ def summarize_risk_rolling(rolling: pd.DataFrame) -> dict[str, Any]:
             baseline_eval_traded,
         )
         summary[scope] = {
+            **selection_weighted_baseline(group),
             "folds": int(len(group)),
             "w3_overlap_purge_rows_total": int(pd.to_numeric(group["train_rows_purged_for_w3_overlap"], errors="coerce").fillna(0).sum()),
             "post_purge_overlap_fold_count": int(overlap.sum()),
@@ -509,6 +534,7 @@ def summarize_family_rolling(families: pd.DataFrame) -> list[dict[str, Any]]:
             {
                 "scope": scope,
                 "family": family,
+                **selection_weighted_baseline(group),
                 "folds": int(len(group)),
                 "zero_selection_folds": int((selected == 0).sum()),
                 "evaluable_stop_lift_folds": int(stop_lift.notna().sum()),
@@ -556,6 +582,8 @@ def main() -> int:
     }
     if args.output_root.resolve() in immutable:
         raise RuntimeError("R1-R4 outputs are immutable and may not be reused by R5")
+    if args.output_root.exists() and any(args.output_root.iterdir()):
+        raise RuntimeError("Corrected R5 requires a fresh output root; preserve prior R5 evidence")
     args.output_root.mkdir(parents=True, exist_ok=True)
 
     provenance = validate_replay_preflight(args.replay_root, daily_pkl=args.daily_pkl, required_quarters=12)
@@ -587,7 +615,9 @@ def main() -> int:
     family_rolling.to_csv(args.output_root / "risk_family_rolling.csv", index=False)
 
     metadata = {
-        "research_mode": "r5_causal_stop_risk_validation_frozen",
+        "research_mode": "r5_w3_only_selection_audit_corrected",
+        "selection_revision": "remove_unpurged_12w_tiebreaker",
+        "pooled_lift_semantics": "legacy pooled lifts are composition-unadjusted; also report selection-weighted lifts",
         "canonical_blind_experiment": False,
         "unseen_holdout_claim_allowed": False,
         "llm_used": False,
@@ -602,9 +632,10 @@ def main() -> int:
                 "higher_stop_risk_quarter_fraction desc",
                 "median_quarter_stop_first_lift desc",
                 "stop_first_lift desc",
-                "persistent_stop_first_lift desc",
                 "evaluable_n desc",
+                "rule_json asc",
             ],
+            "persistent_stop_training_metric": "descriptive_only_not_used_in_selection",
             "weighted_risk_score_used": False,
         },
         "post_r4_semantic_families": list(RISK_FAMILIES),
