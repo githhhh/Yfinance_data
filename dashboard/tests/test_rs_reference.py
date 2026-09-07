@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+from datetime import date
+
+import pandas as pd
+
+from dashboard.rs_reference import (
+    RSReferenceSnapshot,
+    attach_rs_reference,
+    fetch_latest_rs_reference,
+    parse_rs_csv,
+    parse_rs_market_date,
+)
+
+
+def test_commit_timestamp_maps_to_us_market_date() -> None:
+    market_date, sha = parse_rs_market_date(
+        '[{"sha":"abc123","commit":{"committer":{"date":"2026-09-05T01:28:10Z"}}}]'
+    )
+
+    assert market_date == date(2026, 9, 4)
+    assert sha == "abc123"
+
+
+def test_rs_csv_parses_current_and_prior_percentiles() -> None:
+    ratings = parse_rs_csv(
+        "Ticker,Percentile,1M_RS_Percentile,3M_RS_Percentile,6M_RS_Percentile\n"
+        "CRWD,96,91,84,79\n"
+    )
+
+    assert ratings["CRWD"] == {
+        "rs_percentile": 96,
+        "rs_1m_percentile": 91,
+        "rs_3m_percentile": 84,
+        "rs_6m_percentile": 79,
+    }
+
+
+def test_rs_is_attached_only_for_exact_market_date_match() -> None:
+    reference = RSReferenceSnapshot(
+        market_date=date(2026, 9, 4),
+        ratings={
+            "CRWD": {
+                "rs_percentile": 96,
+                "rs_1m_percentile": 91,
+                "rs_3m_percentile": 84,
+                "rs_6m_percentile": 79,
+            }
+        },
+        commit_sha="abc123",
+    )
+    frame = pd.DataFrame([{"code": "CRWD"}, {"code": "MISSING"}])
+
+    matched = attach_rs_reference(
+        frame,
+        snapshot_date=date(2026, 9, 4),
+        reference=reference,
+    )
+    stale = attach_rs_reference(
+        frame,
+        snapshot_date=date(2026, 9, 3),
+        reference=reference,
+    )
+
+    assert matched.loc[0, "rs_percentile"] == 96
+    assert pd.isna(matched.loc[1, "rs_percentile"])
+    assert stale["rs_percentile"].isna().all()
+
+
+def test_external_rs_failure_is_fail_soft() -> None:
+    def fail(_: str) -> str:
+        raise TimeoutError("source unavailable")
+
+    reference = fetch_latest_rs_reference(fetch_text=fail)
+
+    assert reference.available is False
+    assert reference.market_date is None
+    assert reference.ratings == {}
+    assert "TimeoutError" in str(reference.error)
