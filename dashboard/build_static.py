@@ -18,12 +18,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from dashboard.data_utils import build_snapshot_freshness
 from dashboard.field_config import FLOW_CARD_META, STATUS_META
-from dashboard.rs_reference import (
-    RSReferenceSnapshot,
-    attach_rs_reference,
-    fetch_latest_rs_reference,
-    reference_meta,
-)
 from dashboard.services.bf_midweek_review import (
     PoolMode,
     analyze_breakout_follow_pool,
@@ -36,6 +30,7 @@ STATIC_ASSETS = (
     "index.html",
     "app.js",
     "table_enhancements.js",
+    "rs_runtime.js",
     "styles.css",
     "manifest.webmanifest",
 )
@@ -53,7 +48,8 @@ PUBLIC_REVIEW_COLUMNS = (
 )
 
 # Public GitHub Pages contract. Pool/schema growth must never implicitly publish
-# new columns. Add a field here only when the static UI intentionally consumes it.
+# new columns. RS is intentionally absent: it is fetched independently by the
+# browser at runtime and never becomes part of the authoritative Pool payload.
 PUBLIC_DASHBOARD_ROW_FIELDS = (
     "code",
     "signal",
@@ -80,10 +76,6 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "ibd_entry_breakout_range_ratio",
     "ibd_breakout_quality",
     "volume_ratio",
-    "rs_percentile",
-    "rs_1m_percentile",
-    "rs_3m_percentile",
-    "rs_6m_percentile",
     "eps_yoy_growth",
     "price_52_week_high",
     "dist_to_52w_high_pct",
@@ -175,7 +167,6 @@ def build_dashboard_payload(
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
-    rs_reference: RSReferenceSnapshot | None = None,
 ) -> dict[str, Any]:
     analysis = analyze_breakout_follow_pool(
         complete_path,
@@ -188,17 +179,6 @@ def build_dashboard_payload(
         materialize_review_view(analysis.midweek_review)
         if analysis.midweek_available
         else pd.DataFrame()
-    )
-
-    complete = attach_rs_reference(
-        complete,
-        snapshot_date=analysis.complete_snapshot_date,
-        reference=rs_reference,
-    )
-    midweek = attach_rs_reference(
-        midweek,
-        snapshot_date=analysis.midweek_snapshot_date,
-        reference=rs_reference,
     )
 
     complete_snapshot = (
@@ -238,11 +218,6 @@ def build_dashboard_payload(
             "warnings": list(analysis.warnings),
             "summary": dict(analysis.summary),
             "complete_freshness": freshness,
-            "rs_reference": reference_meta(
-                rs_reference,
-                complete_snapshot_date=analysis.complete_snapshot_date,
-                midweek_snapshot_date=analysis.midweek_snapshot_date,
-            ),
         },
         "views": {
             "weekend": {
@@ -277,7 +252,6 @@ def build_site(
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
-    rs_reference: RSReferenceSnapshot | None = None,
 ) -> Path:
     output = Path(output_dir).resolve()
     if output.exists():
@@ -294,7 +268,6 @@ def build_site(
         complete_path=complete_path,
         midweek_path=midweek_path,
         window_date=window_date,
-        rs_reference=rs_reference,
     )
     data_dir = output / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -328,13 +301,11 @@ def main() -> int:
     parser.add_argument("--window-date", default=None)
     args = parser.parse_args()
 
-    rs_reference = fetch_latest_rs_reference()
     output = build_site(
         args.output,
         complete_path=args.complete,
         midweek_path=args.midweek,
         window_date=_parse_date(args.window_date),
-        rs_reference=rs_reference,
     )
     print(f"Static dashboard built: {output}")
     return 0
