@@ -4,11 +4,7 @@
   const app = document.getElementById("app");
   if (!app) return;
 
-  const sortState = {
-    review: { field: null, direction: "asc" },
-    cRank: { field: null, direction: "asc" },
-  };
-
+  const sortState = { field: null, direction: "asc" };
   const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let qualityTooltip = null;
@@ -50,55 +46,40 @@
   function compareValues(field, left, right, direction) {
     const ordinalLeft = ordinalValue(field, left);
     const ordinalRight = ordinalValue(field, right);
-    let result = 0;
-
     if (ordinalLeft !== null && ordinalRight !== null) {
-      result = ordinalLeft - ordinalRight;
-    } else {
-      const numericLeft = numericValue(left);
-      const numericRight = numericValue(right);
-      if (numericLeft !== null && numericRight !== null) {
-        result = numericLeft - numericRight;
-      } else if (numericLeft !== null) {
-        result = -1;
-      } else if (numericRight !== null) {
-        result = 1;
-      } else {
-        result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      }
+      const result = ordinalLeft - ordinalRight;
+      return direction === "desc" ? -result : result;
     }
+
+    const numericLeft = numericValue(left);
+    const numericRight = numericValue(right);
+    if (numericLeft === null && numericRight !== null) return 1;
+    if (numericLeft !== null && numericRight === null) return -1;
+    if (numericLeft !== null && numericRight !== null) {
+      const result = numericLeft - numericRight;
+      return direction === "desc" ? -result : result;
+    }
+
+    const result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
     return direction === "desc" ? -result : result;
   }
 
-  function tableKind(shell) {
-    return shell.hasAttribute("data-c-rank-table") ? "cRank" : "review";
-  }
-
-  function columnField(label, kind) {
+  function columnField(label) {
     const normalized = normalizeText(label).replace(/[▲▼▾]/g, "").trim();
-    const common = {
+    return {
       Code: "code",
+      Change: "review_change_label",
       Status: "ibd_entry_status",
       Setup: "ibd_candidate_rule",
       "Vs Buy Point": "current_vs_ibd_candidate_pct",
+      "Breakout Price Quality": "ibd_breakout_quality",
       Latest: "latest_close",
+      "Entry / Reason": "ibd_entry_vol_or_reject",
       "Weekly Vol": "volume_ratio",
-      "C Rank": "rank_C_continuous",
-    };
-    if (kind === "review") {
-      return {
-        ...common,
-        Change: "review_change_label",
-        "Breakout Price Quality": "ibd_breakout_quality",
-        "Entry / Reason": "ibd_entry_vol_or_reject",
-      }[normalized] || null;
-    }
-    return {
-      ...common,
-      "Continuous C": "C_continuous",
+      RS: "rs_percentile",
     }[normalized] || null;
   }
 
@@ -120,26 +101,23 @@
   }
 
   function updateSortIndicators(shell) {
-    const kind = tableKind(shell);
-    const active = sortState[kind];
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
-      const isActive = active.field === header.dataset.sortField;
-      header.setAttribute("aria-sort", isActive ? (active.direction === "asc" ? "ascending" : "descending") : "none");
-      if (icon) icon.textContent = isActive ? (active.direction === "asc" ? "▲" : "▼") : "";
+      const isActive = sortState.field === header.dataset.sortField;
+      header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
+      if (icon) icon.textContent = isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "";
     });
   }
 
-  function updateSummary(kind) {
-    const active = sortState[kind];
-    if (!active.field) return;
-    const label = document.querySelector(
-      `${kind === "cRank" ? "[data-c-rank-table]" : "[data-table-shell]"} thead th[data-sort-field="${active.field}"] .table-header-label`,
+  function updateSummary() {
+    if (!sortState.field) return;
+    const label = app.querySelector(
+      `[data-table-shell] thead th[data-sort-field="${sortState.field}"] .table-header-label`,
     )?.textContent;
     const summary = app.querySelector(".results-summary");
     if (summary && label) {
       const count = summary.textContent.match(/^\d+\s+(results|of)/i)?.[0];
-      summary.textContent = `${count ? `${count} · ` : ""}Sorted by ${label} ${active.direction === "asc" ? "↑" : "↓"}`;
+      summary.textContent = `${count ? `${count} · ` : ""}Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`;
     }
   }
 
@@ -148,20 +126,18 @@
     if (event.target.closest("[data-quality-info]")) return;
     const shell = button.closest(".table-shell");
     if (!shell) return;
-    const kind = tableKind(shell);
     const field = button.closest("th")?.dataset.sortField;
     if (!field) return;
 
-    const active = sortState[kind];
-    if (active.field === field) {
-      active.direction = active.direction === "asc" ? "desc" : "asc";
+    if (sortState.field === field) {
+      sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
     } else {
-      active.field = field;
-      active.direction = "asc";
+      sortState.field = field;
+      sortState.direction = "asc";
     }
-    sortTable(shell, active.field, active.direction);
+    sortTable(shell, sortState.field, sortState.direction);
     updateSortIndicators(shell);
-    updateSummary(kind);
+    updateSummary();
   }
 
   function qualityTooltipHtml() {
@@ -227,12 +203,11 @@
   }
 
   function decorateTable(shell) {
-    const kind = tableKind(shell);
     const headers = [...shell.querySelectorAll("thead th")];
     headers.forEach((header) => {
       if (header.dataset.sortEnhanced === "true") return;
       const originalLabel = normalizeText(header.textContent);
-      const field = columnField(originalLabel, kind);
+      const field = columnField(originalLabel);
       if (!field) return;
 
       header.dataset.sortEnhanced = "true";
@@ -287,16 +262,15 @@
       header.appendChild(button);
     });
 
-    const active = sortState[kind];
-    if (active.field) {
-      sortTable(shell, active.field, active.direction);
-      updateSummary(kind);
+    if (sortState.field) {
+      sortTable(shell, sortState.field, sortState.direction);
+      updateSummary();
     }
     updateSortIndicators(shell);
   }
 
   function enhanceTables() {
-    app.querySelectorAll("[data-table-shell], [data-c-rank-table]").forEach(decorateTable);
+    app.querySelectorAll("[data-table-shell]").forEach(decorateTable);
   }
 
   function scheduleEnhance() {
@@ -310,10 +284,8 @@
 
   app.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
-    const shell = event.target.closest?.("[data-table-shell], [data-c-rank-table]");
-    if (!shell) return;
-    const kind = tableKind(shell);
-    if (!sortState[kind].field) return;
+    const shell = event.target.closest?.("[data-table-shell]");
+    if (!shell || !sortState.field) return;
 
     const rows = [...shell.querySelectorAll("tbody tr[data-code]")];
     if (!rows.length) return;
