@@ -7,13 +7,14 @@ import os
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Callable
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 RS_SOURCE = "Fred6725/rs-log"
-RS_CSV_URL = "https://raw.githubusercontent.com/Fred6725/rs-log/main/output/rs_stocks.csv"
+RS_CSV_URL_TEMPLATE = "https://raw.githubusercontent.com/Fred6725/rs-log/{sha}/output/rs_stocks.csv"
 RS_COMMIT_API_URL = (
     "https://api.github.com/repos/Fred6725/rs-log/commits"
     "?path=output/rs_stocks.csv&per_page=1"
@@ -44,8 +45,11 @@ def _request_text(url: str, *, timeout: float = 12.0) -> str:
         "Accept": "application/vnd.github+json",
         "User-Agent": "Yfinance_data-dashboard-rs-reference",
     }
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
+    # Optional API auth is deliberately narrow. PR builds do not receive this
+    # token, and raw.githubusercontent.com never receives an Authorization
+    # header because the CSV is public and pinned by commit SHA.
+    token = os.environ.get("RS_GITHUB_TOKEN")
+    if token and urlparse(url).hostname == "api.github.com":
         headers["Authorization"] = f"Bearer {token}"
     request = Request(url, headers=headers)
     with urlopen(request, timeout=timeout) as response:
@@ -112,7 +116,13 @@ def fetch_latest_rs_reference(
 ) -> RSReferenceSnapshot:
     try:
         market_date, commit_sha = parse_rs_market_date(fetch_text(RS_COMMIT_API_URL))
-        ratings = parse_rs_csv(fetch_text(RS_CSV_URL))
+        if not commit_sha:
+            raise ValueError("rs-log latest commit SHA is missing")
+        # Bind metadata and data atomically to the same public commit. Reading
+        # `main` here would allow an rs-log update between the two requests and
+        # could label a newer CSV with an older market date.
+        csv_url = RS_CSV_URL_TEMPLATE.format(sha=commit_sha)
+        ratings = parse_rs_csv(fetch_text(csv_url))
         return RSReferenceSnapshot(
             market_date=market_date,
             ratings=ratings,
