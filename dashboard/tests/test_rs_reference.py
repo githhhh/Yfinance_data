@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 
 from dashboard.rs_reference import (
+    RS_COMMIT_API_URL,
     RSReferenceSnapshot,
     attach_rs_reference,
     fetch_latest_rs_reference,
@@ -34,6 +35,29 @@ def test_rs_csv_parses_current_and_prior_percentiles() -> None:
         "rs_3m_percentile": 84,
         "rs_6m_percentile": 79,
     }
+
+
+def test_latest_rs_csv_is_pinned_to_the_same_commit_as_market_date() -> None:
+    urls: list[str] = []
+
+    def fetch(url: str) -> str:
+        urls.append(url)
+        if url == RS_COMMIT_API_URL:
+            return '[{"sha":"abc123","commit":{"committer":{"date":"2026-09-05T01:28:10Z"}}}]'
+        assert "/abc123/output/rs_stocks.csv" in url
+        assert "/main/output/rs_stocks.csv" not in url
+        return (
+            "Ticker,Percentile,1M_RS_Percentile,3M_RS_Percentile,6M_RS_Percentile\n"
+            "CRWD,96,91,84,79\n"
+        )
+
+    reference = fetch_latest_rs_reference(fetch_text=fetch)
+
+    assert reference.available is True
+    assert reference.commit_sha == "abc123"
+    assert reference.market_date == date(2026, 9, 4)
+    assert reference.ratings["CRWD"]["rs_percentile"] == 96
+    assert len(urls) == 2
 
 
 def test_rs_is_attached_only_for_exact_market_date_match() -> None:
