@@ -24,7 +24,7 @@
 - `EXTENDED`：已超过 Buy Point +5%。
 - Midweek Review 使用合法完整周 Pool 作为 baseline；没有合法 baseline 时关闭 Carry / Change / Origin 比较。
 - Midweek `Changes` 默认按 `Review Priority`；其它 Review 默认按 `Code`。
-- 主表 `RS` 只引用 `Fred6725/rs-log` 最新公开数据；只有 RS market date 与 Pool `snapshot_date` 严格一致才显示，否则 `N/A`。
+- 主表 `RS` 只引用 `Fred6725/rs-log` 最新公开数据；commit artifact 时间先映射到最近已经完成的美股交易日，只有该 market date 与 Pool `snapshot_date` 严格一致才显示，否则 `N/A`。
 - RS 只是 context，不进入 Gate、Top3、Review Priority 或默认排序，也不保存为本仓库 PIT 历史。
 - `Breakout Price Quality` 仍由 Python 权威层生成，表头保留强度说明。
 - More Filters Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`。
@@ -62,9 +62,9 @@ quant_trade scheduled run
   → GitHub Pages
 ```
 
-Pool push 仍是数据发布权威触发。由于 `rs-log` 通常在美股收盘后的约 `01:30 UTC` 才发布对应市场日 RS，而周末 Pool 可能更早提交，Dashboard 额外在 **周四、周六 `03:00 UTC`** 重建一次当前已发布 Pool，只用于补齐 exact-date RS reference。这个定时任务不会重新下载行情、不会重新计算 Pool、不会改变 `snapshot_date`，也不是第二套 weekly / midweek 数据调度。
+Pool push 仍是数据发布权威触发。由于 `rs-log` 通常在美股收盘后的约 `01:30 UTC` 才发布对应市场日 RS，而 Pool 可能更早提交，Dashboard 额外在 **周四、周六 `03:00 UTC`** 尝试一次 RS-only refresh。Scheduled refresh 只有在 **当前目标 Pool snapshot、RS market date、以及该时点最新已完成的美股交易日三者完全一致**时才发布 Pages；否则直接跳过发布并保留上一份 Pages artifact。它不会重新下载行情、不会重新计算 Pool、不会改变 `snapshot_date`，也不是第二套 weekly / midweek 数据调度。
 
-因此 Pages 不会从原始行情下载 workflow 提前发布半成品。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署，后续 Pool push 或定时 refresh 可再次补齐。
+因此 Pages 不会从原始行情下载 workflow 提前发布半成品。Pool push 无论 RS 是否可用都照常发布主体；如果 Pool 发布本身失败，或 scheduled refresh 遇到 RS 缺失 / 过期 / 错日，Pages 保持上一份成功部署的快照。
 
 ## Public payload 安全边界
 
