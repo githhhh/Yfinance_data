@@ -62,7 +62,9 @@ quant_trade scheduled run
   → GitHub Pages
 ```
 
-因此 Pages 没有第二套 weekly/midweek 调度，也不会从原始行情下载 workflow 提前发布半成品。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署。
+Pool push 仍是数据发布权威触发。由于 `rs-log` 通常在美股收盘后的约 `01:30 UTC` 才发布对应市场日 RS，而周末 Pool 可能更早提交，Dashboard 额外在 **周四、周六 `03:00 UTC`** 重建一次当前已发布 Pool，只用于补齐 exact-date RS reference。这个定时任务不会重新下载行情、不会重新计算 Pool、不会改变 `snapshot_date`，也不是第二套 weekly / midweek 数据调度。
+
+因此 Pages 不会从原始行情下载 workflow 提前发布半成品。Pool 发布失败时，Pages 保持上一份成功部署的快照；RS 外部源失败不会阻塞部署，后续 Pool push 或定时 refresh 可再次补齐。
 
 ## Public payload 安全边界
 
