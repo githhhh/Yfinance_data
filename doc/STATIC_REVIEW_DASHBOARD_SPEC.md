@@ -44,7 +44,8 @@ Authoritative Pool CSV
 - 浏览器只负责展示、筛选、排序、选行、复制和响应式交互；
 - 不重新引入 Streamlit、AG Grid、服务端状态或第二套交易规则；
 - `dashboard/services/` 是共享契约，不为纯 UI 改动随意破坏；
-- 外部参考源失效时必须 fail-soft，不阻塞 Pool 或 Dashboard 发布。
+- 外部参考源失效时必须 fail-soft，不阻塞 Pool 或 Dashboard 发布；
+- 不得为了视觉或前端实现修改权威 Pool、Entry Status、Breakout Price Quality 或跨仓库交易事实契约。
 
 ## 3. 页面结构
 
@@ -182,9 +183,10 @@ rs_6m_percentile
 5. 只有 `rs_market_date == pool.snapshot_date` 时才 join ticker；
 6. 日期不一致、ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常时显示 `N/A`；
 7. RS 失败不得阻塞 Dashboard 构建或 Pool 发布；
-8. 不要求本仓库保存 RS PIT 历史；源未来停止更新时继续显示 `N/A` 即可。
+8. 不要求本仓库保存 RS PIT 历史；源未来停止更新时继续显示 `N/A` 即可；
+9. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据。
 
-主表直接原生显示当前 `RS` percentile；hover / 选中详情可同时查看当前、1M、3M、6M ago percentile、market date 与来源。不得通过额外前端 patch 层再替换其它字段。
+主表直接原生显示当前 `RS` percentile；hover / focus / 触屏点击以及 Selected Detail 可查看当前、1M、3M、6M ago percentile、market date 与来源。不得通过额外字段替换层改变 Pool 事实。
 
 禁止：
 
@@ -222,7 +224,7 @@ GitHub Pages 是公网资源：
 - Pool 新增字段默认不发布；
 - 禁止账户、持仓、成本、订单、broker account hash、OAuth token、API key、密码或私有研究数据进入 payload；
 - 浏览器未显示但收到的数据同样视为公开；
-- PR 构建不向分支代码暴露 RS API token；已合入主分支的构建若使用短期 GitHub token，只允许发送到 `api.github.com`，不得发送到 raw host。
+- RS 公共数据获取不接收或转发仓库 Token、API Key 或其它凭据。
 
 ## 10. 验收
 
