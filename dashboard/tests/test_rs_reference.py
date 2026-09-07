@@ -24,6 +24,28 @@ def test_commit_timestamp_maps_to_us_market_date() -> None:
     assert sha == "abc123"
 
 
+def test_holiday_commit_maps_to_previous_actual_market_date() -> None:
+    # 2026-07-03 is the observed Independence Day market holiday. rs-log
+    # nevertheless has a real artifact commit at 2026-07-04T01:19Z, which is
+    # 2026-07-03 evening in New York. It must represent the last completed
+    # trading session (2026-07-02), not the holiday artifact date.
+    market_date, sha = parse_rs_market_date(
+        '[{"sha":"holiday123","commit":{"committer":{"date":"2026-07-04T01:19:42Z"}}}]'
+    )
+
+    assert market_date == date(2026, 7, 2)
+    assert sha == "holiday123"
+
+
+def test_preclose_delayed_commit_maps_to_previous_completed_session() -> None:
+    market_date, _ = parse_rs_market_date(
+        '[{"sha":"delayed","commit":{"committer":{"date":"2026-09-08T17:00:00Z"}}}]'
+    )
+
+    # 13:00 New York: today's regular session has not completed yet.
+    assert market_date == date(2026, 9, 4)
+
+
 def test_rs_csv_parses_current_and_prior_percentiles() -> None:
     ratings = parse_rs_csv(
         "Ticker,Percentile,1M_RS_Percentile,3M_RS_Percentile,6M_RS_Percentile\n"
