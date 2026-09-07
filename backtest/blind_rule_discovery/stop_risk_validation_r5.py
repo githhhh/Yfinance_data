@@ -1,12 +1,12 @@
 """Causal R5 stop-risk validation for BreakoutFollow trigger entries.
 
-R5 is a narrow retrospective follow-up to R4.  R4 established that historical
+R5 is a narrow retrospective follow-up to R4. R4 established that historical
 stop-risk / loser pockets are easier to find than stable winner rules, but its
-chronological rolling selector still chose the quality-ranked *positive* stock rule.
+chronological rolling selector still chose the quality-ranked positive stock rule.
 Therefore R4 did not answer whether stop-risk information itself is chronologically
 learnable.
 
-R5 answers only that missing question.  It does not search for a new winner Alpha.
+R5 answers only that missing question. It does not search for a new winner Alpha.
 For each expanding-window fold it:
 
 1. purges training rows whose W3 label overlaps the test quarter;
@@ -16,7 +16,7 @@ For each expanding-window fold it:
 5. separately evaluates a small set of post-R4 semantic risk families whose
    thresholds are regenerated from training data only.
 
-All R1-R4 periods are already-known history.  R5 is robustness research, not an
+All R1-R4 periods are already-known history. R5 is robustness research, not an
 unseen holdout and not production Alpha certification.
 """
 from __future__ import annotations
@@ -67,7 +67,7 @@ def _baseline_persistent_rate(frame: pd.DataFrame) -> float | None:
 
 
 def rank_stop_risk_rules(scored: pd.DataFrame, *, baseline_persistent_rate: float | None) -> pd.DataFrame:
-    """Return the same frozen search candidates ordered only by stop-risk evidence.
+    """Order the same frozen search candidates only by stop-risk evidence.
 
     Selection is deliberately lexicographic rather than a newly tuned scalar score:
 
@@ -76,9 +76,6 @@ def rank_stop_risk_rules(scored: pd.DataFrame, *, baseline_persistent_rate: floa
     3. aggregate stop-first lift;
     4. persistent-stop lift;
     5. support.
-
-    This makes the R5 question explicit and avoids inventing another optimized
-    weighted objective after seeing R4 results.
     """
     if scored.empty:
         return scored.copy()
@@ -121,6 +118,45 @@ def _test_metrics(frame: pd.DataFrame, mask: np.ndarray, baseline: Mapping[str, 
         **metrics,
         "stop_first_lift": stop_lift,
         "persistent_stop_first_lift": persistent_lift,
+    }
+
+
+def matched_stop_risk_from_mask(frame: pd.DataFrame, selected_mask: np.ndarray) -> dict[str, Any]:
+    """Equal-snapshot selected-vs-unselected stop-risk contrast for arbitrary masks."""
+    if len(selected_mask) != len(frame):
+        raise ValueError("selected mask length differs from frame")
+    stop_lifts: list[float] = []
+    persistent_lifts: list[float] = []
+    for _, snapshot in frame.assign(_selected=np.asarray(selected_mask, dtype=bool)).groupby(
+        "snapshot_date", sort=True
+    ):
+        selected = snapshot.loc[snapshot["_selected"]].reset_index(drop=True)
+        unselected = snapshot.loc[~snapshot["_selected"]].reset_index(drop=True)
+        if selected.empty or unselected.empty:
+            continue
+        sm = summarize_path(selected)
+        um = summarize_path(unselected)
+        if min(int(sm["evaluable_n"]), int(um["evaluable_n"])) < 1:
+            continue
+        if sm["stop_first_rate"] is None or um["stop_first_rate"] is None:
+            continue
+        stop_lifts.append(float(sm["stop_first_rate"] - um["stop_first_rate"]))
+        if sm["persistent_stop_first_rate"] is not None and um["persistent_stop_first_rate"] is not None:
+            persistent_lifts.append(
+                float(sm["persistent_stop_first_rate"] - um["persistent_stop_first_rate"])
+            )
+    stop_array = np.asarray(stop_lifts, dtype=float)
+    persistent_array = np.asarray(persistent_lifts, dtype=float)
+    return {
+        "matched_snapshot_count": int(stop_array.size),
+        "matched_stop_first_lift_p50": float(np.median(stop_array)) if stop_array.size else None,
+        "matched_positive_stop_lift_fraction": float(np.mean(stop_array > 0)) if stop_array.size else None,
+        "matched_persistent_stop_lift_p50": (
+            float(np.median(persistent_array)) if persistent_array.size else None
+        ),
+        "matched_positive_persistent_lift_fraction": (
+            float(np.mean(persistent_array > 0)) if persistent_array.size else None
+        ),
     }
 
 
@@ -346,17 +382,20 @@ def rolling_risk_families(
             for family in RISK_FAMILIES:
                 rule = build_risk_family_rule(train, family)
                 if rule is None:
-                    selected_metrics = summarize_path(test, np.zeros(len(test), dtype=bool))
-                    rule_json = None
-                else:
-                    selected_metrics = _test_metrics(test, risk_family_mask(test, rule), baseline)
-                    rule_json = json.dumps(rule, sort_keys=True, separators=(",", ":"))
-                if "stop_first_lift" not in selected_metrics:
+                    mask = np.zeros(len(test), dtype=bool)
+                    selected_metrics = summarize_path(test, mask)
                     selected_metrics = {
                         **selected_metrics,
                         "stop_first_lift": None,
                         "persistent_stop_first_lift": None,
                     }
+                    rule_json = None
+                    matched = {}
+                else:
+                    mask = risk_family_mask(test, rule)
+                    selected_metrics = _test_metrics(test, mask, baseline)
+                    rule_json = json.dumps(rule, sort_keys=True, separators=(",", ":"))
+                    matched = matched_stop_risk_from_mask(test, mask) if not test.empty else {}
                 rows.append(
                     {
                         "scope": scope,
@@ -372,6 +411,7 @@ def rolling_risk_families(
                         "test_scope_n": int(len(test)),
                         **{f"test_{key}": value for key, value in selected_metrics.items()},
                         **{f"test_baseline_{key}": value for key, value in baseline.items()},
+                        **{f"test_{key}": value for key, value in matched.items()},
                     }
                 )
     return pd.DataFrame(rows)
@@ -389,24 +429,24 @@ def summarize_risk_rolling(rolling: pd.DataFrame) -> dict[str, Any]:
     if rolling.empty:
         return summary
     for scope, group in rolling.groupby("scope", sort=True):
-        selected = pd.to_numeric(group.get("test_selected_n"), errors="coerce").fillna(0)
-        evaluable = pd.to_numeric(group.get("test_evaluable_n"), errors="coerce").fillna(0)
-        stop_lift = pd.to_numeric(group.get("test_stop_first_lift"), errors="coerce")
-        persistent_lift = pd.to_numeric(group.get("test_persistent_stop_first_lift"), errors="coerce")
-        matched = pd.to_numeric(group.get("test_matched_stop_first_lift_p50"), errors="coerce")
-        overlap = pd.to_numeric(group.get("w3_label_overlap_after_purge"), errors="coerce").fillna(0).astype(bool)
+        selected = pd.to_numeric(group["test_selected_n"], errors="coerce").fillna(0)
+        evaluable = pd.to_numeric(group["test_evaluable_n"], errors="coerce").fillna(0)
+        stop_lift = pd.to_numeric(group["test_stop_first_lift"], errors="coerce")
+        persistent_lift = pd.to_numeric(group["test_persistent_stop_first_lift"], errors="coerce")
+        matched = pd.to_numeric(group["test_matched_stop_first_lift_p50"], errors="coerce")
+        overlap = pd.to_numeric(group["w3_label_overlap_after_purge"], errors="coerce").fillna(0).astype(bool)
         if overlap.any():
             raise AssertionError("R5 summary observed post-purge W3 overlap")
         traded = selected > 0
-        selected_stop_rate = _pooled_rate(group.get("test_stop_first_n"), evaluable)
-        selected_persistent_rate = _pooled_rate(group.get("test_persistent_stop_first_n"), evaluable)
-        baseline_eval_traded = pd.to_numeric(group.get("test_baseline_evaluable_n"), errors="coerce").fillna(0).where(traded, 0)
+        selected_stop_rate = _pooled_rate(group["test_stop_first_n"], evaluable)
+        selected_persistent_rate = _pooled_rate(group["test_persistent_stop_first_n"], evaluable)
+        baseline_eval_traded = pd.to_numeric(group["test_baseline_evaluable_n"], errors="coerce").fillna(0).where(traded, 0)
         baseline_stop_traded = _pooled_rate(
-            pd.to_numeric(group.get("test_baseline_stop_first_n"), errors="coerce").fillna(0).where(traded, 0),
+            pd.to_numeric(group["test_baseline_stop_first_n"], errors="coerce").fillna(0).where(traded, 0),
             baseline_eval_traded,
         )
         baseline_persistent_traded = _pooled_rate(
-            pd.to_numeric(group.get("test_baseline_persistent_stop_first_n"), errors="coerce").fillna(0).where(traded, 0),
+            pd.to_numeric(group["test_baseline_persistent_stop_first_n"], errors="coerce").fillna(0).where(traded, 0),
             baseline_eval_traded,
         )
         summary[scope] = {
@@ -451,11 +491,18 @@ def summarize_family_rolling(families: pd.DataFrame) -> list[dict[str, Any]]:
         evaluable = pd.to_numeric(group["test_evaluable_n"], errors="coerce").fillna(0)
         stop_lift = pd.to_numeric(group["test_stop_first_lift"], errors="coerce")
         persistent_lift = pd.to_numeric(group["test_persistent_stop_first_lift"], errors="coerce")
+        matched_stop = pd.to_numeric(group.get("test_matched_stop_first_lift_p50"), errors="coerce")
+        matched_persistent = pd.to_numeric(group.get("test_matched_persistent_stop_lift_p50"), errors="coerce")
         traded = selected > 0
         selected_stop_rate = _pooled_rate(group["test_stop_first_n"], evaluable)
+        selected_persistent_rate = _pooled_rate(group["test_persistent_stop_first_n"], evaluable)
         baseline_eval = pd.to_numeric(group["test_baseline_evaluable_n"], errors="coerce").fillna(0).where(traded, 0)
         baseline_stop_rate = _pooled_rate(
             pd.to_numeric(group["test_baseline_stop_first_n"], errors="coerce").fillna(0).where(traded, 0),
+            baseline_eval,
+        )
+        baseline_persistent_rate = _pooled_rate(
+            pd.to_numeric(group["test_baseline_persistent_stop_first_n"], errors="coerce").fillna(0).where(traded, 0),
             baseline_eval,
         )
         rows.append(
@@ -470,6 +517,14 @@ def summarize_family_rolling(families: pd.DataFrame) -> list[dict[str, Any]]:
                 "stop_first_lift_p50_evaluable": float(stop_lift.dropna().median()) if stop_lift.notna().any() else None,
                 "positive_persistent_lift_all_fold_fraction": float((persistent_lift.fillna(-np.inf) > 0).mean()),
                 "persistent_stop_lift_p50_evaluable": float(persistent_lift.dropna().median()) if persistent_lift.notna().any() else None,
+                "matched_positive_stop_lift_fraction": float((matched_stop.dropna() > 0).mean()) if matched_stop.notna().any() else None,
+                "matched_stop_lift_p50": float(matched_stop.dropna().median()) if matched_stop.notna().any() else None,
+                "matched_positive_persistent_lift_fraction": (
+                    float((matched_persistent.dropna() > 0).mean()) if matched_persistent.notna().any() else None
+                ),
+                "matched_persistent_lift_p50": (
+                    float(matched_persistent.dropna().median()) if matched_persistent.notna().any() else None
+                ),
                 "selected_n_total": int(selected.sum()),
                 "evaluable_n_total": int(evaluable.sum()),
                 "pooled_selected_stop_first_rate": selected_stop_rate,
@@ -477,6 +532,13 @@ def summarize_family_rolling(families: pd.DataFrame) -> list[dict[str, Any]]:
                 "pooled_selected_stop_first_lift": (
                     selected_stop_rate - baseline_stop_rate
                     if selected_stop_rate is not None and baseline_stop_rate is not None
+                    else None
+                ),
+                "pooled_selected_persistent_stop_rate": selected_persistent_rate,
+                "pooled_baseline_persistent_stop_rate_selected_folds": baseline_persistent_rate,
+                "pooled_selected_persistent_stop_lift": (
+                    selected_persistent_rate - baseline_persistent_rate
+                    if selected_persistent_rate is not None and baseline_persistent_rate is not None
                     else None
                 ),
             }
