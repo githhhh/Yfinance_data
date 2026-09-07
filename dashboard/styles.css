@@ -102,7 +102,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   border-radius: 9px;
   background: #10161e;
 }
-.segmented button, .small-button, .copy-button, .filter-toggle, .reset-button, .topn-select {
+.segmented button, .small-button, .copy-button, .filter-toggle, .reset-button {
   min-height: 36px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -217,7 +217,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .filter-controls { display: grid; grid-template-columns: 194px repeat(4, minmax(0, 1fr)); gap: 12px; padding: 12px 12px 16px; margin-top: 4px; border: 1px solid #303a46; border-radius: 8px; background: #11171e; }
 .filter-field { min-width: 0; }
 .filter-field label { display: block; min-height: 28px; color: #c5ced9; font-size: 10px; font-weight: 700; line-height: 1.25; }
-.filter-field select, .topn-select {
+.filter-field select {
   width: 100%;
   height: 36px;
   border: 1px solid #445163;
@@ -331,11 +331,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .warning-stack { margin-top: 8px; display: grid; gap: 6px; }
 .warning { padding: 8px 10px; border: 1px solid rgb(255 210 31 / 32%); border-radius: 6px; background: rgb(255 210 31 / 6%); color: #e7cd72; font-size: 10px; }
 
-.reference-header { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 160px 160px; gap: 10px; align-items: end; }
-.reference-header h2 { margin: 0 0 5px; font-size: 16px; }
-.reference-header p { margin: 0; color: var(--muted); font-size: 10px; }
-.reference-rule { margin-top: 8px; padding: 10px 12px; border: 1px solid #303a46; border-radius: 7px; color: var(--muted); background: #11171e; font-size: 10px; line-height: 1.6; }
-
 .footer-note { padding: 12px 0 4px; color: #637184; font-size: 9px; text-align: right; }
 
 @media (width <= 1120px) {
@@ -375,8 +370,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .detail-panel { grid-template-columns: 1fr; }
   .table-shell { max-height: 58vh; }
   .review-table { min-width: 930px; }
-  .reference-header { grid-template-columns: 1fr 120px; }
-  .reference-header > div:first-child { grid-column: 1 / -1; }
 }
 
 @media (width <= 480px) {
