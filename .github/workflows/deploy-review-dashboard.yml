@@ -86,19 +86,23 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
 
-          from dashboard.rs_reference import latest_completed_market_date
+          from dashboard.rs_reference import (
+              latest_completed_market_date,
+              scheduled_refresh_publishable,
+          )
 
           payload = json.loads(Path("_site/data/dashboard.json").read_text(encoding="utf-8"))
+          now = datetime.now(timezone.utc)
+          publish = scheduled_refresh_publishable(payload, now)
           meta = payload.get("meta", {})
           rs = meta.get("rs_reference", {})
-          expected = latest_completed_market_date(datetime.now(timezone.utc)).isoformat()
+          expected = latest_completed_market_date(now).isoformat()
           period = payload.get("default_period")
           pool_date = (
               meta.get("midweek_snapshot_date")
               if period == "MIDWEEK"
               else meta.get("complete_snapshot_date")
           )
-          publish = bool(rs.get("available")) and rs.get("market_date") == expected and pool_date == expected
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"publish={'true' if publish else 'false'}\n")
           print(
