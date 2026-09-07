@@ -63,8 +63,6 @@ Selected Row Detail
 Decision Table
 ```
 
-不再提供 C Rank Reference 页面，也不在公开 payload 中发布 C Rank / Continuous C。
-
 ### 3.1 Period / Scope
 
 - Midweek 有合法完整周 baseline：默认 `Midweek Review + Changes`；
@@ -133,10 +131,11 @@ Period + Scope + Change + Origin + Entry Status + Setup
 
 可见字段支持点击表头排序：
 
+- 第一次点击升序，再次点击降序；
 - 数值列按数值；
 - Entry Status 按业务状态顺序；
 - Breakout Price Quality 按质量强度顺序；
-- RS 可按 percentile 手工排序；
+- RS 可按 percentile 手工排序，`N/A` 无论升降序都排最后；
 - 自定义排序后的选中行、键盘 ↑↓ Review 与 Copy 顺序必须跟随当前可见顺序。
 
 ### 5.3 Breakout Price Quality
@@ -176,15 +175,16 @@ rs_6m_percentile
 
 使用规则：
 
-1. 构建时读取 rs-log 最新公开 CSV；
-2. 读取该 CSV 最新 commit 时间，并转换为 `America/New_York` 日期，作为 RS market date；
-3. Pool 的 `snapshot_date` 是最新实际市场数据日期；
-4. 只有 `rs_market_date == pool.snapshot_date` 时才 join ticker；
-5. 日期不一致、ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常时显示 `N/A`；
-6. RS 失败不得阻塞 Dashboard 构建或 Pool 发布；
-7. 不要求本仓库保存 RS PIT 历史；源未来停止更新时继续显示 `N/A` 即可。
+1. 构建时先读取 `rs_stocks.csv` 的最新 commit metadata；
+2. 将该 commit 时间转换为 `America/New_York` 日期，作为 RS market date；
+3. 使用同一个 commit SHA 固定读取对应版本的 `rs_stocks.csv`，禁止再从浮动 `main` 读取，避免 metadata / CSV 更新竞态；
+4. Pool 的 `snapshot_date` 是最新实际市场数据日期；
+5. 只有 `rs_market_date == pool.snapshot_date` 时才 join ticker；
+6. 日期不一致、ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常时显示 `N/A`；
+7. RS 失败不得阻塞 Dashboard 构建或 Pool 发布；
+8. 不要求本仓库保存 RS PIT 历史；源未来停止更新时继续显示 `N/A` 即可。
 
-主表只显示当前 `RS` percentile；hover / 选中详情可同时查看当前、1M、3M、6M ago percentile、market date 与来源。
+主表直接原生显示当前 `RS` percentile；hover / 选中详情可同时查看当前、1M、3M、6M ago percentile、market date 与来源。不得通过额外前端 patch 层再替换其它字段。
 
 禁止：
 
@@ -220,9 +220,9 @@ GitHub Pages 是公网资源：
 
 - `dashboard.json` 行数据只能来自 `PUBLIC_DASHBOARD_ROW_FIELDS`；
 - Pool 新增字段默认不发布；
-- C Rank / Continuous C 不再进入公开 payload；
 - 禁止账户、持仓、成本、订单、broker account hash、OAuth token、API key、密码或私有研究数据进入 payload；
-- 浏览器未显示但收到的数据同样视为公开。
+- 浏览器未显示但收到的数据同样视为公开；
+- PR 构建不向分支代码暴露 RS API token；已合入主分支的构建若使用短期 GitHub token，只允许发送到 `api.github.com`，不得发送到 raw host。
 
 ## 10. 验收
 
@@ -235,7 +235,6 @@ python dashboard/self_check.py \
 python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
-node --check dashboard/rs_enhancements.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 ```
@@ -245,8 +244,8 @@ python security_scan.py --history
 - Midweek / Weekend 默认语境正确；
 - Range 默认显示当前语境真实边界；
 - Midweek Changes 仍按 Review Priority，其余默认 Code；
-- C Rank UI / public payload 已移除；
-- RS 只在严格交易日匹配时显示，错日与外部失败为 N/A；
+- RS 只在严格交易日匹配时显示，错日、ticker 缺失与外部失败为 N/A；
+- RS 直接由主 UI 实现，不存在额外字段替换 patch 层；
 - 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；
 - 表格横纵滚动到边界不产生自身 bounce；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列。
