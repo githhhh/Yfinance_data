@@ -44,7 +44,6 @@ PUBLIC_REVIEW_COLUMNS = (
     "latest_close",
     "ibd_entry_vol_or_reject",
     "volume_ratio",
-    "rs_percentile",
 )
 
 # Public GitHub Pages contract. Pool/schema growth must never implicitly publish
