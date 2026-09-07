@@ -131,7 +131,8 @@ class RDAgentProposer:
         # hashed bounded responses and local aggregate experiment traces ourselves.
         with ExitStack() as stack:
             for method in ("info", "warning", "error", "debug", "log_object"):
-                stack.enter_context(patch.object(rdagent_logger, method, lambda *a, **kw: None))
+                if hasattr(rdagent_logger, method):
+                    stack.enter_context(patch.object(rdagent_logger, method, lambda *a, **kw: None))
             stack.enter_context(patch.object(backend_module, "completion", counted_completion))
             stack.enter_context(patch.object(LLM_SETTINGS, "max_retry", 1))
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_model", model))
