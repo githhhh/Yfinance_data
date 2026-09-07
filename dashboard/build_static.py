@@ -17,12 +17,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.data_utils import build_snapshot_freshness
-from dashboard.field_config import (
-    FLOW_CARD_META,
-    STATUS_META,
-    get_column_view_fields,
-    get_default_table_columns,
-    get_midweek_table_columns,
+from dashboard.field_config import FLOW_CARD_META, STATUS_META
+from dashboard.rs_reference import (
+    RSReferenceSnapshot,
+    attach_rs_reference,
+    fetch_latest_rs_reference,
+    reference_meta,
 )
 from dashboard.services.bf_midweek_review import (
     PoolMode,
@@ -36,8 +36,21 @@ STATIC_ASSETS = (
     "index.html",
     "app.js",
     "table_enhancements.js",
+    "rs_enhancements.js",
     "styles.css",
     "manifest.webmanifest",
+)
+
+PUBLIC_REVIEW_COLUMNS = (
+    "code",
+    "ibd_entry_status",
+    "ibd_candidate_rule",
+    "current_vs_ibd_candidate_pct",
+    "ibd_breakout_quality",
+    "latest_close",
+    "ibd_entry_vol_or_reject",
+    "volume_ratio",
+    "rs_percentile",
 )
 
 # Public GitHub Pages contract. Pool/schema growth must never implicitly publish
@@ -68,8 +81,10 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "ibd_entry_breakout_range_ratio",
     "ibd_breakout_quality",
     "volume_ratio",
-    "rank_C_continuous",
-    "C_continuous",
+    "rs_percentile",
+    "rs_1m_percentile",
+    "rs_3m_percentile",
+    "rs_6m_percentile",
     "eps_yoy_growth",
     "price_52_week_high",
     "dist_to_52w_high_pct",
@@ -118,9 +133,9 @@ def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
     result = frame.copy()
     result["review_watch_active"] = result["signal"]
     result["review_effective_entry_status"] = result["ibd_entry_status"]
-    result["review_priority"] = pd.to_numeric(
-        result.get("rank_C_continuous"), errors="coerce"
-    )
+    # Weekend review has no transition priority. Keep the public field for a
+    # stable row schema without falling back to the unvalidated C Rank.
+    result["review_priority"] = None
     return result
 
 
@@ -151,11 +166,19 @@ def _flow_meta() -> dict[str, Any]:
     }
 
 
+def _review_columns(*, comparison: bool) -> list[str]:
+    columns = list(PUBLIC_REVIEW_COLUMNS)
+    if comparison:
+        columns.insert(1, "review_change_label")
+    return columns
+
+
 def build_dashboard_payload(
     *,
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
+    rs_reference: RSReferenceSnapshot | None = None,
 ) -> dict[str, Any]:
     analysis = analyze_breakout_follow_pool(
         complete_path,
@@ -168,6 +191,17 @@ def build_dashboard_payload(
         materialize_review_view(analysis.midweek_review)
         if analysis.midweek_available
         else pd.DataFrame()
+    )
+
+    complete = attach_rs_reference(
+        complete,
+        snapshot_date=analysis.complete_snapshot_date,
+        reference=rs_reference,
+    )
+    midweek = attach_rs_reference(
+        midweek,
+        snapshot_date=analysis.midweek_snapshot_date,
+        reference=rs_reference,
     )
 
     complete_snapshot = (
@@ -190,7 +224,7 @@ def build_dashboard_payload(
     )
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "window_date": window_date.isoformat(),
         "default_period": default_period,
@@ -207,23 +241,22 @@ def build_dashboard_payload(
             "warnings": list(analysis.warnings),
             "summary": dict(analysis.summary),
             "complete_freshness": freshness,
+            "rs_reference": reference_meta(
+                rs_reference,
+                complete_snapshot_date=analysis.complete_snapshot_date,
+                midweek_snapshot_date=analysis.midweek_snapshot_date,
+            ),
         },
         "views": {
             "weekend": {
                 "rows": _records(complete),
-                "table_columns": get_default_table_columns(),
+                "table_columns": _review_columns(comparison=False),
             },
             "midweek": {
                 "rows": _records(midweek),
-                "table_columns": (
-                    get_midweek_table_columns()
-                    if analysis.midweek_baseline_available
-                    else get_default_table_columns()
+                "table_columns": _review_columns(
+                    comparison=bool(analysis.midweek_baseline_available)
                 ),
-            },
-            "c_rank": {
-                "rows": _records(complete),
-                "table_columns": get_column_view_fields("C Rank Reference"),
             },
         },
         "ui": {
@@ -247,6 +280,7 @@ def build_site(
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
+    rs_reference: RSReferenceSnapshot | None = None,
 ) -> Path:
     output = Path(output_dir).resolve()
     if output.exists():
@@ -263,6 +297,7 @@ def build_site(
         complete_path=complete_path,
         midweek_path=midweek_path,
         window_date=window_date,
+        rs_reference=rs_reference,
     )
     data_dir = output / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -296,11 +331,16 @@ def main() -> int:
     parser.add_argument("--window-date", default=None)
     args = parser.parse_args()
 
+    # RS is deliberately fail-soft. If the public source is unavailable or its
+    # market date does not match a Pool snapshot, the site still builds and RS
+    # is rendered as N/A.
+    rs_reference = fetch_latest_rs_reference()
     output = build_site(
         args.output,
         complete_path=args.complete,
         midweek_path=args.midweek,
         window_date=_parse_date(args.window_date),
+        rs_reference=rs_reference,
     )
     print(f"Static dashboard built: {output}")
     return 0
