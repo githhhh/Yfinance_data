@@ -80,7 +80,6 @@
   function initialState() {
     const period = data.default_period === "MIDWEEK" && data.meta.midweek_available ? "MIDWEEK" : "WEEKEND";
     return {
-      globalMode: "IBD",
       period,
       scope: period === "MIDWEEK" && data.meta.midweek_baseline_available ? "CHANGES" : "ALL_SIGNALS",
       change: "ALL",
@@ -92,9 +91,8 @@
       entryVolumeMin: null,
       weeklyVolumeMin: null,
       filtersExpanded: false,
-      selected: { WEEKEND: null, MIDWEEK: null, C_RANK: null },
+      selected: { WEEKEND: null, MIDWEEK: null },
       detailOpen: false,
-      cRankTopN: "ALL",
     };
   }
 
@@ -109,6 +107,40 @@
 
   function currentHasComparison() {
     return state.period === "MIDWEEK" && data.meta.midweek_baseline_available;
+  }
+
+  function expectedMarketDate() {
+    return state.period === "MIDWEEK"
+      ? data.meta.midweek_snapshot_date || null
+      : data.meta.complete_snapshot_date || null;
+  }
+
+  function rsTitle(row) {
+    const meta = data?.meta?.rs_reference || {};
+    const source = meta.source || "Fred6725/rs-log";
+    const poolDate = expectedMarketDate();
+    const sourceDate = meta.market_date || null;
+    const current = num(row?.rs_percentile);
+
+    if (current === null) {
+      if (!meta.available) {
+        return `RS N/A\nSource: ${source}\nPublic reference unavailable.`;
+      }
+      if (!poolDate || sourceDate !== poolDate) {
+        return `RS N/A\nSource: ${source}\nRS market date: ${sourceDate || "N/A"}\nPool market date: ${poolDate || "N/A"}\nExact trading-date match required.`;
+      }
+      return `RS N/A\nSource: ${source}\nTicker is not present in the current public RS dataset.`;
+    }
+
+    return [
+      `RS Percentile: ${current}`,
+      `1M ago: ${num(row.rs_1m_percentile) ?? "N/A"}`,
+      `3M ago: ${num(row.rs_3m_percentile) ?? "N/A"}`,
+      `6M ago: ${num(row.rs_6m_percentile) ?? "N/A"}`,
+      `Market date: ${sourceDate || "N/A"}`,
+      `Source: ${source}`,
+      "IBD-style reference; not official IBD RS and not a ranking gate.",
+    ].join("\n");
   }
 
   function filterRows(rows, exclude = "") {
@@ -184,12 +216,11 @@
       });
       return { rows: result, label: "Review Priority" };
     }
-    result.sort((a, b) => {
-      const ar = num(a.rank_C_continuous) ?? 999999;
-      const br = num(b.rank_C_continuous) ?? 999999;
-      return ar !== br ? ar - br : String(a.code).localeCompare(String(b.code));
-    });
-    return { rows: result, label: "C Rank" };
+    result.sort((a, b) => String(a.code).localeCompare(String(b.code), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }));
+    return { rows: result, label: "Code" };
   }
 
   function advancedCount() {
@@ -238,7 +269,7 @@
   }
 
   function headerHtml(rows) {
-    const isMidweek = state.globalMode === "IBD" && state.period === "MIDWEEK";
+    const isMidweek = state.period === "MIDWEEK";
     const snapshot = isMidweek ? data.meta.midweek_snapshot_date : data.meta.complete_snapshot_date;
     const active = rows.filter(isActive).length;
     const fresh = freshness(snapshot);
@@ -253,10 +284,6 @@
         <div>
           <div class="dashboard-title-row"><div class="dashboard-title">Breakout Pool</div>${badge}</div>
           <div class="dashboard-snapshot">${snapshotText} · <b>${rows.length}</b> Total Pool · <b>${active}</b> Active Signals</div>
-        </div>
-        <div class="segmented" aria-label="Dashboard mode">
-          <button data-action="global-mode" data-value="IBD" aria-pressed="${state.globalMode === "IBD"}">IBD Review</button>
-          <button data-action="global-mode" data-value="C_RANK" aria-pressed="${state.globalMode === "C_RANK"}">C Rank Reference</button>
         </div>
       </header>`;
   }
@@ -278,7 +305,7 @@
         <div class="queue-heading">
           <div><h2>Review Queue</h2></div>
           <div><div class="control-group-label">Period</div><div class="segmented">
-            <button data-action="period" data-value="MIDWEEK" aria-pressed="${state.period === "MIDWEEK"}" ${midweekDisabled ? "disabled title=\"Midweek snapshot unavailable\"" : ""}>Midweek Review</button>
+            <button data-action="period" data-value="MIDWEEK" aria-pressed="${state.period === "MIDWEEK"}" ${midweekDisabled ? 'disabled title="Midweek snapshot unavailable"' : ""}>Midweek Review</button>
             <button data-action="period" data-value="WEEKEND" aria-pressed="${state.period === "WEEKEND"}">Weekend Pool</button>
           </div></div>
           ${scope}
@@ -369,7 +396,7 @@
       </section>`;
   }
 
-  function selectedHtml(row, modeKey = state.period) {
+  function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
     const code = esc(row.code);
     const status = row.ibd_entry_status;
@@ -379,12 +406,16 @@
       ? `${esc(statusLabel(baseline))} → <span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`
       : `<span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
     const change = text(row.review_change_label, "");
+    const currentRs = num(row.rs_percentile);
+    const rsValue = currentRs === null
+      ? "N/A"
+      : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip">
       <div class="selected-cell"><div class="selected-key">Selected</div><div class="selected-value selected-code">${code}</div>${change ? `<div class="selected-change">${esc(change)}</div>` : ""}<button class="detail-toggle" data-action="detail">${state.detailOpen ? "Hide details ▴" : "Details ▾"}</button></div>
       <div class="selected-cell"><div class="selected-key">Buy Point</div><div class="selected-value">${fmt(row.ibd_candidate_price)} <small>(${esc(routeLabel(row.ibd_candidate_rule))})</small></div></div>
       <div class="selected-cell"><div class="selected-key">Vs Buy Point</div><div class="selected-value">${fmt(row.current_vs_ibd_candidate_pct, "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
       <div class="selected-cell"><div class="selected-key">Entry Status</div><div class="selected-value">${transition} <small>(${esc(volReason)})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">C Rank & Continuous</div><div class="selected-value">#${fmt(row.rank_C_continuous, "int")} <small>(${fmt(row.C_continuous)})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
       ${state.detailOpen ? detailHtml(row) : ""}
     </div>`;
   }
@@ -419,7 +450,7 @@
       ["latest_close", "Latest"],
       ["ibd_entry_vol_or_reject", "Entry / Reason"],
       ["volume_ratio", "Weekly Vol"],
-      ["rank_C_continuous", "C Rank"],
+      ["rs_percentile", "RS"],
     ];
     const selected = state.selected[state.period];
     return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([, label]) => `<th>${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -434,50 +465,26 @@
     if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
     if (field === "latest_close") return esc(fmt(value));
     if (field === "volume_ratio") return esc(fmt(value, "x"));
-    if (field === "rank_C_continuous") return esc(fmt(value, "int"));
+    if (field === "rs_percentile") {
+      const current = num(value);
+      return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
+    }
     if (field === "ibd_entry_vol_or_reject") return esc(text(value).replace(/x$/, "×"));
     return esc(text(value));
   }
 
   function warningsHtml() {
     const warnings = data.meta.warnings || [];
-    if (!warnings.length || state.globalMode !== "IBD" || state.period !== "MIDWEEK") return "";
+    if (!warnings.length || state.period !== "MIDWEEK") return "";
     return `<div class="warning-stack">${warnings.map((warning) => `<div class="warning">⚠ ${esc(warning)}</div>`).join("")}</div>`;
   }
 
-  function cRankHtml() {
-    const all = data.views.c_rank.rows.filter(isActive).sort((a, b) => (num(a.rank_C_continuous) ?? 999999) - (num(b.rank_C_continuous) ?? 999999));
-    const limit = state.cRankTopN === "ALL" ? all.length : Number(state.cRankTopN);
-    const rows = all.slice(0, limit);
-    const selectedCode = state.selected.C_RANK;
-    const selected = rows.find((row) => String(row.code) === String(selectedCode)) || null;
-    return `${headerHtml(data.views.weekend.rows)}
-      <section>
-        <div class="reference-header"><div><h2>C Rank Reference View</h2><p>Active Signals · C Rank · Best First · reference only</p></div><select class="topn-select" data-control="top-n"><option value="ALL" ${state.cRankTopN === "ALL" ? "selected" : ""}>All rows</option><option value="10" ${state.cRankTopN === "10" ? "selected" : ""}>Top 10</option><option value="25" ${state.cRankTopN === "25" ? "selected" : ""}>Top 25</option><option value="50" ${state.cRankTopN === "50" ? "selected" : ""}>Top 50</option></select><button class="copy-button" data-action="copy-c-rank">Copy ${rows.length} Codes</button></div>
-        <div class="reference-rule">Fixed mode: evaluates Active Signals only; C Rank best first; Top N slice only. This is a horizontal quality reference and does not replace IBD entry status.</div>
-        <div class="results-toolbar"><div class="results-summary">Showing: ${rows.length} of ${all.length} Active Signals · Reference Only</div><div></div><div></div></div>
-        ${selectedHtml(selected, "C_RANK")}
-        ${cRankTableHtml(rows)}
-      </section>${footerHtml()}`;
-  }
-
-  function cRankTableHtml(rows) {
-    if (!rows.length) return `<div class="table-shell"><div class="no-results">No active signals.</div></div>`;
-    const columns = [["code", "Code"], ["rank_C_continuous", "C Rank"], ["C_continuous", "Continuous C"], ["ibd_entry_status", "Status"], ["current_vs_ibd_candidate_pct", "Vs Buy Point"], ["ibd_candidate_rule", "Setup"], ["volume_ratio", "Weekly Vol"], ["latest_close", "Latest"]];
-    return `<div class="table-shell" tabindex="0" data-c-rank-table><table class="review-table"><thead><tr>${columns.map(([, label]) => `<th>${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" class="${String(row.code) === String(state.selected.C_RANK) ? "selected" : ""}">${columns.map(([field]) => `<td class="${field === "code" ? "code-cell" : ""}">${field === "C_continuous" ? esc(fmt(row[field])) : cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-  }
-
   function footerHtml() {
-    return `<div class="footer-note">Static snapshot · source: Yfinance_data authoritative BreakoutFollow pool</div>`;
+    return `<div class="footer-note">Static snapshot · source: Yfinance_data authoritative BreakoutFollow pool · RS reference: Fred6725/rs-log</div>`;
   }
 
   function render() {
     if (!data || !state) return;
-    if (state.globalMode === "C_RANK") {
-      app.innerHTML = cRankHtml();
-      bindEvents();
-      return;
-    }
 
     const sourceRows = rowsForPeriod();
     const counts = filterCounts(sourceRows);
@@ -496,11 +503,7 @@
     app.querySelectorAll("[data-action]").forEach((element) => {
       element.addEventListener("click", async () => {
         const action = element.dataset.action;
-        if (action === "global-mode") {
-          state.globalMode = element.dataset.value;
-          state.detailOpen = false;
-          render();
-        } else if (action === "period") {
+        if (action === "period") {
           if (!element.disabled) resetPeriodState(element.dataset.value);
           render();
         } else if (action === "scope") {
@@ -535,11 +538,10 @@
           state.detailOpen = !state.detailOpen;
           render();
         } else if (action === "copy-codes") {
-          await copyCodes(currentRows.map((row) => row.code), element);
-        } else if (action === "copy-c-rank") {
-          const rows = data.views.c_rank.rows.filter(isActive).sort((a, b) => (num(a.rank_C_continuous) ?? 999999) - (num(b.rank_C_continuous) ?? 999999));
-          const limit = state.cRankTopN === "ALL" ? rows.length : Number(state.cRankTopN);
-          await copyCodes(rows.slice(0, limit).map((row) => row.code), element);
+          const visible = [...app.querySelectorAll("[data-table-shell] tbody tr[data-code]")]
+            .map((row) => row.dataset.code)
+            .filter(Boolean);
+          await copyCodes(visible.length ? visible : currentRows.map((row) => row.code), element);
         }
       });
     });
@@ -560,13 +562,9 @@
     bindRange("entry-volume", (value, element) => { state.entryVolumeMin = Math.abs(value - Number(element.min)) < 1e-9 ? null : value; });
     bindRange("weekly-volume", (value, element) => { state.weeklyVolumeMin = Math.abs(value - Number(element.min)) < 1e-9 ? null : value; });
 
-    const topN = app.querySelector('[data-control="top-n"]');
-    if (topN) topN.addEventListener("change", () => { state.cRankTopN = topN.value; state.detailOpen = false; render(); });
-
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
       row.addEventListener("click", () => {
-        const key = state.globalMode === "C_RANK" ? "C_RANK" : state.period;
-        state.selected[key] = row.dataset.code;
+        state.selected[state.period] = row.dataset.code;
         state.detailOpen = false;
         render();
       });
@@ -574,12 +572,6 @@
 
     const reviewShell = app.querySelector("[data-table-shell]");
     if (reviewShell) reviewShell.addEventListener("keydown", (event) => handleArrow(event, currentRows, state.period));
-    const cRankShell = app.querySelector("[data-c-rank-table]");
-    if (cRankShell) {
-      const rows = data.views.c_rank.rows.filter(isActive).sort((a, b) => (num(a.rank_C_continuous) ?? 999999) - (num(b.rank_C_continuous) ?? 999999));
-      const limit = state.cRankTopN === "ALL" ? rows.length : Number(state.cRankTopN);
-      cRankShell.addEventListener("keydown", (event) => handleArrow(event, rows.slice(0, limit), "C_RANK"));
-    }
   }
 
   function bindRange(name, update) {
@@ -605,8 +597,7 @@
     requestAnimationFrame(() => {
       const target = app.querySelector(`tr[data-code="${CSS.escape(String(rows[index].code))}"]`);
       target?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      const shell = key === "C_RANK" ? app.querySelector("[data-c-rank-table]") : app.querySelector("[data-table-shell]");
-      shell?.focus({ preventScroll: true });
+      app.querySelector("[data-table-shell]")?.focus({ preventScroll: true });
     });
   }
 

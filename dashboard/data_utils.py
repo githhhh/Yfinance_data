@@ -7,9 +7,8 @@ from typing import Any
 from zoneinfo import ZoneInfo
 import zlib
 
-import pandas as pd
-
 import numpy as np
+import pandas as pd
 
 from dashboard.field_config import (
     BOOLEAN_FIELDS,
@@ -52,8 +51,6 @@ REQUIRED_CORE_FIELDS = {
     "ibd_entry_volume_ratio",
     "ibd_entry_reject_reason",
     "volume_ratio",
-    "rank_C_continuous",
-    "C_continuous",
 }
 
 
@@ -86,10 +83,17 @@ def validate_pool_semantics(df: pd.DataFrame) -> None:
     active_mask = df["signal"].map(_to_bool_or_na) == True
     active_df = df[active_mask]
 
-    for col in ["latest_close", "ibd_candidate_price", "current_vs_ibd_candidate_pct", "rank_C_continuous", "C_continuous", "volume_ratio"]:
+    for col in [
+        "latest_close",
+        "ibd_candidate_price",
+        "current_vs_ibd_candidate_pct",
+        "volume_ratio",
+    ]:
         nums = pd.to_numeric(active_df[col], errors="coerce")
         if nums.isna().any() or not np.isfinite(nums).all():
-            raise ValueError(f"Schema / Data Error: {col} must be valid finite numerical values for active signals")
+            raise ValueError(
+                f"Schema / Data Error: {col} must be valid finite numerical values for active signals"
+            )
 
     if (pd.to_numeric(active_df["ibd_candidate_price"], errors="coerce") <= 0).any():
         raise ValueError("Schema / Data Error: ibd_candidate_price must be > 0 for active signals")
@@ -126,13 +130,18 @@ def validate_pool_semantics(df: pd.DataFrame) -> None:
     non_active_df = df[~active_mask]
     if not non_active_df.empty and "ibd_entry_status" in non_active_df.columns:
         for val in non_active_df["ibd_entry_status"]:
-            if pd.notna(val) and str(val).strip() != "" and str(val).strip().lower() not in ("nan", "none"):
+            if (
+                pd.notna(val)
+                and str(val).strip() != ""
+                and str(val).strip().lower() not in ("nan", "none")
+            ):
                 raise ValueError("Schema / Data Error: ibd_entry_status must be empty for non-signal rows")
 
 
 def _extract_snapshot_date_from_csv(path: Path) -> str | None:
     try:
         import csv
+
         with open(path, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -224,7 +233,9 @@ def normalize_pool_df(df: pd.DataFrame) -> pd.DataFrame:
             if pd.isna(vol):
                 return "n/a"
             return f"{vol:.2f}x"
+
         result["ibd_entry_vol_or_reject"] = result.apply(_vol_or_reject, axis=1)
+
     quality_input_columns = {"ibd_entry_close_position", "ibd_entry_breakout_range_ratio"}
     if quality_input_columns.issubset(result.columns):
         result["ibd_breakout_quality"] = result.apply(_compute_breakout_quality, axis=1)
@@ -243,7 +254,6 @@ def _compute_breakout_quality(row: pd.Series) -> str | Any:
         return pd.NA
     if not np.isfinite(pos) or not np.isfinite(rr) or rr < 0:
         return pd.NA
-
     if pos < 0.65:
         return "Weak Close"
 
@@ -268,7 +278,6 @@ def apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
             continue
         _ensure_column(df, spec.field)
         mask &= _filter_mask(df[spec.field], spec)
-
     return df.loc[mask].copy()
 
 
@@ -278,9 +287,9 @@ def apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame:
         return df.copy()
 
     work = df.copy()
-    temp_cols = []
-    by_cols = []
-    ascending_list = []
+    temp_cols: list[str] = []
+    by_cols: list[str] = []
+    ascending_list: list[bool] = []
 
     for i, spec in enumerate(enabled_specs):
         _ensure_column(work, spec.field)
@@ -299,7 +308,6 @@ def apply_sort(df: pd.DataFrame, sort_specs: list[SortSpec]) -> pd.DataFrame:
         na_position="last",
         kind="mergesort",
     ).copy()
-
     return sorted_df.drop(columns=temp_cols, errors="ignore")
 
 
@@ -331,26 +339,18 @@ def apply_default_review_order(df: pd.DataFrame) -> pd.DataFrame:
     if "code" in work.columns:
         sort_cols.append("code")
         ascending.append(True)
-    sorted_df = work.sort_values(by=sort_cols, ascending=ascending, na_position="last", kind="mergesort")
+    sorted_df = work.sort_values(
+        by=sort_cols,
+        ascending=ascending,
+        na_position="last",
+        kind="mergesort",
+    )
     return sorted_df.drop(columns=["_status_rank", "_quality_rank"], errors="ignore")
 
 
-def apply_c_rank_mode(df: pd.DataFrame, limit: int | None = None) -> pd.DataFrame:
-    _ensure_column(df, "signal")
-    _ensure_column(df, "rank_C_continuous")
-
-    ranked = apply_filters(df, [FilterSpec("signal", "is true")])
-    ranked = apply_sort(ranked, [SortSpec("rank_C_continuous", "asc")])
-    if limit is not None:
-        ranked = ranked.head(limit)
-    return ranked.copy()
-
-
-
 def build_kpis(df: pd.DataFrame) -> dict[str, float | int | None]:
-    row_count = len(df)
     return {
-        "filtered_rows": row_count,
+        "filtered_rows": len(df),
         "median_current_vs_ibd_candidate_pct": _median_or_none(df, "current_vs_ibd_candidate_pct"),
         "median_ibd_entry_volume_ratio": _median_or_none(df, "ibd_entry_volume_ratio"),
         "median_volume_ratio": _median_or_none(df, "volume_ratio"),
@@ -453,7 +453,6 @@ def _filter_mask(series: pd.Series, spec: FilterSpec) -> pd.Series:
         return _empty_mask(series)
     if operator in {"not empty", "non-empty"}:
         return ~_empty_mask(series)
-
     raise ValueError(f"Unsupported operator: {spec.operator}")
 
 
@@ -539,7 +538,9 @@ def _build_route_quality_data(df: pd.DataFrame) -> pd.DataFrame:
     working = working[working["ibd_candidate_rule"] != "(empty)"].copy()
     if working.empty:
         return pd.DataFrame(columns=columns)
-    working["valid"] = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))).astype(int)
+    working["valid"] = _true_mask(
+        working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))
+    ).astype(int)
 
     grouped = working.groupby(["ibd_candidate_rule"], dropna=False).agg(
         total_count=("valid", "size"),
@@ -550,10 +551,16 @@ def _build_route_quality_data(df: pd.DataFrame) -> pd.DataFrame:
         median_ibd_entry_breakout_range_ratio=("ibd_entry_breakout_range_ratio", "median"),
     )
     grouped["invalid_count"] = grouped["total_count"] - grouped["valid_count"]
-    grouped["valid_rate_pct"] = (grouped["valid_count"] / grouped["total_count"] * 100).round(2)
+    grouped["valid_rate_pct"] = (
+        grouped["valid_count"] / grouped["total_count"] * 100
+    ).round(2)
     return (
         grouped.reset_index()[columns]
-        .sort_values(["total_count", "ibd_candidate_rule"], ascending=[False, True], kind="mergesort")
+        .sort_values(
+            ["total_count", "ibd_candidate_rule"],
+            ascending=[False, True],
+            kind="mergesort",
+        )
         .reset_index(drop=True)
     )
 
@@ -578,15 +585,24 @@ def _build_trend_volume_map_data(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=columns)
 
-    available = [c for c in columns if c != "touched_ema10_jittered" and c in df.columns]
+    available = [
+        c for c in columns
+        if c != "touched_ema10_jittered" and c in df.columns
+    ]
     working = df[available].copy()
     for column in [c for c in columns if c != "touched_ema10_jittered"]:
         if column not in working.columns:
             working[column] = pd.NA
-    working["touched_ema10_count"] = pd.to_numeric(working["touched_ema10_count"], errors="coerce")
+    working["touched_ema10_count"] = pd.to_numeric(
+        working["touched_ema10_count"], errors="coerce"
+    )
     working["volume_ratio"] = pd.to_numeric(working["volume_ratio"], errors="coerce")
-    valid_mask = _true_mask(working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object")))
-    working = working[valid_mask].dropna(subset=["touched_ema10_count", "volume_ratio"]).copy()
+    valid_mask = _true_mask(
+        working.get("ibd_entry_valid", pd.Series(index=working.index, dtype="object"))
+    )
+    working = working[valid_mask].dropna(
+        subset=["touched_ema10_count", "volume_ratio"]
+    ).copy()
     if working.empty:
         working["touched_ema10_jittered"] = pd.Series(dtype="float64")
         return working[columns].copy()
@@ -594,7 +610,11 @@ def _build_trend_volume_map_data(df: pd.DataFrame) -> pd.DataFrame:
     working["entry_status"] = working["ibd_entry_valid"].map(_entry_status)
     working["dry_status"] = working["pullback_v_is_dry"].map(_dry_status)
     jitter = working["code"].apply(
-        lambda x: (zlib.crc32(str(x).encode("utf-8")) % 301) / 300.0 * 0.3 - 0.15 if pd.notna(x) else 0.0
+        lambda x: (
+            (zlib.crc32(str(x).encode("utf-8")) % 301) / 300.0 * 0.3 - 0.15
+            if pd.notna(x)
+            else 0.0
+        )
     )
     working["touched_ema10_jittered"] = working["touched_ema10_count"] + jitter
     return working[columns].copy()
@@ -623,16 +643,17 @@ def _build_volume_close_matrix_data(df: pd.DataFrame) -> pd.DataFrame:
             working[column] = pd.NA
 
     working["volume_ratio"] = pd.to_numeric(working["volume_ratio"], errors="coerce")
-    working["ibd_entry_close_position"] = pd.to_numeric(working["ibd_entry_close_position"], errors="coerce")
-    working = working.dropna(subset=["volume_ratio", "ibd_entry_close_position"]).copy()
+    working["ibd_entry_close_position"] = pd.to_numeric(
+        working["ibd_entry_close_position"], errors="coerce"
+    )
+    working = working.dropna(
+        subset=["volume_ratio", "ibd_entry_close_position"]
+    ).copy()
     if working.empty:
         return working[columns].copy()
 
     working["entry_status"] = working["ibd_entry_valid"].map(_entry_status)
     return working[columns].copy()
-
-
-
 
 
 def _label_series(df: pd.DataFrame, field: str) -> pd.Series:
@@ -651,7 +672,6 @@ def _dry_status(value: Any) -> str:
     if pd.isna(value):
         return "n/a"
     return "Dry pullback" if bool(value) is True else "Not dry"
-
 
 
 def _compute_ibd_entry_status(row: pd.Series) -> str | Any:
@@ -682,12 +702,20 @@ def build_entry_status_counts(signal_df: pd.DataFrame) -> dict[str, int]:
         for status in statuses:
             counts[status] = int(vc.get(status, 0))
         if "current_vs_ibd_candidate_pct" in signal_df.columns:
-            unconf_mask = (signal_df["ibd_entry_status"] == "UNCONFIRMED") & pd.to_numeric(
-                signal_df["current_vs_ibd_candidate_pct"], errors="coerce"
-            ).between(0.0, 3.0, inclusive="both")
+            unconf_mask = (
+                signal_df["ibd_entry_status"].eq("UNCONFIRMED")
+                & pd.to_numeric(
+                    signal_df["current_vs_ibd_candidate_pct"], errors="coerce"
+                ).between(0.0, 3.0, inclusive="both")
+            )
             unconfirmed_within_3pct = int(unconf_mask.sum())
     total = len(signal_df)
-    return {"All": total, "ALL": total, "unconfirmed_within_3pct": unconfirmed_within_3pct, **counts}
+    return {
+        "All": total,
+        "ALL": total,
+        "unconfirmed_within_3pct": unconfirmed_within_3pct,
+        **counts,
+    }
 
 
 def build_snapshot_freshness(
@@ -698,7 +726,9 @@ def build_snapshot_freshness(
         today_date = datetime.now(ZoneInfo("America/New_York")).date()
     elif isinstance(today, str):
         try:
-            today_date = datetime.strptime(today.strip().split(" ")[0].split("T")[0], "%Y-%m-%d").date()
+            today_date = datetime.strptime(
+                today.strip().split(" ")[0].split("T")[0], "%Y-%m-%d"
+            ).date()
         except (ValueError, TypeError):
             today_date = datetime.now(ZoneInfo("America/New_York")).date()
     elif isinstance(today, datetime):
@@ -708,7 +738,11 @@ def build_snapshot_freshness(
     else:
         today_date = datetime.now(ZoneInfo("America/New_York")).date()
 
-    if snapshot_date is None or pd.isna(snapshot_date) or str(snapshot_date).strip() in ("", "N/A", "Unknown", "nan", "None"):
+    if (
+        snapshot_date is None
+        or pd.isna(snapshot_date)
+        or str(snapshot_date).strip() in ("", "N/A", "Unknown", "nan", "None")
+    ):
         return {
             "status": "UNKNOWN",
             "label": "Unknown",
@@ -748,7 +782,10 @@ def build_snapshot_freshness(
         "label": label,
         "age_days": age_days,
         "snapshot_date_str": s_str,
-        "header_html": f'Snapshot <b>{s_str}</b> · {age_days}d old · <span style="color:{color}; font-weight:600;">{label}</span>',
+        "header_html": (
+            f'Snapshot <b>{s_str}</b> · {age_days}d old · '
+            f'<span style="color:{color}; font-weight:600;">{label}</span>'
+        ),
     }
 
 

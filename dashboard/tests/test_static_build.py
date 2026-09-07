@@ -29,10 +29,12 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
     )
     normalized = load_pool_csv(COMPLETE)
 
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert len(payload["views"]["weekend"]["rows"]) == len(normalized)
     assert payload["meta"]["complete_snapshot_date"] is not None
     assert payload["default_period"] in {"WEEKEND", "MIDWEEK"}
+    assert set(payload["views"]) == {"weekend", "midweek"}
+    assert "rs_reference" not in payload["meta"]
 
     row = payload["views"]["weekend"]["rows"][0]
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
@@ -46,6 +48,17 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "review_priority",
     ):
         assert field in row
+
+    payload_text = json.dumps(payload)
+    for field in (
+        "rank_C_continuous",
+        "C_continuous",
+        "rs_percentile",
+        "rs_1m_percentile",
+        "rs_3m_percentile",
+        "rs_6m_percentile",
+    ):
+        assert field not in payload_text
 
 
 def test_static_records_fail_closed_on_new_pool_columns() -> None:
@@ -79,6 +92,7 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
         output / "index.html",
         output / "app.js",
         output / "table_enhancements.js",
+        output / "rs_runtime.js",
         output / "styles.css",
         output / "manifest.webmanifest",
         output / ".nojekyll",
@@ -86,20 +100,54 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     ):
         assert path.exists(), path
 
-    payload = json.loads((output / "data" / "dashboard.json").read_text(encoding="utf-8"))
+    dashboard_json = (output / "data" / "dashboard.json").read_text(encoding="utf-8")
+    payload = json.loads(dashboard_json)
     assert payload["views"]["weekend"]["rows"]
+    assert "rs_reference" not in payload["meta"]
+    for field in (
+        "rank_C_continuous",
+        "C_continuous",
+        "rs_percentile",
+        "rs_1m_percentile",
+        "rs_3m_percentile",
+        "rs_6m_percentile",
+    ):
+        assert field not in dashboard_json
     for view in payload["views"].values():
         for row in view["rows"]:
             assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
 
-    index = (output / "index.html").read_text(encoding="utf-8").lower()
-    assert "streamlit" not in index
+    index = (output / "index.html").read_text(encoding="utf-8")
+    assert "streamlit" not in index.lower()
     assert "table_enhancements.js" in index
+    assert "rs_runtime.js" in index
+    assert "Dashboard mode" not in index
+
+    app = (output / "app.js").read_text(encoding="utf-8")
+    assert "RS Reference" in app
+    assert "C Rank" not in app
+    assert "rank_C_continuous" not in app
+    assert "C_RANK" not in app
+
+    runtime = (output / "rs_runtime.js").read_text(encoding="utf-8")
+    assert "Fred6725/rs-log" in runtime
+    assert "api.github.com/repos/Fred6725/rs-log/commits" in runtime
+    assert "raw.githubusercontent.com/Fred6725/rs-log" in runtime
+    assert "Reference only; never used by Pool, Gate, Top3 or default ordering." in runtime
+    assert "scheduled" not in runtime.lower()
 
     enhancements = (output / "table_enhancements.js").read_text(encoding="utf-8")
     assert "Breakout Price Quality" in enhancements
     assert "Powerful" in enhancements
-    assert "data-sort-field" in enhancements
+    assert 'data-rs-enhanced="true"' in enhancements
+    assert 'title^="RS "' in enhancements
+    assert "C Rank" not in enhancements
+    assert "data-c-rank-table" not in enhancements
+
+    styles = (output / "styles.css").read_text(encoding="utf-8")
+    assert ".reference-header" not in styles
+    assert ".reference-rule" not in styles
+    assert ".topn-select" not in styles
 
 
 def test_streamlit_runtime_has_been_removed() -> None:

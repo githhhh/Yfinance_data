@@ -4,11 +4,7 @@
   const app = document.getElementById("app");
   if (!app) return;
 
-  const sortState = {
-    review: { field: null, direction: "asc" },
-    cRank: { field: null, direction: "asc" },
-  };
-
+  const sortState = { field: null, direction: "asc" };
   const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let qualityTooltip = null;
@@ -50,55 +46,50 @@
   function compareValues(field, left, right, direction) {
     const ordinalLeft = ordinalValue(field, left);
     const ordinalRight = ordinalValue(field, right);
-    let result = 0;
-
     if (ordinalLeft !== null && ordinalRight !== null) {
-      result = ordinalLeft - ordinalRight;
+      const result = ordinalLeft - ordinalRight;
+      return direction === "desc" ? -result : result;
+    }
+
+    const numericLeft = numericValue(left);
+    const numericRight = numericValue(right);
+
+    // RS is optional runtime data, so an unavailable value stays last in both
+    // directions. All other columns retain the pre-RS table sort semantics.
+    if (field === "rs_percentile") {
+      if (numericLeft === null && numericRight !== null) return 1;
+      if (numericLeft !== null && numericRight === null) return -1;
+    }
+
+    let result = 0;
+    if (numericLeft !== null && numericRight !== null) {
+      result = numericLeft - numericRight;
+    } else if (numericLeft !== null) {
+      result = -1;
+    } else if (numericRight !== null) {
+      result = 1;
     } else {
-      const numericLeft = numericValue(left);
-      const numericRight = numericValue(right);
-      if (numericLeft !== null && numericRight !== null) {
-        result = numericLeft - numericRight;
-      } else if (numericLeft !== null) {
-        result = -1;
-      } else if (numericRight !== null) {
-        result = 1;
-      } else {
-        result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      }
+      result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     }
     return direction === "desc" ? -result : result;
   }
 
-  function tableKind(shell) {
-    return shell.hasAttribute("data-c-rank-table") ? "cRank" : "review";
-  }
-
-  function columnField(label, kind) {
+  function columnField(label) {
     const normalized = normalizeText(label).replace(/[▲▼▾]/g, "").trim();
-    const common = {
+    return {
       Code: "code",
+      Change: "review_change_label",
       Status: "ibd_entry_status",
       Setup: "ibd_candidate_rule",
       "Vs Buy Point": "current_vs_ibd_candidate_pct",
+      "Breakout Price Quality": "ibd_breakout_quality",
       Latest: "latest_close",
+      "Entry / Reason": "ibd_entry_vol_or_reject",
       "Weekly Vol": "volume_ratio",
-      "C Rank": "rank_C_continuous",
-    };
-    if (kind === "review") {
-      return {
-        ...common,
-        Change: "review_change_label",
-        "Breakout Price Quality": "ibd_breakout_quality",
-        "Entry / Reason": "ibd_entry_vol_or_reject",
-      }[normalized] || null;
-    }
-    return {
-      ...common,
-      "Continuous C": "C_continuous",
+      RS: "rs_percentile",
     }[normalized] || null;
   }
 
@@ -120,26 +111,23 @@
   }
 
   function updateSortIndicators(shell) {
-    const kind = tableKind(shell);
-    const active = sortState[kind];
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
-      const isActive = active.field === header.dataset.sortField;
-      header.setAttribute("aria-sort", isActive ? (active.direction === "asc" ? "ascending" : "descending") : "none");
-      if (icon) icon.textContent = isActive ? (active.direction === "asc" ? "▲" : "▼") : "";
+      const isActive = sortState.field === header.dataset.sortField;
+      header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
+      if (icon) icon.textContent = isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "";
     });
   }
 
-  function updateSummary(kind) {
-    const active = sortState[kind];
-    if (!active.field) return;
-    const label = document.querySelector(
-      `${kind === "cRank" ? "[data-c-rank-table]" : "[data-table-shell]"} thead th[data-sort-field="${active.field}"] .table-header-label`,
+  function updateSummary() {
+    if (!sortState.field) return;
+    const label = app.querySelector(
+      `[data-table-shell] thead th[data-sort-field="${sortState.field}"] .table-header-label`,
     )?.textContent;
     const summary = app.querySelector(".results-summary");
     if (summary && label) {
       const count = summary.textContent.match(/^\d+\s+(results|of)/i)?.[0];
-      summary.textContent = `${count ? `${count} · ` : ""}Sorted by ${label} ${active.direction === "asc" ? "↑" : "↓"}`;
+      summary.textContent = `${count ? `${count} · ` : ""}Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`;
     }
   }
 
@@ -148,20 +136,18 @@
     if (event.target.closest("[data-quality-info]")) return;
     const shell = button.closest(".table-shell");
     if (!shell) return;
-    const kind = tableKind(shell);
     const field = button.closest("th")?.dataset.sortField;
     if (!field) return;
 
-    const active = sortState[kind];
-    if (active.field === field) {
-      active.direction = active.direction === "asc" ? "desc" : "asc";
+    if (sortState.field === field) {
+      sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
     } else {
-      active.field = field;
-      active.direction = "asc";
+      sortState.field = field;
+      sortState.direction = "asc";
     }
-    sortTable(shell, active.field, active.direction);
+    sortTable(shell, sortState.field, sortState.direction);
     updateSortIndicators(shell);
-    updateSummary(kind);
+    updateSummary();
   }
 
   function qualityTooltipHtml() {
@@ -227,12 +213,11 @@
   }
 
   function decorateTable(shell) {
-    const kind = tableKind(shell);
     const headers = [...shell.querySelectorAll("thead th")];
     headers.forEach((header) => {
       if (header.dataset.sortEnhanced === "true") return;
       const originalLabel = normalizeText(header.textContent);
-      const field = columnField(originalLabel, kind);
+      const field = columnField(originalLabel);
       if (!field) return;
 
       header.dataset.sortEnhanced = "true";
@@ -287,16 +272,15 @@
       header.appendChild(button);
     });
 
-    const active = sortState[kind];
-    if (active.field) {
-      sortTable(shell, active.field, active.direction);
-      updateSummary(kind);
+    if (sortState.field) {
+      sortTable(shell, sortState.field, sortState.direction);
+      updateSummary();
     }
     updateSortIndicators(shell);
   }
 
   function enhanceTables() {
-    app.querySelectorAll("[data-table-shell], [data-c-rank-table]").forEach(decorateTable);
+    app.querySelectorAll("[data-table-shell]").forEach(decorateTable);
   }
 
   function scheduleEnhance() {
@@ -310,10 +294,8 @@
 
   app.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
-    const shell = event.target.closest?.("[data-table-shell], [data-c-rank-table]");
-    if (!shell) return;
-    const kind = tableKind(shell);
-    if (!sortState[kind].field) return;
+    const shell = event.target.closest?.("[data-table-shell]");
+    if (!shell || !sortState.field) return;
 
     const rows = [...shell.querySelectorAll("tbody tr[data-code]")];
     if (!rows.length) return;
@@ -491,4 +473,125 @@
     .catch(() => {
       dashboardData = null;
     });
+})();
+
+(() => {
+  "use strict";
+
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  let tooltip = null;
+  let anchor = null;
+  let pinned = false;
+  let refreshQueued = false;
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function positionTooltip() {
+    if (!tooltip || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const tip = tooltip.getBoundingClientRect();
+    const padding = 8;
+    const left = Math.min(
+      Math.max(padding, rect.left),
+      Math.max(padding, window.innerWidth - tip.width - padding),
+    );
+    const below = rect.bottom + 6;
+    const top = below + tip.height <= window.innerHeight - padding
+      ? below
+      : Math.max(padding, rect.top - tip.height - 6);
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+  }
+
+  function hideTooltip(force = false) {
+    if (pinned && !force) return;
+    tooltip?.remove();
+    tooltip = null;
+    anchor = null;
+    if (force) pinned = false;
+  }
+
+  function showTooltip(target, pin = false) {
+    const copy = target.dataset.rsTooltip || "RS reference unavailable";
+    hideTooltip(true);
+    pinned = pin;
+    anchor = target;
+    const node = document.createElement("div");
+    node.setAttribute("role", "tooltip");
+    node.style.cssText = "position:fixed;width:min(310px,calc(100vw - 16px));padding:11px 12px;border-radius:7px;background:#0b1329;color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.45);border:1px solid rgba(148,163,184,.22);z-index:999999;font:11px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;pointer-events:none;white-space:normal;";
+    node.innerHTML = copy.split("\n").map((line, index) => {
+      const tag = index === 0 ? "strong" : "div";
+      return `<${tag}>${escapeHtml(line)}</${tag}>`;
+    }).join("");
+    document.body.appendChild(node);
+    tooltip = node;
+    positionTooltip();
+  }
+
+  function decorateRsReference(target) {
+    if (target.dataset.rsEnhanced === "true") return;
+    const copy = target.getAttribute("title") || "";
+    if (!copy.startsWith("RS ")) return;
+    target.dataset.rsEnhanced = "true";
+    target.dataset.rsTooltip = copy;
+    target.removeAttribute("title");
+    target.setAttribute("tabindex", "0");
+    target.setAttribute("role", "button");
+    target.setAttribute("aria-label", `${target.textContent?.trim() || "RS"}. Tap for RS reference details.`);
+    target.style.cursor = "help";
+
+    target.addEventListener("mouseenter", () => {
+      if (!pinned) showTooltip(target, false);
+    });
+    target.addEventListener("mouseleave", () => hideTooltip(false));
+    target.addEventListener("focus", () => {
+      if (!pinned) showTooltip(target, false);
+    });
+    target.addEventListener("blur", () => hideTooltip(false));
+    target.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (pinned && anchor === target) hideTooltip(true);
+      else showTooltip(target, true);
+    });
+    target.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (pinned && anchor === target) hideTooltip(true);
+        else showTooltip(target, true);
+      }
+      if (event.key === "Escape") hideTooltip(true);
+    });
+  }
+
+  function enhanceRsReferences() {
+    app.querySelectorAll('[title^="RS "]').forEach(decorateRsReference);
+  }
+
+  function scheduleEnhance() {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    requestAnimationFrame(() => {
+      refreshQueued = false;
+      enhanceRsReferences();
+    });
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (pinned && !event.target.closest?.('[data-rs-enhanced="true"]')) hideTooltip(true);
+  });
+  window.addEventListener("resize", positionTooltip);
+  window.addEventListener("scroll", () => hideTooltip(true), true);
+
+  const observer = new MutationObserver(scheduleEnhance);
+  observer.observe(app, { childList: true, subtree: true });
+  scheduleEnhance();
 })();

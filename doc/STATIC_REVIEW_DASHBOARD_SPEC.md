@@ -1,7 +1,7 @@
 # Static Breakout Pool Review Dashboard Spec
 
 状态：当前唯一 Dashboard 心流 / 交互规范  
-日期：2026-09-06
+日期：2026-09-07
 
 本文是静态 GitHub Pages Dashboard 的唯一交互规范。旧 Streamlit / AG Grid 时代的 Dashboard 设计文档已经删除；需要追溯设计演进时使用 Git 历史，不在当前文档目录保留重复规范。
 
@@ -35,12 +35,12 @@ Dashboard 是高频 Review 工作台，不是分析报告。用户应沿同一�
 - **快速条件优先，高级筛选按需展开。**
 - **表格是主要工作区，详情紧贴结果。**
 - **默认排序提供起点，表头排序允许即时探索。**
-- **C Rank 只是 Reference，不作为隐藏 Gate。**
+- **RS 只是浏览器端外部 Reference context，不作为隐藏 Gate、Top3 或默认排序。**
 - 不新增首页分析型图表，不让辅助信息打断 Review 流。
 
 ## 3. 当前技术边界
 
-运行时为纯静态页面：
+主体运行链路：
 
 ```text
 Authoritative Pool CSV
@@ -51,17 +51,28 @@ Authoritative Pool CSV
 → GitHub Pages
 ```
 
-- Python 是业务事实与投影权威层。
-- 浏览器只负责展示、筛选、排序、选行、复制和响应式交互。
+RS 独立链路：
+
+```text
+browser opens Pages
+→ authoritative Dashboard already renders
+→ rs_runtime.js fetches public Fred6725/rs-log
+→ fills RS reference cells only
+```
+
+- Python 是 Pool 事实与投影权威层。
+- 浏览器负责展示、筛选、排序、选行、复制和响应式交互。
 - 不重新引入 Streamlit、AG Grid、服务端状态或第二套交易规则。
 - `dashboard/services/` 属于跨仓库共享契约，不因前端重构随意移动或改名。
+- RS 不进入 Python projection、`dashboard.json`、Pages build 或 Pages deploy 条件。
+- RS 请求失败、数据落后或 ticker 缺失不能阻塞、替换或触发主体 Pages 发布。
 
 ## 4. 页面结构
 
 固定从上到下：
 
 ```text
-Header / Snapshot / Data State / IBD vs C Rank
+Header / Snapshot / Data State
 Review Queue
   Period
   Scope
@@ -144,14 +155,14 @@ Period
 ### 5.1 默认排序
 
 - Midweek + Changes + 合法 baseline：`Review Priority`；
-- 其它 IBD Review：`C Rank`；
-- C Rank Reference：`C Rank` best first。
+- 其它 Review：`Code`，保持中性、可预测；
+- RS 不进入默认排序、Gate、Top3 或 Review Priority。
 
 默认排序是进入队列的起点，不是强制锁定。
 
 ### 5.2 表头排序
 
-Decision Table 与 C Rank Reference 的可见字段必须支持点击表头排序：
+Decision Table 的可见字段必须支持点击表头排序：
 
 - 第一次点击：升序；
 - 再次点击：降序；
@@ -159,6 +170,7 @@ Decision Table 与 C Rank Reference 的可见字段必须支持点击表头排�
 - 数值列按数值排序；
 - Entry Status 按业务状态顺序；
 - Breakout Price Quality 按业务质量强度顺序；
+- RS 可在加载成功后手工按 percentile 排序，`N/A` 无论升降序均保持最后；
 - 自定义排序后的选中行、键盘 ↑↓ Review 和 Copy 顺序均跟随当前可见顺序。
 
 ### 5.3 Breakout Price Quality 表头说明
@@ -185,14 +197,33 @@ Weak
 
 不得在浏览器重新计算质量等级。
 
-### 5.4 Selected Detail
+### 5.4 RS Reference
+
+RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。
+
+数据源固定为 `Fred6725/rs-log` 的公开 `output/rs_stocks.csv`。RS 完全采用浏览器端 fail-soft 语义：
+
+1. 主体 `dashboard.json` 先独立加载并完成页面渲染；
+2. `rs_runtime.js` 再读取该 CSV 的最新公开 commit metadata，并用同一 commit SHA 读取 CSV；
+3. 不把 RS 写入 Pool、Python projection、`dashboard.json` 或本仓库 PIT；
+4. 正常加载：显示当前 percentile，详情提供 1M / 3M / 6M ago percentile；
+5. RS 更新时间早于当前 Pool snapshot：允许继续显示最近可用 RS，但明确标记 `stale`；
+6. ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常或请求失败：显示 `N/A`；
+7. 不需要 exact-date gate，不因为 RS 状态重新发布 Pages；
+8. 不存在 RS schedule、RS-only Pages refresh 或 RS publish condition；
+9. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
+10. RS 永远不进入 Gate、Top3、Review Priority 或默认排序。
+
+主表只显示当前 `RS` percentile；桌面 hover / focus 与触屏点击可查看当前、1M、3M、6M ago、RS 更新时间、Pool snapshot 与来源。
+
+### 5.5 Selected Detail
 
 Selected Detail 位于结果摘要和表格之间；选行后原地更新，不要求用户滚动到页面底部确认。至少覆盖：
 
 - Buy Point / Setup；
 - Vs Buy Point / Latest；
 - Entry Status；
-- C Rank；
+- RS Reference；
 - 展开后的 Daily Entry、Pullback、CANSLIM/Base 事实。
 
 详情只解释当前行，不创建第二套筛选器。
@@ -206,7 +237,7 @@ Selected Detail 位于结果摘要和表格之间；选行后原地更新，不�
 - Period / Scope、Quick filters、Status cards 自动换行；
 - 表格允许横向与纵向滚动，但 Code 列保持 sticky；
 - 表格自身两个方向到边界时不使用 overscroll / bounce 弹性；页面外层正常纵向滚动不受影响；
-- 表头排序和 Quality 说明必须支持触屏；
+- 表头排序、Quality 与 RS 说明必须支持触屏；
 - 不为移动端复制第二套业务逻辑。
 
 ## 7. 数据与公开安全契约
@@ -216,6 +247,8 @@ GitHub Pages 是公网资源。
 - `dashboard.json` 行数据只能来自 `dashboard.build_static.PUBLIC_DASHBOARD_ROW_FIELDS`；
 - Pool 新增字段默认 **不发布**；
 - 新字段只有在 UI 明确使用且确认可公开后才加入白名单；
+- `dashboard.json` 不发布 C Rank / Continuous C，也不发布 RS percentile；
+- RS 由浏览器直接读取公开 GitHub API / raw 内容，不接收或转发仓库 Token、API Key 或其它凭据；
 - 禁止账户、持仓、成本、订单、broker account hash、OAuth token、API key、密码或私有研究数据进入 payload；
 - 浏览器未显示但收到的数据也视为已公开，因此不能依赖“前端不渲染”作为安全边界。
 
@@ -230,6 +263,7 @@ python dashboard/self_check.py \
 python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
+node --check dashboard/rs_runtime.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 ```
@@ -241,10 +275,13 @@ python security_scan.py --history
 - Quick filters、Status、More Filters 不互相误重置；
 - 默认 Range 显示当前语境真实边界，完整范围不显示 `Any`；
 - Range 拖动后 active 状态与结果数量一致；
-- 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；
+- Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
+- 主体页面在 RS 请求开始前即可正常使用；
+- RS 正常时显示；落后时标记 stale；请求失败或 ticker 缺失时为 N/A；
+- RS 任一状态都不影响 Pool / Pages build 与 deploy；
+- 表头排序、Quality / RS tooltip、选行、键盘 ↑↓、Copy 顺序一致；
 - 表格横纵滚动到边界不产生自身 bounce；
-- C Rank Reference 与 IBD Review 状态互不污染；
-- 生成的 `dashboard.json` 不含白名单之外的 Pool 列。
+- 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。
 
 ## 9. 文档维护规则
 

@@ -1,19 +1,18 @@
 import warnings
-import pytest
+
 import pandas as pd
+import pytest
 
 from dashboard.data_utils import (
     FilterSpec,
     SortSpec,
-    apply_c_rank_mode,
-    apply_filters,
-    apply_sort,
-    normalize_pool_df,
-    build_entry_status_counts,
     _false_mask,
     _true_mask,
+    apply_filters,
+    apply_sort,
+    build_entry_status_counts,
+    normalize_pool_df,
 )
-from dashboard.field_config import EXCLUDED_CUSTOM_FIELDS
 
 
 def sample_pool_df() -> pd.DataFrame:
@@ -39,7 +38,6 @@ def sample_pool_df() -> pd.DataFrame:
                     "breakout_date": "2026-05-10",
                     "pct_above_ceiling": "4.0",
                     "touched_ema10_count": "2",
-                    "rank_C_continuous": "2",
                 },
                 {
                     "code": "BBB",
@@ -60,7 +58,6 @@ def sample_pool_df() -> pd.DataFrame:
                     "breakout_date": "2026-04-15",
                     "pct_above_ceiling": "8.0",
                     "touched_ema10_count": "5",
-                    "rank_C_continuous": "1",
                 },
                 {
                     "code": "DDD",
@@ -81,7 +78,6 @@ def sample_pool_df() -> pd.DataFrame:
                     "breakout_date": "2026-05-20",
                     "pct_above_ceiling": "12.0",
                     "touched_ema10_count": "3",
-                    "rank_C_continuous": "4",
                 },
                 {
                     "code": "CCC",
@@ -102,7 +98,6 @@ def sample_pool_df() -> pd.DataFrame:
                     "breakout_date": "2026-06-01",
                     "pct_above_ceiling": "2.0",
                     "touched_ema10_count": "1",
-                    "rank_C_continuous": "3",
                 },
             ]
         )
@@ -220,7 +215,10 @@ def test_date_between_filter_uses_date_semantics():
         )
     )
 
-    actual = apply_filters(df, [FilterSpec("breakout_date", "between", "2026-05-01", "2026-06-01")])
+    actual = apply_filters(
+        df,
+        [FilterSpec("breakout_date", "between", "2026-05-01", "2026-06-01")],
+    )
 
     assert actual["code"].tolist() == ["AAA"]
 
@@ -236,7 +234,10 @@ def test_invalid_numeric_filter_value_returns_no_rows_instead_of_raising():
 def test_invalid_date_filter_value_returns_no_rows_instead_of_raising():
     df = sample_pool_df()
 
-    actual = apply_filters(df, [FilterSpec("breakout_date", "between", "2026-05-01", "not-a-date")])
+    actual = apply_filters(
+        df,
+        [FilterSpec("breakout_date", "between", "2026-05-01", "not-a-date")],
+    )
 
     assert actual.empty
 
@@ -255,16 +256,6 @@ def test_apply_sort_supports_three_stable_levels_and_nulls_last():
     assert sorted_df["code"].tolist() == ["AAA", "DDD", "BBB", "CCC"]
 
 
-def test_c_rank_mode_ignores_custom_filters_and_sorts_by_rank():
-    df = sample_pool_df()
-    custom_filters = [FilterSpec("code", "equals", "AAA")]
-    custom_sort = [SortSpec("volume_ratio", "desc")]
-
-    actual = apply_c_rank_mode(df, limit=None)
-
-    assert actual["code"].tolist() == ["BBB", "AAA", "DDD"]
-
-
 def test_boolean_masks_do_not_emit_pandas_downcasting_warning():
     series = pd.Series([True, False, None], dtype="object")
 
@@ -281,7 +272,10 @@ def test_boolean_masks_do_not_emit_pandas_downcasting_warning():
 def test_funnel_stage1_route_filtering():
     df = sample_pool_df()
 
-    actual = apply_filters(df, [FilterSpec("ibd_candidate_rule", "in", ["pivot", "ma10_touch_confirm"])])
+    actual = apply_filters(
+        df,
+        [FilterSpec("ibd_candidate_rule", "in", ["pivot", "ma10_touch_confirm"])],
+    )
 
     assert set(actual["code"]) == {"BBB", "DDD"}
 
@@ -337,7 +331,11 @@ def test_funnel_stage5_grouping_filtering():
         df,
         [
             FilterSpec("sector", "in", ["Technology Services"]),
-            FilterSpec("industry", "in", ["Software - Enterprise", "Software - Infrastructure"]),
+            FilterSpec(
+                "industry",
+                "in",
+                ["Software - Enterprise", "Software - Infrastructure"],
+            ),
         ],
     )
 
@@ -350,7 +348,11 @@ def test_funnel_full_decision_funnel_integration_and_logic():
     actual = apply_filters(
         df,
         [
-            FilterSpec("ibd_candidate_rule", "in", ["ceiling_pullback", "ma10_touch_confirm"]),
+            FilterSpec(
+                "ibd_candidate_rule",
+                "in",
+                ["ceiling_pullback", "ma10_touch_confirm"],
+            ),
             FilterSpec("ibd_entry_valid", "is true"),
             FilterSpec("ibd_entry_close_position", ">=", 0.80),
             FilterSpec("volume_ratio", ">=", 1.4),
@@ -399,9 +401,7 @@ def test_apply_filters_supports_entry_range_and_close_position_boundaries():
     )
     bull_trap = apply_filters(
         df,
-        [
-            FilterSpec("ibd_entry_close_position", "<", 0.5),
-        ],
+        [FilterSpec("ibd_entry_close_position", "<", 0.5)],
     )
 
     assert gap_up["code"].tolist() == ["AAA", "DDD"]
@@ -423,12 +423,42 @@ def test_funnel_stage1_default_all_filters_signal_true():
 def test_entry_status_boundary_cases():
     raw = pd.DataFrame(
         [
-            {"code": "S1", "signal": "True", "ibd_entry_valid": "0", "current_vs_ibd_candidate_pct": 2.0},
-            {"code": "S2", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": None},
-            {"code": "S3", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": -0.01},
-            {"code": "S4", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 0.0},
-            {"code": "S5", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 5.0},
-            {"code": "S6", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 5.01},
+            {
+                "code": "S1",
+                "signal": "True",
+                "ibd_entry_valid": "0",
+                "current_vs_ibd_candidate_pct": 2.0,
+            },
+            {
+                "code": "S2",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": None,
+            },
+            {
+                "code": "S3",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": -0.01,
+            },
+            {
+                "code": "S4",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 0.0,
+            },
+            {
+                "code": "S5",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 5.0,
+            },
+            {
+                "code": "S6",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 5.01,
+            },
         ]
     )
     df = normalize_pool_df(raw)
@@ -447,7 +477,10 @@ def test_entry_status_mutual_exclusion_and_conservation():
     counts = build_entry_status_counts(sig)
     assert counts["All"] == len(sig)
     assert (
-        counts["UNCONFIRMED"] + counts["ACTIONABLE"] + counts["EXTENDED"] + counts["BELOW_TRIGGER"]
+        counts["UNCONFIRMED"]
+        + counts["ACTIONABLE"]
+        + counts["EXTENDED"]
+        + counts["BELOW_TRIGGER"]
         <= counts["All"]
     )
 
@@ -455,10 +488,30 @@ def test_entry_status_mutual_exclusion_and_conservation():
 def test_build_entry_status_counts():
     raw = pd.DataFrame(
         [
-            {"code": "A", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 2.0},
-            {"code": "B", "signal": "True", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 8.0},
-            {"code": "C", "signal": "True", "ibd_entry_valid": "0", "current_vs_ibd_candidate_pct": 1.0},
-            {"code": "D", "signal": "False", "ibd_entry_valid": "1", "current_vs_ibd_candidate_pct": 2.0},
+            {
+                "code": "A",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 2.0,
+            },
+            {
+                "code": "B",
+                "signal": "True",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 8.0,
+            },
+            {
+                "code": "C",
+                "signal": "True",
+                "ibd_entry_valid": "0",
+                "current_vs_ibd_candidate_pct": 1.0,
+            },
+            {
+                "code": "D",
+                "signal": "False",
+                "ibd_entry_valid": "1",
+                "current_vs_ibd_candidate_pct": 2.0,
+            },
         ]
     )
     df = normalize_pool_df(raw)

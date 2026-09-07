@@ -5,10 +5,7 @@ from typing import Any
 
 
 DISPLAY_VALUE_MAPS: dict[str, dict[str, str]] = {
-    "signal": {
-        "True": "Active Signal",
-        "False": "Inactive",
-    },
+    "signal": {"True": "Active Signal", "False": "Inactive"},
     "signal_source": {
         "10_wk_ema_touch_confirm": "10W EMA Touch",
         "ceiling_breakout": "Ceiling Breakout",
@@ -60,15 +57,8 @@ def format_display_value(field: str, value: Any) -> str:
         return mapped
     if "_" not in text:
         return text
-    words = []
-    acronym_map = {
-        "ema10": "EMA10",
-        "ma10": "MA10",
-        "wk": "W",
-    }
-    for word in text.split("_"):
-        words.append(acronym_map.get(word.lower(), word.capitalize()))
-    return " ".join(words)
+    acronym_map = {"ema10": "EMA10", "ma10": "MA10", "wk": "W"}
+    return " ".join(acronym_map.get(word.lower(), word.capitalize()) for word in text.split("_"))
 
 
 def _tooltip_meta(
@@ -207,6 +197,7 @@ FLOW_CARD_META = {
     },
 }
 
+
 QUALITY_META = {
     "Powerful Breakout": {
         "label": "Powerful Breakout",
@@ -271,14 +262,12 @@ QUALITY_ALIASES = {
 }
 QUALITY_ORDER.update({alias: QUALITY_ORDER[current] for alias, current in QUALITY_ALIASES.items()})
 
-EXCLUDED_CUSTOM_FIELDS = {"C_continuous", "rank_C_continuous", "is_priority"}
 
 BOOLEAN_FIELDS = {
     "signal",
     "pullback_v_is_dry",
     "ibd_entry_valid",
     "is_bullish",
-    "is_priority",
     "review_watch_active",
     "review_futu_actionable",
 }
@@ -308,8 +297,6 @@ NUMBER_FIELDS = {
     "base_depth_pct",
     "base_mbox_count",
     "base_depth_abs",
-    "C_continuous",
-    "rank_C_continuous",
     "pullback_count",
     "pullback_duration_weeks",
     "pullback_pct",
@@ -381,9 +368,6 @@ ALL_TABLE_COLUMNS = [
     "latest_close",
     "current_vs_ibd_candidate_pct",
     "ibd_breakout_quality",
-    "C_continuous",
-    "rank_C_continuous",
-    "is_priority",
 ]
 
 IBD_DECISION_COLUMNS = [
@@ -395,20 +379,7 @@ IBD_DECISION_COLUMNS = [
     "latest_close",
     "ibd_entry_vol_or_reject",
     "volume_ratio",
-    "rank_C_continuous",
 ]
-
-C_RANK_REFERENCE_COLUMNS = [
-    "code",
-    "rank_C_continuous",
-    "C_continuous",
-    "ibd_entry_status",
-    "current_vs_ibd_candidate_pct",
-    "ibd_candidate_rule",
-    "volume_ratio",
-    "latest_close",
-]
-
 DEFAULT_TABLE_COLUMNS = IBD_DECISION_COLUMNS
 
 SIGNAL_COLUMNS = [
@@ -453,13 +424,6 @@ VOLUME_PULLBACK_COLUMNS = [
     "hold_return",
 ]
 
-REFERENCE_COLUMNS = [
-    "code",
-    "C_continuous",
-    "rank_C_continuous",
-    "is_priority",
-]
-
 LONG_FIELDS = {"ibd_entry_reject_reason", "ibd_candidate_extra"}
 
 
@@ -472,7 +436,6 @@ def _field(
     sortable: bool = True,
     default_table: bool = False,
     custom_mode: bool = True,
-    c_rank_mode: bool = False,
     advanced_filter: bool = True,
     fmt: str | None = None,
     help_text: str = "",
@@ -485,7 +448,6 @@ def _field(
         "sortable": sortable,
         "default_table": default_table,
         "custom_mode": custom_mode,
-        "c_rank_mode": c_rank_mode,
         "advanced_filter": advanced_filter,
         "format": fmt,
         "help": help_text,
@@ -494,7 +456,17 @@ def _field(
 
 FIELD_CONFIG = OrderedDict(
     [
-        ("code", _field("Code", "text", "Identity", sortable=True, default_table=True, help_text="点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。")),
+        (
+            "code",
+            _field(
+                "Code",
+                "text",
+                "Identity",
+                sortable=True,
+                default_table=True,
+                help_text="点击股票代码、Origin 标签或空白处选择该行；仅点击右侧复制按钮复制代码。",
+            ),
+        ),
         (
             "review_change_label",
             _field(
@@ -522,9 +494,27 @@ FIELD_CONFIG = OrderedDict(
         ("snapshot_date", _field("Snapshot Date", "date", "Identity")),
         ("signal", _field("Signal", "boolean", "Signal")),
         ("signal_source", _field("Signal Source", "category", "Signal", default_table=True)),
-        ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
-        ("ibd_candidate_rule", _field("Setup", "category", "Buy Point", default_table=True, help_text="买点所依据的形态或触发结构。")),
-        ("ibd_candidate_price", _field("Buy Point", "number", "Buy Point", default_table=True, fmt="0.00", help_text="当前复盘使用的有效买点价格。")),
+        (
+            "ibd_candidate_rule",
+            _field(
+                "Setup",
+                "category",
+                "Buy Point",
+                default_table=True,
+                help_text="买点所依据的形态或触发结构。",
+            ),
+        ),
+        (
+            "ibd_candidate_price",
+            _field(
+                "Buy Point",
+                "number",
+                "Buy Point",
+                default_table=True,
+                fmt="0.00",
+                help_text="当前复盘使用的有效买点价格。",
+            ),
+        ),
         ("ibd_candidate_signal_source", _field("IBD Candidate Signal Source", "category", "Candidate")),
         (
             "ibd_candidate_extra",
@@ -681,7 +671,14 @@ FIELD_CONFIG = OrderedDict(
         ("hold_return", _field("Hold Return", "number", "Volume/Pullback", fmt="0.0%")),
         (
             "breakout_date",
-            _field("Breakout Date", "date", "Signal", filterable=True, default_table=True, advanced_filter=True),
+            _field(
+                "Breakout Date",
+                "date",
+                "Signal",
+                filterable=True,
+                default_table=True,
+                advanced_filter=True,
+            ),
         ),
         ("pct_above_ceiling", _field("Pct Above Ceiling", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("touched_ema10_count", _field("Touched EMA10 Count", "number", "Risk / Structure", default_table=True)),
@@ -692,31 +689,6 @@ FIELD_CONFIG = OrderedDict(
         ("base_depth_pct", _field("Base Depth Pct", "number", "Risk / Structure", fmt="0.0%")),
         ("base_mbox_count", _field("Base M Box Count", "number", "Risk / Structure")),
         ("base_depth_abs", _field("Base Depth Abs", "number", "Risk / Structure")),
-        (
-            "C_continuous",
-            _field(
-                "Continuous C",
-                "number",
-                "C Rank",
-                custom_mode=False,
-                c_rank_mode=True,
-                advanced_filter=False,
-                help_text="综合质量评分（只对 Active Signals 计算和展示分布）。",
-            ),
-        ),
-        (
-            "rank_C_continuous",
-            _field(
-                "C Rank",
-                "number",
-                "C Rank",
-                default_table=True,
-                custom_mode=False,
-                c_rank_mode=True,
-                advanced_filter=False,
-                help_text="综合质量对照排名（只对 Active Signals 计算和展示分布），数值越小越靠前。",
-            ),
-        ),
         ("pullback_count", _field("Pullback Count", "number", "Risk / Structure", default_table=True)),
         (
             "pullback_duration_weeks",
@@ -732,17 +704,6 @@ FIELD_CONFIG = OrderedDict(
         ("pullback_pct_off_peak", _field("Pullback Pct Off Peak", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
         ("is_bullish", _field("Is Bullish", "boolean", "Risk / Structure")),
-        (
-            "is_priority",
-            _field(
-                "Is Priority",
-                "boolean",
-                "C Rank",
-                custom_mode=False,
-                c_rank_mode=True,
-                advanced_filter=False,
-            ),
-        ),
         ("sector", _field("Sector", "category", "Grouping", default_table=True)),
         ("industry", _field("Industry", "category", "Grouping", default_table=True)),
         ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
@@ -752,13 +713,12 @@ FIELD_CONFIG = OrderedDict(
 )
 
 
-def _allowed(field: str) -> bool:
-    config = FIELD_CONFIG[field]
-    return bool(config.get("custom_mode")) and field not in EXCLUDED_CUSTOM_FIELDS
-
-
 def get_custom_mode_fields() -> list[str]:
-    return [field for field in FIELD_CONFIG if _allowed(field) and field not in LONG_FIELDS]
+    return [
+        field
+        for field in FIELD_CONFIG
+        if FIELD_CONFIG[field].get("custom_mode") and field not in LONG_FIELDS
+    ]
 
 
 def get_filterable_fields() -> list[str]:
@@ -767,7 +727,9 @@ def get_filterable_fields() -> list[str]:
         fields.extend(
             field
             for field in group_fields
-            if field in FIELD_CONFIG and FIELD_CONFIG[field].get("filterable") and FIELD_CONFIG[field].get("advanced_filter")
+            if field in FIELD_CONFIG
+            and FIELD_CONFIG[field].get("filterable")
+            and FIELD_CONFIG[field].get("advanced_filter")
         )
     return fields
 
@@ -788,8 +750,6 @@ def get_midweek_table_columns() -> list[str]:
 def get_column_view_fields(view_name: str) -> list[str]:
     if view_name == "IBD Decision":
         return [field for field in IBD_DECISION_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "C Rank Reference":
-        return [field for field in C_RANK_REFERENCE_COLUMNS if field in FIELD_CONFIG]
     if view_name == "All Fields":
         return get_all_table_columns()
     if view_name == "Signal":
@@ -798,8 +758,6 @@ def get_column_view_fields(view_name: str) -> list[str]:
         return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
     if view_name == "Volume/Pullback":
         return [field for field in VOLUME_PULLBACK_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "Reference":
-        return [field for field in REFERENCE_COLUMNS if field in FIELD_CONFIG]
     raise ValueError(f"Unknown column view: {view_name}")
 
 

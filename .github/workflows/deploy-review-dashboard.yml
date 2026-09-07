@@ -55,6 +55,7 @@ jobs:
         run: |
           node --check dashboard/app.js
           node --check dashboard/table_enhancements.js
+          node --check dashboard/rs_runtime.js
           python -m py_compile dashboard/build_static.py
 
       - name: Validate authoritative pool projection

@@ -17,13 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.data_utils import build_snapshot_freshness
-from dashboard.field_config import (
-    FLOW_CARD_META,
-    STATUS_META,
-    get_column_view_fields,
-    get_default_table_columns,
-    get_midweek_table_columns,
-)
+from dashboard.field_config import FLOW_CARD_META, STATUS_META
 from dashboard.services.bf_midweek_review import (
     PoolMode,
     analyze_breakout_follow_pool,
@@ -36,12 +30,25 @@ STATIC_ASSETS = (
     "index.html",
     "app.js",
     "table_enhancements.js",
+    "rs_runtime.js",
     "styles.css",
     "manifest.webmanifest",
 )
 
+PUBLIC_REVIEW_COLUMNS = (
+    "code",
+    "ibd_entry_status",
+    "ibd_candidate_rule",
+    "current_vs_ibd_candidate_pct",
+    "ibd_breakout_quality",
+    "latest_close",
+    "ibd_entry_vol_or_reject",
+    "volume_ratio",
+)
+
 # Public GitHub Pages contract. Pool/schema growth must never implicitly publish
-# new columns. Add a field here only when the static UI intentionally consumes it.
+# new columns. RS is intentionally absent: it is fetched independently by the
+# browser at runtime and never becomes part of the authoritative Pool payload.
 PUBLIC_DASHBOARD_ROW_FIELDS = (
     "code",
     "signal",
@@ -68,8 +75,6 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "ibd_entry_breakout_range_ratio",
     "ibd_breakout_quality",
     "volume_ratio",
-    "rank_C_continuous",
-    "C_continuous",
     "eps_yoy_growth",
     "price_52_week_high",
     "dist_to_52w_high_pct",
@@ -118,9 +123,7 @@ def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
     result = frame.copy()
     result["review_watch_active"] = result["signal"]
     result["review_effective_entry_status"] = result["ibd_entry_status"]
-    result["review_priority"] = pd.to_numeric(
-        result.get("rank_C_continuous"), errors="coerce"
-    )
+    result["review_priority"] = None
     return result
 
 
@@ -149,6 +152,13 @@ def _flow_meta() -> dict[str, Any]:
         }
         for key, meta in FLOW_CARD_META.items()
     }
+
+
+def _review_columns(*, comparison: bool) -> list[str]:
+    columns = list(PUBLIC_REVIEW_COLUMNS)
+    if comparison:
+        columns.insert(1, "review_change_label")
+    return columns
 
 
 def build_dashboard_payload(
@@ -190,7 +200,7 @@ def build_dashboard_payload(
     )
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "window_date": window_date.isoformat(),
         "default_period": default_period,
@@ -211,19 +221,13 @@ def build_dashboard_payload(
         "views": {
             "weekend": {
                 "rows": _records(complete),
-                "table_columns": get_default_table_columns(),
+                "table_columns": _review_columns(comparison=False),
             },
             "midweek": {
                 "rows": _records(midweek),
-                "table_columns": (
-                    get_midweek_table_columns()
-                    if analysis.midweek_baseline_available
-                    else get_default_table_columns()
+                "table_columns": _review_columns(
+                    comparison=bool(analysis.midweek_baseline_available)
                 ),
-            },
-            "c_rank": {
-                "rows": _records(complete),
-                "table_columns": get_column_view_fields("C Rank Reference"),
             },
         },
         "ui": {
