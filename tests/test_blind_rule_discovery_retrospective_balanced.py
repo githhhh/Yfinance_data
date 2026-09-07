@@ -6,10 +6,15 @@ import pandas as pd
 
 from backtest.blind_rule_discovery.retrospective_ceiling_balanced import (
     _balanced_condition_pool,
+    _score_all_single_conditions,
     balanced_rolling_walk_forward,
     balanced_search_rules,
 )
-from backtest.blind_rule_discovery.retrospective_ceiling import search_rules
+from backtest.blind_rule_discovery.retrospective_ceiling import (
+    _condition_key,
+    _condition_mask,
+    generate_conditions,
+)
 
 
 def interaction_history(quarters: int = 8) -> pd.DataFrame:
@@ -47,17 +52,15 @@ def interaction_history(quarters: int = 8) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_balanced_pool_keeps_every_feature_even_with_tiny_global_beam():
+def test_balanced_pool_keeps_every_feature_even_when_masks_are_identical():
     frame = interaction_history()
     features = ["A", "B", *[f"D{i}" for i in range(6)]]
-    singles, _, _ = search_rules(
+    conditions = generate_conditions(frame, features, quantiles=(0.25, 0.5, 0.75))
+    condition_masks = {_condition_key(c): _condition_mask(frame, c) for c in conditions}
+    singles = _score_all_single_conditions(
         frame,
-        features,
-        quantiles=(0.25, 0.5, 0.75),
-        beam_width=20,
-        max_conditions=1,
-        max_clauses=1,
-        dnf_clause_pool=0,
+        conditions,
+        condition_masks,
         min_selected=20,
         min_resolved=20,
         min_active_quarters=4,
