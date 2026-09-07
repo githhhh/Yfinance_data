@@ -30,6 +30,7 @@ from .outcomes import RESEARCH_PRICE_MODE, SPLIT_SAFE_PRICE_MODES
 from .pipeline_contract import validate_replay_preflight
 
 DEFAULT_MIN_DISCOVERY_QUARTERS = 8
+RESEARCH_BUDGET_POLICY = "hard_ceiling_stop_early_on_convergence"
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,6 +76,11 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _effective_research_seconds(value: int) -> int:
+    """Clamp the requested research timeout to the canonical safety ceiling."""
+    return min(max(1, int(value)), MAX_RESEARCH_SECONDS)
 
 
 def _prepare_output_root(output_root: Path) -> None:
@@ -135,6 +141,7 @@ def main() -> int:
     args = parse_args()
     _prepare_output_root(args.output_root)
     required_quarters = args.holdout_quarters + args.min_discovery_quarters
+    effective_research_seconds = _effective_research_seconds(args.research_seconds)
 
     replay_provenance: dict[str, object] = {"verification": "debug_override"}
     if not args.allow_unverified_replay:
@@ -241,7 +248,10 @@ def main() -> int:
         "loser_semantics": "minus8_before_plus20_including_later_recovery",
         "unresolved_semantics": "neither_boundary_within_60_sessions",
         "purge_semantics": "drop_discovery_rows_whose_12w_outcome_window_reaches_holdout_start",
+        "research_seconds_requested": int(args.research_seconds),
+        "research_seconds_effective": effective_research_seconds,
         "research_seconds_cap": MAX_RESEARCH_SECONDS,
+        "research_budget_policy": RESEARCH_BUDGET_POLICY,
         "private_artifacts_materialized": False,
         "agent_workspace": str(workspace),
     }
@@ -257,7 +267,7 @@ def main() -> int:
         shlex.split(args.agent_command),
         workspace,
         sandbox_prefix=shlex.split(args.sandbox_prefix),
-        timeout_seconds=args.research_seconds,
+        timeout_seconds=effective_research_seconds,
     )
     (args.output_root / "agent_stdout.txt").write_text(completed.stdout, encoding="utf-8")
     (args.output_root / "agent_stderr.txt").write_text(completed.stderr, encoding="utf-8")
