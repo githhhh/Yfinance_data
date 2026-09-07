@@ -32,7 +32,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": 1.0,
                 "ibd_entry_volume_ratio": 2.0,
                 "volume_ratio": 1.5,
-                "rank_C_continuous": 3,
             },
             {
                 "code": "B",
@@ -45,7 +44,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": 2.0,
                 "ibd_entry_volume_ratio": 1.8,
                 "volume_ratio": 1.2,
-                "rank_C_continuous": 1,
             },
             {
                 "code": "C",
@@ -58,7 +56,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": 8.0,
                 "ibd_entry_volume_ratio": 2.4,
                 "volume_ratio": 1.7,
-                "rank_C_continuous": 2,
             },
             {
                 "code": "D",
@@ -71,7 +68,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": 0.5,
                 "ibd_entry_volume_ratio": None,
                 "volume_ratio": 2.0,
-                "rank_C_continuous": 4,
             },
             {
                 "code": "E",
@@ -84,7 +80,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": 4.0,
                 "ibd_entry_volume_ratio": 2.2,
                 "volume_ratio": 1.8,
-                "rank_C_continuous": 0,
             },
             {
                 "code": "POOL_ONLY",
@@ -97,7 +92,6 @@ def _review_rows() -> pd.DataFrame:
                 "current_vs_ibd_candidate_pct": None,
                 "ibd_entry_volume_ratio": None,
                 "volume_ratio": 1.0,
-                "rank_C_continuous": 99,
             },
         ]
     )
@@ -107,9 +101,9 @@ def test_public_view_default_sort_is_deterministic():
     resolver = getattr(review_service, "default_sort_mode", None)
     assert callable(resolver)
     assert resolver("MIDWEEK", "CHANGES", has_comparison=True) == "Review Priority"
-    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=True) == "C Rank"
-    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=False) == "C Rank"
-    assert resolver("WEEKEND", "ALL_SIGNALS", has_comparison=False) == "C Rank"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=True) == "Code"
+    assert resolver("MIDWEEK", "ALL_SIGNALS", has_comparison=False) == "Code"
+    assert resolver("WEEKEND", "ALL_SIGNALS", has_comparison=False) == "Code"
 
 
 def test_legacy_text_filter_state_is_normalized_for_slider_widgets():
@@ -218,7 +212,7 @@ def test_no_baseline_state_clears_only_incompatible_comparison_state():
     assert reconciled["scope"] == "ALL_SIGNALS"
     assert reconciled["change_filter"] == "ALL"
     assert reconciled["origin_filter"] == "ALL"
-    assert reconciled["sort_mode"] == "C Rank"
+    assert reconciled["sort_mode"] == "Code"
     assert reconciled["status_filter"] == "ACTIONABLE"
     assert reconciled["route_filter"] == "pivot"
 
@@ -230,7 +224,7 @@ def test_filter_counts_use_the_same_composed_filter_model_as_results():
     counts = build_review_filter_counts(_review_rows(), state)
 
     assert counts["change"]["BECAME_ACTIONABLE"] == 1
-    assert counts["change"]["UNCHANGED"] == 0  # Changes scope excludes unchanged rows.
+    assert counts["change"]["UNCHANGED"] == 0
     assert counts["origin"]["CARRY"] == 1
     assert counts["status"]["ACTIONABLE"] == 1
     assert counts["result"] == len(apply_review_filters(_review_rows(), state)) == 1
@@ -318,12 +312,12 @@ def test_default_modes_choose_compatible_scope_sort_and_collapsed_filters():
     assert (weekend["mode"], weekend["scope"], weekend["sort_mode"]) == (
         "WEEKEND",
         "ALL_SIGNALS",
-        "C Rank",
+        "Code",
     )
     assert (no_baseline["mode"], no_baseline["scope"], no_baseline["sort_mode"]) == (
         "MIDWEEK",
         "ALL_SIGNALS",
-        "C Rank",
+        "Code",
     )
     assert midweek["filters_expanded"] is False
     assert weekend["filters_expanded"] is False
@@ -340,7 +334,7 @@ def test_repeated_mode_click_preserves_state_but_real_switch_resets_incompatible
             "status_filter": "ACTIONABLE",
             "filters_expanded": True,
             "copy_state": "COPIED",
-            "sort_mode": "C Rank",
+            "sort_mode": "Code",
         }
     )
 
@@ -354,7 +348,7 @@ def test_repeated_mode_click_preserves_state_but_real_switch_resets_incompatible
     assert switched["status_filter"] == "ALL"
     assert switched["filters_expanded"] is False
     assert switched["copy_state"] == "IDLE"
-    assert switched["sort_mode"] == "C Rank"
+    assert switched["sort_mode"] == "Code"
 
     no_baseline = switch_review_mode(
         switched,
@@ -364,7 +358,7 @@ def test_repeated_mode_click_preserves_state_but_real_switch_resets_incompatible
     assert (no_baseline["mode"], no_baseline["scope"], no_baseline["sort_mode"]) == (
         "MIDWEEK",
         "ALL_SIGNALS",
-        "C Rank",
+        "Code",
     )
 
 
@@ -372,7 +366,7 @@ def test_sort_control_label_matches_actual_review_and_weekend_order():
     rows = _review_rows().query("review_watch_active == True").copy()
 
     review_sorted = sort_review_rows(rows, "Review Priority")
-    c_rank_sorted = sort_review_rows(rows, "C Rank")
+    code_sorted = sort_review_rows(rows.sample(frac=1, random_state=7), "Code")
 
     assert review_sorted["code"].tolist() == ["A", "B", "C", "D", "E"]
-    assert c_rank_sorted["code"].tolist() == ["E", "B", "C", "A", "D"]
+    assert code_sorted["code"].tolist() == ["A", "B", "C", "D", "E"]
