@@ -63,14 +63,8 @@ def _coerce_percentile(value: object) -> int | None:
     return int(round(parsed))
 
 
-def _latest_completed_market_date(timestamp: datetime) -> date:
-    """Map an rs-log commit time to the latest completed US market session.
-
-    rs-log is published by a post-close workflow, but GitHub commit dates are
-    artifact times rather than market-data dates. On weekends and exchange
-    holidays those dates can differ. A delayed pre-close commit likewise still
-    belongs to the previous completed session.
-    """
+def latest_completed_market_date(timestamp: datetime) -> date:
+    """Map a timestamp to the latest completed US equity market session."""
     local = timestamp.astimezone(RS_MARKET_TIMEZONE)
     candidate = local.date()
     if local.time() < RS_REGULAR_CLOSE:
@@ -92,7 +86,7 @@ def parse_rs_market_date(commit_payload: str | list[dict[str, object]]) -> tuple
     if not isinstance(committer, dict) or not committer.get("date"):
         raise ValueError("rs-log commit timestamp is missing")
     timestamp = datetime.fromisoformat(str(committer["date"]).replace("Z", "+00:00"))
-    market_date = _latest_completed_market_date(timestamp)
+    market_date = latest_completed_market_date(timestamp)
     sha = str(latest.get("sha")) if isinstance(latest, dict) and latest.get("sha") else None
     return market_date, sha
 
@@ -204,6 +198,7 @@ __all__ = [
     "RSReferenceSnapshot",
     "attach_rs_reference",
     "fetch_latest_rs_reference",
+    "latest_completed_market_date",
     "parse_rs_csv",
     "parse_rs_market_date",
     "reference_meta",
