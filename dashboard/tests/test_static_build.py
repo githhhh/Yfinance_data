@@ -48,6 +48,8 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "review_priority",
     ):
         assert field in row
+
+    payload_text = json.dumps(payload)
     for field in (
         "rank_C_continuous",
         "C_continuous",
@@ -56,7 +58,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "rs_3m_percentile",
         "rs_6m_percentile",
     ):
-        assert field not in row
+        assert field not in payload_text
 
 
 def test_static_records_fail_closed_on_new_pool_columns() -> None:
@@ -98,18 +100,22 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     ):
         assert path.exists(), path
 
-    payload = json.loads((output / "data" / "dashboard.json").read_text(encoding="utf-8"))
+    dashboard_json = (output / "data" / "dashboard.json").read_text(encoding="utf-8")
+    payload = json.loads(dashboard_json)
     assert payload["views"]["weekend"]["rows"]
     assert "rs_reference" not in payload["meta"]
+    for field in (
+        "rank_C_continuous",
+        "C_continuous",
+        "rs_percentile",
+        "rs_1m_percentile",
+        "rs_3m_percentile",
+        "rs_6m_percentile",
+    ):
+        assert field not in dashboard_json
     for view in payload["views"].values():
         for row in view["rows"]:
             assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
-            assert "rank_C_continuous" not in row
-            assert "C_continuous" not in row
-            assert "rs_percentile" not in row
-            assert "rs_1m_percentile" not in row
-            assert "rs_3m_percentile" not in row
-            assert "rs_6m_percentile" not in row
 
     index = (output / "index.html").read_text(encoding="utf-8")
     assert "streamlit" not in index.lower()
