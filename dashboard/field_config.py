@@ -309,10 +309,6 @@ NUMBER_FIELDS = {
     "review_candidate_price",
     "review_current_vs_candidate_pct",
     "review_priority",
-    "rs_percentile",
-    "rs_1m_percentile",
-    "rs_3m_percentile",
-    "rs_6m_percentile",
 }
 
 FILTER_FUNNEL_GROUPS = OrderedDict(
@@ -372,10 +368,6 @@ ALL_TABLE_COLUMNS = [
     "latest_close",
     "current_vs_ibd_candidate_pct",
     "ibd_breakout_quality",
-    "rs_percentile",
-    "rs_1m_percentile",
-    "rs_3m_percentile",
-    "rs_6m_percentile",
 ]
 
 IBD_DECISION_COLUMNS = [
@@ -387,7 +379,6 @@ IBD_DECISION_COLUMNS = [
     "latest_close",
     "ibd_entry_vol_or_reject",
     "volume_ratio",
-    "rs_percentile",
 ]
 DEFAULT_TABLE_COLUMNS = IBD_DECISION_COLUMNS
 
@@ -431,14 +422,6 @@ VOLUME_PULLBACK_COLUMNS = [
     "pullback_pct_off_peak",
     "pullback_v_is_dry",
     "hold_return",
-]
-
-REFERENCE_COLUMNS = [
-    "code",
-    "rs_percentile",
-    "rs_1m_percentile",
-    "rs_3m_percentile",
-    "rs_6m_percentile",
 ]
 
 LONG_FIELDS = {"ibd_entry_reject_reason", "ibd_candidate_extra"}
@@ -726,30 +709,6 @@ FIELD_CONFIG = OrderedDict(
         ("eps_yoy_growth", _field("EPS YoY Growth", "number", "Grouping", default_table=True, fmt="0.0%")),
         ("price_52_week_high", _field("Price 52 Week High", "number", "Grouping", default_table=True, fmt="0.00")),
         ("dist_to_52w_high_pct", _field("Distance To 52W High", "number", "Grouping", default_table=True, fmt="0.0%")),
-        (
-            "rs_percentile",
-            _field(
-                "RS",
-                "number",
-                "Reference",
-                filterable=False,
-                default_table=True,
-                advanced_filter=False,
-                help_text="Current public IBD-style RS percentile; reference only, not an official IBD rating or strategy gate.",
-            ),
-        ),
-        (
-            "rs_1m_percentile",
-            _field("RS 1M Ago", "number", "Reference", filterable=False, advanced_filter=False),
-        ),
-        (
-            "rs_3m_percentile",
-            _field("RS 3M Ago", "number", "Reference", filterable=False, advanced_filter=False),
-        ),
-        (
-            "rs_6m_percentile",
-            _field("RS 6M Ago", "number", "Reference", filterable=False, advanced_filter=False),
-        ),
     ]
 )
 
@@ -799,8 +758,6 @@ def get_column_view_fields(view_name: str) -> list[str]:
         return [field for field in IBD_COLUMNS if field in FIELD_CONFIG]
     if view_name == "Volume/Pullback":
         return [field for field in VOLUME_PULLBACK_COLUMNS if field in FIELD_CONFIG]
-    if view_name == "Reference":
-        return [field for field in REFERENCE_COLUMNS if field in FIELD_CONFIG]
     raise ValueError(f"Unknown column view: {view_name}")
 
 
