@@ -105,6 +105,7 @@ def test_r5_rolling_preserves_every_fold_and_generalizes_synthetic_risk():
     assert (rolling["train_rows_purged_for_w3_overlap"] > 0).any()
     assert (pd.to_numeric(rolling["test_stop_first_lift"], errors="coerce").dropna() > 0).all()
     assert (pd.to_numeric(rolling["test_persistent_stop_first_lift"], errors="coerce").dropna() > 0).all()
+    assert (pd.to_numeric(rolling["test_matched_stop_first_lift_p50"], errors="coerce").dropna() > 0).all()
     for rule in rolling["rule_json"].dropna():
         assert "M_" not in str(rule)
 
@@ -129,7 +130,7 @@ def test_post_r4_family_thresholds_are_training_only_quantiles():
     }
 
 
-def test_risk_family_rolling_keeps_all_families_and_folds():
+def test_risk_family_rolling_keeps_all_families_folds_and_matched_risk():
     data = risk_frame()
     families = rolling_risk_families(data, min_train_quarters=4)
     assert len(families) == 2 * 4 * len(RISK_FAMILIES)
@@ -137,6 +138,8 @@ def test_risk_family_rolling_keeps_all_families_and_folds():
     assert (~families["w3_label_overlap_after_purge"].astype(bool)).all()
     deep_extended = families.loc[families["family"] == "deep_pullback_and_extended"]
     assert (pd.to_numeric(deep_extended["test_stop_first_lift"], errors="coerce").dropna() > 0).all()
+    assert (pd.to_numeric(deep_extended["test_persistent_stop_first_lift"], errors="coerce").dropna() > 0).all()
+    assert (pd.to_numeric(deep_extended["test_matched_stop_first_lift_p50"], errors="coerce").dropna() > 0).all()
     for payload in deep_extended["family_rule_json"].dropna():
         decoded = json.loads(payload)
         assert decoded["family"] == "deep_pullback_and_extended"
@@ -160,6 +163,7 @@ def test_r5_summaries_count_all_folds_and_pooled_risk():
         assert item["positive_stop_lift_all_fold_fraction"] == 1.0
         assert item["pooled_selected_stop_first_lift"] > 0
         assert item["pooled_selected_persistent_stop_lift"] > 0
+        assert item["matched_positive_stop_lift_fraction"] == 1.0
 
     families = rolling_risk_families(data, min_train_quarters=4)
     family_summary = summarize_family_rolling(families)
@@ -171,3 +175,6 @@ def test_r5_summaries_count_all_folds_and_pooled_risk():
     assert target["folds"] == 4
     assert target["positive_stop_lift_all_fold_fraction"] == 1.0
     assert target["pooled_selected_stop_first_lift"] > 0
+    assert target["pooled_selected_persistent_stop_lift"] > 0
+    assert target["matched_positive_stop_lift_fraction"] == 1.0
+    assert target["matched_positive_persistent_lift_fraction"] == 1.0
