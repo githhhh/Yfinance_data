@@ -23,8 +23,8 @@
 - `BELOW TRIGGER`：有效信号当前低于 Buy Point。
 - `EXTENDED`：已超过 Buy Point +5%。
 - Midweek Review 使用合法完整周 Pool 作为 baseline；没有合法 baseline 时关闭 Carry / Change / Origin 比较。
-- Midweek `Changes` 默认按 `Review Priority`；其它 Review 默认按 `Code`，不再使用 C Rank。
-- 主表以 `RS` 替代 C Rank 列。RS 只引用 `Fred6725/rs-log` 最新公开数据；只有 RS market date 与 Pool `snapshot_date` 严格一致才显示，否则 `N/A`。
+- Midweek `Changes` 默认按 `Review Priority`；其它 Review 默认按 `Code`。
+- 主表 `RS` 只引用 `Fred6725/rs-log` 最新公开数据；只有 RS market date 与 Pool `snapshot_date` 严格一致才显示，否则 `N/A`。
 - RS 只是 context，不进入 Gate、Top3、Review Priority 或默认排序，也不保存为本仓库 PIT 历史。
 - `Breakout Price Quality` 仍由 Python 权威层生成，表头保留强度说明。
 - More Filters Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`。
@@ -39,13 +39,12 @@ python dashboard/self_check.py \
 python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
-node --check dashboard/rs_enhancements.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 python -m http.server 8000 --directory /tmp/yfinance-dashboard-site
 ```
 
-`build_static.py` 获取 RS 失败时仍正常构建，RS 显示 `N/A`。
+`build_static.py` 获取 RS 失败、RS 日期不匹配或 ticker 缺失时仍正常构建，对应 RS 显示 `N/A`。
 
 ## 部署
 
@@ -66,7 +65,6 @@ Pages 没有第二套 weekly/midweek 调度。Pool 发布失败时，Pages 保�
 GitHub Pages 是公网资源。`dashboard/build_static.py` 通过 `PUBLIC_DASHBOARD_ROW_FIELDS` 显式白名单输出行字段：
 
 - Pool 新增列不会自动进入 `dashboard.json`；
-- C Rank / Continuous C 不再进入公开 payload；
 - RS 只发布当前 percentile 和 1M / 3M / 6M ago percentile；
 - 不得把账户、持仓、成本、订单、broker account hash、API Key、OAuth Token 或其它私有交易数据加入静态 payload。
 
