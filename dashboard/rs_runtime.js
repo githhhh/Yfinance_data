@@ -231,7 +231,8 @@
       const timestamp = latest?.commit?.committer?.date;
       if (!sha || !timestamp) throw new Error("RS metadata is incomplete");
 
-      const csvResponse = await fetch(CSV_URL(sha), { cache: "no-store" });
+      // A commit-pinned raw URL is immutable, so let the browser reuse it.
+      const csvResponse = await fetch(CSV_URL(sha), { cache: "force-cache" });
       if (!csvResponse.ok) throw new Error(`RS CSV HTTP ${csvResponse.status}`);
       reference = {
         status: "ready",
