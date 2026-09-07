@@ -96,6 +96,38 @@ def _balanced_condition_pool(
     return chosen
 
 
+def _score_all_single_conditions(
+    frame: pd.DataFrame,
+    conditions: Sequence[Mapping[str, Any]],
+    condition_masks: Mapping[tuple[str, str, float], np.ndarray],
+    *,
+    min_selected: int,
+    min_resolved: int,
+    min_active_quarters: int,
+    min_resolved_per_quarter: int,
+) -> pd.DataFrame:
+    """Score every eligible single condition without cross-feature mask deduplication.
+
+    Two different features can select exactly the same rows historically. Collapsing
+    those masks before interaction search arbitrarily deletes one feature and can hide
+    a later interaction. Feature identity is therefore preserved until the balanced
+    condition pool has selected representatives from every searchable feature.
+    """
+    records: list[dict[str, Any]] = []
+    for condition in conditions:
+        rule = _canonical_rule([[condition]])
+        mask = condition_masks[_condition_key(condition)]
+        metrics = evaluate_mask(frame, mask, min_resolved_per_quarter=min_resolved_per_quarter)
+        if _eligible(
+            metrics,
+            min_selected=min_selected,
+            min_resolved=min_resolved,
+            min_active_quarters=min_active_quarters,
+        ):
+            records.append(_record_for_rule(rule, mask, metrics))
+    return score_records(records)
+
+
 def balanced_search_rules(
     frame: pd.DataFrame,
     feature_columns: Sequence[str],
@@ -124,19 +156,15 @@ def balanced_search_rules(
         raise ValueError("no usable search conditions")
     condition_masks = {_condition_key(c): _condition_mask(frame, c) for c in conditions}
 
-    single_records: list[dict[str, Any]] = []
-    for condition in conditions:
-        rule = _canonical_rule([[condition]])
-        mask = condition_masks[_condition_key(condition)]
-        metrics = evaluate_mask(frame, mask, min_resolved_per_quarter=min_resolved_per_quarter)
-        if _eligible(
-            metrics,
-            min_selected=min_selected,
-            min_resolved=min_resolved,
-            min_active_quarters=min_active_quarters,
-        ):
-            single_records.append(_record_for_rule(rule, mask, metrics))
-    single_scored = score_records(_dedupe_records(single_records))
+    single_scored = _score_all_single_conditions(
+        frame,
+        conditions,
+        condition_masks,
+        min_selected=min_selected,
+        min_resolved=min_resolved,
+        min_active_quarters=min_active_quarters,
+        min_resolved_per_quarter=min_resolved_per_quarter,
+    )
     if single_scored.empty:
         raise ValueError("no single-condition rule satisfies support constraints")
 
@@ -146,7 +174,8 @@ def balanced_search_rules(
         conditions_per_feature=conditions_per_feature,
     )
     represented_features = {str(condition["feature"]) for condition in interaction_conditions}
-    missing_features = sorted(set(feature_columns) - represented_features)
+    searchable_features = {str(condition["feature"]) for condition in conditions}
+    missing_features = sorted(searchable_features - represented_features)
     if missing_features:
         raise ValueError(
             "feature-balanced interaction pool lost searchable features: " + ",".join(missing_features)
