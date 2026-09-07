@@ -35,29 +35,37 @@ Dashboard 是高频 Review 工作台，不是分析报告。用户应沿同一�
 - **快速条件优先，高级筛选按需展开。**
 - **表格是主要工作区，详情紧贴结果。**
 - **默认排序提供起点，表头排序允许即时探索。**
-- **RS 只是外部 Reference context，不作为隐藏 Gate、Top3 或默认排序。**
+- **RS 只是浏览器端外部 Reference context，不作为隐藏 Gate、Top3 或默认排序。**
 - 不新增首页分析型图表，不让辅助信息打断 Review 流。
 
 ## 3. 当前技术边界
 
-运行时为纯静态页面：
+主体运行链路：
 
 ```text
 Authoritative Pool CSV
 → Python projection / normalization
-→ optional current RS reference enrichment
 → dashboard/build_static.py
 → public dashboard.json
 → HTML / CSS / vanilla JS
 → GitHub Pages
 ```
 
-- Python 是业务事实与投影权威层。
-- 浏览器只负责展示、筛选、排序、选行、复制和响应式交互。
+RS 独立链路：
+
+```text
+browser opens Pages
+→ authoritative Dashboard already renders
+→ rs_runtime.js fetches public Fred6725/rs-log
+→ fills RS reference cells only
+```
+
+- Python 是 Pool 事实与投影权威层。
+- 浏览器负责展示、筛选、排序、选行、复制和响应式交互。
 - 不重新引入 Streamlit、AG Grid、服务端状态或第二套交易规则。
 - `dashboard/services/` 属于跨仓库共享契约，不因前端重构随意移动或改名。
-- RS 是 fail-soft 外部参考源，失败不能阻塞 Pool 或 Dashboard 发布。
-- Dashboard 的定时 refresh 只能重建**已经发布的权威 Pool**，不能下载行情、重新计算 Pool 或修改 `snapshot_date`。
+- RS 不进入 Python projection、`dashboard.json`、Pages build 或 Pages deploy 条件。
+- RS 请求失败、数据落后或 ticker 缺失不能阻塞、替换或触发主体 Pages 发布。
 
 ## 4. 页面结构
 
@@ -162,7 +170,7 @@ Decision Table 的可见字段必须支持点击表头排序：
 - 数值列按数值排序；
 - Entry Status 按业务状态顺序；
 - Breakout Price Quality 按业务质量强度顺序；
-- RS 可手工按 percentile 排序，`N/A` 无论升降序均保持最后；
+- RS 可在加载成功后手工按 percentile 排序，`N/A` 无论升降序均保持最后；
 - 自定义排序后的选中行、键盘 ↑↓ Review 和 Copy 顺序均跟随当前可见顺序。
 
 ### 5.3 Breakout Price Quality 表头说明
@@ -191,30 +199,22 @@ Weak
 
 ### 5.4 RS Reference
 
-RS 是**当前横向强弱参考**，不是策略评分，也不是官方 IBD RS。
+RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。
 
-数据源固定为 `Fred6725/rs-log` 的公开 `output/rs_stocks.csv`，公开字段仅包含：
+数据源固定为 `Fred6725/rs-log` 的公开 `output/rs_stocks.csv`。RS 完全采用浏览器端 fail-soft 语义：
 
-```text
-rs_percentile
-rs_1m_percentile
-rs_3m_percentile
-rs_6m_percentile
-```
+1. 主体 `dashboard.json` 先独立加载并完成页面渲染；
+2. `rs_runtime.js` 再读取该 CSV 的最新公开 commit metadata，并用同一 commit SHA 读取 CSV；
+3. 不把 RS 写入 Pool、Python projection、`dashboard.json` 或本仓库 PIT；
+4. 正常加载：显示当前 percentile，详情提供 1M / 3M / 6M ago percentile；
+5. RS 更新时间早于当前 Pool snapshot：允许继续显示最近可用 RS，但明确标记 `stale`；
+6. ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常或请求失败：显示 `N/A`；
+7. 不需要 exact-date gate，不因为 RS 状态重新发布 Pages；
+8. 不存在 RS schedule、RS-only Pages refresh 或 RS publish condition；
+9. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
+10. RS 永远不进入 Gate、Top3、Review Priority 或默认排序。
 
-构建规则：
-
-1. 读取 `rs_stocks.csv` 最新 commit metadata；
-2. commit timestamp 只是 artifact 时间，不直接当作交易日；将其转换到 `America/New_York` 后映射到**该时点最新已经完成的美股交易日**：周末 / 美股休市日向前回退，若 artifact 在正常收盘前出现也使用前一已完成交易日；
-3. 使用同一 commit SHA 固定读取对应 CSV，避免 metadata / CSV 更新竞态；
-4. 只有 `rs_market_date == pool.snapshot_date` 才 join ticker；
-5. 日期不一致、ticker 缺失、GitHub / rs-log 不可用或 CSV schema 异常时显示 `N/A`；
-6. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
-7. RS 失败不得阻塞权威 Pool push 触发的 Dashboard 构建与发布；
-8. 不在本仓库建立 RS PIT 历史，不能用当前 RS 数据倒推历史回测结论；
-9. 权威 Pool push 仍立即触发 Dashboard；另在**周四、周六 `03:00 UTC`**尝试一次 RS-only static refresh，用来覆盖“Pool 已发布但 rs-log 稍后才发布”的竞态。Scheduled refresh 只有当**目标 Pool snapshot、RS market date、该时点最新已完成的美股交易日三者完全一致**时才允许发布新的 Pages artifact；任一不匹配或 RS 不可用时跳过发布并保留上一份 Pages。refresh 不产生第二套 Pool 数据。
-
-主表显示当前 `RS` percentile；桌面 hover / focus 与触屏点击可查看当前、1M、3M、6M ago percentile、market date 与来源。
+主表只显示当前 `RS` percentile；桌面 hover / focus 与触屏点击可查看当前、1M、3M、6M ago、RS 更新时间、Pool snapshot 与来源。
 
 ### 5.5 Selected Detail
 
@@ -247,8 +247,8 @@ GitHub Pages 是公网资源。
 - `dashboard.json` 行数据只能来自 `dashboard.build_static.PUBLIC_DASHBOARD_ROW_FIELDS`；
 - Pool 新增字段默认 **不发布**；
 - 新字段只有在 UI 明确使用且确认可公开后才加入白名单；
-- RS 只发布当前 percentile 与 1M / 3M / 6M ago percentile；
-- RS 公共数据获取不接收或转发仓库 Token、API Key 或其它凭据；
+- `dashboard.json` 不发布 C Rank / Continuous C，也不发布 RS percentile；
+- RS 由浏览器直接读取公开 GitHub API / raw 内容，不接收或转发仓库 Token、API Key 或其它凭据；
 - 禁止账户、持仓、成本、订单、broker account hash、OAuth token、API key、密码或私有研究数据进入 payload；
 - 浏览器未显示但收到的数据也视为已公开，因此不能依赖“前端不渲染”作为安全边界。
 
@@ -263,6 +263,7 @@ python dashboard/self_check.py \
 python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
+node --check dashboard/rs_runtime.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 ```
@@ -275,12 +276,12 @@ python security_scan.py --history
 - 默认 Range 显示当前语境真实边界，完整范围不显示 `Any`；
 - Range 拖动后 active 状态与结果数量一致；
 - Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
-- RS market date 必须映射到实际已完成交易日；周末 / 休市日 artifact 不能冒充交易日；
-- RS 仅在严格交易日匹配时显示，错日、ticker 缺失与外部失败均为 N/A；
-- 周四 / 周六 `03:00 UTC` refresh 仅在 Pool / RS / 最新完成交易日三者一致时发布；否则 Pages 保持上一份成功 artifact；
+- 主体页面在 RS 请求开始前即可正常使用；
+- RS 正常时显示；落后时标记 stale；请求失败或 ticker 缺失时为 N/A；
+- RS 任一状态都不影响 Pool / Pages build 与 deploy；
 - 表头排序、Quality / RS tooltip、选行、键盘 ↑↓、Copy 顺序一致；
 - 表格横纵滚动到边界不产生自身 bounce；
-- 生成的 `dashboard.json` 不含白名单之外的 Pool 列，也不含 C Rank / Continuous C。
+- 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。
 
 ## 9. 文档维护规则
 
