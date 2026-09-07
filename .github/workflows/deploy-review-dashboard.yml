@@ -66,8 +66,6 @@ jobs:
 
       - name: Build static dashboard
         run: python dashboard/build_static.py --output _site
-        env:
-          RS_GITHUB_TOKEN: ${{ github.event_name != 'pull_request' && github.token || '' }}
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'
