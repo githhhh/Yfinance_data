@@ -57,6 +57,7 @@ Authoritative Pool CSV
 - 不重新引入 Streamlit、AG Grid、服务端状态或第二套交易规则。
 - `dashboard/services/` 属于跨仓库共享契约，不因前端重构随意移动或改名。
 - RS 是 fail-soft 外部参考源，失败不能阻塞 Pool 或 Dashboard 发布。
+- Dashboard 的定时 refresh 只能重建**已经发布的权威 Pool**，不能下载行情、重新计算 Pool 或修改 `snapshot_date`。
 
 ## 4. 页面结构
 
@@ -210,7 +211,8 @@ rs_6m_percentile
 5. 日期不一致、ticker 缺失、GitHub / rs-log 不可用或 CSV schema 异常时显示 `N/A`；
 6. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
 7. RS 失败不得阻塞 Dashboard 构建或 Pool 发布；
-8. 不在本仓库建立 RS PIT 历史，不能用当前 RS 数据倒推历史回测结论。
+8. 不在本仓库建立 RS PIT 历史，不能用当前 RS 数据倒推历史回测结论；
+9. 权威 Pool push 仍立即触发 Dashboard；另在**周四、周六 `03:00 UTC`**执行一次静态 refresh，用来覆盖“Pool 已发布但 rs-log 稍后才发布同一 market date”的竞态；refresh 只读取当前仓库已经发布的 Pool 并重新 build Pages，不产生第二套 Pool 数据。
 
 主表显示当前 `RS` percentile；桌面 hover / focus 与触屏点击可查看当前、1M、3M、6M ago percentile、market date 与来源。
 
@@ -274,6 +276,7 @@ python security_scan.py --history
 - Range 拖动后 active 状态与结果数量一致；
 - Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
 - RS 仅在严格交易日匹配时显示，错日、ticker 缺失与外部失败均为 N/A；
+- 周四 / 周六 `03:00 UTC` refresh 只重建当前权威 Pool，不修改 Pool 数据或 `snapshot_date`；
 - 表头排序、Quality / RS tooltip、选行、键盘 ↑↓、Copy 顺序一致；
 - 表格横纵滚动到边界不产生自身 bounce；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列，也不含 C Rank / Continuous C。
