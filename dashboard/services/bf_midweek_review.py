@@ -153,7 +153,7 @@ def default_review_state(mode: PoolMode) -> dict[str, Any]:
         "weekly_volume_min": None,
         "filters_expanded": False,
         "copy_state": "IDLE",
-        "sort_mode": "Review Priority" if has_comparison else "C Rank",
+        "sort_mode": "Review Priority" if has_comparison else "Code",
         "widget_generation": 0,
     }
 
@@ -200,7 +200,7 @@ def default_sort_mode(
         and has_comparison
     ):
         return "Review Priority"
-    return "C Rank"
+    return "Code"
 
 
 def reconcile_review_state(state: dict[str, Any], mode: PoolMode) -> dict[str, Any]:
@@ -216,7 +216,7 @@ def reconcile_review_state(state: dict[str, Any], mode: PoolMode) -> dict[str, A
     result["change_filter"] = "ALL"
     result["origin_filter"] = "ALL"
     if result.get("sort_mode") == "Review Priority":
-        result["sort_mode"] = "C Rank"
+        result["sort_mode"] = "Code"
         result["widget_generation"] = int(result.get("widget_generation", 0)) + 1
     return result
 
@@ -402,11 +402,11 @@ def sort_review_rows(review: pd.DataFrame, sort_mode: str) -> pd.DataFrame:
     if review.empty:
         return review.copy()
     result = review.copy()
-    if sort_mode == "C Rank":
-        by = [field for field in ("rank_C_continuous", "code") if field in result.columns]
-        return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").copy()
     if sort_mode == "Distance":
         by = [field for field in ("current_vs_ibd_candidate_pct", "code") if field in result.columns]
+        return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").copy()
+    if sort_mode != "Review Priority":
+        by = [field for field in ("code",) if field in result.columns]
         return result.sort_values(by=by, ascending=True, na_position="last", kind="mergesort").copy()
     status_field = (
         "review_effective_entry_status"
