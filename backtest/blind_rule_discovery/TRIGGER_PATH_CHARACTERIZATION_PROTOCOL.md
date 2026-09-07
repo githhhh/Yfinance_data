@@ -1,114 +1,98 @@
 # R4 Trigger-Path Winner / Loser Characterization Protocol
 
-This protocol freezes the next retrospective research stage after R1/R2/R3.
-
-R4 is **known-history characterization and robustness research**. It is not a new
-sealed holdout, and no R1/R2/R3 period regains unseen status.
+R4 is the next retrospective research stage after R1/R2/R3. It is **known-history
+characterization and robustness research**, not a new sealed holdout. No previously
+consumed period regains unseen status.
 
 ## 1. Research question
 
-At the moment a BreakoutFollow candidate reaches an executable trigger entry, which
-point-in-time stock/setup features and causal execution features are associated with:
+At an executable BreakoutFollow trigger entry, which point-in-time stock/setup
+features and causal execution facts are associated with:
 
-1. a fast favorable path;
-2. an early stop-first path;
-3. better or worse W1-W4 return trajectories;
-4. better or worse 3w/4w MAE/MFE;
-5. stable cross-sectional separation after controlling market state.
+1. +20% before -8% within 3 trading weeks;
+2. -8% before +20% within 3 trading weeks;
+3. persistent stop-first risk versus later 12w recovery;
+4. W1/W2/W3/W4 return and excess-return paths;
+5. 3w/4w MAE/MFE;
+6. stable same-market cross-sectional separation between winners and losers.
 
-The purpose is to characterize **winner stocks and loser stocks**, not to rediscover
-another market-timing rule.
+The purpose is to characterize **winner stocks and loser stocks**. It is explicitly
+not another search for a broad-market timing rule.
 
-## 2. Frozen execution entry
+## 2. Only approved execution entry
 
-The only approved R4 execution command is:
+The only approved R4 command is:
 
 ```bash
-python -m backtest.blind_rule_discovery.trigger_path_characterization_r4_runner ...
+python -m backtest.blind_rule_discovery.trigger_path_characterization_r4_final_runner ...
 ```
 
-The following modules are implementation/development layers and are not approved as
-standalone research commands:
+The following are implementation/development layers only and must not be executed as
+standalone R4 studies:
 
 - `trigger_path_characterization.py`
 - `trigger_path_characterization_r4.py`
+- `trigger_path_characterization_r4_runner.py`
+- `trigger_path_characterization_r4_search.py`
 
-An executor such as Gemini may run the frozen runner and read outputs. It may not
-edit, patch, tune, or replace any implementation during the run.
+Gemini/execution agents may run the final runner and read outputs only. They may not
+edit or patch any implementation during execution.
 
 ## 3. Entry semantics
 
-Entry causality is inherited from the established BF research path:
+Entry causality inherits the established BF research path:
 
 - start from the historical signal snapshot;
-- use `ibd_trigger_price`, falling back to `ibd_candidate_price` only when needed;
+- use `ibd_trigger_price`, falling back to `ibd_candidate_price` only when required;
 - inspect only the next 5 trading sessions;
-- accept an open/gap entry only up to +5% above trigger;
+- an open/gap entry is accepted only up to +5% above trigger;
 - otherwise enter when intraday High first reaches trigger;
-- do not use a later hindsight dip entry.
+- never use a later hindsight dip entry.
 
-Stock/setup predictors are values already known by the signal snapshot. R4 additionally
-allows the following execution facts because they are known at the moment the order is
-actually triggered:
+Stock/setup predictors are fields already known by the signal snapshot. R4 also allows
+three execution facts because they are known when the entry actually fires:
 
 - `entry_delay_sessions`;
 - `entry_extension_pct`;
 - `entry_is_gap_or_open`.
 
-No post-entry bar close/volume feature may be used as an entry predictor.
+No post-entry close/volume information may be used as a predictor.
 
 ## 4. Primary 3-week first-passage outcome
 
 The primary horizon is 15 trading sessions including the entry session.
 
-For an executable entry:
+- `fast_winner_3w`: +20% before -8% within 15 sessions;
+- `stop_first_3w`: -8% before +20% within 15 sessions;
+- `unresolved_3w`: neither boundary within 15 sessions;
+- `ambiguous_3w`: causal intrabar order cannot be determined.
 
-- `fast_winner_3w`: +20% is reached before -8% within 15 sessions;
-- `stop_first_3w`: -8% is reached before +20% within 15 sessions;
-- `unresolved_3w`: neither boundary is reached within 15 sessions;
-- `ambiguous_3w`: intrabar order cannot be established causally.
-
-### Probability denominator
-
-The primary probabilities are:
-
-```text
-P(fast_winner_3w)
-P(stop_first_3w)
-P(unresolved_3w)
-```
-
-using **all non-ambiguous executable entries** as the denominator.
-
-`unresolved_3w` remains in the denominator. It must never be removed merely to make
-winner/stop rates look larger.
-
-`ambiguous_3w` is excluded from those three probabilities and reported separately.
+The primary probability denominator is **all non-ambiguous executable entries**.
+`unresolved_3w` remains in the denominator. It must never be removed just to increase
+reported winner/stop rates. Ambiguous paths are excluded from these three rates and
+reported separately.
 
 ## 5. Stop-first recovery split
 
-A stop-first trade is not automatically treated as the same economic failure as a
-setup that never recovers.
+R4 separately reports:
 
-R4 therefore separately reports:
-
-- `stop_first_then_winner_12w`: stop first within 3w, but the canonical 12w path later
+- `stop_first_then_winner_12w`: stop first within 3w, but canonical 12w path later
   reaches +20%;
-- `persistent_stop_first`: stop first within 3w without that canonical 12w recovery.
+- `persistent_stop_first`: stop first within 3w without that later canonical recovery.
 
-This allows later work to distinguish bad setup selection from entry/stop-placement
-problems.
+This distinction is required because a bad setup and an entry/stop-placement problem
+are not the same economic failure.
 
-## 6. W1-W4 path and risk/reward
+## 6. W1-W4 and risk/reward path
 
-For every usable entry, report stock return and SPY excess return at:
+For every usable entry:
 
 - W1 = 5 sessions;
 - W2 = 10 sessions;
 - W3 = 15 sessions;
 - W4 = 20 sessions.
 
-For every W1-W4 return/excess series report at minimum:
+Report stock return and SPY excess return at every horizon with:
 
 ```text
 p25 / p50 / p75
@@ -120,13 +104,13 @@ Also report:
 - 3w MFE p50;
 - 4w MAE p50;
 - 4w MFE p50;
-- `MFE_3w_p50 / abs(MAE_3w_p50)` where defined.
+- `MFE_3w_p50 / abs(MAE_3w_p50)` when defined.
 
-Fast-winner probability alone is not sufficient evidence of a good feature.
+A high fast-winner probability without acceptable path/risk metrics is not sufficient.
 
-## 7. Market timing must be separated from stock selection
+## 7. Market timing and stock selection must remain separated
 
-### 7.1 Frozen R3 favorable-regime scope
+### 7.1 Frozen R3 favorable-regime context
 
 R4 may condition descriptively on the already-known R3 historical regime:
 
@@ -136,156 +120,172 @@ AND
 M_dist_52w_high >= -0.05692191
 ```
 
-This is frozen historical context only. It is not a newly validated market rule and
-cannot be called OOS evidence.
+This is frozen retrospective context only. It is not newly validated OOS evidence.
 
-### 7.2 Same-snapshot cross-sectional comparison
+### 7.2 Same-snapshot cross-sectional control
 
 The stronger stock-selection control is identical `snapshot_date`.
 
-For each stock/setup feature, compare `fast_winner_3w` stocks with `stop_first_3w`
-stocks occurring in the same snapshot. Because broad-market state is identical within
-the snapshot, this directly asks why one candidate worked while another failed.
+For every stock/execution feature compare `fast_winner_3w` stocks and
+`stop_first_3w` stocks from the same snapshot. Because broad-market state is identical
+within a snapshot, this directly tests stock-level separation.
 
 Report at minimum:
 
 - matched snapshot count;
-- pairwise probability that the winner feature value exceeds the stop-first value;
+- pairwise probability winner feature value > stop-first value;
 - equal-weight snapshot AUC median;
 - median within-snapshot feature difference;
-- sign-consistency fraction across matched snapshots.
+- sign-consistency fraction.
 
 ## 8. Single-feature characterization
 
-Use deterministic historical quantile bins. For every stock/execution feature, report
-both the full-history scope and the frozen favorable-regime scope.
+Use deterministic historical q20/q40/q60/q80 bins. Apply the same full-history bin
+boundaries to both scopes:
 
-Each bin must contain:
+- `all`;
+- frozen `r3_favorable`.
 
-- sample/evaluable/ambiguous counts;
+Every bin must report:
+
+- selected/evaluable/ambiguous support;
 - fast-winner rate and lift;
 - stop-first rate and reduction/lift;
 - unresolved rate;
-- stop-first recovery split;
+- persistent/recovered stop-first split;
 - W1-W4 p25/p50/p75 return and excess paths;
 - 3w/4w MAE/MFE;
-- quarter path-edge stability.
+- evaluated-quarter count;
+- positive path-edge quarter fraction;
+- median/worst quarter path edge;
+- higher-stop-risk quarter fraction.
 
-Also produce explicit `feature_extremes.csv` identifying, with support constraints:
-
-- the bin most associated with fast-winner behavior;
-- the bin most associated with stop-first behavior.
-
+`feature_extremes.csv` must separately identify the supported bin most associated
+with fast winners and the supported bin most associated with stop-first risk.
 These are retrospective characterizations, not production thresholds.
 
-## 9. Stock interaction search
+## 9. Stock-only interaction search
 
-The interaction search may use only:
+The search may use only:
 
 - the explicit stock/setup feature allowlist;
-- causal execution features listed in section 3.
+- causal execution features from section 3.
 
 **Every `M_*` feature is forbidden as a stock-condition input.**
 
-Generate deterministic q20/q40/q60/q80 threshold conditions and search:
+Generate deterministic q20/q40/q60/q80 conditions and test:
 
 - every supported single condition;
 - every distinct-feature two-condition AND pair.
 
-No LLM chooses thresholds or rules.
+There is no pair pruning or beam search in R4. No LLM chooses thresholds/rules.
 
-For every rule report:
+For ranking every candidate rule, the vectorized search computes only metrics required
+by the frozen score:
 
 - fast-winner lift;
 - stop-first reduction;
 - `path_edge = fast-winner lift + stop-first reduction`;
-- W1-W4 path metrics;
-- MAE/MFE;
+- W3 excess p50;
+- 3w MAE/MFE and their ratio;
 - evaluated-quarter count;
-- positive path-edge quarter fraction;
-- median/worst quarter path edge.
+- positive/median/worst quarter path edge.
 
-The scalar `quality_score` is only an ordering aid. All underlying metrics remain the
+This compact evaluation is a performance optimization only. It does **not** reduce the
+search space or change ranking semantics. After ranking, the final runner enriches
+reported top rules with full W1-W4 p25/p50/p75 path distributions.
+
+Frozen reporting limits:
+
+- quality-ranked rules: top 500;
+- winner-oriented view: top 200;
+- stop-risk view: top 200.
+
+The complete candidate count and pair count remain in metadata/search audit.
+
+The scalar `quality_score` is only an ordering aid; all underlying metrics are the
 primary evidence.
 
-Produce separate views from the same frozen search:
+## 10. Separate winner and loser interaction views
 
-- `winner_interactions_*`: rules most associated with fast winners;
-- `stop_risk_interactions_*`: rules most associated with stop-first risk.
+From the **same frozen search**, produce:
+
+- `winner_interactions_*`: highest fast-winner lift, then lower stop risk / better W3;
+- `stop_risk_interactions_*`: highest stop-first lift, then weaker fast-winner/W3 path.
 
 Do not run a second tuned search for either view.
 
-## 10. Rolling robustness
+## 11. Rolling robustness
 
 Run expanding-window re-search separately for:
 
-- `all` market history;
-- frozen `r3_favorable` scope.
+- `all`;
+- frozen `r3_favorable`.
 
 For every chronological fold:
 
-1. thresholds are regenerated from past training quarters only;
-2. the stock rule is selected from past data only;
-3. the rule is frozen;
-4. exactly the next entry quarter is evaluated.
+1. regenerate stock thresholds from past training quarters only;
+2. search/select the stock rule from past data only;
+3. freeze the rule;
+4. evaluate exactly the next entry quarter.
 
-Every fold after the minimum training window must remain in the output.
+Every fold after the minimum training window must remain in output.
 
-If a scope has insufficient training support, the fold is marked
-`train_insufficient=1`; it is **not dropped**. It remains a zero-selection/stability
-failure in the all-fold denominator.
+If training support is insufficient, record `train_insufficient=1`, selected=0, and
+keep the fold in the all-fold denominator. Never silently drop difficult folds.
 
-Report both:
+Rolling reporting must include:
 
-- positive path-edge fraction among evaluable folds;
-- positive path-edge fraction among all folds;
-- zero-selection fraction;
-- insufficient-training fraction.
+- all-fold positive path-edge fraction;
+- evaluable-fold positive path-edge fraction;
+- zero-selection count/fraction;
+- insufficient-training count/fraction;
+- same-snapshot matched edge where available;
+- pooled selected fast-winner/stop-first rates;
+- pooled baseline across all folds;
+- pooled baseline restricted to folds where the rule actually selected trades.
 
-Also keep two different pooled baselines:
+The selected-fold baseline is the key pooled comparison for residual stock-selection
+edge. The all-fold baseline also reflects opportunity/timing availability.
 
-1. baseline across all chronological test folds;
-2. baseline only across folds in which the stock rule selected at least one trade.
+## 12. Interpretation boundary
 
-The second is the relevant pooled baseline for residual stock-selection edge; the
-first also measures opportunity/timing availability.
+R4 can support claims such as:
 
-## 11. Interpretation discipline
+- a stock feature is repeatedly higher/lower in same-snapshot fast winners;
+- a feature bin historically lowers stop-first risk and improves W3/MAE/MFE;
+- a stock-only interaction retains path edge across multiple chronological folds;
+- favorable-market context plus a stock feature improves historical path quality.
 
-R4 can support statements such as:
+R4 alone cannot support:
 
-- a stock feature is consistently higher/lower in same-snapshot fast winners;
-- a feature bin has lower stop-first probability and better W3 MAE/MFE historically;
-- a stock-only interaction retains positive edge in multiple rolling folds;
-- a favorable market regime plus a stock feature has better historical path quality.
+- "production Alpha";
+- immediate replacement of B0;
+- guaranteed threshold generalization;
+- treating the R3 favorable regime as new OOS evidence.
 
-R4 cannot by itself support:
-
-- "this is production Alpha";
-- "replace B0 immediately";
-- "this threshold will generalize";
-- "R3 favorable regime is validated OOS".
-
-## 12. Execution discipline
+## 13. Executor discipline
 
 Gemini/execution agents are strictly read/run only.
 
-They may:
+Allowed:
 
-- verify branch and HEAD;
-- run the committed tests;
-- execute the frozen R4 runner once;
-- read and report generated outputs.
+- verify branch/HEAD/status;
+- read this protocol;
+- run committed tests;
+- execute the final frozen R4 runner once;
+- read generated outputs and report facts.
 
-They may not:
+Forbidden:
 
 - edit source/tests/docs/config;
-- create helper scripts or alternate runners;
-- change any default threshold/support/search parameter;
+- create helper scripts/runners;
+- change default search/support thresholds;
+- change output limits;
 - call DeepSeek, another LLM, or RD-agent;
 - rerun with different parameters after seeing results;
-- overwrite historical R1/R2/R3 outputs;
+- overwrite R1/R2/R3 output;
 - commit anything.
 
-If tests or the frozen run fail, stop and report the exact failure. Code repair belongs
-in a separate audited development turn before any new execution.
+If a test or frozen command fails, stop and return the exact failure. Code repair must
+happen in a separate audited development turn before any new execution.
