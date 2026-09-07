@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from dashboard.rs_reference import (
     RS_COMMIT_API_URL,
@@ -26,7 +27,7 @@ def test_commit_timestamp_maps_to_us_market_date() -> None:
 def test_rs_csv_parses_current_and_prior_percentiles() -> None:
     ratings = parse_rs_csv(
         "Ticker,Percentile,1M_RS_Percentile,3M_RS_Percentile,6M_RS_Percentile\n"
-        "CRWD,96,91,84,79\n"
+        " crwd ,96,91,84,79\n"
     )
 
     assert ratings["CRWD"] == {
@@ -35,6 +36,11 @@ def test_rs_csv_parses_current_and_prior_percentiles() -> None:
         "rs_3m_percentile": 84,
         "rs_6m_percentile": 79,
     }
+
+
+def test_rs_csv_rejects_incomplete_schema() -> None:
+    with pytest.raises(ValueError, match="schema is incomplete"):
+        parse_rs_csv("Ticker,Percentile\nCRWD,96\n")
 
 
 def test_latest_rs_csv_is_pinned_to_the_same_commit_as_market_date() -> None:
@@ -73,7 +79,7 @@ def test_rs_is_attached_only_for_exact_market_date_match() -> None:
         },
         commit_sha="abc123",
     )
-    frame = pd.DataFrame([{"code": "CRWD"}, {"code": "MISSING"}])
+    frame = pd.DataFrame([{"code": " crwd "}, {"code": "MISSING"}])
 
     matched = attach_rs_reference(
         frame,
