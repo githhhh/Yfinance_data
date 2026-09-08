@@ -24,9 +24,10 @@
 - `EXTENDED`：已超过 Buy Point +5%。
 - Midweek Review 使用合法完整周 Pool 作为 baseline；没有合法 baseline 时关闭 Carry / Change / Origin 比较。
 - Midweek `Changes` 默认按 `Review Priority`；其它 Review 默认按 `Code`。
-- 主表 `RS` 在页面主体已经加载后，由 `rs_runtime.js` 从 `Fred6725/rs-log` 拉取最新公开数据。
+- 主表 `RS` 在页面主体已经加载后，由 `rs_runtime.js` 从 [`Fred6725 / rs-log`](https://github.com/Fred6725/rs-log) 拉取最新公开数据。
 - RS 只是 context，不进入 Gate、Top3、Review Priority、默认排序或 `dashboard.json`，也不保存为本仓库 PIT 历史。
-- RS 拉取失败或 ticker 不存在时显示 `N/A`；RS 更新时间早于当前 Pool snapshot 时仍可作为参考显示，但明确标为 stale，不阻塞也不刷新主体 Pages。
+- RS 表头承担来源、更新时间、与 Pool snapshot 的时间状态以及 `Refresh / Retry`；RS cell 只显示当前 percentile，点击仍按普通表格行为选中该行；Selected Detail 显示当前 / 1M / 3M / 6M。
+- 首次加载显示 `—`；RS 比 Pool 旧或新都继续显示并在表头标明状态；拉取失败或 ticker 不存在时显示 `N/A`。所有状态都不阻塞也不刷新主体 Pages。
 - `Breakout Price Quality` 仍由 Python 权威层生成，表头保留强度说明。
 - More Filters Range 使用当前 Period / Scope / Change / Origin / Status / Setup 语境下的实际数据边界；完整范围显示 `Full range`。
 - 表格横纵两个方向允许滚动，但表格自身到边界时关闭 overscroll / bounce。
@@ -46,7 +47,7 @@ python security_scan.py --history
 python -m http.server 8000 --directory /tmp/yfinance-dashboard-site
 ```
 
-浏览器访问 `http://localhost:8000` 即可检查与 GitHub Pages 相同的静态产物。静态站点构建本身不访问 RS；即使 `rs-log` 不可用，Dashboard 主体仍正常发布和加载，RS 位置显示 `N/A`。
+浏览器访问 `http://localhost:8000` 即可检查与 GitHub Pages 相同的静态产物。静态站点构建本身不访问 RS；即使 `rs-log` 不可用，Dashboard 主体仍正常发布和加载，RS 位置显示 `N/A` 并可从表头执行 Retry。
 
 ## 部署
 

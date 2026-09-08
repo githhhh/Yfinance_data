@@ -1,7 +1,7 @@
 # Static Breakout Pool Review Dashboard Spec
 
 状态：当前唯一 Dashboard 心流 / 交互规范  
-日期：2026-09-07
+日期：2026-09-08
 
 本文是静态 GitHub Pages Dashboard 的唯一交互规范。旧 Streamlit / AG Grid 时代的 Dashboard 设计文档已经删除；需要追溯设计演进时使用 Git 历史，不在当前文档目录保留重复规范。
 
@@ -199,22 +199,26 @@ Weak
 
 ### 5.4 RS Reference
 
-RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。
+RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它与主体 Review 流保持弱关联：表格负责“一眼看强弱”，RS 表头负责“来源与数据状态”，Selected Detail 负责“当前 / 1M / 3M / 6M 轨迹”。
 
-数据源固定为 `Fred6725/rs-log` 的公开 `output/rs_stocks.csv`。RS 完全采用浏览器端 fail-soft 语义：
+数据源固定为 [`Fred6725 / rs-log`](https://github.com/Fred6725/rs-log) 的公开 `output/rs_stocks.csv`。RS 完全采用浏览器端 fail-soft 语义：
 
 1. 主体 `dashboard.json` 先独立加载并完成页面渲染；
 2. `rs_runtime.js` 再读取该 CSV 的最新公开 commit metadata，并用同一 commit SHA 读取 CSV；
 3. 不把 RS 写入 Pool、Python projection、`dashboard.json` 或本仓库 PIT；
-4. 正常加载：显示当前 percentile，详情提供 1M / 3M / 6M ago percentile；
-5. RS 更新时间早于当前 Pool snapshot：允许继续显示最近可用 RS，但明确标记 `stale`；
-6. ticker 缺失、GitHub / rs-log 不可用、CSV schema 异常或请求失败：显示 `N/A`；
-7. 不需要 exact-date gate，不因为 RS 状态重新发布 Pages；
-8. 不存在 RS schedule、RS-only Pages refresh 或 RS publish condition；
-9. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
-10. RS 永远不进入 Gate、Top3、Review Priority 或默认排序。
+4. 首次加载尚未完成时，RS cell 显示 `—`，不使用 `N/A` 冒充“没有数据”；
+5. 正常加载：主表只显示当前 percentile；Selected Detail 显示当前、1M、3M、6M ago percentile；
+6. RS 更新时间等于当前 Pool snapshot：表头状态为 `Current`；
+7. RS 更新时间早于当前 Pool snapshot：继续显示最近可用值，表头明确标记 `Older than Pool`；
+8. RS 更新时间晚于当前 Pool snapshot：继续显示当前公开值，表头明确标记 `Newer than Pool`；
+9. ticker 缺失：该 ticker 显示 `N/A`；GitHub / rs-log 不可用、CSV schema 异常或首次请求失败：整列显示 `N/A`；
+10. RS 表头提供唯一的 Reference 信息入口，展示状态、RS update (ET)、Pool snapshot、来源链接与 `Refresh / Retry`；刷新失败但已有成功数据时，保留最后一次成功值并提示 refresh failed；
+11. RS cell 本身不是独立按钮或 tooltip 入口；点击数字与点击该行其它普通区域一致，继续执行选行；
+12. 不需要 exact-date gate，不因为 RS 状态重新发布 Pages，也不存在 RS schedule、RS-only Pages refresh 或 RS publish condition；
+13. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
+14. RS 永远不进入 Gate、Top3、Review Priority 或默认排序；用户仍可主动点击 RS 表头做临时排序。
 
-主表只显示当前 `RS` percentile；桌面 hover / focus 与触屏点击可查看当前、1M、3M、6M ago、RS 更新时间、Pool snapshot 与来源。
+RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上把 Reference 误导成策略 Gate。
 
 ### 5.5 Selected Detail
 
@@ -238,6 +242,7 @@ Selected Detail 位于结果摘要和表格之间；选行后原地更新，不�
 - 表格允许横向与纵向滚动，但 Code 列保持 sticky；
 - 表格自身两个方向到边界时不使用 overscroll / bounce 弹性；页面外层正常纵向滚动不受影响；
 - 表头排序、Quality 与 RS 说明必须支持触屏；
+- RS cell 在移动端仍只负责选行，不弹出 cell tooltip；RS 表头信息入口在窄屏以紧凑 bottom-sheet 方式呈现；
 - 不为移动端复制第二套业务逻辑。
 
 ## 7. 数据与公开安全契约
@@ -277,9 +282,11 @@ python security_scan.py --history
 - Range 拖动后 active 状态与结果数量一致；
 - Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
 - 主体页面在 RS 请求开始前即可正常使用；
-- RS 正常时显示；落后时标记 stale；请求失败或 ticker 缺失时为 N/A；
+- RS 首次加载时显示 `—`；Current / Older / Newer 状态可辨识；请求失败或 ticker 缺失时为 `N/A`；
+- RS 表头 popover 可查看来源、RS update、Pool snapshot，并支持 Refresh / Retry；来源链接可跳转到 `Fred6725 / rs-log`；
+- 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Detail 显示当前 / 1M / 3M / 6M；
 - RS 任一状态都不影响 Pool / Pages build 与 deploy；
-- 表头排序、Quality / RS tooltip、选行、键盘 ↑↓、Copy 顺序一致；
+- 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；
 - 表格横纵滚动到边界不产生自身 bounce；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。
 
