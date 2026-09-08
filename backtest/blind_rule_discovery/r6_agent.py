@@ -136,7 +136,7 @@ class RDAgentProposer:
             stack.enter_context(patch.object(backend_module, "completion", counted_completion))
             stack.enter_context(patch.object(LLM_SETTINGS, "max_retry", 1))
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_model", model))
-            stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_max_tokens", 3000))
+            stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_max_tokens", 8192))
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_stream", False))
             backend = backend_module.LiteLLMAPIBackend(
                 use_chat_cache=False, dump_chat_cache=False,
