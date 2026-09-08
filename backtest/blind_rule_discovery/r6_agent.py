@@ -134,10 +134,13 @@ class RDAgentProposer:
                 if hasattr(rdagent_logger, method):
                     stack.enter_context(patch.object(rdagent_logger, method, lambda *a, **kw: None))
             stack.enter_context(patch.object(backend_module, "completion", counted_completion))
-            stack.enter_context(patch.object(LLM_SETTINGS, "max_retry", 1))
+            # Transport retries repeat the exact same frozen prompt. Each underlying
+            # provider completion still passes through counted_completion/reserve().
+            stack.enter_context(patch.object(LLM_SETTINGS, "max_retry", 3))
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_model", model))
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_max_tokens", 8192))
-            stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_stream", False))
+            # Stream to avoid long reasoning phases being buffered behind a proxy idle timeout.
+            stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_stream", True))
             backend = backend_module.LiteLLMAPIBackend(
                 use_chat_cache=False, dump_chat_cache=False,
                 use_embedding_cache=False, dump_embedding_cache=False)
