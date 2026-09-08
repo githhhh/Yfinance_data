@@ -37,6 +37,7 @@ def test_official_backend_retries_truncated_reasoning_from_original_prompt(tmp_p
 
     def completion(**kwargs):
         assert kwargs["max_retries"] == kwargs["num_retries"] == 0
+        assert kwargs["timeout"] == 240
         calls.append(kwargs)
         if len(calls) == 1:
             return "partial reasoning turn", "length"
