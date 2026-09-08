@@ -50,7 +50,8 @@ class RDAgentProposer:
         self.deadline = time.monotonic() + 3600
         self.transport = transport
         self.provenance = {"adapter": "custom_r6_with_official_rdagent_backend",
-                           "canonical_fin_factor": False, "prior_used_user_reported": prior_used}
+                           "canonical_fin_factor": False, "prior_used_user_reported": prior_used,
+                           "reasoning_auto_continue": "disabled_full_prompt_retry"}
 
     def snapshot(self):
         return {**self.ledger.snapshot(), "prior_used_user_reported": self.prior_used,
@@ -125,6 +126,26 @@ class RDAgentProposer:
             kwargs.update(model=model, api_key=api_key, api_base=api_base,
                           timeout=90, max_retries=0, num_retries=0)
             return original_completion(*args, **kwargs)
+
+        class R6LiteLLMBackend(backend_module.LiteLLMAPIBackend):
+            """Keep RD-Agent retries, but never continue a truncated reasoning turn."""
+
+            def _create_chat_completion_auto_continue(self, messages, response_format=None, **kwargs):
+                # RD-Agent 0.8.0 auto-continue appends assistant content without
+                # DeepSeek reasoning_content. That continuation is rejected by
+                # reasoning-model APIs. On truncation, fail this provider attempt
+                # so RD-Agent retries the exact original frozen prompt instead.
+                for key in ("json_mode", "chat_cache_prefix", "seed", "json_target_type",
+                            "add_json_in_prompt", "code_block_language", "code_block_fallback"):
+                    kwargs.pop(key, None)
+                response, finish_reason = self._create_chat_completion_inner_function(
+                    messages=messages, response_format=response_format, **kwargs)
+                if finish_reason == "length":
+                    raise RuntimeError(
+                        "R6 reasoning completion truncated; retry the exact original prompt"
+                    )
+                return response
+
         self.provenance.update(rdagent_version=version, model=model,
                                backend="rdagent.oai.backend.litellm.LiteLLMAPIBackend")
         # Keep provider config and training content out of SDK logs; persist only
@@ -141,7 +162,7 @@ class RDAgentProposer:
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_max_tokens", 8192))
             # Stream to avoid long reasoning phases being buffered behind a proxy idle timeout.
             stack.enter_context(patch.object(backend_module.LITELLM_SETTINGS, "chat_stream", True))
-            backend = backend_module.LiteLLMAPIBackend(
+            backend = R6LiteLLMBackend(
                 use_chat_cache=False, dump_chat_cache=False,
                 use_embedding_cache=False, dump_embedding_cache=False)
             return backend.build_messages_and_create_chat_completion(
