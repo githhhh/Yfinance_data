@@ -7,7 +7,7 @@ import dotenv
 from backtest.blind_rule_discovery.r6_agent import RDAgentProposer
 
 
-def test_official_backend_tolerates_logger_without_debug_and_uses_8192_tokens(tmp_path, monkeypatch):
+def test_official_backend_tolerates_logger_without_debug_and_uses_long_reasoning_transport(tmp_path, monkeypatch):
     monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.8.0-test")
     monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **kw: None)
     monkeypatch.setenv("RD_AGENT_MODEL", "deepseek/test-model")
@@ -27,9 +27,10 @@ def test_official_backend_tolerates_logger_without_debug_and_uses_8192_tokens(tm
     }
     backend = modules["rdagent.oai.backend.litellm"]
     modules["rdagent.oai.backend"].litellm = backend
-    modules["rdagent.oai.backend.base"].LLM_SETTINGS = SimpleNamespace(max_retry=10)
+    llm_settings = SimpleNamespace(max_retry=10)
+    modules["rdagent.oai.backend.base"].LLM_SETTINGS = llm_settings
     backend.LITELLM_SETTINGS = SimpleNamespace(
-        chat_model="old", chat_max_tokens=3000, chat_stream=True
+        chat_model="old", chat_max_tokens=3000, chat_stream=False
     )
 
     calls = []
@@ -46,7 +47,9 @@ def test_official_backend_tolerates_logger_without_debug_and_uses_8192_tokens(tm
             assert not any(kwargs.values())
 
         def build_messages_and_create_chat_completion(self, **kwargs):
+            assert llm_settings.max_retry == 3
             assert backend.LITELLM_SETTINGS.chat_max_tokens == 8192
+            assert backend.LITELLM_SETTINGS.chat_stream is True
             return backend.completion(messages=[])
 
     backend.LiteLLMAPIBackend = FakeBackend
