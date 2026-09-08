@@ -124,7 +124,7 @@ class RDAgentProposer:
         def counted_completion(*args, **kwargs):
             reserve()  # Every actual SDK call, including backend retries/continuations.
             kwargs.update(model=model, api_key=api_key, api_base=api_base,
-                          timeout=90, max_retries=0, num_retries=0)
+                          timeout=240, max_retries=0, num_retries=0)
             return original_completion(*args, **kwargs)
 
         class R6LiteLLMBackend(backend_module.LiteLLMAPIBackend):
