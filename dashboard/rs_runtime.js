@@ -4,18 +4,25 @@
   const app = document.getElementById("app");
   if (!app) return;
 
-  const RS_SOURCE = "Fred6725/rs-log";
+  const RS_SOURCE = "Fred6725 / rs-log";
+  const RS_SOURCE_URL = "https://github.com/Fred6725/rs-log";
   const COMMIT_URL = "https://api.github.com/repos/Fred6725/rs-log/commits?path=output/rs_stocks.csv&per_page=1";
   const CSV_URL = (sha) => `https://raw.githubusercontent.com/Fred6725/rs-log/${sha}/output/rs_stocks.csv`;
 
+  // Contract: Reference only; never used by Pool, Gate, Top3 or default ordering.
   let dashboard = null;
+  let dashboardPromise = null;
   let reference = {
     status: "loading",
     sourceDate: null,
     ratings: new Map(),
     error: null,
+    checkedAt: null,
   };
   let refreshQueued = false;
+  let popover = null;
+  let popoverAnchor = null;
+  let loading = false;
 
   function nyDate(isoTimestamp) {
     const value = new Date(isoTimestamp);
@@ -30,6 +37,23 @@
     return values.year && values.month && values.day
       ? `${values.year}-${values.month}-${values.day}`
       : null;
+  }
+
+  function clockTime(value) {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "N/A";
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(value);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
   function parseCsvLine(line) {
@@ -100,81 +124,201 @@
     return reference.ratings.get(String(code ?? "").trim().toUpperCase()) || null;
   }
 
-  function stateFor(poolDate) {
+  function dateState(poolDate) {
+    if (!reference.sourceDate || !poolDate) return "current";
+    if (reference.sourceDate < poolDate) return "stale";
+    if (reference.sourceDate > poolDate) return "newer";
+    return "current";
+  }
+
+  function stateFor(poolDate = currentPoolDate()) {
     if (reference.status === "loading") return "loading";
-    if (reference.status !== "ready") return "unavailable";
-    if (reference.sourceDate && poolDate && reference.sourceDate < poolDate) return "stale";
-    return "ready";
+    if (reference.status === "refreshing") return "refreshing";
+    if (reference.status === "error" && !reference.ratings.size) return "unavailable";
+    if (reference.status === "error" && reference.ratings.size) return "refresh_failed";
+    return dateState(poolDate);
   }
 
-  function tooltip(code) {
-    const poolDate = currentPoolDate();
-    const state = stateFor(poolDate);
-    const rating = ratingFor(code);
-    if (state === "loading") {
-      return `RS N/A\nSource: ${RS_SOURCE}\nLoading public reference…`;
-    }
-    if (state === "unavailable") {
-      return `RS N/A\nSource: ${RS_SOURCE}\nReference unavailable. Dashboard data is unaffected.`;
-    }
-    if (!rating || rating.current === null) {
-      return [
-        "RS N/A",
-        `Source: ${RS_SOURCE}`,
-        `Updated (ET): ${reference.sourceDate || "N/A"}`,
-        "Ticker is not present in the current public RS dataset.",
-      ].join("\n");
-    }
-    return [
-      `${state === "stale" ? "RS stale" : "RS Percentile"}: ${rating.current}`,
-      `1M ago: ${rating.m1 ?? "N/A"}`,
-      `3M ago: ${rating.m3 ?? "N/A"}`,
-      `6M ago: ${rating.m6 ?? "N/A"}`,
-      `Updated (ET): ${reference.sourceDate || "N/A"}`,
-      `Pool snapshot: ${poolDate || "N/A"}`,
-      `Source: ${RS_SOURCE}`,
-      "Reference only; never used by Pool, Gate, Top3 or default ordering.",
-    ].join("\n");
+  function stateCopy(state) {
+    return {
+      loading: { icon: "···", label: "Loading reference", tone: "loading" },
+      refreshing: { icon: "↻", label: "Refreshing", tone: "loading" },
+      current: { icon: "ⓘ", label: "Current", tone: "current" },
+      stale: { icon: "!", label: "Older than Pool", tone: "stale" },
+      newer: { icon: "•", label: "Newer than Pool", tone: "newer" },
+      unavailable: { icon: "○", label: "Unavailable", tone: "unavailable" },
+      refresh_failed: { icon: "!", label: "Refresh failed", tone: "stale" },
+    }[state] || { icon: "ⓘ", label: "Reference", tone: "current" };
   }
 
-  function applyTooltip(node, copy) {
+  function ensureStyles() {
+    if (document.getElementById("rs-reference-styles")) return;
+    const style = document.createElement("style");
+    style.id = "rs-reference-styles";
+    style.textContent = `
+      th[data-sort-field="rs_percentile"] { position: relative; }
+      th[data-sort-field="rs_percentile"] > button { padding-right: 24px !important; }
+      .rs-info-button {
+        position: absolute;
+        right: 7px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 18px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 1px solid #465365;
+        border-radius: 50%;
+        background: #11171e;
+        color: #9ca8b7;
+        font: 800 9px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        cursor: help;
+        z-index: 3;
+      }
+      .rs-info-button[data-state="current"] { color: #70e8d6; border-color: rgb(31 205 180 / 45%); }
+      .rs-info-button[data-state="newer"] { color: #60a5fa; border-color: rgb(96 165 250 / 48%); }
+      .rs-info-button[data-state="stale"],
+      .rs-info-button[data-state="refresh_failed"] { color: #ffd21f; border-color: rgb(255 210 31 / 52%); }
+      .rs-info-button[data-state="unavailable"] { color: #9ca8b7; border-color: #465365; }
+      .rs-info-button[data-state="loading"],
+      .rs-info-button[data-state="refreshing"] { color: #9ca8b7; border-color: #465365; }
+      .rs-reference-popover {
+        position: fixed;
+        width: min(330px, calc(100vw - 20px));
+        padding: 13px;
+        border: 1px solid rgb(148 163 184 / 24%);
+        border-radius: 9px;
+        background: #0b1320;
+        color: #e2e8f0;
+        box-shadow: 0 12px 32px rgb(0 0 0 / 44%);
+        z-index: 1000000;
+        font: 11px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .rs-popover-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .rs-popover-title { color: #fff; font-size: 13px; font-weight: 800; }
+      .rs-popover-subtitle { margin-top: 2px; color: #8fa0b4; font-size: 10px; }
+      .rs-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 23px;
+        margin-top: 11px;
+        padding: 0 8px;
+        border: 1px solid #35404d;
+        border-radius: 99px;
+        color: #cbd5e1;
+        background: rgb(255 255 255 / 2%);
+        font-size: 10px;
+        font-weight: 750;
+      }
+      .rs-state[data-tone="current"] { color: #70e8d6; border-color: rgb(31 205 180 / 38%); }
+      .rs-state[data-tone="newer"] { color: #93c5fd; border-color: rgb(96 165 250 / 38%); }
+      .rs-state[data-tone="stale"] { color: #fde68a; border-color: rgb(255 210 31 / 42%); }
+      .rs-meta-grid {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 5px 12px;
+        margin-top: 11px;
+        padding-top: 10px;
+        border-top: 1px solid rgb(148 163 184 / 14%);
+      }
+      .rs-meta-grid span { color: #8391a3; }
+      .rs-meta-grid b { color: #dbe3ec; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+      .rs-source-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .rs-source-link { color: #70e8d6; text-decoration: none; font-weight: 700; }
+      .rs-source-link:hover, .rs-source-link:focus-visible { text-decoration: underline; }
+      .rs-disclaimer { margin-top: 3px; color: #7f8da0; font-size: 10px; }
+      .rs-refresh-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 11px;
+        padding-top: 9px;
+        border-top: 1px solid rgb(148 163 184 / 14%);
+      }
+      .rs-checked { color: #758397; font-size: 10px; }
+      .rs-refresh-button {
+        min-height: 29px;
+        padding: 0 10px;
+        border: 1px solid #465365;
+        border-radius: 6px;
+        background: #151b23;
+        color: #d5dde7;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .rs-refresh-button:disabled { opacity: .55; cursor: wait; }
+      .rs-reference-popover a,
+      .rs-reference-popover button { -webkit-tap-highlight-color: transparent; }
+      @media (width <= 760px) {
+        .rs-reference-popover {
+          left: 10px !important;
+          right: 10px;
+          bottom: max(10px, env(safe-area-inset-bottom));
+          top: auto !important;
+          width: auto;
+          max-width: none;
+          border-radius: 11px;
+          padding: 14px;
+        }
+        .rs-info-button { width: 19px; height: 19px; right: 5px; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function plainRsNode(node) {
+    if (!node) return node;
     if (node.dataset.rsEnhanced === "true") {
-      node.dataset.rsTooltip = copy;
-      node.removeAttribute("title");
-      node.setAttribute("aria-label", `${node.textContent.trim() || "RS"}. Tap for RS reference details.`);
-    } else if (node.getAttribute("title") !== copy) {
-      node.setAttribute("title", copy);
+      const replacement = node.cloneNode(true);
+      node.replaceWith(replacement);
+      node = replacement;
     }
+    node.removeAttribute("title");
+    node.removeAttribute("data-rs-enhanced");
+    node.removeAttribute("data-rs-tooltip");
+    node.removeAttribute("tabindex");
+    node.removeAttribute("role");
+    node.style.removeProperty("cursor");
+    node.classList.remove("rs-stale");
+    return node;
   }
 
-  function setReferenceNode(node, code) {
-    const poolDate = currentPoolDate();
-    const state = stateFor(poolDate);
+  function displayValue(code) {
+    const state = stateFor();
     const rating = ratingFor(code);
-    const current = rating?.current ?? null;
-    const display = current === null ? "N/A" : String(current);
-    if (node.textContent !== display) node.textContent = display;
-    node.classList.toggle("rs-stale", current !== null && state === "stale");
-    applyTooltip(node, tooltip(code));
+    if (state === "loading") return "—";
+    if (state === "unavailable") return "N/A";
+    return rating?.current === null || rating?.current === undefined ? "N/A" : String(rating.current);
   }
 
   function updateTable() {
     app.querySelectorAll("[data-table-shell]").forEach((shell) => {
       const headers = [...shell.querySelectorAll("thead th")];
-      const rsIndex = headers.findIndex((header) => {
-        const label = header.querySelector(".table-header-label")?.textContent || header.textContent;
-        return String(label).trim() === "RS";
-      });
+      const rsIndex = headers.findIndex((header) => header.dataset.sortField === "rs_percentile"
+        || String(header.querySelector(".table-header-label")?.textContent || header.textContent).trim() === "RS");
       if (rsIndex < 0) return;
       shell.querySelectorAll("tbody tr[data-code]").forEach((row) => {
         const cell = row.children[rsIndex];
         if (!cell) return;
-        let target = cell.querySelector("span");
+        let target = plainRsNode(cell.querySelector("span"));
         if (!target) {
           target = document.createElement("span");
           cell.replaceChildren(target);
         }
-        setReferenceNode(target, row.dataset.code);
+        const display = displayValue(row.dataset.code);
+        if (target.textContent !== display) target.textContent = display;
       });
     });
   }
@@ -187,24 +331,157 @@
     const cell = [...selected.querySelectorAll(".selected-cell")].find(
       (item) => item.querySelector(".selected-key")?.textContent?.trim() === "RS Reference",
     );
-    const value = cell?.querySelector(".selected-value");
+    const value = plainRsNode(cell?.querySelector(".selected-value"));
     if (!value) return;
 
+    const state = stateFor();
     const rating = ratingFor(code);
+    if (state === "loading") {
+      if (value.textContent !== "—") value.textContent = "—";
+      return;
+    }
+    if (state === "unavailable" || !rating || rating.current === null) {
+      if (value.textContent !== "N/A") value.textContent = "N/A";
+      return;
+    }
+    const suffix = [
+      `1M ${rating.m1 ?? "N/A"}`,
+      `3M ${rating.m3 ?? "N/A"}`,
+      `6M ${rating.m6 ?? "N/A"}`,
+    ].join(" · ");
+    const html = `${rating.current} <small>${suffix}</small>`;
+    if (value.innerHTML !== html) value.innerHTML = html;
+  }
+
+  function infoHeader() {
+    const header = app.querySelector('th[data-sort-field="rs_percentile"]');
+    if (!header) return null;
+    let button = header.querySelector("[data-rs-info]");
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "rs-info-button";
+      button.dataset.rsInfo = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (popover && popoverAnchor === button) {
+          closePopover();
+        } else {
+          openPopover(button);
+        }
+      });
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closePopover();
+      });
+      header.appendChild(button);
+    }
+    const state = stateFor();
+    const copy = stateCopy(state);
+    button.dataset.state = state;
+    if (button.textContent !== copy.icon) button.textContent = copy.icon;
+    button.setAttribute("aria-label", `RS reference: ${copy.label}. Open details.`);
+    button.title = `RS reference · ${copy.label}`;
+    return button;
+  }
+
+  function positionPopover() {
+    if (!popover || !popoverAnchor || window.innerWidth <= 760) return;
+    const anchor = popoverAnchor.getBoundingClientRect();
+    const tip = popover.getBoundingClientRect();
+    const padding = 8;
+    const left = Math.min(
+      Math.max(padding, anchor.right - tip.width),
+      Math.max(padding, window.innerWidth - tip.width - padding),
+    );
+    const below = anchor.bottom + 7;
+    const top = below + tip.height <= window.innerHeight - padding
+      ? below
+      : Math.max(padding, anchor.top - tip.height - 7);
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.top = `${Math.round(top)}px`;
+  }
+
+  function closePopover() {
+    popover?.remove();
+    popover = null;
+    popoverAnchor = null;
+  }
+
+  function popoverHtml() {
     const poolDate = currentPoolDate();
     const state = stateFor(poolDate);
-    if (!rating || rating.current === null || state === "loading" || state === "unavailable") {
-      if (value.textContent !== "N/A") value.textContent = "N/A";
-    } else {
-      const html = `${rating.current} <small>1M ${rating.m1 ?? "N/A"} · 3M ${rating.m3 ?? "N/A"} · 6M ${rating.m6 ?? "N/A"}${state === "stale" ? ` · stale ${reference.sourceDate || ""}` : ""}</small>`;
-      if (value.innerHTML !== html) value.innerHTML = html;
-    }
-    applyTooltip(value, tooltip(code));
+    const copy = stateCopy(state);
+    const checked = reference.checkedAt ? `Checked ${clockTime(reference.checkedAt)}` : "Not checked yet";
+    let note = "";
+    if (state === "stale") note = "RS update is older than the selected Pool snapshot.";
+    if (state === "newer") note = "RS update is newer than the selected Pool snapshot.";
+    if (state === "unavailable") note = "Public RS reference is unavailable. Pool review is unaffected.";
+    if (state === "refresh_failed") note = "Refresh failed. Showing the last successfully loaded RS data.";
+    if (state === "loading") note = "Loading public RS reference…";
+    if (state === "refreshing") note = "Refreshing public RS reference…";
+
+    return `
+      <div class="rs-popover-head">
+        <div>
+          <div class="rs-popover-title">Relative Strength</div>
+          <div class="rs-popover-subtitle">IBD-style percentile · 0–99</div>
+        </div>
+      </div>
+      <div class="rs-state" data-tone="${copy.tone}"><span>${copy.icon}</span><span>${copy.label}</span></div>
+      ${note ? `<div class="rs-disclaimer">${note}</div>` : ""}
+      <div class="rs-meta-grid">
+        <span>RS update (ET)</span><b>${escapeHtml(reference.sourceDate || "N/A")}</b>
+        <span>Pool snapshot</span><b>${escapeHtml(poolDate || "N/A")}</b>
+      </div>
+      <div class="rs-source-row">
+        <a class="rs-source-link" href="${RS_SOURCE_URL}" target="_blank" rel="noopener noreferrer">${RS_SOURCE} ↗</a>
+      </div>
+      <div class="rs-disclaimer">Public reference · not official IBD RS</div>
+      <div class="rs-refresh-row">
+        <span class="rs-checked">${escapeHtml(checked)}</span>
+        <button class="rs-refresh-button" type="button" data-rs-refresh ${loading ? "disabled" : ""}>
+          ${state === "unavailable" || state === "refresh_failed" ? "↻ Retry" : "↻ Refresh"}
+        </button>
+      </div>
+    `;
+  }
+
+  function renderPopover() {
+    if (!popover) return;
+    popover.innerHTML = popoverHtml();
+    popover.querySelector("[data-rs-refresh]")?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await loadReference({ preserve: reference.ratings.size > 0 });
+    });
+    popover.querySelector(".rs-source-link")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    requestAnimationFrame(positionPopover);
+  }
+
+  function openPopover(anchor) {
+    closePopover();
+    popoverAnchor = anchor;
+    popover = document.createElement("section");
+    popover.className = "rs-reference-popover";
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-label", "Relative Strength reference details");
+    document.body.appendChild(popover);
+    renderPopover();
+  }
+
+  function updateOpenPopover() {
+    if (popover) renderPopover();
   }
 
   function refresh() {
+    ensureStyles();
+    infoHeader();
     updateTable();
     updateSelected();
+    updateOpenPopover();
   }
 
   function scheduleRefresh() {
@@ -216,22 +493,46 @@
     });
   }
 
-  async function loadReference() {
+  async function ensureDashboard() {
+    if (dashboard) return dashboard;
+    if (!dashboardPromise) {
+      dashboardPromise = fetch("./data/dashboard.json", { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Dashboard HTTP ${response.status}`);
+          return response.json();
+        })
+        .then((payload) => {
+          dashboard = payload;
+          return payload;
+        })
+        .finally(() => {
+          dashboardPromise = null;
+        });
+    }
+    return dashboardPromise;
+  }
+
+  async function loadReference({ preserve = false } = {}) {
+    if (loading) return;
+    loading = true;
+    const previous = reference;
+    reference = preserve
+      ? { ...previous, status: "refreshing", error: null }
+      : { status: "loading", sourceDate: null, ratings: new Map(), error: null, checkedAt: previous.checkedAt };
+    scheduleRefresh();
+
     try {
-      const [dashboardResponse, commitResponse] = await Promise.all([
-        fetch("./data/dashboard.json", { cache: "no-store" }),
+      const [, commitResponse] = await Promise.all([
+        ensureDashboard(),
         fetch(COMMIT_URL, { cache: "no-store" }),
       ]);
-      if (!dashboardResponse.ok) throw new Error(`Dashboard HTTP ${dashboardResponse.status}`);
       if (!commitResponse.ok) throw new Error(`RS metadata HTTP ${commitResponse.status}`);
-      dashboard = await dashboardResponse.json();
       const commits = await commitResponse.json();
       const latest = Array.isArray(commits) ? commits[0] : null;
       const sha = latest?.sha;
       const timestamp = latest?.commit?.committer?.date;
       if (!sha || !timestamp) throw new Error("RS metadata is incomplete");
 
-      // A commit-pinned raw URL is immutable, so let the browser reuse it.
       const csvResponse = await fetch(CSV_URL(sha), { cache: "force-cache" });
       if (!csvResponse.ok) throw new Error(`RS CSV HTTP ${csvResponse.status}`);
       reference = {
@@ -239,20 +540,40 @@
         sourceDate: nyDate(timestamp),
         ratings: parseRatings(await csvResponse.text()),
         error: null,
+        checkedAt: new Date(),
       };
     } catch (error) {
-      reference = {
-        status: "error",
-        sourceDate: null,
-        ratings: new Map(),
-        error: String(error?.message || error),
-      };
+      reference = preserve
+        ? { ...previous, status: "error", error: String(error?.message || error), checkedAt: new Date() }
+        : {
+          status: "error",
+          sourceDate: null,
+          ratings: new Map(),
+          error: String(error?.message || error),
+          checkedAt: new Date(),
+        };
+    } finally {
+      loading = false;
+      scheduleRefresh();
     }
-    scheduleRefresh();
   }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!popover) return;
+    if (event.target.closest?.(".rs-reference-popover") || event.target.closest?.("[data-rs-info]")) return;
+    closePopover();
+  });
+  window.addEventListener("resize", () => {
+    if (popover && window.innerWidth > 760) positionPopover();
+  });
+  window.addEventListener("scroll", () => {
+    if (popover && window.innerWidth > 760) closePopover();
+  }, true);
 
   const observer = new MutationObserver(scheduleRefresh);
   observer.observe(app, { childList: true, subtree: true });
+
+  ensureStyles();
   scheduleRefresh();
   loadReference();
 })();

@@ -130,17 +130,25 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "C_RANK" not in app
 
     runtime = (output / "rs_runtime.js").read_text(encoding="utf-8")
-    assert "Fred6725/rs-log" in runtime
+    assert "Fred6725 / rs-log" in runtime
+    assert "https://github.com/Fred6725/rs-log" in runtime
     assert "api.github.com/repos/Fred6725/rs-log/commits" in runtime
     assert "raw.githubusercontent.com/Fred6725/rs-log" in runtime
     assert "Reference only; never used by Pool, Gate, Top3 or default ordering." in runtime
+    assert "Older than Pool" in runtime
+    assert "Newer than Pool" in runtime
+    assert "Loading reference" in runtime
+    assert "Public reference · not official IBD RS" in runtime
+    assert 'data-rs-info' in runtime
+    assert "↻ Refresh" in runtime
+    assert "↻ Retry" in runtime
+    assert 'removeAttribute("data-rs-enhanced")' in runtime
+    assert "Not used in Review Priority" not in runtime
     assert "scheduled" not in runtime.lower()
 
     enhancements = (output / "table_enhancements.js").read_text(encoding="utf-8")
     assert "Breakout Price Quality" in enhancements
     assert "Powerful" in enhancements
-    assert 'data-rs-enhanced="true"' in enhancements
-    assert 'title^="RS "' in enhancements
     assert "C Rank" not in enhancements
     assert "data-c-rank-table" not in enhancements
 
