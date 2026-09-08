@@ -7,7 +7,7 @@ import dotenv
 from backtest.blind_rule_discovery.r6_agent import RDAgentProposer
 
 
-def test_official_backend_tolerates_logger_without_debug_and_uses_long_reasoning_transport(tmp_path, monkeypatch):
+def test_official_backend_retries_truncated_reasoning_from_original_prompt(tmp_path, monkeypatch):
     monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.8.0-test")
     monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **kw: None)
     monkeypatch.setenv("RD_AGENT_MODEL", "deepseek/test-model")
@@ -38,7 +38,9 @@ def test_official_backend_tolerates_logger_without_debug_and_uses_long_reasoning
     def completion(**kwargs):
         assert kwargs["max_retries"] == kwargs["num_retries"] == 0
         calls.append(kwargs)
-        return '{"proposals": []}'
+        if len(calls) == 1:
+            return "partial reasoning turn", "length"
+        return '{"proposals": []}', "stop"
 
     backend.completion = completion
 
@@ -46,11 +48,25 @@ def test_official_backend_tolerates_logger_without_debug_and_uses_long_reasoning
         def __init__(self, **kwargs):
             assert not any(kwargs.values())
 
-        def build_messages_and_create_chat_completion(self, **kwargs):
-            assert llm_settings.max_retry == 3
+        def _create_chat_completion_inner_function(self, messages, response_format=None, **kwargs):
+            assert response_format is None
             assert backend.LITELLM_SETTINGS.chat_max_tokens == 8192
             assert backend.LITELLM_SETTINGS.chat_stream is True
-            return backend.completion(messages=[])
+            return backend.completion(messages=messages)
+
+        def build_messages_and_create_chat_completion(self, user_prompt, system_prompt=None, **kwargs):
+            assert llm_settings.max_retry == 3
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            last_error = None
+            for _ in range(llm_settings.max_retry):
+                try:
+                    return self._create_chat_completion_auto_continue(messages=messages)
+                except RuntimeError as exc:
+                    last_error = exc
+            raise last_error
 
     backend.LiteLLMAPIBackend = FakeBackend
     # Mirror rdagent==0.8.0 behavior observed on the execution machine: no debug method.
@@ -69,6 +85,9 @@ def test_official_backend_tolerates_logger_without_debug_and_uses_long_reasoning
         cache_dir=tmp_path / "cache",
     )
     assert agent({"fold": "2025Q1", "round": 1}) == {"proposals": []}
-    assert len(calls) == 1
-    assert agent.snapshot()["accounted_total"] == 43
+    assert len(calls) == 2
+    assert calls[0]["messages"] == calls[1]["messages"]
+    assert all(message["role"] != "assistant" for message in calls[1]["messages"])
+    assert agent.snapshot()["accounted_total"] == 44
     assert agent.snapshot()["rdagent_version"] == "0.8.0-test"
+    assert agent.snapshot()["reasoning_auto_continue"] == "disabled_full_prompt_retry"
