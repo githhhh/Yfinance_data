@@ -15,6 +15,7 @@
   let reference = {
     status: "loading",
     sourceDate: null,
+    publishedDate: null,
     ratings: new Map(),
     error: null,
     checkedAt: null,
@@ -37,6 +38,102 @@
     return values.year && values.month && values.day
       ? `${values.year}-${values.month}-${values.day}`
       : null;
+  }
+
+  function parseDateKey(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function dateKey(date) {
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  }
+
+  function shiftDate(value, days) {
+    const date = parseDateKey(value);
+    if (!date) return null;
+    date.setUTCDate(date.getUTCDate() + days);
+    return dateKey(date);
+  }
+
+  function nthWeekday(year, month, weekday, occurrence) {
+    const first = new Date(Date.UTC(year, month - 1, 1));
+    const offset = (weekday - first.getUTCDay() + 7) % 7;
+    first.setUTCDate(1 + offset + (occurrence - 1) * 7);
+    return dateKey(first);
+  }
+
+  function lastWeekday(year, month, weekday) {
+    const last = new Date(Date.UTC(year, month, 0));
+    const offset = (last.getUTCDay() - weekday + 7) % 7;
+    last.setUTCDate(last.getUTCDate() - offset);
+    return dateKey(last);
+  }
+
+  function easterSunday(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return dateKey(new Date(Date.UTC(year, month - 1, day)));
+  }
+
+  function observedFixedHoliday(year, month, day) {
+    const key = dateKey(new Date(Date.UTC(year, month - 1, day)));
+    const weekday = parseDateKey(key)?.getUTCDay();
+    if (weekday === 6) return shiftDate(key, -1);
+    if (weekday === 0) return shiftDate(key, 1);
+    return key;
+  }
+
+  function marketHolidayDates(year) {
+    const holidays = new Set();
+    const newYear = dateKey(new Date(Date.UTC(year, 0, 1)));
+    const newYearWeekday = parseDateKey(newYear)?.getUTCDay();
+    if (newYearWeekday === 0) holidays.add(shiftDate(newYear, 1));
+    else if (newYearWeekday !== 6) holidays.add(newYear);
+
+    holidays.add(nthWeekday(year, 1, 1, 3)); // Martin Luther King Jr. Day
+    holidays.add(nthWeekday(year, 2, 1, 3)); // Presidents' Day
+    holidays.add(shiftDate(easterSunday(year), -2)); // Good Friday
+    holidays.add(lastWeekday(year, 5, 1)); // Memorial Day
+    holidays.add(observedFixedHoliday(year, 6, 19)); // Juneteenth
+    holidays.add(observedFixedHoliday(year, 7, 4)); // Independence Day
+    holidays.add(nthWeekday(year, 9, 1, 1)); // Labor Day
+    holidays.add(nthWeekday(year, 11, 4, 4)); // Thanksgiving
+    holidays.add(observedFixedHoliday(year, 12, 25)); // Christmas
+    return holidays;
+  }
+
+  function isMarketSessionDate(value) {
+    const date = parseDateKey(value);
+    if (!date) return false;
+    const weekday = date.getUTCDay();
+    if (weekday === 0 || weekday === 6) return false;
+    return !marketHolidayDates(date.getUTCFullYear()).has(value);
+  }
+
+  function marketSessionDateForCommit(isoTimestamp) {
+    // rs-log may still run on a weekend/NYSE holiday. Its prices then represent
+    // the most recent completed US session, not the GitHub publication date.
+    let candidate = nyDate(isoTimestamp);
+    for (let attempts = 0; candidate && attempts < 10; attempts += 1) {
+      if (isMarketSessionDate(candidate)) return candidate;
+      candidate = shiftDate(candidate, -1);
+    }
+    return null;
   }
 
   function clockTime(value) {
@@ -157,12 +254,13 @@
     style.id = "rs-reference-styles";
     style.textContent = `
       th[data-sort-field="rs_percentile"] { position: relative; }
-      th[data-sort-field="rs_percentile"] > button { padding-right: 24px !important; }
+      th[data-sort-field="rs_percentile"] > button:not(.rs-info-button) { padding-right: 24px !important; }
       .rs-info-button {
         position: absolute;
         right: 7px;
         top: 50%;
         transform: translateY(-50%);
+        box-sizing: border-box;
         width: 18px;
         height: 18px;
         display: grid;
@@ -172,7 +270,7 @@
         border-radius: 50%;
         background: #11171e;
         color: #9ca8b7;
-        font: 800 9px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font: 800 10px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         cursor: help;
         z-index: 3;
       }
@@ -183,6 +281,7 @@
       .rs-info-button[data-state="unavailable"] { color: #9ca8b7; border-color: #465365; }
       .rs-info-button[data-state="loading"],
       .rs-info-button[data-state="refreshing"] { color: #9ca8b7; border-color: #465365; }
+      [data-rs-enhanced="true"] { pointer-events: none !important; }
       .rs-reference-popover {
         position: fixed;
         width: min(330px, calc(100vw - 20px));
@@ -379,7 +478,7 @@
     const state = stateFor();
     const copy = stateCopy(state);
     button.dataset.state = state;
-    if (button.textContent !== copy.icon) button.textContent = copy.icon;
+    if (button.textContent !== "i") button.textContent = "i";
     button.setAttribute("aria-label", `RS reference: ${copy.label}. Open details.`);
     button.title = `RS reference · ${copy.label}`;
     return button;
@@ -414,8 +513,8 @@
     const copy = stateCopy(state);
     const checked = reference.checkedAt ? `Checked ${clockTime(reference.checkedAt)}` : "Not checked yet";
     let note = "";
-    if (state === "stale") note = "RS update is older than the selected Pool snapshot.";
-    if (state === "newer") note = "RS update is newer than the selected Pool snapshot.";
+    if (state === "stale") note = "RS market session is older than the selected Pool snapshot.";
+    if (state === "newer") note = "RS market session is newer than the selected Pool snapshot.";
     if (state === "unavailable") note = "Public RS reference is unavailable. Pool review is unaffected.";
     if (state === "refresh_failed") note = "Refresh failed. Showing the last successfully loaded RS data.";
     if (state === "loading") note = "Loading public RS reference…";
@@ -431,7 +530,8 @@
       <div class="rs-state" data-tone="${copy.tone}"><span>${copy.icon}</span><span>${copy.label}</span></div>
       ${note ? `<div class="rs-disclaimer">${note}</div>` : ""}
       <div class="rs-meta-grid">
-        <span>RS update (ET)</span><b>${escapeHtml(reference.sourceDate || "N/A")}</b>
+        <span>RS market session</span><b>${escapeHtml(reference.sourceDate || "N/A")}</b>
+        <span>Published (ET)</span><b>${escapeHtml(reference.publishedDate || "N/A")}</b>
         <span>Pool snapshot</span><b>${escapeHtml(poolDate || "N/A")}</b>
       </div>
       <div class="rs-source-row">
@@ -518,7 +618,14 @@
     const previous = reference;
     reference = preserve
       ? { ...previous, status: "refreshing", error: null }
-      : { status: "loading", sourceDate: null, ratings: new Map(), error: null, checkedAt: previous.checkedAt };
+      : {
+        status: "loading",
+        sourceDate: null,
+        publishedDate: null,
+        ratings: new Map(),
+        error: null,
+        checkedAt: previous.checkedAt,
+      };
     scheduleRefresh();
 
     try {
@@ -533,11 +640,16 @@
       const timestamp = latest?.commit?.committer?.date;
       if (!sha || !timestamp) throw new Error("RS metadata is incomplete");
 
+      const publishedDate = nyDate(timestamp);
+      const sourceDate = marketSessionDateForCommit(timestamp);
+      if (!publishedDate || !sourceDate) throw new Error("RS publication date is invalid");
+
       const csvResponse = await fetch(CSV_URL(sha), { cache: "force-cache" });
       if (!csvResponse.ok) throw new Error(`RS CSV HTTP ${csvResponse.status}`);
       reference = {
         status: "ready",
-        sourceDate: nyDate(timestamp),
+        sourceDate,
+        publishedDate,
         ratings: parseRatings(await csvResponse.text()),
         error: null,
         checkedAt: new Date(),
@@ -548,6 +660,7 @@
         : {
           status: "error",
           sourceDate: null,
+          publishedDate: null,
           ratings: new Map(),
           error: String(error?.message || error),
           checkedAt: new Date(),
