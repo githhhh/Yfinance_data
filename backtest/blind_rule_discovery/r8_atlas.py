@@ -93,8 +93,7 @@ def class_profiles(frame: pd.DataFrame, features: list[str], calendar: list[str]
             values = numeric(qframe[feature]) if feature in qframe else np.full(len(qframe), np.nan)
             for label in LABELS:
                 mask = masks[label]
-                raw = values[mask]
-                known = finite(raw)
+                known = finite(values[mask])
                 row = {
                     "quarter": quarter,
                     "feature": feature,
@@ -110,12 +109,14 @@ def class_profiles(frame: pd.DataFrame, features: list[str], calendar: list[str]
     return pd.DataFrame(rows)
 
 
-def _tail_log_odds(winner: np.ndarray, stop: np.ndarray, selected: np.ndarray) -> float | None:
-    primary = winner | stop
-    if not primary.any() or not (selected & primary).any():
+def _tail_log_odds(winner: np.ndarray, stop: np.ndarray, selected: np.ndarray,
+                   known: np.ndarray) -> float | None:
+    """Winner-vs-Stop enrichment inside a tail relative to feature-known primary rows."""
+    primary_known = (winner | stop) & known
+    if not primary_known.any() or not (selected & primary_known).any():
         return None
     w, s = int((winner & selected).sum()), int((stop & selected).sum())
-    all_w, all_s = int(winner.sum()), int(stop.sum())
+    all_w, all_s = int((winner & known).sum()), int((stop & known).sum())
     if not all_w or not all_s:
         return None
     tail_odds = (w + 0.5) / (s + 0.5)
@@ -154,18 +155,18 @@ def quarter_feature_contrasts(frame: pd.DataFrame, features: list[str], calendar
                 rows.append({"quarter": quarter, "feature": feature, "status": "NO_TRAIN_FEATURE_SUPPORT"})
                 continue
             values = numeric(test[feature])
+            known = np.isfinite(values)
             pct = train_percentile(reference, values)
             winner = numeric(test.fast_winner_3w) == 1
             stop = numeric(test.stop_first_3w) == 1
-            w_known = winner & np.isfinite(values)
-            s_known = stop & np.isfinite(values)
+            w_known = winner & known
+            s_known = stop & known
             gaps = _matched_percentile_gaps(test, pct)
             supported = (w_known.sum() >= cfg.min_class_n and s_known.sum() >= cfg.min_class_n
                          and len(gaps) >= cfg.min_matched_snapshots)
             q20, q80 = float(np.quantile(ref, .2)), float(np.quantile(ref, .8))
-            low = np.isfinite(values) & (values <= q20)
-            high = np.isfinite(values) & (values >= q80)
-            raw_delta = cliffs_delta(values[w_known], values[s_known])
+            low = known & (values <= q20)
+            high = known & (values >= q80)
             rows.append({
                 "quarter": quarter,
                 "feature": feature,
@@ -179,7 +180,7 @@ def quarter_feature_contrasts(frame: pd.DataFrame, features: list[str], calendar
                 "stop_missing_fraction": float(1-s_known.sum()/stop.sum()) if stop.sum() else None,
                 "raw_winner_median": quantile_or_none(values[w_known], .5),
                 "raw_stop_median": quantile_or_none(values[s_known], .5),
-                "cliffs_delta_winner_minus_stop": raw_delta,
+                "cliffs_delta_winner_minus_stop": cliffs_delta(values[w_known], values[s_known]),
                 "winner_percentile_mean": float(np.nanmean(pct[winner])) if np.isfinite(pct[winner]).any() else None,
                 "stop_percentile_mean": float(np.nanmean(pct[stop])) if np.isfinite(pct[stop]).any() else None,
                 "percentile_mean_gap": (float(np.nanmean(pct[winner])-np.nanmean(pct[stop]))
@@ -189,8 +190,8 @@ def quarter_feature_contrasts(frame: pd.DataFrame, features: list[str], calendar
                 "matched_winner_high_fraction": float(np.mean(np.asarray(gaps) > 0)) if gaps else None,
                 "train_q20": q20,
                 "train_q80": q80,
-                "low_tail_log_odds_winner_vs_stop": _tail_log_odds(winner, stop, low),
-                "high_tail_log_odds_winner_vs_stop": _tail_log_odds(winner, stop, high),
+                "low_tail_log_odds_winner_vs_stop": _tail_log_odds(winner, stop, low, known),
+                "high_tail_log_odds_winner_vs_stop": _tail_log_odds(winner, stop, high, known),
             })
     return pd.DataFrame(rows)
 
@@ -201,15 +202,20 @@ def _sign(value: float | None) -> int:
     return 1 if value > 0 else -1
 
 
+def _numeric_column(frame: pd.DataFrame, name: str) -> pd.Series:
+    if name not in frame:
+        return pd.Series(dtype=float)
+    return pd.to_numeric(frame[name], errors="coerce")
+
+
 def aggregate_feature_stability(contrasts: pd.DataFrame, cfg: AtlasConfig) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for feature, group in contrasts.groupby("feature", sort=True):
         supported = group.loc[group.status == "SUPPORTED"].copy()
-        gaps = supported.matched_percentile_gap_median.dropna().to_numpy(float)
-        deltas = supported.cliffs_delta_winner_minus_stop.dropna().to_numpy(float)
+        gaps = _numeric_column(supported, "matched_percentile_gap_median").dropna().to_numpy(float)
+        deltas = _numeric_column(supported, "cliffs_delta_winner_minus_stop").dropna().to_numpy(float)
         pos, neg = int((gaps > 0).sum()), int((gaps < 0).sum())
-        directional_n = pos + neg
-        consistency = max(pos, neg) / directional_n if directional_n else None
+        consistency = max(pos, neg) / len(gaps) if len(gaps) else None  # zero-direction quarters count against stability.
         median_gap = float(np.median(gaps)) if len(gaps) else None
         median_delta = float(np.median(deltas)) if len(deltas) else None
         full_sign = _sign(median_gap)
@@ -217,14 +223,19 @@ def aggregate_feature_stability(contrasts: pd.DataFrame, cfg: AtlasConfig) -> pd
         if len(gaps) >= 2 and full_sign:
             loo_sign_stable = all(_sign(float(np.median(np.delete(gaps, i)))) == full_sign for i in range(len(gaps)))
         enough = len(supported) >= cfg.min_stable_quarters
-        aligned = full_sign and _sign(median_delta) == full_sign
+        aligned = bool(full_sign and _sign(median_delta) == full_sign)
         practical = median_delta is not None and abs(median_delta) >= cfg.min_abs_cliffs_delta
-        stable = enough and consistency is not None and consistency >= cfg.stable_direction_fraction and aligned and practical and loo_sign_stable
+        stable = (enough and consistency is not None and consistency >= cfg.stable_direction_fraction
+                  and aligned and practical and loo_sign_stable)
         label = ("CONSISTENT_WINNER_HIGH" if stable and full_sign > 0 else
                  "CONSISTENT_STOP_HIGH" if stable and full_sign < 0 else
                  "INSUFFICIENT_EVIDENCE" if not enough else "MIXED_OR_WEAK")
         strength = ("MODERATE_PLUS" if median_delta is not None and abs(median_delta) >= .20 else
                     "SMALL" if median_delta is not None and abs(median_delta) >= .10 else "WEAK")
+        low_tail = _numeric_column(supported, "low_tail_log_odds_winner_vs_stop").dropna()
+        high_tail = _numeric_column(supported, "high_tail_log_odds_winner_vs_stop").dropna()
+        winner_missing = _numeric_column(supported, "winner_missing_fraction")
+        stop_missing = _numeric_column(supported, "stop_missing_fraction")
         rows.append({
             "feature": feature,
             "stability_label": label,
@@ -236,11 +247,9 @@ def aggregate_feature_stability(contrasts: pd.DataFrame, cfg: AtlasConfig) -> pd
             "median_matched_percentile_gap": median_gap,
             "median_cliffs_delta": median_delta,
             "loo_median_sign_stable": loo_sign_stable,
-            "median_low_tail_log_odds": (float(supported.low_tail_log_odds_winner_vs_stop.median())
-                                         if supported.low_tail_log_odds_winner_vs_stop.notna().any() else None),
-            "median_high_tail_log_odds": (float(supported.high_tail_log_odds_winner_vs_stop.median())
-                                          if supported.high_tail_log_odds_winner_vs_stop.notna().any() else None),
-            "median_winner_minus_stop_missing": (float((supported.winner_missing_fraction-supported.stop_missing_fraction).median())
+            "median_low_tail_log_odds": float(low_tail.median()) if len(low_tail) else None,
+            "median_high_tail_log_odds": float(high_tail.median()) if len(high_tail) else None,
+            "median_winner_minus_stop_missing": (float((winner_missing-stop_missing).median())
                                                   if len(supported) else None),
             "production_change": False,
         })
@@ -316,12 +325,14 @@ def validate_interaction(proposal: dict, features: list[str]) -> set[str]:
         raise ValueError("invalid name")
     if not isinstance(proposal["hypothesis"], str) or not 1 <= len(proposal["hypothesis"]) <= 1000:
         raise ValueError("invalid hypothesis")
-    if proposal["target"] not in TARGETS or proposal["tail"] not in {"high", "low"} or proposal["quantile"] not in {0.2, 0.8}:
-        raise ValueError("target/tail/quantile outside frozen R8 contract")
+    if proposal["target"] not in TARGETS or proposal["tail"] not in {"high", "low"}:
+        raise ValueError("target/tail outside frozen R8 contract")
+    if (proposal["tail"], proposal["quantile"]) not in {("low", 0.2), ("high", 0.8)}:
+        raise ValueError("R8 interactions are fixed extreme q20-low or q80-high tails")
     allowed = set(features) & set(DISCOVERY_FEATURE_ALLOWLIST)
     leaves = _visit_expression(proposal["expression"], allowed)
-    if len(leaves) < 2:
-        raise ValueError("R8 Agent proposals must combine at least two distinct PIT features")
+    if len(leaves) != 2:
+        raise ValueError("R8 Agent proposals must combine exactly two distinct PIT features")
     return leaves
 
 
@@ -330,8 +341,7 @@ def interaction_id(proposal: dict) -> str:
 
 
 def fit_interaction_rule(proposal: dict, train: pd.DataFrame) -> dict:
-    values = evaluate_expression(proposal["expression"], train, train)
-    values = finite(values)
+    values = finite(evaluate_expression(proposal["expression"], train, train))
     return {**proposal, "threshold": float(np.quantile(values, proposal["quantile"])) if len(values) else None}
 
 
@@ -445,7 +455,6 @@ def past_univariate_summary(past: pd.DataFrame, features: list[str]) -> list[dic
         values = numeric(past[feature])
         winner = numeric(past.fast_winner_3w) == 1
         stop = numeric(past.stop_first_3w) == 1
-        delta = cliffs_delta(values[winner], values[stop])
         quarter_delta = []
         for quarter in sorted(quarters.unique()):
             q = quarters == quarter
@@ -458,7 +467,7 @@ def past_univariate_summary(past: pd.DataFrame, features: list[str]) -> list[dic
             "feature": feature,
             "winner_known_n": int((winner & np.isfinite(values)).sum()),
             "stop_known_n": int((stop & np.isfinite(values)).sum()),
-            "cliffs_delta_winner_minus_stop": delta,
+            "cliffs_delta_winner_minus_stop": cliffs_delta(values[winner], values[stop]),
             "quarter_support": len(quarter_delta),
             "winner_high_quarter_fraction": (float(np.mean(np.asarray(quarter_delta) > 0)) if quarter_delta else None),
             "winner_missing_fraction": float(1-(winner & np.isfinite(values)).sum()/winner.sum()) if winner.sum() else None,
@@ -481,6 +490,7 @@ def discover_interactions(frame: pd.DataFrame, features: list[str], calendar: li
     traces: list[dict[str, Any]] = []
     quarters = frame.snapshot_date.dt.to_period("Q").astype(str)
     trace_path = output / "discovery_trace.jsonl"
+    trace_path.touch()
     for quarter in calendar[cfg.min_train_quarters:]:
         test = frame.loc[quarters == quarter]
         if test.empty:
@@ -570,7 +580,11 @@ def discover_interactions(frame: pd.DataFrame, features: list[str], calendar: li
             "features": "+".join(item["features"]),
             **metrics,
         })
-    outer = pd.DataFrame(outer_rows)
+    outer_columns = ["quarter", "interaction_id", "signature", "name", "target", "tail", "quantile", "features",
+                     "test_n", "selected_n_total", "selected_primary_n", "complement_primary_n", "coverage_all",
+                     "matched_snapshots", "matched_target_lift", "matched_target_positive_fraction", "target_capture",
+                     "other_class_loss", "capture_minus_other_loss", "selected_unresolved_n", "selected_ambiguous_n", "supported"]
+    outer = pd.DataFrame(outer_rows, columns=outer_columns)
     stability_rows = []
     recurrence_rows = []
     if not outer.empty:
@@ -581,7 +595,7 @@ def discover_interactions(frame: pd.DataFrame, features: list[str], calendar: li
             positive = float((lifts > 0).mean()) if len(lifts) else None
             stability_rows.append({
                 "signature": signature,
-                "name": group.iloc[0].name if "name" in group else None,
+                "name": group["name"].iloc[0],
                 "target": group.target.iloc[0],
                 "features": group.features.iloc[0],
                 "selected_folds": len(group),
@@ -606,7 +620,13 @@ def discover_interactions(frame: pd.DataFrame, features: list[str], calendar: li
                 "median_target_lift": (float(supported.matched_target_lift.median()) if len(supported) else None),
                 "adaptive_descriptive_only": True,
             })
-    return lock, outer, pd.DataFrame(stability_rows), pd.DataFrame(recurrence_rows), traces
+    stability_columns = ["signature", "name", "target", "features", "selected_folds", "supported_outer_folds",
+                         "positive_outer_fraction", "median_outer_target_lift", "median_outer_capture_minus_other_loss",
+                         "descriptive_verdict", "independent_confirmation"]
+    recurrence_columns = ["target", "features", "frozen_occurrences", "supported_occurrences",
+                          "positive_target_lift_occurrences", "median_target_lift", "adaptive_descriptive_only"]
+    return (lock, outer, pd.DataFrame(stability_rows, columns=stability_columns),
+            pd.DataFrame(recurrence_rows, columns=recurrence_columns), traces)
 
 
 def render_report(stability: pd.DataFrame, interactions: pd.DataFrame,
@@ -638,7 +658,7 @@ def render_report(stability: pd.DataFrame, interactions: pd.DataFrame,
               "", "## RD-Agent Interaction Layer", "",
               f"- Provider attempts are metered separately; request accounting: {manifest.get('requests', {})}.",
               "- Agent sees purged-past aggregates only; all fold interactions freeze before outer evaluation.",
-              "- Each expression combines at least two PIT features; no generated Python executes."]
+              "- Each expression combines exactly two PIT features; only q20-low or q80-high tails are allowed; no generated Python executes."]
     if interaction_stability.empty:
         lines.append("No recurring interaction stability result was produced.")
     else:
