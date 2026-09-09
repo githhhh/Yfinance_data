@@ -26,10 +26,15 @@ from .r8_atlas import (
 
 
 def load_bound_inputs(samples: Path, metadata: Path, r6_dir: Path):
-    manifest_path = r6_dir / "input_manifest.json"
-    if not manifest_path.exists():
-        raise ValueError("completed R6 input_manifest.json is required")
+    required = {name: r6_dir / name for name in ("input_manifest.json", "frozen_rules.json", "summary.json", "R6_REPORT.md")}
+    if (r6_dir / "FAILED.json").exists() or any(not path.exists() for path in required.values()):
+        raise ValueError("R8 requires a completed, non-failed R6 directory")
+    manifest_path = required["input_manifest.json"]
     anchor = json.loads(manifest_path.read_text())
+    lock = json.loads(required["frozen_rules.json"].read_text())
+    summary = json.loads(required["summary.json"].read_text())
+    if digest(lock) != summary.get("frozen_sha256") or summary.get("research_mode") != "known_history_adaptive_retrospective":
+        raise ValueError("R8 R6 frozen-rule provenance mismatch")
     if sha256_file(metadata) != anchor.get("metadata_sha256"):
         raise ValueError("R8 metadata does not match completed R6")
     frame, observed = load_inputs(samples, metadata, anchor["samples_sha256"])
@@ -41,7 +46,8 @@ def load_bound_inputs(samples: Path, metadata: Path, r6_dir: Path):
     accounted = requests.get("accounted_total")
     if not isinstance(accounted, int) or accounted < 0:
         raise ValueError("completed R6 manifest lacks accounted_total request floor")
-    return frame, observed, anchor, manifest_path, accounted
+    bound_files = [manifest_path, required["frozen_rules.json"], required["summary.json"]]
+    return frame, observed, anchor, bound_files, accounted, summary["frozen_sha256"]
 
 
 def _model_from_env() -> str:
@@ -51,7 +57,7 @@ def _model_from_env() -> str:
 def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
         ledger: Path, cache_dir: Path, *, prior_used_floor: int | None = None,
         run_cap: int = 80, agent_rounds: int = 3, preflight: bool = False):
-    frame, observed, r6_anchor, r6_manifest_path, r6_accounted = load_bound_inputs(samples, metadata, r6_dir)
+    frame, observed, r6_anchor, r6_bound_files, r6_accounted, r6_frozen_sha = load_bound_inputs(samples, metadata, r6_dir)
     model = _model_from_env()
     if not model:
         raise RuntimeError("R8 requires RD_AGENT_MODEL or CHAT_MODEL in the existing environment")
@@ -65,6 +71,8 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
 
     floor = max(r6_accounted, int(prior_used_floor or 0))
     cfg = replace(AtlasConfig(), agent_rounds=agent_rounds)
+    if not 1 <= agent_rounds <= 3:
+        raise ValueError("R8 agent rounds may only be reduced from the frozen maximum of 3")
     if not 1 <= run_cap <= 1000-floor:
         raise ValueError("R8 run cap exceeds remaining lower-bound provider budget")
     protocol = {
@@ -83,7 +91,8 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
     manifest = {
         **{k: observed[k] for k in ("samples_sha256", "metadata_sha256", "source_replay_dataset_sha256",
                                     "sample_rows", "snapshot_weeks", "unique_tickers", "calendar", "features")},
-        "r6_anchor_manifest_sha256": sha256_file(r6_manifest_path),
+        "r6_anchor_manifest_sha256": sha256_file(r6_bound_files[0]),
+        "r6_frozen_sha256": r6_frozen_sha,
         "r6_accounted_total_floor": r6_accounted,
         "rdagent_version": version,
         "protocol": protocol,
@@ -103,11 +112,12 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
     if output.exists() and any(output.iterdir()):
         raise ValueError("R8 requires a fresh output directory")
     out = output.resolve()
-    protected = [samples.resolve(), metadata.resolve(), r6_manifest_path.resolve(), ledger.resolve(), cache_dir.resolve()]
-    for path in protected:
+    protected_roots = [samples.resolve(), metadata.resolve(), r6_dir.resolve(), ledger.resolve(), cache_dir.resolve()]
+    for path in protected_roots:
         if out == path or out in path.parents or path in out.parents:
-            raise ValueError("R8 output must be disjoint from inputs, ledger and cache")
-    before = {str(p): sha256_file(p) for p in (samples.resolve(), metadata.resolve(), r6_manifest_path.resolve())}
+            raise ValueError("R8 output must be disjoint from inputs, R6, ledger and cache")
+    immutable_files = [samples.resolve(), metadata.resolve(), *(p.resolve() for p in r6_bound_files)]
+    before = {str(p): sha256_file(p) for p in immutable_files}
 
     contrasts = quarter_feature_contrasts(frame, manifest["features"], manifest["calendar"], cfg)
     stability = aggregate_feature_stability(contrasts, cfg)
@@ -120,7 +130,7 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
     try:
         lock, outer, interaction_stability, recurrence, _ = discover_interactions(
             frame, manifest["features"], manifest["calendar"], proposer, cfg, output)
-        for path in (samples.resolve(), metadata.resolve(), r6_manifest_path.resolve()):
+        for path in immutable_files:
             if sha256_file(path) != before[str(path)]:
                 raise RuntimeError("R8 protected input changed during execution")
 
@@ -136,7 +146,7 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
         (output / "input_manifest.json").write_text(canonical(manifest) + "\n")
         (output / "R8_REPORT.md").write_text(render_report(stability, outer, interaction_stability, manifest))
 
-        for path in (samples.resolve(), metadata.resolve(), r6_manifest_path.resolve()):
+        for path in immutable_files:
             if sha256_file(path) != before[str(path)]:
                 raise RuntimeError("R8 protected input changed before publication")
         outputs = {p.name: sha256_file(p) for p in sorted(output.iterdir()) if p.is_file()}
