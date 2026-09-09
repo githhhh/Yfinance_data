@@ -58,7 +58,9 @@ quarter_start`). For every feature:
 - mean and median percentile gap;
 - equal-snapshot Winner-minus-Stop percentile gap, its median and sign fraction;
 - Winner and Stop missing fractions;
-- fixed past q20/q80 thresholds and class-enrichment log-odds in each tail.
+- fixed past q20/q80 thresholds and class-enrichment log-odds in each tail,
+  relative to feature-known Winner/Stop rows only so missingness cannot create a
+  false enrichment signal.
 
 A quarter is supported only with at least 8 known Winners, 8 known Stops and 3
 matched snapshot weeks containing both classes. Unsupported and empty quarters
@@ -69,7 +71,8 @@ remain explicit.
 A feature is `CONSISTENT_WINNER_HIGH` or `CONSISTENT_STOP_HIGH` only when:
 
 - at least 6 supported outer quarters;
-- at least 75% of supported quarters have the same matched-week direction;
+- at least 75% of supported quarters have the same matched-week direction (zero
+  direction counts against consistency);
 - median absolute Cliff's delta is at least 0.10;
 - the median matched percentile gap and median Cliff's delta have the same sign;
 - deleting any one supported quarter does not flip the sign of the median matched
@@ -84,8 +87,9 @@ p-value or multiplicity-adjusted significance claim is made.
 For every outer quarter and feature, q20/q40/q60/q80 boundaries are fitted from
 purged past only. Each test row is placed into one of five bins. Export all four
 W3 class rates and Winner-vs-Stop share per bin. No bin is chosen or promoted.
-This is specifically intended to expose non-monotone structure that rank scores
-can hide.
+Degenerate bins for discrete/binary features remain visible rather than being
+silently redefined. This is specifically intended to expose non-monotone
+structure that rank scores can hide.
 
 ## Layer B — RD-Agent Interaction Discovery
 
@@ -111,12 +115,12 @@ Each proposal has exactly:
 `name, hypothesis, expression, target, tail, quantile`
 
 - `target`: `winner` or `stop`;
-- `tail`: `high` or `low`;
-- `quantile`: only `0.2` or `0.8`;
+- only the extreme tail pairs are legal: `tail=low, quantile=0.2` or
+  `tail=high, quantile=0.8`;
 - expression leaves: `raw` or `train_percentile` of an allowlisted PIT feature;
 - binary nodes: `difference`, `product`, `minimum`, `maximum`;
 - max expression depth 2;
-- at least **two distinct PIT features** must occur in the expression.
+- **exactly two distinct PIT features** must occur in the expression.
 
 No Python, arbitrary thresholds, generated code or inferred earnings trajectory is
 executed. A threshold is always fitted from the corresponding past training
