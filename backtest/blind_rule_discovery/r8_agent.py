@@ -18,12 +18,12 @@ This is known-history retrospective mechanism research, never untouched OOS or p
 You see only purged historical aggregate summaries and inner-quarter feedback.
 Propose at most 2 candidates; return {\"proposals\": []} when no useful idea remains.
 Each proposal has exactly name, hypothesis, expression, target, tail, quantile.
-target is winner or stop. tail is high or low. quantile is only 0.2 or 0.8.
-expression is a bounded JSON tree, maximum depth 2, using at least two distinct available PIT features.
+target is winner or stop. Use only the extreme tail pairs: tail=low with quantile=0.2, or tail=high with quantile=0.8.
+expression is a bounded JSON tree, maximum depth 2, using exactly two distinct available PIT features.
 Leaves: {\"op\":\"raw\" or \"train_percentile\", \"feature\": an available feature}.
 Binary nodes: {\"op\":\"difference\"/\"product\"/\"minimum\"/\"maximum\", \"left\":node,\"right\":node}.
-Do not propose single-feature rules, dates, tickers, market fields, future facts, Python, arbitrary thresholds,
-changed outcome definitions, inferred earnings trajectories, or renamed duplicates.
+Do not propose single-feature rules, three-or-more-feature rules, dates, tickers, market fields, future facts,
+Python, arbitrary thresholds, changed outcome definitions, inferred earnings trajectories, or renamed duplicates.
 Explain the economic mechanism and a falsifying observation. Return only compact JSON.
 Never force a proposal merely to improve the reported historical result.
 """
