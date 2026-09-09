@@ -1,219 +1,221 @@
-# R8 Winner / Stop Stable Feature Atlas
+# R8 Winner / Stop Stable Feature Atlas — Split Execution V2
 
 ## Goal
 
 R1-R7 found that stable winner alpha is difficult to identify, while several PIT
-features describe stop-risk pockets. R8 changes the question. It does **not** ask
-for another ranking winner. It builds the missing descriptive atlas:
+features describe stop-risk pockets. R8 does not search for another ranking
+champion. Its primary deliverable is the missing Winner/Stop feature atlas:
 
-- Which snapshot-PIT features consistently differ between `fast_winner_3w` and
-  `stop_first_3w` across calendar quarters?
-- How large is the separation, how much do the class distributions overlap, and
-  is the direction stable after matching within snapshot weeks?
-- Do fixed past-only q20/q80 tails or quintile surfaces reveal monotone,
-  threshold-like, or U-shaped behavior that a single score would hide?
-- Can a small number of bounded two-feature interactions improve class
-  separation on the next quarter without being promoted as alpha?
+- which snapshot-PIT features differ consistently between `fast_winner_3w` and
+  `stop_first_3w`;
+- how large the separation is and whether it survives calendar-quarter and
+  repeated-ticker controls;
+- whether q20/q80 tails or fixed quintile surfaces reveal nonlinear structure;
+- whether bounded two-feature mechanisms recur when proposed from past-only facts.
 
-The primary binary contrast is **Fast Winner vs Stop First**. `unresolved_3w` and
-`ambiguous_3w` are never relabeled; they remain visible in class profiles and
-quintile surfaces. R8 is known-history retrospective research, not untouched OOS,
-not causal proof, and not a production selector.
+`unresolved_3w` and `ambiguous_3w` are never relabeled. R8 is known-history
+retrospective research, not untouched OOS, causal proof, or a production selector.
 
-## Bound Inputs
+## Why R8 is now split
 
-Use exactly the R4 `trigger_path_samples.csv` and matching metadata bound by the
-completed R6 `input_manifest.json`. R8 must reproduce the R6 sample SHA, metadata
-SHA, feature list, calendar, row count, snapshot-week count and ticker count.
-Only the R6 snapshot-PIT feature allowlist is profiled or exposed to the Agent.
-No price download, EPS refresh, B0 rank, market field, ticker identity, date,
-execution-time fact or future field may enter a feature expression.
+The original combined runner allowed a transport failure in the optional RD-Agent
+layer to prevent publication of the deterministic atlas. Two formal attempts
+failed before the first successful model response because the configured API
+proxy terminated the connection at about 60 seconds before the reasoning model
+returned its first byte.
 
-The source population is the existing 8,983 usable executable entries, not all
-listings or all original signals. That conditioning remains an explicit limit.
-The completed R6 frozen-rule hash and research mode are also checked so an
-incomplete/failed R6 directory cannot be used as an anchor.
+That transport limitation must not invalidate deterministic research that needs no
+model at all. R8 therefore has two independently auditable stages:
 
-## Layer A — Fixed Full Feature Atlas
+1. **R8A deterministic atlas** — fully offline after the bound CSVs are present;
+   no API key, RD-Agent call, request ledger or cache is required.
+2. **R8B optional Agent interactions** — runs only after binding to a completed
+   R8A directory. R8B failure writes its own `AGENT_FAILED` artifact and never
+   invalidates R8A.
 
-Every allowlisted PIT feature is evaluated. There is no top-N prefilter and no
+No model, outcome definition, stability threshold or production rule was changed
+to rescue historical results.
+
+## Bound inputs
+
+Both stages use exactly the R4 `trigger_path_samples.csv` and matching metadata
+bound by the completed R6 `input_manifest.json`. They reproduce the R6 sample SHA,
+metadata SHA, feature list, calendar, row count, snapshot-week count and ticker
+count. The completed R6 frozen-rule hash and research mode are also checked.
+
+The population is the existing usable executable entries only, not every original
+signal or listing. No price download, EPS refresh, B0 rank, market field,
+execution-time fact or future field is added.
+
+# R8A — Deterministic full feature atlas
+
+Every R6-allowlisted PIT feature is published. There is no top-N prefilter and no
 feature selection before publication.
 
-Two fixed panels are exported for Winner-vs-Stop chronological contrasts:
+## Fixed panels
 
-- `all_entries`: every usable executable entry;
-- `nonoverlap_w3`: a shared outcome-independent issuer schedule. The earliest
-  entry for a ticker is admitted and that ticker stays reserved through its W3
-  exit; re-entry on the same closing date is forbidden. The schedule is identical
-  for every feature and class and is not changed by the observed label.
+Every atlas table is generated for both:
 
-The formal report emphasizes `nonoverlap_w3`; `all_entries` remains visible as a
-sensitivity panel. This reduces repeated-ticker/overlapping-path amplification,
-but does not create independent observations or an untouched holdout.
+- `all_entries` — every usable executable entry;
+- `nonoverlap_w3` — an outcome-independent issuer schedule: admit a ticker's
+  earliest entry, reserve the ticker through `exit_date_w3`, forbid same-close-date
+  re-entry, then allow a later entry only after the reservation has ended.
 
-### 1. Four-class raw profile
+`nonoverlap_w3` is the primary report panel. `all_entries` remains a sensitivity
+panel. The admission schedule never reads a label or feature value.
 
-For every calendar quarter, feature and W3 path class, export:
+## Four-class raw profiles
+
+For every calendar quarter, feature, panel and W3 path class, export:
 
 - class N / known N / missing fraction;
 - q10 / q25 / median / q75 / q90;
-- raw mean where finite.
+- finite mean.
 
-This raw profile uses all entries and includes Winner, Stop, Unresolved and
-Ambiguous classes.
+Winner, Stop, Unresolved and Ambiguous all remain visible.
 
-### 2. Winner-vs-Stop chronological contrasts
+## Winner-vs-Stop chronological contrasts
 
-Starting only after six consecutive calendar quarters, each test quarter uses a
-purged past surface (`snapshot_date < quarter_start` and `exit_date_w3 <
-quarter_start`). For every feature and both panels:
+Starting after six consecutive calendar quarters, each test quarter uses a purged
+past surface (`snapshot_date < quarter_start` and `exit_date_w3 < quarter_start`).
+For every feature and panel export:
 
 - raw Cliff's delta, Winner minus Stop;
-- Winner/Stop values mapped to the empirical percentile of the panel's purged past;
-- mean and median percentile gap;
-- equal-snapshot Winner-minus-Stop percentile gap, its median and sign fraction;
+- empirical past-percentile Winner/Stop means and gap;
+- equal-snapshot Winner-minus-Stop percentile gap and direction;
 - Winner and Stop missing fractions;
-- fixed past q20/q80 thresholds and class-enrichment log-odds in each tail,
-  relative to feature-known Winner/Stop rows only so missingness cannot create a
-  false enrichment signal.
+- past-only q20/q80 thresholds;
+- low/high tail Winner-vs-Stop log-odds relative to feature-known primary rows.
 
 A quarter is supported only with at least 8 known Winners, 8 known Stops and 3
 matched snapshot weeks containing both classes. Unsupported and empty quarters
 remain explicit.
 
-### 3. Predeclared descriptive stability label
+## Predeclared descriptive stability
 
-A feature is `CONSISTENT_WINNER_HIGH` or `CONSISTENT_STOP_HIGH` within a panel only
-when:
+Within a panel, a feature is `CONSISTENT_WINNER_HIGH` or
+`CONSISTENT_STOP_HIGH` only when:
 
 - at least 6 supported outer quarters;
-- at least 75% of supported quarters have the same matched-week direction (zero
-  direction counts against consistency);
-- the absolute value of the median Cliff's delta is at least 0.10;
-- the median matched percentile gap and median Cliff's delta have the same sign;
-- deleting any one supported quarter does not flip the sign of the median matched
-  percentile gap.
+- at least 75% of supported quarters have the same matched-week direction, with
+  zero-direction quarters counting against consistency;
+- `|median Cliff's delta| >= 0.10`;
+- median matched percentile gap and median Cliff's delta have the same sign;
+- deleting any one supported quarter does not flip the median matched-gap sign.
 
-Otherwise it is `MIXED_OR_WEAK`; insufficient support is separate. These are
-**descriptive labels**, not hypothesis-test passes or production weights. No
-p-value or multiplicity-adjusted significance claim is made. A feature that is
-stable only in `all_entries` but not in `nonoverlap_w3` should be treated as
-issuer-overlap sensitive, not as robust.
+Everything else is `MIXED_OR_WEAK` or `INSUFFICIENT_EVIDENCE`. These are
+**descriptive labels**, not p-value passes, alpha estimates or production weights.
 
-### 4. Fixed quintile surface
+## Fixed quintile surface
 
-For every outer quarter and feature, q20/q40/q60/q80 boundaries are fitted from
-purged past only. Each test row is placed into one of five bins. Export all four
-W3 class rates and Winner-vs-Stop share per bin. No bin is chosen or promoted.
-Degenerate bins for discrete/binary features remain visible rather than being
-silently redefined. Quintile surfaces use the full entry panel; the nonoverlap
-contrast table is the dependency sensitivity. This is specifically intended to
-expose non-monotone structure that rank scores can hide.
+For each outer quarter, feature and panel, q20/q40/q60/q80 boundaries are fitted
+from that panel's purged past only. Every test row is placed into a fixed bin and
+all four W3 class rates plus Winner share within Winner/Stop are exported. No bin
+is selected or promoted. Degenerate bins remain visible.
 
-## Layer B — RD-Agent Interaction Discovery
+## R8A outputs
 
-R8 may use the remaining provider allowance, but Agent output is subordinate to
-the fixed atlas.
+A successful R8A directory contains:
 
-### Prompt boundary
+- `class_profiles.csv`
+- `quarter_feature_contrasts.csv`
+- `feature_stability.csv`
+- `quintile_surfaces.csv`
+- `input_manifest.json`
+- `R8_ATLAS_REPORT.md`
+- `COMPLETE.json` with `status=ATLAS_COMPLETE` and `rdagent_calls=0`
 
-For each outer quarter after the first six calendar quarters, the Agent sees only:
+Every published output is SHA256-bound by `COMPLETE.json`.
 
-- compact aggregates computed from purged past;
-- per-feature Winner/Stop counts, Cliff's delta, missingness and quarter-direction
-  consistency;
-- inner-quarter feedback for interaction proposals from the same past surface.
+# R8B — Optional compact RD-Agent interactions
 
-It never sees the outer-quarter outcomes before rules for that quarter are frozen.
-Later folds may use earlier labels after they have matured under the same W3 purge.
-Agent interaction discovery uses the full-entry population so it retains maximum
-support; it is explicitly secondary to the nonoverlap univariate atlas.
+R8B requires a completed R8A directory and verifies every R8A output hash plus the
+R4/R6 bindings before making any model call. Its output root is separate.
 
-### Bounded expression contract
+## Dependency-control panel
+
+Interaction discovery and outer evaluation use `nonoverlap_w3` only. This is
+predeclared and reduces repeated-issuer amplification. R8A retains the full-entry
+sensitivity atlas separately.
+
+## Compact prompt contract
+
+The previous verbose prompt is replaced by `R8_COMPACT_INTERACTION_V1`. Every
+allowlisted PIT feature still appears; there is **no feature prefilter**. Each
+feature is represented by a short fixed row containing:
+
+`feature, Winner-known N, Stop-known N, Cliff delta, supported-quarter count,
+Winner-high quarter fraction, Winner-minus-Stop missingness gap`.
+
+Later-round feedback returns only aggregate inner evidence. Full inner-quarter
+evidence remains preserved in `interaction_frozen.json`; it is simply not echoed
+back into the model prompt. `discovery_trace.jsonl` records `prompt_chars` for
+transport audit.
+
+This reduces token and reasoning burden without hiding weak features or choosing a
+historical top-N subset.
+
+## Bounded interaction contract
 
 Each proposal has exactly:
 
 `name, hypothesis, expression, target, tail, quantile`
 
 - `target`: `winner` or `stop`;
-- only the extreme tail pairs are legal: `tail=low, quantile=0.2` or
-  `tail=high, quantile=0.8`;
+- only `low/q20` or `high/q80` extreme tails;
 - expression leaves: `raw` or `train_percentile` of an allowlisted PIT feature;
 - binary nodes: `difference`, `product`, `minimum`, `maximum`;
-- max expression depth 2;
-- **exactly two distinct PIT features** must occur in the expression.
+- maximum expression depth 2;
+- exactly two distinct PIT features.
 
-No Python, arbitrary thresholds, generated code or inferred earnings trajectory is
-executed. A threshold is always fitted from the corresponding past training
-surface.
+No Python, arbitrary threshold, date, ticker, market field or future fact is
+allowed. Thresholds are fitted from the corresponding purged past surface only.
 
-### Fixed discovery budget
+## Discovery and freeze
 
-- exactly 3 maximum discovery rounds per non-empty outer fold;
-- maximum 2 proposals per round;
-- patience 2 rounds;
+- 3 formal rounds maximum per non-empty outer fold;
+- at most 2 proposals per round;
+- patience 2;
 - at most 3 qualifying interactions frozen per fold;
-- no Agent call for an empty test quarter;
-- run provider-attempt cap 80;
-- global provider budget remains 1000 using the completed R6 accounted usage as a
-  lower-bound prior. Provider-account usage remains explicitly unverified.
+- qualification requires >=3 supported inner quarters, >=2/3 positive target
+  direction across evaluated inner quarters, positive median equal-snapshot target
+  lift and positive median `target_capture - other_class_loss`;
+- **all fold rules freeze before any outer evaluation**;
+- outer results never enter proposal feedback.
 
-The request cache identity includes the exact model identifier in addition to the
-system and prompt hashes, preventing the R6 alias/cache ambiguity from recurring.
-All retries are metered. Streaming, 8192 output tokens, 240-second provider timeout,
-three transport retries and disabled reasoning auto-continue retain the audited R6
-compatibility behavior.
+The cache identity includes the exact model identifier. Streaming, 8192 output
+tokens, 240-second client timeout, three metered transport retries and disabled
+reasoning auto-continue remain unchanged. These settings cannot override an
+upstream proxy first-byte timeout, which is why R8B is optional and isolated.
 
-### Inner qualification
+The existing R8 ledger/cache must be reused after a failed attempt. The two prior
+failed attempts therefore remain counted; they are not reset or rewritten.
 
-For a proposed target pocket, each inner quarter compares selected vs complement
-only among Fast Winner and Stop First rows. Qualification requires:
+## R8B outputs
 
-- at least 3 supported inner quarters;
-- positive target enrichment in at least two thirds of all evaluated inner
-  quarters;
-- positive median equal-snapshot target-rate lift;
-- positive median `target_capture - other_class_loss`.
+On success:
 
-Every qualifying interaction is ranked by this fixed evidence tuple only to cap
-output size; up to three are frozen. This is not champion selection. Outer results
-are evaluated only after all fold rules have been frozen and are never copied into
-proposal feedback.
-
-## Outputs
-
-A successful run publishes the complete directory, including:
-
-- `class_profiles.csv`
-- `quarter_feature_contrasts.csv` (both panels)
-- `feature_stability.csv` (both panels)
-- `quintile_surfaces.csv`
 - `discovery_trace.jsonl`
 - `interaction_frozen.json`
 - `interaction_outer.csv`
 - `interaction_stability.csv`
 - `interaction_feature_recurrence.csv`
 - `input_manifest.json`
-- `R8_REPORT.md`
-- `COMPLETE.json`
+- `R8_INTERACTION_REPORT.md`
+- `COMPLETE.json` with `status=AGENT_COMPLETE`
 
-`COMPLETE.json` hashes every published output. A failed run writes `FAILED.json`
-and is never reported as complete. Use a fresh output root for every attempt and
-reuse the same R8 request ledger/cache after failure.
+On transport/model failure, the R8B output root writes `FAILED.json` with
+`status=AGENT_FAILED` and `atlas_invalidated=false`. The completed R8A directory
+remains valid and publishable.
 
 ## Interpretation
 
-The most valuable R8 outcome can legitimately be:
+The most valuable R8 outcome may be stable Winner/Stop descriptive features with
+no ranking alpha, nonlinear tail structure, an issuer-overlap-sensitive effect,
+recurring two-feature mechanisms, or no robust separation at all.
 
-- a small set of consistently Winner-high or Stop-high **descriptive** features;
-- stable tail/nonlinear structure without a profitable ranking alpha;
-- an apparent full-entry effect that disappears after issuer-overlap control;
-- no stable univariate feature but recurring interaction mechanisms;
-- or no robust separation at all.
-
-Do not change thresholds after seeing R8, do not convert a stable descriptive
-feature into a B0 penalty/bonus automatically, and do not treat Agent recurrence
-as independent validation. Any prospective production hypothesis must be frozen
-before genuinely future observations arrive.
+Do not convert a descriptive feature or Agent recurrence into a B0 bonus/penalty
+automatically. Any future production hypothesis must be frozen before genuinely
+future observations arrive.
 
 **KEEP PRODUCTION FROZEN.**
