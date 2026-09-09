@@ -1,6 +1,8 @@
-import json
-from pathlib import Path
+import importlib.metadata
+import sys
+from types import ModuleType, SimpleNamespace
 
+import dotenv
 import numpy as np
 import pandas as pd
 import pytest
@@ -30,7 +32,7 @@ def test_cliffs_delta_and_train_percentile_ties():
     assert np.isnan(pct[2])
 
 
-def test_predeclared_feature_stability_requires_effect_and_loo_sign():
+def test_predeclared_feature_stability_requires_effect_zeros_and_loo_sign():
     rows = []
     for i in range(8):
         rows.append(dict(quarter=f"Q{i}", feature="x", status="SUPPORTED",
@@ -44,6 +46,9 @@ def test_predeclared_feature_stability_requires_effect_and_loo_sign():
     changed = pd.DataFrame(rows)
     changed.loc[:2, "matched_percentile_gap_median"] = -.5
     assert aggregate_feature_stability(changed, AtlasConfig()).iloc[0].stability_label == "MIXED_OR_WEAK"
+    zeros = pd.DataFrame(rows)
+    zeros.loc[:2, "matched_percentile_gap_median"] = 0.0
+    assert aggregate_feature_stability(zeros, AtlasConfig()).iloc[0].direction_consistency == pytest.approx(5/8)
 
 
 def synthetic(periods=10, weeks=4, each_class=6):
@@ -66,6 +71,7 @@ def synthetic(periods=10, weeks=4, each_class=6):
                         "ambiguous_3w": int(label == "ambiguous_3w"),
                         "pullback_pct": base + i/10 + q_idx/100,
                         "volume_ratio": base + (each_class-i)/10 + q_idx/100,
+                        "current_vs_ibd_candidate_pct": base + i/20,
                     })
     return pd.DataFrame(rows)
 
@@ -112,17 +118,30 @@ def proposal():
     }
 
 
-def test_interaction_contract_requires_two_features_and_inner_past_support():
+def test_interaction_contract_requires_exactly_two_features_and_extreme_tail():
     p = proposal()
-    assert validate_interaction(p, ["pullback_pct", "volume_ratio"]) == {"pullback_pct", "volume_ratio"}
-    bad = {**p, "expression": {"op": "raw", "feature": "pullback_pct"}}
-    with pytest.raises(ValueError, match="two distinct"):
-        validate_interaction(bad, ["pullback_pct", "volume_ratio"])
+    features = ["pullback_pct", "volume_ratio", "current_vs_ibd_candidate_pct"]
+    assert validate_interaction(p, features) == {"pullback_pct", "volume_ratio"}
+    bad_single = {**p, "expression": {"op": "raw", "feature": "pullback_pct"}}
+    with pytest.raises(ValueError, match="exactly two distinct"):
+        validate_interaction(bad_single, features)
+    bad_tail = {**p, "quantile": 0.2}
+    with pytest.raises(ValueError, match="q20-low or q80-high"):
+        validate_interaction(bad_tail, features)
+    bad_three = {**p, "expression": {"op": "product",
+        "left": {"op": "product", "left": {"op": "raw", "feature": "pullback_pct"},
+                 "right": {"op": "raw", "feature": "volume_ratio"}},
+        "right": {"op": "raw", "feature": "current_vs_ibd_candidate_pct"}}}
+    with pytest.raises(ValueError, match="exactly two distinct"):
+        validate_interaction(bad_three, features)
+
+
+def test_inner_interaction_uses_purged_past_and_has_support():
     df = synthetic()
     calendar = [str(q) for q in pd.period_range("2022Q4", periods=10, freq="Q")]
     cutoff = pd.Period(calendar[6], freq="Q").start_time
     past = df.loc[(df.snapshot_date < cutoff) & (df.exit_date_w3 < cutoff)].reset_index(drop=True)
-    evidence = inner_interaction_evidence(p, past, calendar[:6], AtlasConfig())
+    evidence = inner_interaction_evidence(proposal(), past, calendar[:6], AtlasConfig())
     assert evidence["supported_quarters"] >= 3
     assert evidence["median_matched_target_lift"] > 0
 
@@ -148,6 +167,8 @@ def test_discovery_freezes_before_outer_and_keeps_complete_trace(tmp_path):
     assert outer.supported.all()
     assert (outer.matched_target_lift > 0).all()
     assert not recurrence.empty
+    if not stability.empty:
+        assert set(stability["name"]) == {"winner_structure_combo"}
 
 
 def test_agent_cache_identity_includes_exact_model_and_all_attempts_are_metered(tmp_path):
@@ -163,17 +184,76 @@ def test_agent_cache_identity_includes_exact_model_and_all_attempts_are_metered(
                         prior_used_floor=132, transport=transport)
     assert a({"fold": "2025Q1", "round": 0}) == {"proposals": []}
     assert a.snapshot()["attempts_used"] == 1
-    # Same exact model/system/prompt must hit cache without provider spend.
     a2 = R8AgentProposer(ledger_path=ledger, cache_dir=cache, model="provider/model-a",
                          prior_used_floor=132, transport=transport)
     assert a2({"fold": "2025Q1", "round": 0}) == {"proposals": []}
     assert len(calls) == 1
-    # Alias/model change is a distinct metered purpose and cannot reuse the response.
     b = R8AgentProposer(ledger_path=ledger, cache_dir=cache, model="other/model-a",
                         prior_used_floor=132, transport=transport)
     assert b({"fold": "2025Q1", "round": 0}) == {"proposals": []}
     assert len(calls) == 2
     assert b.snapshot()["attempts_used"] == 2
+
+
+def test_official_backend_contract_retries_original_prompt_with_240s_streaming(tmp_path, monkeypatch):
+    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.8.0-test")
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "unit-test-placeholder")
+    monkeypatch.setenv("DEEPSEEK_API_BASE", "https://example.invalid")
+    modules = {name: ModuleType(name) for name in (
+        "rdagent", "rdagent.oai", "rdagent.oai.backend", "rdagent.oai.backend.base",
+        "rdagent.oai.backend.litellm", "rdagent.log")}
+    backend = modules["rdagent.oai.backend.litellm"]
+    modules["rdagent.oai.backend"].litellm = backend
+    llm_settings = SimpleNamespace(max_retry=10)
+    modules["rdagent.oai.backend.base"].LLM_SETTINGS = llm_settings
+    backend.LITELLM_SETTINGS = SimpleNamespace(chat_model="old", chat_max_tokens=3000, chat_stream=False)
+    calls = []
+
+    def completion(**kwargs):
+        assert kwargs["timeout"] == 240
+        assert kwargs["max_retries"] == kwargs["num_retries"] == 0
+        calls.append(kwargs)
+        return ("partial", "length") if len(calls) == 1 else ('{"proposals": []}', "stop")
+
+    backend.completion = completion
+
+    class FakeBackend:
+        def __init__(self, **kwargs):
+            assert not any(kwargs.values())
+
+        def _create_chat_completion_inner_function(self, messages, response_format=None, **kwargs):
+            assert response_format is None
+            assert backend.LITELLM_SETTINGS.chat_max_tokens == 8192
+            assert backend.LITELLM_SETTINGS.chat_stream is True
+            return backend.completion(messages=messages)
+
+        def build_messages_and_create_chat_completion(self, user_prompt, system_prompt=None, **kwargs):
+            assert llm_settings.max_retry == 3
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+            last = None
+            for _ in range(llm_settings.max_retry):
+                try:
+                    return self._create_chat_completion_auto_continue(messages=messages)
+                except RuntimeError as exc:
+                    last = exc
+            raise last
+
+    backend.LiteLLMAPIBackend = FakeBackend
+    modules["rdagent.log"].rdagent_logger = SimpleNamespace(
+        info=lambda *a, **kw: None, warning=lambda *a, **kw: None,
+        error=lambda *a, **kw: None, log_object=lambda *a, **kw: None)
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
+
+    agent = R8AgentProposer(ledger_path=tmp_path / "ledger.json", cache_dir=tmp_path / "cache",
+                            model="deepseek/test-model", prior_used_floor=132)
+    assert agent({"fold": "2025Q1", "round": 0}) == {"proposals": []}
+    assert len(calls) == 2
+    assert calls[0]["messages"] == calls[1]["messages"]
+    assert all(m["role"] != "assistant" for m in calls[1]["messages"])
+    assert agent.snapshot()["accounted_total_floor"] == 134
+    assert agent.snapshot()["cache_identity_includes_model"] is True
 
 
 def test_no_feature_prefilter_all_requested_features_are_published():
