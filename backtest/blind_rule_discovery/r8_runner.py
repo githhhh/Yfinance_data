@@ -10,6 +10,9 @@ import os
 from pathlib import Path
 import subprocess
 
+import numpy as np
+import pandas as pd
+
 from .pipeline_contract import sha256_file
 from .r6_runner import load_inputs
 from .r6_stability import canonical, digest
@@ -50,6 +53,20 @@ def load_bound_inputs(samples: Path, metadata: Path, r6_dir: Path):
     return frame, observed, anchor, bound_files, accounted, summary["frozen_sha256"]
 
 
+def nonoverlap_w3_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Shared outcome-independent issuer schedule: one ticker reserved through W3 exit."""
+    admitted = np.zeros(len(frame), dtype=bool)
+    busy: dict[str, pd.Timestamp] = {}
+    ordered = frame.assign(_position=np.arange(len(frame))).sort_values(
+        ["entry_date", "snapshot_date", "code"], kind="stable")
+    for row in ordered.to_dict("records"):
+        code, entry, exit_w3 = row["code"], row["entry_date"], row["exit_date_w3"]
+        if code not in busy or entry > busy[code]:  # same close date cannot re-enter.
+            admitted[row["_position"]] = True
+            busy[code] = exit_w3
+    return frame.loc[admitted].reset_index(drop=True)
+
+
 def _model_from_env() -> str:
     return os.environ.get("RD_AGENT_MODEL") or os.environ.get("CHAT_MODEL") or ""
 
@@ -70,16 +87,20 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
         raise RuntimeError("Compatible official RD-Agent backend is required in quant_env") from exc
 
     floor = max(r6_accounted, int(prior_used_floor or 0))
+    if agent_rounds != 3:
+        raise ValueError("R8 formal protocol freezes agent_rounds at 3")
     cfg = replace(AtlasConfig(), agent_rounds=agent_rounds)
-    if not 1 <= agent_rounds <= 3:
-        raise ValueError("R8 agent rounds may only be reduced from the frozen maximum of 3")
     if not 1 <= run_cap <= 1000-floor:
         raise ValueError("R8 run cap exceeds remaining lower-bound provider budget")
+    nonoverlap = nonoverlap_w3_frame(frame)
     protocol = {
         "revision": "R8_WINNER_STOP_STABLE_ATLAS_V1",
         "config": asdict(cfg),
         "primary_contrast": ["fast_winner_3w", "stop_first_3w"],
         "context_classes": ["unresolved_3w", "ambiguous_3w"],
+        "atlas_panels": ["all_entries", "nonoverlap_w3"],
+        "report_primary_panel": "nonoverlap_w3",
+        "nonoverlap_rule": "earliest entry per ticker; reserve through exit_date_w3; same-date reentry forbidden",
         "model": model,
         "prior_used_floor": floor,
         "provider_usage_verified": False,
@@ -91,6 +112,7 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
     manifest = {
         **{k: observed[k] for k in ("samples_sha256", "metadata_sha256", "source_replay_dataset_sha256",
                                     "sample_rows", "snapshot_weeks", "unique_tickers", "calendar", "features")},
+        "nonoverlap_w3_rows": len(nonoverlap),
         "r6_anchor_manifest_sha256": sha256_file(r6_bound_files[0]),
         "r6_frozen_sha256": r6_frozen_sha,
         "r6_accounted_total_floor": r6_accounted,
@@ -119,10 +141,14 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
     immutable_files = [samples.resolve(), metadata.resolve(), *(p.resolve() for p in r6_bound_files)]
     before = {str(p): sha256_file(p) for p in immutable_files}
 
-    contrasts = quarter_feature_contrasts(frame, manifest["features"], manifest["calendar"], cfg)
-    stability = aggregate_feature_stability(contrasts, cfg)
     profiles = class_profiles(frame, manifest["features"], manifest["calendar"])
     surfaces = quintile_surfaces(frame, manifest["features"], manifest["calendar"], cfg)
+    all_contrasts = quarter_feature_contrasts(frame, manifest["features"], manifest["calendar"], cfg).assign(panel="all_entries")
+    nonoverlap_contrasts = quarter_feature_contrasts(nonoverlap, manifest["features"], manifest["calendar"], cfg).assign(panel="nonoverlap_w3")
+    all_stability = aggregate_feature_stability(all_contrasts, cfg).assign(panel="all_entries")
+    nonoverlap_stability = aggregate_feature_stability(nonoverlap_contrasts, cfg).assign(panel="nonoverlap_w3")
+    contrasts = pd.concat([all_contrasts, nonoverlap_contrasts], ignore_index=True)
+    stability = pd.concat([all_stability, nonoverlap_stability], ignore_index=True)
 
     output.mkdir(parents=True, exist_ok=True)
     proposer = R8AgentProposer(ledger_path=ledger, cache_dir=cache_dir, model=model,
@@ -144,7 +170,7 @@ def run(samples: Path, metadata: Path, r6_dir: Path, output: Path,
         manifest["requests"] = proposer.snapshot()
         manifest["interaction_frozen_sha256"] = digest(lock)
         (output / "input_manifest.json").write_text(canonical(manifest) + "\n")
-        (output / "R8_REPORT.md").write_text(render_report(stability, outer, interaction_stability, manifest))
+        (output / "R8_REPORT.md").write_text(render_report(nonoverlap_stability, outer, interaction_stability, manifest))
 
         for path in immutable_files:
             if sha256_file(path) != before[str(path)]:
