@@ -31,11 +31,25 @@ execution-time fact or future field may enter a feature expression.
 
 The source population is the existing 8,983 usable executable entries, not all
 listings or all original signals. That conditioning remains an explicit limit.
+The completed R6 frozen-rule hash and research mode are also checked so an
+incomplete/failed R6 directory cannot be used as an anchor.
 
 ## Layer A — Fixed Full Feature Atlas
 
 Every allowlisted PIT feature is evaluated. There is no top-N prefilter and no
 feature selection before publication.
+
+Two fixed panels are exported for Winner-vs-Stop chronological contrasts:
+
+- `all_entries`: every usable executable entry;
+- `nonoverlap_w3`: a shared outcome-independent issuer schedule. The earliest
+  entry for a ticker is admitted and that ticker stays reserved through its W3
+  exit; re-entry on the same closing date is forbidden. The schedule is identical
+  for every feature and class and is not changed by the observed label.
+
+The formal report emphasizes `nonoverlap_w3`; `all_entries` remains visible as a
+sensitivity panel. This reduces repeated-ticker/overlapping-path amplification,
+but does not create independent observations or an untouched holdout.
 
 ### 1. Four-class raw profile
 
@@ -45,16 +59,17 @@ For every calendar quarter, feature and W3 path class, export:
 - q10 / q25 / median / q75 / q90;
 - raw mean where finite.
 
-This table includes Winner, Stop, Unresolved and Ambiguous classes.
+This raw profile uses all entries and includes Winner, Stop, Unresolved and
+Ambiguous classes.
 
 ### 2. Winner-vs-Stop chronological contrasts
 
 Starting only after six consecutive calendar quarters, each test quarter uses a
 purged past surface (`snapshot_date < quarter_start` and `exit_date_w3 <
-quarter_start`). For every feature:
+quarter_start`). For every feature and both panels:
 
 - raw Cliff's delta, Winner minus Stop;
-- Winner/Stop values mapped to the empirical percentile of the purged past;
+- Winner/Stop values mapped to the empirical percentile of the panel's purged past;
 - mean and median percentile gap;
 - equal-snapshot Winner-minus-Stop percentile gap, its median and sign fraction;
 - Winner and Stop missing fractions;
@@ -68,19 +83,22 @@ remain explicit.
 
 ### 3. Predeclared descriptive stability label
 
-A feature is `CONSISTENT_WINNER_HIGH` or `CONSISTENT_STOP_HIGH` only when:
+A feature is `CONSISTENT_WINNER_HIGH` or `CONSISTENT_STOP_HIGH` within a panel only
+when:
 
 - at least 6 supported outer quarters;
 - at least 75% of supported quarters have the same matched-week direction (zero
   direction counts against consistency);
-- median absolute Cliff's delta is at least 0.10;
+- the absolute value of the median Cliff's delta is at least 0.10;
 - the median matched percentile gap and median Cliff's delta have the same sign;
 - deleting any one supported quarter does not flip the sign of the median matched
   percentile gap.
 
 Otherwise it is `MIXED_OR_WEAK`; insufficient support is separate. These are
 **descriptive labels**, not hypothesis-test passes or production weights. No
-p-value or multiplicity-adjusted significance claim is made.
+p-value or multiplicity-adjusted significance claim is made. A feature that is
+stable only in `all_entries` but not in `nonoverlap_w3` should be treated as
+issuer-overlap sensitive, not as robust.
 
 ### 4. Fixed quintile surface
 
@@ -88,8 +106,9 @@ For every outer quarter and feature, q20/q40/q60/q80 boundaries are fitted from
 purged past only. Each test row is placed into one of five bins. Export all four
 W3 class rates and Winner-vs-Stop share per bin. No bin is chosen or promoted.
 Degenerate bins for discrete/binary features remain visible rather than being
-silently redefined. This is specifically intended to expose non-monotone
-structure that rank scores can hide.
+silently redefined. Quintile surfaces use the full entry panel; the nonoverlap
+contrast table is the dependency sensitivity. This is specifically intended to
+expose non-monotone structure that rank scores can hide.
 
 ## Layer B — RD-Agent Interaction Discovery
 
@@ -107,6 +126,8 @@ For each outer quarter after the first six calendar quarters, the Agent sees onl
 
 It never sees the outer-quarter outcomes before rules for that quarter are frozen.
 Later folds may use earlier labels after they have matured under the same W3 purge.
+Agent interaction discovery uses the full-entry population so it retains maximum
+support; it is explicitly secondary to the nonoverlap univariate atlas.
 
 ### Bounded expression contract
 
@@ -128,7 +149,7 @@ surface.
 
 ### Fixed discovery budget
 
-- maximum 3 rounds per outer fold;
+- exactly 3 maximum discovery rounds per non-empty outer fold;
 - maximum 2 proposals per round;
 - patience 2 rounds;
 - at most 3 qualifying interactions frozen per fold;
@@ -164,8 +185,8 @@ proposal feedback.
 A successful run publishes the complete directory, including:
 
 - `class_profiles.csv`
-- `quarter_feature_contrasts.csv`
-- `feature_stability.csv`
+- `quarter_feature_contrasts.csv` (both panels)
+- `feature_stability.csv` (both panels)
 - `quintile_surfaces.csv`
 - `discovery_trace.jsonl`
 - `interaction_frozen.json`
@@ -186,6 +207,7 @@ The most valuable R8 outcome can legitimately be:
 
 - a small set of consistently Winner-high or Stop-high **descriptive** features;
 - stable tail/nonlinear structure without a profitable ranking alpha;
+- an apparent full-entry effect that disappears after issuer-overlap control;
 - no stable univariate feature but recurring interaction mechanisms;
 - or no robust separation at all.
 
