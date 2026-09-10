@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -175,3 +176,11 @@ def test_store_persists_and_reuses_single_sec_cik_binding(tmp_path):
     assert store.get_sec_cik("ABC") == "0000123456"
     persisted = pd.read_csv(path, dtype={"sec_cik": str})
     assert persisted.loc[persisted["code"].eq("ABC"), "sec_cik"].iloc[0] == "0000123456"
+
+
+def test_committed_pit_sec_ciks_are_canonical_strings():
+    path = Path(__file__).resolve().parents[1] / "us" / "signal_eps_pit.csv"
+    values = pd.read_csv(path, dtype={"sec_cik": str})["sec_cik"].dropna()
+
+    invalid = values[~values.map(lambda value: bool(re.fullmatch(r"\d{10}", value)))]
+    assert invalid.empty, f"noncanonical sec_cik values: {invalid.tolist()}"
