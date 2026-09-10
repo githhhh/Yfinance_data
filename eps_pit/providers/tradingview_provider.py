@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 import pandas as pd
+import requests
 
 from eps_pit.models import EPSMissingReason
 from eps_pit.providers.pit_provider import normalize_symbol, safe_float
 
 EPS_FIELD = "earnings_per_share_diluted_yoy_growth_fq"
+MAX_TRANSPORT_RETRIES = 3
+RETRYABLE_HTTP_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
 class TradingViewEPSProvider:
     """Current-state TradingView EPS provider. Never use for historical replay."""
+
+    @staticmethod
+    def _is_retryable_transport_error(error: requests.RequestException) -> bool:
+        if isinstance(error, requests.exceptions.JSONDecodeError):
+            return False
+        response = error.response
+        return response is None or response.status_code in RETRYABLE_HTTP_STATUS_CODES
 
     def fetch_eps_yoy(self, codes: list[str]) -> dict[str, dict[str, Any]]:
         symbols = sorted({normalize_symbol(code) for code in codes if normalize_symbol(code)})
@@ -20,18 +32,36 @@ class TradingViewEPSProvider:
 
         from tradingview_screener import Query, col
 
-        _, frame = (
-            Query()
-            .select("name", "exchange", EPS_FIELD)
-            .where(
-                col("exchange").isin(["AMEX", "CBOE", "NASDAQ", "NYSE"]),
-                col("active_symbol") == True,
-                col("name").isin(symbols),
-            )
-            .limit(max(50, len(symbols) * 4))
-            .set_markets("america")
-            .get_scanner_data()
-        )
+        for attempt in range(MAX_TRANSPORT_RETRIES + 1):
+            try:
+                _, frame = (
+                    Query()
+                    .select("name", "exchange", EPS_FIELD)
+                    .where(
+                        col("exchange").isin(["AMEX", "CBOE", "NASDAQ", "NYSE"]),
+                        col("active_symbol") == True,
+                        col("name").isin(symbols),
+                    )
+                    .limit(max(50, len(symbols) * 4))
+                    .set_markets("america")
+                    .get_scanner_data()
+                )
+                break
+            except requests.RequestException as exc:
+                if (
+                    attempt >= MAX_TRANSPORT_RETRIES
+                    or not self._is_retryable_transport_error(exc)
+                ):
+                    raise
+                delay = float(2**attempt)
+                logging.warning(
+                    "TradingView EPS request failed (%s/%s); retrying in %.0fs: %s",
+                    attempt + 1,
+                    MAX_TRANSPORT_RETRIES + 1,
+                    delay,
+                    exc,
+                )
+                time.sleep(delay)
 
         outcomes: dict[str, dict[str, Any]] = {
             symbol: {"missing_reason": EPSMissingReason.TV_NOT_FOUND}
