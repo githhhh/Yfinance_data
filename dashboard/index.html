@@ -17,25 +17,26 @@
       overscroll-behavior-y: none;
     }
 
-    /* RS runtime must preserve the table's sticky header behavior. The visible
-       info glyph stays compact while its touch target is large enough not to
-       fall through to the RS sort control on mobile. */
+    /* RS runtime must preserve the table's sticky header behavior. The visual
+       glyph stays compact while a transparent 44px hit target prevents taps
+       from falling through to the surrounding RS sort control. */
     .review-table th[data-sort-field="rs_percentile"] {
       position: sticky !important;
       top: 0;
     }
     .review-table th[data-sort-field="rs_percentile"] > button:not(.rs-info-button) {
-      padding-right: 38px !important;
+      padding-right: 46px !important;
     }
     .review-table .rs-info-button {
-      width: 36px !important;
-      height: 36px !important;
-      right: 0 !important;
+      width: 18px !important;
+      height: 18px !important;
+      right: 10px !important;
       padding: 0 !important;
       border: 0 !important;
       background: transparent !important;
       font-size: 0 !important;
       cursor: pointer !important;
+      touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
     .review-table .rs-info-button::before {
@@ -49,6 +50,19 @@
       border-radius: 50%;
       background: #11171e;
       font: 800 10px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .review-table .rs-info-button::after {
+      content: "";
+      position: absolute;
+      inset: -13px;
+      border-radius: 50%;
+    }
+    .rs-popover-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: transparent;
+      touch-action: manipulation;
     }
   </style>
 </head>
@@ -66,5 +80,6 @@
   <script src="./app.js" defer></script>
   <script src="./rs_runtime.js" defer></script>
   <script src="./table_enhancements.js" defer></script>
+  <script src="./interaction_runtime.js" defer></script>
 </body>
 </html>

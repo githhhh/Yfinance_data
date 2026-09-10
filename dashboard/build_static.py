@@ -31,6 +31,7 @@ STATIC_ASSETS = (
     "app.js",
     "table_enhancements.js",
     "rs_runtime.js",
+    "interaction_runtime.js",
     "styles.css",
     "manifest.webmanifest",
 )
