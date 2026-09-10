@@ -77,10 +77,8 @@
     return "";
   }
 
-  function initialState() {
-    const period = data.default_period === "MIDWEEK" && data.meta.midweek_available ? "MIDWEEK" : "WEEKEND";
+  function defaultPeriodContext(period) {
     return {
-      period,
       scope: period === "MIDWEEK" && data.meta.midweek_baseline_available ? "CHANGES" : "ALL_SIGNALS",
       change: "ALL",
       origin: "ALL",
@@ -91,9 +89,50 @@
       entryVolumeMin: null,
       weeklyVolumeMin: null,
       filtersExpanded: false,
-      selected: { WEEKEND: null, MIDWEEK: null },
       detailOpen: false,
     };
+  }
+
+  function initialState() {
+    const period = data.default_period === "MIDWEEK" && data.meta.midweek_available ? "MIDWEEK" : "WEEKEND";
+    const context = defaultPeriodContext(period);
+    return {
+      period,
+      ...context,
+      selected: { WEEKEND: null, MIDWEEK: null },
+      periodContexts: { [period]: { ...context } },
+    };
+  }
+
+  function periodContextSnapshot() {
+    return {
+      scope: state.scope,
+      change: state.change,
+      origin: state.origin,
+      status: state.status,
+      route: state.route,
+      distanceMin: state.distanceMin,
+      distanceMax: state.distanceMax,
+      entryVolumeMin: state.entryVolumeMin,
+      weeklyVolumeMin: state.weeklyVolumeMin,
+      filtersExpanded: state.filtersExpanded,
+      detailOpen: state.detailOpen,
+    };
+  }
+
+  function savePeriodContext(period = state.period) {
+    state.periodContexts[period] = periodContextSnapshot();
+  }
+
+  function restorePeriodContext(period) {
+    const context = state.periodContexts[period] || defaultPeriodContext(period);
+    state.period = period;
+    Object.assign(state, context);
+    if (period !== "MIDWEEK" || !data.meta.midweek_baseline_available) {
+      state.scope = "ALL_SIGNALS";
+      state.change = "ALL";
+      state.origin = "ALL";
+    }
   }
 
   function rowsForPeriod(period = state.period) {
@@ -245,14 +284,9 @@
   }
 
   function resetPeriodState(period) {
-    state.period = period;
-    state.scope = period === "MIDWEEK" && data.meta.midweek_baseline_available ? "CHANGES" : "ALL_SIGNALS";
-    state.change = "ALL";
-    state.origin = "ALL";
-    state.status = "ALL";
-    state.filtersExpanded = false;
-    state.detailOpen = false;
-    resetAdvanced();
+    if (period === state.period) return;
+    savePeriodContext();
+    restorePeriodContext(period);
   }
 
   function freshness(snapshot) {
@@ -377,10 +411,10 @@
         <div class="filters-head"><button class="filter-toggle expanded" data-action="toggle-filters">More Filters · ${active ? `${active} active` : "None"}</button>${active ? `<button class="reset-button" data-action="reset-filters">Reset</button>` : ""}</div>
         <div class="filter-controls">
           <div class="filter-field"><div class="eyebrow">Setup</div><label>Signal setup</label><select data-control="route">${data.ui.setup_options.map((value) => `<option value="${esc(value)}" ${state.route === value ? "selected" : ""}>${esc(routeLabel(value))}</option>`).join("")}</select></div>
-          ${distance ? `<div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Min</label><input data-control="distance-min" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMin}"><div class="range-values"><small>${fmt(dMin, "pct1")}</small><small>${state.distanceMin === null ? "Any" : "Active"}</small></div></div>
-          <div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Max</label><input data-control="distance-max" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMax}"><div class="range-values"><small>${fmt(dMax, "pct1")}</small><small>${state.distanceMax === null ? "Any" : "Active"}</small></div></div>` : ""}
-          ${entry ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.entryVolumeMin === null ? "Entry Volume ≥ Any" : `Entry Volume ≥ ${fmt(entryValue, "x1")}`}</label><input data-control="entry-volume" type="range" min="${entry[0]}" max="${entry[1]}" step="0.1" value="${entryValue}"><div class="range-values"><small>${fmt(entryValue, "x1")}</small><small>${state.entryVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
-          ${weekly ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.weeklyVolumeMin === null ? "Weekly Volume ≥ Any" : `Weekly Volume ≥ ${fmt(weeklyValue, "x1")}`}</label><input data-control="weekly-volume" type="range" min="${weekly[0]}" max="${weekly[1]}" step="0.1" value="${weeklyValue}"><div class="range-values"><small>${fmt(weeklyValue, "x1")}</small><small>${state.weeklyVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
+          ${distance ? `<div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Min</label><input data-control="distance-min" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMin}"><div class="range-values"><small>${fmt(dMin, "pct1")}</small><small>${state.distanceMin === null ? "Any" : "Active"}</small></div></div>
+          <div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Max</label><input data-control="distance-max" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMax}"><div class="range-values"><small>${fmt(dMax, "pct1")}</small><small>${state.distanceMax === null ? "Any" : "Active"}</small></div></div>` : ""}
+          ${entry ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.entryVolumeMin === null ? "Entry Volume ≥ Any" : `Entry Volume ≥ ${fmt(entryValue, "x1")}`}</label><input data-control="entry-volume" data-dynamic-bounds="true" type="range" min="${entry[0]}" max="${entry[1]}" step="0.1" value="${entryValue}"><div class="range-values"><small>${fmt(entryValue, "x1")}</small><small>${state.entryVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
+          ${weekly ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.weeklyVolumeMin === null ? "Weekly Volume ≥ Any" : `Weekly Volume ≥ ${fmt(weeklyValue, "x1")}`}</label><input data-control="weekly-volume" data-dynamic-bounds="true" type="range" min="${weekly[0]}" max="${weekly[1]}" step="0.1" value="${weeklyValue}"><div class="range-values"><small>${fmt(weeklyValue, "x1")}</small><small>${state.weeklyVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
         </div>
       </section>`;
   }
@@ -435,6 +469,41 @@
 
   function detailItem(label, value) {
     return `<div class="detail-item"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+  }
+
+  function bindSelectedEvents(currentRows) {
+    const detail = app.querySelector('[data-action="detail"]');
+    if (!detail) return;
+    detail.addEventListener("click", () => {
+      state.detailOpen = !state.detailOpen;
+      renderSelection(currentRows);
+    });
+  }
+
+  function renderSelection(currentRows, { focusTable = false, scrollCode = null } = {}) {
+    const selectedCode = state.selected[state.period];
+    const selectedRow = currentRows.find((row) => String(row.code) === String(selectedCode)) || null;
+    const strip = app.querySelector(".selected-strip");
+    if (strip) {
+      const template = document.createElement("template");
+      template.innerHTML = selectedHtml(selectedRow).trim();
+      const replacement = template.content.firstElementChild;
+      if (replacement) strip.replaceWith(replacement);
+    }
+
+    app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
+      row.classList.toggle("selected", String(row.dataset.code) === String(selectedCode));
+    });
+    bindSelectedEvents(currentRows);
+
+    const shell = app.querySelector("[data-table-shell]");
+    if (shell && scrollCode) {
+      const scrollLeft = shell.scrollLeft;
+      const target = shell.querySelector(`tr[data-code="${CSS.escape(String(scrollCode))}"]`);
+      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      shell.scrollLeft = scrollLeft;
+    }
+    if (focusTable) shell?.focus({ preventScroll: true });
   }
 
   function tableHtml(rows) {
@@ -500,7 +569,7 @@
   }
 
   function bindEvents(currentRows = []) {
-    app.querySelectorAll("[data-action]").forEach((element) => {
+    app.querySelectorAll('[data-action]:not([data-action="detail"])').forEach((element) => {
       element.addEventListener("click", async () => {
         const action = element.dataset.action;
         if (action === "period") {
@@ -534,9 +603,6 @@
         } else if (action === "reset-filters") {
           resetAdvanced();
           render();
-        } else if (action === "detail") {
-          state.detailOpen = !state.detailOpen;
-          render();
         } else if (action === "copy-codes") {
           const visible = [...app.querySelectorAll("[data-table-shell] tbody tr[data-code]")]
             .map((row) => row.dataset.code)
@@ -565,11 +631,11 @@
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
       row.addEventListener("click", () => {
         state.selected[state.period] = row.dataset.code;
-        state.detailOpen = false;
-        render();
+        renderSelection(currentRows, { focusTable: true });
       });
     });
 
+    bindSelectedEvents(currentRows);
     const reviewShell = app.querySelector("[data-table-shell]");
     if (reviewShell) reviewShell.addEventListener("keydown", (event) => handleArrow(event, currentRows, state.period));
   }
@@ -592,13 +658,7 @@
     index += event.key === "ArrowDown" ? 1 : -1;
     index = Math.max(0, Math.min(rows.length - 1, index));
     state.selected[key] = String(rows[index].code);
-    state.detailOpen = false;
-    render();
-    requestAnimationFrame(() => {
-      const target = app.querySelector(`tr[data-code="${CSS.escape(String(rows[index].code))}"]`);
-      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      app.querySelector("[data-table-shell]")?.focus({ preventScroll: true });
-    });
+    renderSelection(rows, { focusTable: true, scrollCode: rows[index].code });
   }
 
   async function copyCodes(codes, button) {
