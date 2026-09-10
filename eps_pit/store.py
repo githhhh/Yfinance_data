@@ -107,7 +107,7 @@ class EPSPITStore:
         if not path.exists():
             return pd.DataFrame(columns=PIT_COLUMNS)
         try:
-            df = pd.read_csv(path)
+            df = pd.read_csv(path, dtype={"sec_cik": str})
         except Exception as exc:
             raise EPSPITStoreError(f"Cannot read EPS PIT store: {path}") from exc
         missing = {"snapshot_date", "code"}.difference(df.columns)

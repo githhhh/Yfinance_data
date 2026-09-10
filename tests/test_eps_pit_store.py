@@ -173,3 +173,5 @@ def test_store_persists_and_reuses_single_sec_cik_binding(tmp_path):
     )
 
     assert store.get_sec_cik("ABC") == "0000123456"
+    persisted = pd.read_csv(path, dtype={"sec_cik": str})
+    assert persisted.loc[persisted["code"].eq("ABC"), "sec_cik"].iloc[0] == "0000123456"
