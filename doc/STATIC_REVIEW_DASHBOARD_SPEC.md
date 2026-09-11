@@ -1,7 +1,7 @@
 # Static Breakout Pool Review Dashboard Spec
 
 状态：当前唯一 Dashboard 心流 / 交互规范  
-日期：2026-09-08
+日期：2026-09-11
 
 本文是静态 GitHub Pages Dashboard 的唯一交互规范。旧 Streamlit / AG Grid 时代的 Dashboard 设计文档已经删除；需要追溯设计演进时使用 Git 历史，不在当前文档目录保留重复规范。
 
@@ -171,11 +171,12 @@ Decision Table 的可见字段必须支持点击表头排序：
 - Entry Status 按业务状态顺序；
 - Breakout Price Quality 按业务质量强度顺序；
 - RS 可在加载成功后手工按 percentile 排序，`N/A` 无论升降序均保持最后；
-- 自定义排序后的选中行、键盘 ↑↓ Review 和 Copy 顺序均跟随当前可见顺序。
+- 自定义排序后的选中行、键盘 ↑↓ Review 和 Copy 顺序均跟随当前可见顺序；
+- 用户手工排序后，筛选、Period 切换或其它全量重绘不得先闪回默认顺序再跳回手工顺序。
 
 ### 5.3 Breakout Price Quality 表头说明
 
-该字段必须有独立说明入口，桌面 hover 与触屏点击均可访问。强度从强到弱：
+该字段必须有独立说明入口，桌面 hover 与触屏点击均可访问；触屏命中区必须足够大，并且点击说明入口不得误触发该列排序。强度从强到弱：
 
 ```text
 Powerful
@@ -216,7 +217,8 @@ RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它
 11. RS cell 本身不是独立按钮或 tooltip 入口；点击数字与点击该行其它普通区域一致，继续执行选行；
 12. 不需要 exact-date gate，不因为 RS 状态重新发布 Pages，也不存在 RS schedule、RS-only Pages refresh 或 RS publish condition；
 13. RS 获取只访问公开 GitHub API / raw 内容，不使用仓库 Token、API Key 或其它凭据；
-14. RS 永远不进入 Gate、Top3、Review Priority 或默认排序；用户仍可主动点击 RS 表头做临时排序。
+14. RS 永远不进入 Gate、Top3、Review Priority 或默认排序；用户仍可主动点击 RS 表头做临时排序；
+15. RS 说明在打开时必须有可感知的 modal/backdrop 状态与明确关闭入口；点击 backdrop 只关闭说明，不得穿透触发底层筛选或排序。
 
 RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上把 Reference 误导成策略 Gate。
 
@@ -230,7 +232,7 @@ Selected Detail 位于结果摘要和表格之间；选行后原地更新，不�
 - RS Reference；
 - 展开后的 Daily Entry、Pullback、CANSLIM/Base 事实。
 
-详情只解释当前行，不创建第二套筛选器。
+详情只解释当前行，不创建第二套筛选器。选行或展开 / 收起 Details 时，应尽量保持当前 Review 行在视口中的位置，避免 Selected Detail 高度变化把刚查看的行推出屏幕。
 
 ## 6. 响应式与滚动
 
@@ -239,8 +241,9 @@ Selected Detail 位于结果摘要和表格之间；选行后原地更新，不�
 移动端：
 
 - Period / Scope、Quick filters、Status cards 自动换行；
-- 表格允许横向与纵向滚动，但 Code 列保持 sticky；
-- 表格自身两个方向到边界时不使用 overscroll / bounce 弹性；页面外层正常纵向滚动不受影响；
+- 表格允许横向与纵向滚动，但 Code 列保持 sticky，并通过明确的视觉分隔与后续滚动列区分；
+- 横向滚动在表格边界内阻断 scroll chaining / 浏览器侧滑干扰；纵向滚动到表格顶部或底部后必须继续传递给外层页面，不得形成 scroll trap；
+- 筛选、Period、Setup 或 Range 导致表格全量重绘时，应保留已有横向滚动位置；
 - 表头排序、Quality 与 RS 说明必须支持触屏；
 - RS cell 在移动端仍只负责选行，不弹出 cell tooltip；RS 表头信息入口在窄屏以紧凑 bottom-sheet 方式呈现；
 - 不为移动端复制第二套业务逻辑。
@@ -269,6 +272,7 @@ python -m pytest dashboard/tests -q
 node --check dashboard/app.js
 node --check dashboard/table_enhancements.js
 node --check dashboard/rs_runtime.js
+node --check dashboard/interaction_runtime.js
 python dashboard/build_static.py --output /tmp/yfinance-dashboard-site
 python security_scan.py --history
 ```
@@ -284,10 +288,13 @@ python security_scan.py --history
 - 主体页面在 RS 请求开始前即可正常使用；
 - RS 首次加载时显示 `—`；Current / Older / Newer 状态可辨识；请求失败或 ticker 缺失时为 `N/A`；
 - RS 表头 popover 可查看来源、RS update、Pool snapshot，并支持 Refresh / Retry；来源链接可跳转到 `Fred6725 / rs-log`；
+- RS popover 打开时 modal 状态清晰，有明确关闭入口，backdrop 点击不穿透底层控件；
 - 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Detail 显示当前 / 1M / 3M / 6M；
 - RS 任一状态都不影响 Pool / Pages build 与 deploy；
-- 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；
-- 表格横纵滚动到边界不产生自身 bounce；
+- 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；Quality 说明触控不会误触排序；
+- 选行和 Details 展开 / 收起不把当前 Review 行无故推出视口；
+- 筛选 / Period / Setup / Range 重绘后保留表格横向位置；
+- 表格横向手势不逃逸，纵向到边界后能自然继续滚动外层页面；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。
 
 ## 9. 文档维护规则

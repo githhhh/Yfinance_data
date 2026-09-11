@@ -8,6 +8,8 @@
   const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let rsBackdrop = null;
+  let pendingTableViewport = null;
+  let pendingReviewAnchor = null;
 
   function normalizeText(value) {
     return String(value ?? "").trim();
@@ -132,11 +134,69 @@
     if (summary && summary.textContent !== nextSummary) summary.textContent = nextSummary;
   }
 
-  // app.js emits initial range markup with the same marker the legacy range
-  // enhancer uses as its "already enhanced" flag. Clear that marker exactly
-  // once per newly rendered input so the existing authoritative context-bound
-  // enhancement still runs; keep a separate bootstrap flag to avoid duplicate
-  // listeners during partial Selected Detail updates.
+  function ensureInteractionStyles() {
+    if (document.getElementById("interaction-runtime-styles")) return;
+    const style = document.createElement("style");
+    style.id = "interaction-runtime-styles";
+    style.textContent = `
+      /* Horizontal table gestures stay contained, but vertical gestures must
+         chain back to the page at the table's top/bottom instead of trapping
+         the user inside the 58vh review surface on mobile. */
+      .table-shell {
+        overscroll-behavior-x: none !important;
+        overscroll-behavior-y: auto !important;
+      }
+      .review-table th:first-child::after,
+      .review-table td:first-child::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -5px;
+        width: 5px;
+        height: 100%;
+        pointer-events: none;
+        background: linear-gradient(to right, rgb(0 0 0 / 34%), transparent);
+      }
+      /* The visible Quality glyph stays compact while the pseudo-element gives
+         it a ~44px touch target. It remains the event target, so its existing
+         stopPropagation prevents accidental column sorting. */
+      [data-quality-info] {
+        position: relative !important;
+        width: 32px !important;
+        height: 32px !important;
+        flex: 0 0 32px !important;
+        margin-left: 4px !important;
+        touch-action: manipulation;
+        z-index: 2;
+      }
+      [data-quality-info]::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+      }
+      .rs-popover-backdrop {
+        background: rgb(0 0 0 / 28%) !important;
+      }
+      .rs-runtime-close {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 30px;
+        padding: 0;
+        border: 1px solid #465365;
+        border-radius: 7px;
+        background: #151b23;
+        color: #b7c1ce;
+        font: 700 17px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function prepareRangeInputs() {
     app.querySelectorAll('input[data-dynamic-bounds="true"]').forEach((input) => {
       if (input.dataset.rangeBootstrap === "true") return;
@@ -145,10 +205,47 @@
     });
   }
 
-  // table_enhancements owns the visible sort controls. Capture its committed
-  // state after the button handler runs, then synchronously re-apply that order
-  // from MutationObserver callbacks before the next paint whenever app.js has
-  // to rebuild the table for filters/period changes.
+  function captureTableViewport() {
+    const shell = app.querySelector("[data-table-shell]");
+    if (!shell) return;
+    pendingTableViewport = {
+      shell,
+      scrollLeft: shell.scrollLeft,
+      scrollTop: shell.scrollTop,
+    };
+  }
+
+  function restoreTableViewport() {
+    if (!pendingTableViewport) return;
+    const snapshot = pendingTableViewport;
+    const shell = app.querySelector("[data-table-shell]");
+    pendingTableViewport = null;
+    if (!shell || shell === snapshot.shell) return;
+    shell.scrollLeft = snapshot.scrollLeft;
+    shell.scrollTop = snapshot.scrollTop;
+  }
+
+  function captureReviewAnchor(event) {
+    const row = event.target.closest?.("tbody tr[data-code]");
+    const detail = event.target.closest?.('[data-action="detail"]');
+    const anchor = row || (detail ? app.querySelector("tbody tr.selected[data-code]") : null);
+    if (!anchor) return;
+    pendingReviewAnchor = {
+      code: anchor.dataset.code,
+      top: anchor.getBoundingClientRect().top,
+    };
+  }
+
+  function restoreReviewAnchor() {
+    if (!pendingReviewAnchor) return;
+    const snapshot = pendingReviewAnchor;
+    pendingReviewAnchor = null;
+    const row = app.querySelector(`tbody tr[data-code="${CSS.escape(String(snapshot.code))}"]`);
+    if (!row) return;
+    const delta = row.getBoundingClientRect().top - snapshot.top;
+    if (Number.isFinite(delta) && Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+  }
+
   app.addEventListener("click", (event) => {
     if (event.target.closest?.("[data-rs-info], [data-quality-info]")) return;
     const button = event.target.closest?.("thead th > button");
@@ -156,9 +253,20 @@
     rememberManualSort(button.closest("th"));
   });
 
-  // The legacy table enhancer also has a manual-sort ArrowUp/ArrowDown handler.
-  // Intercept one level earlier (document capture) so keyboard review preserves
-  // the current horizontal scroll position just like pointer row selection.
+  document.addEventListener("click", (event) => {
+    if (event.target.closest?.(
+      '[data-action="period"], [data-action="scope"], [data-action="quick"], '
+      + '[data-action="clear-quick"], [data-action="status"], '
+      + '[data-action="toggle-filters"], [data-action="reset-filters"]',
+    )) captureTableViewport();
+    captureReviewAnchor(event);
+  }, true);
+  document.addEventListener("change", (event) => {
+    if (event.target.matches?.('[data-control="route"], input[type="range"][data-control]')) {
+      captureTableViewport();
+    }
+  }, true);
+
   document.addEventListener("keydown", (event) => {
     if (!sortState.field || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
     const shell = event.target.closest?.("[data-table-shell]");
@@ -187,24 +295,47 @@
     });
   }, true);
 
+  function closeRsPopover() {
+    document.querySelector("[data-rs-info]")?.click();
+  }
+
+  function ensureRsCloseButton(popover) {
+    const head = popover?.querySelector(".rs-popover-head");
+    if (!head || head.querySelector("[data-rs-runtime-close]")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rs-runtime-close";
+    button.dataset.rsRuntimeClose = "true";
+    button.setAttribute("aria-label", "Close Relative Strength details");
+    button.textContent = "×";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeRsPopover();
+    });
+    head.appendChild(button);
+  }
+
   function syncRsBackdrop() {
     const popover = document.querySelector(".rs-reference-popover");
-    if (popover && !rsBackdrop) {
-      rsBackdrop = document.createElement("div");
-      rsBackdrop.className = "rs-popover-backdrop";
-      rsBackdrop.setAttribute("aria-hidden", "true");
-      rsBackdrop.addEventListener("pointerdown", (event) => {
-        // Keep the backdrop alive through the pointer sequence so the following
-        // click still targets it instead of a filter/sort control underneath.
-        event.stopPropagation();
-      });
-      rsBackdrop.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        document.querySelector("[data-rs-info]")?.click();
-      });
-      document.body.insertBefore(rsBackdrop, popover);
-    } else if (!popover && rsBackdrop) {
+    if (popover) {
+      popover.setAttribute("aria-modal", "true");
+      ensureRsCloseButton(popover);
+      if (!rsBackdrop) {
+        rsBackdrop = document.createElement("div");
+        rsBackdrop.className = "rs-popover-backdrop";
+        rsBackdrop.setAttribute("aria-hidden", "true");
+        rsBackdrop.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+        });
+        rsBackdrop.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeRsPopover();
+        });
+        document.body.insertBefore(rsBackdrop, popover);
+      }
+    } else if (rsBackdrop) {
       rsBackdrop.remove();
       rsBackdrop = null;
     }
@@ -213,11 +344,14 @@
   const appObserver = new MutationObserver(() => {
     prepareRangeInputs();
     applyRememberedSort();
+    restoreTableViewport();
+    restoreReviewAnchor();
   });
   appObserver.observe(app, { childList: true, subtree: true });
 
   const bodyObserver = new MutationObserver(syncRsBackdrop);
-  bodyObserver.observe(document.body, { childList: true });
+  bodyObserver.observe(document.body, { childList: true, subtree: true });
+  ensureInteractionStyles();
   prepareRangeInputs();
   syncRsBackdrop();
 })();

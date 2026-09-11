@@ -63,6 +63,43 @@ def test_manual_sort_keyboard_review_preserves_horizontal_scroll():
     assert 'currentShell.focus({ preventScroll: true })' in INTERACTION
 
 
+def test_full_app_renders_preserve_table_viewport():
+    assert "function captureTableViewport()" in INTERACTION
+    assert "function restoreTableViewport()" in INTERACTION
+    assert "scrollLeft: shell.scrollLeft" in INTERACTION
+    assert "scrollTop: shell.scrollTop" in INTERACTION
+    assert "shell.scrollLeft = snapshot.scrollLeft" in INTERACTION
+    assert "shell.scrollTop = snapshot.scrollTop" in INTERACTION
+    assert '[data-action="status"]' in INTERACTION
+    assert '[data-control="route"]' in INTERACTION
+
+
+def test_selected_detail_growth_keeps_review_row_in_view():
+    assert "function captureReviewAnchor(event)" in INTERACTION
+    assert "function restoreReviewAnchor()" in INTERACTION
+    assert 'event.target.closest?.("tbody tr[data-code]")' in INTERACTION
+    assert 'event.target.closest?.(\'[data-action="detail"]\')' in INTERACTION
+    assert "getBoundingClientRect().top" in INTERACTION
+    assert "window.scrollBy(0, delta)" in INTERACTION
+
+
+def test_mobile_table_scroll_chains_vertically_and_freezes_code_cleanly():
+    assert "overscroll-behavior-x: none !important" in INTERACTION
+    assert "overscroll-behavior-y: auto !important" in INTERACTION
+    assert ".review-table th:first-child::after" in INTERACTION
+    assert ".review-table td:first-child::after" in INTERACTION
+
+
+def test_quality_info_has_large_touch_target_without_sort_fallthrough():
+    assert "[data-quality-info]" in INTERACTION
+    assert "width: 32px !important" in INTERACTION
+    assert "height: 32px !important" in INTERACTION
+    assert "[data-quality-info]::after" in INTERACTION
+    assert "inset: -6px" in INTERACTION
+    quality = TABLE.split('if (field === "ibd_breakout_quality")', 1)[1].split('button.addEventListener("click", onHeaderSort)', 1)[0]
+    assert "event.stopPropagation();" in quality
+
+
 def test_range_enhancement_keeps_authoritative_context_bounds_semantics():
     assert "if (low === high) input.disabled = true" in TABLE
     assert "const singleton" not in TABLE
@@ -73,10 +110,11 @@ def test_range_enhancement_keeps_authoritative_context_bounds_semantics():
     assert "prepareRangeInputs();" in INTERACTION
 
 
-def test_rs_info_has_large_touch_target_and_non_clickthrough_backdrop():
+def test_rs_popover_is_visibly_modal_closeable_and_non_clickthrough():
     assert '.review-table .rs-info-button::after' in INDEX
     assert 'inset: -13px' in INDEX
     assert "rs-popover-backdrop" in INTERACTION
+    assert "background: rgb(0 0 0 / 28%) !important" in INTERACTION
+    assert "rs-runtime-close" in INTERACTION
+    assert 'popover.setAttribute("aria-modal", "true")' in INTERACTION
     assert 'event.stopPropagation();' in INTERACTION
-    assert 'document.querySelector("[data-rs-info]")?.click()' in INTERACTION
-    assert "Keep the backdrop alive through the pointer sequence" in INTERACTION
