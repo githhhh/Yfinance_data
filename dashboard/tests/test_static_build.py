@@ -162,6 +162,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
                 "ibd_candidate_extra": json.dumps(
                     {
                         "pending_high": 48.21,
+                        "touch_high": 48.21,
+                        "touch_date": "2026-08-17",
                         "confirm_date": "2026-09-07",
                     }
                 ),
@@ -191,8 +193,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
     assert rows["PIV"]["ceiling"] == 57.68
     assert rows["PIV"]["ceiling_date"] == "2024-05-20"
     assert rows["PIV_SELECTED"]["buy_point_date"] == "2026-09-08"
-    assert rows["MA10"]["buy_point_date"] == "2026-09-07"
-    assert rows["PB"]["buy_point_date"] == "2026-09-07"
+    assert rows["MA10"]["buy_point_date"] is None
+    assert rows["PB"]["buy_point_date"] == "2026-08-17"
     assert rows["3WT"]["buy_point_date"] is None
     assert all("ibd_candidate_extra" not in row for row in rows.values())
 
