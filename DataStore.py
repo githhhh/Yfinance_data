@@ -10,6 +10,7 @@ from pathlib import Path
 from eps_screener import run_screener as run_eps_screener
 from stage2_screener import run_screener as run_stage2_screener, load_whitelist, WHITELIST_PATH
 from data_providers import DataProviderFactory, YahooDataProvider
+from data_providers.ohlcv_validation import validate_download_batch
 from market_universe import build_download_universe
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
@@ -21,6 +22,7 @@ BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
 
+
 def read_stock_list(stock_list_dir="us"):
     """Return the named strategy inputs that require market-data coverage."""
     source_directory = Path(stock_list_dir)
@@ -28,43 +30,80 @@ def read_stock_list(stock_list_dir="us"):
     print(f"[Merge] Explicit download universe: {len(tickers)} unique tickers")
     return tickers
 
+
 def download_single_stock(stock_code, period, interval):
     """Download data for a single stock using default Yahoo provider (legacy alias)."""
-    provider = YahooDataProvider(batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES)
+    provider = YahooDataProvider(
+        batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES
+    )
     return provider.download_single_stock(stock_code, period=period, interval=interval)
+
 
 def download_batch_stocks(tickers, period="1y", interval="1d"):
     """Download stock data in parallel batches using default Yahoo provider (legacy alias)."""
-    provider = YahooDataProvider(batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES)
-    return provider.download_batch_stocks(tickers, period=period, interval=interval)
+    provider = YahooDataProvider(
+        batch_size=BATCH_SIZE, max_workers=MAX_WORKERS, max_retries=MAX_RETRIES
+    )
+    return provider.download_batch_stocks(
+        tickers, period=period, interval=interval
+    )
 
-def save_stock_data(stock_data, save_dir=RESULTS_PKL_DIR, interval="1d"):
-    """Save stock data dict to a pickle file."""
+
+def save_stock_data(
+    stock_data,
+    save_dir=RESULTS_PKL_DIR,
+    interval="1d",
+    expected_symbols=None,
+):
+    """Validate, round-trip verify, then atomically publish a pickle file."""
+    # Fail closed before touching the output file. This is the final provider-agnostic
+    # guard against partial downloads, NaN/inf OHLCV rows, or stale latest bars.
+    validate_download_batch(
+        stock_data,
+        expected_symbols=expected_symbols,
+        interval=interval,
+    )
+
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
     filepath = get_stock_pkl_path(interval)
+    temp_filepath = f"{filepath}.tmp"
     try:
         converted_data = {}
         for k, v in stock_data.items():
             # 美股不需要去掉.NS后缀，因为我们已经修改了read_stock_list
             new_key = k
-            if hasattr(v, "to_dict"):
-                df_copy = v.copy()
-                if not isinstance(df_copy.index.dtype, pd.DatetimeTZDtype):
-                    # 美股使用美国东部时区
-                    df_copy.index = pd.to_datetime(df_copy.index).tz_localize(
-                        "US/Eastern", ambiguous="NaT", nonexistent="shift_forward"
-                    )
-                converted_data[new_key] = df_copy.to_dict("split")
-            else:
-                converted_data[new_key] = v
-        with open(filepath, "wb") as f:
+            df_copy = v.copy()
+            if not isinstance(df_copy.index.dtype, pd.DatetimeTZDtype):
+                # 美股使用美国东部时区
+                df_copy.index = pd.to_datetime(df_copy.index).tz_localize(
+                    "US/Eastern", ambiguous="NaT", nonexistent="shift_forward"
+                )
+            converted_data[new_key] = df_copy.to_dict("split")
+
+        # Write only to a temporary file first. The previously published PKL remains
+        # untouched until the temp file has been read back and validated successfully.
+        with open(temp_filepath, "wb") as f:
             pickle.dump(converted_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            f.flush()
+            os.fsync(f.fileno())
+
+        round_trip_data = load_stock_data(temp_filepath)
+        validate_download_batch(
+            round_trip_data,
+            expected_symbols=expected_symbols,
+            interval=interval,
+        )
+
+        os.replace(temp_filepath, filepath)
         print(f"Saved stock data for {len(converted_data)} tickers to {filepath}")
         return filepath
     except Exception as e:
+        if os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
         print(f"Error saving pickle file: {e}")
         return None
+
 
 def load_stock_data(pickle_path):
     """Load stock data dict from pickle file and convert dicts in 'split' format to DataFrames if needed."""
@@ -83,11 +122,13 @@ def load_stock_data(pickle_path):
         print(f"Error loading pickle file: {e}")
         return {}
 
+
 def get_stock_pkl_path(interval="1d"):
     date_suffix = datetime.now().strftime("%d%m%y")
     filename = f"stock_data_{date_suffix}_{interval}.pkl"
     filepath = os.path.join(RESULTS_PKL_DIR, filename)
     return filepath
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download stock data')
@@ -180,6 +221,36 @@ if __name__ == "__main__":
             token_path=args.token_path,
             callback_url=args.callback_url,
         )
-        stock_data, failed = provider.download_batch_stocks(tickers, period=args.period, interval=args.interval)
-        save_path = save_stock_data(stock_data, interval=args.interval)
-        loaded_data = load_stock_data(save_path) if save_path else None
+        stock_data, failed = provider.download_batch_stocks(
+            tickers, period=args.period, interval=args.interval
+        )
+
+        if failed:
+            raise RuntimeError(
+                "Market-data download failed integrity requirements; refusing to "
+                f"publish PKL. Failed symbols ({len(failed)}): {failed[:50]}"
+            )
+
+        validate_download_batch(
+            stock_data,
+            expected_symbols=tickers,
+            interval=args.interval,
+        )
+        save_path = save_stock_data(
+            stock_data,
+            interval=args.interval,
+            expected_symbols=tickers,
+        )
+        if not save_path:
+            raise RuntimeError("Failed to save validated market-data PKL")
+
+        loaded_data = load_stock_data(save_path)
+        validate_download_batch(
+            loaded_data,
+            expected_symbols=tickers,
+            interval=args.interval,
+        )
+        print(
+            f"[DataStore] Integrity verification passed after PKL round-trip: "
+            f"{len(loaded_data)} tickers"
+        )
