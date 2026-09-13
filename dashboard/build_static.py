@@ -192,19 +192,43 @@ def _buy_point_date(row: dict[str, Any]) -> str | None:
         }
         return next(iter(matched_dates)) if len(matched_dates) == 1 else None
 
-    if rule in {"ceiling_pullback", "ma10_touch_confirm"}:
+    if rule == "ceiling_pullback":
         pending_high = extra.get("pending_high")
         if pending_high is not None and not _same_price(candidate_price, pending_high):
             return None
-        return _iso_date(extra.get("confirm_date"))
+
+        # pending_high can rise while the pullback remains inside the ceiling
+        # zone, so confirm_date is not the date when the buy-point price formed.
+        # Prefer an explicit upstream date when available. For legacy payloads,
+        # touch_date is exact only when the original touch_high still equals the
+        # final pending_high/candidate price.
+        pending_high_date = _iso_date(extra.get("pending_high_date"))
+        if pending_high_date:
+            return pending_high_date
+        touch_high = extra.get("touch_high")
+        if (
+            touch_high is not None
+            and _same_price(candidate_price, touch_high)
+            and _same_price(pending_high, touch_high)
+        ):
+            return _iso_date(extra.get("touch_date"))
+        return None
+
+    if rule == "ma10_touch_confirm":
+        pending_high = extra.get("pending_high")
+        if pending_high is not None and not _same_price(candidate_price, pending_high):
+            return None
+        # MA10 pending_high is max(zone High), which may be raised after the
+        # initial touch. Neither touch_date nor confirm_date is authoritative.
+        return _iso_date(extra.get("pending_high_date"))
 
     if rule == "three_weeks_tight":
         twk_high = extra.get("twk_high")
         if twk_high is not None and not _same_price(candidate_price, twk_high):
             return None
-        # Current 3WT payloads do not carry an authoritative setup date. Keep
-        # fail-soft semantics rather than substituting snapshot/breakout dates.
-        return _iso_date(extra.get("confirm_date") or extra.get("resistance_date"))
+        # The buy point is the max High of the tight window; use only the date
+        # that identifies the bar which actually supplied that High.
+        return _iso_date(extra.get("twk_high_date"))
 
     return None
 
