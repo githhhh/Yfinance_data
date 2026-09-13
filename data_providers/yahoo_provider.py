@@ -44,8 +44,10 @@ class YahooDataProvider(BaseDataProvider):
                     period=period,
                     interval=interval,
                     # Raw Yahoo OHLC: split-adjusted, not dividend-adjusted.
-                    # Keep yfinance source precision for downstream comparisons.
+                    # Exclude action-only rows before strict OHLCV validation.
                     auto_adjust=False,
+                    actions=False,
+                    keepna=False,
                     timeout=5,
                 )
                 if not data.empty:
