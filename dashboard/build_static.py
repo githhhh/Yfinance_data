@@ -32,6 +32,7 @@ STATIC_ASSETS = (
     "table_enhancements.js",
     "rs_runtime.js",
     "interaction_runtime.js",
+    "base_context_runtime.js",
     "styles.css",
     "manifest.webmanifest",
 )
@@ -61,6 +62,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_change_group",
     "review_change_label",
     "review_signal_origin",
+    "review_buy_point_date",
     "ibd_entry_status",
     "ibd_candidate_rule",
     "ibd_candidate_price",
@@ -85,6 +87,8 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "pullback_v_is_dry",
     "base_depth_pct",
     "base_duration_weeks",
+    "ceiling",
+    "ceiling_date",
     "industry",
 )
 
@@ -118,6 +122,91 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
         {field: _json_value(row.get(field)) for field in fields}
         for row in frame.to_dict(orient="records")
     ]
+
+
+def _safe_json_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _same_price(left: Any, right: Any) -> bool:
+    lhs = _finite_float(left)
+    rhs = _finite_float(right)
+    if lhs is None or rhs is None:
+        return False
+    tolerance = max(0.01, abs(lhs) * 1e-4)
+    return abs(lhs - rhs) <= tolerance
+
+
+def _review_buy_point_date(row: pd.Series) -> Any:
+    """Return the date on which the current buy-point price was formed.
+
+    This is display provenance only. It never changes candidate selection or
+    trading state, and it stays fail-closed when the upstream Pool does not
+    carry an explicit date for the active price level.
+    """
+    rule_value = row.get("ibd_candidate_rule")
+    rule = "" if rule_value is None or pd.isna(rule_value) else str(rule_value).strip()
+    candidate_price = row.get("ibd_candidate_price")
+    extra = _safe_json_object(row.get("ibd_candidate_extra"))
+
+    if rule == "ceiling":
+        if _same_price(candidate_price, row.get("ceiling")):
+            return row.get("ceiling_date")
+        return None
+
+    if rule in {"ceiling_pullback", "ma10_touch_confirm"}:
+        if _same_price(candidate_price, extra.get("pending_high")):
+            return extra.get("touch_date")
+        return None
+
+    if rule == "pivot":
+        selected = extra.get("selected_pivot")
+        if isinstance(selected, dict) and _same_price(candidate_price, selected.get("price")):
+            return selected.get("resistance_date")
+
+        candidates = extra.get("pivot_candidates")
+        if not isinstance(candidates, list):
+            return None
+        matches = [
+            item
+            for item in candidates
+            if isinstance(item, dict) and _same_price(candidate_price, item.get("price"))
+        ]
+        dates = {
+            str(item.get("resistance_date")).strip()
+            for item in matches
+            if item.get("resistance_date") not in (None, "")
+        }
+        if len(dates) == 1:
+            return next(iter(dates))
+
+    # three_weeks_tight currently carries the level but no explicit source date.
+    return None
+
+
+def _add_review_display_context(frame: pd.DataFrame) -> pd.DataFrame:
+    result = frame.copy()
+    if result.empty:
+        result["review_buy_point_date"] = pd.Series(dtype="object")
+        return result
+    result["review_buy_point_date"] = result.apply(_review_buy_point_date, axis=1)
+    return result
 
 
 def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
@@ -174,9 +263,9 @@ def build_dashboard_payload(
         window_date=window_date,
     )
 
-    complete = _complete_view(analysis.complete_pool)
+    complete = _add_review_display_context(_complete_view(analysis.complete_pool))
     midweek = (
-        materialize_review_view(analysis.midweek_review)
+        _add_review_display_context(materialize_review_view(analysis.midweek_review))
         if analysis.midweek_available
         else pd.DataFrame()
     )
