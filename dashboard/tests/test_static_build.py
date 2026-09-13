@@ -46,6 +46,9 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "review_watch_active",
         "review_effective_entry_status",
         "review_priority",
+        "buy_point_date",
+        "ceiling",
+        "ceiling_date",
     ):
         assert field in row
 
@@ -57,6 +60,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "rs_1m_percentile",
         "rs_3m_percentile",
         "rs_6m_percentile",
+        "ibd_candidate_extra",
     ):
         assert field not in payload_text
 
@@ -78,6 +82,119 @@ def test_static_records_fail_closed_on_new_pool_columns() -> None:
     assert row["code"] == "SAFE"
     assert "future_private_field" not in row
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
+
+
+def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "code": "CEIL",
+                "signal": True,
+                "ibd_candidate_rule": "ceiling",
+                "ibd_candidate_price": 63.52,
+                "ceiling": 63.52,
+                "ceiling_date": "2025-10-06",
+                "ibd_candidate_extra": "{}",
+            },
+            {
+                "code": "STALE_CEIL",
+                "signal": True,
+                "ibd_candidate_rule": "ceiling",
+                "ibd_candidate_price": 63.52,
+                "ceiling": 70.00,
+                "ceiling_date": "2026-09-07",
+                "ibd_candidate_extra": "{}",
+            },
+            {
+                "code": "PIV",
+                "signal": True,
+                "ibd_candidate_rule": "pivot",
+                "ibd_candidate_price": 93.37,
+                "ceiling": 57.68,
+                "ceiling_date": "2024-05-20",
+                "ibd_candidate_extra": json.dumps(
+                    {
+                        "pivot_candidates": [
+                            {"price": 90.0, "resistance_date": "2026-08-31"},
+                            {"price": 93.37, "resistance_date": "2026-09-07"},
+                        ]
+                    }
+                ),
+            },
+            {
+                "code": "PIV_SELECTED",
+                "signal": True,
+                "ibd_candidate_rule": "pivot",
+                "ibd_candidate_price": 43.98,
+                "ibd_candidate_extra": json.dumps(
+                    {
+                        "selected_pivot": {
+                            "price": 43.98,
+                            "resistance_date": "2026-09-08",
+                        },
+                        "pivot_candidates": [
+                            {"price": 43.98, "resistance_date": "2026-09-08"},
+                            {"price": 44.95, "resistance_date": "2026-09-01"},
+                        ],
+                    }
+                ),
+            },
+            {
+                "code": "MA10",
+                "signal": True,
+                "ibd_candidate_rule": "ma10_touch_confirm",
+                "ibd_candidate_price": 38.9,
+                "ibd_candidate_extra": json.dumps(
+                    {
+                        "pending_high": 38.9,
+                        "touch_date": "2026-08-17",
+                        "confirm_date": "2026-09-07",
+                    }
+                ),
+            },
+            {
+                "code": "PB",
+                "signal": True,
+                "ibd_candidate_rule": "ceiling_pullback",
+                "ibd_candidate_price": 48.21,
+                "ceiling": 45.99,
+                "ceiling_date": "2025-12-08",
+                "ibd_candidate_extra": json.dumps(
+                    {
+                        "pending_high": 48.21,
+                        "confirm_date": "2026-09-07",
+                    }
+                ),
+            },
+            {
+                "code": "3WT",
+                "signal": True,
+                "snapshot_date": "2026-09-11",
+                "ibd_candidate_rule": "three_weeks_tight",
+                "ibd_candidate_price": 68.38,
+                "ibd_candidate_extra": json.dumps(
+                    {
+                        "twk_high": 68.38,
+                        "status": "breakout",
+                        "tight_weeks": 3,
+                    }
+                ),
+            },
+        ]
+    )
+
+    rows = {row["code"]: row for row in _records(frame)}
+
+    assert rows["CEIL"]["buy_point_date"] == "2025-10-06"
+    assert rows["STALE_CEIL"]["buy_point_date"] is None
+    assert rows["PIV"]["buy_point_date"] == "2026-09-07"
+    assert rows["PIV"]["ceiling"] == 57.68
+    assert rows["PIV"]["ceiling_date"] == "2024-05-20"
+    assert rows["PIV_SELECTED"]["buy_point_date"] == "2026-09-08"
+    assert rows["MA10"]["buy_point_date"] == "2026-09-07"
+    assert rows["PB"]["buy_point_date"] == "2026-09-07"
+    assert rows["3WT"]["buy_point_date"] is None
+    assert all("ibd_candidate_extra" not in row for row in rows.values())
 
 
 def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
@@ -111,6 +228,7 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
         "rs_1m_percentile",
         "rs_3m_percentile",
         "rs_6m_percentile",
+        "ibd_candidate_extra",
     ):
         assert field not in dashboard_json
     for view in payload["views"].values():
@@ -125,6 +243,10 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
 
     app = (output / "app.js").read_text(encoding="utf-8")
     assert "RS Reference" in app
+    assert "Buy Point Date" in app
+    assert "Base Ceiling" in app
+    assert "Base Ceiling Date" in app
+    assert 'grid-template-columns:repeat(3,minmax(0,1fr))' in app
     assert "C Rank" not in app
     assert "rank_C_continuous" not in app
     assert "C_RANK" not in app

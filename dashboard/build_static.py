@@ -64,6 +64,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "ibd_entry_status",
     "ibd_candidate_rule",
     "ibd_candidate_price",
+    "buy_point_date",
     "ibd_trigger_price",
     "current_vs_ibd_candidate_pct",
     "latest_close",
@@ -83,6 +84,8 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "pullback_pct_off_peak",
     "pullback_duration_weeks",
     "pullback_v_is_dry",
+    "ceiling",
+    "ceiling_date",
     "base_depth_pct",
     "base_duration_weeks",
     "industry",
@@ -110,14 +113,115 @@ def _json_value(value: Any) -> Any:
     return value
 
 
+def _text_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "<na>"}:
+        return None
+    return text
+
+
+def _iso_date(value: Any) -> str | None:
+    text = _text_or_none(value)
+    if text is None:
+        return None
+    try:
+        return date.fromisoformat(text[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _candidate_extra(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    text = _text_or_none(value)
+    if text is None:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _same_price(left: Any, right: Any) -> bool:
+    try:
+        left_value = float(left)
+        right_value = float(right)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(left_value) and math.isfinite(right_value) and math.isclose(
+        left_value,
+        right_value,
+        rel_tol=1e-9,
+        abs_tol=1e-4,
+    )
+
+
+def _buy_point_date(row: dict[str, Any]) -> str | None:
+    rule = (_text_or_none(row.get("ibd_candidate_rule")) or "").lower()
+    candidate_price = row.get("ibd_candidate_price")
+    extra = _candidate_extra(row.get("ibd_candidate_extra"))
+
+    if rule in {"ceiling", "ceiling_breakout"}:
+        # A carried candidate can outlive the current scan's ceiling. Only attach
+        # the current ceiling date when it still describes this exact buy point.
+        if _same_price(candidate_price, row.get("ceiling")):
+            return _iso_date(row.get("ceiling_date"))
+        return None
+
+    if rule == "pivot":
+        selected = extra.get("selected_pivot")
+        if isinstance(selected, dict) and _same_price(candidate_price, selected.get("price")):
+            selected_date = _iso_date(selected.get("resistance_date"))
+            if selected_date:
+                return selected_date
+
+        matched_dates = {
+            parsed_date
+            for item in extra.get("pivot_candidates", [])
+            if isinstance(item, dict) and _same_price(candidate_price, item.get("price"))
+            for parsed_date in [_iso_date(item.get("resistance_date"))]
+            if parsed_date is not None
+        }
+        return next(iter(matched_dates)) if len(matched_dates) == 1 else None
+
+    if rule in {"ceiling_pullback", "ma10_touch_confirm"}:
+        pending_high = extra.get("pending_high")
+        if pending_high is not None and not _same_price(candidate_price, pending_high):
+            return None
+        return _iso_date(extra.get("confirm_date"))
+
+    if rule == "three_weeks_tight":
+        twk_high = extra.get("twk_high")
+        if twk_high is not None and not _same_price(candidate_price, twk_high):
+            return None
+        # Current 3WT payloads do not carry an authoritative setup date. Keep
+        # fail-soft semantics rather than substituting snapshot/breakout dates.
+        return _iso_date(extra.get("confirm_date") or extra.get("resistance_date"))
+
+    return None
+
+
 def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     if frame.empty:
         return []
-    fields = [field for field in PUBLIC_DASHBOARD_ROW_FIELDS if field in frame.columns]
-    return [
-        {field: _json_value(row.get(field)) for field in fields}
-        for row in frame.to_dict(orient="records")
-    ]
+    records: list[dict[str, Any]] = []
+    for row in frame.to_dict(orient="records"):
+        record: dict[str, Any] = {}
+        for field in PUBLIC_DASHBOARD_ROW_FIELDS:
+            if field == "buy_point_date":
+                record[field] = _buy_point_date(row)
+            elif field in row:
+                record[field] = _json_value(row.get(field))
+        records.append(record)
+    return records
 
 
 def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
