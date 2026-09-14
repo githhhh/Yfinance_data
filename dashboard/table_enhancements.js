@@ -5,7 +5,7 @@
   if (!app) return;
 
   const sortState = { field: null, direction: "asc" };
-  const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
+  const STATUS_ORDER = ["NEAR BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let qualityTooltip = null;
   let qualityTooltipPinned = false;
@@ -348,9 +348,36 @@
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  function isActive(row) {
+  function isSignalActive(row) {
     if (Object.hasOwn(row, "review_watch_active")) return bool(row.review_watch_active);
     return bool(row.signal);
+  }
+
+  function isNearBreakout(row) {
+    return !isSignalActive(row) && bool(row.bf_watch_active);
+  }
+
+  function isActive(row) {
+    return isSignalActive(row) || isNearBreakout(row);
+  }
+
+  function displayStatus(row) {
+    return isNearBreakout(row) ? "NEAR_BREAKOUT" : row.ibd_entry_status;
+  }
+
+  function reviewSetup(row) {
+    return isNearBreakout(row) ? "pivot" : row.ibd_candidate_rule;
+  }
+
+  function nearBreakoutDistance(row) {
+    const sResistance = num(row.bf_watch_s_resistance);
+    return sResistance !== null
+      ? num(row.bf_watch_s_distance_pct)
+      : num(row.bf_watch_m_distance_pct);
+  }
+
+  function reviewDistance(row) {
+    return isNearBreakout(row) ? nearBreakoutDistance(row) : num(row.current_vs_ibd_candidate_pct);
   }
 
   function pressedValue(action) {
@@ -369,7 +396,9 @@
     let rows = Array.isArray(source) ? source.filter(isActive) : [];
 
     if (comparison && pressedValue("scope") === "CHANGES") {
-      rows = rows.filter((row) => String(row.review_change_group || "UNCHANGED") !== "UNCHANGED");
+      rows = rows.filter((row) => (
+        String(row.review_change_group || "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)
+      ));
     }
 
     const change = quickValue("change");
@@ -379,16 +408,18 @@
     if (comparison && origin !== "ALL") rows = rows.filter((row) => row.review_signal_origin === origin);
 
     const status = pressedValue("status");
-    if (status) rows = rows.filter((row) => row.ibd_entry_status === status);
+    if (status) rows = rows.filter((row) => displayStatus(row) === status);
 
     const route = app.querySelector('[data-control="route"]')?.value || "All";
-    if (route !== "All") rows = rows.filter((row) => row.ibd_candidate_rule === route);
+    if (route !== "All") rows = rows.filter((row) => reviewSetup(row) === route);
 
     return rows;
   }
 
   function bounds(rows, field) {
-    const values = rows.map((row) => num(row[field])).filter((value) => value !== null);
+    const values = rows.map((row) => (
+      field === "review_distance_pct" ? reviewDistance(row) : num(row[field])
+    )).filter((value) => value !== null);
     if (!values.length) return null;
     const low = Math.floor(Math.min(...values) * 10) / 10;
     const high = Math.ceil(Math.max(...values) * 10) / 10;
@@ -448,8 +479,8 @@
     if (!dashboardData) return;
     const rows = contextRows();
     if (!rows.length) return;
-    enhanceRange("distance-min", bounds(rows, "current_vs_ibd_candidate_pct"), "min", "pct");
-    enhanceRange("distance-max", bounds(rows, "current_vs_ibd_candidate_pct"), "max", "pct");
+    enhanceRange("distance-min", bounds(rows, "review_distance_pct"), "min", "pct");
+    enhanceRange("distance-max", bounds(rows, "review_distance_pct"), "max", "pct");
     enhanceRange("entry-volume", bounds(rows, "ibd_entry_volume_ratio"), "min", "x");
     enhanceRange("weekly-volume", bounds(rows, "volume_ratio"), "min", "x");
   }

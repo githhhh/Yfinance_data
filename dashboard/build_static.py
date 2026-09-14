@@ -61,6 +61,13 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_change_group",
     "review_change_label",
     "review_signal_origin",
+    "bf_watch_active",
+    "bf_watch_s_resistance",
+    "bf_watch_s_distance_pct",
+    "bf_watch_s_side",
+    "bf_watch_m_resistance",
+    "bf_watch_m_distance_pct",
+    "bf_watch_m_side",
     "ibd_entry_status",
     "ibd_candidate_rule",
     "ibd_candidate_price",
@@ -257,7 +264,7 @@ def _complete_view(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _status_meta() -> dict[str, Any]:
-    return {
+    result = {
         key: {
             "label": meta["label"],
             "subtitle": meta["subtitle"],
@@ -268,6 +275,19 @@ def _status_meta() -> dict[str, Any]:
         }
         for key, meta in STATUS_META.items()
     }
+    result["NEAR_BREAKOUT"] = {
+        "label": "NEAR BREAKOUT",
+        "subtitle": "Approaching Pivot",
+        "tone": "cyan",
+        "color": "#1fcdb4",
+        "tooltip_title": "NEAR BREAKOUT",
+        "tooltip": (
+            "含义：突破前预警。右侧结构已确认，价格从下方进入阻力下 3% 区域且尚未突破。\n"
+            "数量：当前范围内符合上游 BreakoutFollow 预警条件的标的数。\n"
+            "点击：只看这类标的，并保留其他已选条件。"
+        ),
+    }
+    return result
 
 
 def _flow_meta() -> dict[str, Any]:

@@ -5,7 +5,7 @@
   if (!app) return;
 
   const sortState = { field: null, direction: "asc", label: null };
-  const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
+  const STATUS_ORDER = ["NEAR BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let rsBackdrop = null;
   let pendingTableViewport = null;

@@ -2,7 +2,7 @@
   "use strict";
 
   const app = document.getElementById("app");
-  const STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
+  const STATUS_ORDER = ["NEAR_BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
   const CHANGE_ORDER = ["BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"];
   const ORIGIN_ORDER = ["NEW", "CARRY", "RECONFIRMED"];
   const ROUTE_LABELS = {
@@ -139,9 +139,49 @@
     return period === "MIDWEEK" ? data.views.midweek.rows : data.views.weekend.rows;
   }
 
-  function isActive(row) {
+  function isSignalActive(row) {
     if (Object.hasOwn(row, "review_watch_active")) return bool(row.review_watch_active);
     return bool(row.signal);
+  }
+
+  function isNearBreakout(row) {
+    return !isSignalActive(row) && bool(row.bf_watch_active);
+  }
+
+  function isActive(row) {
+    return isSignalActive(row) || isNearBreakout(row);
+  }
+
+  function displayStatus(row) {
+    return isNearBreakout(row) ? "NEAR_BREAKOUT" : row.ibd_entry_status;
+  }
+
+  function reviewSetup(row) {
+    return isNearBreakout(row) ? "pivot" : row.ibd_candidate_rule;
+  }
+
+  function nearBreakoutTarget(row) {
+    const sResistance = num(row.bf_watch_s_resistance);
+    return sResistance !== null ? sResistance : num(row.bf_watch_m_resistance);
+  }
+
+  function nearBreakoutDistance(row) {
+    const sResistance = num(row.bf_watch_s_resistance);
+    return sResistance !== null
+      ? num(row.bf_watch_s_distance_pct)
+      : num(row.bf_watch_m_distance_pct);
+  }
+
+  function reviewDistance(row) {
+    return isNearBreakout(row) ? nearBreakoutDistance(row) : num(row.current_vs_ibd_candidate_pct);
+  }
+
+  function reviewBuyPoint(row) {
+    return isNearBreakout(row) ? nearBreakoutTarget(row) : num(row.ibd_candidate_price);
+  }
+
+  function displayChange(row) {
+    return isNearBreakout(row) ? "NEAR BREAKOUT" : text(row.review_change_label, "");
   }
 
   function currentHasComparison() {
@@ -187,7 +227,9 @@
     const comparison = currentHasComparison();
 
     if (comparison && state.scope === "CHANGES") {
-      result = result.filter((row) => text(row.review_change_group, "UNCHANGED") !== "UNCHANGED");
+      result = result.filter((row) => (
+        text(row.review_change_group, "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)
+      ));
     }
     if (comparison && exclude !== "change" && state.change !== "ALL") {
       result = result.filter((row) => row.review_change_group === state.change);
@@ -196,21 +238,21 @@
       result = result.filter((row) => row.review_signal_origin === state.origin);
     }
     if (exclude !== "status" && state.status !== "ALL") {
-      result = result.filter((row) => row.ibd_entry_status === state.status);
+      result = result.filter((row) => displayStatus(row) === state.status);
     }
     if (exclude !== "advanced") {
       if (state.route !== "All") {
-        result = result.filter((row) => row.ibd_candidate_rule === state.route);
+        result = result.filter((row) => reviewSetup(row) === state.route);
       }
       if (state.distanceMin !== null) {
         result = result.filter((row) => {
-          const value = num(row.current_vs_ibd_candidate_pct);
+          const value = reviewDistance(row);
           return value !== null && value >= state.distanceMin;
         });
       }
       if (state.distanceMax !== null) {
         result = result.filter((row) => {
-          const value = num(row.current_vs_ibd_candidate_pct);
+          const value = reviewDistance(row);
           return value !== null && value <= state.distanceMax;
         });
       }
@@ -235,7 +277,7 @@
     const changeBase = filterRows(rows, "change");
     const originBase = filterRows(rows, "origin");
     return {
-      status: Object.fromEntries(STATUS_ORDER.map((key) => [key, statusBase.filter((row) => row.ibd_entry_status === key).length])),
+      status: Object.fromEntries(STATUS_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length])),
       change: Object.fromEntries(CHANGE_ORDER.map((key) => [key, changeBase.filter((row) => row.review_change_group === key).length])),
       origin: Object.fromEntries(ORIGIN_ORDER.map((key) => [key, originBase.filter((row) => row.review_signal_origin === key).length])),
     };
@@ -245,11 +287,11 @@
     const result = [...rows];
     if (currentHasComparison() && state.scope === "CHANGES") {
       result.sort((a, b) => {
-        const ap = num(a.review_priority) ?? 9999;
-        const bp = num(b.review_priority) ?? 9999;
+        const ap = isNearBreakout(a) ? 5 : num(a.review_priority) ?? 9999;
+        const bp = isNearBreakout(b) ? 5 : num(b.review_priority) ?? 9999;
         if (ap !== bp) return ap - bp;
-        const as = STATUS_ORDER.indexOf(a.ibd_entry_status);
-        const bs = STATUS_ORDER.indexOf(b.ibd_entry_status);
+        const as = STATUS_ORDER.indexOf(displayStatus(a));
+        const bs = STATUS_ORDER.indexOf(displayStatus(b));
         if (as !== bs) return as - bs;
         return String(a.code).localeCompare(String(b.code));
       });
@@ -305,7 +347,8 @@
   function headerHtml(rows) {
     const isMidweek = state.period === "MIDWEEK";
     const snapshot = isMidweek ? data.meta.midweek_snapshot_date : data.meta.complete_snapshot_date;
-    const active = rows.filter(isActive).length;
+    const signalCount = rows.filter(isSignalActive).length;
+    const nearCount = rows.filter(isNearBreakout).length;
     const fresh = freshness(snapshot);
     const badge = isMidweek
       ? `<span class="data-badge loaded">Data Loaded</span>`
@@ -317,7 +360,7 @@
       <header class="dashboard-header">
         <div>
           <div class="dashboard-title-row"><div class="dashboard-title">Breakout Pool</div>${badge}</div>
-          <div class="dashboard-snapshot">${snapshotText} · <b>${rows.length}</b> Total Pool · <b>${active}</b> Active Signals</div>
+          <div class="dashboard-snapshot">${snapshotText} · <b>${rows.length}</b> Total Pool · <b>${signalCount}</b> Active Signals · <b>${nearCount}</b> Near Breakout</div>
         </div>
       </header>`;
   }
@@ -325,14 +368,16 @@
   function queueHtml(rows, counts) {
     const comparison = currentHasComparison();
     const activeTotal = rows.filter(isActive).length;
-    const changeTotal = comparison ? rows.filter(isActive).filter((row) => row.review_change_group !== "UNCHANGED").length : 0;
+    const changeTotal = comparison
+      ? rows.filter(isActive).filter((row) => row.review_change_group !== "UNCHANGED" || isNearBreakout(row)).length
+      : 0;
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}">Changes · ${changeTotal}</button>
-           <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Signals · ${activeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Changed signals plus current Near Breakout candidates">Review Now · ${changeTotal}</button>
+           <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
-      : `<div><div class="control-group-label">Scope</div><div class="scope-static">All Signals · ${activeTotal}</div></div>`;
+      : `<div><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
 
     return `
       <section class="review-section">
@@ -387,7 +432,9 @@
   }
 
   function bounds(rows, field, floor, ceiling) {
-    const values = rows.map((row) => num(row[field])).filter((value) => value !== null);
+    const values = rows.map((row) => (
+      field === "review_distance_pct" ? reviewDistance(row) : num(row[field])
+    )).filter((value) => value !== null);
     if (!values.length) return null;
     const low = Math.min(floor, Math.floor(Math.min(...values) * 10) / 10);
     const high = Math.max(ceiling, Math.ceil(Math.max(...values) * 10) / 10);
@@ -399,7 +446,7 @@
     if (!state.filtersExpanded) {
       return `<section class="filters-wrap"><div class="filters-head"><button class="filter-toggle" data-action="toggle-filters">More Filters · ${active ? `${active} active` : "None"}</button>${active ? `<button class="reset-button" data-action="reset-filters">Reset</button>` : ""}</div></section>`;
     }
-    const distance = bounds(rows, "current_vs_ibd_candidate_pct", -5, 5);
+    const distance = bounds(rows, "review_distance_pct", -5, 5);
     const entry = bounds(rows, "ibd_entry_volume_ratio", 0, 1);
     const weekly = bounds(rows, "volume_ratio", 0, 1);
     const dMin = state.distanceMin ?? distance?.[0] ?? -5;
@@ -433,28 +480,47 @@
   function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
     const code = esc(row.code);
-    const status = row.ibd_entry_status;
-    const baseline = text(row.review_baseline_entry_status, "");
-    const volReason = text(row.ibd_entry_vol_or_reject, "n/a").replace(/x$/, "×");
+    const near = isNearBreakout(row);
+    const status = displayStatus(row);
+    const baseline = near ? "" : text(row.review_baseline_entry_status, "");
+    const volReason = near ? "Pre-signal" : text(row.ibd_entry_vol_or_reject, "n/a").replace(/x$/, "×");
+    const stageKey = near ? "Review Stage" : "Entry Status";
     const transition = baseline
       ? `${esc(statusLabel(baseline))} → <span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`
       : `<span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
-    const change = text(row.review_change_label, "");
+    const change = displayChange(row);
     const currentRs = num(row.rs_percentile);
     const rsValue = currentRs === null
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip">
       <div class="selected-cell"><div class="selected-key">Selected</div><div class="selected-value selected-code">${code}</div>${change ? `<div class="selected-change">${esc(change)}</div>` : ""}<button class="detail-toggle" data-action="detail">${state.detailOpen ? "Hide details ▴" : "Details ▾"}</button></div>
-      <div class="selected-cell"><div class="selected-key">Buy Point</div><div class="selected-value">${fmt(row.ibd_candidate_price)} <small>(${esc(routeLabel(row.ibd_candidate_rule))})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">Vs Buy Point</div><div class="selected-value">${fmt(row.current_vs_ibd_candidate_pct, "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">Entry Status</div><div class="selected-value">${transition} <small>(${esc(volReason)})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">Buy Point</div><div class="selected-value">${fmt(reviewBuyPoint(row))} <small>(${esc(routeLabel(reviewSetup(row)))})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">Vs Buy Point</div><div class="selected-value">${fmt(reviewDistance(row), "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">${stageKey}</div><div class="selected-value">${transition} <small>(${esc(volReason)})</small></div></div>
       <div class="selected-cell"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
       ${state.detailOpen ? detailHtml(row) : ""}
     </div>`;
   }
 
+  function nearBreakoutDetailHtml(row) {
+    const sResistance = num(row.bf_watch_s_resistance);
+    const targetSource = sResistance !== null ? "S Resistance" : "M Resistance";
+    return `<div class="detail-panel">
+      <div class="detail-section"><div class="detail-title">1. Breakout Setup</div><div class="detail-grid">
+        ${detailItem("Buy Point", fmt(reviewBuyPoint(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Buy Point", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", "Pivot")}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
+      </div></div>
+      <div class="detail-section"><div class="detail-title">2. Structure</div><div class="detail-grid">
+        ${detailItem("S Resistance", fmt(row.bf_watch_s_resistance))}${detailItem("S Distance", fmt(row.bf_watch_s_distance_pct, "pct"))}${detailItem("S Side", text(row.bf_watch_s_side))}${detailItem("M Resistance", fmt(row.bf_watch_m_resistance))}${detailItem("M Distance", fmt(row.bf_watch_m_distance_pct, "pct"))}${detailItem("M Side", text(row.bf_watch_m_side))}
+      </div></div>
+      <div class="detail-section"><div class="detail-title">3. Context</div><div class="detail-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        ${detailItem("Weekly Vol", fmt(row.volume_ratio, "x"))}${detailItem("To 52W High", fmt(row.dist_to_52w_high_pct, "pct1"))}${detailItem("52W High", fmt(row.price_52_week_high))}${detailItem("EPS YoY", fmt(row.eps_yoy_growth, "pct1"))}${detailItem("Industry", text(row.industry))}
+      </div></div>
+    </div>`;
+  }
+
   function detailHtml(row) {
+    if (isNearBreakout(row)) return nearBreakoutDetailHtml(row);
     const valid = bool(row.ibd_entry_valid);
     const reject = valid ? "" : `<div class="detail-reject">Unconfirmed · ${esc(text(row.ibd_entry_reject_reason, "Volume not confirmed"))}</div>`;
     const pullbackVisible = num(row.pullback_pct) !== null || num(row.pullback_pct_off_peak) !== null;
@@ -527,10 +593,13 @@
 
   function cellHtml(row, field) {
     const value = row[field];
-    if (field === "review_change_label") return `<span class="change-badge">${esc(text(value))}</span>`;
-    if (field === "ibd_entry_status") return `<span class="status-text" style="color:${statusColor(value)}">${esc(statusLabel(value))}</span>`;
-    if (field === "ibd_candidate_rule") return esc(routeLabel(value));
-    if (field === "current_vs_ibd_candidate_pct") return esc(fmt(value, "pct"));
+    if (field === "review_change_label") return `<span class="change-badge">${esc(displayChange(row) || "n/a")}</span>`;
+    if (field === "ibd_entry_status") {
+      const status = displayStatus(row);
+      return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+    }
+    if (field === "ibd_candidate_rule") return esc(routeLabel(reviewSetup(row)));
+    if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
     if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
     if (field === "latest_close") return esc(fmt(value));
     if (field === "volume_ratio") return esc(fmt(value, "x"));
@@ -538,7 +607,7 @@
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
     }
-    if (field === "ibd_entry_vol_or_reject") return esc(text(value).replace(/x$/, "×"));
+    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(text(value).replace(/x$/, "×"));
     return esc(text(value));
   }
 

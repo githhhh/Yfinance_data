@@ -17,6 +17,18 @@
       overscroll-behavior-y: none;
     }
 
+    @media (width > 1120px) {
+      .status-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+    }
+
+    @media (width > 760px) and (width <= 1120px) {
+      .status-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
     /* RS runtime must preserve the table's sticky header behavior. The visual
        glyph stays compact while a transparent 44px hit target prevents taps
        from falling through to the surrounding RS sort control. */
