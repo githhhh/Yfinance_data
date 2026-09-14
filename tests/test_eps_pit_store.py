@@ -47,6 +47,27 @@ def test_store_persists_resolved_only(tmp_path):
     assert stored.eps_yoy_growth == 25.0
 
 
+def test_store_uses_day_level_retrieved_at_to_avoid_same_day_noise(tmp_path):
+    path = tmp_path / "signal_eps_pit.csv"
+    store = EPSPITStore(str(path))
+    result = EPSResult(
+        code="ABC",
+        snapshot_date="2026-08-21",
+        status=EPSStatus.RESOLVED,
+        eps_yoy_growth=25.0,
+        source="SEC",
+        effective_date="2026-08-01",
+    )
+
+    store.upsert(result)
+    first_write = path.read_text()
+    retrieved_at = pd.read_csv(path)["retrieved_at"].iloc[0]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", retrieved_at)
+
+    store.upsert(result)
+    assert path.read_text() == first_write
+
+
 def test_store_rejects_future_effective_date_on_write(tmp_path):
     store = EPSPITStore(str(tmp_path / "signal_eps_pit.csv"))
     with pytest.raises(EPSPITStoreError, match="effective_date exceeds snapshot_date"):

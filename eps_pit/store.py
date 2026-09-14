@@ -326,7 +326,7 @@ class EPSPITStore:
         record["eps_yoy_growth"] = eps
         record["effective_date"] = effective
         record["resolver_version"] = EPS_RESOLVER_VERSION
-        record["retrieved_at"] = pd.Timestamp.utcnow().isoformat()
+        record["retrieved_at"] = pd.Timestamp.utcnow().date().isoformat()
         rows = df[PIT_COLUMNS].to_dict("records")
         rows.append({column: record.get(column) for column in PIT_COLUMNS})
         df = pd.DataFrame.from_records(rows, columns=PIT_COLUMNS)
