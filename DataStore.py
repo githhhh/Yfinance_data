@@ -1,7 +1,6 @@
 import os
 import pickle
 import time
-import json
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
@@ -22,13 +21,6 @@ RESULTS_PKL_DIR = "results_pkl"
 BATCH_SIZE = 100          # smaller batches keep Yahoo responsive
 MAX_WORKERS = 8         # more threads = faster, until Yahoo rate-limits
 MAX_RETRIES = 1          # retry failed tickers a couple of times
-# Schwab applies a per-account request limit.  The normal local pipeline uses a
-# single request worker and this gap between symbols, avoiding concurrent token
-# refreshes and keeping the sustained request rate below that limit.
-SCHWAB_SAFE_BATCH_SIZE = 1
-SCHWAB_SAFE_MAX_WORKERS = 1
-SCHWAB_SAFE_REQUEST_INTERVAL_SECONDS = 0.55
-PRICE_METADATA_SUFFIX = ".metadata.json"
 
 
 def read_stock_list(stock_list_dir="us"):
@@ -62,7 +54,6 @@ def save_stock_data(
     save_dir=RESULTS_PKL_DIR,
     interval="1d",
     expected_symbols=None,
-    source_provider="yahoo",
 ):
     """Validate, round-trip verify, then atomically publish a pickle file."""
     # Fail closed before touching the output file. This is the final provider-agnostic
@@ -77,8 +68,6 @@ def save_stock_data(
         os.makedirs(save_dir, exist_ok=True)
     filepath = get_stock_pkl_path(interval)
     temp_filepath = f"{filepath}.tmp"
-    metadata_path = f"{filepath}{PRICE_METADATA_SUFFIX}"
-    temp_metadata_path = f"{metadata_path}.tmp"
     try:
         converted_data = {}
         for k, v in stock_data.items():
@@ -106,29 +95,12 @@ def save_stock_data(
             interval=interval,
         )
 
-        metadata = {
-            "schema_version": 1,
-            "provider": str(source_provider).strip().lower(),
-            "interval": interval,
-            "price_contract": "raw_split_adjusted_not_dividend_adjusted",
-            "precision": "source",
-            "pkl_filename": os.path.basename(filepath),
-        }
-        with open(temp_metadata_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, sort_keys=True)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-
         os.replace(temp_filepath, filepath)
-        os.replace(temp_metadata_path, metadata_path)
         print(f"Saved stock data for {len(converted_data)} tickers to {filepath}")
         return filepath
     except Exception as e:
         if os.path.exists(temp_filepath):
             os.remove(temp_filepath)
-        if os.path.exists(temp_metadata_path):
-            os.remove(temp_metadata_path)
         print(f"Error saving pickle file: {e}")
         return None
 
@@ -242,21 +214,12 @@ if __name__ == "__main__":
                 tickers.remove(idx)
             tickers.insert(0, idx)
 
-        provider_kwargs = {
-            "app_key": args.app_key,
-            "app_secret": args.app_secret,
-            "token_path": args.token_path,
-            "callback_url": args.callback_url,
-        }
-        if args.provider == "schwab":
-            provider_kwargs.update(
-                batch_size=SCHWAB_SAFE_BATCH_SIZE,
-                max_workers=SCHWAB_SAFE_MAX_WORKERS,
-                rate_limit_sleep=SCHWAB_SAFE_REQUEST_INTERVAL_SECONDS,
-            )
         provider = DataProviderFactory.get_provider(
             provider_type=args.provider,
-            **provider_kwargs,
+            app_key=args.app_key,
+            app_secret=args.app_secret,
+            token_path=args.token_path,
+            callback_url=args.callback_url,
         )
         stock_data, failed = provider.download_batch_stocks(
             tickers, period=args.period, interval=args.interval
@@ -277,7 +240,6 @@ if __name__ == "__main__":
             stock_data,
             interval=args.interval,
             expected_symbols=tickers,
-            source_provider=args.provider,
         )
         if not save_path:
             raise RuntimeError("Failed to save validated market-data PKL")

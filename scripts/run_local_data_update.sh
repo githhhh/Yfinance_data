@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run the same screener + daily + weekly cache generation as data-update.yml,
-# but obtain OHLCV locally from the selected provider.  Schwab OAuth material
-# stays local; this entry never publishes a branch or writes Git history.
+# Mirror the existing data-update.yml data-generation flow locally while allowing
+# the OHLCV provider to be selected. Provider-specific throttling/auth stays in
+# the provider implementation; this runner does not publish Git history.
 
 set -Eeuo pipefail
 
@@ -22,11 +22,30 @@ if [ "${YFINANCE_DATA_LOCAL_UPDATE_SOURCE_ONLY:-}" = "1" ]; then
 fi
 
 cd "$DATA_REPO_ROOT"
+mkdir -p results_pkl
 
-echo "[LocalDataUpdate] provider=$PROVIDER: running screener + 2Y daily download"
-python DataStore.py --provider="$PROVIDER" --period=2y --interval=1d
+echo "[LocalDataUpdate] running screener and merge"
+if ! python DataStore.py --screener-only --min-eps-growth=150; then
+    echo "[LocalDataUpdate] warning: screener failed; preserving existing data-update.yml continue-on-error semantics" >&2
+fi
+
+echo "[LocalDataUpdate] provider=$PROVIDER: running 2Y daily download"
+python DataStore.py --provider="$PROVIDER" --period=2y --interval=1d --skip-screener
+
+# The remote Yahoo workflow has an explicit 180~300s cooldown between daily and
+# weekly downloads. Keep that behavior only when this local runner is explicitly
+# used with Yahoo; Schwab pacing is owned by SchwabDataProvider.
+if [ "$PROVIDER" = "yahoo" ]; then
+    SLEEP_TIME=$((RANDOM % 121 + 180))
+    echo "[LocalDataUpdate] waiting ${SLEEP_TIME}s for Yahoo Finance rate-limit cooldown"
+    sleep "$SLEEP_TIME"
+fi
 
 echo "[LocalDataUpdate] provider=$PROVIDER: running 5Y weekly download"
 python DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener
+
+TODAY=$(date +"%d%m%y")
+echo "[LocalDataUpdate] keeping PKL files with suffix: $TODAY"
+find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete
 
 echo "[LocalDataUpdate] validated local PKL snapshots are ready for the strategy run"

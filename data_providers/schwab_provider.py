@@ -170,16 +170,18 @@ class SchwabDataProvider(BaseDataProvider):
 
     The provider preserves vendor numeric precision and emits the canonical
     ``Open, High, Low, Close, Volume`` schema used by the existing PKL pipeline.
+    Its conservative default batch/concurrency/pacing policy is provider-owned
+    so callers do not need Schwab-specific rate-limit knowledge.
     """
 
     def __init__(
         self,
         creds: Optional[SchwabCredentials] = None,
         client: Optional[Any] = None,
-        batch_size: int = 50,
-        max_workers: int = 4,
+        batch_size: int = 1,
+        max_workers: int = 1,
         max_retries: int = 1,
-        rate_limit_sleep: float = 0.25,
+        rate_limit_sleep: float = 0.55,
     ):
         self.creds = creds or SchwabCredentials()
         self.batch_size = batch_size
