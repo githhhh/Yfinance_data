@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Mirror the existing data-update.yml data-generation flow locally while allowing
-# the OHLCV provider to be selected. Provider-specific throttling/auth stays in
-# the provider implementation; this runner does not publish Git history.
+# Mirror the existing data-update.yml flow locally while allowing the OHLCV
+# provider to be selected. Provider-specific throttling/auth stays in the
+# provider implementation; validated data artifacts follow the same Git
+# publication lifecycle as the existing Yahoo workflow.
 
 set -Eeuo pipefail
 
@@ -48,4 +49,13 @@ TODAY=$(date +"%d%m%y")
 echo "[LocalDataUpdate] keeping PKL files with suffix: $TODAY"
 find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete
 
-echo "[LocalDataUpdate] validated local PKL snapshots are ready for the strategy run"
+echo "[LocalDataUpdate] publishing validated data artifacts"
+git add results_pkl/ us/
+if git diff --cached --quiet; then
+    echo "[LocalDataUpdate] no data changes to commit"
+else
+    git commit -m "Update stock data [skip ci]"
+    git push origin HEAD:main
+fi
+
+echo "[LocalDataUpdate] validated PKL snapshots are ready for the strategy run"
