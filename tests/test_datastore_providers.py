@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
@@ -134,6 +136,24 @@ class TestSchwabDataProvider:
         assert df.iloc[0]["Open"] == 150.126
         assert df.iloc[0]["High"] == 155.888
         assert df.iloc[0]["Volume"] == 5000000
+
+    def test_index_alias_is_used_only_at_schwab_request_boundary(self):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5, "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = mock_resp
+
+        provider = SchwabDataProvider(client=mock_client, max_retries=0)
+        symbol, frame = provider.download_single_stock("^GSPC")
+
+        assert symbol == "^GSPC"
+        assert frame is not None
+        assert mock_client.get_price_history.call_args.args[0] == "$SPX"
 
     def test_download_single_stock_rejects_missing_required_price_column(self):
         mock_client = MagicMock()
@@ -370,3 +390,15 @@ class TestLegacyBackwardCompatibility:
         assert loaded["AAPL"].iloc[0]["High"] == pytest.approx(105.789123)
         assert loaded["AAPL"].iloc[0]["Low"] == pytest.approx(99.001987)
         assert loaded["AAPL"].iloc[0]["Close"] == pytest.approx(103.555123)
+
+        metadata_path = f"{saved_path}{DataStore.PRICE_METADATA_SUFFIX}"
+        with open(metadata_path, encoding="utf-8") as metadata_file:
+            metadata = json.load(metadata_file)
+        assert metadata == {
+            "schema_version": 1,
+            "provider": "yahoo",
+            "interval": "1d",
+            "price_contract": "raw_split_adjusted_not_dividend_adjusted",
+            "precision": "source",
+            "pkl_filename": pkl_path.name,
+        }

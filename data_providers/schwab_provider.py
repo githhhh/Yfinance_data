@@ -11,12 +11,25 @@ from data_providers.base_provider import BaseDataProvider
 
 SCHWAB_API_BASE = "https://api.schwabapi.com"
 SCHWAB_TOKEN_URL = f"{SCHWAB_API_BASE}/v1/oauth/token"
+# The rest of the pipeline deliberately keeps Yahoo-compatible index keys.  The
+# Schwab Trader API uses its own index symbols on the request boundary only.
+SCHWAB_SYMBOL_ALIASES = {
+    "^GSPC": "$SPX",
+    "^IXIC": "$COMPX",
+    "^DJI": "$DJI",
+}
 
 
 def _enum_value(value: Any) -> Any:
     if hasattr(value, "value"):
         return value.value
     return value
+
+
+def _schwab_symbol(symbol: str) -> str:
+    """Translate only provider-specific symbols; retain the caller's key."""
+    normalized = str(symbol).strip().upper()
+    return SCHWAB_SYMBOL_ALIASES.get(normalized, normalized.replace("-", "."))
 
 
 class SchwabCredentials:
@@ -153,7 +166,11 @@ class SchwabRawTokenClient:
 
 
 class SchwabDataProvider(BaseDataProvider):
-    """基于 schwab-py 库实现的嘉信理财 (Charles Schwab) 数据提供者。"""
+    """Schwab raw OHLCV provider: split-adjusted, not dividend-adjusted.
+
+    The provider preserves vendor numeric precision and emits the canonical
+    ``Open, High, Low, Close, Volume`` schema used by the existing PKL pipeline.
+    """
 
     def __init__(
         self,
@@ -223,7 +240,7 @@ class SchwabDataProvider(BaseDataProvider):
         self, symbol: str, period: str = "1y", interval: str = "1d"
     ) -> Optional[pd.DataFrame]:
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self._request_price_history(schwab_symbol, period=period, interval=interval)
 
             if resp is None:
@@ -352,7 +369,7 @@ class SchwabDataProvider(BaseDataProvider):
     def fetch_quote(self, symbol: str) -> Optional[Dict]:
         """获取交易日盘中实时行情快照 (REST /marketdata/v1/quotes API)。"""
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self.client.get_quote(schwab_symbol)
             data = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
             if isinstance(data, dict) and schwab_symbol in data:
@@ -365,7 +382,7 @@ class SchwabDataProvider(BaseDataProvider):
     def fetch_option_chain(self, symbol: str) -> Optional[Dict]:
         """获取期权链数据 (REST /marketdata/v1/chains API)。"""
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self.client.get_option_chain(schwab_symbol)
             data = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
             return data
