@@ -1,7 +1,7 @@
 import time
 import threading
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -177,12 +177,23 @@ class YahooDataProvider(BaseDataProvider):
         return min(delay, self.rate_limit_backoff_max_seconds)
 
     def download_single_stock(
-        self, symbol: str, period: str = "1y", interval: str = "1d"
+        self,
+        symbol: str,
+        period: str = "1y",
+        interval: str = "1d",
+        *,
+        abort_event: Optional[threading.Event] = None,
     ) -> Tuple[str, Optional[pd.DataFrame]]:
-        """抓取单只股票数据；429 使用共享熔断，其它失败按原策略重试。"""
+        """抓取单只股票数据；数据完整性错误立即失败，429 沿用共享熔断。"""
         attempt = 0
         while attempt <= self.max_retries:
+            if abort_event is not None and abort_event.is_set():
+                return symbol, None
+
             self._wait_for_rate_limit_cooldown()
+            if abort_event is not None and abort_event.is_set():
+                return symbol, None
+
             try:
                 with self._request_guard():
                     ticker = yf.Ticker(symbol)
@@ -228,10 +239,10 @@ class YahooDataProvider(BaseDataProvider):
                     continue
                 return symbol, None
             except DataIntegrityError as e:
-                print(
-                    f"[Yahoo] Invalid history for {symbol} "
-                    f"(attempt {attempt + 1}/{self.max_retries + 1}): {e}"
-                )
+                if abort_event is not None:
+                    abort_event.set()
+                print(f"[Yahoo] Invalid history for {symbol}; aborting batch: {e}")
+                raise
             except Exception as e:
                 print(
                     f"[Yahoo] Error downloading {symbol} "
@@ -240,6 +251,8 @@ class YahooDataProvider(BaseDataProvider):
 
             attempt += 1
             if attempt <= self.max_retries:
+                if abort_event is not None and abort_event.is_set():
+                    return symbol, None
                 # Preserve the existing retry cadence for non-rate-limit failures.
                 time.sleep(0.5 * attempt)
 
@@ -258,19 +271,67 @@ class YahooDataProvider(BaseDataProvider):
         if not symbols:
             return downloaded, failed
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_ticker = {
-                executor.submit(
-                    self.download_single_stock, ticker, period, interval
-                ): ticker
-                for ticker in symbols
-            }
-            for future in as_completed(future_to_ticker):
-                stock_code, data = future.result()
-                if data is not None:
-                    downloaded[stock_code] = data
-                else:
-                    failed.append(stock_code)
+        abort_event = threading.Event()
+        symbol_iter = iter(symbols)
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        future_to_ticker = {}
+
+        def submit_next() -> bool:
+            if abort_event.is_set():
+                return False
+            try:
+                ticker = next(symbol_iter)
+            except StopIteration:
+                return False
+            future = executor.submit(
+                self.download_single_stock,
+                ticker,
+                period,
+                interval,
+                abort_event=abort_event,
+            )
+            future_to_ticker[future] = ticker
+            return True
+
+        try:
+            for _ in range(max_workers):
+                if not submit_next():
+                    break
+
+            while future_to_ticker:
+                done, _ = wait(
+                    tuple(future_to_ticker),
+                    return_when=FIRST_COMPLETED,
+                )
+
+                completed_count = 0
+                for future in done:
+                    future_to_ticker.pop(future)
+                    try:
+                        stock_code, data = future.result()
+                    except DataIntegrityError:
+                        abort_event.set()
+                        for pending in future_to_ticker:
+                            pending.cancel()
+                        raise
+
+                    if data is not None:
+                        downloaded[stock_code] = data
+                    else:
+                        failed.append(stock_code)
+                    completed_count += 1
+
+                if abort_event.is_set():
+                    continue
+
+                for _ in range(completed_count):
+                    if not submit_next():
+                        break
+        finally:
+            if abort_event.is_set():
+                for pending in future_to_ticker:
+                    pending.cancel()
+            executor.shutdown(wait=True, cancel_futures=abort_event.is_set())
 
         return downloaded, failed
 
