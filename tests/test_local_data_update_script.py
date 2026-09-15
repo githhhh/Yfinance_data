@@ -13,6 +13,7 @@ def test_local_data_update_runner_has_valid_shell_syntax():
 def test_local_data_update_runner_mirrors_existing_update_flow():
     source = RUNNER.read_text(encoding="utf-8")
 
+    assert "git pull --ff-only origin main" in source
     assert 'DataStore.py --screener-only --min-eps-growth=150' in source
     assert 'DataStore.py --provider="$PROVIDER" --period=2y --interval=1d --skip-screener' in source
     assert 'DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener' in source
@@ -23,12 +24,14 @@ def test_local_data_update_runner_mirrors_existing_update_flow():
     assert "git push origin HEAD:main" in source
 
 
-def test_local_data_update_publishes_only_after_both_downloads_and_cleanup():
+def test_local_data_update_syncs_first_and_publishes_only_after_validated_cleanup():
     source = RUNNER.read_text(encoding="utf-8")
 
+    sync = source.index("git pull --ff-only origin main")
+    screener = source.index("DataStore.py --screener-only --min-eps-growth=150")
     daily = source.index('DataStore.py --provider="$PROVIDER" --period=2y --interval=1d --skip-screener')
     weekly = source.index('DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener')
     cleanup = source.index('find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete')
     publish = source.index("git add results_pkl/ us/")
 
-    assert daily < weekly < cleanup < publish
+    assert sync < screener < daily < weekly < cleanup < publish
