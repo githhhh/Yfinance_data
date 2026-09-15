@@ -121,9 +121,8 @@ def test_validate_download_batch_rejects_globally_stale_consensus():
         )
 
 
-def test_yahoo_single_download_retries_invalid_partial_row(monkeypatch):
+def test_yahoo_single_download_fails_fast_on_invalid_partial_row(monkeypatch):
     bad = _frame(["2026-09-10", "2026-09-11"], nan_close=True)
-    good = _frame(["2026-09-10", "2026-09-11"])
 
     class FakeTicker:
         calls = 0
@@ -133,19 +132,16 @@ def test_yahoo_single_download_retries_invalid_partial_row(monkeypatch):
 
         def history(self, **kwargs):
             FakeTicker.calls += 1
-            return bad if FakeTicker.calls == 1 else good
+            return bad
 
     monkeypatch.setattr(yahoo_module.yf, "Ticker", FakeTicker)
     monkeypatch.setattr(yahoo_module.time, "sleep", lambda _: None)
 
     provider = YahooDataProvider(max_retries=1)
-    symbol, data = provider.download_single_stock(
-        "AAPL", period="2y", interval="1d"
-    )
+    with pytest.raises(DataIntegrityError, match="null/non-numeric OHLCV"):
+        provider.download_single_stock("AAPL", period="2y", interval="1d")
 
-    assert symbol == "AAPL"
-    assert data is not None
-    assert FakeTicker.calls == 2
+    assert FakeTicker.calls == 1
 
 
 def test_yahoo_batch_retries_one_stale_latest_bar(monkeypatch):
@@ -163,7 +159,7 @@ def test_yahoo_batch_retries_one_stale_latest_bar(monkeypatch):
         lambda: pd.Timestamp("2026-09-11").date(),
     )
 
-    def fake_download(symbol, period="1y", interval="1d"):
+    def fake_download(symbol, period="1y", interval="1d", *, abort_event=None):
         calls[symbol] = calls.get(symbol, 0) + 1
         if symbol == "AAPL" and calls[symbol] == 1:
             return symbol, stale.copy()
@@ -195,7 +191,7 @@ def test_yahoo_batch_rejects_persistently_stale_latest_bar(monkeypatch):
         lambda: pd.Timestamp("2026-09-11").date(),
     )
 
-    def fake_download(symbol, period="1y", interval="1d"):
+    def fake_download(symbol, period="1y", interval="1d", *, abort_event=None):
         return (
             symbol,
             stale.copy() if symbol == "AAPL" else current.copy(),

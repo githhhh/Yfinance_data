@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
 from data_providers.base_provider import BaseDataProvider
+from data_providers.ohlcv_validation import DataIntegrityError
 from data_providers.yahoo_provider import YahooDataProvider
 from data_providers.schwab_provider import SchwabDataProvider, SchwabCredentials, SchwabRawTokenClient
 from data_providers.factory import DataProviderFactory
@@ -57,10 +58,8 @@ class TestYahooDataProvider:
         mock_ticker_cls.return_value = mock_instance
 
         provider = YahooDataProvider(max_retries=0)
-        symbol, df = provider.download_single_stock("AAPL", period="1y", interval="1d")
-
-        assert symbol == "AAPL"
-        assert df is None
+        with pytest.raises(DataIntegrityError, match="missing required OHLCV columns"):
+            provider.download_single_stock("AAPL", period="1y", interval="1d")
 
     @patch("yfinance.Ticker")
     def test_download_batch_stocks(self, mock_ticker_cls):
