@@ -87,7 +87,7 @@ class SchwabRawTokenClient:
         self,
         symbol: str,
         period_type: Any = "year",
-        period: int = 1,
+        period: Any = 1,
         frequency_type: Any = "daily",
         frequency: Any = 1,
         **_: Any,
@@ -97,7 +97,7 @@ class SchwabRawTokenClient:
             params={
                 "symbol": symbol,
                 "periodType": _enum_value(period_type),
-                "period": period,
+                "period": _enum_value(period),
                 "frequencyType": _enum_value(frequency_type),
                 "frequency": _enum_value(frequency),
                 "needExtendedHoursData": "false",
@@ -293,41 +293,61 @@ class SchwabDataProvider(BaseDataProvider):
             return None
 
     def _request_price_history(self, symbol: str, period: str, interval: str) -> Any:
-        """调用 Schwab Client 获取价格历史 response。"""
+        """Request the exact history shape needed by the existing PKL pipeline."""
+        period_num = 1
+        if period.endswith("y"):
+            try:
+                period_num = int(period[:-1])
+            except ValueError:
+                period_num = 1
+
         try:
             import schwab
         except ImportError:
-            if hasattr(self.client, "get_price_history"):
-                return self.client.get_price_history(symbol)
-            return None
-        try:
-            if interval == "1wk":
-                freq_type = schwab.client.Client.PriceHistory.FrequencyType.WEEKLY
-                freq = schwab.client.Client.PriceHistory.Frequency.EVERY_WEEK
-            else:
-                freq_type = schwab.client.Client.PriceHistory.FrequencyType.DAILY
-                freq = schwab.client.Client.PriceHistory.Frequency.DAILY
-
-            period_type = schwab.client.Client.PriceHistory.PeriodType.YEAR
-            period_num = 1
-            if period.endswith("y"):
-                try:
-                    period_num = int(period[:-1])
-                except ValueError:
-                    period_num = 1
-
-            resp = self.client.get_price_history(
+            if not hasattr(self.client, "get_price_history"):
+                return None
+            frequency_type = "weekly" if interval == "1wk" else "daily"
+            return self.client.get_price_history(
                 symbol,
-                period_type=period_type,
+                period_type="year",
                 period=period_num,
+                frequency_type=frequency_type,
+                frequency=1,
+            )
+
+        try:
+            price_history = schwab.client.Client.PriceHistory
+            if interval == "1wk":
+                freq_type = price_history.FrequencyType.WEEKLY
+                freq = price_history.Frequency.WEEKLY
+            elif interval == "1d":
+                freq_type = price_history.FrequencyType.DAILY
+                freq = price_history.Frequency.DAILY
+            else:
+                print(f"[Schwab] Unsupported price-history interval: {interval}")
+                return None
+
+            period_map = {
+                1: price_history.Period.ONE_YEAR,
+                2: price_history.Period.TWO_YEARS,
+                3: price_history.Period.THREE_YEARS,
+                5: price_history.Period.FIVE_YEARS,
+                10: price_history.Period.TEN_YEARS,
+                15: price_history.Period.FIFTEEN_YEARS,
+                20: price_history.Period.TWENTY_YEARS,
+            }
+            period_value = period_map.get(period_num)
+            if period_value is None:
+                print(f"[Schwab] Unsupported yearly price-history period: {period}")
+                return None
+
+            return self.client.get_price_history(
+                symbol,
+                period_type=price_history.PeriodType.YEAR,
+                period=period_value,
                 frequency_type=freq_type,
                 frequency=freq,
             )
-            return resp
-        except AttributeError:
-            if hasattr(self.client, "get_price_history"):
-                return self.client.get_price_history(symbol)
-            return None
         except Exception as e:
             print(f"[Schwab] API Request Error for {symbol}: {e}")
             return None
