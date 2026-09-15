@@ -11,12 +11,25 @@ from data_providers.base_provider import BaseDataProvider
 
 SCHWAB_API_BASE = "https://api.schwabapi.com"
 SCHWAB_TOKEN_URL = f"{SCHWAB_API_BASE}/v1/oauth/token"
+# The rest of the pipeline deliberately keeps Yahoo-compatible index keys.  The
+# Schwab Trader API uses its own index symbols on the request boundary only.
+SCHWAB_SYMBOL_ALIASES = {
+    "^GSPC": "$SPX",
+    "^IXIC": "$COMPX",
+    "^DJI": "$DJI",
+}
 
 
 def _enum_value(value: Any) -> Any:
     if hasattr(value, "value"):
         return value.value
     return value
+
+
+def _schwab_symbol(symbol: str) -> str:
+    """Translate only provider-specific symbols; retain the caller's key."""
+    normalized = str(symbol).strip().upper()
+    return SCHWAB_SYMBOL_ALIASES.get(normalized, normalized.replace("-", "."))
 
 
 class SchwabCredentials:
@@ -74,7 +87,7 @@ class SchwabRawTokenClient:
         self,
         symbol: str,
         period_type: Any = "year",
-        period: int = 1,
+        period: Any = 1,
         frequency_type: Any = "daily",
         frequency: Any = 1,
         **_: Any,
@@ -84,7 +97,7 @@ class SchwabRawTokenClient:
             params={
                 "symbol": symbol,
                 "periodType": _enum_value(period_type),
-                "period": period,
+                "period": _enum_value(period),
                 "frequencyType": _enum_value(frequency_type),
                 "frequency": _enum_value(frequency),
                 "needExtendedHoursData": "false",
@@ -153,16 +166,22 @@ class SchwabRawTokenClient:
 
 
 class SchwabDataProvider(BaseDataProvider):
-    """基于 schwab-py 库实现的嘉信理财 (Charles Schwab) 数据提供者。"""
+    """Schwab raw OHLCV provider: split-adjusted, not dividend-adjusted.
+
+    The provider preserves vendor numeric precision and emits the canonical
+    ``Open, High, Low, Close, Volume`` schema used by the existing PKL pipeline.
+    Its conservative default batch/concurrency/pacing policy is provider-owned
+    so callers do not need Schwab-specific rate-limit knowledge.
+    """
 
     def __init__(
         self,
         creds: Optional[SchwabCredentials] = None,
         client: Optional[Any] = None,
-        batch_size: int = 50,
-        max_workers: int = 4,
+        batch_size: int = 1,
+        max_workers: int = 1,
         max_retries: int = 1,
-        rate_limit_sleep: float = 0.25,
+        rate_limit_sleep: float = 0.55,
     ):
         self.creds = creds or SchwabCredentials()
         self.batch_size = batch_size
@@ -223,7 +242,7 @@ class SchwabDataProvider(BaseDataProvider):
         self, symbol: str, period: str = "1y", interval: str = "1d"
     ) -> Optional[pd.DataFrame]:
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self._request_price_history(schwab_symbol, period=period, interval=interval)
 
             if resp is None:
@@ -274,41 +293,61 @@ class SchwabDataProvider(BaseDataProvider):
             return None
 
     def _request_price_history(self, symbol: str, period: str, interval: str) -> Any:
-        """调用 Schwab Client 获取价格历史 response。"""
+        """Request the exact history shape needed by the existing PKL pipeline."""
+        period_num = 1
+        if period.endswith("y"):
+            try:
+                period_num = int(period[:-1])
+            except ValueError:
+                period_num = 1
+
         try:
             import schwab
         except ImportError:
-            if hasattr(self.client, "get_price_history"):
-                return self.client.get_price_history(symbol)
-            return None
-        try:
-            if interval == "1wk":
-                freq_type = schwab.client.Client.PriceHistory.FrequencyType.WEEKLY
-                freq = schwab.client.Client.PriceHistory.Frequency.EVERY_WEEK
-            else:
-                freq_type = schwab.client.Client.PriceHistory.FrequencyType.DAILY
-                freq = schwab.client.Client.PriceHistory.Frequency.DAILY
-
-            period_type = schwab.client.Client.PriceHistory.PeriodType.YEAR
-            period_num = 1
-            if period.endswith("y"):
-                try:
-                    period_num = int(period[:-1])
-                except ValueError:
-                    period_num = 1
-
-            resp = self.client.get_price_history(
+            if not hasattr(self.client, "get_price_history"):
+                return None
+            frequency_type = "weekly" if interval == "1wk" else "daily"
+            return self.client.get_price_history(
                 symbol,
-                period_type=period_type,
+                period_type="year",
                 period=period_num,
+                frequency_type=frequency_type,
+                frequency=1,
+            )
+
+        try:
+            price_history = schwab.client.Client.PriceHistory
+            if interval == "1wk":
+                freq_type = price_history.FrequencyType.WEEKLY
+                freq = price_history.Frequency.WEEKLY
+            elif interval == "1d":
+                freq_type = price_history.FrequencyType.DAILY
+                freq = price_history.Frequency.DAILY
+            else:
+                print(f"[Schwab] Unsupported price-history interval: {interval}")
+                return None
+
+            period_map = {
+                1: price_history.Period.ONE_YEAR,
+                2: price_history.Period.TWO_YEARS,
+                3: price_history.Period.THREE_YEARS,
+                5: price_history.Period.FIVE_YEARS,
+                10: price_history.Period.TEN_YEARS,
+                15: price_history.Period.FIFTEEN_YEARS,
+                20: price_history.Period.TWENTY_YEARS,
+            }
+            period_value = period_map.get(period_num)
+            if period_value is None:
+                print(f"[Schwab] Unsupported yearly price-history period: {period}")
+                return None
+
+            return self.client.get_price_history(
+                symbol,
+                period_type=price_history.PeriodType.YEAR,
+                period=period_value,
                 frequency_type=freq_type,
                 frequency=freq,
             )
-            return resp
-        except AttributeError:
-            if hasattr(self.client, "get_price_history"):
-                return self.client.get_price_history(symbol)
-            return None
         except Exception as e:
             print(f"[Schwab] API Request Error for {symbol}: {e}")
             return None
@@ -352,7 +391,7 @@ class SchwabDataProvider(BaseDataProvider):
     def fetch_quote(self, symbol: str) -> Optional[Dict]:
         """获取交易日盘中实时行情快照 (REST /marketdata/v1/quotes API)。"""
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self.client.get_quote(schwab_symbol)
             data = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
             if isinstance(data, dict) and schwab_symbol in data:
@@ -365,7 +404,7 @@ class SchwabDataProvider(BaseDataProvider):
     def fetch_option_chain(self, symbol: str) -> Optional[Dict]:
         """获取期权链数据 (REST /marketdata/v1/chains API)。"""
         try:
-            schwab_symbol = symbol.replace("-", ".")
+            schwab_symbol = _schwab_symbol(symbol)
             resp = self.client.get_option_chain(schwab_symbol)
             data = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
             return data
