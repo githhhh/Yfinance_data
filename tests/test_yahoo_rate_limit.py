@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pandas as pd
 from yfinance.exceptions import YFRateLimitError
 
@@ -83,7 +86,6 @@ def test_repeated_rate_limits_trip_shared_cooldown(monkeypatch):
         max_retries=0,
         rate_limit_threshold=2,
         rate_limit_window_seconds=10,
-        rate_limit_cooldown_seconds=90,
         recovery_max_workers=2,
     )
 
@@ -95,7 +97,62 @@ def test_repeated_rate_limits_trip_shared_cooldown(monkeypatch):
     assert symbol == "CCC"
     assert data is not None
     assert provider._recovery_mode is True
-    assert sleeps == [90]
+    assert sleeps == [180]
+
+
+def test_circuit_trip_drains_inflight_and_blocks_new_admission():
+    provider = YahooDataProvider(
+        max_retries=0,
+        rate_limit_threshold=1,
+        rate_limit_window_seconds=10,
+        rate_limit_cooldown_seconds=0.05,
+        recovery_max_workers=2,
+    )
+
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    queued_entered = threading.Event()
+
+    def hold_request():
+        with provider._request_guard():
+            first_entered.set()
+            assert release_first.wait(1.0)
+
+    def trip_circuit():
+        provider._record_rate_limit()
+
+    def queued_request():
+        with provider._request_guard():
+            queued_entered.set()
+
+    first_thread = threading.Thread(target=hold_request)
+    first_thread.start()
+    assert first_entered.wait(1.0)
+
+    trip_thread = threading.Thread(target=trip_circuit)
+    trip_thread.start()
+
+    deadline = time.monotonic() + 1.0
+    while provider._cooldown_remaining() <= 0 and time.monotonic() < deadline:
+        time.sleep(0.001)
+
+    assert provider._cooldown_remaining() > 0
+    assert trip_thread.is_alive()
+
+    queued_thread = threading.Thread(target=queued_request)
+    queued_thread.start()
+    time.sleep(0.01)
+    assert not queued_entered.is_set()
+
+    release_first.set()
+    first_thread.join(1.0)
+    trip_thread.join(1.0)
+    queued_thread.join(1.0)
+
+    assert not first_thread.is_alive()
+    assert not trip_thread.is_alive()
+    assert not queued_thread.is_alive()
+    assert queued_entered.is_set()
 
 
 def test_batch_retry_keeps_normal_workers_and_uses_low_concurrency(monkeypatch):

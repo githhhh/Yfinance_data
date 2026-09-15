@@ -2,7 +2,7 @@ import time
 import threading
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import nullcontext
+from contextlib import contextmanager
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -62,9 +62,11 @@ class YahooDataProvider(BaseDataProvider):
         )
 
         self._rate_limit_lock = threading.Lock()
+        self._rate_limit_condition = threading.Condition(self._rate_limit_lock)
         self._rate_limit_events = deque()
         self._cooldown_until = 0.0
         self._recovery_mode = False
+        self._active_requests = 0
         self._recovery_gate = threading.BoundedSemaphore(self.recovery_max_workers)
 
     def _cooldown_remaining(self) -> float:
@@ -78,16 +80,47 @@ class YahooDataProvider(BaseDataProvider):
                 return
             time.sleep(remaining)
 
+    @contextmanager
     def _request_guard(self):
-        with self._rate_limit_lock:
-            recovery_mode = self._recovery_mode
-        return self._recovery_gate if recovery_mode else nullcontext()
+        """Admit requests without letting queued workers bypass a tripped circuit."""
+        recovery_gate_acquired = False
+
+        while True:
+            self._wait_for_rate_limit_cooldown()
+
+            with self._rate_limit_lock:
+                recovery_mode = self._recovery_mode
+
+            if recovery_mode:
+                self._recovery_gate.acquire()
+                recovery_gate_acquired = True
+
+            with self._rate_limit_condition:
+                now = time.monotonic()
+                circuit_open = self._cooldown_until > now
+                switched_to_recovery = self._recovery_mode and not recovery_mode
+                if not circuit_open and not switched_to_recovery:
+                    self._active_requests += 1
+                    break
+
+            if recovery_gate_acquired:
+                self._recovery_gate.release()
+                recovery_gate_acquired = False
+
+        try:
+            yield
+        finally:
+            with self._rate_limit_condition:
+                self._active_requests -= 1
+                self._rate_limit_condition.notify_all()
+            if recovery_gate_acquired:
+                self._recovery_gate.release()
 
     def _record_rate_limit(self) -> bool:
         """Record a Yahoo 429 burst and trip a shared cooldown when threshold is hit."""
         now = time.monotonic()
         tripped = False
-        with self._rate_limit_lock:
+        with self._rate_limit_condition:
             cutoff = now - self.rate_limit_window_seconds
             while self._rate_limit_events and self._rate_limit_events[0] < cutoff:
                 self._rate_limit_events.popleft()
@@ -100,6 +133,12 @@ class YahooDataProvider(BaseDataProvider):
                 self._cooldown_until = now + self.rate_limit_cooldown_seconds
                 self._recovery_mode = True
                 tripped = True
+
+                # The circuit is visible before waiting, so no new request can be
+                # admitted. Existing synchronous Yahoo calls cannot be cancelled;
+                # drain them before declaring the trip complete.
+                while self._active_requests > 0:
+                    self._rate_limit_condition.wait()
 
         if tripped:
             print(
