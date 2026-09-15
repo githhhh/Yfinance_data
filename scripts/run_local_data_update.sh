@@ -23,6 +23,10 @@ if [ "${YFINANCE_DATA_LOCAL_UPDATE_SOURCE_ONLY:-}" = "1" ]; then
 fi
 
 cd "$DATA_REPO_ROOT"
+
+# Formal local updates must run from a checkout that can fast-forward to the
+# authoritative main branch. Local developer changes/divergence fail closed.
+git pull --ff-only origin main
 mkdir -p results_pkl
 
 echo "[LocalDataUpdate] running screener and merge"
