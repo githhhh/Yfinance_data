@@ -62,6 +62,9 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_change_label",
     "review_signal_origin",
     "bf_watch_active",
+    "bf_watch_type",
+    "bf_watch_trigger_price",
+    "bf_watch_distance_pct",
     "bf_watch_s_resistance",
     "bf_watch_s_distance_pct",
     "bf_watch_s_side",
@@ -277,13 +280,13 @@ def _status_meta() -> dict[str, Any]:
     }
     result["NEAR_BREAKOUT"] = {
         "label": "NEAR BREAKOUT",
-        "subtitle": "Approaching Pivot",
+        "subtitle": "Approaching Trigger",
         "tone": "cyan",
         "color": "#1fcdb4",
         "tooltip_title": "NEAR BREAKOUT",
         "tooltip": (
-            "含义：突破前预警。右侧结构已确认，价格从下方进入阻力下 3% 区域且尚未突破。\n"
-            "数量：当前范围内符合上游 BreakoutFollow 预警条件的标的数。\n"
+            "含义：BreakoutFollow 形成中 setup 已进入突破前观察区，价格接近该结构当前 trigger；仍不是正式 signal 或入场。\n"
+            "数量：当前范围内符合上游 BreakoutFollow Setup Watch 条件的标的数。\n"
             "点击：只看这类标的，并保留其他已选条件。"
         ),
     }
@@ -386,6 +389,7 @@ def build_dashboard_payload(
                 "All",
                 "ceiling",
                 "ceiling_pullback",
+                "ma10_pullback",
                 "ma10_touch_confirm",
                 "pivot",
                 "three_weeks_tight",

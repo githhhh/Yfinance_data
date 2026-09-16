@@ -9,6 +9,7 @@
     All: "All",
     ceiling: "Ceiling",
     ceiling_pullback: "Ceiling Pullback",
+    ma10_pullback: "MA10 Pullback",
     ma10_touch_confirm: "MA10 Touch",
     pivot: "Pivot",
     three_weeks_tight: "Three Weeks Tight",
@@ -157,19 +158,32 @@
   }
 
   function reviewSetup(row) {
-    return isNearBreakout(row) ? "pivot" : row.ibd_candidate_rule;
+    return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : row.ibd_candidate_rule;
   }
 
   function nearBreakoutTarget(row) {
+    const genericTarget = num(row.bf_watch_trigger_price);
+    if (genericTarget !== null) return genericTarget;
     const sResistance = num(row.bf_watch_s_resistance);
     return sResistance !== null ? sResistance : num(row.bf_watch_m_resistance);
   }
 
   function nearBreakoutDistance(row) {
+    const genericDistance = num(row.bf_watch_distance_pct);
+    if (genericDistance !== null) return genericDistance;
     const sResistance = num(row.bf_watch_s_resistance);
     return sResistance !== null
       ? num(row.bf_watch_s_distance_pct)
       : num(row.bf_watch_m_distance_pct);
+  }
+
+  function watchTargetSource(row) {
+    const watchType = reviewSetup(row);
+    if (watchType === "ceiling_pullback") return "Recovery High";
+    if (watchType === "three_weeks_tight") return "TWK High";
+    if (watchType === "ma10_pullback") return "Pending High";
+    if (num(row.bf_watch_trigger_price) !== null) return "Pivot Resistance";
+    return num(row.bf_watch_s_resistance) !== null ? "S Resistance" : "M Resistance";
   }
 
   function reviewDistance(row) {
@@ -504,14 +518,17 @@
   }
 
   function nearBreakoutDetailHtml(row) {
-    const sResistance = num(row.bf_watch_s_resistance);
-    const targetSource = sResistance !== null ? "S Resistance" : "M Resistance";
+    const setup = reviewSetup(row);
+    const targetSource = watchTargetSource(row);
+    const structure = setup === "pivot"
+      ? `${detailItem("S Resistance", fmt(row.bf_watch_s_resistance))}${detailItem("S Distance", fmt(row.bf_watch_s_distance_pct, "pct"))}${detailItem("S Side", text(row.bf_watch_s_side))}${detailItem("M Resistance", fmt(row.bf_watch_m_resistance))}${detailItem("M Distance", fmt(row.bf_watch_m_distance_pct, "pct"))}${detailItem("M Side", text(row.bf_watch_m_side))}`
+      : `${detailItem("Watch Type", routeLabel(setup))}${detailItem("Trigger", fmt(row.bf_watch_trigger_price))}${detailItem("Distance", fmt(row.bf_watch_distance_pct, "pct"))}`;
     return `<div class="detail-panel">
       <div class="detail-section"><div class="detail-title">1. Breakout Setup</div><div class="detail-grid">
-        ${detailItem("Buy Point", fmt(reviewBuyPoint(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Buy Point", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", "Pivot")}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
+        ${detailItem("Buy Point", fmt(reviewBuyPoint(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Buy Point", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", routeLabel(setup))}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
       </div></div>
-      <div class="detail-section"><div class="detail-title">2. Structure</div><div class="detail-grid">
-        ${detailItem("S Resistance", fmt(row.bf_watch_s_resistance))}${detailItem("S Distance", fmt(row.bf_watch_s_distance_pct, "pct"))}${detailItem("S Side", text(row.bf_watch_s_side))}${detailItem("M Resistance", fmt(row.bf_watch_m_resistance))}${detailItem("M Distance", fmt(row.bf_watch_m_distance_pct, "pct"))}${detailItem("M Side", text(row.bf_watch_m_side))}
+      <div class="detail-section"><div class="detail-title">2. Watch Structure</div><div class="detail-grid">
+        ${structure}
       </div></div>
       <div class="detail-section"><div class="detail-title">3. Context</div><div class="detail-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
         ${detailItem("Weekly Vol", fmt(row.volume_ratio, "x"))}${detailItem("To 52W High", fmt(row.dist_to_52w_high_pct, "pct1"))}${detailItem("52W High", fmt(row.price_52_week_high))}${detailItem("EPS YoY", fmt(row.eps_yoy_growth, "pct1"))}${detailItem("Industry", text(row.industry))}

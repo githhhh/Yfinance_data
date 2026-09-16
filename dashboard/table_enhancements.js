@@ -366,10 +366,16 @@
   }
 
   function reviewSetup(row) {
-    return isNearBreakout(row) ? "pivot" : row.ibd_candidate_rule;
+    if (!isNearBreakout(row)) return row.ibd_candidate_rule;
+    const watchType = String(row.bf_watch_type ?? "").trim();
+    return watchType && !["nan", "none", "<na>"].includes(watchType.toLowerCase())
+      ? watchType
+      : "pivot";
   }
 
   function nearBreakoutDistance(row) {
+    const genericDistance = num(row.bf_watch_distance_pct);
+    if (genericDistance !== null) return genericDistance;
     const sResistance = num(row.bf_watch_s_resistance);
     return sResistance !== null
       ? num(row.bf_watch_s_distance_pct)
