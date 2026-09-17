@@ -71,8 +71,9 @@ def test_near_breakout_is_a_ui_stage_not_an_ibd_entry_status() -> None:
     assert meta["NEAR_BREAKOUT"]["label"] == "NEAR BREAKOUT"
     assert meta["NEAR_BREAKOUT"]["subtitle"] == "Approaching Trigger"
     assert "NEAR_BREAKOUT" not in ENTRY_STATUSES
-    assert 'const STATUS_ORDER = ["NEAR_BREAKOUT", "ACTIONABLE"' in APP
-    assert 'return isNearBreakout(row) ? "NEAR_BREAKOUT" : row.ibd_entry_status;' in APP
+    assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
+    assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
+    assert 'return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;' in APP
     assert 'const stageKey = near ? "Review Stage" : "Entry Status";' in APP
 
 
@@ -116,13 +117,16 @@ def test_near_breakout_selected_detail_explains_generic_watch_and_pivot_diagnost
     assert 'detailItem("S Side", text(row.bf_watch_s_side))' in APP
     assert 'detailItem("M Side", text(row.bf_watch_m_side))' in APP
     assert 'const volReason = near ? "Pre-signal"' in APP
+    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
+    assert 'const distanceKey = near ? "Vs Trigger" : "Vs Buy Point";' in APP
 
 
-def test_status_sorting_runtimes_follow_the_five_stage_review_flow() -> None:
+def test_status_sorting_is_owned_by_table_runtime_only() -> None:
     expected = 'const STATUS_ORDER = ["NEAR BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"]'
 
     assert expected in TABLE_RUNTIME
-    assert expected in INTERACTION_RUNTIME
+    assert "sortState" not in INTERACTION_RUNTIME
+    assert "applyRememberedSort" not in INTERACTION_RUNTIME
 
 
 def test_dynamic_filter_runtime_uses_v2_watch_semantics_with_v1_fallback() -> None:
@@ -135,14 +139,17 @@ def test_dynamic_filter_runtime_uses_v2_watch_semantics_with_v1_fallback() -> No
     assert 'displayStatus(row) === status' in TABLE_RUNTIME
     assert 'reviewSetup(row) === route' in TABLE_RUNTIME
     assert 'bounds(rows, "review_distance_pct")' in TABLE_RUNTIME
+    assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio")' in TABLE_RUNTIME
     assert 'String(row.review_change_group || "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)' in TABLE_RUNTIME
 
 
-def test_status_cards_use_roomy_desktop_and_tablet_breakpoints() -> None:
-    assert "@media (width > 1120px)" in INDEX
-    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in INDEX
-    assert "@media (width > 760px) and (width <= 1120px)" in INDEX
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in INDEX
+def test_status_cards_use_explicit_watch_and_entry_groups_with_responsive_breakpoints() -> None:
+    assert "review-stage-status" in APP
+    assert "review-watch-grid" in APP
+    assert "review-entry-grid" in APP
+    assert ".review-watch-grid.status-grid" in INDEX
+    assert ".review-entry-grid.status-grid" in INDEX
+    assert "@media (width <= 760px)" in INDEX
 
 
 def test_dashboard_javascript_is_syntactically_valid() -> None:

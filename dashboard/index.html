@@ -17,6 +17,49 @@
       overscroll-behavior-y: none;
     }
 
+    .review-stage-status {
+      display: grid;
+      grid-template-columns: minmax(210px, .8fr) minmax(0, 3.2fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .review-flow-group { min-width: 0; }
+    .review-flow-label {
+      margin: 0 0 5px;
+      color: #718094;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .review-flow-label span {
+      color: #596779;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .review-watch-grid.status-grid { grid-template-columns: minmax(0, 1fr); }
+    .review-entry-grid.status-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .filter-helper {
+      display: block;
+      margin-top: 5px;
+      color: #718094;
+      font-size: 9px;
+      line-height: 1.3;
+    }
+    .review-default-sort {
+      min-height: 36px;
+      padding: 0 10px;
+      border: 1px solid #465365;
+      border-radius: 6px;
+      background: #151b23;
+      color: #c3ccd8;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     @media (width > 1120px) {
       .status-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -27,6 +70,12 @@
       .status-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
+    }
+
+    @media (width <= 760px) {
+      .review-stage-status { grid-template-columns: 1fr; }
+      .review-entry-grid.status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .review-default-sort { grid-column: 1 / -1; }
     }
 
     /* RS runtime must preserve the table's sticky header behavior. The visual
