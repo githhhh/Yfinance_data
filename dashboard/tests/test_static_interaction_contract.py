@@ -47,20 +47,22 @@ def test_period_context_is_cached_per_period():
     assert "resetAdvanced();" not in reset
 
 
-def test_manual_sort_is_reapplied_synchronously_after_app_renders():
-    assert "rememberManualSort" in INTERACTION
-    assert "applyRememberedSort" in INTERACTION
-    assert 'appObserver.observe(app, { childList: true, subtree: true })' in INTERACTION
-    assert 'event.target.closest?.("thead th > button")' in INTERACTION
-    assert 'event.target.closest?.("[data-rs-info], [data-quality-info]")' in INTERACTION
+def test_manual_sort_is_reapplied_by_single_table_owner_after_app_renders():
+    assert "const sortStates = new Map();" in TABLE
+    assert "function currentSortState()" in TABLE
+    assert "function sortTable(shell, field, direction)" in TABLE
+    assert "const observer = new MutationObserver(enhanceTables);" in TABLE
+    assert "enhanceTables();" in TABLE
+    assert "sortState" not in INTERACTION
+    assert "applyRememberedSort" not in INTERACTION
 
 
 def test_manual_sort_keyboard_review_preserves_horizontal_scroll():
-    assert 'document.addEventListener("keydown"' in INTERACTION
-    assert 'event.stopImmediatePropagation();' in INTERACTION
-    assert "const scrollLeft = shell.scrollLeft" in INTERACTION
-    assert "currentShell.scrollLeft = scrollLeft" in INTERACTION
-    assert 'currentShell.focus({ preventScroll: true })' in INTERACTION
+    assert 'app.addEventListener("keydown"' in TABLE
+    assert 'event.stopImmediatePropagation();' in TABLE
+    assert "const scrollLeft = shell.scrollLeft" in TABLE
+    assert "currentShell.scrollLeft = scrollLeft" in TABLE
+    assert 'currentShell.focus({ preventScroll: true })' in TABLE
 
 
 def test_full_app_renders_preserve_table_viewport():

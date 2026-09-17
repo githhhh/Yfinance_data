@@ -4,16 +4,33 @@
   const app = document.getElementById("app");
   if (!app) return;
 
-  const sortState = { field: null, direction: "asc" };
+  const sortStates = new Map();
   const STATUS_ORDER = ["NEAR BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW TRIGGER", "EXTENDED"];
   const QUALITY_ORDER = ["POWERFUL", "STRONG", "CONSTRUCTIVE", "MARGINAL", "WEAK"];
   let qualityTooltip = null;
   let qualityTooltipPinned = false;
   let qualityTooltipAnchor = null;
-  let refreshQueued = false;
 
   function normalizeText(value) {
     return String(value ?? "").trim();
+  }
+
+  function pressedValue(action) {
+    return app.querySelector(`[data-action="${action}"][aria-pressed="true"]`)?.dataset.value || null;
+  }
+
+  function currentContextKey() {
+    return `${pressedValue("period") || "WEEKEND"}:${pressedValue("scope") || "ALL_SIGNALS"}`;
+  }
+
+  function currentSortState() {
+    return sortStates.get(currentContextKey()) || null;
+  }
+
+  function setCurrentSortState(value) {
+    const key = currentContextKey();
+    if (value) sortStates.set(key, value);
+    else sortStates.delete(key);
   }
 
   function numericValue(value) {
@@ -25,7 +42,7 @@
       .replaceAll("×", "")
       .replace(/x$/i, "")
       .trim();
-    if (!cleaned || cleaned.toLowerCase() === "n/a") return null;
+    if (!cleaned || cleaned.toLowerCase() === "n/a" || cleaned === "—") return null;
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -53,22 +70,16 @@
 
     const numericLeft = numericValue(left);
     const numericRight = numericValue(right);
-
-    // RS is optional runtime data, so an unavailable value stays last in both
-    // directions. All other columns retain the pre-RS table sort semantics.
     if (field === "rs_percentile") {
       if (numericLeft === null && numericRight !== null) return 1;
       if (numericLeft !== null && numericRight === null) return -1;
     }
 
     let result = 0;
-    if (numericLeft !== null && numericRight !== null) {
-      result = numericLeft - numericRight;
-    } else if (numericLeft !== null) {
-      result = -1;
-    } else if (numericRight !== null) {
-      result = 1;
-    } else {
+    if (numericLeft !== null && numericRight !== null) result = numericLeft - numericRight;
+    else if (numericLeft !== null) result = -1;
+    else if (numericRight !== null) result = 1;
+    else {
       result = normalizeText(left).localeCompare(normalizeText(right), undefined, {
         numeric: true,
         sensitivity: "base",
@@ -83,8 +94,10 @@
       Code: "code",
       Change: "review_change_label",
       Status: "ibd_entry_status",
+      "Stage / Status": "ibd_entry_status",
       Setup: "ibd_candidate_rule",
       "Vs Buy Point": "current_vs_ibd_candidate_pct",
+      "Vs Reference": "current_vs_ibd_candidate_pct",
       "Breakout Price Quality": "ibd_breakout_quality",
       Latest: "latest_close",
       "Entry / Reason": "ibd_entry_vol_or_reject",
@@ -108,32 +121,66 @@
       return normalizeText(a.dataset.code).localeCompare(normalizeText(b.dataset.code));
     });
 
-    // MutationObserver re-runs table enhancement after a DOM change. Moving
-    // already-sorted rows again would create a self-sustaining RAF/mutation
-    // loop, which is especially visible as frozen/ignored taps on mobile.
     const orderChanged = sortedRows.some((row, position) => row !== rows[position]);
     if (orderChanged) sortedRows.forEach((row) => body.appendChild(row));
   }
 
   function updateSortIndicators(shell) {
+    const sortState = currentSortState();
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
-      const isActive = sortState.field === header.dataset.sortField;
+      const isActive = sortState?.field === header.dataset.sortField;
       header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
       if (icon) icon.textContent = isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "";
     });
   }
 
-  function updateSummary() {
-    if (!sortState.field) return;
-    const label = app.querySelector(
-      `[data-table-shell] thead th[data-sort-field="${sortState.field}"] .table-header-label`,
+  function updateSummary(shell) {
+    const sortState = currentSortState();
+    if (!sortState) return;
+    const label = shell.querySelector(
+      `thead th[data-sort-field="${sortState.field}"] .table-header-label`,
     )?.textContent;
     const summary = app.querySelector(".results-summary");
-    if (summary && label) {
-      const count = summary.textContent.match(/^\d+\s+(results|of)/i)?.[0];
-      summary.textContent = `${count ? `${count} · ` : ""}Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`;
+    const count = shell.querySelectorAll("tbody tr[data-code]").length;
+    if (summary && label) summary.textContent = `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`;
+  }
+
+  function defaultOrder(shell) {
+    return String(shell.dataset.defaultOrder || "").split("\u001f").filter(Boolean);
+  }
+
+  function restoreDefaultOrder(shell) {
+    const body = shell?.querySelector("tbody");
+    if (!body) return;
+    const rank = new Map(defaultOrder(shell).map((code, index) => [code, index]));
+    [...body.querySelectorAll("tr[data-code]")]
+      .sort((a, b) => (rank.get(a.dataset.code) ?? 999999) - (rank.get(b.dataset.code) ?? 999999))
+      .forEach((row) => body.appendChild(row));
+    setCurrentSortState(null);
+    updateSortIndicators(shell);
+    const summary = app.querySelector(".results-summary");
+    if (summary && shell.dataset.defaultSummary) summary.textContent = shell.dataset.defaultSummary;
+    syncDefaultSortButton(shell);
+  }
+
+  function syncDefaultSortButton(shell) {
+    const toolbar = app.querySelector(".results-toolbar");
+    const slot = toolbar?.lastElementChild;
+    if (!slot) return;
+    let button = slot.querySelector(".review-default-sort");
+    if (!currentSortState()) {
+      button?.remove();
+      return;
     }
+    if (button) return;
+    button = document.createElement("button");
+    button.type = "button";
+    button.className = "review-default-sort";
+    button.textContent = "Default order";
+    button.title = "Return to the system review order for this Period and Scope";
+    button.addEventListener("click", () => restoreDefaultOrder(shell));
+    slot.appendChild(button);
   }
 
   function onHeaderSort(event) {
@@ -144,15 +191,15 @@
     const field = button.closest("th")?.dataset.sortField;
     if (!field) return;
 
-    if (sortState.field === field) {
-      sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
-    } else {
-      sortState.field = field;
-      sortState.direction = "asc";
-    }
-    sortTable(shell, sortState.field, sortState.direction);
+    const previous = currentSortState();
+    const next = previous?.field === field
+      ? { field, direction: previous.direction === "asc" ? "desc" : "asc" }
+      : { field, direction: "asc" };
+    setCurrentSortState(next);
+    sortTable(shell, next.field, next.direction);
     updateSortIndicators(shell);
-    updateSummary();
+    updateSummary(shell);
+    syncDefaultSortButton(shell);
   }
 
   function qualityTooltipHtml() {
@@ -218,6 +265,13 @@
   }
 
   function decorateTable(shell) {
+    if (!shell.dataset.defaultOrder) {
+      shell.dataset.defaultOrder = [...shell.querySelectorAll("tbody tr[data-code]")]
+        .map((row) => row.dataset.code)
+        .join("\u001f");
+      shell.dataset.defaultSummary = app.querySelector(".results-summary")?.textContent || "";
+    }
+
     const headers = [...shell.querySelectorAll("thead th")];
     headers.forEach((header) => {
       if (header.dataset.sortEnhanced === "true") return;
@@ -277,30 +331,23 @@
       header.appendChild(button);
     });
 
-    if (sortState.field) {
+    const sortState = currentSortState();
+    if (sortState) {
       sortTable(shell, sortState.field, sortState.direction);
-      updateSummary();
+      updateSummary(shell);
     }
     updateSortIndicators(shell);
+    syncDefaultSortButton(shell);
   }
 
   function enhanceTables() {
     app.querySelectorAll("[data-table-shell]").forEach(decorateTable);
   }
 
-  function scheduleEnhance() {
-    if (refreshQueued) return;
-    refreshQueued = true;
-    requestAnimationFrame(() => {
-      refreshQueued = false;
-      enhanceTables();
-    });
-  }
-
   app.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     const shell = event.target.closest?.("[data-table-shell]");
-    if (!shell || !sortState.field) return;
+    if (!shell || !currentSortState()) return;
 
     const rows = [...shell.querySelectorAll("tbody tr[data-code]")];
     if (!rows.length) return;
@@ -310,10 +357,17 @@
     if (index < 0) index = event.key === "ArrowDown" ? -1 : rows.length;
     index += event.key === "ArrowDown" ? 1 : -1;
     index = Math.max(0, Math.min(rows.length - 1, index));
+    const code = rows[index].dataset.code;
+    const scrollLeft = shell.scrollLeft;
     rows[index].click();
     requestAnimationFrame(() => {
-      const refreshed = [...shell.querySelectorAll("tbody tr[data-code]")].find((row) => row.dataset.code === rows[index].dataset.code);
-      refreshed?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      const currentShell = app.querySelector("[data-table-shell]");
+      currentShell?.querySelector(`tbody tr[data-code="${CSS.escape(String(code))}"]`)
+        ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (currentShell) {
+        currentShell.scrollLeft = scrollLeft;
+        currentShell.focus({ preventScroll: true });
+      }
     });
   }, true);
 
@@ -323,9 +377,9 @@
   window.addEventListener("resize", positionQualityTooltip);
   window.addEventListener("scroll", () => hideQualityTooltip(true), true);
 
-  const observer = new MutationObserver(scheduleEnhance);
+  const observer = new MutationObserver(enhanceTables);
   observer.observe(app, { childList: true, subtree: true });
-  scheduleEnhance();
+  enhanceTables();
 })();
 
 (() => {
@@ -440,8 +494,8 @@
   }
 
   function labelText(name, inactive, value, kind) {
-    if (name === "distance-min") return `Vs Buy Point · Min · ${inactive ? "Full range" : format(value, kind)}`;
-    if (name === "distance-max") return `Vs Buy Point · Max · ${inactive ? "Full range" : format(value, kind)}`;
+    if (name === "distance-min") return `Vs Reference · Min · ${inactive ? "Full range" : format(value, kind)}`;
+    if (name === "distance-max") return `Vs Reference · Max · ${inactive ? "Full range" : format(value, kind)}`;
     if (name === "entry-volume") return inactive ? "Entry Volume · Min · Full range" : `Entry Volume ≥ ${format(value, kind)}`;
     return inactive ? "Weekly Volume · Min · Full range" : `Weekly Volume ≥ ${format(value, kind)}`;
   }
@@ -455,19 +509,25 @@
     const valueLabels = field ? [...field.querySelectorAll(".range-values small")] : [];
     const appStatus = valueLabels[1]?.textContent?.trim() || "";
     const inactive = appStatus === "Any" || label?.textContent?.includes("Any");
-    const [low, high] = rangeBounds;
+    let [low, high] = rangeBounds;
     const previous = Number(input.value);
+
+    if (!inactive && Number.isFinite(previous)) {
+      low = Math.min(low, previous);
+      high = Math.max(high, previous);
+    }
 
     input.dataset.dynamicBounds = "true";
     input.min = String(low);
     input.max = String(high);
     input.step = "0.1";
 
-    let nextValue = inactive ? (edge === "max" ? high : low) : Math.min(high, Math.max(low, previous));
+    let nextValue = inactive ? (edge === "max" ? high : low) : previous;
     if (!Number.isFinite(nextValue)) nextValue = edge === "max" ? high : low;
     input.value = String(nextValue);
 
     if (low === high) input.disabled = true;
+    else input.disabled = false;
     if (valueLabels[0]) valueLabels[0].textContent = format(low, kind);
     if (valueLabels[1]) valueLabels[1].textContent = format(high, kind);
     if (label) label.textContent = labelText(name, inactive, nextValue, kind);
@@ -475,10 +535,6 @@
     input.addEventListener("input", () => {
       if (label) label.textContent = labelText(name, false, Number(input.value), kind);
     });
-
-    if (!inactive && Math.abs(previous - nextValue) > 1e-9) {
-      queueMicrotask(() => input.dispatchEvent(new Event("change", { bubbles: true })));
-    }
   }
 
   function enhanceRanges() {
@@ -487,7 +543,7 @@
     if (!rows.length) return;
     enhanceRange("distance-min", bounds(rows, "review_distance_pct"), "min", "pct");
     enhanceRange("distance-max", bounds(rows, "review_distance_pct"), "max", "pct");
-    enhanceRange("entry-volume", bounds(rows, "ibd_entry_volume_ratio"), "min", "x");
+    enhanceRange("entry-volume", bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio"), "min", "x");
     enhanceRange("weekly-volume", bounds(rows, "volume_ratio"), "min", "x");
   }
 

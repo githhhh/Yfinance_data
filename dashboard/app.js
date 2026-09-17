@@ -2,7 +2,9 @@
   "use strict";
 
   const app = document.getElementById("app");
-  const STATUS_ORDER = ["NEAR_BREAKOUT", "ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
+  const WATCH_STAGE = "NEAR_BREAKOUT";
+  const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
+  const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER];
   const CHANGE_ORDER = ["BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"];
   const ORIGIN_ORDER = ["NEW", "CARRY", "RECONFIRMED"];
   const ROUTE_LABELS = {
@@ -29,8 +31,8 @@
 
   function bool(value) {
     if (value === true || value === 1) return true;
-    const text = String(value ?? "").trim().toLowerCase();
-    return ["true", "1", "1.0", "yes", "y", "t"].includes(text);
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return ["true", "1", "1.0", "yes", "y", "t"].includes(normalized);
   }
 
   function num(value) {
@@ -154,7 +156,7 @@
   }
 
   function displayStatus(row) {
-    return isNearBreakout(row) ? "NEAR_BREAKOUT" : row.ibd_entry_status;
+    return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;
   }
 
   function reviewSetup(row) {
@@ -190,12 +192,12 @@
     return isNearBreakout(row) ? nearBreakoutDistance(row) : num(row.current_vs_ibd_candidate_pct);
   }
 
-  function reviewBuyPoint(row) {
+  function reviewReferencePrice(row) {
     return isNearBreakout(row) ? nearBreakoutTarget(row) : num(row.ibd_candidate_price);
   }
 
   function displayChange(row) {
-    return isNearBreakout(row) ? "NEAR BREAKOUT" : text(row.review_change_label, "");
+    return isNearBreakout(row) ? "" : text(row.review_change_label, "");
   }
 
   function currentHasComparison() {
@@ -272,6 +274,7 @@
       }
       if (state.entryVolumeMin !== null) {
         result = result.filter((row) => {
+          if (isNearBreakout(row)) return true;
           const value = num(row.ibd_entry_volume_ratio);
           return value !== null && value >= state.entryVolumeMin;
         });
@@ -291,9 +294,18 @@
     const changeBase = filterRows(rows, "change");
     const originBase = filterRows(rows, "origin");
     return {
-      status: Object.fromEntries(STATUS_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length])),
-      change: Object.fromEntries(CHANGE_ORDER.map((key) => [key, changeBase.filter((row) => row.review_change_group === key).length])),
-      origin: Object.fromEntries(ORIGIN_ORDER.map((key) => [key, originBase.filter((row) => row.review_signal_origin === key).length])),
+      status: Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [
+        key,
+        statusBase.filter((row) => displayStatus(row) === key).length,
+      ])),
+      change: Object.fromEntries(CHANGE_ORDER.map((key) => [
+        key,
+        changeBase.filter((row) => row.review_change_group === key).length,
+      ])),
+      origin: Object.fromEntries(ORIGIN_ORDER.map((key) => [
+        key,
+        originBase.filter((row) => row.review_signal_origin === key).length,
+      ])),
     };
   }
 
@@ -304,8 +316,8 @@
         const ap = isNearBreakout(a) ? 5 : num(a.review_priority) ?? 9999;
         const bp = isNearBreakout(b) ? 5 : num(b.review_priority) ?? 9999;
         if (ap !== bp) return ap - bp;
-        const as = STATUS_ORDER.indexOf(displayStatus(a));
-        const bs = STATUS_ORDER.indexOf(displayStatus(b));
+        const as = REVIEW_STATE_ORDER.indexOf(displayStatus(a));
+        const bs = REVIEW_STATE_ORDER.indexOf(displayStatus(b));
         if (as !== bs) return as - bs;
         return String(a.code).localeCompare(String(b.code));
       });
@@ -436,13 +448,26 @@
     </button>`;
   }
 
+  function statusCardHtml(key, count) {
+    const meta = data.ui.status_meta[key] || {};
+    return `<button class="status-card" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${state.status === key}" title="${esc(meta.tooltip || "")}">
+      <span class="status-orb"></span><span><span class="status-label">${esc(meta.label || key)}</span><span class="status-subtitle">${esc(meta.subtitle || "")}</span></span><span class="status-count">${count ?? 0}</span>
+    </button>`;
+  }
+
   function statusCardsHtml(counts) {
-    return `<div class="status-grid">${STATUS_ORDER.map((key) => {
-      const meta = data.ui.status_meta[key] || {};
-      return `<button class="status-card" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${state.status === key}" title="${esc(meta.tooltip || "")}">
-        <span class="status-orb"></span><span><span class="status-label">${esc(meta.label || key)}</span><span class="status-subtitle">${esc(meta.subtitle || "")}</span></span><span class="status-count">${counts[key] ?? 0}</span>
-      </button>`;
-    }).join("")}</div>`;
+    const watch = statusCardHtml(WATCH_STAGE, counts[WATCH_STAGE]);
+    const entries = ENTRY_STATUS_ORDER.map((key) => statusCardHtml(key, counts[key])).join("");
+    return `<div class="review-stage-status">
+      <div class="review-flow-group">
+        <div class="review-flow-label">Watch Stage <span>pre-signal · current candidates</span></div>
+        <div class="status-grid review-watch-grid">${watch}</div>
+      </div>
+      <div class="review-flow-group">
+        <div class="review-flow-label">Entry Status <span>active signals</span></div>
+        <div class="status-grid review-entry-grid">${entries}</div>
+      </div>
+    </div>`;
   }
 
   function bounds(rows, field, floor, ceiling) {
@@ -461,7 +486,7 @@
       return `<section class="filters-wrap"><div class="filters-head"><button class="filter-toggle" data-action="toggle-filters">More Filters · ${active ? `${active} active` : "None"}</button>${active ? `<button class="reset-button" data-action="reset-filters">Reset</button>` : ""}</div></section>`;
     }
     const distance = bounds(rows, "review_distance_pct", -5, 5);
-    const entry = bounds(rows, "ibd_entry_volume_ratio", 0, 1);
+    const entry = bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio", 0, 1);
     const weekly = bounds(rows, "volume_ratio", 0, 1);
     const dMin = state.distanceMin ?? distance?.[0] ?? -5;
     const dMax = state.distanceMax ?? distance?.[1] ?? 5;
@@ -471,10 +496,10 @@
       <section class="filters-wrap">
         <div class="filters-head"><button class="filter-toggle expanded" data-action="toggle-filters">More Filters · ${active ? `${active} active` : "None"}</button>${active ? `<button class="reset-button" data-action="reset-filters">Reset</button>` : ""}</div>
         <div class="filter-controls">
-          <div class="filter-field"><div class="eyebrow">Setup</div><label>Signal setup</label><select data-control="route">${data.ui.setup_options.map((value) => `<option value="${esc(value)}" ${state.route === value ? "selected" : ""}>${esc(routeLabel(value))}</option>`).join("")}</select></div>
-          ${distance ? `<div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Min</label><input data-control="distance-min" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMin}"><div class="range-values"><small>${fmt(dMin, "pct1")}</small><small>${state.distanceMin === null ? "Any" : "Active"}</small></div></div>
-          <div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Buy Point · Max</label><input data-control="distance-max" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMax}"><div class="range-values"><small>${fmt(dMax, "pct1")}</small><small>${state.distanceMax === null ? "Any" : "Active"}</small></div></div>` : ""}
-          ${entry ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.entryVolumeMin === null ? "Entry Volume ≥ Any" : `Entry Volume ≥ ${fmt(entryValue, "x1")}`}</label><input data-control="entry-volume" data-dynamic-bounds="true" type="range" min="${entry[0]}" max="${entry[1]}" step="0.1" value="${entryValue}"><div class="range-values"><small>${fmt(entryValue, "x1")}</small><small>${state.entryVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
+          <div class="filter-field"><div class="eyebrow">Setup</div><label>Setup type</label><select data-control="route">${data.ui.setup_options.map((value) => `<option value="${esc(value)}" ${state.route === value ? "selected" : ""}>${esc(routeLabel(value))}</option>`).join("")}</select></div>
+          ${distance ? `<div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Reference · Min</label><input data-control="distance-min" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMin}"><div class="range-values"><small>${fmt(dMin, "pct1")}</small><small>${state.distanceMin === null ? "Any" : "Active"}</small></div><small class="filter-helper">Watch → trigger · Signal → buy point</small></div>
+          <div class="filter-field"><div class="eyebrow">Price Position</div><label>Vs Reference · Max</label><input data-control="distance-max" data-dynamic-bounds="true" type="range" min="${distance[0]}" max="${distance[1]}" step="0.1" value="${dMax}"><div class="range-values"><small>${fmt(dMax, "pct1")}</small><small>${state.distanceMax === null ? "Any" : "Active"}</small></div></div>` : ""}
+          ${entry ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.entryVolumeMin === null ? "Entry Volume ≥ Any" : `Entry Volume ≥ ${fmt(entryValue, "x1")}`}</label><input data-control="entry-volume" data-dynamic-bounds="true" type="range" min="${entry[0]}" max="${entry[1]}" step="0.1" value="${entryValue}"><div class="range-values"><small>${fmt(entryValue, "x1")}</small><small>${state.entryVolumeMin === null ? "Any" : "Active"}</small></div><small class="filter-helper">Signal stage only · Watch candidates stay visible as N/A</small></div>` : ""}
           ${weekly ? `<div class="filter-field"><div class="eyebrow">Volume</div><label>${state.weeklyVolumeMin === null ? "Weekly Volume ≥ Any" : `Weekly Volume ≥ ${fmt(weeklyValue, "x1")}`}</label><input data-control="weekly-volume" data-dynamic-bounds="true" type="range" min="${weekly[0]}" max="${weekly[1]}" step="0.1" value="${weeklyValue}"><div class="range-values"><small>${fmt(weeklyValue, "x1")}</small><small>${state.weeklyVolumeMin === null ? "Any" : "Active"}</small></div></div>` : ""}
         </div>
       </section>`;
@@ -499,6 +524,8 @@
     const baseline = near ? "" : text(row.review_baseline_entry_status, "");
     const volReason = near ? "Pre-signal" : text(row.ibd_entry_vol_or_reject, "n/a").replace(/x$/, "×");
     const stageKey = near ? "Review Stage" : "Entry Status";
+    const referenceKey = near ? "Watch Trigger" : "Buy Point";
+    const distanceKey = near ? "Vs Trigger" : "Vs Buy Point";
     const transition = baseline
       ? `${esc(statusLabel(baseline))} → <span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`
       : `<span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
@@ -509,8 +536,8 @@
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip">
       <div class="selected-cell"><div class="selected-key">Selected</div><div class="selected-value selected-code">${code}</div>${change ? `<div class="selected-change">${esc(change)}</div>` : ""}<button class="detail-toggle" data-action="detail">${state.detailOpen ? "Hide details ▴" : "Details ▾"}</button></div>
-      <div class="selected-cell"><div class="selected-key">Buy Point</div><div class="selected-value">${fmt(reviewBuyPoint(row))} <small>(${esc(routeLabel(reviewSetup(row)))})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">Vs Buy Point</div><div class="selected-value">${fmt(reviewDistance(row), "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">${referenceKey}</div><div class="selected-value">${fmt(reviewReferencePrice(row))} <small>(${esc(routeLabel(reviewSetup(row)))})</small></div></div>
+      <div class="selected-cell"><div class="selected-key">${distanceKey}</div><div class="selected-value">${fmt(reviewDistance(row), "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
       <div class="selected-cell"><div class="selected-key">${stageKey}</div><div class="selected-value">${transition} <small>(${esc(volReason)})</small></div></div>
       <div class="selected-cell"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
       ${state.detailOpen ? detailHtml(row) : ""}
@@ -525,7 +552,7 @@
       : `${detailItem("Watch Type", routeLabel(setup))}${detailItem("Trigger", fmt(row.bf_watch_trigger_price))}${detailItem("Distance", fmt(row.bf_watch_distance_pct, "pct"))}`;
     return `<div class="detail-panel">
       <div class="detail-section"><div class="detail-title">1. Breakout Setup</div><div class="detail-grid">
-        ${detailItem("Buy Point", fmt(reviewBuyPoint(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Buy Point", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", routeLabel(setup))}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
+        ${detailItem("Watch Trigger", fmt(reviewReferencePrice(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Trigger", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", routeLabel(setup))}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
       </div></div>
       <div class="detail-section"><div class="detail-title">2. Watch Structure</div><div class="detail-grid">
         ${structure}
@@ -595,9 +622,9 @@
     const columns = [
       ["code", "Code"],
       ...(comparison ? [["review_change_label", "Change"]] : []),
-      ["ibd_entry_status", "Status"],
+      ["ibd_entry_status", "Stage / Status"],
       ["ibd_candidate_rule", "Setup"],
-      ["current_vs_ibd_candidate_pct", "Vs Buy Point"],
+      ["current_vs_ibd_candidate_pct", "Vs Reference"],
       ["ibd_breakout_quality", "Breakout Price Quality"],
       ["latest_close", "Latest"],
       ["ibd_entry_vol_or_reject", "Entry / Reason"],
@@ -610,7 +637,11 @@
 
   function cellHtml(row, field) {
     const value = row[field];
-    if (field === "review_change_label") return `<span class="change-badge">${esc(displayChange(row) || "n/a")}</span>`;
+    if (field === "review_change_label") {
+      return isNearBreakout(row)
+        ? `<span class="change-badge" title="Current watch-stage candidate; signal transition labels do not apply yet.">—</span>`
+        : `<span class="change-badge">${esc(displayChange(row) || "n/a")}</span>`;
+    }
     if (field === "ibd_entry_status") {
       const status = displayStatus(row);
       return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
@@ -663,9 +694,6 @@
           render();
         } else if (action === "scope") {
           state.scope = element.dataset.value;
-          state.change = "ALL";
-          state.origin = "ALL";
-          state.status = "ALL";
           state.detailOpen = false;
           render();
         } else if (action === "quick") {
