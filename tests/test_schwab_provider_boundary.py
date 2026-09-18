@@ -7,6 +7,7 @@ from data_providers.schwab_provider import (
     SchwabCredentials,
     SchwabDataProvider,
     SchwabRawTokenClient,
+    _schwab_symbol,
 )
 
 
@@ -78,6 +79,11 @@ def test_index_alias_is_used_only_at_schwab_request_boundary():
     assert symbol == "^GSPC"
     assert frame is not None
     assert mock_client.get_price_history.call_args.args[0] == "$SPX"
+
+
+def test_share_class_symbol_uses_schwab_slash_boundary_format():
+    assert _schwab_symbol("MOG-A") == "MOG/A"
+    assert _schwab_symbol("brk-b") == "BRK/B"
 
 
 def test_formal_daily_history_maps_two_year_request_to_schwab_enums(monkeypatch):

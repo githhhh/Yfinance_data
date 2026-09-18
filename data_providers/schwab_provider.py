@@ -29,7 +29,9 @@ def _enum_value(value: Any) -> Any:
 def _schwab_symbol(symbol: str) -> str:
     """Translate only provider-specific symbols; retain the caller's key."""
     normalized = str(symbol).strip().upper()
-    return SCHWAB_SYMBOL_ALIASES.get(normalized, normalized.replace("-", "."))
+    # Schwab represents dual-class tickers with a slash (for example MOG/A),
+    # while the repository's Yahoo-compatible keys use a hyphen (MOG-A).
+    return SCHWAB_SYMBOL_ALIASES.get(normalized, normalized.replace("-", "/"))
 
 
 class SchwabCredentials:
