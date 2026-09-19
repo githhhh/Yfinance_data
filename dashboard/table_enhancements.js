@@ -125,13 +125,17 @@
     if (orderChanged) sortedRows.forEach((row) => body.appendChild(row));
   }
 
+  function setTextIfChanged(element, value) {
+    if (element && element.textContent !== value) element.textContent = value;
+  }
+
   function updateSortIndicators(shell) {
     const sortState = currentSortState();
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
       const isActive = sortState?.field === header.dataset.sortField;
       header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
-      if (icon) icon.textContent = isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "";
+      setTextIfChanged(icon, isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "");
     });
   }
 
@@ -143,7 +147,9 @@
     )?.textContent;
     const summary = app.querySelector(".results-summary");
     const count = shell.querySelectorAll("tbody tr[data-code]").length;
-    if (summary && label) summary.textContent = `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`;
+    if (summary && label) {
+      setTextIfChanged(summary, `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`);
+    }
   }
 
   function defaultOrder(shell) {

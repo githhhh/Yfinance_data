@@ -57,6 +57,13 @@ def test_manual_sort_is_reapplied_by_single_table_owner_after_app_renders():
     assert "applyRememberedSort" not in INTERACTION
 
 
+def test_manual_sort_updates_are_idempotent_under_the_table_observer():
+    assert "function setTextIfChanged(element, value)" in TABLE
+    assert 'if (element && element.textContent !== value) element.textContent = value;' in TABLE
+    assert 'setTextIfChanged(icon, isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "");' in TABLE
+    assert 'setTextIfChanged(summary, `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`);' in TABLE
+
+
 def test_manual_sort_keyboard_review_preserves_horizontal_scroll():
     assert 'app.addEventListener("keydown"' in TABLE
     assert 'event.stopImmediatePropagation();' in TABLE
