@@ -143,3 +143,19 @@ def test_double_bottom_snapshot_commit_is_explicit(monkeypatch, tmp_path):
             "Update IBD double bottom snapshot",
         )
     ]
+
+
+def test_older_run_rejects_commit_after_current_state_changes(tmp_path, monkeypatch):
+    _patch_paths(tmp_path, monkeypatch)
+
+    complete = yd.IbdDoubleBottomSnapshotRun.complete()
+    complete.save_snapshot(_snapshot(), snapshot_date="2026-09-18")
+
+    midweek = yd.IbdDoubleBottomSnapshotRun.midweek()
+    midweek.save_snapshot(_snapshot(), snapshot_date="2026-09-19")
+
+    with pytest.raises(ValueError, match="snapshot state"):
+        complete.ensure_current_snapshot()
+
+    loaded = midweek.ensure_current_snapshot()
+    assert loaded["snapshot_date"].tolist() == ["2026-09-19", "2026-09-19"]
