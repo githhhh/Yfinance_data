@@ -663,7 +663,10 @@ def _commit_managed_files(paths: list[str], *, message: str) -> None:
         for attempt in range(1, 4):
             try:
                 subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info("Yfinance_data仓库已更新: %s", os.path.basename(path))
+                logging.info(
+                    "Yfinance_data仓库已更新: %s",
+                    ", ".join(os.path.basename(item) for item in managed_paths),
+                )
                 break
             except subprocess.CalledProcessError:
                 if attempt == 3:
