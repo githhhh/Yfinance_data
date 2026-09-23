@@ -443,6 +443,7 @@ class IbdDoubleBottomSnapshotRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
+        self._published_state_digest: str | None = None
 
     @classmethod
     def complete(cls) -> "IbdDoubleBottomSnapshotRun":
@@ -527,6 +528,9 @@ class IbdDoubleBottomSnapshotRun:
             IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH,
         )
         self._published_digest = _snapshot_digest(self.path)
+        self._published_state_digest = _snapshot_digest(
+            IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH
+        )
 
     def ensure_current_snapshot(self) -> pd.DataFrame:
         if self._published_digest is None:
@@ -542,6 +546,22 @@ class IbdDoubleBottomSnapshotRun:
         if current_digest != self._published_digest:
             raise ValueError(
                 f"IBD Double Bottom {self.name} snapshot 与本轮结果不一致"
+            )
+        if self._published_state_digest is None:
+            raise RuntimeError(
+                f"IBD Double Bottom {self.name} snapshot state 未绑定本轮结果"
+            )
+        try:
+            current_state_digest = _snapshot_digest(
+                IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH
+            )
+        except OSError as exc:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot state 与本轮结果不一致"
+            ) from exc
+        if current_state_digest != self._published_state_digest:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot state 与本轮结果不一致"
             )
         snapshot = pd.read_csv(
             self.path,
