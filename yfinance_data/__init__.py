@@ -6,7 +6,6 @@ the compatibility API use the same current-left business rules.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
@@ -40,9 +39,6 @@ IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH = os.path.join(
 )
 IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH = os.path.join(
     DATA_ROOT, "us", "ibd_double_bottom_snapshot_midweek.csv"
-)
-IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH = os.path.join(
-    DATA_ROOT, "us", "ibd_double_bottom_snapshot_state.json"
 )
 
 EPS_PUBLICATION_COLUMNS = (
@@ -137,27 +133,6 @@ def _write_pool_snapshot_atomically(pool: pd.DataFrame, path: str) -> None:
     os.close(fd)
     try:
         pool.to_csv(pending_path, index=False, encoding="utf-8-sig")
-        os.replace(pending_path, path)
-    except Exception:
-        if os.path.exists(pending_path):
-            os.unlink(pending_path)
-        raise
-
-
-def _write_json_atomically(payload: dict[str, object], path: str) -> None:
-    directory = os.path.dirname(path) or "."
-    os.makedirs(directory, exist_ok=True)
-    fd, pending_path = tempfile.mkstemp(
-        prefix=f".{os.path.basename(path)}.",
-        suffix=".pending",
-        dir=directory,
-    )
-    os.close(fd)
-    try:
-        with open(pending_path, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
-            handle.flush()
-            os.fsync(handle.fileno())
         os.replace(pending_path, path)
     except Exception:
         if os.path.exists(pending_path):
@@ -430,7 +405,7 @@ def supplement_latest_pool_signal_eps() -> dict[str, object]:
 
 
 class IbdDoubleBottomSnapshotRun:
-    """Run-scoped publication contract for Double Bottom strategy snapshots."""
+    """Run-scoped publication contract for Double Bottom review snapshots."""
 
     REQUIRED_COLUMNS = {
         "code",
@@ -443,7 +418,6 @@ class IbdDoubleBottomSnapshotRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
-        self._published_state_digest: str | None = None
 
     @classmethod
     def complete(cls) -> "IbdDoubleBottomSnapshotRun":
@@ -513,24 +487,10 @@ class IbdDoubleBottomSnapshotRun:
             )
 
         published = snapshot.copy(deep=True)
-        if "snapshot_date" not in published.columns:
-            published["snapshot_date"] = snapshot_date
-        else:
-            published["snapshot_date"] = snapshot_date
+        published["snapshot_date"] = snapshot_date
         self._validate(published)
-
         _write_pool_snapshot_atomically(published, self.path)
-        _write_json_atomically(
-            {
-                "kind": self.name,
-                "snapshot_date": snapshot_date,
-            },
-            IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH,
-        )
         self._published_digest = _snapshot_digest(self.path)
-        self._published_state_digest = _snapshot_digest(
-            IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH
-        )
 
     def ensure_current_snapshot(self) -> pd.DataFrame:
         if self._published_digest is None:
@@ -547,22 +507,6 @@ class IbdDoubleBottomSnapshotRun:
             raise ValueError(
                 f"IBD Double Bottom {self.name} snapshot 与本轮结果不一致"
             )
-        if self._published_state_digest is None:
-            raise RuntimeError(
-                f"IBD Double Bottom {self.name} snapshot state 未绑定本轮结果"
-            )
-        try:
-            current_state_digest = _snapshot_digest(
-                IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH
-            )
-        except OSError as exc:
-            raise ValueError(
-                f"IBD Double Bottom {self.name} snapshot state 与本轮结果不一致"
-            ) from exc
-        if current_state_digest != self._published_state_digest:
-            raise ValueError(
-                f"IBD Double Bottom {self.name} snapshot state 与本轮结果不一致"
-            )
         snapshot = pd.read_csv(
             self.path,
             dtype={"code": str},
@@ -573,8 +517,8 @@ class IbdDoubleBottomSnapshotRun:
 
     def commit(self) -> None:
         self.ensure_current_snapshot()
-        _commit_managed_files(
-            [self.path, IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH],
+        _commit_managed_csv(
+            self.path,
             message="Update IBD double bottom snapshot",
         )
 
@@ -661,10 +605,10 @@ def _pit_store_path() -> str:
     return path if os.path.isabs(path) else os.path.join(DATA_ROOT, path)
 
 
-def _commit_managed_files(paths: list[str], *, message: str) -> None:
-    """Commit and push already-validated managed files."""
+def _commit_managed_csv(path: str, *, message: str) -> None:
+    """Commit and push one already-validated managed CSV."""
     try:
-        managed_paths = list(dict.fromkeys(paths))
+        managed_paths = [path]
         subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
         staged = subprocess.run(
             ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
@@ -683,10 +627,7 @@ def _commit_managed_files(paths: list[str], *, message: str) -> None:
         for attempt in range(1, 4):
             try:
                 subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info(
-                    "Yfinance_data仓库已更新: %s",
-                    ", ".join(os.path.basename(item) for item in managed_paths),
-                )
+                logging.info("Yfinance_data仓库已更新: %s", os.path.basename(path))
                 break
             except subprocess.CalledProcessError:
                 if attempt == 3:
@@ -698,10 +639,6 @@ def _commit_managed_files(paths: list[str], *, message: str) -> None:
     except Exception as exc:
         logging.error("检查并提交文件时出错: %s", exc)
         raise
-
-
-def _commit_managed_csv(path: str, *, message: str) -> None:
-    _commit_managed_files([path], message=message)
 
 
 def _commit_pool(pool_path: str) -> None:
@@ -753,7 +690,6 @@ __all__ = [
     "BREAKOUT_FOLLOW_POOL_PATH",
     "IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH",
     "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH",
-    "IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH",
     "BreakoutFollowPoolKind",
     "BreakoutFollowPoolRun",
     "IbdDoubleBottomSnapshotRun",
