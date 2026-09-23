@@ -1,24 +1,20 @@
-import json
-
 import pandas as pd
 import pytest
 
 import yfinance_data as yd
 
 
-def _snapshot(date="2026-09-18"):
+def _snapshot():
     return pd.DataFrame(
         [
             {
                 "code": "AAA",
-                "snapshot_date": date,
                 "detection_path": "double_bottom",
                 "signal_type": "Early Watch",
                 "selection_eligible": True,
             },
             {
                 "code": "BBB",
-                "snapshot_date": date,
                 "detection_path": "ibd_double_bottom",
                 "signal_type": "Buy Zone",
                 "selection_eligible": True,
@@ -27,45 +23,48 @@ def _snapshot(date="2026-09-18"):
     )
 
 
-def _patch_paths(tmp_path, monkeypatch, *, midweek=False):
-    complete = tmp_path / "ibd_double_bottom_snapshot.csv"
-    mid = tmp_path / "ibd_double_bottom_snapshot_midweek.csv"
-    state = tmp_path / "ibd_double_bottom_snapshot_state.json"
-    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(complete))
-    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH", str(mid))
-    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_STATE_PATH", str(state))
-    return (mid if midweek else complete), state
-
-
 @pytest.mark.parametrize(
-    ("factory", "midweek", "kind"),
+    ("factory", "midweek", "filename"),
     [
-        (yd.IbdDoubleBottomSnapshotRun.complete, False, "complete"),
-        (yd.IbdDoubleBottomSnapshotRun.midweek, True, "midweek"),
+        (
+            yd.IbdDoubleBottomSnapshotRun.complete,
+            False,
+            "ibd_double_bottom_snapshot.csv",
+        ),
+        (
+            yd.IbdDoubleBottomSnapshotRun.midweek,
+            True,
+            "ibd_double_bottom_snapshot_midweek.csv",
+        ),
     ],
 )
 def test_double_bottom_snapshot_publish_is_atomic_and_run_scoped(
-    tmp_path, monkeypatch, factory, midweek, kind
+    tmp_path,
+    monkeypatch,
+    factory,
+    midweek,
+    filename,
 ):
-    target, state = _patch_paths(tmp_path, monkeypatch, midweek=midweek)
+    complete = tmp_path / "ibd_double_bottom_snapshot.csv"
+    mid = tmp_path / "ibd_double_bottom_snapshot_midweek.csv"
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(complete))
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH", str(mid))
 
     run = factory()
     run.save_snapshot(_snapshot(), snapshot_date="2026-09-18")
 
+    target = mid if midweek else complete
+    assert target.name == filename
     assert target.is_file()
-    assert state.is_file()
     loaded = run.ensure_current_snapshot()
     assert loaded["code"].tolist() == ["AAA", "BBB"]
     assert loaded["snapshot_date"].tolist() == ["2026-09-18", "2026-09-18"]
-    assert json.loads(state.read_text(encoding="utf-8")) == {
-        "kind": kind,
-        "snapshot_date": "2026-09-18",
-    }
     assert not list(tmp_path.glob("*.pending"))
 
 
 def test_double_bottom_snapshot_rejects_duplicate_codes(tmp_path, monkeypatch):
-    target, state = _patch_paths(tmp_path, monkeypatch)
+    target = tmp_path / "ibd_double_bottom_snapshot.csv"
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(target))
     snapshot = _snapshot()
     snapshot.loc[1, "code"] = "AAA"
 
@@ -76,11 +75,11 @@ def test_double_bottom_snapshot_rejects_duplicate_codes(tmp_path, monkeypatch):
         )
 
     assert not target.exists()
-    assert not state.exists()
 
 
 def test_double_bottom_snapshot_rejects_invalid_explicit_date(tmp_path, monkeypatch):
-    target, state = _patch_paths(tmp_path, monkeypatch)
+    target = tmp_path / "ibd_double_bottom_snapshot.csv"
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(target))
 
     with pytest.raises(ValueError, match="snapshot_date"):
         yd.IbdDoubleBottomSnapshotRun.complete().save_snapshot(
@@ -89,25 +88,11 @@ def test_double_bottom_snapshot_rejects_invalid_explicit_date(tmp_path, monkeypa
         )
 
     assert not target.exists()
-    assert not state.exists()
 
 
-def test_explicit_snapshot_date_is_authoritative(tmp_path, monkeypatch):
-    target, state = _patch_paths(tmp_path, monkeypatch)
-    snapshot = _snapshot("2026-09-17")
-
-    run = yd.IbdDoubleBottomSnapshotRun.complete()
-    run.save_snapshot(snapshot, snapshot_date="2026-09-18")
-
-    loaded = pd.read_csv(target, encoding="utf-8-sig")
-    assert loaded["snapshot_date"].tolist() == ["2026-09-18", "2026-09-18"]
-    assert json.loads(state.read_text(encoding="utf-8"))["snapshot_date"] == "2026-09-18"
-
-
-def test_empty_double_bottom_snapshot_persists_authoritative_date(
-    tmp_path, monkeypatch
-):
-    target, state = _patch_paths(tmp_path, monkeypatch)
+def test_empty_double_bottom_snapshot_is_valid(tmp_path, monkeypatch):
+    target = tmp_path / "ibd_double_bottom_snapshot.csv"
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(target))
     empty = _snapshot().iloc[0:0]
 
     run = yd.IbdDoubleBottomSnapshotRun.complete()
@@ -117,19 +102,16 @@ def test_empty_double_bottom_snapshot_persists_authoritative_date(
     loaded = run.ensure_current_snapshot()
     assert loaded.empty
     assert set(yd.IbdDoubleBottomSnapshotRun.REQUIRED_COLUMNS).issubset(loaded.columns)
-    assert json.loads(state.read_text(encoding="utf-8")) == {
-        "kind": "complete",
-        "snapshot_date": "2026-09-18",
-    }
 
 
 def test_double_bottom_snapshot_commit_is_explicit(monkeypatch, tmp_path):
-    target, state = _patch_paths(tmp_path, monkeypatch)
+    target = tmp_path / "ibd_double_bottom_snapshot.csv"
+    monkeypatch.setattr(yd, "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH", str(target))
     calls = []
     monkeypatch.setattr(
         yd,
-        "_commit_managed_files",
-        lambda paths, message: calls.append((list(paths), message)),
+        "_commit_managed_csv",
+        lambda path, message: calls.append((path, message)),
     )
 
     run = yd.IbdDoubleBottomSnapshotRun.complete()
@@ -139,23 +121,7 @@ def test_double_bottom_snapshot_commit_is_explicit(monkeypatch, tmp_path):
     run.commit()
     assert calls == [
         (
-            [str(target), str(state)],
+            str(target),
             "Update IBD double bottom snapshot",
         )
     ]
-
-
-def test_older_run_rejects_commit_after_current_state_changes(tmp_path, monkeypatch):
-    _patch_paths(tmp_path, monkeypatch)
-
-    complete = yd.IbdDoubleBottomSnapshotRun.complete()
-    complete.save_snapshot(_snapshot(), snapshot_date="2026-09-18")
-
-    midweek = yd.IbdDoubleBottomSnapshotRun.midweek()
-    midweek.save_snapshot(_snapshot(), snapshot_date="2026-09-19")
-
-    with pytest.raises(ValueError, match="snapshot state"):
-        complete.ensure_current_snapshot()
-
-    loaded = midweek.ensure_current_snapshot()
-    assert loaded["snapshot_date"].tolist() == ["2026-09-19", "2026-09-19"]
