@@ -34,6 +34,12 @@ BREAKOUT_FOLLOW_POOL_PATH = os.path.join(DATA_ROOT, "us", "breakout_follow_pool.
 BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH = os.path.join(
     DATA_ROOT, "us", "breakout_follow_pool_midweek.csv"
 )
+IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH = os.path.join(
+    DATA_ROOT, "us", "ibd_double_bottom_snapshot.csv"
+)
+IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH = os.path.join(
+    DATA_ROOT, "us", "ibd_double_bottom_snapshot_midweek.csv"
+)
 
 EPS_PUBLICATION_COLUMNS = (
     "eps_yoy_growth",
@@ -398,6 +404,106 @@ def supplement_latest_pool_signal_eps() -> dict[str, object]:
     }
 
 
+class IbdDoubleBottomSnapshotRun:
+    """Run-scoped publication contract for Double Bottom strategy snapshots."""
+
+    REQUIRED_COLUMNS = {
+        "code",
+        "snapshot_date",
+        "detection_path",
+        "signal_type",
+        "selection_eligible",
+    }
+
+    def __init__(self, *, _midweek: bool):
+        self._midweek = _midweek
+        self._published_digest: str | None = None
+
+    @classmethod
+    def complete(cls) -> "IbdDoubleBottomSnapshotRun":
+        return cls(_midweek=False)
+
+    @classmethod
+    def midweek(cls) -> "IbdDoubleBottomSnapshotRun":
+        return cls(_midweek=True)
+
+    @property
+    def name(self) -> str:
+        return "midweek" if self._midweek else "complete"
+
+    @property
+    def path(self) -> str:
+        if self._midweek:
+            return IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH
+        return IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH
+
+    def _validate(self, snapshot: pd.DataFrame) -> None:
+        missing = self.REQUIRED_COLUMNS.difference(snapshot.columns)
+        if missing:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot 缺少字段: {sorted(missing)}"
+            )
+
+        codes = [
+            str(value).strip()
+            for value in snapshot["code"].dropna()
+            if str(value).strip() and str(value).strip().lower() != "nan"
+        ]
+        if len(codes) != len(set(codes)):
+            raise ValueError(f"IBD Double Bottom {self.name} snapshot code 重复")
+
+        if snapshot.empty:
+            return
+
+        dates = (
+            snapshot["snapshot_date"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .str[:10]
+        )
+        dates = dates[dates.ne("")]
+        if len(dates) != len(snapshot) or dates.nunique() != 1:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot snapshot_date 不一致"
+            )
+
+    def save_snapshot(self, snapshot: pd.DataFrame) -> None:
+        self._validate(snapshot)
+        _write_pool_snapshot_atomically(snapshot, self.path)
+        self._published_digest = _snapshot_digest(self.path)
+
+    def ensure_current_snapshot(self) -> pd.DataFrame:
+        if self._published_digest is None:
+            raise RuntimeError(
+                f"IBD Double Bottom {self.name} snapshot 本轮尚未成功写入"
+            )
+        try:
+            current_digest = _snapshot_digest(self.path)
+        except OSError as exc:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot 与本轮结果不一致"
+            ) from exc
+        if current_digest != self._published_digest:
+            raise ValueError(
+                f"IBD Double Bottom {self.name} snapshot 与本轮结果不一致"
+            )
+        snapshot = pd.read_csv(
+            self.path,
+            dtype={"code": str},
+            encoding="utf-8-sig",
+        )
+        self._validate(snapshot)
+        return snapshot
+
+    def commit(self) -> None:
+        self.ensure_current_snapshot()
+        _commit_managed_csv(
+            self.path,
+            message="Update IBD double bottom snapshot",
+        )
+
+
 class BreakoutFollowPoolRun:
     """Run-scoped access to the weekend or midweek BreakoutFollow Pool."""
 
@@ -480,6 +586,42 @@ def _pit_store_path() -> str:
     return path if os.path.isabs(path) else os.path.join(DATA_ROOT, path)
 
 
+def _commit_managed_csv(path: str, *, message: str) -> None:
+    """Commit and push one already-validated managed CSV."""
+    try:
+        managed_paths = [path]
+        subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
+            cwd=DATA_ROOT,
+        )
+        if staged.returncode == 0:
+            return
+        if staged.returncode != 1:
+            raise subprocess.CalledProcessError(staged.returncode, staged.args)
+
+        subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=DATA_ROOT,
+            check=True,
+        )
+        for attempt in range(1, 4):
+            try:
+                subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
+                logging.info("Yfinance_data仓库已更新: %s", os.path.basename(path))
+                break
+            except subprocess.CalledProcessError:
+                if attempt == 3:
+                    raise
+                time.sleep(5)
+    except subprocess.CalledProcessError as exc:
+        logging.error("Git操作失败: %s", exc)
+        raise
+    except Exception as exc:
+        logging.error("检查并提交文件时出错: %s", exc)
+        raise
+
+
 def _commit_pool(pool_path: str) -> None:
     """Commit only a pool that satisfies the current EPS publication contract."""
     if os.path.exists(pool_path):
@@ -527,8 +669,11 @@ def _commit_pool(pool_path: str) -> None:
 __all__ = [
     "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH",
     "BREAKOUT_FOLLOW_POOL_PATH",
+    "IBD_DOUBLE_BOTTOM_SNAPSHOT_MIDWEEK_PATH",
+    "IBD_DOUBLE_BOTTOM_SNAPSHOT_PATH",
     "BreakoutFollowPoolKind",
     "BreakoutFollowPoolRun",
+    "IbdDoubleBottomSnapshotRun",
     "classify_breakout_follow_pool",
     "complete_snapshot_week",
     "complete_target_week",
