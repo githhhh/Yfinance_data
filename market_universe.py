@@ -6,6 +6,7 @@ artifacts such as EPS PIT caches are deliberately not inferred from ``us/``.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -24,6 +25,7 @@ IBD_DOUBLE_BOTTOM_TRACKING_SOURCE_FILES = (
     "us/ibd_double_bottom_snapshot.csv",
     "us/ibd_double_bottom_snapshot_midweek.csv",
 )
+IBD_DOUBLE_BOTTOM_TRACKING_STATE_FILE = "us/ibd_double_bottom_snapshot_state.json"
 
 
 def _normalize_code(value: object) -> str | None:
@@ -93,6 +95,82 @@ def _double_bottom_tracking_codes(source: pd.DataFrame) -> set[str]:
     return codes
 
 
+def _load_current_double_bottom_tracking_source(root: Path) -> pd.DataFrame | None:
+    state_path = root / IBD_DOUBLE_BOTTOM_TRACKING_STATE_FILE
+    snapshot_paths = {
+        "complete": root / IBD_DOUBLE_BOTTOM_TRACKING_SOURCE_FILES[0],
+        "midweek": root / IBD_DOUBLE_BOTTOM_TRACKING_SOURCE_FILES[1],
+    }
+    existing_snapshots = [path for path in snapshot_paths.values() if path.exists()]
+
+    if not state_path.exists():
+        if existing_snapshots:
+            raise RuntimeError(
+                "IBD Double Bottom snapshot state missing while snapshot CSV exists"
+            )
+        return None
+
+    try:
+        with state_path.open("r", encoding="utf-8") as handle:
+            state = json.load(handle)
+    except Exception as exc:
+        raise RuntimeError(
+            f"IBD Double Bottom snapshot state unreadable: {state_path}"
+        ) from exc
+
+    kind = _text(state.get("kind"))
+    snapshot_date = _text(state.get("snapshot_date"))
+    if kind not in snapshot_paths:
+        raise ValueError(f"IBD Double Bottom snapshot state kind invalid: {kind}")
+    try:
+        normalized_date = pd.Timestamp(snapshot_date).strftime("%Y-%m-%d")
+    except Exception as exc:
+        raise ValueError(
+            f"IBD Double Bottom snapshot state date invalid: {snapshot_date}"
+        ) from exc
+    if normalized_date != snapshot_date:
+        raise ValueError(
+            f"IBD Double Bottom snapshot state date invalid: {snapshot_date}"
+        )
+
+    source_path = snapshot_paths[kind]
+    if not source_path.exists():
+        raise RuntimeError(
+            f"IBD Double Bottom current snapshot missing: {source_path}"
+        )
+    try:
+        source = pd.read_csv(source_path, dtype={"code": str})
+    except Exception as exc:
+        raise RuntimeError(
+            f"IBD Double Bottom current snapshot unreadable: {source_path}"
+        ) from exc
+
+    required = {"code", "snapshot_date", "detection_path", "signal_type"}
+    missing = required.difference(source.columns)
+    if missing:
+        raise ValueError(
+            f"IBD Double Bottom current snapshot missing columns: {sorted(missing)}"
+        )
+    if not source.empty:
+        dates = source["snapshot_date"].dropna().astype(str).str.strip().str[:10]
+        dates = dates[dates.ne("")]
+        if (
+            len(dates) != len(source)
+            or dates.nunique() != 1
+            or dates.iloc[0] != snapshot_date
+        ):
+            raise ValueError(
+                "IBD Double Bottom current snapshot date does not match state"
+            )
+
+    logging.info(
+        "Download universe Double Bottom current snapshot %s: %s",
+        kind,
+        snapshot_date,
+    )
+    return source
+
+
 def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
     """Return the deduplicated, deterministic market-data input universe."""
     root = Path(data_root)
@@ -120,25 +198,12 @@ def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
         tickers.update(source_codes)
         logging.info("Download universe source %s: %s codes", relative_path, len(source_codes))
 
-    for relative_path in IBD_DOUBLE_BOTTOM_TRACKING_SOURCE_FILES:
-        source_path = root / relative_path
-        if not source_path.exists():
-            logging.warning("Download universe source missing: %s", source_path)
-            continue
-        try:
-            source = pd.read_csv(source_path, dtype={"code": str})
-            source_codes = _double_bottom_tracking_codes(source)
-        except Exception as exc:
-            logging.warning(
-                "Double Bottom tracking source unreadable: %s (%s)",
-                source_path,
-                exc,
-            )
-            continue
+    double_bottom_source = _load_current_double_bottom_tracking_source(root)
+    if double_bottom_source is not None:
+        source_codes = _double_bottom_tracking_codes(double_bottom_source)
         tickers.update(source_codes)
         logging.info(
-            "Download universe Double Bottom source %s: %s active codes",
-            relative_path,
+            "Download universe Double Bottom active tracking: %s codes",
             len(source_codes),
         )
 
