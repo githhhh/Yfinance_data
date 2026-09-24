@@ -527,7 +527,7 @@
     const buyPointDate = dateText(row.buy_point_date);
     const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
     const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
-    const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
+    const referenceNote = `<strong class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
     const baseDepth = num(row.base_depth_pct);
     const baseDuration = num(row.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null

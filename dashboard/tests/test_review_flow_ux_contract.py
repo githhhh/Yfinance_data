@@ -33,7 +33,9 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
     assert 'return isNearBreakout(row) ? "" : text(row.review_change_label, "");' in APP
     assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
-    assert 'const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
+    assert 'class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
     assert "signal transition labels do not apply yet" in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP

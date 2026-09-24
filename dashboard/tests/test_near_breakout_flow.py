@@ -113,7 +113,7 @@ def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
     assert 'return "Recovery High"' in APP
     assert 'return "TWK High"' in APP
     assert 'return "Pending High"' in APP
-    assert 'const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
+    assert 'class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
 
 
