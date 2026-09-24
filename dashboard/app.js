@@ -537,20 +537,33 @@
     const pullbackDuration = num(row.pullback_duration_weeks);
     const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
       ? null : bool(row.pullback_v_is_dry);
-    const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry === true;
-    const pullbackValue = `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}w`}`;
+    const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
+    const pullbackValue = pullbackVisible
+      ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}w`}`
+      : "—";
     const currentRs = num(row.rs_percentile);
     const rsValue = currentRs === null
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
-    return `<div class="selected-strip ${pullbackVisible ? "has-pullback" : ""}" aria-label="Selected overview for ${esc(row.code)}">
+    return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
       <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
       <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">Depth · Duration</div></div>
       <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
-      ${pullbackVisible ? `<div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}</div></div>` : ""}
+      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">${pullbackVisible ? `Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}` : "No evidence"}</div></div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
+  }
+
+  function keepReviewRowVisibleInTable(shell, target) {
+    const shellRect = shell.getBoundingClientRect();
+    const rowRect = target.getBoundingClientRect();
+    const headerHeight = shell.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    const visibleTop = shellRect.top + headerHeight;
+    let delta = 0;
+    if (rowRect.top < visibleTop) delta = rowRect.top - visibleTop;
+    else if (rowRect.bottom > shellRect.bottom) delta = rowRect.bottom - shellRect.bottom;
+    if (Math.abs(delta) > 0.5) shell.scrollTop = Math.max(0, shell.scrollTop + delta);
   }
 
   function renderSelection(currentRows, { focusTable = false, scrollCode = null } = {}) {
@@ -570,10 +583,8 @@
 
     const shell = app.querySelector("[data-table-shell]");
     if (shell && scrollCode) {
-      const scrollLeft = shell.scrollLeft;
       const target = shell.querySelector(`tr[data-code="${CSS.escape(String(scrollCode))}"]`);
-      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      shell.scrollLeft = scrollLeft;
+      if (target) keepReviewRowVisibleInTable(shell, target);
     }
     if (focusTable) shell?.focus({ preventScroll: true });
   }

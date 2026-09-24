@@ -350,6 +350,17 @@
     app.querySelectorAll("[data-table-shell]").forEach(decorateTable);
   }
 
+  function keepRowVisibleInTable(shell, target) {
+    const shellRect = shell.getBoundingClientRect();
+    const rowRect = target.getBoundingClientRect();
+    const headerHeight = shell.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    const visibleTop = shellRect.top + headerHeight;
+    let delta = 0;
+    if (rowRect.top < visibleTop) delta = rowRect.top - visibleTop;
+    else if (rowRect.bottom > shellRect.bottom) delta = rowRect.bottom - shellRect.bottom;
+    if (Math.abs(delta) > 0.5) shell.scrollTop = Math.max(0, shell.scrollTop + delta);
+  }
+
   app.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     const shell = event.target.closest?.("[data-table-shell]");
@@ -364,16 +375,12 @@
     index += event.key === "ArrowDown" ? 1 : -1;
     index = Math.max(0, Math.min(rows.length - 1, index));
     const code = rows[index].dataset.code;
-    const scrollLeft = shell.scrollLeft;
     rows[index].click();
     requestAnimationFrame(() => {
       const currentShell = app.querySelector("[data-table-shell]");
-      currentShell?.querySelector(`tbody tr[data-code="${CSS.escape(String(code))}"]`)
-        ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      if (currentShell) {
-        currentShell.scrollLeft = scrollLeft;
-        currentShell.focus({ preventScroll: true });
-      }
+      const target = currentShell?.querySelector(`tbody tr[data-code="${CSS.escape(String(code))}"]`);
+      if (currentShell && target) keepRowVisibleInTable(currentShell, target);
+      currentShell?.focus({ preventScroll: true });
     });
   }, true);
 
