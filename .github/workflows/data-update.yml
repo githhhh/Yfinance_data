@@ -54,6 +54,13 @@ jobs:
           python DataStore.py --period=5y --interval=1wk --skip-screener
           echo "Weekly data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
+      - name: Update Pine-compatible RS snapshot
+        continue-on-error: true
+        run: |
+          echo "RS snapshot execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          python rs_snapshot.py
+          echo "RS snapshot execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+
       - name: Clean old data files (Keep today only)
         run: |
           cd results_pkl 2>/dev/null || { echo "No results_pkl directory"; exit 0; }

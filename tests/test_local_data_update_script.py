@@ -1,4 +1,5 @@
 import subprocess
+import stat
 from pathlib import Path
 
 
@@ -8,6 +9,10 @@ RUNNER = PROJECT_ROOT / "scripts" / "run_local_data_update.sh"
 
 def test_local_data_update_runner_has_valid_shell_syntax():
     subprocess.run(["/bin/bash", "-n", str(RUNNER)], check=True)
+
+
+def test_local_data_update_runner_is_executable():
+    assert RUNNER.stat().st_mode & stat.S_IXUSR
 
 
 def test_local_data_update_runner_mirrors_existing_update_flow():

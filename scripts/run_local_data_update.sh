@@ -49,6 +49,11 @@ fi
 echo "[LocalDataUpdate] provider=$PROVIDER: running 5Y weekly download"
 python DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener
 
+echo "[LocalDataUpdate] updating Pine-compatible RS snapshot"
+if ! python rs_snapshot.py; then
+    echo "[LocalDataUpdate] warning: RS snapshot failed; continuing PKL publication" >&2
+fi
+
 TODAY=$(date +"%d%m%y")
 echo "[LocalDataUpdate] keeping PKL files with suffix: $TODAY"
 find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete
