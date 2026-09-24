@@ -160,19 +160,24 @@ def test_breakout_follow_commit_reuses_managed_csv(monkeypatch, tmp_path):
     ]
 
 
-def test_commit_managed_csv_pushes_even_when_no_new_diff(monkeypatch, tmp_path):
+def test_commit_managed_csv_retries_push_for_unpushed_managed_change(
+    monkeypatch,
+    tmp_path,
+):
     calls = []
 
     class Result:
-        def __init__(self, returncode=0):
+        def __init__(self, returncode=0, args=None):
             self.returncode = returncode
-            self.args = []
+            self.args = list(args or [])
 
     def fake_run(args, cwd=None, check=False):
         calls.append(list(args))
         if args[:4] == ["git", "diff", "--cached", "--quiet"]:
-            return Result(0)
-        return Result(0)
+            return Result(0, args)
+        if args[:4] == ["git", "diff", "--quiet", "@{u}..HEAD"]:
+            return Result(1, args)
+        return Result(0, args)
 
     monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(yd.subprocess, "run", fake_run)
@@ -183,6 +188,30 @@ def test_commit_managed_csv_pushes_even_when_no_new_diff(monkeypatch, tmp_path):
     assert ["git", "push"] in calls
 
 
+def test_commit_managed_csv_skips_push_when_managed_change_is_already_upstream(
+    monkeypatch,
+    tmp_path,
+):
+    calls = []
+
+    class Result:
+        def __init__(self, returncode=0, args=None):
+            self.returncode = returncode
+            self.args = list(args or [])
+
+    def fake_run(args, cwd=None, check=False):
+        calls.append(list(args))
+        return Result(0, args)
+
+    monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(yd.subprocess, "run", fake_run)
+
+    yd._commit_managed_csv("us/example.csv", message="Update example")
+
+    assert ["git", "commit", "-m", "Update example"] not in calls
+    assert ["git", "push"] not in calls
+
+
 def test_commit_managed_csv_commits_then_pushes_when_diff_is_staged(
     monkeypatch,
     tmp_path,
@@ -190,15 +219,15 @@ def test_commit_managed_csv_commits_then_pushes_when_diff_is_staged(
     calls = []
 
     class Result:
-        def __init__(self, returncode=0):
+        def __init__(self, returncode=0, args=None):
             self.returncode = returncode
-            self.args = []
+            self.args = list(args or [])
 
     def fake_run(args, cwd=None, check=False):
         calls.append(list(args))
         if args[:4] == ["git", "diff", "--cached", "--quiet"]:
-            return Result(1)
-        return Result(0)
+            return Result(1, args)
+        return Result(0, args)
 
     monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(yd.subprocess, "run", fake_run)
