@@ -420,8 +420,13 @@ class IbdDoubleBottomSnapshotRun:
         self._published_digest: str | None = None
 
     @classmethod
-    def complete(cls) -> "IbdDoubleBottomSnapshotRun":
+    def weekend(cls) -> "IbdDoubleBottomSnapshotRun":
         return cls(_midweek=False)
+
+    @classmethod
+    def complete(cls) -> "IbdDoubleBottomSnapshotRun":
+        """Backward-compatible alias for the weekend snapshot."""
+        return cls.weekend()
 
     @classmethod
     def midweek(cls) -> "IbdDoubleBottomSnapshotRun":
@@ -429,6 +434,8 @@ class IbdDoubleBottomSnapshotRun:
 
     @property
     def name(self) -> str:
+        # Preserve the pre-existing public name while exposing weekend() as
+        # the canonical constructor for the complete snapshot.
         return "midweek" if self._midweek else "complete"
 
     @property
@@ -605,10 +612,10 @@ def _pit_store_path() -> str:
     return path if os.path.isabs(path) else os.path.join(DATA_ROOT, path)
 
 
-def _commit_managed_csv(path: str, *, message: str) -> None:
-    """Commit and push one already-validated managed CSV."""
+def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
+    """Commit and push one or more already-validated managed CSVs."""
     try:
-        managed_paths = [path]
+        managed_paths = [paths] if isinstance(paths, str) else list(paths)
         subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
         staged = subprocess.run(
             ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
@@ -627,7 +634,10 @@ def _commit_managed_csv(path: str, *, message: str) -> None:
         for attempt in range(1, 4):
             try:
                 subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info("Yfinance_data仓库已更新: %s", os.path.basename(path))
+                logging.info(
+                    "Yfinance_data仓库已更新: %s",
+                    os.path.basename(managed_paths[0]),
+                )
                 break
             except subprocess.CalledProcessError:
                 if attempt == 3:
@@ -647,42 +657,15 @@ def _commit_pool(pool_path: str) -> None:
         pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
 
-    try:
-        managed_paths = [pool_path]
-        pit_path = _pit_store_path()
-        if os.path.exists(pit_path):
-            managed_paths.append(pit_path)
+    managed_paths = [pool_path]
+    pit_path = _pit_store_path()
+    if os.path.exists(pit_path):
+        managed_paths.append(pit_path)
 
-        subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
-            cwd=DATA_ROOT,
-        )
-        if staged.returncode == 0:
-            return
-        if staged.returncode != 1:
-            raise subprocess.CalledProcessError(staged.returncode, staged.args)
-
-        subprocess.run(
-            ["git", "commit", "-m", "Update breakout follow pool"],
-            cwd=DATA_ROOT,
-            check=True,
-        )
-        for attempt in range(1, 4):
-            try:
-                subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info("Yfinance_data仓库已更新: %s", os.path.basename(pool_path))
-                break
-            except subprocess.CalledProcessError:
-                if attempt == 3:
-                    raise
-                time.sleep(5)
-    except subprocess.CalledProcessError as exc:
-        logging.error("Git操作失败: %s", exc)
-        raise
-    except Exception as exc:
-        logging.error("检查并提交文件时出错: %s", exc)
-        raise
+    _commit_managed_csv(
+        managed_paths,
+        message="Update breakout follow pool",
+    )
 
 
 __all__ = [
