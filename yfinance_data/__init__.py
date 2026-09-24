@@ -630,10 +630,23 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
                 cwd=DATA_ROOT,
                 check=True,
             )
+        else:
+            # No new diff may mean either "already published" or "the previous
+            # run committed locally but push failed". Only retry push when the
+            # managed CSVs themselves differ from the configured upstream;
+            # unrelated local commits must not be pushed by this helper.
+            unpushed = subprocess.run(
+                ["git", "diff", "--quiet", "@{u}..HEAD", "--", *managed_paths],
+                cwd=DATA_ROOT,
+            )
+            if unpushed.returncode == 0:
+                return
+            if unpushed.returncode != 1:
+                raise subprocess.CalledProcessError(
+                    unpushed.returncode,
+                    unpushed.args,
+                )
 
-        # Always push, even when this run has no new staged diff. A previous
-        # run may have committed successfully but failed during push; returning
-        # early here would incorrectly report publication success on retry.
         for attempt in range(1, 4):
             try:
                 subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
