@@ -327,7 +327,11 @@ def write_snapshot(rows: list[dict], run_date: date, results_dir: Path = RESULTS
     fd, tmp = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=results_dir)
     try:
         with os.fdopen(fd, "w", newline="", encoding="utf-8") as fh:
-            writer = csv.DictWriter(fh, fieldnames=["Ticker", "RS", "AnchorDate"])
+            writer = csv.DictWriter(
+                fh,
+                fieldnames=["Ticker", "RS", "AnchorDate"],
+                lineterminator="\n",
+            )
             writer.writeheader()
             writer.writerows(rows)
             fh.flush()

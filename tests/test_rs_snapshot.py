@@ -175,6 +175,7 @@ def test_snapshot_output_has_only_required_columns(tmp_path):
     )
     frame = pd.read_csv(target)
     assert frame.columns.tolist() == ["Ticker", "RS", "AnchorDate"]
+    assert b"\r\n" not in target.read_bytes()
 
 
 def test_manual_pkl_entry_publishes_from_selected_existing_daily_file(monkeypatch, tmp_path):
