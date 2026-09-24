@@ -24,12 +24,12 @@ def test_interaction_runtime_is_published_by_static_build():
     assert 'src="./interaction_runtime.js"' in INDEX
 
 
-def test_row_selection_updates_in_place_and_keeps_detail_state():
+def test_row_selection_updates_overview_in_place():
     needle = 'app.querySelectorAll("tbody tr[data-code]").forEach((row) => {'
-    row_handler = APP.rsplit(needle, 1)[1].split("bindSelectedEvents(currentRows);", 1)[0]
+    row_handler = APP.rsplit(needle, 1)[1].split('const reviewShell = app.querySelector("[data-table-shell]");', 1)[0]
     assert "renderSelection(currentRows, { focusTable: true })" in row_handler
-    assert "state.detailOpen = false" not in row_handler
     assert "render();" not in row_handler
+    assert "detailOpen" not in APP
 
 
 def test_selection_restores_focus_and_horizontal_scroll():
@@ -83,11 +83,11 @@ def test_full_app_renders_preserve_table_viewport():
     assert '[data-control="route"]' in INTERACTION
 
 
-def test_selected_detail_growth_keeps_review_row_in_view():
+def test_selected_overview_update_keeps_review_row_in_view():
     assert "function captureReviewAnchor(event)" in INTERACTION
     assert "function restoreReviewAnchor()" in INTERACTION
     assert 'event.target.closest?.("tbody tr[data-code]")' in INTERACTION
-    assert 'event.target.closest?.(\'[data-action="detail"]\')' in INTERACTION
+    assert '[data-action="detail"]' not in INTERACTION
     assert "getBoundingClientRect().top" in INTERACTION
     assert "window.scrollBy(0, delta)" in INTERACTION
 

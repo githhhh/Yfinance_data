@@ -58,6 +58,11 @@
     return out && !["nan", "none", "<na>"].includes(out.toLowerCase()) ? out : fallback;
   }
 
+  function dateText(value) {
+    const out = text(value, "");
+    return /^\d{4}-\d{2}-\d{2}/.test(out) ? out.slice(0, 10) : out;
+  }
+
   function statusLabel(status) {
     return text(status, "N/A").replaceAll("_", " ");
   }
@@ -92,7 +97,6 @@
       entryVolumeMin: null,
       weeklyVolumeMin: null,
       filtersExpanded: false,
-      detailOpen: false,
     };
   }
 
@@ -119,7 +123,6 @@
       entryVolumeMin: state.entryVolumeMin,
       weeklyVolumeMin: state.weeklyVolumeMin,
       filtersExpanded: state.filtersExpanded,
-      detailOpen: state.detailOpen,
     };
   }
 
@@ -518,76 +521,36 @@
 
   function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
-    const code = esc(row.code);
     const near = isNearBreakout(row);
-    const status = displayStatus(row);
-    const baseline = near ? "" : text(row.review_baseline_entry_status, "");
-    const volReason = near ? "Pre-signal" : text(row.ibd_entry_vol_or_reject, "n/a").replace(/x$/, "×");
-    const stageKey = near ? "Review Stage" : "Entry Status";
     const referenceKey = near ? "Watch Trigger" : "Buy Point";
-    const distanceKey = near ? "Vs Trigger" : "Vs Buy Point";
-    const transition = baseline
-      ? `${esc(statusLabel(baseline))} → <span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`
-      : `<span style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
-    const change = displayChange(row);
+    const entryDate = dateText(row.ibd_entry_date);
+    const buyPointDate = dateText(row.buy_point_date);
+    const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
+    const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
+    const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
+    const baseDepth = num(row.base_depth_pct);
+    const baseDuration = num(row.base_duration_weeks);
+    const baseValue = baseDepth === null && baseDuration === null
+      ? "—"
+      : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}w`}`;
+    const pullbackDepth = num(row.pullback_pct);
+    const pullbackDuration = num(row.pullback_duration_weeks);
+    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
+      ? null : bool(row.pullback_v_is_dry);
+    const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry === true;
+    const pullbackValue = `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}w`}`;
     const currentRs = num(row.rs_percentile);
     const rsValue = currentRs === null
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
-    return `<div class="selected-strip">
-      <div class="selected-cell"><div class="selected-key">Selected</div><div class="selected-value selected-code">${code}</div>${change ? `<div class="selected-change">${esc(change)}</div>` : ""}<button class="detail-toggle" data-action="detail">${state.detailOpen ? "Hide details ▴" : "Details ▾"}</button></div>
-      <div class="selected-cell"><div class="selected-key">${referenceKey}</div><div class="selected-value">${fmt(reviewReferencePrice(row))} <small>(${esc(routeLabel(reviewSetup(row)))})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">${distanceKey}</div><div class="selected-value">${fmt(reviewDistance(row), "pct")} <small>(Close: ${fmt(row.latest_close)})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">${stageKey}</div><div class="selected-value">${transition} <small>(${esc(volReason)})</small></div></div>
-      <div class="selected-cell"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
-      ${state.detailOpen ? detailHtml(row) : ""}
+    return `<div class="selected-strip ${pullbackVisible ? "has-pullback" : ""}" aria-label="Selected overview for ${esc(row.code)}">
+      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
+      <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
+      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">Depth · Duration</div></div>
+      <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
+      ${pullbackVisible ? `<div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}</div></div>` : ""}
+      <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
-  }
-
-  function nearBreakoutDetailHtml(row) {
-    const setup = reviewSetup(row);
-    const targetSource = watchTargetSource(row);
-    const structure = setup === "pivot"
-      ? `${detailItem("S Resistance", fmt(row.bf_watch_s_resistance))}${detailItem("S Distance", fmt(row.bf_watch_s_distance_pct, "pct"))}${detailItem("S Side", text(row.bf_watch_s_side))}${detailItem("M Resistance", fmt(row.bf_watch_m_resistance))}${detailItem("M Distance", fmt(row.bf_watch_m_distance_pct, "pct"))}${detailItem("M Side", text(row.bf_watch_m_side))}`
-      : `${detailItem("Watch Type", routeLabel(setup))}${detailItem("Trigger", fmt(row.bf_watch_trigger_price))}${detailItem("Distance", fmt(row.bf_watch_distance_pct, "pct"))}`;
-    return `<div class="detail-panel">
-      <div class="detail-section"><div class="detail-title">1. Breakout Setup</div><div class="detail-grid">
-        ${detailItem("Watch Trigger", fmt(reviewReferencePrice(row)))}${detailItem("Latest Close", fmt(row.latest_close))}${detailItem("Vs Trigger", fmt(reviewDistance(row), "pct"))}${detailItem("Setup", routeLabel(setup))}${detailItem("Stage", "Near Breakout")}${detailItem("Target Source", targetSource)}
-      </div></div>
-      <div class="detail-section"><div class="detail-title">2. Watch Structure</div><div class="detail-grid">
-        ${structure}
-      </div></div>
-      <div class="detail-section"><div class="detail-title">3. Context</div><div class="detail-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-        ${detailItem("Weekly Vol", fmt(row.volume_ratio, "x"))}${detailItem("To 52W High", fmt(row.dist_to_52w_high_pct, "pct1"))}${detailItem("52W High", fmt(row.price_52_week_high))}${detailItem("EPS YoY", fmt(row.eps_yoy_growth, "pct1"))}${detailItem("Industry", text(row.industry))}
-      </div></div>
-    </div>`;
-  }
-
-  function detailHtml(row) {
-    if (isNearBreakout(row)) return nearBreakoutDetailHtml(row);
-    const valid = bool(row.ibd_entry_valid);
-    const reject = valid ? "" : `<div class="detail-reject">Unconfirmed · ${esc(text(row.ibd_entry_reject_reason, "Volume not confirmed"))}</div>`;
-    const pullbackVisible = num(row.pullback_pct) !== null || num(row.pullback_pct_off_peak) !== null;
-    return `<div class="detail-panel">
-      <div class="detail-section"><div class="detail-title">1. Daily Entry</div><div class="detail-grid">
-        ${detailItem("Trigger", fmt(row.ibd_trigger_price))}${detailItem("Entry Date", text(row.ibd_entry_date))}${detailItem("Daily Entry Vol", fmt(row.ibd_entry_volume_ratio, "x"))}${detailItem("Close Position", fmt(row.ibd_entry_close_position))}${detailItem("Range Ratio", fmt(row.ibd_entry_breakout_range_ratio, "x"))}${detailItem("Price Quality", text(row.ibd_breakout_quality))}
-      </div>${reject}</div>
-      ${pullbackVisible ? `<div class="detail-section"><div class="detail-title">2. Pullback</div><div class="detail-grid">${detailItem("Pullback Depth", fmt(row.pullback_pct, "pct1"))}${detailItem("Off Peak", fmt(row.pullback_pct_off_peak, "pct1"))}${detailItem("Duration", num(row.pullback_duration_weeks) === null ? "n/a" : `${fmt(row.pullback_duration_weeks, "int")}w`)}${detailItem("Volume Dry", row.pullback_v_is_dry === null ? "n/a" : bool(row.pullback_v_is_dry) ? "Yes" : "No")}</div></div>` : `<div class="detail-section"><div class="detail-title">2. Pullback</div><div class="detail-grid">${detailItem("Evidence", "n/a")}</div></div>`}
-      <div class="detail-section"><div class="detail-title">3. CANSLIM / Base</div><div class="detail-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">${detailItem("Buy Point Date", text(row.buy_point_date))}${detailItem("Base Ceiling", fmt(row.ceiling))}${detailItem("Base Ceiling Date", text(row.ceiling_date))}${detailItem("Base Duration", num(row.base_duration_weeks) === null ? "n/a" : `${fmt(row.base_duration_weeks, "int")}w`)}${detailItem("Base Depth", fmt(row.base_depth_pct, "pct1"))}${detailItem("To 52W High", fmt(row.dist_to_52w_high_pct, "pct1"))}${detailItem("EPS YoY", fmt(row.eps_yoy_growth, "pct1"))}${detailItem("52W High", fmt(row.price_52_week_high))}${detailItem("Industry", text(row.industry))}</div></div>
-    </div>`;
-  }
-
-  function detailItem(label, value) {
-    return `<div class="detail-item"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
-  }
-
-  function bindSelectedEvents(currentRows) {
-    const detail = app.querySelector('[data-action="detail"]');
-    if (!detail) return;
-    detail.addEventListener("click", () => {
-      state.detailOpen = !state.detailOpen;
-      renderSelection(currentRows);
-    });
   }
 
   function renderSelection(currentRows, { focusTable = false, scrollCode = null } = {}) {
@@ -604,7 +567,6 @@
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
       row.classList.toggle("selected", String(row.dataset.code) === String(selectedCode));
     });
-    bindSelectedEvents(currentRows);
 
     const shell = app.querySelector("[data-table-shell]");
     if (shell && scrollCode) {
@@ -679,14 +641,13 @@
     const selectedCode = state.selected[state.period];
     if (selectedCode && !sorted.rows.some((row) => String(row.code) === String(selectedCode))) {
       state.selected[state.period] = null;
-      state.detailOpen = false;
     }
     app.innerHTML = `${headerHtml(sourceRows)}${warningsHtml()}${queueHtml(sourceRows, counts)}${filtersHtml(sourceRows)}${resultsHtml(sorted.rows, sorted.label)}${footerHtml()}`;
     bindEvents(sorted.rows);
   }
 
   function bindEvents(currentRows = []) {
-    app.querySelectorAll('[data-action]:not([data-action="detail"])').forEach((element) => {
+    app.querySelectorAll("[data-action]").forEach((element) => {
       element.addEventListener("click", async () => {
         const action = element.dataset.action;
         if (action === "period") {
@@ -694,13 +655,11 @@
           render();
         } else if (action === "scope") {
           state.scope = element.dataset.value;
-          state.detailOpen = false;
           render();
         } else if (action === "quick") {
           const field = element.dataset.field;
           const value = element.dataset.value;
           state[field] = state[field] === value ? "ALL" : value;
-          state.detailOpen = false;
           render();
         } else if (action === "clear-quick") {
           state.change = "ALL";
@@ -709,7 +668,6 @@
         } else if (action === "status") {
           const value = element.dataset.value;
           state.status = state.status === value ? "ALL" : value;
-          state.detailOpen = false;
           render();
         } else if (action === "toggle-filters") {
           state.filtersExpanded = !state.filtersExpanded;
@@ -749,7 +707,6 @@
       });
     });
 
-    bindSelectedEvents(currentRows);
     const reviewShell = app.querySelector("[data-table-shell]");
     if (reviewShell) reviewShell.addEventListener("keydown", (event) => handleArrow(event, currentRows, state.period));
   }

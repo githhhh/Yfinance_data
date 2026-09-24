@@ -33,11 +33,32 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
     assert 'return isNearBreakout(row) ? "" : text(row.review_change_label, "");' in APP
     assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
-    assert 'const distanceKey = near ? "Vs Trigger" : "Vs Buy Point";' in APP
-    assert 'detailItem("Watch Trigger", fmt(reviewReferencePrice(row)))' in APP
-    assert 'detailItem("Vs Trigger", fmt(reviewDistance(row), "pct"))' in APP
+    assert 'const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
+    assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
     assert "signal transition labels do not apply yet" in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
+
+
+def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
+    assert 'class="selected-strip ${pullbackVisible ? "has-pullback" : ""}"' in APP
+    assert 'Selected Overview' in APP
+    for field in (
+        "row.industry",
+        "row.eps_yoy_growth",
+        "row.base_depth_pct",
+        "row.base_duration_weeks",
+        "row.dist_to_52w_high_pct",
+        "row.pullback_pct",
+        "row.pullback_duration_weeks",
+        "row.pullback_v_is_dry",
+        "row.rs_1m_percentile",
+        "row.rs_3m_percentile",
+        "row.rs_6m_percentile",
+    ):
+        assert field in APP
+    assert "detailOpen" not in APP
+    assert 'data-action="detail"' not in APP
+    assert "function detailHtml(row)" not in APP
 
 
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:

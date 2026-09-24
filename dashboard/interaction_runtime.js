@@ -100,12 +100,10 @@
 
   function captureReviewAnchor(event) {
     const row = event.target.closest?.("tbody tr[data-code]");
-    const detail = event.target.closest?.('[data-action="detail"]');
-    const anchor = row || (detail ? app.querySelector("tbody tr.selected[data-code]") : null);
-    if (!anchor) return;
+    if (!row) return;
     pendingReviewAnchor = {
-      code: anchor.dataset.code,
-      top: anchor.getBoundingClientRect().top,
+      code: row.dataset.code,
+      top: row.getBoundingClientRect().top,
     };
   }
 

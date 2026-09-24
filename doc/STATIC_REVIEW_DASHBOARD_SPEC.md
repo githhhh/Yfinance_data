@@ -25,7 +25,7 @@ Dashboard 是高频 Review 工作台，不是分析报告。用户应沿同一�
 → Change / Origin / Entry Status
 → 必要时 More Filters
 → Results / 排序 / Copy Codes
-→ Selected Detail
+→ Selected Overview
 → 连续表格 Review
 ```
 
@@ -33,7 +33,7 @@ Dashboard 是高频 Review 工作台，不是分析报告。用户应沿同一�
 
 - **先知道当前数据语境，再筛选。**
 - **快速条件优先，高级筛选按需展开。**
-- **表格是主要工作区，详情紧贴结果。**
+- **表格呈现当前机会，Selected Overview 紧贴结果并补充标的画像。**
 - **默认排序提供起点，表头排序允许即时探索。**
 - **RS 只是浏览器端外部 Reference context，不作为隐藏 Gate、Top3 或默认排序。**
 - 不新增首页分析型图表，不让辅助信息打断 Review 流。
@@ -57,7 +57,7 @@ RS 独立链路：
 browser opens Pages
 → authoritative Dashboard already renders
 → rs_runtime.js fetches public Fred6725/rs-log
-→ fills RS reference cells only
+→ fills RS reference cells and Selected Overview
 ```
 
 - Python 是 Pool 事实与投影权威层。
@@ -80,7 +80,7 @@ Review Queue
   Entry Status cards
 More Filters
 Results summary + Copy Codes
-Selected Row Detail
+Selected Overview
 Decision Table
 ```
 
@@ -200,7 +200,7 @@ Weak
 
 ### 5.4 RS Reference
 
-RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它与主体 Review 流保持弱关联：表格负责“一眼看强弱”，RS 表头负责“来源与数据状态”，Selected Detail 负责“当前 / 1M / 3M / 6M 轨迹”。
+RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它与主体 Review 流保持弱关联：表格负责“一眼看强弱”，RS 表头负责“来源与数据状态”，Selected Overview 负责“当前 / 1M / 3M / 6M 百分位”。
 
 数据源固定为 [`Fred6725 / rs-log`](https://github.com/Fred6725/rs-log) 的公开 `output/rs_stocks.csv`。RS 完全采用浏览器端 fail-soft 语义：
 
@@ -208,7 +208,7 @@ RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它
 2. `rs_runtime.js` 再读取该 CSV 的最新公开 commit metadata，并用同一 commit SHA 读取 CSV；
 3. 不把 RS 写入 Pool、Python projection、`dashboard.json` 或本仓库 PIT；
 4. 首次加载尚未完成时，RS cell 显示 `—`，不使用 `N/A` 冒充“没有数据”；
-5. 正常加载：主表只显示当前 percentile；Selected Detail 显示当前、1M、3M、6M ago percentile；
+5. 正常加载：主表只显示当前 percentile；Selected Overview 显示当前、1M、3M、6M ago percentile；
 6. RS 更新时间等于当前 Pool snapshot：表头状态为 `Current`；
 7. RS 更新时间早于当前 Pool snapshot：继续显示最近可用值，表头明确标记 `Older than Pool`；
 8. RS 更新时间晚于当前 Pool snapshot：继续显示当前公开值，表头明确标记 `Newer than Pool`；
@@ -222,21 +222,20 @@ RS 是**附加参考信息**，不是策略评分，也不是官方 IBD RS。它
 
 RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上把 Reference 误导成策略 Gate。
 
-### 5.5 Selected Detail
+### 5.5 Selected Overview
 
-Selected Detail 位于结果摘要和表格之间；选行后原地更新，不要求用户滚动到页面底部确认。至少覆盖：
+Selected Overview 位于结果摘要和表格之间；选行后原地更新。桌面优先保持约 80–110px 高度，供连续 ↑↓ Review 使用。至少覆盖：
 
-- Buy Point / Setup；
-- Vs Buy Point / Latest；
-- Entry Status；
-- RS Reference；
-- 展开后的 Daily Entry、Pullback、CANSLIM/Base 事实。
+- Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；
+- 有有效证据时才显示 Pullback Depth / Duration / Volume Dry；
+- RS Reference 当前及 1M / 3M / 6M 百分位，缺失允许 `N/A`；
+- 表格未显示的实际参考价：Signal 为 Buy Point，Watch 为 Watch Trigger；Signal 有 Entry Date 时显示，否则可显示 Buy Point Date；Watch 显示 Target Source。
 
-详情只解释当前行，不创建第二套筛选器。选行或展开 / 收起 Details 时，应尽量保持当前 Review 行在视口中的位置，避免 Selected Detail 高度变化把刚查看的行推出屏幕。
+表格继续呈现 Stage / Status、Setup、Vs Reference、Price Quality、Latest、Entry / Reason、Weekly Vol 和 RS。Selected Overview 不重复这些机会字段；没有二级 Detail 面板。Close Position、Range Ratio、Ceiling Date、Off Peak 等诊断字段保留在权威数据链路，不进入高频展示。选行时尽量保持当前 Review 行在视口中的位置。
 
 ## 6. 响应式与滚动
 
-桌面优先保持 Review Queue、筛选入口、Results 与 Selected Detail 在表格前连续出现，减少视觉跳跃。
+桌面优先保持 Review Queue、筛选入口、Results 与 Selected Overview 在表格前连续出现，减少视觉跳跃。
 
 移动端：
 
@@ -289,10 +288,10 @@ python security_scan.py --history
 - RS 首次加载时显示 `—`；Current / Older / Newer 状态可辨识；请求失败或 ticker 缺失时为 `N/A`；
 - RS 表头 popover 可查看来源、RS update、Pool snapshot，并支持 Refresh / Retry；来源链接可跳转到 `Fred6725 / rs-log`；
 - RS popover 打开时 modal 状态清晰，有明确关闭入口，backdrop 点击不穿透底层控件；
-- 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Detail 显示当前 / 1M / 3M / 6M；
+- 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Overview 显示当前 / 1M / 3M / 6M；
 - RS 任一状态都不影响 Pool / Pages build 与 deploy；
 - 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；Quality 说明触控不会误触排序；
-- 选行和 Details 展开 / 收起不把当前 Review 行无故推出视口；
+- 选行与键盘 ↑↓ 更新 Selected Overview，不需要打开二级面板，且不把当前 Review 行无故推出视口；
 - 筛选 / Period / Setup / Range 重绘后保留表格横向位置；
 - 表格横向手势不逃逸，纵向到边界后能自然继续滚动外层页面；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。

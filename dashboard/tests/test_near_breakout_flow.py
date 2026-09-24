@@ -74,7 +74,8 @@ def test_near_breakout_is_a_ui_stage_not_an_ibd_entry_status() -> None:
     assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
     assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
     assert 'return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;' in APP
-    assert 'const stageKey = near ? "Review Stage" : "Entry Status";' in APP
+    assert 'const status = displayStatus(row);' in APP
+    assert '["ibd_entry_status", "Stage / Status"]' in APP
 
 
 def test_near_breakout_prefers_v2_generic_watch_contract_with_v1_pivot_fallback() -> None:
@@ -104,21 +105,16 @@ def test_midweek_review_now_scope_keeps_current_near_breakout_rows() -> None:
     assert "All Review" in APP
 
 
-def test_near_breakout_selected_detail_explains_generic_watch_and_pivot_diagnostics() -> None:
-    assert "function nearBreakoutDetailHtml(row)" in APP
-    assert 'detailItem("Stage", "Near Breakout")' in APP
-    assert 'detailItem("Setup", routeLabel(setup))' in APP
-    assert 'detailItem("Target Source", targetSource)' in APP
+def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
+    assert "function nearBreakoutDetailHtml(row)" not in APP
+    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
+    assert 'const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;' in APP
+    assert 'const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";' in APP
     assert 'return "Recovery High"' in APP
     assert 'return "TWK High"' in APP
     assert 'return "Pending High"' in APP
-    assert 'detailItem("Watch Type", routeLabel(setup))' in APP
-    assert 'detailItem("Trigger", fmt(row.bf_watch_trigger_price))' in APP
-    assert 'detailItem("S Side", text(row.bf_watch_s_side))' in APP
-    assert 'detailItem("M Side", text(row.bf_watch_m_side))' in APP
-    assert 'const volReason = near ? "Pre-signal"' in APP
-    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
-    assert 'const distanceKey = near ? "Vs Trigger" : "Vs Buy Point";' in APP
+    assert 'const referenceNote = `${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
+    assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
 
 
 def test_status_sorting_is_owned_by_table_runtime_only() -> None:
