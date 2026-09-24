@@ -621,16 +621,19 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
             ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
             cwd=DATA_ROOT,
         )
-        if staged.returncode == 0:
-            return
-        if staged.returncode != 1:
+        if staged.returncode not in (0, 1):
             raise subprocess.CalledProcessError(staged.returncode, staged.args)
 
-        subprocess.run(
-            ["git", "commit", "-m", message],
-            cwd=DATA_ROOT,
-            check=True,
-        )
+        if staged.returncode == 1:
+            subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=DATA_ROOT,
+                check=True,
+            )
+
+        # Always push, even when this run has no new staged diff. A previous
+        # run may have committed successfully but failed during push; returning
+        # early here would incorrectly report publication success on retry.
         for attempt in range(1, 4):
             try:
                 subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
