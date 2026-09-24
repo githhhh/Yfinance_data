@@ -227,7 +227,7 @@ RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上�
 Selected Overview 位于结果摘要和表格之间；选行后原地更新。桌面优先保持约 80–110px 高度，供连续 ↑↓ Review 使用。至少覆盖：
 
 - Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；
-- 有有效证据时才显示 Pullback Depth / Duration / Volume Dry；
+- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时显示 Depth / Duration / Volume Dry，无证据时显示 `—`；
 - RS Reference 当前及 1M / 3M / 6M 百分位，缺失允许 `N/A`；
 - 表格未显示的实际参考价：Signal 为 Buy Point，Watch 为 Watch Trigger；Signal 有 Entry Date 时显示，否则可显示 Buy Point Date；Watch 显示 Target Source。
 
@@ -291,7 +291,7 @@ python security_scan.py --history
 - 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Overview 显示当前 / 1M / 3M / 6M；
 - RS 任一状态都不影响 Pool / Pages build 与 deploy；
 - 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；Quality 说明触控不会误触排序；
-- 选行与键盘 ↑↓ 更新 Selected Overview，不需要打开二级面板，且不把当前 Review 行无故推出视口；
+- 选行只更新 Selected Overview，不滚动页面或表格；键盘 ↑↓ 仅在目标行超出表格可视区时调整表格内部纵向滚动，不调用页面级滚动；
 - 筛选 / Period / Setup / Range 重绘后保留表格横向位置；
 - 表格横向手势不逃逸，纵向到边界后能自然继续滚动外层页面；
 - 生成的 `dashboard.json` 不含白名单之外的 Pool 列，不含 C Rank / Continuous C，也不含 RS percentile。

@@ -240,14 +240,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .selected-strip {
   height: 104px;
   display: grid;
-  grid-template-columns: minmax(230px, 1.4fr) repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(230px, 1.4fr) repeat(5, minmax(0, 1fr));
   gap: 1px;
   border: 1px solid #303a46;
   border-radius: 8px 8px 0 0;
   background: #29333f;
   overflow: hidden;
 }
-.selected-strip.has-pullback { grid-template-columns: minmax(230px, 1.4fr) repeat(5, minmax(0, 1fr)); }
 .selected-strip.empty { display: flex; align-items: center; padding: 0 14px; background: #11171e; color: var(--muted); font-size: 11px; }
 .selected-cell { min-width: 0; padding: 10px 12px; background: #11171e; }
 .selected-key { color: #8899a6; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
@@ -322,7 +321,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (width <= 1120px) {
   .filter-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-field:first-child { grid-column: span 2; }
-  .selected-strip, .selected-strip.has-pullback { height: auto; min-height: 90px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .selected-strip { height: auto; min-height: 90px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (width <= 760px) {
@@ -348,9 +347,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .results-toolbar { grid-template-columns: minmax(0, 1fr) 142px; }
   .results-summary { min-width: 0; }
   .copy-button { width: 142px; }
-  .selected-strip, .selected-strip.has-pullback { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .selected-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .selected-identity { grid-column: 1 / -1; }
-  .selected-strip.has-pullback .selected-rs { grid-column: 1 / -1; }
+  .selected-rs { grid-column: 1 / -1; }
   .table-shell { max-height: 58vh; }
   .review-table { min-width: 930px; }
 }
@@ -366,7 +365,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .filter-toggle { min-width: 0; flex: 1; }
   .results-toolbar { grid-template-columns: 1fr; }
   .copy-button { width: 100%; }
-  .selected-strip, .selected-strip.has-pullback { grid-template-columns: 1fr 1fr; }
+  .selected-strip { grid-template-columns: 1fr 1fr; }
   .review-table { min-width: 880px; }
   .footer-note { text-align: left; }
 }

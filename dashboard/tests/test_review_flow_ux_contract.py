@@ -40,7 +40,10 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
 
 
 def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
-    assert 'class="selected-strip ${pullbackVisible ? "has-pullback" : ""}"' in APP
+    assert 'class="selected-strip"' in APP
+    assert "has-pullback" not in APP
+    assert 'class="selected-cell selected-pullback"' in APP
+    assert "pullbackDry !== null" in APP
     assert 'Selected Overview' in APP
     for field in (
         "row.industry",

@@ -32,10 +32,10 @@ def test_row_selection_updates_overview_in_place():
     assert "detailOpen" not in APP
 
 
-def test_selection_restores_focus_and_horizontal_scroll():
+def test_selection_keeps_focus_without_horizontal_scroll_mutation():
     selection = APP.split("function renderSelection", 1)[1].split("function tableHtml", 1)[0]
-    assert "const scrollLeft = shell.scrollLeft" in selection
-    assert "shell.scrollLeft = scrollLeft" in selection
+    assert "shell.scrollLeft" not in selection
+    assert "keepReviewRowVisibleInTable(shell, target)" in selection
     assert 'shell?.focus({ preventScroll: true })' in selection
 
 
@@ -64,12 +64,14 @@ def test_manual_sort_updates_are_idempotent_under_the_table_observer():
     assert 'setTextIfChanged(summary, `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`);' in TABLE
 
 
-def test_manual_sort_keyboard_review_preserves_horizontal_scroll():
+def test_manual_sort_keyboard_review_stays_inside_table_viewport():
     assert 'app.addEventListener("keydown"' in TABLE
     assert 'event.stopImmediatePropagation();' in TABLE
-    assert "const scrollLeft = shell.scrollLeft" in TABLE
-    assert "currentShell.scrollLeft = scrollLeft" in TABLE
-    assert 'currentShell.focus({ preventScroll: true })' in TABLE
+    assert "function keepRowVisibleInTable(shell, target)" in TABLE
+    assert "shell.scrollTop = Math.max(0, shell.scrollTop + delta)" in TABLE
+    assert "scrollIntoView" not in TABLE
+    assert "currentShell.scrollLeft" not in TABLE
+    assert 'currentShell?.focus({ preventScroll: true })' in TABLE
 
 
 def test_full_app_renders_preserve_table_viewport():
@@ -88,7 +90,13 @@ def test_selected_overview_click_does_not_scroll_the_page():
     assert "captureReviewAnchor" not in INTERACTION
     assert "restoreReviewAnchor" not in INTERACTION
     assert "window.scrollBy(0, delta)" not in INTERACTION
+    assert "scrollIntoView" not in APP
+    assert "scrollIntoView" not in TABLE
+    assert "function keepReviewRowVisibleInTable(shell, target)" in APP
+    assert "shell.scrollTop = Math.max(0, shell.scrollTop + delta)" in APP
     assert "height: 104px" in styles
+    assert "grid-template-columns: minmax(230px, 1.4fr) repeat(5, minmax(0, 1fr))" in styles
+    assert ".selected-strip.has-pullback" not in styles
 
 
 def test_mobile_table_scroll_chains_vertically_and_freezes_code_cleanly():
