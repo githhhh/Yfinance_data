@@ -6,7 +6,6 @@
 
   let rsBackdrop = null;
   let pendingTableViewport = null;
-  let pendingReviewAnchor = null;
 
   function ensureInteractionStyles() {
     if (document.getElementById("interaction-runtime-styles")) return;
@@ -98,32 +97,12 @@
     shell.scrollTop = snapshot.scrollTop;
   }
 
-  function captureReviewAnchor(event) {
-    const row = event.target.closest?.("tbody tr[data-code]");
-    if (!row) return;
-    pendingReviewAnchor = {
-      code: row.dataset.code,
-      top: row.getBoundingClientRect().top,
-    };
-  }
-
-  function restoreReviewAnchor() {
-    if (!pendingReviewAnchor) return;
-    const snapshot = pendingReviewAnchor;
-    pendingReviewAnchor = null;
-    const row = app.querySelector(`tbody tr[data-code="${CSS.escape(String(snapshot.code))}"]`);
-    if (!row) return;
-    const delta = row.getBoundingClientRect().top - snapshot.top;
-    if (Number.isFinite(delta) && Math.abs(delta) > 0.5) window.scrollBy(0, delta);
-  }
-
   document.addEventListener("click", (event) => {
     if (event.target.closest?.(
       '[data-action="period"], [data-action="scope"], [data-action="quick"], '
       + '[data-action="clear-quick"], [data-action="status"], '
       + '[data-action="toggle-filters"], [data-action="reset-filters"]',
     )) captureTableViewport();
-    captureReviewAnchor(event);
   }, true);
 
   document.addEventListener("change", (event) => {
@@ -181,7 +160,6 @@
   const appObserver = new MutationObserver(() => {
     prepareRangeInputs();
     restoreTableViewport();
-    restoreReviewAnchor();
   });
   appObserver.observe(app, { childList: true, subtree: true });
 

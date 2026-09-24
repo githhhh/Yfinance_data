@@ -83,13 +83,12 @@ def test_full_app_renders_preserve_table_viewport():
     assert '[data-control="route"]' in INTERACTION
 
 
-def test_selected_overview_update_keeps_review_row_in_view():
-    assert "function captureReviewAnchor(event)" in INTERACTION
-    assert "function restoreReviewAnchor()" in INTERACTION
-    assert 'event.target.closest?.("tbody tr[data-code]")' in INTERACTION
-    assert '[data-action="detail"]' not in INTERACTION
-    assert "getBoundingClientRect().top" in INTERACTION
-    assert "window.scrollBy(0, delta)" in INTERACTION
+def test_selected_overview_click_does_not_scroll_the_page():
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    assert "captureReviewAnchor" not in INTERACTION
+    assert "restoreReviewAnchor" not in INTERACTION
+    assert "window.scrollBy(0, delta)" not in INTERACTION
+    assert "height: 104px" in styles
 
 
 def test_mobile_table_scroll_chains_vertically_and_freezes_code_cleanly():
