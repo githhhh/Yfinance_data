@@ -277,6 +277,7 @@ DATE_FIELDS = {
     "ibd_entry_date",
     "breakout_date",
     "ceiling_date",
+    "pullback_peak_date",
 }
 
 NUMBER_FIELDS = {
@@ -299,6 +300,7 @@ NUMBER_FIELDS = {
     "base_depth_abs",
     "pullback_count",
     "pullback_duration_weeks",
+    "pullback_peak_price",
     "pullback_pct",
     "pullback_pct_off_peak",
     "eps_yoy_growth",
@@ -361,6 +363,8 @@ ALL_TABLE_COLUMNS = [
     "is_bullish",
     "pullback_count",
     "pullback_duration_weeks",
+    "pullback_peak_date",
+    "pullback_peak_price",
     "pullback_pct",
     "pullback_pct_off_peak",
     "pullback_v_is_dry",
@@ -418,6 +422,8 @@ VOLUME_PULLBACK_COLUMNS = [
     "is_bullish",
     "pullback_count",
     "pullback_duration_weeks",
+    "pullback_peak_date",
+    "pullback_peak_price",
     "pullback_pct",
     "pullback_pct_off_peak",
     "pullback_v_is_dry",
@@ -700,6 +706,8 @@ FIELD_CONFIG = OrderedDict(
                 help_text="上游正式产出的回撤/巩固持续时间，用于 Continuation 信号的时长检查。",
             ),
         ),
+        ("pullback_peak_date", _field("Pullback Peak Date", "date", "Risk / Structure")),
+        ("pullback_peak_price", _field("Pullback Peak Price", "number", "Risk / Structure", fmt="0.00")),
         ("pullback_pct", _field("Pullback Pct", "number", "Risk / Structure", fmt="0.0%")),
         ("pullback_pct_off_peak", _field("Pullback Pct Off Peak", "number", "Risk / Structure", default_table=True, fmt="0.0%")),
         ("pullback_v_is_dry", _field("Pullback V Is Dry", "boolean", "Risk / Structure", default_table=True)),
