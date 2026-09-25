@@ -1,5 +1,7 @@
 import pytest
 import pandas as pd
+import threading
+import time
 from unittest.mock import MagicMock, patch
 from data_providers.base_provider import BaseDataProvider
 from data_providers.ohlcv_validation import DataIntegrityError
@@ -158,6 +160,62 @@ class TestSchwabDataProvider:
         assert symbol == "AAPL"
         assert df is None
 
+    def test_download_single_stock_filters_inconsistent_bar(self):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {"open": 35.50, "high": 35.50, "low": 35.50, "close": 35.51,
+                 "volume": 242833, "datetime": 1782450000000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = mock_resp
+        provider = SchwabDataProvider(client=mock_client, max_retries=0, rate_limit_sleep=0)
+
+        symbol, frame = provider.download_single_stock("FNLC")
+
+        assert symbol == "FNLC"
+        assert frame is None
+        assert "High<Close" in provider._last_failure_reasons["FNLC"]
+
+    def test_inconsistent_vendor_bar_is_excluded_before_round_trip(self, tmp_path, monkeypatch):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {"open": 35.50, "high": 35.50, "low": 35.50, "close": 35.51,
+                 "volume": 242833, "datetime": 1782450000000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = mock_resp
+        provider = SchwabDataProvider(client=mock_client, max_retries=0, rate_limit_sleep=0)
+        symbol, frame = provider.download_single_stock("FNLC")
+        assert frame is None
+        valid = pd.DataFrame(
+            {"Open": [10.0], "High": [11.0], "Low": [9.0],
+             "Close": [10.5], "Volume": [100]},
+            index=pd.to_datetime(["2026-09-21"]),
+        )
+        batch = {reference: valid.copy() for reference in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
+        filtered, excluded = DataStore.filter_schwab_stock_data(
+            batch, failed=[symbol], expected_symbols=[*batch, symbol],
+            interval="1wk", failure_reasons=provider.failure_reasons,
+        )
+        assert excluded == ["FNLC"]
+
+        output = tmp_path / "schwab.pkl"
+        monkeypatch.setattr(DataStore, "get_stock_pkl_path", lambda interval: str(output))
+        saved = DataStore.save_stock_data(
+            filtered, save_dir=str(tmp_path), interval="1wk",
+            expected_symbols=list(filtered),
+        )
+        assert saved == str(output)
+        restored = DataStore.load_stock_data(saved)
+        assert set(restored) == set(filtered)
+        assert "FNLC" not in restored
+
     def test_download_batch_stocks(self):
         mock_client = MagicMock()
         mock_resp = MagicMock()
@@ -199,7 +257,7 @@ class TestSchwabDataProvider:
         assert len(df) == 1
         assert mock_client.get_price_history.call_count == 2
 
-    def test_download_batch_stocks_paces_schwab_batches(self, monkeypatch):
+    def test_download_batch_stocks_paces_requests_across_workers(self):
         mock_client = MagicMock()
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -208,16 +266,78 @@ class TestSchwabDataProvider:
             ],
             "empty": False,
         }
-        mock_client.get_price_history.return_value = mock_resp
-        sleeps = []
-        monkeypatch.setattr("data_providers.schwab_provider.time.sleep", lambda value: sleeps.append(value))
+        starts = []
+        lock = threading.Lock()
+        active = 0
+        peak_active = 0
 
-        provider = SchwabDataProvider(client=mock_client, batch_size=1, max_workers=1, rate_limit_sleep=0.25)
+        def get_history(*args, **kwargs):
+            nonlocal active, peak_active
+            with lock:
+                starts.append(time.monotonic())
+                active += 1
+                peak_active = max(peak_active, active)
+            time.sleep(0.06)
+            with lock:
+                active -= 1
+            return mock_resp
+
+        mock_client.get_price_history.side_effect = get_history
+        provider = SchwabDataProvider(
+            client=mock_client, batch_size=4, max_workers=4,
+            max_retries=0, rate_limit_sleep=0.02, recovery_rounds=0,
+        )
+        all_data, failed = provider.download_batch_stocks(["AAPL", "MSFT", "NVDA", "TSLA"])
+
+        assert set(all_data) == {"AAPL", "MSFT", "NVDA", "TSLA"}
+        assert failed == []
+        assert min(b - a for a, b in zip(starts, starts[1:])) >= 0.015
+        assert peak_active >= 2  # Network waits overlap despite shared request pacing.
+
+    def test_batch_retries_failed_symbols_after_other_downloads(self, capsys):
+        mock_client = MagicMock()
+        good_resp = MagicMock()
+        good_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5,
+                 "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        attempts = {"AAPL": 0, "MSFT": 0}
+
+        def get_history(symbol, **kwargs):
+            attempts[symbol] += 1
+            if symbol == "AAPL" and attempts[symbol] <= 2:
+                raise ConnectionError("temporary disconnect")
+            return good_resp
+
+        mock_client.get_price_history.side_effect = get_history
+        provider = SchwabDataProvider(
+            client=mock_client, batch_size=2, max_workers=2,
+            max_retries=1, rate_limit_sleep=0, recovery_rounds=1,
+            recovery_sleep=0,
+        )
         all_data, failed = provider.download_batch_stocks(["AAPL", "MSFT"])
 
         assert set(all_data) == {"AAPL", "MSFT"}
         assert failed == []
-        assert sleeps == [0.25]
+        assert attempts == {"AAPL": 3, "MSFT": 1}
+        assert "temporary disconnect" in capsys.readouterr().out
+
+    def test_batch_reports_last_reason_when_symbol_still_fails(self, capsys):
+        mock_client = MagicMock()
+        mock_client.get_price_history.side_effect = ConnectionError("persistent disconnect")
+        provider = SchwabDataProvider(
+            client=mock_client, max_retries=0, rate_limit_sleep=0,
+            recovery_rounds=1, recovery_sleep=0,
+        )
+
+        all_data, failed = provider.download_batch_stocks(["AAPL"])
+
+        assert all_data == {}
+        assert failed == ["AAPL"]
+        assert "Failed AAPL: ConnectionError: persistent disconnect" in capsys.readouterr().out
 
     def test_fetch_quote_and_options(self):
         mock_client = MagicMock()

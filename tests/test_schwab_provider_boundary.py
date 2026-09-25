@@ -1,4 +1,5 @@
 import sys
+import time
 from enum import Enum
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -47,12 +48,28 @@ def _fake_schwab_module():
     )
 
 
-def test_schwab_provider_owns_conservative_default_pacing():
+def test_schwab_provider_uses_bounded_concurrency_and_shared_pacing():
     provider = SchwabDataProvider(client=MagicMock())
 
-    assert provider.batch_size == 1
-    assert provider.max_workers == 1
+    assert provider.batch_size == 100
+    assert provider.max_workers == 8
     assert provider.rate_limit_sleep == 0.55
+    assert provider.recovery_rounds == 2
+
+
+def test_schwab_429_pauses_shared_request_starts():
+    mock_client = MagicMock()
+    response = MagicMock()
+    response.status_code = 429
+    mock_client.get_price_history.return_value = response
+    provider = SchwabDataProvider(client=mock_client, max_retries=0, rate_limit_sleep=0)
+
+    symbol, frame = provider.download_single_stock("AAPL")
+
+    assert symbol == "AAPL"
+    assert frame is None
+    assert provider._next_request_time - time.monotonic() > 29
+    assert provider._last_failure_reasons["AAPL"] == "HTTP 429"
 
 
 def test_index_alias_is_used_only_at_schwab_request_boundary():
