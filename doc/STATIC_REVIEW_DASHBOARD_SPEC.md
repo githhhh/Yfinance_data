@@ -226,12 +226,12 @@ RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上�
 
 Selected Overview 位于结果摘要和表格之间；选行后原地更新。桌面优先保持约 80–110px 高度，供连续 ↑↓ Review 使用。至少覆盖：
 
-- Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；
-- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时显示 Depth / Duration / Volume Dry，无证据时显示 `—`；
+- Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；Base 在数值下方显示 `Ceiling 价格 · YYYY-MM-DD → BO YYYY-MM-DD`，分别取权威 `ceiling`、`ceiling_date`、`breakout_date`，不得用 `buy_point_date` 代替突破日期；缺失的锚点单独省略；
+- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时在主数值行显示 Depth / Duration / Dry，无证据时显示 `—`。目前上游未提供权威起始日期，浏览器不得从 Duration 或行情推算；待上游正式产出 `pullback_start_date` 后再显示 `Start YYYY-MM-DD`；
 - RS Reference 当前及 1M / 3M / 6M 百分位，缺失允许 `N/A`；
 - 表格未显示的实际参考价：Signal 为 Buy Point，Watch 为 Watch Trigger；Signal 有 Entry Date 时显示，否则可显示 Buy Point Date；Watch 显示 Target Source。
 
-表格继续呈现 Stage / Status、Setup、Vs Reference、Price Quality、Latest、Entry / Reason、Weekly Vol 和 RS。Selected Overview 不重复这些机会字段；没有二级 Detail 面板。Close Position、Range Ratio、Ceiling Date、Off Peak 等诊断字段保留在权威数据链路，不进入高频展示。选行时尽量保持当前 Review 行在视口中的位置。
+结构日期统一显示完整 ISO 日期 `YYYY-MM-DD`，不按当前年份补全或缩写。表格继续呈现 Stage / Status、Setup、Vs Reference、Price Quality、Latest、Entry / Reason、Weekly Vol 和 RS。Selected Overview 不重复这些机会字段；没有二级 Detail 面板。Close Position、Range Ratio、Off Peak 等诊断字段保留在权威数据链路，不进入高频展示。选行时尽量保持当前 Review 行在视口中的位置。
 
 ## 6. 响应式与滚动
 
@@ -289,6 +289,7 @@ python security_scan.py --history
 - RS 表头 popover 可查看来源、RS update、Pool snapshot，并支持 Refresh / Retry；来源链接可跳转到 `Fred6725 / rs-log`；
 - RS popover 打开时 modal 状态清晰，有明确关闭入口，backdrop 点击不穿透底层控件；
 - 点击 RS 数字仍然选中该行，不打开独立 cell tooltip；Selected Overview 显示当前 / 1M / 3M / 6M；
+- Base 展示权威 Ceiling 价格 / 日期与独立的 BO 日期，结构日期均为 `YYYY-MM-DD`；Pullback 不推算起始日期；
 - RS 任一状态都不影响 Pool / Pages build 与 deploy；
 - 表头排序、Quality tooltip、选行、键盘 ↑↓、Copy 顺序一致；Quality 说明触控不会误触排序；
 - 选行只更新 Selected Overview，不滚动页面或表格；键盘 ↑↓ 仅在目标行超出表格可视区时调整表格内部纵向滚动，不调用页面级滚动；

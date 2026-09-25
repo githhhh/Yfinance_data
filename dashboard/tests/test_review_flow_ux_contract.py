@@ -52,6 +52,9 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         "row.eps_yoy_growth",
         "row.base_depth_pct",
         "row.base_duration_weeks",
+        "row.ceiling",
+        "row.ceiling_date",
+        "row.breakout_date",
         "row.dist_to_52w_high_pct",
         "row.pullback_pct",
         "row.pullback_duration_weeks",
@@ -61,6 +64,9 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         "row.rs_6m_percentile",
     ):
         assert field in APP
+    assert 'Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}' in APP
+    assert 'BO ${esc(breakoutDate)}' in APP
+    assert 'pullback_start_date' not in APP
     assert "detailOpen" not in APP
     assert 'data-action="detail"' not in APP
     assert "function detailHtml(row)" not in APP

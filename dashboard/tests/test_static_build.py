@@ -49,6 +49,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "buy_point_date",
         "ceiling",
         "ceiling_date",
+        "breakout_date",
     ):
         assert field in row
 
@@ -82,6 +83,22 @@ def test_static_records_fail_closed_on_new_pool_columns() -> None:
     assert row["code"] == "SAFE"
     assert "future_private_field" not in row
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
+
+
+def test_breakout_date_is_public_and_distinct_from_buy_point_date() -> None:
+    frame = pd.DataFrame([{
+        "code": "BASE",
+        "ibd_candidate_rule": "ceiling",
+        "ibd_candidate_price": 14.99,
+        "ceiling": 14.99,
+        "ceiling_date": pd.Timestamp("2026-02-09"),
+        "breakout_date": pd.Timestamp("2026-06-08"),
+    }])
+
+    row = _records(frame)[0]
+    assert row["ceiling_date"] == "2026-02-09"
+    assert row["breakout_date"] == "2026-06-08"
+    assert row["buy_point_date"] == "2026-02-09"
 
 
 def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -> None:
