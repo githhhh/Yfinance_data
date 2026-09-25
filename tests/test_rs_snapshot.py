@@ -82,14 +82,14 @@ def test_compute_rows_rejects_age_five():
 
 
 def test_write_snapshot_replaces_old_only_after_new_exists(tmp_path):
-    old = tmp_path / "rs_data_260923.csv"
+    old = tmp_path / "rs_data_230926.csv"
     old.write_text("Ticker,RS,AnchorDate\nOLD,1,2026-09-22\n", encoding="utf-8")
     target = rs_snapshot.write_snapshot(
         [{"Ticker": "FORM", "RS": 88, "AnchorDate": "2026-09-23"}],
         date(2026, 9, 24),
         tmp_path,
     )
-    assert target.name == "rs_data_260924.csv"
+    assert target.name == "rs_data_240926.csv"
     assert target.exists()
     assert not old.exists()
     assert target.read_text(encoding="utf-8").splitlines()[0] == "Ticker,RS,AnchorDate"
@@ -145,8 +145,8 @@ def test_cleanup_stale_published_snapshots_when_refresh_is_unavailable(tmp_path)
         date(2026, 9, 24),
         date(2026, 9, 25),
     ]
-    stale = tmp_path / "rs_data_260918.csv"
-    fresh = tmp_path / "rs_data_260924.csv"
+    stale = tmp_path / "rs_data_180926.csv"
+    fresh = tmp_path / "rs_data_240926.csv"
     stale.write_text(
         "Ticker,RS,AnchorDate\nFORM,88,2026-09-18\n", encoding="utf-8"
     )
@@ -169,12 +169,17 @@ def test_rs_rating_matches_pine_band_edges():
 
 def test_snapshot_output_has_only_required_columns(tmp_path):
     target = rs_snapshot.write_snapshot(
-        [{"Ticker": "P", "RS": 77, "AnchorDate": "2026-09-23"}],
+        [
+            {"Ticker": "P", "RS": 77, "AnchorDate": "2026-09-23"},
+            {"Ticker": "A", "RS": 99, "AnchorDate": "2026-09-23"},
+            {"Ticker": "B", "RS": 77, "AnchorDate": "2026-09-23"},
+        ],
         date(2026, 9, 24),
         tmp_path,
     )
     frame = pd.read_csv(target)
     assert frame.columns.tolist() == ["Ticker", "RS", "AnchorDate"]
+    assert frame["Ticker"].tolist() == ["A", "P", "B"]
     assert b"\r\n" not in target.read_bytes()
 
 
@@ -222,7 +227,7 @@ def test_diagnostic_stale_anchor_does_not_delete_published_snapshot(monkeypatch,
         "^GSPC": pd.DataFrame({"Close": range(100, 106)}, index=idx),
         "FORM": pd.DataFrame({"Close": range(50, 56)}, index=idx),
     }
-    published = tmp_path / "rs_data_260923.csv"
+    published = tmp_path / "rs_data_230926.csv"
     published.write_text(
         "Ticker,RS,AnchorDate\nFORM,88,2026-09-18\n", encoding="utf-8"
     )

@@ -323,7 +323,7 @@ def cleanup_stale_published_snapshots(
 
 def write_snapshot(rows: list[dict], run_date: date, results_dir: Path = RESULTS_DIR) -> Path:
     results_dir.mkdir(parents=True, exist_ok=True)
-    target = results_dir / f"rs_data_{run_date.strftime('%y%m%d')}.csv"
+    target = results_dir / f"rs_data_{run_date.strftime('%d%m%y')}.csv"
     fd, tmp = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=results_dir)
     try:
         with os.fdopen(fd, "w", newline="", encoding="utf-8") as fh:
@@ -333,7 +333,7 @@ def write_snapshot(rows: list[dict], run_date: date, results_dir: Path = RESULTS
                 lineterminator="\n",
             )
             writer.writeheader()
-            writer.writerows(rows)
+            writer.writerows(sorted(rows, key=lambda row: -int(row["RS"])))
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, target)
