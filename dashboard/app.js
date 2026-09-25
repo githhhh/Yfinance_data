@@ -533,11 +533,22 @@
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
       : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}w`}`;
+    const ceilingPrice = num(row.ceiling);
+    const baseStartDate = dateText(row.ceiling_date);
+    const breakoutDate = dateText(row.breakout_date);
+    const baseStructure = ceilingPrice === null && !baseStartDate && !breakoutDate
+      ? ""
+      : `<div>Ceiling ${ceilingPrice === null ? "—" : fmt(ceilingPrice)}</div><div>Start ${esc(baseStartDate || "—")} → Breakout ${esc(breakoutDate || "—")}</div>`;
     const pullbackDepth = num(row.pullback_pct);
     const pullbackDuration = num(row.pullback_duration_weeks);
     const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
       ? null : bool(row.pullback_v_is_dry);
+    const pullbackPeakDate = dateText(row.pullback_peak_date);
+    const pullbackPeakPrice = num(row.pullback_peak_price);
     const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
+    const pullbackStructure = pullbackPeakDate || pullbackPeakPrice !== null
+      ? `<div>Start ${esc(pullbackPeakDate || "—")}</div><div>Peak ${pullbackPeakPrice === null ? "—" : fmt(pullbackPeakPrice)}</div>`
+      : "";
     const pullbackValue = pullbackVisible
       ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}w`}`
       : "—";
@@ -548,9 +559,9 @@
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
       <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
       <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
-      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">Depth · Duration</div></div>
+      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">Depth · Duration</div>${baseStructure ? `<div class="selected-structure">${baseStructure}</div>` : ""}</div>
       <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
-      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">${pullbackVisible ? `Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}` : "No evidence"}</div></div>
+      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">${pullbackVisible ? `Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}` : "No evidence"}</div>${pullbackStructure ? `<div class="selected-structure">${pullbackStructure}</div>` : ""}</div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
   }

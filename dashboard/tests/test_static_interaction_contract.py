@@ -94,7 +94,7 @@ def test_selected_overview_click_does_not_scroll_the_page():
     assert "scrollIntoView" not in TABLE
     assert "function keepReviewRowVisibleInTable(shell, target)" in APP
     assert "shell.scrollTop = Math.max(0, shell.scrollTop + delta)" in APP
-    assert "height: 104px" in styles
+    assert "height: 110px" in styles
     assert "grid-template-columns: minmax(230px, 1.4fr) repeat(5, minmax(0, 1fr))" in styles
     assert ".selected-strip.has-pullback" not in styles
 

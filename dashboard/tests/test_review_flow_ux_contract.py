@@ -52,9 +52,14 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         "row.eps_yoy_growth",
         "row.base_depth_pct",
         "row.base_duration_weeks",
+        "row.ceiling",
+        "row.ceiling_date",
+        "row.breakout_date",
         "row.dist_to_52w_high_pct",
         "row.pullback_pct",
         "row.pullback_duration_weeks",
+        "row.pullback_peak_date",
+        "row.pullback_peak_price",
         "row.pullback_v_is_dry",
         "row.rs_1m_percentile",
         "row.rs_3m_percentile",
@@ -64,6 +69,10 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
     assert "detailOpen" not in APP
     assert 'data-action="detail"' not in APP
     assert "function detailHtml(row)" not in APP
+    assert 'Ceiling ${ceilingPrice === null ? "—" : fmt(ceilingPrice)}' in APP
+    assert 'Start ${esc(baseStartDate || "—")} → Breakout ${esc(breakoutDate || "—")}' in APP
+    assert 'Start ${esc(pullbackPeakDate || "—")}' in APP
+    assert 'Peak ${pullbackPeakPrice === null ? "—" : fmt(pullbackPeakPrice)}' in APP
 
 
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:

@@ -226,12 +226,12 @@ RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上�
 
 Selected Overview 位于结果摘要和表格之间；选行后原地更新。桌面优先保持约 80–110px 高度，供连续 ↑↓ Review 使用。至少覆盖：
 
-- Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；
-- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时显示 Depth / Duration / Volume Dry，无证据时显示 `—`；
+- Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；Base 同时显示 Ceiling 价格、Base 起点 `ceiling_date` 与 `breakout_date`，结构日期统一使用完整 `YYYY-MM-DD`；
+- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时显示 Depth / Duration / Volume Dry，并显示上游权威 `pullback_peak_date` / `pullback_peak_price`（UI 将 peak 周作为本轮 Pullback Start）；无证据时显示 `—`。Pullback 日期不得由 Dashboard 根据 duration 或 snapshot 反推；
 - RS Reference 当前及 1M / 3M / 6M 百分位，缺失允许 `N/A`；
 - 表格未显示的实际参考价：Signal 为 Buy Point，Watch 为 Watch Trigger；Signal 有 Entry Date 时显示，否则可显示 Buy Point Date；Watch 显示 Target Source。
 
-表格继续呈现 Stage / Status、Setup、Vs Reference、Price Quality、Latest、Entry / Reason、Weekly Vol 和 RS。Selected Overview 不重复这些机会字段；没有二级 Detail 面板。Close Position、Range Ratio、Ceiling Date、Off Peak 等诊断字段保留在权威数据链路，不进入高频展示。选行时尽量保持当前 Review 行在视口中的位置。
+表格继续呈现 Stage / Status、Setup、Vs Reference、Price Quality、Latest、Entry / Reason、Weekly Vol 和 RS。Selected Overview 不重复这些机会字段；没有二级 Detail 面板。Base / Pullback 的结构时间锚点属于高频 Review 上下文，因此在 Overview 展示；Close Position、Range Ratio、Off Peak 等诊断字段仍保留在权威数据链路，不进入高频展示。选行时尽量保持当前 Review 行在视口中的位置。
 
 ## 6. 响应式与滚动
 

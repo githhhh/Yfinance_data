@@ -49,6 +49,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "buy_point_date",
         "ceiling",
         "ceiling_date",
+        "breakout_date",
     ):
         assert field in row
 
@@ -82,6 +83,30 @@ def test_static_records_fail_closed_on_new_pool_columns() -> None:
     assert row["code"] == "SAFE"
     assert "future_private_field" not in row
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
+
+
+def test_static_records_publish_structure_timeline_fields_only_when_authoritative() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "code": "STRUCT",
+                "signal": True,
+                "ceiling": 52.0,
+                "ceiling_date": "2026-02-02",
+                "breakout_date": "2026-04-27",
+                "pullback_peak_date": "2026-06-22",
+                "pullback_peak_price": 61.5,
+                "pullback_duration_weeks": 4,
+            }
+        ]
+    )
+
+    row = _records(frame)[0]
+
+    assert row["ceiling_date"] == "2026-02-02"
+    assert row["breakout_date"] == "2026-04-27"
+    assert row["pullback_peak_date"] == "2026-06-22"
+    assert row["pullback_peak_price"] == 61.5
 
 
 def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -> None:
@@ -249,6 +274,10 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "Buy Point Date" in app
     assert 'row.base_depth_pct' in app
     assert 'row.base_duration_weeks' in app
+    assert 'row.ceiling_date' in app
+    assert 'row.breakout_date' in app
+    assert 'row.pullback_peak_date' in app
+    assert 'row.pullback_peak_price' in app
     assert 'row.eps_yoy_growth' in app
     assert 'row.dist_to_52w_high_pct' in app
     assert 'data-action="detail"' not in app
