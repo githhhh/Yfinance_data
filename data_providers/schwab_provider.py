@@ -5,10 +5,10 @@ import time
 import pandas as pd
 import requests
 from typing import Dict, List, Optional, Tuple, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from data_providers.base_provider import BaseDataProvider
-from data_providers.ohlcv_validation import validate_ohlcv_frame
+from data_providers.ohlcv_validation import DataIntegrityError, validate_ohlcv_frame
 
 
 SCHWAB_API_BASE = "https://api.schwabapi.com"
@@ -19,6 +19,18 @@ SCHWAB_SYMBOL_ALIASES = {
     "^GSPC": "$SPX",
     "^IXIC": "$COMPX",
     "^DJI": "$DJI",
+}
+
+_RETRYABLE_TRANSPORT_ERROR_NAMES = {
+    "ConnectError",
+    "ConnectTimeout",
+    "NetworkError",
+    "PoolTimeout",
+    "ReadError",
+    "ReadTimeout",
+    "RemoteProtocolError",
+    "WriteError",
+    "WriteTimeout",
 }
 
 
@@ -200,6 +212,7 @@ class SchwabDataProvider(BaseDataProvider):
         self._request_lock = threading.Lock()
         self._next_request_time = 0.0
         self._last_failure_reasons: Dict[str, str] = {}
+        self._retryable_failures: Dict[str, bool] = {}
 
     def _wait_for_request_slot(self) -> None:
         """Pace all workers, including retries, by request start time."""
@@ -215,9 +228,19 @@ class SchwabDataProvider(BaseDataProvider):
                 self._next_request_time, time.monotonic() + 30.0
             )
 
-    def _record_failure(self, symbol: str, reason: str) -> None:
+    def _record_failure(self, symbol: str, reason: str, *, retryable: bool) -> None:
         self._last_failure_reasons[symbol] = reason
+        self._retryable_failures[symbol] = retryable
         print(f"[Schwab] {symbol}: {reason}")
+
+    @staticmethod
+    def _is_retryable_request_error(error: Exception, status_code: Any) -> bool:
+        """Classify transport failures without importing a specific HTTP client."""
+        if isinstance(status_code, int):
+            return status_code == 429 or status_code >= 500
+        return isinstance(
+            error, (requests.RequestException, ConnectionError, TimeoutError)
+        ) or type(error).__name__ in _RETRYABLE_TRANSPORT_ERROR_NAMES
 
     @property
     def failure_reasons(self) -> Dict[str, str]:
@@ -266,7 +289,10 @@ class SchwabDataProvider(BaseDataProvider):
             data = self._download_single_stock_once(symbol, period=period, interval=interval)
             if data is not None:
                 self._last_failure_reasons.pop(symbol, None)
+                self._retryable_failures.pop(symbol, None)
                 return symbol, data
+            if not self._retryable_failures.get(symbol, False):
+                break
             attempt += 1
             if attempt <= self.max_retries:
                 time.sleep(self.rate_limit_sleep * attempt)
@@ -281,25 +307,31 @@ class SchwabDataProvider(BaseDataProvider):
             resp = self._request_price_history(schwab_symbol, period=period, interval=interval)
 
             if resp is None:
-                self._record_failure(symbol, "empty API response")
+                self._record_failure(symbol, "empty API response", retryable=True)
                 return None
 
             status_code = getattr(resp, "status_code", None)
             if isinstance(status_code, int) and status_code >= 400:
                 if status_code == 429:
                     self._cooldown_after_rate_limit()
-                self._record_failure(symbol, f"HTTP {status_code}")
+                self._record_failure(
+                    symbol,
+                    f"HTTP {status_code}",
+                    retryable=status_code == 429 or status_code >= 500,
+                )
                 return None
 
             data_json = resp.json() if hasattr(resp, "json") and callable(resp.json) else resp
 
             if not isinstance(data_json, dict) or data_json.get("empty", False):
-                self._record_failure(symbol, "empty or invalid history response")
+                self._record_failure(
+                    symbol, "empty or invalid history response", retryable=True
+                )
                 return None
 
             candles = data_json.get("candles", [])
             if not candles:
-                self._record_failure(symbol, "no history candles")
+                self._record_failure(symbol, "no history candles", retryable=True)
                 return None
 
             df = pd.DataFrame(candles)
@@ -319,7 +351,7 @@ class SchwabDataProvider(BaseDataProvider):
 
             req_cols = ["Open", "High", "Low", "Close", "Volume"]
             if any(col not in df.columns for col in req_cols):
-                self._record_failure(symbol, "missing OHLCV columns")
+                self._record_failure(symbol, "missing OHLCV columns", retryable=False)
                 return None
 
             df = df[req_cols].copy()
@@ -330,16 +362,37 @@ class SchwabDataProvider(BaseDataProvider):
             df = df.dropna(how="all")
 
             if df.empty:
-                self._record_failure(symbol, "empty OHLCV rows")
+                self._record_failure(symbol, "empty OHLCV rows", retryable=False)
                 return None
 
             validate_ohlcv_frame(symbol, df)
             return df
 
-        except Exception as e:
-            if getattr(getattr(e, "response", None), "status_code", None) == 429:
+        except DataIntegrityError as e:
+            self._record_failure(symbol, f"{type(e).__name__}: {e}", retryable=False)
+            return None
+        except requests.RequestException as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            if status_code == 429:
                 self._cooldown_after_rate_limit()
-            self._record_failure(symbol, f"{type(e).__name__}: {e}")
+            self._record_failure(
+                symbol,
+                f"{type(e).__name__}: {e}",
+                retryable=status_code is None or status_code == 429 or status_code >= 500,
+            )
+            return None
+        except (ConnectionError, TimeoutError) as e:
+            self._record_failure(symbol, f"{type(e).__name__}: {e}", retryable=True)
+            return None
+        except Exception as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            if status_code == 429:
+                self._cooldown_after_rate_limit()
+            self._record_failure(
+                symbol,
+                f"{type(e).__name__}: {e}",
+                retryable=self._is_retryable_request_error(e, status_code),
+            )
             return None
 
     def _request_price_history(self, symbol: str, period: str, interval: str) -> Any:
@@ -403,19 +456,39 @@ class SchwabDataProvider(BaseDataProvider):
     ) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
         data: Dict[str, pd.DataFrame] = {}
         failed: List[str] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for batch_start in range(0, len(symbols), self.batch_size):
-                batch = symbols[batch_start : batch_start + self.batch_size]
-                futures = {
-                    executor.submit(self.download_single_stock, symbol, period, interval): symbol
-                    for symbol in batch
-                }
-                for future in as_completed(futures):
+        if not symbols:
+            return data, failed
+
+        # Keep bounded work in flight and refill it immediately. This preserves
+        # global request pacing while avoiding the old 100-symbol batch barrier:
+        # a slow request no longer leaves other workers idle before the next
+        # symbols can start.
+        worker_count = max(1, min(self.max_workers, self.batch_size, len(symbols)))
+        symbol_iter = iter(symbols)
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(self.download_single_stock, symbol, period, interval): symbol
+                for _, symbol in zip(range(worker_count), symbol_iter)
+            }
+            while futures:
+                completed, _ = wait(futures, return_when=FIRST_COMPLETED)
+                for future in completed:
+                    futures.pop(future)
                     stock_code, frame = future.result()
                     if frame is not None and not frame.empty:
                         data[stock_code] = frame
                     else:
                         failed.append(stock_code)
+
+                    try:
+                        next_symbol = next(symbol_iter)
+                    except StopIteration:
+                        continue
+                    futures[
+                        executor.submit(
+                            self.download_single_stock, next_symbol, period, interval
+                        )
+                    ] = next_symbol
         return data, sorted(failed)
 
     def download_batch_stocks(
@@ -433,14 +506,35 @@ class SchwabDataProvider(BaseDataProvider):
         _ = self.client
 
         all_data, failed = self._download_pass(symbols, period, interval)
+        terminal_failed = {
+            symbol
+            for symbol in failed
+            if not self._retryable_failures.get(symbol, False)
+        }
+        retryable_failed = [
+            symbol for symbol in failed if self._retryable_failures.get(symbol, False)
+        ]
         for round_number in range(1, self.recovery_rounds + 1):
-            if not failed:
+            if not retryable_failed:
                 break
-            print(f"[Schwab Batch] Recovery round {round_number}: {len(failed)} symbols")
+            print(
+                f"[Schwab Batch] Recovery round {round_number}: "
+                f"{len(retryable_failed)} retryable symbols"
+            )
             if self.recovery_sleep > 0:
                 time.sleep(self.recovery_sleep * round_number)
-            recovered, failed = self._download_pass(failed, period, interval)
+            recovered, failed = self._download_pass(retryable_failed, period, interval)
             all_data.update(recovered)
+            terminal_failed.update(
+                symbol
+                for symbol in failed
+                if not self._retryable_failures.get(symbol, False)
+            )
+            retryable_failed = [
+                symbol for symbol in failed if self._retryable_failures.get(symbol, False)
+            ]
+
+        failed = sorted(terminal_failed.union(retryable_failed))
 
         for symbol in failed:
             print(

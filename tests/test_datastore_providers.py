@@ -257,6 +257,28 @@ class TestSchwabDataProvider:
         assert len(df) == 1
         assert mock_client.get_price_history.call_count == 2
 
+    def test_download_single_stock_retries_http_client_read_timeout(self):
+        class ReadTimeout(Exception):
+            pass
+
+        mock_client = MagicMock()
+        good_resp = MagicMock()
+        good_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5,
+                 "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.side_effect = [ReadTimeout("timed out"), good_resp]
+        provider = SchwabDataProvider(client=mock_client, max_retries=1, rate_limit_sleep=0)
+
+        symbol, df = provider.download_single_stock("AAPL")
+
+        assert symbol == "AAPL"
+        assert df is not None
+        assert mock_client.get_price_history.call_count == 2
+
     def test_download_batch_stocks_paces_requests_across_workers(self):
         mock_client = MagicMock()
         mock_resp = MagicMock()
@@ -293,6 +315,80 @@ class TestSchwabDataProvider:
         assert failed == []
         assert min(b - a for a, b in zip(starts, starts[1:])) >= 0.015
         assert peak_active >= 2  # Network waits overlap despite shared request pacing.
+
+    def test_download_pass_refills_worker_before_slow_request_finishes(self):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 11.0, "low": 9.0, "close": 10.5,
+                 "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        slow_started = threading.Event()
+        fast_finished = threading.Event()
+        third_started = threading.Event()
+        release_slow = threading.Event()
+
+        def get_history(symbol, **kwargs):
+            if symbol == "AAPL":
+                slow_started.set()
+                assert release_slow.wait(timeout=2)
+            elif symbol == "MSFT":
+                assert slow_started.wait(timeout=1)
+                fast_finished.set()
+            elif symbol == "NVDA":
+                third_started.set()
+            return mock_resp
+
+        mock_client.get_price_history.side_effect = get_history
+        provider = SchwabDataProvider(
+            client=mock_client, batch_size=2, max_workers=2,
+            max_retries=0, rate_limit_sleep=0, recovery_rounds=0,
+        )
+        result = {}
+        worker = threading.Thread(
+            target=lambda: result.setdefault(
+                "value", provider.download_batch_stocks(["AAPL", "MSFT", "NVDA"])
+            )
+        )
+        worker.start()
+
+        assert fast_finished.wait(timeout=1)
+        assert third_started.wait(timeout=1)
+        release_slow.set()
+        worker.join(timeout=2)
+
+        assert not worker.is_alive()
+        all_data, failed = result["value"]
+        assert set(all_data) == {"AAPL", "MSFT", "NVDA"}
+        assert failed == []
+
+    def test_invalid_ohlc_is_not_retried_or_sent_to_recovery(self, capsys):
+        mock_client = MagicMock()
+        invalid_resp = MagicMock()
+        invalid_resp.json.return_value = {
+            "candles": [
+                {"open": 10.0, "high": 10.0, "low": 9.0, "close": 10.5,
+                 "volume": 100, "datetime": 1672531200000}
+            ],
+            "empty": False,
+        }
+        mock_client.get_price_history.return_value = invalid_resp
+        provider = SchwabDataProvider(
+            client=mock_client, max_retries=1, rate_limit_sleep=0,
+            recovery_rounds=2, recovery_sleep=0,
+        )
+
+        all_data, failed = provider.download_batch_stocks(["AAPL"])
+
+        assert all_data == {}
+        assert failed == ["AAPL"]
+        assert mock_client.get_price_history.call_count == 1
+        output = capsys.readouterr().out
+        assert "Recovery round" not in output
+        assert "OHLCInconsistencyError" in output
 
     def test_batch_retries_failed_symbols_after_other_downloads(self, capsys):
         mock_client = MagicMock()
