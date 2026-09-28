@@ -104,6 +104,20 @@ def test_static_records_publish_pullback_structure_anchor_only_when_authoritativ
     assert row["pullback_peak_price"] == 61.5
 
 
+def test_static_records_normalize_missing_pullback_peak_date() -> None:
+    frame = pd.DataFrame(
+        [
+            {"code": "MISSING", "pullback_peak_date": "NaT"},
+            {"code": "REAL", "pullback_peak_date": pd.Timestamp("2026-06-22")},
+        ]
+    )
+
+    rows = _records(frame)
+
+    assert rows[0]["pullback_peak_date"] is None
+    assert rows[1]["pullback_peak_date"] == "2026-06-22"
+
+
 def test_breakout_date_is_public_and_distinct_from_buy_point_date() -> None:
     frame = pd.DataFrame([{
         "code": "BASE",

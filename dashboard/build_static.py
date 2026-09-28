@@ -259,7 +259,7 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 record[field] = _text_or_none(extra.get("overridden_signal_source"))
             elif field == "buy_point_date":
                 record[field] = _buy_point_date(row)
-            elif field in {"ceiling_date", "breakout_date"} and field in row:
+            elif field in {"ceiling_date", "breakout_date", "pullback_peak_date"} and field in row:
                 record[field] = _iso_date(row.get(field))
             elif field in row:
                 record[field] = _json_value(row.get(field))

@@ -85,6 +85,10 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
     assert "function detailHtml(row)" not in APP
 
 
+def test_selected_overview_never_renders_nat_as_a_date() -> None:
+    assert '["nat", "nan", "none", "<na>", "null"].includes(out.toLowerCase())' in APP
+
+
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:
     assert "if (isNearBreakout(row)) return true;" in APP
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio", 0, 1)' in APP
@@ -131,9 +135,16 @@ def test_mobile_review_demotes_static_scope_and_low_frequency_tools() -> None:
     assert "scope-switch" in APP
     assert "mobile-filter-button" in APP
     assert 'class="results-order-slot"' in APP
+    toolbar = APP.split('class="results-toolbar"', 1)[1].split("</div>", 5)
+    toolbar_text = "".join(toolbar)
+    assert toolbar_text.index('class="results-order-slot"') < toolbar_text.index('class="copy-button"')
+    assert toolbar_text.index('class="copy-button"') < toolbar_text.index('class="mobile-filter-button"')
     assert ".scope-static-block { position: absolute;" in styles
     assert ".filters-wrap:not(.filters-expanded) { display: none; }" in styles
-    assert ".mobile-filter-button { display: inline-flex;" in styles
+    assert ".mobile-filter-button" in styles
+    assert ".copy-button::before" in styles
+    assert ".mobile-filter-button::before" in styles
+    assert 'data-count="${activeFilters || ""}"' in APP
     assert ".results-section > .selected-strip { order: 1; }" in styles
     assert ".results-section > .results-toolbar { order: 2; }" in styles
 
@@ -151,10 +162,20 @@ def test_mobile_selected_overview_prioritizes_dense_metrics_and_structure_contex
         "selected-structure-mobile",
     ):
         assert token in APP
-    assert ".selected-eps, .selected-high, .selected-rs { grid-column: span 2; }" in styles
-    assert ".selected-base, .selected-pullback { grid-column: span 3; }" in styles
-    assert ".selected-strip.empty { min-height: 52px; grid-template-columns: 1fr; }" in styles
+    assert '"eps eps high high rs rs"' in styles
+    assert '"base base base pullback pullback pullback"' in styles
+    assert ".selected-eps { grid-area: eps; }" in styles
+    assert ".selected-high { grid-area: high; }" in styles
+    assert ".selected-rs { grid-area: rs; }" in styles
+    assert ".selected-base { grid-area: base; }" in styles
+    assert ".selected-pullback { grid-area: pullback; }" in styles
+    assert ".selected-strip.empty { min-height: 52px; grid-template-columns: 1fr; grid-template-areas: none; }" in styles
     assert ".selected-structure-compact { display: none; }" in styles
+
+
+def test_default_order_uses_explicit_toolbar_slot() -> None:
+    assert 'toolbar?.querySelector(".results-order-slot")' in TABLE
+    assert "toolbar?.lastElementChild" not in TABLE
 
 
 def test_rs_sort_cycles_desc_asc_then_restores_default_order() -> None:

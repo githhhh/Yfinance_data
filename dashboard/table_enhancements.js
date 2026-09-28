@@ -172,7 +172,7 @@
 
   function syncDefaultSortButton(shell) {
     const toolbar = app.querySelector(".results-toolbar");
-    const slot = toolbar?.lastElementChild;
+    const slot = toolbar?.querySelector(".results-order-slot");
     if (!slot) return;
     let button = slot.querySelector(".review-default-sort");
     if (!currentSortState()) {
