@@ -198,6 +198,22 @@
     if (!field) return;
 
     const previous = currentSortState();
+    if (field === "rs_percentile") {
+      if (previous?.field === field && previous.direction === "asc") {
+        restoreDefaultOrder(shell);
+        return;
+      }
+      const nextRs = previous?.field === field && previous.direction === "desc"
+        ? { field, direction: "asc" }
+        : { field, direction: "desc" };
+      setCurrentSortState(nextRs);
+      sortTable(shell, nextRs.field, nextRs.direction);
+      updateSortIndicators(shell);
+      updateSummary(shell);
+      syncDefaultSortButton(shell);
+      return;
+    }
+
     const next = previous?.field === field
       ? { field, direction: previous.direction === "asc" ? "desc" : "asc" }
       : { field, direction: "asc" };
