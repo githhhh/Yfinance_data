@@ -134,7 +134,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
                         "pivot_candidates": [
                             {"price": 90.0, "resistance_date": "2026-08-31"},
                             {"price": 93.37, "resistance_date": "2026-09-07"},
-                        ]
+                        ],
+                        "overridden_signal_source": "three_weeks_tight_breakout",
                     }
                 ),
             },
@@ -209,6 +210,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
     assert rows["PIV"]["buy_point_date"] == "2026-09-07"
     assert rows["PIV"]["ceiling"] == 57.68
     assert rows["PIV"]["ceiling_date"] == "2024-05-20"
+    assert rows["PIV"]["overridden_signal_source"] == "three_weeks_tight_breakout"
+    assert rows["CEIL"]["overridden_signal_source"] is None
     assert rows["PIV_SELECTED"]["buy_point_date"] == "2026-09-08"
     assert rows["MA10"]["buy_point_date"] is None
     assert rows["PB"]["buy_point_date"] == "2026-08-17"
