@@ -66,6 +66,7 @@
 
   function dateText(value) {
     const out = text(value, "");
+    if (!out || ["nat", "nan", "none", "<na>", "null"].includes(out.toLowerCase())) return "";
     return /^\d{4}-\d{2}-\d{2}/.test(out) ? out.slice(0, 10) : out;
   }
 
@@ -533,9 +534,9 @@
       <section class="results-section">
         <div class="results-toolbar">
           <div class="results-summary">${rows.length} results · Sorted by ${esc(sortedLabel)}</div>
-          <button class="copy-button" data-action="copy-codes" title="Copy visible codes">Copy ${rows.length} Codes</button>
-          <button class="mobile-filter-button" data-action="toggle-filters" aria-expanded="${state.filtersExpanded}" title="More Filters">Filters${activeFilters ? ` · ${activeFilters}` : ""}</button>
           <div class="results-order-slot"></div>
+          <button class="copy-button" data-action="copy-codes" aria-label="Copy ${rows.length} visible codes" title="Copy visible codes">Copy ${rows.length} Codes</button>
+          <button class="mobile-filter-button" data-action="toggle-filters" data-count="${activeFilters || ""}" aria-expanded="${state.filtersExpanded}" aria-label="More Filters${activeFilters ? `, ${activeFilters} active` : ""}" title="More Filters">Filters${activeFilters ? ` · ${activeFilters}` : ""}</button>
         </div>
         ${selectedHtml(selectedRow)}
         ${tableHtml(rows)}
