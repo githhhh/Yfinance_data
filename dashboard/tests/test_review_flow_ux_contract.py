@@ -41,6 +41,14 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 
+def test_setup_displays_single_overridden_signal_only_when_present() -> None:
+    assert "function setupHtml(row)" in APP
+    assert 'text(row.overridden_signal_source, "")' in APP
+    assert "if (!overridden) return esc(primary);" in APP
+    assert '<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>' in APP
+    assert 'if (field === "ibd_candidate_rule") return setupHtml(row);' in APP
+
+
 def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
     assert 'class="selected-strip"' in APP
     assert "has-pullback" not in APP
