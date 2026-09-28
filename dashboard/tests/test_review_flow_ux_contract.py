@@ -174,8 +174,16 @@ def test_mobile_selected_overview_prioritizes_dense_metrics_and_structure_contex
 
 
 def test_default_order_uses_explicit_toolbar_slot() -> None:
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert 'toolbar?.querySelector(".results-order-slot")' in TABLE
     assert "toolbar?.lastElementChild" not in TABLE
+    assert 'button.setAttribute("aria-label", "Default order")' in TABLE
+    assert "grid-template-columns: minmax(0, 1fr) 34px 34px 34px;" in styles
+    assert ".results-order-slot { grid-column: auto; width: 34px; min-width: 34px;" in styles
+    assert ".results-order-slot:empty { display: none; }" not in styles
+    assert '.review-default-sort::before {' in styles
+    assert 'content: "↺";' in styles
+    assert '.review-default-sort { grid-column: 1 / -1; }' not in INDEX
 
 
 def test_rs_sort_cycles_desc_asc_then_restores_default_order() -> None:
