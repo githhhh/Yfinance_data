@@ -16,6 +16,12 @@
     pivot: "Pivot",
     three_weeks_tight: "Three Weeks Tight",
   };
+  const SIGNAL_SOURCE_LABELS = {
+    ceiling_breakout: "Ceiling",
+    pivot: "Pivot",
+    three_weeks_tight_breakout: "Three Weeks Tight",
+    "10_wk_ema_touch_confirm": "MA10 Touch",
+  };
 
   let data = null;
   let state = null;
@@ -73,6 +79,10 @@
 
   function routeLabel(route) {
     return ROUTE_LABELS[route] || text(route, "N/A").replaceAll("_", " ");
+  }
+
+  function signalSourceLabel(source) {
+    return SIGNAL_SOURCE_LABELS[source] || text(source, "").replaceAll("_", " ");
   }
 
   function qualityClass(value) {
@@ -164,6 +174,13 @@
 
   function reviewSetup(row) {
     return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : row.ibd_candidate_rule;
+  }
+
+  function setupHtml(row) {
+    const primary = routeLabel(reviewSetup(row));
+    const overridden = isNearBreakout(row) ? "" : text(row.overridden_signal_source, "");
+    if (!overridden) return esc(primary);
+    return `${esc(primary)}<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>`;
   }
 
   function nearBreakoutTarget(row) {
@@ -626,7 +643,7 @@
       const status = displayStatus(row);
       return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
     }
-    if (field === "ibd_candidate_rule") return esc(routeLabel(reviewSetup(row)));
+    if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
     if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
     if (field === "latest_close") return esc(fmt(value));
