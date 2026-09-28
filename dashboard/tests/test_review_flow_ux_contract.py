@@ -41,6 +41,14 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 
+def test_setup_displays_single_overridden_signal_only_when_present() -> None:
+    assert "function setupHtml(row)" in APP
+    assert 'text(row.overridden_signal_source, "")' in APP
+    assert "if (!overridden) return esc(primary);" in APP
+    assert '<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>' in APP
+    assert 'if (field === "ibd_candidate_rule") return setupHtml(row);' in APP
+
+
 def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
     assert 'class="selected-strip"' in APP
     assert "has-pullback" not in APP
@@ -66,13 +74,15 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         "row.rs_6m_percentile",
     ):
         assert field in APP
+    assert 'Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}' in APP
+    assert 'BO ${esc(breakoutDate)}' in APP
+    assert "pullbackPeakDate = dateText(row.pullback_peak_date)" in APP
+    assert "pullbackPeakPrice = num(row.pullback_peak_price)" in APP
+    assert 'Start ${esc(pullbackPeakDate || "—")}' in APP
+    assert 'pullback_start_date' not in APP
     assert "detailOpen" not in APP
     assert 'data-action="detail"' not in APP
     assert "function detailHtml(row)" not in APP
-    assert 'Ceiling ${ceilingPrice === null ? "—" : fmt(ceilingPrice)}' in APP
-    assert 'Start ${esc(baseStartDate || "—")} → Breakout ${esc(breakoutDate || "—")}' in APP
-    assert 'Start ${esc(pullbackPeakDate || "—")}' in APP
-    assert 'Peak ${pullbackPeakPrice === null ? "—" : fmt(pullbackPeakPrice)}' in APP
 
 
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:

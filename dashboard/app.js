@@ -16,6 +16,12 @@
     pivot: "Pivot",
     three_weeks_tight: "Three Weeks Tight",
   };
+  const SIGNAL_SOURCE_LABELS = {
+    ceiling_breakout: "Ceiling",
+    pivot: "Pivot",
+    three_weeks_tight_breakout: "Three Weeks Tight",
+    "10_wk_ema_touch_confirm": "MA10 Touch",
+  };
 
   let data = null;
   let state = null;
@@ -73,6 +79,10 @@
 
   function routeLabel(route) {
     return ROUTE_LABELS[route] || text(route, "N/A").replaceAll("_", " ");
+  }
+
+  function signalSourceLabel(source) {
+    return SIGNAL_SOURCE_LABELS[source] || text(source, "").replaceAll("_", " ");
   }
 
   function qualityClass(value) {
@@ -164,6 +174,13 @@
 
   function reviewSetup(row) {
     return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : row.ibd_candidate_rule;
+  }
+
+  function setupHtml(row) {
+    const primary = routeLabel(reviewSetup(row));
+    const overridden = isNearBreakout(row) ? "" : text(row.overridden_signal_source, "");
+    if (!overridden) return esc(primary);
+    return `${esc(primary)}<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>`;
   }
 
   function nearBreakoutTarget(row) {
@@ -532,13 +549,14 @@
     const baseDuration = num(row.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
-      : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}w`}`;
-    const ceilingPrice = num(row.ceiling);
-    const baseStartDate = dateText(row.ceiling_date);
+      : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
+    const ceiling = num(row.ceiling);
+    const ceilingDate = dateText(row.ceiling_date);
     const breakoutDate = dateText(row.breakout_date);
-    const baseStructure = ceilingPrice === null && !baseStartDate && !breakoutDate
+    const ceilingContext = ceiling === null && !ceilingDate
       ? ""
-      : `<div>Ceiling ${ceilingPrice === null ? "—" : fmt(ceilingPrice)}</div><div>Start ${esc(baseStartDate || "—")} → Breakout ${esc(breakoutDate || "—")}</div>`;
+      : `Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}${ceilingDate ? ` · ${esc(ceilingDate)}` : ""}`;
+    const baseContext = [ceilingContext, breakoutDate ? `BO ${esc(breakoutDate)}` : ""].filter(Boolean).join(" → ");
     const pullbackDepth = num(row.pullback_pct);
     const pullbackDuration = num(row.pullback_duration_weeks);
     const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
@@ -546,11 +564,11 @@
     const pullbackPeakDate = dateText(row.pullback_peak_date);
     const pullbackPeakPrice = num(row.pullback_peak_price);
     const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
-    const pullbackStructure = pullbackPeakDate || pullbackPeakPrice !== null
-      ? `<div>Start ${esc(pullbackPeakDate || "—")}</div><div>Peak ${pullbackPeakPrice === null ? "—" : fmt(pullbackPeakPrice)}</div>`
+    const pullbackAnchor = pullbackPeakDate || pullbackPeakPrice !== null
+      ? `Start ${esc(pullbackPeakDate || "—")}${pullbackPeakPrice === null ? "" : ` · Peak ${fmt(pullbackPeakPrice)}`}`
       : "";
     const pullbackValue = pullbackVisible
-      ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}w`}`
+      ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}W`}${pullbackDry === null ? "" : ` · ${pullbackDry ? "Dry" : "Not Dry"}`}`
       : "—";
     const currentRs = num(row.rs_percentile);
     const rsValue = currentRs === null
@@ -559,9 +577,9 @@
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
       <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
       <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
-      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">Depth · Duration</div>${baseStructure ? `<div class="selected-structure">${baseStructure}</div>` : ""}</div>
+      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">${baseContext || "Depth · Duration"}</div></div>
       <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
-      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div><div class="selected-hint">${pullbackVisible ? `Depth · Duration${pullbackDry === null ? "" : ` · Dry ${pullbackDry ? "Yes" : "No"}`}` : "No evidence"}</div>${pullbackStructure ? `<div class="selected-structure">${pullbackStructure}</div>` : ""}</div>
+      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint">No evidence</div>'}</div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
   }
@@ -630,7 +648,7 @@
       const status = displayStatus(row);
       return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
     }
-    if (field === "ibd_candidate_rule") return esc(routeLabel(reviewSetup(row)));
+    if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
     if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
     if (field === "latest_close") return esc(fmt(value));

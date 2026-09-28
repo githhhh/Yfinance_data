@@ -71,6 +71,80 @@ def test_validate_download_batch_rejects_missing_expected_symbol():
         )
 
 
+def test_schwab_filters_invalid_ohlc_but_yahoo_validation_remains_strict(capsys):
+    invalid = _frame(["2026-09-11"])
+    invalid.loc[:, "Close"] = 11.5  # Above High; retain the source value.
+    data = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
+    data["AAPL"] = invalid
+
+    filtered, excluded = DataStore.filter_schwab_stock_data(
+        data, failed=[], expected_symbols=list(data), interval="1wk"
+    )
+    assert set(filtered) == set(data) - {"AAPL"}
+    assert excluded == ["AAPL"]
+    output = capsys.readouterr().out
+    assert "AAPL: inconsistent OHLC rows" in output
+    assert "High=11.0" in output
+    assert "Close=11.5" in output
+    assert "High<Close" in output
+
+    with pytest.raises(DataIntegrityError, match="inconsistent OHLC rows"):
+        validate_download_batch(
+            data, expected_symbols=list(data), interval="1wk"
+        )
+
+
+def test_schwab_filters_reported_download_failure_and_stale_symbol(capsys):
+    current = _frame(["2026-09-11"])
+    data = {symbol: current.copy() for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
+    data["AAPL"] = _frame(["2026-09-04"])
+
+    filtered, excluded = DataStore.filter_schwab_stock_data(
+        data, failed=["IVZ"], expected_symbols=[*data, "IVZ"], interval="1wk"
+    )
+    assert set(filtered) == {"^GSPC", "^IXIC", "^DJI", "MSFT"}
+    assert excluded == ["AAPL", "IVZ"]
+    output = capsys.readouterr().out
+    assert "IVZ" in output and "filtered" in output
+    assert "AAPL" in output and "2026-09-04" in output
+
+
+def test_schwab_does_not_hide_unreported_missing_or_missing_market_reference():
+    data = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "^DJI")}
+    with pytest.raises(DataIntegrityError, match="unreported missing"):
+        DataStore.filter_schwab_stock_data(
+            data, failed=[], expected_symbols=[*data, "IVZ"], interval="1wk"
+        )
+    with pytest.raises(DataIntegrityError, match="market reference"):
+        DataStore.filter_schwab_stock_data(
+            {"^GSPC": data["^GSPC"], "^IXIC": data["^IXIC"]},
+            failed=["^DJI"], expected_symbols=list(data), interval="1wk"
+        )
+
+
+def test_schwab_does_not_filter_disagreeing_market_references():
+    data = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "MSFT")}
+    data["^DJI"] = _frame(["2026-09-10"])
+
+    with pytest.raises(DataIntegrityError, match="market reference latest-bar dates disagree"):
+        DataStore.filter_schwab_stock_data(
+            data, failed=[], expected_symbols=list(data), interval="1wk"
+        )
+
+
+def test_schwab_does_not_filter_globally_stale_daily_batch(monkeypatch):
+    data = {symbol: _frame(["2026-09-10"]) for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
+    monkeypatch.setattr(
+        "data_providers.ohlcv_validation.expected_latest_us_session",
+        lambda now=None: pd.Timestamp("2026-09-11").date(),
+    )
+
+    with pytest.raises(DataIntegrityError, match="latest completed US session 2026-09-11"):
+        DataStore.filter_schwab_stock_data(
+            data, failed=[], expected_symbols=list(data), interval="1d"
+        )
+
+
 def test_validate_download_batch_rejects_missing_latest_session_bar():
     current = _frame(["2026-09-10", "2026-09-11"])
     stale = _frame(["2026-09-10"])
@@ -93,6 +167,23 @@ def test_validate_download_batch_rejects_missing_latest_session_bar():
                 12,
                 tzinfo=ZoneInfo("America/New_York"),
             ),
+        )
+
+@pytest.mark.parametrize(
+    ("column", "value", "reason"),
+    [
+        ("Close", np.nan, "null/non-numeric OHLCV"),
+        ("Close", np.inf, "non-finite OHLCV"),
+        ("Close", 0.0, "non-positive price"),
+        ("Volume", -1, "negative volume"),
+    ],
+)
+def test_schwab_still_rejects_other_invalid_rows(column, value, reason):
+    invalid = _frame(["2026-09-11"])
+    invalid.loc[:, column] = value
+    with pytest.raises(DataIntegrityError, match=reason):
+        validate_ohlcv_frame(
+            "AAPL", invalid,
         )
 
 
@@ -228,6 +319,35 @@ def test_save_stock_data_rejects_invalid_frame_before_writing(
 
     assert not output.exists()
     assert not (tmp_path / "invalid.pkl.tmp").exists()
+
+
+def test_schwab_filtered_save_round_trips_only_valid_symbols(tmp_path, monkeypatch):
+    output = tmp_path / "schwab_1d.pkl"
+    monkeypatch.setattr(
+        DataStore,
+        "get_stock_pkl_path",
+        lambda interval="1d": str(output),
+    )
+    invalid = _frame(["2026-09-11"])
+    invalid.loc[:, "Close"] = 11.5
+
+    batch = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
+    batch["AAPL"] = invalid
+    filtered, excluded = DataStore.filter_schwab_stock_data(
+        batch, failed=[], expected_symbols=list(batch), interval="1wk"
+    )
+    assert excluded == ["AAPL"]
+    saved = DataStore.save_stock_data(
+        filtered,
+        save_dir=str(tmp_path),
+        interval="1wk",
+        expected_symbols=list(filtered),
+    )
+
+    assert saved == str(output)
+    loaded = DataStore.load_stock_data(saved)
+    assert set(loaded) == set(filtered)
+    assert "AAPL" not in loaded
 
 
 def test_save_stock_data_preserves_previous_file_if_temp_round_trip_fails(

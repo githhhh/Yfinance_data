@@ -74,8 +74,8 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "ibd_entry_status",
     "ibd_candidate_rule",
     "ibd_candidate_price",
+    "overridden_signal_source",
     "buy_point_date",
-    "breakout_date",
     "ibd_trigger_price",
     "current_vs_ibd_candidate_pct",
     "latest_close",
@@ -99,6 +99,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "pullback_v_is_dry",
     "ceiling",
     "ceiling_date",
+    "breakout_date",
     "base_depth_pct",
     "base_duration_weeks",
     "industry",
@@ -253,8 +254,13 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     for row in frame.to_dict(orient="records"):
         record: dict[str, Any] = {}
         for field in PUBLIC_DASHBOARD_ROW_FIELDS:
-            if field == "buy_point_date":
+            if field == "overridden_signal_source":
+                extra = _candidate_extra(row.get("ibd_candidate_extra"))
+                record[field] = _text_or_none(extra.get("overridden_signal_source"))
+            elif field == "buy_point_date":
                 record[field] = _buy_point_date(row)
+            elif field in {"ceiling_date", "breakout_date"} and field in row:
+                record[field] = _iso_date(row.get(field))
             elif field in row:
                 record[field] = _json_value(row.get(field))
         records.append(record)

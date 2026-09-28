@@ -85,15 +85,12 @@ def test_static_records_fail_closed_on_new_pool_columns() -> None:
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
 
 
-def test_static_records_publish_structure_timeline_fields_only_when_authoritative() -> None:
+def test_static_records_publish_pullback_structure_anchor_only_when_authoritative() -> None:
     frame = pd.DataFrame(
         [
             {
                 "code": "STRUCT",
                 "signal": True,
-                "ceiling": 52.0,
-                "ceiling_date": "2026-02-02",
-                "breakout_date": "2026-04-27",
                 "pullback_peak_date": "2026-06-22",
                 "pullback_peak_price": 61.5,
                 "pullback_duration_weeks": 4,
@@ -103,10 +100,24 @@ def test_static_records_publish_structure_timeline_fields_only_when_authoritativ
 
     row = _records(frame)[0]
 
-    assert row["ceiling_date"] == "2026-02-02"
-    assert row["breakout_date"] == "2026-04-27"
     assert row["pullback_peak_date"] == "2026-06-22"
     assert row["pullback_peak_price"] == 61.5
+
+
+def test_breakout_date_is_public_and_distinct_from_buy_point_date() -> None:
+    frame = pd.DataFrame([{
+        "code": "BASE",
+        "ibd_candidate_rule": "ceiling",
+        "ibd_candidate_price": 14.99,
+        "ceiling": 14.99,
+        "ceiling_date": pd.Timestamp("2026-02-09"),
+        "breakout_date": pd.Timestamp("2026-06-08"),
+    }])
+
+    row = _records(frame)[0]
+    assert row["ceiling_date"] == "2026-02-09"
+    assert row["breakout_date"] == "2026-06-08"
+    assert row["buy_point_date"] == "2026-02-09"
 
 
 def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -> None:
@@ -142,7 +153,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
                         "pivot_candidates": [
                             {"price": 90.0, "resistance_date": "2026-08-31"},
                             {"price": 93.37, "resistance_date": "2026-09-07"},
-                        ]
+                        ],
+                        "overridden_signal_source": "three_weeks_tight_breakout",
                     }
                 ),
             },
@@ -217,6 +229,8 @@ def test_buy_point_provenance_is_setup_aware_and_private_extra_stays_private() -
     assert rows["PIV"]["buy_point_date"] == "2026-09-07"
     assert rows["PIV"]["ceiling"] == 57.68
     assert rows["PIV"]["ceiling_date"] == "2024-05-20"
+    assert rows["PIV"]["overridden_signal_source"] == "three_weeks_tight_breakout"
+    assert rows["CEIL"]["overridden_signal_source"] is None
     assert rows["PIV_SELECTED"]["buy_point_date"] == "2026-09-08"
     assert rows["MA10"]["buy_point_date"] is None
     assert rows["PB"]["buy_point_date"] == "2026-08-17"
@@ -274,8 +288,6 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "Buy Point Date" in app
     assert 'row.base_depth_pct' in app
     assert 'row.base_duration_weeks' in app
-    assert 'row.ceiling_date' in app
-    assert 'row.breakout_date' in app
     assert 'row.pullback_peak_date' in app
     assert 'row.pullback_peak_price' in app
     assert 'row.eps_yoy_growth' in app

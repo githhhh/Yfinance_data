@@ -10,7 +10,13 @@ from pathlib import Path
 from eps_screener import run_screener as run_eps_screener
 from stage2_screener import run_screener as run_stage2_screener, load_whitelist, WHITELIST_PATH
 from data_providers import DataProviderFactory, YahooDataProvider
-from data_providers.ohlcv_validation import validate_download_batch
+from data_providers.ohlcv_validation import (
+    DataIntegrityError,
+    MARKET_REFERENCE_SYMBOLS,
+    find_latest_bar_mismatches,
+    validate_download_batch,
+    validate_ohlcv_frame,
+)
 from market_universe import build_download_universe
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
@@ -130,6 +136,67 @@ def get_stock_pkl_path(interval="1d"):
     return filepath
 
 
+def filter_schwab_stock_data(
+    stock_data, *, failed, expected_symbols, interval, failure_reasons=None
+):
+    """Exclude reported Schwab symbol failures, then strictly validate survivors."""
+    expected = set(expected_symbols)
+    actual = set(stock_data)
+    failed_set = set(failed)
+    if actual & failed_set:
+        raise DataIntegrityError(
+            f"Schwab symbols both downloaded and failed: {sorted(actual & failed_set)}"
+        )
+    unexpected = (actual | failed_set) - expected
+    unreported = expected - (actual | failed_set)
+    if unexpected:
+        raise DataIntegrityError(f"Schwab unexpected symbols: {sorted(unexpected)}")
+    if unreported:
+        raise DataIntegrityError(f"Schwab unreported missing symbols: {sorted(unreported)}")
+
+    excluded = set(failed_set)
+    reasons = failure_reasons or {}
+    for symbol in sorted(failed_set):
+        print(
+            f"[Schwab Filter] {symbol}: filtered after retries; "
+            f"{reasons.get(symbol, 'provider returned no validated history')}"
+        )
+
+    valid = {}
+    for symbol, data in stock_data.items():
+        try:
+            validate_ohlcv_frame(symbol, data)
+        except DataIntegrityError as exc:
+            excluded.add(symbol)
+            print(f"[Schwab Filter] {exc}")
+        else:
+            valid[symbol] = data
+
+    missing_references = sorted(set(MARKET_REFERENCE_SYMBOLS) - set(valid))
+    if missing_references:
+        raise DataIntegrityError(
+            f"Schwab market reference missing or invalid: {missing_references}"
+        )
+
+    if interval in {"1d", "1wk"}:
+        for symbol, latest in sorted(find_latest_bar_mismatches(valid).items()):
+            excluded.add(symbol)
+            valid.pop(symbol)
+            print(
+                f"[Schwab Filter] {symbol}: latest bar {latest} "
+                "differs from market references"
+            )
+
+    if not set(valid) - set(MARKET_REFERENCE_SYMBOLS):
+        raise DataIntegrityError("Schwab batch has no valid equity symbols")
+    validate_download_batch(valid, expected_symbols=valid.keys(), interval=interval)
+    print(
+        f"[Schwab Filter] kept {len(valid)} symbols; "
+        f"excluded {len(excluded)}: {sorted(excluded)}"
+    )
+    return valid, sorted(excluded)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download stock data')
     parser.add_argument('--provider', default='yahoo', choices=['yahoo', 'schwab'], help='Data provider to use (yahoo, schwab)')
@@ -225,21 +292,30 @@ if __name__ == "__main__":
             tickers, period=args.period, interval=args.interval
         )
 
-        if failed:
-            raise RuntimeError(
-                "Market-data download failed integrity requirements; refusing to "
-                f"publish PKL. Failed symbols ({len(failed)}): {failed[:50]}"
+        if args.provider == "schwab":
+            stock_data, _excluded = filter_schwab_stock_data(
+                stock_data,
+                failed=failed,
+                expected_symbols=tickers,
+                interval=args.interval,
+                failure_reasons=provider.failure_reasons,
             )
+            expected_saved_symbols = list(stock_data)
+        else:
+            if failed:
+                raise RuntimeError(
+                    "Market-data download failed integrity requirements; refusing to "
+                    f"publish PKL. Failed symbols ({len(failed)}): {failed[:50]}"
+                )
+            validate_download_batch(
+                stock_data, expected_symbols=tickers, interval=args.interval
+            )
+            expected_saved_symbols = tickers
 
-        validate_download_batch(
-            stock_data,
-            expected_symbols=tickers,
-            interval=args.interval,
-        )
         save_path = save_stock_data(
             stock_data,
             interval=args.interval,
-            expected_symbols=tickers,
+            expected_symbols=expected_saved_symbols,
         )
         if not save_path:
             raise RuntimeError("Failed to save validated market-data PKL")
@@ -247,7 +323,7 @@ if __name__ == "__main__":
         loaded_data = load_stock_data(save_path)
         validate_download_batch(
             loaded_data,
-            expected_symbols=tickers,
+            expected_symbols=expected_saved_symbols,
             interval=args.interval,
         )
         print(

@@ -29,6 +29,10 @@ class DataIntegrityError(ValueError):
     """Raised when downloaded market data is incomplete or internally invalid."""
 
 
+class OHLCInconsistencyError(DataIntegrityError):
+    """Raised only for a bar whose four prices violate OHLC ordering."""
+
+
 class _NYSEHolidayCalendar(AbstractHolidayCalendar):
     """Regular full-day NYSE holidays used to determine the latest completed session."""
 
@@ -163,8 +167,25 @@ def validate_ohlcv_frame(symbol: str, data: pd.DataFrame) -> None:
         | (numeric["Low"] > numeric["Close"])
     )
     if inconsistent.any():
-        raise DataIntegrityError(
-            f"{symbol}: inconsistent OHLC rows at {_format_rows(inconsistent, data.index)}"
+        examples = []
+        for timestamp, row in numeric.loc[inconsistent, price_columns].head(5).iterrows():
+            relations = [
+                name
+                for name, violated in (
+                    ("High<Low", row["High"] < row["Low"]),
+                    ("High<Open", row["High"] < row["Open"]),
+                    ("High<Close", row["High"] < row["Close"]),
+                    ("Low>Open", row["Low"] > row["Open"]),
+                    ("Low>Close", row["Low"] > row["Close"]),
+                )
+                if violated
+            ]
+            values = ", ".join(f"{column}={row[column]}" for column in price_columns)
+            examples.append(f"{timestamp} ({values}; {', '.join(relations)})")
+        remaining = int(inconsistent.sum()) - len(examples)
+        suffix = f"; ... (+{remaining} rows)" if remaining else ""
+        raise OHLCInconsistencyError(
+            f"{symbol}: inconsistent OHLC rows at {'; '.join(examples)}{suffix}"
         )
 
 

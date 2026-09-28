@@ -88,6 +88,7 @@ def test_quant_trade_import_path_and_zero_argument_contract_are_available():
     assert list(inspect.signature(pool_type.load_actionable_codes).parameters) == ["self"]
     assert list(inspect.signature(pool_type.commit).parameters) == ["self"]
     assert callable(yfinance_data.load_industry_lookup)
+    assert callable(yfinance_data.get_signal_eps)
 
 
 def test_weekend_pool_run_returns_reverse_csv_order_actionable_list(tmp_path, monkeypatch):
