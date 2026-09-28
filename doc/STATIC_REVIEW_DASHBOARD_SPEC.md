@@ -227,7 +227,7 @@ RS 数字保持中性色，不按高低染成绿 / 黄 / 红，避免视觉上�
 Selected Overview 位于结果摘要和表格之间；选行后原地更新。桌面优先保持约 80–110px 高度，供连续 ↑↓ Review 使用。至少覆盖：
 
 - Ticker / Industry、EPS YoY、Base Depth / Duration、距 52W High 百分比；Base 在数值下方显示 `Ceiling 价格 · YYYY-MM-DD → BO YYYY-MM-DD`，分别取权威 `ceiling`、`ceiling_date`、`breakout_date`，不得用 `buy_point_date` 代替突破日期；缺失的锚点单独省略；
-- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时在主数值行显示 Depth / Duration / Dry，无证据时显示 `—`。目前上游未提供权威起始日期，浏览器不得从 Duration 或行情推算；待上游正式产出 `pullback_start_date` 后再显示 `Start YYYY-MM-DD`；
+- Pullback 保留固定槽位，避免 ↑↓ Review 时布局跳动；有证据时在主数值行显示 Depth / Duration / Dry；上游提供权威 `pullback_peak_date` / `pullback_peak_price` 时，在下方显示 `Start YYYY-MM-DD · Peak 00.00`。这里的 Start 使用本轮 Pullback profile 已采用的 peak bar 作为起点锚点；缺失时省略，不得由 Dashboard 根据 Duration、snapshot date 或行情反推；
 - RS Reference 当前及 1M / 3M / 6M 百分位，缺失允许 `N/A`；
 - 表格未显示的实际参考价：Signal 为 Buy Point，Watch 为 Watch Trigger；Signal 有 Entry Date 时显示，否则可显示 Buy Point Date；Watch 显示 Target Source。
 

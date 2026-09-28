@@ -66,6 +66,8 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         "row.dist_to_52w_high_pct",
         "row.pullback_pct",
         "row.pullback_duration_weeks",
+        "row.pullback_peak_date",
+        "row.pullback_peak_price",
         "row.pullback_v_is_dry",
         "row.rs_1m_percentile",
         "row.rs_3m_percentile",
@@ -74,6 +76,9 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         assert field in APP
     assert 'Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}' in APP
     assert 'BO ${esc(breakoutDate)}' in APP
+    assert "pullbackPeakDate = dateText(row.pullback_peak_date)" in APP
+    assert "pullbackPeakPrice = num(row.pullback_peak_price)" in APP
+    assert 'Start ${esc(pullbackPeakDate || "—")}' in APP
     assert 'pullback_start_date' not in APP
     assert "detailOpen" not in APP
     assert 'data-action="detail"' not in APP

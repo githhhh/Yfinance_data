@@ -94,6 +94,8 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "pullback_pct",
     "pullback_pct_off_peak",
     "pullback_duration_weeks",
+    "pullback_peak_date",
+    "pullback_peak_price",
     "pullback_v_is_dry",
     "ceiling",
     "ceiling_date",

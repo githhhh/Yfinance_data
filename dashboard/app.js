@@ -561,7 +561,12 @@
     const pullbackDuration = num(row.pullback_duration_weeks);
     const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
       ? null : bool(row.pullback_v_is_dry);
+    const pullbackPeakDate = dateText(row.pullback_peak_date);
+    const pullbackPeakPrice = num(row.pullback_peak_price);
     const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
+    const pullbackAnchor = pullbackPeakDate || pullbackPeakPrice !== null
+      ? `Start ${esc(pullbackPeakDate || "—")}${pullbackPeakPrice === null ? "" : ` · Peak ${fmt(pullbackPeakPrice)}`}`
+      : "";
     const pullbackValue = pullbackVisible
       ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}W`}${pullbackDry === null ? "" : ` · ${pullbackDry ? "Dry" : "Not Dry"}`}`
       : "—";
@@ -574,7 +579,7 @@
       <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">${baseContext || "Depth · Duration"}</div></div>
       <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
-      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackVisible ? "" : '<div class="selected-hint">No evidence</div>'}</div>
+      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint">No evidence</div>'}</div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
   }

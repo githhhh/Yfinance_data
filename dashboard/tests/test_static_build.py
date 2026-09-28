@@ -85,6 +85,25 @@ def test_static_records_fail_closed_on_new_pool_columns() -> None:
     assert set(row).issubset(PUBLIC_DASHBOARD_ROW_FIELDS)
 
 
+def test_static_records_publish_pullback_structure_anchor_only_when_authoritative() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "code": "STRUCT",
+                "signal": True,
+                "pullback_peak_date": "2026-06-22",
+                "pullback_peak_price": 61.5,
+                "pullback_duration_weeks": 4,
+            }
+        ]
+    )
+
+    row = _records(frame)[0]
+
+    assert row["pullback_peak_date"] == "2026-06-22"
+    assert row["pullback_peak_price"] == 61.5
+
+
 def test_breakout_date_is_public_and_distinct_from_buy_point_date() -> None:
     frame = pd.DataFrame([{
         "code": "BASE",
@@ -269,6 +288,8 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "Buy Point Date" in app
     assert 'row.base_depth_pct' in app
     assert 'row.base_duration_weeks' in app
+    assert 'row.pullback_peak_date' in app
+    assert 'row.pullback_peak_price' in app
     assert 'row.eps_yoy_growth' in app
     assert 'row.dist_to_52w_high_pct' in app
     assert 'data-action="detail"' not in app
