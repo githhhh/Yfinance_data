@@ -184,6 +184,7 @@
     button.type = "button";
     button.className = "review-default-sort";
     button.textContent = "Default order";
+    button.setAttribute("aria-label", "Default order");
     button.title = "Return to the system review order for this Period and Scope";
     button.addEventListener("click", () => restoreDefaultOrder(shell));
     slot.appendChild(button);
