@@ -125,6 +125,48 @@ def test_review_flow_has_responsive_stage_status_layout() -> None:
     assert "@media (width <= 760px)" in INDEX
 
 
+def test_mobile_review_demotes_static_scope_and_low_frequency_tools() -> None:
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    assert "scope-static-block" in APP
+    assert "scope-switch" in APP
+    assert "mobile-filter-button" in APP
+    assert 'class="results-order-slot"' in APP
+    assert ".scope-static-block { position: absolute;" in styles
+    assert ".filters-wrap:not(.filters-expanded) { display: none; }" in styles
+    assert ".mobile-filter-button { display: inline-flex;" in styles
+    assert ".results-section > .selected-strip { order: 1; }" in styles
+    assert ".results-section > .results-toolbar { order: 2; }" in styles
+
+
+def test_mobile_selected_overview_prioritizes_dense_metrics_and_structure_context() -> None:
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    for token in (
+        "selected-eps",
+        "selected-high",
+        "selected-base",
+        "selected-pullback",
+        "selected-rs",
+        "baseMobileLines",
+        "pullbackMobileLines",
+        "selected-structure-mobile",
+    ):
+        assert token in APP
+    assert ".selected-eps, .selected-high, .selected-rs { grid-column: span 2; }" in styles
+    assert ".selected-base, .selected-pullback { grid-column: span 3; }" in styles
+    assert ".selected-strip.empty { min-height: 52px; grid-template-columns: 1fr; }" in styles
+    assert ".selected-structure-compact { display: none; }" in styles
+
+
+def test_rs_sort_cycles_desc_asc_then_restores_default_order() -> None:
+    handler = TABLE.split("function onHeaderSort", 1)[1].split("function qualityTooltipHtml", 1)[0]
+    assert 'if (field === "rs_percentile")' in handler
+    assert 'previous.direction === "desc"' in handler
+    assert 'previous.direction === "asc"' in handler
+    assert '{ field, direction: "desc" }' in handler
+    assert '{ field, direction: "asc" }' in handler
+    assert "restoreDefaultOrder(shell);" in handler
+
+
 def test_dashboard_javascript_is_syntactically_valid() -> None:
     for script in ("app.js", "table_enhancements.js", "interaction_runtime.js"):
         subprocess.run(

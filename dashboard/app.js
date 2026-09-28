@@ -419,17 +419,17 @@
       : 0;
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
-      ? `<div><div class="control-group-label">Scope</div><div class="segmented">
+      ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
            <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Changed signals plus current Near Breakout candidates">Review Now · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
-      : `<div><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
+      : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
 
     return `
       <section class="review-section">
-        <div class="queue-heading">
-          <div><h2>Review Queue</h2></div>
-          <div><div class="control-group-label">Period</div><div class="segmented">
+        <div class="queue-heading ${comparison ? "has-scope-switch" : "has-static-scope"}">
+          <div class="queue-title"><h2>Review Queue</h2></div>
+          <div class="period-block"><div class="control-group-label">Period</div><div class="segmented">
             <button data-action="period" data-value="MIDWEEK" aria-pressed="${state.period === "MIDWEEK"}" ${midweekDisabled ? 'disabled title="Midweek snapshot unavailable"' : ""}>Midweek Review</button>
             <button data-action="period" data-value="WEEKEND" aria-pressed="${state.period === "WEEKEND"}">Weekend Pool</button>
           </div></div>
@@ -513,7 +513,7 @@
     const entryValue = state.entryVolumeMin ?? entry?.[0] ?? 0;
     const weeklyValue = state.weeklyVolumeMin ?? weekly?.[0] ?? 0;
     return `
-      <section class="filters-wrap">
+      <section class="filters-wrap filters-expanded">
         <div class="filters-head"><button class="filter-toggle expanded" data-action="toggle-filters">More Filters · ${active ? `${active} active` : "None"}</button>${active ? `<button class="reset-button" data-action="reset-filters">Reset</button>` : ""}</div>
         <div class="filter-controls">
           <div class="filter-field"><div class="eyebrow">Setup</div><label>Setup type</label><select data-control="route">${data.ui.setup_options.map((value) => `<option value="${esc(value)}" ${state.route === value ? "selected" : ""}>${esc(routeLabel(value))}</option>`).join("")}</select></div>
@@ -528,9 +528,15 @@
   function resultsHtml(rows, sortedLabel) {
     const selectedCode = state.selected[state.period];
     const selectedRow = rows.find((row) => String(row.code) === String(selectedCode)) || null;
+    const activeFilters = advancedCount();
     return `
-      <section>
-        <div class="results-toolbar"><div class="results-summary">${rows.length} results · Sorted by ${esc(sortedLabel)}</div><button class="copy-button" data-action="copy-codes">Copy ${rows.length} Codes</button><div></div></div>
+      <section class="results-section">
+        <div class="results-toolbar">
+          <div class="results-summary">${rows.length} results · Sorted by ${esc(sortedLabel)}</div>
+          <button class="copy-button" data-action="copy-codes" title="Copy visible codes">Copy ${rows.length} Codes</button>
+          <button class="mobile-filter-button" data-action="toggle-filters" aria-expanded="${state.filtersExpanded}" title="More Filters">Filters${activeFilters ? ` · ${activeFilters}` : ""}</button>
+          <div class="results-order-slot"></div>
+        </div>
         ${selectedHtml(selectedRow)}
         ${tableHtml(rows)}
       </section>`;
@@ -557,6 +563,11 @@
       ? ""
       : `Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}${ceilingDate ? ` · ${esc(ceilingDate)}` : ""}`;
     const baseContext = [ceilingContext, breakoutDate ? `BO ${esc(breakoutDate)}` : ""].filter(Boolean).join(" → ");
+    const baseMobileLines = [
+      ceiling === null ? "" : `<div>Ceiling ${fmt(ceiling)}</div>`,
+      ceilingDate ? `<div>Start ${esc(ceilingDate)}</div>` : "",
+      breakoutDate ? `<div>BO ${esc(breakoutDate)}</div>` : "",
+    ].filter(Boolean).join("");
     const pullbackDepth = num(row.pullback_pct);
     const pullbackDuration = num(row.pullback_duration_weeks);
     const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
@@ -567,6 +578,10 @@
     const pullbackAnchor = pullbackPeakDate || pullbackPeakPrice !== null
       ? `Start ${esc(pullbackPeakDate || "—")}${pullbackPeakPrice === null ? "" : ` · Peak ${fmt(pullbackPeakPrice)}`}`
       : "";
+    const pullbackMobileLines = [
+      pullbackPeakDate ? `<div>Start ${esc(pullbackPeakDate)}</div>` : "",
+      pullbackPeakPrice === null ? "" : `<div>Peak ${fmt(pullbackPeakPrice)}</div>`,
+    ].filter(Boolean).join("");
     const pullbackValue = pullbackVisible
       ? `${pullbackDepth === null ? "—" : fmt(pullbackDepth, "pct1")} · ${pullbackDuration === null ? "—" : `${fmt(pullbackDuration, "int")}W`}${pullbackDry === null ? "" : ` · ${pullbackDry ? "Dry" : "Not Dry"}`}`
       : "—";
@@ -576,10 +591,10 @@
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
       <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
-      <div class="selected-cell"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
-      <div class="selected-cell"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint">${baseContext || "Depth · Duration"}</div></div>
-      <div class="selected-cell"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
-      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint">No evidence</div>'}</div>
+      <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
+      <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
+      <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
+      <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint selected-structure-compact">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint selected-structure-compact">No evidence</div>'}<div class="selected-structure-mobile">${pullbackMobileLines || (pullbackVisible ? "" : "<div>No evidence</div>")}</div></div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
   }

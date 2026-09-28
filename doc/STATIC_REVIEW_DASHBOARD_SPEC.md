@@ -239,6 +239,12 @@ Selected Overview 位于结果摘要和表格之间；选行后原地更新。�
 
 移动端：
 
+- Header / Snapshot 保持现有展示，不引入自动折叠或持久化展开状态；
+- Weekend 等无可切换 Scope 的语境中，`All Review · N` 仅作为 Review Queue 标题右侧的低强调状态文字；合法 Midweek comparison 的 `Review Now / All Review` 仍保留真实 Scope 交互；
+- More Filters 在未展开时不占独立一级行，入口与 Copy Codes 一起收敛到 Results 上方紧凑工具栏；展开后仍使用同一组权威筛选控件；
+- Selected Overview 在窄屏将 EPS / To 52W High / RS Reference 收敛为身份区后的紧凑三列摘要；EPS 槽位固定，缺失显示 `N/A` / `—`；Base / Pullback 各占半宽并排结构块，各自允许 3–4 行上下文，在完整信息与垂直密度之间保持平衡；
+- Selected Overview 在移动端位于 Results 工具栏之前，使选中标的画像紧贴 Status → Selected → Table 的连续 Review 心流；桌面布局顺序不变；
+- RS 表头排序在移动端与桌面共享同一三态语义：首次点击降序、第二次升序、第三次恢复默认顺序；
 - Period / Scope、Quick filters、Status cards 自动换行；
 - 表格允许横向与纵向滚动，但 Code 列保持 sticky，并通过明确的视觉分隔与后续滚动列区分；
 - 横向滚动在表格边界内阻断 scroll chaining / 浏览器侧滑干扰；纵向滚动到表格顶部或底部后必须继续传递给外层页面，不得形成 scroll trap；
