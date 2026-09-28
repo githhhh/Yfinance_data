@@ -27,6 +27,7 @@ python security_scan.py --history
 - 先检查 Git 状态，只修改任务范围；未经授权不得改动 `us/`、`results_pkl/` 数据。
 - 修改仪表板后运行相关测试、`dashboard/self_check.py` 和静态构建。
 - Dashboard 不得重新引入 Streamlit、服务端运行时或第二套交易规则；状态、Midweek projection、Breakout Quality 等业务口径继续由 Python 权威层生成，浏览器只做展示、筛选、排序与交互。
+- 候选质量排序、Top N / Top3、Industry 覆盖和人工复核路由属于 `quant_trade/strategy/lab`；本仓库只发布数据事实与权威数据服务，不保存 `.agents` 策略 Skill 或候选选择实现。
 - 静态站不得包含账户、持仓、API Key、OAuth Token、broker account hash 或其它私有交易数据；新增 Pool 字段不得绕过 `PUBLIC_DASHBOARD_ROW_FIELDS` 自动发布。
 - 涉及凭据、provider、GitHub Actions、公开 payload 或 `.gitignore` 的修改必须运行 `python security_scan.py --history`；不得通过关闭扫描规则解决真实命中。
 - 过程笔记、计划、草稿、截图等临时材料放在项目外；禁止创建 `docs/superpowers/`、`dashboard/artifacts/`。
