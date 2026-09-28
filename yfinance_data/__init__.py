@@ -25,7 +25,7 @@ from bf_snapshot import (
     monday_of_week,
 )
 from dashboard.services.bf_midweek_review import build_midweek_review_for_snapshots
-from eps_pit import EPSResolveMode, EPSStatus, SignalEPSLookup, enrich_pool_with_signal_eps
+from eps_pit import EPSResolveMode, EPSStatus, SignalEPSLookup, enrich_pool_with_signal_eps, get_signal_eps
 from .pool_industry import enrich_pool_with_industry, load_industry_lookup
 
 
@@ -696,6 +696,7 @@ __all__ = [
     "complete_snapshot_week",
     "complete_target_week",
     "is_valid_complete_baseline",
+    "get_signal_eps",
     "load_industry_lookup",
     "monday_of_week",
     "supplement_latest_pool_signal_eps",
