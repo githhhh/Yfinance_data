@@ -690,18 +690,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table thead tr,
   .review-table tbody tr[data-code] {
     display: grid;
-    grid-template-columns: 26% 18% 35% 21%;
+    grid-template-columns: 27% 18% 33% 22%;
     width: 100%;
     align-items: stretch;
   }
   .review-table th,
   .review-table td {
     min-width: 0;
-    padding: 0 7px;
+    padding: 0 8px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .review-table th { position: static; height: 36px; }
+  .review-table th {
+    position: static;
+    height: 36px;
+    border-bottom-color: #465465;
+  }
   .review-table tbody tr[data-code] td {
     display: none;
     height: 44px;
@@ -720,20 +724,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     align-items: center;
     grid-row: 1;
   }
-  .review-table [data-field="code"] { grid-column: 1; }
+  .review-table [data-field="code"] {
+    grid-column: 1;
+    padding-left: 10px;
+    padding-right: 8px;
+  }
   .review-table [data-field="rs_percentile"] { grid-column: 2; }
   .review-table tbody tr[data-code] td[data-field="rs_percentile"] {
     justify-content: center;
     text-align: center;
-  }
-  .review-table th[data-field="rs_percentile"] .table-sort-button {
-    justify-content: center !important;
+    font-weight: 650;
   }
   .review-table th[data-field="rs_percentile"] .table-header-control.with-info {
-    gap: 9px;
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    column-gap: 9px;
+    align-items: center;
   }
+  .review-table th[data-field="rs_percentile"] .table-header-control.with-info::before {
+    content: "";
+    grid-column: 1;
+    width: 32px;
+    height: 1px;
+  }
+  .review-table th[data-field="rs_percentile"] .table-sort-button {
+    grid-column: 2;
+    justify-content: center !important;
+  }
+  .review-table th[data-field="rs_percentile"] .rs-info-button { grid-column: 3; }
   .review-table [data-field="ibd_entry_status"] { grid-column: 3; }
-  .review-table [data-field="current_vs_ibd_candidate_pct"] { grid-column: 4; justify-content: flex-end; text-align: right; }
+  .review-table [data-field="current_vs_ibd_candidate_pct"] {
+    grid-column: 4;
+    justify-content: flex-end;
+    padding-left: 8px;
+    padding-right: 10px;
+    text-align: right;
+  }
   .review-table th[data-field="ibd_entry_status"] .table-header-label,
   .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-header-label { font-size: 0; }
   .review-table th[data-field="ibd_entry_status"] .table-header-label::after {
@@ -746,6 +772,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   }
   .review-table th:first-child,
   .review-table td:first-child { position: static; left: auto; }
+  .review-table td:first-child { background: transparent; }
   .review-table th:first-child { z-index: auto; }
   .review-table th:first-child::after,
   .review-table td:first-child::after { display: none !important; }

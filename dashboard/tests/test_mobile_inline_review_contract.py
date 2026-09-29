@@ -15,15 +15,21 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
 
     assert 'columns.map(([field, label]) => `<th data-field="${esc(field)}">' in APP
     assert 'columns.map(([field]) => `<td data-field="${esc(field)}"' in APP
-    assert '.review-table [data-field="code"] { grid-column: 1; }' in STYLES
+    assert '.review-table [data-field="code"] {\n    grid-column: 1;\n    padding-left: 10px;' in STYLES
     assert '.review-table [data-field="rs_percentile"] { grid-column: 2; }' in STYLES
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
-    assert '.review-table [data-field="current_vs_ibd_candidate_pct"] { grid-column: 4;' in STYLES
-    assert "grid-template-columns: 26% 18% 35% 21%;" in STYLES
+    assert '.review-table [data-field="current_vs_ibd_candidate_pct"] {\n    grid-column: 4;\n    justify-content: flex-end;' in STYLES
+    assert "grid-template-columns: 27% 18% 33% 22%;" in STYLES
     assert 'td[data-field="rs_percentile"] {' in STYLES
     assert "justify-content: center;" in STYLES
     assert '.review-table th[data-field="rs_percentile"] .table-sort-button {' in STYLES
-    assert '.table-header-control.with-info { gap: 9px; }' in STYLES
+    assert 'grid-template-columns: 32px minmax(0, 1fr) 32px;' in STYLES
+    assert '.table-header-control.with-info::before {' in STYLES
+    assert '.review-table th[data-field="rs_percentile"] .rs-info-button { grid-column: 3; }' in STYLES
+    assert 'padding-left: 10px;' in STYLES
+    assert 'padding-right: 10px;' in STYLES
+    assert 'border-bottom-color: #465465;' in STYLES
+    assert '.review-table td:first-child { background: transparent; }' in STYLES
     assert ".review-table thead {" in STYLES
     assert "transform: translateZ(0);" in STYLES
     assert '.review-table tbody tr[data-code] td[data-field="code"],' in STYLES
