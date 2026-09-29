@@ -12,12 +12,17 @@
     const style = document.createElement("style");
     style.id = "interaction-runtime-styles";
     style.textContent = `
-      /* Horizontal table gestures stay contained, but vertical gestures must
-         chain back to the page at the table's top/bottom instead of trapping
-         the user inside the review surface on mobile. */
+      /* Keep horizontal gestures contained. On mobile, suppress vertical
+         rubber-band overscroll so the sticky review header stays visually
+         fixed while the result body scrolls. */
       .table-shell {
         overscroll-behavior-x: none !important;
         overscroll-behavior-y: auto !important;
+      }
+      @media (max-width: 760px) {
+        .table-shell {
+          overscroll-behavior-y: none !important;
+        }
       }
       .review-table th:first-child::after,
       .review-table td:first-child::after {
@@ -29,22 +34,6 @@
         height: 100%;
         pointer-events: none;
         background: linear-gradient(to right, rgb(0 0 0 / 34%), transparent);
-      }
-      /* The visible Quality glyph stays compact while the pseudo-element gives
-         it a ~44px touch target. Its own handlers prevent accidental sorting. */
-      [data-quality-info] {
-        position: relative !important;
-        width: 32px !important;
-        height: 32px !important;
-        flex: 0 0 32px !important;
-        margin-left: 4px !important;
-        touch-action: manipulation;
-        z-index: 2;
-      }
-      [data-quality-info]::after {
-        content: "";
-        position: absolute;
-        inset: -6px;
       }
       .rs-popover-backdrop {
         background: rgb(0 0 0 / 28%) !important;

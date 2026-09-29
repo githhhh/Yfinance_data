@@ -64,46 +64,8 @@
       .review-entry-grid.status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
-    /* RS runtime must preserve the table's sticky header behavior. The visual
-       glyph stays compact while a transparent 44px hit target prevents taps
-       from falling through to the surrounding RS sort control. */
-    .review-table th[data-sort-field="rs_percentile"] {
-      position: sticky !important;
-      top: 0;
-    }
-    .review-table th[data-sort-field="rs_percentile"] > button:not(.rs-info-button) {
-      padding-right: 46px !important;
-    }
-    .review-table .rs-info-button {
-      width: 18px !important;
-      height: 18px !important;
-      right: 10px !important;
-      padding: 0 !important;
-      border: 0 !important;
-      background: transparent !important;
-      font-size: 0 !important;
-      cursor: pointer !important;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .review-table .rs-info-button::before {
-      content: "i";
-      box-sizing: border-box;
-      width: 18px;
-      height: 18px;
-      display: grid;
-      place-items: center;
-      border: 1px solid currentColor;
-      border-radius: 50%;
-      background: #11171e;
-      font: 800 10px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    .review-table .rs-info-button::after {
-      content: "";
-      position: absolute;
-      inset: -13px;
-      border-radius: 50%;
-    }
+    /* RS and Quality explanation controls are separate from their sort buttons.
+       Shared sizing and spacing live in styles.css. */
     .rs-popover-backdrop {
       position: fixed;
       inset: 0;

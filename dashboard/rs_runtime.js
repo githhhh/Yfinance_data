@@ -253,34 +253,12 @@
     const style = document.createElement("style");
     style.id = "rs-reference-styles";
     style.textContent = `
-      th[data-sort-field="rs_percentile"] { position: relative; }
-      th[data-sort-field="rs_percentile"] > button:not(.rs-info-button) { padding-right: 24px !important; }
-      .rs-info-button {
-        position: absolute;
-        right: 7px;
-        top: 50%;
-        transform: translateY(-50%);
-        box-sizing: border-box;
-        width: 18px;
-        height: 18px;
-        display: grid;
-        place-items: center;
-        padding: 0;
-        border: 1px solid #465365;
-        border-radius: 50%;
-        background: #11171e;
-        color: #9ca8b7;
-        font: 800 10px/1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        cursor: help;
-        z-index: 3;
-      }
-      .rs-info-button[data-state="current"] { color: #70e8d6; border-color: rgb(31 205 180 / 45%); }
-      .rs-info-button[data-state="newer"] { color: #60a5fa; border-color: rgb(96 165 250 / 48%); }
+      .rs-info-button { color: #8796a8; }
       .rs-info-button[data-state="stale"],
-      .rs-info-button[data-state="refresh_failed"] { color: #ffd21f; border-color: rgb(255 210 31 / 52%); }
-      .rs-info-button[data-state="unavailable"] { color: #9ca8b7; border-color: #465365; }
-      .rs-info-button[data-state="loading"],
-      .rs-info-button[data-state="refreshing"] { color: #9ca8b7; border-color: #465365; }
+      .rs-info-button[data-state="refresh_failed"] { color: #c9a94f; }
+      .rs-info-button:hover,
+      .rs-info-button:focus-visible,
+      .rs-info-button[aria-expanded="true"] { color: #70e8d6; }
       [data-rs-enhanced="true"] { pointer-events: none !important; }
       .rs-reference-popover {
         position: fixed;
@@ -371,7 +349,6 @@
           border-radius: 11px;
           padding: 14px;
         }
-        .rs-info-button { width: 19px; height: 19px; right: 5px; }
       }
     `;
     document.head.appendChild(style);
@@ -462,13 +439,15 @@
 
   function infoHeader() {
     const header = app.querySelector('th[data-sort-field="rs_percentile"]');
-    if (!header) return null;
-    let button = header.querySelector("[data-rs-info]");
+    const controls = header?.querySelector(".table-header-control");
+    if (!header || !controls) return null;
+    let button = controls.querySelector("[data-rs-info]");
     if (!button) {
       button = document.createElement("button");
       button.type = "button";
-      button.className = "rs-info-button";
+      button.className = "table-info-button rs-info-button";
       button.dataset.rsInfo = "true";
+      button.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 7.1v4"></path><circle cx="8" cy="4.7" r=".65" fill="currentColor" stroke="none"></circle></svg>';
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -481,13 +460,14 @@
       button.addEventListener("keydown", (event) => {
         if (event.key === "Escape") closePopover();
       });
-      header.appendChild(button);
+      controls.classList.add("with-info");
+      controls.appendChild(button);
     }
     const state = stateFor();
     const copy = stateCopy(state);
     button.dataset.state = state;
-    if (button.textContent !== "i") button.textContent = "i";
     button.setAttribute("aria-label", `RS reference: ${copy.label}. Open details.`);
+    button.setAttribute("aria-expanded", String(Boolean(popover && popoverAnchor === button)));
     button.title = `RS reference · ${copy.label}`;
     return button;
   }
@@ -510,9 +490,11 @@
   }
 
   function closePopover() {
+    const anchor = popoverAnchor;
     popover?.remove();
     popover = null;
     popoverAnchor = null;
+    anchor?.setAttribute("aria-expanded", "false");
   }
 
   function popoverHtml() {
@@ -572,6 +554,7 @@
   function openPopover(anchor) {
     closePopover();
     popoverAnchor = anchor;
+    anchor.setAttribute("aria-expanded", "true");
     popover = document.createElement("section");
     popover.className = "rs-reference-popover";
     popover.setAttribute("role", "dialog");
