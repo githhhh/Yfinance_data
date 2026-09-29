@@ -431,16 +431,24 @@
       (item) => item.querySelector(".selected-key")?.textContent?.trim() === "RS Reference",
     );
     const value = plainRsNode(cell?.querySelector(".selected-value"));
-    if (!value) return;
+    const mobileValue = app.querySelector("[data-mobile-rs-reference]");
+    if (!value && !mobileValue) return;
+
+    const setBoth = (html, plain) => {
+      if (value && value.innerHTML !== html) value.innerHTML = html;
+      if (mobileValue && mobileValue.innerHTML !== html) mobileValue.innerHTML = html;
+      if (!html && value && value.textContent !== plain) value.textContent = plain;
+      if (!html && mobileValue && mobileValue.textContent !== plain) mobileValue.textContent = plain;
+    };
 
     const state = stateFor();
     const rating = ratingFor(code);
     if (state === "loading") {
-      if (value.textContent !== "—") value.textContent = "—";
+      setBoth("", "—");
       return;
     }
     if (state === "unavailable" || !rating || rating.current === null) {
-      if (value.textContent !== "N/A") value.textContent = "N/A";
+      setBoth("", "N/A");
       return;
     }
     const suffix = [
@@ -449,7 +457,7 @@
       `6M ${rating.m6 ?? "N/A"}`,
     ].join(" · ");
     const html = `${rating.current} <small>${suffix}</small>`;
-    if (value.innerHTML !== html) value.innerHTML = html;
+    setBoth(html, "");
   }
 
   function infoHeader() {

@@ -153,6 +153,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   font-weight: 700;
 }
 
+
 .context-panel {
   margin-top: 8px;
   border: 1px solid #303a46;
@@ -245,6 +246,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   font-size: 11px;
   font-weight: 700;
 }
+.review-default-sort:disabled { opacity: .45; cursor: default; }
 .copy-button { width: 154px; border-color: #465365; background: #151b23; padding: 0 12px; }
 .copy-button.success { border-color: var(--green); background: #163d2b; color: #d8ffe2; }
 .copy-button.fail { border-color: var(--red); background: #4a1818; color: #ffe2e2; }
@@ -312,6 +314,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   white-space: nowrap;
 }
 .review-table td { height: 42px; padding: 0 10px; border-bottom: 1px solid #222c37; color: #d4dbe4; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mobile-detail-row { display: none; }
 .review-table tr { cursor: pointer; }
 .review-table tbody tr:hover td { background: #17202a; }
 .review-table tbody tr.selected td { background: #16252a; box-shadow: inset 0 1px rgb(31 205 180 / 18%), inset 0 -1px rgb(31 205 180 / 18%); }
@@ -344,6 +347,84 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .warning { padding: 8px 10px; border: 1px solid rgb(255 210 31 / 32%); border-radius: 6px; background: rgb(255 210 31 / 6%); color: #e7cd72; font-size: 10px; }
 
 .footer-note { padding: 12px 0 4px; color: #637184; font-size: 9px; text-align: right; }
+
+@media (width > 760px) {
+  /* Keep Period pinned to the right so Scope width changes cannot shift it. */
+  .queue-heading > .scope-block { grid-column: 2; grid-row: 1; }
+  .queue-heading > .period-block { grid-column: 3; grid-row: 1; justify-self: end; }
+
+  /* Use the same compact result tools as mobile: Copy + More Filters. */
+  .filters-wrap:not(.filters-expanded) { display: none; }
+  .results-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto 34px 34px;
+    gap: 6px;
+  }
+  .results-order-slot { justify-content: flex-end; }
+  .copy-button,
+  .mobile-filter-button {
+    position: relative;
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    font-size: 0;
+  }
+  .mobile-filter-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .copy-button::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 10px;
+    width: 10px;
+    height: 11px;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    box-shadow: -3px -3px 0 -1px #151b23, -3px -3px 0 0 currentColor;
+  }
+  .copy-button.success::before,
+  .copy-button.fail::before {
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    border: 0;
+    box-shadow: none;
+    font-size: 16px;
+  }
+  .copy-button.success::before { content: "✓"; }
+  .copy-button.fail::before { content: "!"; }
+  .mobile-filter-button::before {
+    content: "";
+    width: 15px;
+    height: 14px;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 0, 62% 45%, 62% 100%, 38% 82%, 38% 45%);
+  }
+  .mobile-filter-button[data-count]:not([data-count=""])::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--bg);
+    border-radius: 999px;
+    background: var(--cyan);
+    color: #07110f;
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1;
+  }
+}
 
 @media (width <= 1120px) {
   .filter-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -525,8 +606,164 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     font-variant-numeric: tabular-nums;
   }
 
-  .table-shell { max-height: 58vh; border-top: 1px solid #303a46; border-radius: 8px; }
-  .review-table { min-width: 930px; }
+  .results-section > .selected-strip { display: none; }
+  
+  .table-shell {
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 58vh;
+    border-top: 1px solid #303a46;
+    border-radius: 8px;
+  }
+  
+  .review-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .review-table thead,
+  .review-table tbody { display: block; width: 100%; }
+  .review-table thead { position: sticky; top: 0; z-index: 8; background: #151c24; }
+  .review-table thead tr,
+  .review-table tbody tr[data-code] {
+    display: grid;
+    grid-template-columns: minmax(70px, 1fr) 54px minmax(92px, 1.15fr) 68px;
+    width: 100%;
+    align-items: stretch;
+  }
+  .review-table th,
+  .review-table td {
+    min-width: 0;
+    padding: 0 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .review-table th { position: static; height: 36px; }
+  .review-table tbody tr[data-code] td {
+    display: none;
+    height: 44px;
+    align-items: center;
+  }
+  .review-table th[data-field] { display: none; }
+  .review-table th[data-field="code"],
+  .review-table th[data-field="rs_percentile"],
+  .review-table th[data-field="ibd_entry_status"],
+  .review-table th[data-field="current_vs_ibd_candidate_pct"],
+  .review-table td[data-field="code"],
+  .review-table td[data-field="rs_percentile"],
+  .review-table td[data-field="ibd_entry_status"],
+  .review-table td[data-field="current_vs_ibd_candidate_pct"] {
+    display: flex;
+    align-items: center;
+  }
+  .review-table [data-field="code"] { grid-column: 1; }
+  .review-table [data-field="rs_percentile"] { grid-column: 2; }
+  .review-table [data-field="ibd_entry_status"] { grid-column: 3; }
+  .review-table [data-field="current_vs_ibd_candidate_pct"] { grid-column: 4; justify-content: flex-end; text-align: right; }
+  .review-table th[data-field="ibd_entry_status"] .table-header-label,
+  .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-header-label { font-size: 0; }
+  .review-table th[data-field="ibd_entry_status"] .table-header-label::after {
+    content: "STATUS";
+    font-size: 9px;
+  }
+  .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-header-label::after {
+    content: "VS REF";
+    font-size: 9px;
+  }
+  .review-table th:first-child,
+  .review-table td:first-child { position: static; left: auto; }
+  .review-table th:first-child { z-index: auto; }
+  .review-table th:first-child::after,
+  .review-table td:first-child::after { display: none !important; }
+  .review-table th.sort-locked > button {
+    cursor: default !important;
+    opacity: .55;
+  }
+  
+  .mobile-detail-row {
+    display: block;
+    width: 100%;
+  }
+  .mobile-detail-row > td {
+    display: block !important;
+    width: 100%;
+    height: auto;
+    padding: 0 !important;
+    overflow: visible;
+    white-space: normal;
+    border-bottom: 1px solid #33404d;
+    background: #0f151c;
+  }
+  .mobile-inline-review {
+    display: grid;
+    gap: 10px;
+    padding: 10px 9px 12px;
+  }
+  .mobile-detail-industry {
+    overflow: hidden;
+    color: #7f8da0;
+    font-size: 9px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-detail-price,
+  .mobile-detail-review-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mobile-detail-review-grid {
+    padding-top: 9px;
+    border-top: 1px solid #25303b;
+  }
+  .mobile-detail-structure {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    padding-top: 9px;
+    border-top: 1px solid #25303b;
+  }
+  .mobile-detail-wide { grid-column: 1 / -1; }
+  .mobile-inline-review span {
+    display: block;
+    color: #7f8da0;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .mobile-inline-review strong {
+    display: block;
+    margin-top: 3px;
+    color: #eef3f8;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .mobile-inline-review small {
+    display: block;
+    margin-top: 3px;
+    color: #94a3b8;
+    font-size: 8px;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .mobile-detail-setup small {
+    display: inline;
+    margin-top: 0;
+    color: #94a3b8;
+    font-size: inherit;
+  }
+  .review-table tbody tr.selected td[data-field="code"],
+  .review-table tbody tr.selected td[data-field="rs_percentile"],
+  .review-table tbody tr.selected td[data-field="ibd_entry_status"],
+  .review-table tbody tr.selected td[data-field="current_vs_ibd_candidate_pct"] {
+    background: #16252a;
+  }
 }
 
 @media (width <= 480px) {
@@ -541,7 +778,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .filter-toggle { min-width: 0; flex: 1; }
   .results-toolbar { grid-template-columns: minmax(0, 1fr) 50px 34px 34px; }
   .selected-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .review-table { min-width: 880px; }
+  .review-table { min-width: 0; }
   .footer-note { text-align: left; }
 }
 
