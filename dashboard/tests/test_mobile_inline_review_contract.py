@@ -18,6 +18,8 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert '.review-table [data-field="rs_percentile"] { grid-column: 2; }' in STYLES
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
     assert '.review-table [data-field="current_vs_ibd_candidate_pct"] { grid-column: 4;' in STYLES
+    assert '.review-table tbody tr[data-code] td[data-field="code"],' in STYLES
+    assert 'grid-row: 1;' in STYLES
     assert 'content: "STATUS";' in STYLES
     assert 'content: "VS REF";' in STYLES
     assert "overflow-x: hidden;" in STYLES

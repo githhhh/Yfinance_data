@@ -649,12 +649,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table th[data-field="rs_percentile"],
   .review-table th[data-field="ibd_entry_status"],
   .review-table th[data-field="current_vs_ibd_candidate_pct"],
-  .review-table td[data-field="code"],
-  .review-table td[data-field="rs_percentile"],
-  .review-table td[data-field="ibd_entry_status"],
-  .review-table td[data-field="current_vs_ibd_candidate_pct"] {
+  .review-table tbody tr[data-code] td[data-field="code"],
+  .review-table tbody tr[data-code] td[data-field="rs_percentile"],
+  .review-table tbody tr[data-code] td[data-field="ibd_entry_status"],
+  .review-table tbody tr[data-code] td[data-field="current_vs_ibd_candidate_pct"] {
     display: flex;
     align-items: center;
+    grid-row: 1;
   }
   .review-table [data-field="code"] { grid-column: 1; }
   .review-table [data-field="rs_percentile"] { grid-column: 2; }
