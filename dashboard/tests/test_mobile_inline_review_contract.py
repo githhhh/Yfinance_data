@@ -19,13 +19,18 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert '.review-table [data-field="rs_percentile"] { grid-column: 2; }' in STYLES
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
     assert '.review-table [data-field="current_vs_ibd_candidate_pct"] {\n    grid-column: 4;\n    justify-content: flex-end;' in STYLES
-    assert "grid-template-columns: 27% 18% 33% 22%;" in STYLES
+    assert "grid-template-columns: 22% 21% 35% 22%;" in STYLES
     assert 'td[data-field="rs_percentile"] {' in STYLES
     assert "justify-content: center;" in STYLES
     assert '.review-table th[data-field="rs_percentile"] .table-sort-button {' in STYLES
-    assert 'grid-template-columns: 32px minmax(0, 1fr) 32px;' in STYLES
-    assert '.table-header-control.with-info::before {' in STYLES
-    assert '.review-table th[data-field="rs_percentile"] .rs-info-button { grid-column: 3; }' in STYLES
+    assert '.review-table th[data-field="rs_percentile"] {' in STYLES
+    assert 'padding-left: 2px;' in STYLES
+    assert '.review-table th[data-field="rs_percentile"] .table-header-control.with-info {' in STYLES
+    assert 'gap: 4px;' in STYLES
+    assert 'flex: 0 0 auto !important;' in STYLES
+    assert 'width: 24px;' in STYLES
+    assert 'flex: 0 0 24px;' in STYLES
+    assert 'grid-template-columns: 32px minmax(0, 1fr) 32px;' not in STYLES
     assert 'padding-left: 10px;' in STYLES
     assert 'padding-right: 10px;' in STYLES
     assert 'border-bottom-color: #465465;' in STYLES
@@ -39,6 +44,18 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert "overflow-x: hidden;" in STYLES
     assert ".mobile-detail-row { display: none; }" in STYLES
     assert ".results-section > .selected-strip { display: none; }" in STYLES
+
+
+def test_mobile_column_budget_fits_rs_info_and_long_status_at_min_viewport() -> None:
+    # 320px viewport - 20px app padding - 2px table border = 298px table content.
+    table_width = 298
+    rs_outer = table_width * 0.21
+    rs_content = rs_outer - 4  # 2px left/right RS header padding.
+    rs_controls = 30 + 4 + 24  # RS+sort arrow budget + gap + info hit area.
+    status_outer = table_width * 0.35
+    status_content = status_outer - 16  # standard 8px left/right cell padding.
+    assert rs_content >= rs_controls
+    assert status_content >= 88
 
 
 def test_mobile_table_header_is_fixed_without_rubber_band_overscroll() -> None:
@@ -80,6 +97,12 @@ def test_inline_review_preserves_decision_fields_and_setup_hierarchy() -> None:
         assert token in APP
     assert "setupHtml(row)" in APP
     assert "overridden_signal_source" in APP
+    assert 'class="mobile-detail-base"' in APP
+    assert 'class="mobile-detail-pullback"' in APP
+    assert "mobile-detail-base" in STYLES
+    assert "mobile-detail-pullback" in STYLES
+    assert 'selected[aria-expanded="true"]' in STYLES
+    assert "border-bottom-color: transparent;" in STYLES
     assert "data-mobile-rs-reference" in APP
     assert "data-mobile-rs-reference" in RS
     assert "1M " in RS and "3M " in RS and "6M " in RS
@@ -95,7 +118,8 @@ def test_mobile_sort_is_frozen_while_inline_review_is_expanded() -> None:
     assert "Collapse the expanded row to restore default order" in TABLE
     assert 'app.addEventListener("mobile-review-lock-change"' in TABLE
     assert 'app.dispatchEvent(new CustomEvent("mobile-review-lock-change"))' in APP
-    assert ".review-table th.sort-locked > button" in STYLES
+    assert ".review-table th.sort-locked .table-sort-button" in STYLES
+    assert ".review-table th.sort-locked > button" not in STYLES
     assert ".review-default-sort:disabled" in STYLES
     assert 'window.matchMedia?.("(max-width: 760px)")?.matches' in TABLE
     assert "if (mobileReviewLocked(shell)) return;\n    const body" in TABLE
