@@ -35,22 +35,6 @@
         pointer-events: none;
         background: linear-gradient(to right, rgb(0 0 0 / 34%), transparent);
       }
-      /* The visible Quality glyph stays compact while the pseudo-element gives
-         it a ~44px touch target. Its own handlers prevent accidental sorting. */
-      [data-quality-info] {
-        position: relative !important;
-        width: 32px !important;
-        height: 32px !important;
-        flex: 0 0 32px !important;
-        margin-left: 4px !important;
-        touch-action: manipulation;
-        z-index: 2;
-      }
-      [data-quality-info]::after {
-        content: "";
-        position: absolute;
-        inset: -6px;
-      }
       .rs-popover-backdrop {
         background: rgb(0 0 0 / 28%) !important;
       }
