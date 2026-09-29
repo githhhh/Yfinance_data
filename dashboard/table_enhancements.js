@@ -63,7 +63,7 @@
     }
     if (field === "ibd_breakout_quality") {
       const index = QUALITY_ORDER.findIndex((item) => upper.includes(item));
-      return index < 0 ? QUALITY_ORDER.length : index;
+      return index < 0 ? 0 : QUALITY_ORDER.length - index;
     }
     return null;
   }
@@ -251,6 +251,18 @@
       return;
     }
 
+    if (field === "ibd_breakout_quality") {
+      const nextQuality = previous?.field === field && previous.direction === "desc"
+        ? { field, direction: "asc" }
+        : { field, direction: "desc" };
+      setCurrentSortState(nextQuality);
+      sortTable(shell, nextQuality.field, nextQuality.direction);
+      updateSortIndicators(shell);
+      updateSummary(shell);
+      syncDefaultSortButton(shell);
+      return;
+    }
+
     const next = previous?.field === field
       ? { field, direction: previous.direction === "asc" ? "desc" : "asc" }
       : { field, direction: "asc" };
@@ -359,11 +371,11 @@
       if (field === "ibd_breakout_quality") {
         const info = document.createElement("span");
         info.dataset.qualityInfo = "true";
-        info.textContent = "▾";
+        info.textContent = "i";
         info.setAttribute("role", "button");
         info.setAttribute("tabindex", "0");
         info.setAttribute("aria-label", "Explain Breakout Price Quality strength");
-        info.style.cssText = "display:inline-grid;place-items:center;width:17px;height:17px;margin-left:2px;border:1px solid #475569;border-radius:4px;color:#86efac;font-size:10px;cursor:help;";
+        info.style.cssText = "display:inline-grid;place-items:center;width:17px;height:17px;margin-left:2px;border:1px solid #475569;border-radius:50%;color:#86efac;font-size:10px;font-weight:800;cursor:help;";
         const openPinned = (event) => {
           event.preventDefault();
           event.stopPropagation();

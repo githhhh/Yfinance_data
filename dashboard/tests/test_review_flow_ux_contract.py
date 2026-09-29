@@ -203,6 +203,18 @@ def test_default_order_uses_explicit_toolbar_slot() -> None:
     assert ".review-default-sort {" not in INDEX
 
 
+def test_breakout_quality_sort_uses_strength_descending_semantics_and_info_icon() -> None:
+    assert 'return index < 0 ? 0 : QUALITY_ORDER.length - index;' in TABLE
+    handler = TABLE.split("function onHeaderSort", 1)[1].split("function qualityTooltipHtml", 1)[0]
+    assert 'if (field === "ibd_breakout_quality")' in handler
+    assert 'previous.direction === "desc"' in handler
+    assert '{ field, direction: "desc" }' in handler
+    assert '{ field, direction: "asc" }' in handler
+    assert 'info.textContent = "i";' in TABLE
+    assert 'border-radius:50%' in TABLE
+    assert 'sortState.direction === "asc" ? "↑" : "↓"' in TABLE
+
+
 def test_rs_sort_cycles_desc_asc_then_restores_default_order() -> None:
     handler = TABLE.split("function onHeaderSort", 1)[1].split("function qualityTooltipHtml", 1)[0]
     assert 'if (field === "rs_percentile")' in handler
