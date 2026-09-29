@@ -27,7 +27,7 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
 
 def test_mobile_row_click_toggles_single_inline_review() -> None:
     assert "function renderMobileDetail(currentRows)" in APP
-    assert 'app.querySelector(".mobile-detail-row")?.remove();' in APP
+    assert 'shell?.querySelector(".mobile-detail-row")?.remove();' in APP
     assert 'state.selected[state.period] = String(state.selected[state.period]) === String(code) ? null : code;' in APP
     assert 'detail.className = "mobile-detail-row";' in APP
     assert 'mainRow.insertAdjacentElement("afterend", detail);' in APP
