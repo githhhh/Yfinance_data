@@ -151,7 +151,7 @@
     const locked = mobileReviewLocked(shell);
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
-      const button = header.querySelector(":scope > button");
+      const button = header.querySelector(".table-sort-button");
       const isActive = sortState?.field === header.dataset.sortField;
       header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
       header.classList.toggle("sort-locked", locked);
@@ -355,9 +355,13 @@
       header.setAttribute("aria-sort", "none");
       header.textContent = "";
 
+      const controls = document.createElement("div");
+      controls.className = "table-header-control";
+
       const button = document.createElement("button");
       button.type = "button";
-      button.style.cssText = "width:100%;height:38px;display:flex;align-items:center;gap:5px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left;cursor:pointer;white-space:nowrap;";
+      button.className = "table-sort-button";
+      button.style.cssText = "min-width:0;flex:1 1 auto;height:38px;display:flex;align-items:center;gap:5px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left;cursor:pointer;white-space:nowrap;";
       button.setAttribute("aria-label", `Sort by ${originalLabel}`);
 
       const label = document.createElement("span");
@@ -368,38 +372,39 @@
       icon.style.cssText = "display:inline-block;min-width:10px;color:#94a3b8;font-size:8px;line-height:1;";
       button.append(label, icon);
 
+      controls.appendChild(button);
+
       if (field === "ibd_breakout_quality") {
-        const info = document.createElement("span");
+        const info = document.createElement("button");
+        info.type = "button";
+        info.className = "table-info-button";
         info.dataset.qualityInfo = "true";
-        info.textContent = "i";
-        info.setAttribute("role", "button");
-        info.setAttribute("tabindex", "0");
         info.setAttribute("aria-label", "Explain Breakout Price Quality strength");
-        info.style.cssText = "display:inline-grid;place-items:center;width:17px;height:17px;margin-left:2px;border:1px solid #475569;border-radius:50%;color:#86efac;font-size:10px;font-weight:800;cursor:help;";
+        info.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 7.1v4"></path><circle cx="8" cy="4.7" r=".65" fill="currentColor" stroke="none"></circle></svg>';
+        controls.classList.add("with-info");
         const openPinned = (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (qualityTooltipPinned && qualityTooltipAnchor === button) hideQualityTooltip(true);
-          else showQualityTooltip(button, true);
+          if (qualityTooltipPinned && qualityTooltipAnchor === info) hideQualityTooltip(true);
+          else showQualityTooltip(info, true);
         };
         info.addEventListener("click", openPinned);
         info.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") openPinned(event);
           if (event.key === "Escape") hideQualityTooltip(true);
         });
-        button.appendChild(info);
-        button.addEventListener("mouseenter", () => {
-          if (!qualityTooltipPinned) showQualityTooltip(button, false);
+        info.addEventListener("mouseenter", () => {
+          if (!qualityTooltipPinned) showQualityTooltip(info, false);
         });
-        button.addEventListener("mouseleave", () => hideQualityTooltip(false));
-        button.addEventListener("focus", () => {
-          if (!qualityTooltipPinned) showQualityTooltip(button, false);
+        info.addEventListener("mouseleave", () => hideQualityTooltip(false));
+        info.addEventListener("focus", () => {
+          if (!qualityTooltipPinned) showQualityTooltip(info, false);
         });
-        button.addEventListener("blur", () => hideQualityTooltip(false));
+        info.addEventListener("blur", () => hideQualityTooltip(false));
+        controls.appendChild(info);
       }
 
       button.addEventListener("click", onHeaderSort);
-      header.appendChild(button);
+      header.appendChild(controls);
     });
 
     const sortState = currentSortState();
