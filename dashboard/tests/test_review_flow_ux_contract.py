@@ -140,6 +140,8 @@ def test_desktop_period_is_pinned_right_and_result_tools_match_mobile() -> None:
     assert ".copy-button," in desktop
     assert ".mobile-filter-button {" in desktop
     assert "display: inline-flex;" in desktop
+    assert ".review-default-sort {" in desktop
+    assert 'content: "Reset";' in desktop
     assert '.mobile-filter-button[data-count]:not([data-count=""])::after' in desktop
 
 
