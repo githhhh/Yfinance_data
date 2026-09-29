@@ -153,6 +153,84 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   font-weight: 700;
 }
 
+@media (width > 760px) {
+  /* Keep Period pinned to the right so Scope width changes cannot shift it. */
+  .queue-heading > .scope-block { grid-column: 2; grid-row: 1; }
+  .queue-heading > .period-block { grid-column: 3; grid-row: 1; justify-self: end; }
+
+  /* Use the same compact result tools as mobile: Copy + More Filters. */
+  .filters-wrap:not(.filters-expanded) { display: none; }
+  .results-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto 34px 34px;
+    gap: 6px;
+  }
+  .results-order-slot { justify-content: flex-end; }
+  .copy-button,
+  .mobile-filter-button {
+    position: relative;
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    font-size: 0;
+  }
+  .mobile-filter-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .copy-button::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 10px;
+    width: 10px;
+    height: 11px;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    box-shadow: -3px -3px 0 -1px #151b23, -3px -3px 0 0 currentColor;
+  }
+  .copy-button.success::before,
+  .copy-button.fail::before {
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    border: 0;
+    box-shadow: none;
+    font-size: 16px;
+  }
+  .copy-button.success::before { content: "✓"; }
+  .copy-button.fail::before { content: "!"; }
+  .mobile-filter-button::before {
+    content: "";
+    width: 15px;
+    height: 14px;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 0, 62% 45%, 62% 100%, 38% 82%, 38% 45%);
+  }
+  .mobile-filter-button[data-count]:not([data-count=""])::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--bg);
+    border-radius: 999px;
+    background: var(--cyan);
+    color: #07110f;
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1;
+  }
+}
+
 .context-panel {
   margin-top: 8px;
   border: 1px solid #303a46;
