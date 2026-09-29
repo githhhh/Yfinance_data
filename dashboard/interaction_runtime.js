@@ -12,12 +12,17 @@
     const style = document.createElement("style");
     style.id = "interaction-runtime-styles";
     style.textContent = `
-      /* Horizontal table gestures stay contained, but vertical gestures must
-         chain back to the page at the table's top/bottom instead of trapping
-         the user inside the review surface on mobile. */
+      /* Keep horizontal gestures contained. On mobile, suppress vertical
+         rubber-band overscroll so the sticky review header stays visually
+         fixed while the result body scrolls. */
       .table-shell {
         overscroll-behavior-x: none !important;
         overscroll-behavior-y: auto !important;
+      }
+      @media (max-width: 760px) {
+        .table-shell {
+          overscroll-behavior-y: none !important;
+        }
       }
       .review-table th:first-child::after,
       .review-table td:first-child::after {
