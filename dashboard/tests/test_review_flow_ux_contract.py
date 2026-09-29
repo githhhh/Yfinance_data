@@ -210,9 +210,26 @@ def test_breakout_quality_sort_uses_strength_descending_semantics_and_info_icon(
     assert 'previous.direction === "desc"' in handler
     assert '{ field, direction: "desc" }' in handler
     assert '{ field, direction: "asc" }' in handler
-    assert 'info.textContent = "i";' in TABLE
-    assert 'border-radius:50%' in TABLE
+    assert 'info.className = "table-info-button";' in TABLE
+    assert 'controls.appendChild(info);' in TABLE
+    assert 'button.appendChild(info);' not in TABLE
+    assert 'qualityTooltipAnchor === info' in TABLE
     assert 'sortState.direction === "asc" ? "↑" : "↓"' in TABLE
+
+
+def test_rs_and_quality_info_controls_are_separate_from_sort_hit_zones() -> None:
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    rs = (DASHBOARD / "rs_runtime.js").read_text(encoding="utf-8")
+    index = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+    assert 'controls.className = "table-header-control";' in TABLE
+    assert 'className = "table-sort-button";' in TABLE
+    assert 'className = "table-info-button rs-info-button";' in rs
+    assert 'controls.appendChild(button);' in rs
+    assert '.table-header-control.with-info { gap: 9px; }' in styles
+    assert 'width: 28px;' in styles
+    assert 'width: 13px;' in styles
+    assert 'padding-right: 46px' not in index
+    assert '.rs-info-button::after' not in index
 
 
 def test_rs_sort_cycles_desc_asc_then_restores_default_order() -> None:
