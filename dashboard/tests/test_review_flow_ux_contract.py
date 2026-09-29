@@ -226,7 +226,7 @@ def test_rs_and_quality_info_controls_are_separate_from_sort_hit_zones() -> None
     assert 'className = "table-info-button rs-info-button";' in rs
     assert 'controls.appendChild(button);' in rs
     assert '.table-header-control.with-info { gap: 9px; }' in styles
-    assert 'width: 28px;' in styles
+    assert 'width: 32px;' in styles
     assert 'width: 13px;' in styles
     assert 'padding-right: 46px' not in index
     assert '.rs-info-button::after' not in index
