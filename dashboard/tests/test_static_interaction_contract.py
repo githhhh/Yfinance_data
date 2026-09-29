@@ -106,13 +106,16 @@ def test_mobile_table_scroll_chains_vertically_and_freezes_code_cleanly():
     assert ".review-table td:first-child::after" in INTERACTION
 
 
-def test_quality_info_has_large_touch_target_without_sort_fallthrough():
-    assert "[data-quality-info]" in INTERACTION
-    assert "width: 32px !important" in INTERACTION
-    assert "height: 32px !important" in INTERACTION
-    assert "[data-quality-info]::after" in INTERACTION
-    assert "inset: -6px" in INTERACTION
+def test_quality_info_has_separate_touch_target_without_sort_fallthrough():
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    assert '.table-header-control.with-info { gap: 9px; }' in styles
+    assert ".table-info-button {" in styles
+    assert "width: 32px;" in styles
+    assert "height: 32px;" in styles
     quality = TABLE.split('if (field === "ibd_breakout_quality")', 1)[1].split('button.addEventListener("click", onHeaderSort)', 1)[0]
+    assert 'info.className = "table-info-button";' in quality
+    assert 'controls.appendChild(info);' in quality
+    assert 'button.appendChild(info);' not in quality
     assert "event.stopPropagation();" in quality
 
 
@@ -127,8 +130,12 @@ def test_range_enhancement_keeps_authoritative_context_bounds_semantics():
 
 
 def test_rs_popover_is_visibly_modal_closeable_and_non_clickthrough():
-    assert '.review-table .rs-info-button::after' in INDEX
-    assert 'inset: -13px' in INDEX
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    rs = (DASHBOARD / "rs_runtime.js").read_text(encoding="utf-8")
+    assert 'className = "table-info-button rs-info-button";' in rs
+    assert 'controls.appendChild(button);' in rs
+    assert ".table-info-button {" in styles
+    assert "width: 32px;" in styles
     assert "rs-popover-backdrop" in INTERACTION
     assert "background: rgb(0 0 0 / 28%) !important" in INTERACTION
     assert "rs-runtime-close" in INTERACTION
