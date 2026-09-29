@@ -22,6 +22,8 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert "grid-template-columns: 26% 18% 35% 21%;" in STYLES
     assert 'td[data-field="rs_percentile"] {' in STYLES
     assert "justify-content: center;" in STYLES
+    assert '.review-table th[data-field="rs_percentile"] .table-sort-button {' in STYLES
+    assert '.table-header-control.with-info { gap: 9px; }' in STYLES
     assert ".review-table thead {" in STYLES
     assert "transform: translateZ(0);" in STYLES
     assert '.review-table tbody tr[data-code] td[data-field="code"],' in STYLES
