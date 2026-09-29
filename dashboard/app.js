@@ -600,6 +600,119 @@
     </div>`;
   }
 
+  function isMobileReview() {
+    return window.matchMedia?.("(max-width: 760px)")?.matches ?? false;
+  }
+  
+  function mobileDetailHtml(row) {
+    const near = isNearBreakout(row);
+    const referenceKey = near ? "Watch Trigger" : "Buy Point";
+    const referenceContext = near
+      ? watchTargetSource(row)
+      : dateText(row.ibd_entry_date) || dateText(row.buy_point_date);
+    const referenceContextLabel = near ? "Source" : dateText(row.ibd_entry_date) ? "Entry" : "Buy Point Date";
+    const position = num(row.ibd_entry_close_position);
+    const rangeRatio = num(row.ibd_entry_breakout_range_ratio);
+    const geometryFacts = [
+      position === null ? "" : `pos ${position.toFixed(2)}`,
+      rangeRatio === null ? "" : `rr ${rangeRatio.toFixed(2)}`,
+    ].filter(Boolean).join(" · ");
+    const entryVolume = num(row.ibd_entry_volume_ratio);
+    const weeklyVolume = num(row.volume_ratio);
+    const entryPrimary = near
+      ? "Pre-signal"
+      : text(row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
+    const entryFacts = [
+      entryVolume === null ? "" : `Entry Vol ${fmt(entryVolume, "x")}`,
+      weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
+    ].filter(Boolean).join(" · ");
+  
+    const baseDepth = num(row.base_depth_pct);
+    const baseDuration = num(row.base_duration_weeks);
+    const baseValue = baseDepth === null && baseDuration === null
+      ? "—"
+      : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
+    const ceiling = num(row.ceiling);
+    const ceilingDate = dateText(row.ceiling_date);
+    const breakoutDate = dateText(row.breakout_date);
+    const baseContext = [
+      ceiling === null ? "" : `Ceiling ${fmt(ceiling)}`,
+      ceilingDate ? `Start ${ceilingDate}` : "",
+      breakoutDate ? `BO ${breakoutDate}` : "",
+    ].filter(Boolean).join(" · ");
+  
+    const pullbackDepth = num(row.pullback_pct);
+    const pullbackDuration = num(row.pullback_duration_weeks);
+    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
+      ? null : bool(row.pullback_v_is_dry);
+    const pullbackValue = pullbackDepth === null && pullbackDuration === null && pullbackDry === null
+      ? "—"
+      : [
+        pullbackDepth === null ? "" : fmt(pullbackDepth, "pct1"),
+        pullbackDuration === null ? "" : `${fmt(pullbackDuration, "int")}W`,
+        pullbackDry === null ? "" : pullbackDry ? "Dry" : "Not Dry",
+      ].filter(Boolean).join(" · ");
+    const pullbackPeakDate = dateText(row.pullback_peak_date);
+    const pullbackPeakPrice = num(row.pullback_peak_price);
+    const pullbackContext = [
+      pullbackPeakDate ? `Start ${pullbackPeakDate}` : "",
+      pullbackPeakPrice === null ? "" : `Peak ${fmt(pullbackPeakPrice)}`,
+    ].filter(Boolean).join(" · ");
+  
+    return `<div class="mobile-inline-review" aria-label="Review details for ${esc(row.code)}">
+      <div class="mobile-detail-industry">${esc(text(row.industry, "Industry N/A"))}</div>
+      <div class="mobile-detail-price">
+        <div><span>${referenceKey}</span><strong>${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? `<small>${referenceContextLabel} ${esc(referenceContext)}</small>` : ""}</div>
+        <div><span>Latest</span><strong>${fmt(row.latest_close)}</strong></div>
+        <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
+      </div>
+      <div class="mobile-detail-review-grid">
+        <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
+        <div><span>Geometry</span><strong>${esc(text(row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
+        <div><span>Entry</span><strong>${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
+      </div>
+      <div class="mobile-detail-structure">
+        <div><span>EPS YoY</span><strong>${fmt(row.eps_yoy_growth, "pct1")}</strong></div>
+        <div><span>To 52W High</span><strong>${fmt(row.dist_to_52w_high_pct, "pct1")}</strong></div>
+        <div class="mobile-detail-wide"><span>Base</span><strong>${baseValue}</strong>${baseContext ? `<small>${esc(baseContext)}</small>` : ""}</div>
+        <div class="mobile-detail-wide"><span>Pullback</span><strong>${pullbackValue}</strong>${pullbackContext ? `<small>${esc(pullbackContext)}</small>` : ""}</div>
+        <div class="mobile-detail-wide mobile-detail-rs"><span>RS Reference</span><strong data-mobile-rs-reference>—</strong></div>
+      </div>
+    </div>`;
+  }
+  
+  function removeMobileDetail() {
+    const shell = app.querySelector("[data-table-shell]");
+    shell?.querySelector(".mobile-detail-row")?.remove();
+    shell?.removeAttribute("data-review-expanded");
+    app.querySelectorAll("tbody tr[data-code][aria-expanded=\"true\"]").forEach((row) => row.setAttribute("aria-expanded", "false"));
+    app.dispatchEvent(new CustomEvent("mobile-review-lock-change"));
+  }
+  
+  function renderMobileDetail(currentRows) {
+    removeMobileDetail();
+    if (!isMobileReview()) return;
+  
+    const selectedCode = state.selected[state.period];
+    if (!selectedCode) return;
+    const selectedRow = currentRows.find((row) => String(row.code) === String(selectedCode));
+    const shell = app.querySelector("[data-table-shell]");
+    const mainRow = shell?.querySelector(`tbody tr[data-code="${CSS.escape(String(selectedCode))}"]`);
+    if (!selectedRow || !shell || !mainRow) return;
+  
+    const detail = document.createElement("tr");
+    detail.className = "mobile-detail-row";
+    detail.dataset.mobileDetail = "true";
+    const cell = document.createElement("td");
+    cell.colSpan = Math.max(1, mainRow.children.length);
+    cell.innerHTML = mobileDetailHtml(selectedRow);
+    detail.appendChild(cell);
+    mainRow.insertAdjacentElement("afterend", detail);
+    mainRow.setAttribute("aria-expanded", "true");
+    shell.dataset.reviewExpanded = "true";
+    app.dispatchEvent(new CustomEvent("mobile-review-lock-change"));
+  }
+
   function keepReviewRowVisibleInTable(shell, target) {
     const shellRect = shell.getBoundingClientRect();
     const rowRect = target.getBoundingClientRect();
@@ -623,8 +736,12 @@
     }
 
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
-      row.classList.toggle("selected", String(row.dataset.code) === String(selectedCode));
+      const selected = String(row.dataset.code) === String(selectedCode);
+      row.classList.toggle("selected", selected);
+      row.setAttribute("aria-expanded", isMobileReview() && selected ? "true" : "false");
     });
+
+    renderMobileDetail(currentRows);
 
     const shell = app.querySelector("[data-table-shell]");
     if (shell && scrollCode) {
@@ -650,7 +767,7 @@
       ["rs_percentile", "RS"],
     ];
     const selected = state.selected[state.period];
-    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([, label]) => `<th>${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function cellHtml(row, field) {
@@ -700,6 +817,7 @@
     }
     app.innerHTML = `${headerHtml(sourceRows)}${warningsHtml()}${queueHtml(sourceRows, counts)}${filtersHtml(sourceRows)}${resultsHtml(sorted.rows, sorted.label)}${footerHtml()}`;
     bindEvents(sorted.rows);
+    renderMobileDetail(sorted.rows);
   }
 
   function bindEvents(currentRows = []) {
@@ -758,7 +876,13 @@
 
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
       row.addEventListener("click", () => {
-        state.selected[state.period] = row.dataset.code;
+        const code = row.dataset.code;
+        if (isMobileReview()) {
+          state.selected[state.period] = String(state.selected[state.period]) === String(code) ? null : code;
+          renderSelection(currentRows, { scrollCode: state.selected[state.period] });
+          return;
+        }
+        state.selected[state.period] = code;
         renderSelection(currentRows, { focusTable: true });
       });
     });

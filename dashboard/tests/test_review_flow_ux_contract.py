@@ -110,7 +110,8 @@ def test_manual_sort_is_context_scoped_and_has_explicit_default_order() -> None:
     assert "Default order" in TABLE
     assert "restoreDefaultOrder(shell)" in TABLE
     assert "slot.replaceChildren()" not in TABLE
-    assert "if (button) return;" in TABLE
+    assert "if (button) {" in TABLE
+    assert "button.disabled = mobileReviewLocked(shell);" in TABLE
     assert "sortState" not in INTERACTION
     assert "applyRememberedSort" not in INTERACTION
 

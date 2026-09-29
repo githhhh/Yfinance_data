@@ -33,6 +33,14 @@
     else sortStates.delete(key);
   }
 
+  function mobileReviewLocked(shell) {
+    return Boolean(
+      window.matchMedia?.("(max-width: 760px)")?.matches
+      && shell?.dataset.reviewExpanded === "true"
+      && shell.querySelector(".mobile-detail-row"),
+    );
+  }
+
   function numericValue(value) {
     const cleaned = normalizeText(value)
       .replaceAll(",", "")
@@ -122,7 +130,16 @@
     });
 
     const orderChanged = sortedRows.some((row, position) => row !== rows[position]);
-    if (orderChanged) sortedRows.forEach((row) => body.appendChild(row));
+    if (orderChanged) {
+      const detailRows = new Map(
+        [...body.querySelectorAll("tr.mobile-detail-row")].map((detail) => [String(detail.previousElementSibling?.dataset?.code || ""), detail]),
+      );
+      sortedRows.forEach((row) => {
+        body.appendChild(row);
+        const detail = detailRows.get(String(row.dataset.code));
+        if (detail) body.appendChild(detail);
+      });
+    }
   }
 
   function setTextIfChanged(element, value) {
@@ -131,10 +148,18 @@
 
   function updateSortIndicators(shell) {
     const sortState = currentSortState();
+    const locked = mobileReviewLocked(shell);
     shell.querySelectorAll("thead th[data-sort-field]").forEach((header) => {
       const icon = header.querySelector(".table-sort-icon");
+      const button = header.querySelector(":scope > button");
       const isActive = sortState?.field === header.dataset.sortField;
       header.setAttribute("aria-sort", isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : "none");
+      header.classList.toggle("sort-locked", locked);
+      if (button) {
+        button.disabled = locked;
+        if (locked) button.title = "Collapse the expanded row to sort";
+        else button.removeAttribute("title");
+      }
       setTextIfChanged(icon, isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "");
     });
   }
@@ -157,6 +182,7 @@
   }
 
   function restoreDefaultOrder(shell) {
+    if (mobileReviewLocked(shell)) return;
     const body = shell?.querySelector("tbody");
     if (!body) return;
     const rank = new Map(defaultOrder(shell).map((code, index) => [code, index]));
@@ -179,13 +205,23 @@
       button?.remove();
       return;
     }
-    if (button) return;
+    if (button) {
+      button.disabled = mobileReviewLocked(shell);
+      button.title = button.disabled
+        ? "Collapse the expanded row to restore default order"
+        : "Return to the system review order for this Period and Scope";
+      return;
+    }
     button = document.createElement("button");
     button.type = "button";
     button.className = "review-default-sort";
     button.textContent = "Default order";
     button.setAttribute("aria-label", "Default order");
     button.title = "Return to the system review order for this Period and Scope";
+    button.disabled = mobileReviewLocked(shell);
+    button.title = button.disabled
+      ? "Collapse the expanded row to restore default order"
+      : "Return to the system review order for this Period and Scope";
     button.addEventListener("click", () => restoreDefaultOrder(shell));
     slot.appendChild(button);
   }
@@ -194,7 +230,7 @@
     const button = event.currentTarget;
     if (event.target.closest("[data-quality-info]")) return;
     const shell = button.closest(".table-shell");
-    if (!shell) return;
+    if (!shell || mobileReviewLocked(shell)) return;
     const field = button.closest("th")?.dataset.sortField;
     if (!field) return;
 
@@ -378,7 +414,15 @@
     if (Math.abs(delta) > 0.5) shell.scrollTop = Math.max(0, shell.scrollTop + delta);
   }
 
+  app.addEventListener("mobile-review-lock-change", () => {
+    const shell = app.querySelector("[data-table-shell]");
+    if (!shell) return;
+    updateSortIndicators(shell);
+    syncDefaultSortButton(shell);
+  });
+
   app.addEventListener("keydown", (event) => {
+    if (window.matchMedia?.("(max-width: 760px)")?.matches) return;
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     const shell = event.target.closest?.("[data-table-shell]");
     if (!shell || !currentSortState()) return;
