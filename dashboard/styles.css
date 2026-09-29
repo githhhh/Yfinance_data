@@ -690,7 +690,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table thead tr,
   .review-table tbody tr[data-code] {
     display: grid;
-    grid-template-columns: 27% 18% 33% 22%;
+    grid-template-columns: 22% 21% 35% 22%;
     width: 100%;
     align-items: stretch;
   }
@@ -735,23 +735,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     text-align: center;
     font-weight: 650;
   }
-  .review-table th[data-field="rs_percentile"] .table-header-control.with-info {
-    display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) 32px;
-    column-gap: 9px;
-    align-items: center;
+  .review-table th[data-field="rs_percentile"] {
+    padding-left: 2px;
+    padding-right: 2px;
   }
-  .review-table th[data-field="rs_percentile"] .table-header-control.with-info::before {
-    content: "";
-    grid-column: 1;
-    width: 32px;
-    height: 1px;
+  .review-table th[data-field="rs_percentile"] .table-header-control.with-info {
+    justify-content: center;
+    gap: 4px;
   }
   .review-table th[data-field="rs_percentile"] .table-sort-button {
-    grid-column: 2;
+    flex: 0 0 auto !important;
     justify-content: center !important;
   }
-  .review-table th[data-field="rs_percentile"] .rs-info-button { grid-column: 3; }
+  .review-table th[data-field="rs_percentile"] .rs-info-button {
+    width: 24px;
+    height: 32px;
+    flex: 0 0 24px;
+  }
   .review-table [data-field="ibd_entry_status"] { grid-column: 3; }
   .review-table [data-field="current_vs_ibd_candidate_pct"] {
     grid-column: 4;
@@ -776,7 +776,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table th:first-child { z-index: auto; }
   .review-table th:first-child::after,
   .review-table td:first-child::after { display: none !important; }
-  .review-table th.sort-locked > button {
+  .review-table th.sort-locked .table-sort-button {
     cursor: default !important;
     opacity: .55;
   }
@@ -793,7 +793,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     overflow: visible;
     white-space: normal;
     border-bottom: 1px solid #33404d;
-    background: #0f151c;
+    background: #111a20;
   }
   .mobile-inline-review {
     display: grid;
@@ -825,6 +825,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     padding-top: 9px;
     border-top: 1px solid #25303b;
   }
+  .mobile-detail-base,
+  .mobile-detail-pullback { min-width: 0; }
   .mobile-detail-wide { grid-column: 1 / -1; }
   .mobile-inline-review span {
     display: block;
@@ -864,6 +866,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table tbody tr.selected td[data-field="ibd_entry_status"],
   .review-table tbody tr.selected td[data-field="current_vs_ibd_candidate_pct"] {
     background: #16252a;
+  }
+  .review-table tbody tr.selected[aria-expanded="true"] td[data-field="code"],
+  .review-table tbody tr.selected[aria-expanded="true"] td[data-field="rs_percentile"],
+  .review-table tbody tr.selected[aria-expanded="true"] td[data-field="ibd_entry_status"],
+  .review-table tbody tr.selected[aria-expanded="true"] td[data-field="current_vs_ibd_candidate_pct"] {
+    border-bottom-color: transparent;
+    box-shadow: inset 0 1px rgb(31 205 180 / 18%);
   }
 }
 

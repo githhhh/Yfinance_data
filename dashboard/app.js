@@ -674,8 +674,8 @@
       <div class="mobile-detail-structure">
         <div><span>EPS YoY</span><strong>${fmt(row.eps_yoy_growth, "pct1")}</strong></div>
         <div><span>To 52W High</span><strong>${fmt(row.dist_to_52w_high_pct, "pct1")}</strong></div>
-        <div class="mobile-detail-wide"><span>Base</span><strong>${baseValue}</strong>${baseContext ? `<small>${esc(baseContext)}</small>` : ""}</div>
-        <div class="mobile-detail-wide"><span>Pullback</span><strong>${pullbackValue}</strong>${pullbackContext ? `<small>${esc(pullbackContext)}</small>` : ""}</div>
+        <div class="mobile-detail-base"><span>Base</span><strong>${baseValue}</strong>${baseContext ? `<small>${esc(baseContext)}</small>` : ""}</div>
+        <div class="mobile-detail-pullback"><span>Pullback</span><strong>${pullbackValue}</strong>${pullbackContext ? `<small>${esc(pullbackContext)}</small>` : ""}</div>
         <div class="mobile-detail-wide mobile-detail-rs"><span>RS Reference</span><strong data-mobile-rs-reference>—</strong></div>
       </div>
     </div>`;
