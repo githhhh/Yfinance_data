@@ -130,6 +130,19 @@ def test_review_flow_has_responsive_stage_status_layout() -> None:
     assert "@media (width <= 760px)" in INDEX
 
 
+def test_desktop_period_is_pinned_right_and_result_tools_match_mobile() -> None:
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    desktop = styles.split("@media (width > 760px)", 1)[1].split("@media (width <= 760px)", 1)[0]
+    assert ".queue-heading > .scope-block { grid-column: 2; grid-row: 1; }" in desktop
+    assert ".queue-heading > .period-block { grid-column: 3; grid-row: 1; justify-self: end; }" in desktop
+    assert ".filters-wrap:not(.filters-expanded) { display: none; }" in desktop
+    assert "grid-template-columns: minmax(0, 1fr) auto 34px 34px;" in desktop
+    assert ".copy-button," in desktop
+    assert ".mobile-filter-button {" in desktop
+    assert "display: inline-flex;" in desktop
+    assert '.mobile-filter-button[data-count]:not([data-count=""])::after' in desktop
+
+
 def test_mobile_review_demotes_static_scope_and_low_frequency_tools() -> None:
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert "scope-static-block" in APP
