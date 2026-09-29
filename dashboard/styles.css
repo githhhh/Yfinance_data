@@ -360,6 +360,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     gap: 6px;
   }
   .results-order-slot { justify-content: flex-end; }
+  .review-default-sort {
+    width: 50px;
+    min-width: 50px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 0;
+    white-space: nowrap;
+  }
+  .review-default-sort::before {
+    content: "Reset";
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+  }
   .copy-button,
   .mobile-filter-button {
     position: relative;
