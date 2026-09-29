@@ -6,6 +6,7 @@ APP = (DASHBOARD / "app.js").read_text(encoding="utf-8")
 TABLE = (DASHBOARD / "table_enhancements.js").read_text(encoding="utf-8")
 RS = (DASHBOARD / "rs_runtime.js").read_text(encoding="utf-8")
 STYLES = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+INTERACTION = (DASHBOARD / "interaction_runtime.js").read_text(encoding="utf-8")
 
 
 def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -> None:
@@ -18,6 +19,11 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert '.review-table [data-field="rs_percentile"] { grid-column: 2; }' in STYLES
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
     assert '.review-table [data-field="current_vs_ibd_candidate_pct"] { grid-column: 4;' in STYLES
+    assert "grid-template-columns: 26% 18% 35% 21%;" in STYLES
+    assert 'td[data-field="rs_percentile"] {' in STYLES
+    assert "justify-content: center;" in STYLES
+    assert ".review-table thead {" in STYLES
+    assert "transform: translateZ(0);" in STYLES
     assert '.review-table tbody tr[data-code] td[data-field="code"],' in STYLES
     assert 'grid-row: 1;' in STYLES
     assert 'content: "STATUS";' in STYLES
@@ -25,6 +31,11 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert "overflow-x: hidden;" in STYLES
     assert ".mobile-detail-row { display: none; }" in STYLES
     assert ".results-section > .selected-strip { display: none; }" in STYLES
+
+
+def test_mobile_table_header_is_fixed_without_rubber_band_overscroll() -> None:
+    assert 'overscroll-behavior-y: none !important;' in INTERACTION
+    assert '@media (max-width: 760px)' in INTERACTION
 
 
 def test_mobile_row_click_toggles_single_inline_review() -> None:
