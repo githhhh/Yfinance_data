@@ -349,7 +349,6 @@
           border-radius: 11px;
           padding: 14px;
         }
-        .rs-info-button { width: 28px; height: 28px; }
       }
     `;
     document.head.appendChild(style);
