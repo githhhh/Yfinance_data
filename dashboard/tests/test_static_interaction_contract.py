@@ -141,3 +141,28 @@ def test_rs_popover_is_visibly_modal_closeable_and_non_clickthrough():
     assert "rs-runtime-close" in INTERACTION
     assert 'popover.setAttribute("aria-modal", "true")' in INTERACTION
     assert 'event.stopPropagation();' in INTERACTION
+
+
+def test_midweek_changes_use_buy_point_flow_not_signal_origin():
+    assert 'Changes vs Weekend · ${changeTotal}' in APP
+    assert 'const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"]' in APP
+    assert 'const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"]' in APP
+    assert "Signal Source</div>" not in APP
+    assert "review_has_value_change" in APP
+    assert "review_weekend_buy_point_change" in APP
+    assert "review_new_buy_point_zone" in APP
+
+
+def test_midweek_near_breakout_is_disabled_only_in_changes_scope():
+    assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
+    assert "Current pre-signal candidates. Available in All Review only." in APP
+    assert 'if (state.scope === "CHANGES" && state.status === WATCH_STAGE) state.status = "ALL";' in APP
+
+
+def test_quick_filter_clear_slot_is_stable_and_mobile_uses_same_logic():
+    styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+    assert "Weekend baseline · <strong>" in APP
+    assert "Clear filters" in APP
+    assert "quick-clear-slot" in APP
+    assert ".clear-quick-button:disabled { visibility: hidden; pointer-events: none; }" in styles
+    assert ".quick-groups { grid-template-columns: 1fr; gap: 10px; }" in styles

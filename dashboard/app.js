@@ -5,8 +5,8 @@
   const WATCH_STAGE = "NEAR_BREAKOUT";
   const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
   const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER];
-  const CHANGE_ORDER = ["BECAME_ACTIONABLE", "LEFT_ACTIONABLE", "OTHER_CHANGES"];
-  const ORIGIN_ORDER = ["NEW", "CARRY", "RECONFIRMED"];
+  const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"];
+  const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"];
   const ROUTE_LABELS = {
     All: "All",
     ceiling: "Ceiling",
@@ -100,7 +100,7 @@
     return {
       scope: period === "MIDWEEK" && data.meta.midweek_baseline_available ? "CHANGES" : "ALL_SIGNALS",
       change: "ALL",
-      origin: "ALL",
+      newBuyPoint: "ALL",
       status: "ALL",
       route: "All",
       distanceMin: null,
@@ -126,7 +126,7 @@
     return {
       scope: state.scope,
       change: state.change,
-      origin: state.origin,
+      newBuyPoint: state.newBuyPoint,
       status: state.status,
       route: state.route,
       distanceMin: state.distanceMin,
@@ -148,7 +148,7 @@
     if (period !== "MIDWEEK" || !data.meta.midweek_baseline_available) {
       state.scope = "ALL_SIGNALS";
       state.change = "ALL";
-      state.origin = "ALL";
+      state.newBuyPoint = "ALL";
     }
   }
 
@@ -218,7 +218,11 @@
   }
 
   function displayChange(row) {
-    return isNearBreakout(row) ? "" : text(row.review_change_label, "");
+    if (isNearBreakout(row)) return "";
+    if (currentHasComparison() && state.scope === "CHANGES") {
+      return text(row.review_buy_point_change_label, "");
+    }
+    return text(row.review_change_label, "");
   }
 
   function currentHasComparison() {
@@ -262,50 +266,24 @@
   function filterRows(rows, exclude = "") {
     let result = rows.filter(isActive);
     const comparison = currentHasComparison();
-
     if (comparison && state.scope === "CHANGES") {
-      result = result.filter((row) => (
-        text(row.review_change_group, "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)
-      ));
+      result = result.filter((row) => bool(row.review_has_value_change));
     }
     if (comparison && exclude !== "change" && state.change !== "ALL") {
-      result = result.filter((row) => row.review_change_group === state.change);
+      result = result.filter((row) => row.review_weekend_buy_point_change === state.change);
     }
-    if (comparison && exclude !== "origin" && state.origin !== "ALL") {
-      result = result.filter((row) => row.review_signal_origin === state.origin);
+    if (comparison && exclude !== "newBuyPoint" && state.newBuyPoint !== "ALL") {
+      result = result.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint);
     }
     if (exclude !== "status" && state.status !== "ALL") {
       result = result.filter((row) => displayStatus(row) === state.status);
     }
     if (exclude !== "advanced") {
-      if (state.route !== "All") {
-        result = result.filter((row) => reviewSetup(row) === state.route);
-      }
-      if (state.distanceMin !== null) {
-        result = result.filter((row) => {
-          const value = reviewDistance(row);
-          return value !== null && value >= state.distanceMin;
-        });
-      }
-      if (state.distanceMax !== null) {
-        result = result.filter((row) => {
-          const value = reviewDistance(row);
-          return value !== null && value <= state.distanceMax;
-        });
-      }
-      if (state.entryVolumeMin !== null) {
-        result = result.filter((row) => {
-          if (isNearBreakout(row)) return true;
-          const value = num(row.ibd_entry_volume_ratio);
-          return value !== null && value >= state.entryVolumeMin;
-        });
-      }
-      if (state.weeklyVolumeMin !== null) {
-        result = result.filter((row) => {
-          const value = num(row.volume_ratio);
-          return value !== null && value >= state.weeklyVolumeMin;
-        });
-      }
+      if (state.route !== "All") result = result.filter((row) => reviewSetup(row) === state.route);
+      if (state.distanceMin !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value >= state.distanceMin; });
+      if (state.distanceMax !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value <= state.distanceMax; });
+      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
+      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = num(row.volume_ratio); return value !== null && value >= state.weeklyVolumeMin; });
     }
     return result;
   }
@@ -313,20 +291,15 @@
   function filterCounts(rows) {
     const statusBase = filterRows(rows, "status");
     const changeBase = filterRows(rows, "change");
-    const originBase = filterRows(rows, "origin");
+    const newBuyPointBase = filterRows(rows, "newBuyPoint");
+    const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length]));
+    if (currentHasComparison() && state.scope === "CHANGES") {
+      status[WATCH_STAGE] = rows.filter(isNearBreakout).length;
+    }
     return {
-      status: Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [
-        key,
-        statusBase.filter((row) => displayStatus(row) === key).length,
-      ])),
-      change: Object.fromEntries(CHANGE_ORDER.map((key) => [
-        key,
-        changeBase.filter((row) => row.review_change_group === key).length,
-      ])),
-      origin: Object.fromEntries(ORIGIN_ORDER.map((key) => [
-        key,
-        originBase.filter((row) => row.review_signal_origin === key).length,
-      ])),
+      status,
+      change: Object.fromEntries(CHANGE_ORDER.map((key) => [key, changeBase.filter((row) => row.review_weekend_buy_point_change === key).length])),
+      newBuyPoint: Object.fromEntries(NEW_BUY_POINT_ORDER.map((key) => [key, newBuyPointBase.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === key).length])),
     };
   }
 
@@ -334,8 +307,8 @@
     const result = [...rows];
     if (currentHasComparison() && state.scope === "CHANGES") {
       result.sort((a, b) => {
-        const ap = isNearBreakout(a) ? 5 : num(a.review_priority) ?? 9999;
-        const bp = isNearBreakout(b) ? 5 : num(b.review_priority) ?? 9999;
+        const ap = num(a.review_buy_point_priority) ?? 9999;
+        const bp = num(b.review_buy_point_priority) ?? 9999;
         if (ap !== bp) return ap - bp;
         const as = REVIEW_STATE_ORDER.indexOf(displayStatus(a));
         const bs = REVIEW_STATE_ORDER.indexOf(displayStatus(b));
@@ -361,7 +334,7 @@
   }
 
   function quickCount() {
-    return [state.change !== "ALL", state.origin !== "ALL"].filter(Boolean).length;
+    return [state.change !== "ALL", state.newBuyPoint !== "ALL"].filter(Boolean).length;
   }
 
   function resetAdvanced() {
@@ -416,12 +389,12 @@
     const comparison = currentHasComparison();
     const activeTotal = rows.filter(isActive).length;
     const changeTotal = comparison
-      ? rows.filter(isActive).filter((row) => row.review_change_group !== "UNCHANGED" || isNearBreakout(row)).length
+      ? rows.filter(isActive).filter((row) => bool(row.review_has_value_change)).length
       : 0;
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Changed signals plus current Near Breakout candidates">Review Now · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Changes vs Weekend · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
@@ -447,37 +420,47 @@
       return `<div class="context-panel"><div class="context-note"><strong>Weekend Baseline</strong><span>Complete weekly pool</span><span>Midweek comparison is not applied in this view.</span></div></div>`;
     }
     if (!data.meta.midweek_baseline_available) {
-      return `<div class="context-panel"><div class="context-note"><strong>Midweek Snapshot</strong><span>No valid complete-week baseline</span><span>Change and Origin comparison is unavailable.</span></div></div>`;
+      return `<div class="context-panel"><div class="context-note"><strong>Midweek Snapshot</strong><span>No valid complete-week baseline</span><span>Weekend Buy Point comparison is unavailable.</span></div></div>`;
     }
     const changeButtons = CHANGE_ORDER.map((key) => quickButton(key, counts.change[key], "change")).join("");
-    const originButtons = ORIGIN_ORDER.map((key) => quickButton(key, counts.origin[key], "origin")).join("");
+    const newBuyPointButtons = NEW_BUY_POINT_ORDER.map((key) => quickButton(key, counts.newBuyPoint[key], "newBuyPoint", `NEW_BP_${key}`)).join("");
+    const quickActive = quickCount() > 0;
     return `
       <div class="context-panel">
+        <div class="context-header">
+          <div class="context-baseline">Weekend baseline · <strong>${esc(data.meta.complete_snapshot_date || "N/A")}</strong></div>
+          <div class="quick-clear-slot"><button class="small-button clear-quick-button" data-action="clear-quick" ${quickActive ? "" : 'disabled aria-hidden="true"'}>Clear filters</button></div>
+        </div>
         <div class="quick-groups">
-          <div><div class="eyebrow">What Changed</div><div class="quick-grid">${changeButtons}</div></div>
-          <div><div class="eyebrow">Signal Source</div><div class="quick-grid">${originButtons}</div></div>
-          <div>${quickCount() ? `<button class="small-button" data-action="clear-quick">Clear</button>` : ""}</div>
+          <div><div class="eyebrow">What Changed <span>Weekend Buy Point</span></div><div class="quick-grid">${changeButtons}</div></div>
+          <div><div class="eyebrow">New Buy Points <span>This Week</span></div><div class="quick-grid">${newBuyPointButtons}</div></div>
         </div>
       </div>`;
   }
 
-  function quickButton(key, count, field) {
-    const meta = data.ui.flow_meta[key] || {};
+  function quickButton(key, count, field, metaKey = key) {
+    const meta = data.ui.flow_meta[metaKey] || {};
     const selected = state[field] === key;
     return `<button class="quick-button" style="--quick-color:${esc(meta.color || "#1fcdb4")}" data-action="quick" data-field="${field}" data-value="${key}" aria-pressed="${selected}" title="${esc(meta.tooltip || "")}">
       <span class="symbol">${esc(meta.symbol || "•")}</span><span>${esc(meta.label || key)}</span><span class="count">${count ?? 0}</span>
     </button>`;
   }
 
-  function statusCardHtml(key, count) {
+  function statusCardHtml(key, count, options = {}) {
     const meta = data.ui.status_meta[key] || {};
-    return `<button class="status-card" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${state.status === key}" title="${esc(meta.tooltip || "")}">
+    const disabled = Boolean(options.disabled);
+    const tooltip = options.tooltip || meta.tooltip || "";
+    return `<button class="status-card${disabled ? " is-disabled" : ""}" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${state.status === key}" title="${esc(tooltip)}" ${disabled ? 'disabled aria-disabled="true"' : ""}>
       <span class="status-orb"></span><span><span class="status-label">${esc(meta.label || key)}</span><span class="status-subtitle">${esc(meta.subtitle || "")}</span></span><span class="status-count">${count ?? 0}</span>
     </button>`;
   }
 
   function statusCardsHtml(counts) {
-    const watch = statusCardHtml(WATCH_STAGE, counts[WATCH_STAGE]);
+    const watchDisabled = currentHasComparison() && state.scope === "CHANGES";
+    const watch = statusCardHtml(WATCH_STAGE, counts[WATCH_STAGE], {
+      disabled: watchDisabled,
+      tooltip: watchDisabled ? "Current pre-signal candidates. Available in All Review only." : "",
+    });
     const entries = ENTRY_STATUS_ORDER.map((key) => statusCardHtml(key, counts[key])).join("");
     return `<div class="review-stage-status">
       <div class="review-flow-group">
@@ -829,6 +812,7 @@
           render();
         } else if (action === "scope") {
           state.scope = element.dataset.value;
+          if (state.scope === "CHANGES" && state.status === WATCH_STAGE) state.status = "ALL";
           render();
         } else if (action === "quick") {
           const field = element.dataset.field;
@@ -837,7 +821,7 @@
           render();
         } else if (action === "clear-quick") {
           state.change = "ALL";
-          state.origin = "ALL";
+          state.newBuyPoint = "ALL";
           render();
         } else if (action === "status") {
           const value = element.dataset.value;
