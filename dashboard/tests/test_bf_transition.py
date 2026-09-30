@@ -566,10 +566,10 @@ def test_midweek_buy_point_review_tracks_weekend_and_new_anchor_independently():
     assert row["review_weekend_buy_point_previous_zone"] == "BUY_ZONE"
     assert row["review_weekend_buy_point_zone"] == "EXTENDED"
     assert row["review_weekend_buy_point_change"] == "BECAME_EXTENDED"
-    assert row["review_new_buy_point"] is True
+    assert bool(row["review_new_buy_point"]) is True
     assert row["review_new_buy_point_zone"] == "BUY_ZONE"
     assert row["review_new_buy_point_date"] == "2026-07-27"
-    assert row["review_has_value_change"] is True
+    assert bool(row["review_has_value_change"]) is True
     assert row["review_buy_point_change_label"] == "Became Extended · New BP · In Buy Zone"
     assert row["review_effective_entry_status"] == "UNCONFIRMED"
 
@@ -578,5 +578,89 @@ def test_new_buy_point_identity_uses_anchor_not_trigger_price():
     complete = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=102.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-24"}]})])
     current = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-27", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=103.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-27"}]})])
     row = analyze_bf_transitions(current, complete).rows.iloc[0]
-    assert row["review_new_buy_point"] is True
+    assert bool(row["review_new_buy_point"]) is True
     assert row["review_new_buy_point_date"] == "2026-07-27"
+
+
+
+def test_same_rule_and_anchor_date_is_not_new_when_box_metadata_changes():
+    complete = pd.DataFrame([
+        _row(
+            "SAME",
+            snapshot_date="2026-07-24",
+            signal=True,
+            status="ACTIONABLE",
+            valid=True,
+            candidate=100.0,
+            close=102.0,
+            rule="pivot",
+            candidate_extra={
+                "pivot_candidates": [
+                    {"box_type": "S_BOX", "price": 100.0, "resistance_date": "2026-07-24"},
+                    {"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-24"},
+                ]
+            },
+        )
+    ])
+    current = pd.DataFrame([
+        _row(
+            "SAME",
+            snapshot_date="2026-07-27",
+            signal=True,
+            status="ACTIONABLE",
+            valid=True,
+            candidate=100.0,
+            close=103.0,
+            rule="pivot",
+            candidate_extra={
+                "selected_pivot": {
+                    "box_type": "M_BOX",
+                    "price": 100.0,
+                    "resistance_date": "2026-07-24",
+                },
+                "pivot_candidates": [
+                    {"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-24"}
+                ],
+            },
+        )
+    ])
+
+    row = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert bool(row["review_new_buy_point"]) is False
+
+
+def test_different_current_rule_is_new_when_legacy_weekend_anchor_date_is_missing():
+    complete = pd.DataFrame([
+        _row(
+            "LEGACY",
+            snapshot_date="2026-07-24",
+            signal=True,
+            status="ACTIONABLE",
+            valid=True,
+            candidate=100.0,
+            close=102.0,
+            rule="ma10_touch_confirm",
+            candidate_extra={"pending_high": 100.0, "touch_date": "2026-07-20"},
+        )
+    ])
+    current = pd.DataFrame([
+        _row(
+            "LEGACY",
+            snapshot_date="2026-07-27",
+            signal=True,
+            status="UNCONFIRMED",
+            valid=False,
+            candidate=106.0,
+            close=108.0,
+            rule="pivot",
+            candidate_extra={
+                "pivot_candidates": [
+                    {"box_type": "S_BOX", "price": 106.0, "resistance_date": "2026-07-27"}
+                ]
+            },
+        )
+    ])
+
+    row = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert bool(row["review_new_buy_point"]) is True
+    assert row["review_new_buy_point_zone"] == "BUY_ZONE"

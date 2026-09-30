@@ -46,16 +46,25 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         "review_watch_active",
         "review_effective_entry_status",
         "review_priority",
-        "review_has_value_change",
-        "review_buy_point_change_label",
-        "review_weekend_buy_point_change",
-        "review_new_buy_point",
         "buy_point_date",
         "ceiling",
         "ceiling_date",
         "breakout_date",
     ):
         assert field in row
+
+    midweek_rows = payload["views"]["midweek"]["rows"]
+    if payload["meta"]["midweek_baseline_available"] and midweek_rows:
+        midweek_row = midweek_rows[0]
+        for field in (
+            "review_has_value_change",
+            "review_buy_point_change_label",
+            "review_weekend_buy_point_change",
+            "review_new_buy_point",
+            "review_new_buy_point_zone",
+            "review_buy_point_priority",
+        ):
+            assert field in midweek_row
 
     payload_text = json.dumps(payload)
     for field in (

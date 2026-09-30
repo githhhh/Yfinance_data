@@ -99,10 +99,14 @@ def test_v2_watch_types_are_available_to_setup_filter() -> None:
     assert 'ma10_pullback: "MA10 Pullback"' in APP
 
 
-def test_midweek_review_now_scope_keeps_current_near_breakout_rows() -> None:
-    assert 'text(row.review_change_group, "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)' in APP
-    assert "Review Now" in APP
+def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() -> None:
+    assert 'result = result.filter((row) => bool(row.review_has_value_change));' in APP
+    assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
+    assert "Current pre-signal candidates. Available in All Review only." in APP
+    assert "Changes vs Weekend" in APP
     assert "All Review" in APP
+    assert "function isActive(row)" in APP
+    assert "return isSignalActive(row) || isNearBreakout(row);" in APP
 
 
 def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
@@ -136,7 +140,9 @@ def test_dynamic_filter_runtime_uses_v2_watch_semantics_with_v1_fallback() -> No
     assert 'reviewSetup(row) === route' in TABLE_RUNTIME
     assert 'bounds(rows, "review_distance_pct")' in TABLE_RUNTIME
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio")' in TABLE_RUNTIME
-    assert 'String(row.review_change_group || "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)' in TABLE_RUNTIME
+    assert 'rows = rows.filter((row) => bool(row.review_has_value_change));' in TABLE_RUNTIME
+    assert 'quickValue("newBuyPoint")' in TABLE_RUNTIME
+    assert "review_weekend_buy_point_change" in TABLE_RUNTIME
 
 
 def test_status_cards_use_explicit_watch_and_entry_groups_with_responsive_breakpoints() -> None:

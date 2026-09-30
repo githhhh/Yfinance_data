@@ -239,7 +239,7 @@ def _anchor(*, rule: str, trigger_price: float, anchor_date: str | None, anchor_
         return None
     kind = _clean_text(anchor_type)
     return {
-        "identity": "|".join((rule, kind or "-", anchor_date)),
+        "identity": "|".join((rule, anchor_date)),
         "rule": rule,
         "trigger_price": trigger_price,
         "anchor_date": anchor_date,
@@ -455,6 +455,13 @@ def _project(
                 new_buy_point = True
             elif weekend_anchor is not None:
                 new_buy_point = current_anchor["identity"] != weekend_anchor["identity"]
+            else:
+                # Some legacy candidates (notably MA10 pending-high) do not yet
+                # expose the bar that supplied the high. A different setup rule
+                # is still sufficient evidence that the current structural buy
+                # point is not the Weekend one; same-rule ambiguity fails closed.
+                weekend_rule = (_clean_text(complete_row.get("ibd_candidate_rule")) or "").lower()
+                new_buy_point = bool(weekend_rule and current_anchor["rule"] != weekend_rule)
         new_buy_point_zone = _price_zone(current_anchor["trigger_price"], latest_close) if new_buy_point and current_anchor is not None else None
         has_value_change = bool(weekend_change != "UNCHANGED" or new_buy_point_zone is not None)
         buy_point_change_label = _buy_point_change_label(weekend_change, new_buy_point_zone)

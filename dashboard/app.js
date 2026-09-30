@@ -275,8 +275,11 @@
     if (comparison && exclude !== "newBuyPoint" && state.newBuyPoint !== "ALL") {
       result = result.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint);
     }
-    if (exclude !== "status" && state.status !== "ALL") {
-      result = result.filter((row) => displayStatus(row) === state.status);
+    const effectiveStatus = (
+      comparison && state.scope === "CHANGES" && state.status === WATCH_STAGE
+    ) ? "ALL" : state.status;
+    if (exclude !== "status" && effectiveStatus !== "ALL") {
+      result = result.filter((row) => displayStatus(row) === effectiveStatus);
     }
     if (exclude !== "advanced") {
       if (state.route !== "All") result = result.filter((row) => reviewSetup(row) === state.route);
@@ -450,7 +453,8 @@
     const meta = data.ui.status_meta[key] || {};
     const disabled = Boolean(options.disabled);
     const tooltip = options.tooltip || meta.tooltip || "";
-    return `<button class="status-card${disabled ? " is-disabled" : ""}" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${state.status === key}" title="${esc(tooltip)}" ${disabled ? 'disabled aria-disabled="true"' : ""}>
+    const pressed = options.pressed ?? (state.status === key);
+    return `<button class="status-card${disabled ? " is-disabled" : ""}" style="--tone:${esc(meta.color || "#9ca8b7")}" data-action="status" data-value="${key}" aria-pressed="${pressed}" title="${esc(tooltip)}" ${disabled ? 'disabled aria-disabled="true"' : ""}>
       <span class="status-orb"></span><span><span class="status-label">${esc(meta.label || key)}</span><span class="status-subtitle">${esc(meta.subtitle || "")}</span></span><span class="status-count">${count ?? 0}</span>
     </button>`;
   }
@@ -459,6 +463,7 @@
     const watchDisabled = currentHasComparison() && state.scope === "CHANGES";
     const watch = statusCardHtml(WATCH_STAGE, counts[WATCH_STAGE], {
       disabled: watchDisabled,
+      pressed: watchDisabled ? false : state.status === WATCH_STAGE,
       tooltip: watchDisabled ? "Current pre-signal candidates. Available in All Review only." : "",
     });
     const entries = ENTRY_STATUS_ORDER.map((key) => statusCardHtml(key, counts[key])).join("");
@@ -812,7 +817,6 @@
           render();
         } else if (action === "scope") {
           state.scope = element.dataset.value;
-          if (state.scope === "CHANGES" && state.status === WATCH_STAGE) state.status = "ALL";
           render();
         } else if (action === "quick") {
           const field = element.dataset.field;
