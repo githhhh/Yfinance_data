@@ -336,10 +336,6 @@
     ].filter(Boolean).length;
   }
 
-  function quickCount() {
-    return [state.change !== "ALL", state.newBuyPoint !== "ALL"].filter(Boolean).length;
-  }
-
   function resetAdvanced() {
     state.route = "All";
     state.distanceMin = null;
@@ -427,13 +423,8 @@
     }
     const changeButtons = CHANGE_ORDER.map((key) => quickButton(key, counts.change[key], "change")).join("");
     const newBuyPointButtons = NEW_BUY_POINT_ORDER.map((key) => quickButton(key, counts.newBuyPoint[key], "newBuyPoint", `NEW_BP_${key}`)).join("");
-    const quickActive = quickCount() > 0;
     return `
       <div class="context-panel">
-        <div class="context-header">
-          <div class="context-baseline">Weekend baseline · <strong>${esc(data.meta.complete_snapshot_date || "N/A")}</strong></div>
-          <div class="quick-clear-slot"><button class="small-button clear-quick-button" data-action="clear-quick" ${quickActive ? "" : 'disabled aria-hidden="true"'}>Clear filters</button></div>
-        </div>
         <div class="quick-groups">
           <div><div class="eyebrow">What Changed <span>Weekend Buy Point</span></div><div class="quick-grid">${changeButtons}</div></div>
           <div><div class="eyebrow">New Buy Points <span>This Week</span></div><div class="quick-grid">${newBuyPointButtons}</div></div>
@@ -822,10 +813,6 @@
           const field = element.dataset.field;
           const value = element.dataset.value;
           state[field] = state[field] === value ? "ALL" : value;
-          render();
-        } else if (action === "clear-quick") {
-          state.change = "ALL";
-          state.newBuyPoint = "ALL";
           render();
         } else if (action === "status") {
           const value = element.dataset.value;

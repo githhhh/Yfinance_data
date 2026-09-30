@@ -162,10 +162,10 @@ def test_midweek_near_breakout_is_disabled_only_in_changes_scope():
     assert 'state.status = "ALL"' not in scope_block
 
 
-def test_quick_filter_clear_slot_is_stable_and_mobile_uses_same_logic():
+def test_midweek_quick_filters_stay_compact_and_toggle_off_in_place():
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
-    assert "Weekend baseline · <strong>" in APP
-    assert "Clear filters" in APP
-    assert "quick-clear-slot" in APP
-    assert ".clear-quick-button:disabled { visibility: hidden; pointer-events: none; }" in styles
+    assert "Weekend baseline · <strong>" not in APP
+    assert "Clear filters" not in APP
+    assert "quick-clear-slot" not in APP
+    assert 'state[field] = state[field] === value ? "ALL" : value;' in APP
     assert ".quick-groups { grid-template-columns: 1fr; gap: 10px; }" in styles

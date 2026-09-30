@@ -98,7 +98,7 @@ Midweek comparison 可用时显示两组 Buy Point 跟踪：
 - `WHAT CHANGED`：锚定 Weekend 已建立的同一个 Buy Point，只展示 `Entered Buy Zone`、`Below Buy Point`、`Became Extended` 三种有 Review 价值的价格区域变化；
 - `NEW BUY POINTS`：锚定本周相对 Weekend 新形成的结构 Buy Point，按当前价格位置显示 `In Buy Zone`、`Below Buy Point`、`Extended`。Buy Point 身份由 setup rule + 权威 anchor/resistance date 识别；box type 等属于结构元数据，trigger price 只是属性，均不能单独作为身份。
 
-两组可以组合并按交集过滤。`Clear filters` 位于比较面板右上角并始终保留布局槽位，只清除这两组，不清 Status、Period、Scope 或高级 Filters。Carry / Reconfirmed / New 等 Signal Origin 只保留为内部 projection / audit 事实，不再作为用户 Quick Filter。
+两组可以组合并按交集过滤；再次点击已选中的快捷项即可取消该项，因此不额外提供 `Clear filters`。Weekend baseline 日期沿用页面顶部 Snapshot/baseline 信息，不在快捷筛选面板重复占行。Carry / Reconfirmed / New 等 Signal Origin 只保留为内部 projection / audit 事实，不再作为用户 Quick Filter。
 
 `Changes vs Weekend` 只包含上述 Weekend Buy Point 变化或 New Buy Point。Near Breakout 不属于变化队列，在该 Scope 下保留真实计数但灰显不可点击；切换到 `All Review` 后恢复原有行为。桌面与移动端使用同一套业务逻辑。
 
