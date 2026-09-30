@@ -31,7 +31,9 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 
 
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
-    assert 'return isNearBreakout(row) ? "" : text(row.review_change_label, "");' in APP
+    assert 'if (isNearBreakout(row)) return "";' in APP
+    assert 'return text(row.review_change_label, "");' in APP
+    assert 'return text(row.review_buy_point_change_label, "");' in APP
     assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
     assert 'class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
@@ -100,8 +102,10 @@ def test_scope_switch_changes_population_without_resetting_review_intent() -> No
     scope_block = APP.split('} else if (action === "scope") {', 1)[1].split('} else if (action === "quick") {', 1)[0]
     assert "state.scope = element.dataset.value;" in scope_block
     assert 'state.change = "ALL"' not in scope_block
-    assert 'state.origin = "ALL"' not in scope_block
+    assert 'state.newBuyPoint = "ALL"' not in scope_block
     assert 'state.status = "ALL"' not in scope_block
+    assert 'state.scope === "CHANGES" && state.status === WATCH_STAGE' in APP
+    assert ') ? "ALL" : state.status;' in APP
 
 
 def test_manual_sort_is_context_scoped_and_has_explicit_default_order() -> None:

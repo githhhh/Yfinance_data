@@ -547,16 +547,20 @@
     let rows = Array.isArray(source) ? source.filter(isActive) : [];
 
     if (comparison && pressedValue("scope") === "CHANGES") {
-      rows = rows.filter((row) => (
-        String(row.review_change_group || "UNCHANGED") !== "UNCHANGED" || isNearBreakout(row)
-      ));
+      rows = rows.filter((row) => bool(row.review_has_value_change));
     }
 
     const change = quickValue("change");
-    if (comparison && change !== "ALL") rows = rows.filter((row) => row.review_change_group === change);
+    if (comparison && change !== "ALL") {
+      rows = rows.filter((row) => row.review_weekend_buy_point_change === change);
+    }
 
-    const origin = quickValue("origin");
-    if (comparison && origin !== "ALL") rows = rows.filter((row) => row.review_signal_origin === origin);
+    const newBuyPoint = quickValue("newBuyPoint");
+    if (comparison && newBuyPoint !== "ALL") {
+      rows = rows.filter((row) => (
+        bool(row.review_new_buy_point) && row.review_new_buy_point_zone === newBuyPoint
+      ));
+    }
 
     const status = pressedValue("status");
     if (status) rows = rows.filter((row) => displayStatus(row) === status);

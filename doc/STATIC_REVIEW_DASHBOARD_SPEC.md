@@ -22,7 +22,7 @@ Dashboard 是高频 Review 工作台，不是分析报告。用户应沿同一�
 ```text
 数据状态
 → Period / Scope
-→ Change / Origin / Entry Status
+→ Weekend Buy Point Changes / New Buy Points / Entry Status
 → 必要时 More Filters
 → Results / 排序 / Copy Codes
 → Selected Overview
@@ -76,7 +76,7 @@ Header / Snapshot / Data State
 Review Queue
   Period
   Scope
-  What Changed / Signal Source（仅合法 Midweek comparison）
+  What Changed / New Buy Points（仅合法 Midweek comparison）
   Entry Status cards
 More Filters
 Results summary + Copy Codes
@@ -86,19 +86,21 @@ Decision Table
 
 ### 4.1 Period / Scope
 
-- Midweek 有合法完整周 baseline：默认 `Midweek Review + Changes`。
-- Midweek 无合法 baseline：允许查看当前周中 Pool，但关闭 Carry / Change / Origin 比较。
+- Midweek 有合法完整周 baseline：默认 `Midweek Review + Changes vs Weekend`。
+- Midweek 无合法 baseline：允许查看当前周中 Pool，但关闭 Weekend Buy Point / New Buy Point 比较。
 - Weekend：固定完整周语境，Scope 为 `All Signals`。
 - 切换 Period 时清理不兼容的临时筛选；同一 Period 内的普通操作不应无故重置其它维度。
 
 ### 4.2 快速筛选
 
-Midweek comparison 可用时显示两组：
+Midweek comparison 可用时显示两组 Buy Point 跟踪：
 
-- `WHAT CHANGED`：Entered/Became Actionable、Left Actionable、Other Changes；
-- `SIGNAL SOURCE`：New、Carry、Reconfirmed。
+- `WHAT CHANGED`：锚定 Weekend 已建立的同一个 Buy Point，只展示 `Entered Buy Zone`、`Below Buy Point`、`Became Extended` 三种有 Review 价值的价格区域变化；
+- `NEW BUY POINTS`：锚定本周相对 Weekend 新形成的结构 Buy Point，按当前价格位置显示 `In Buy Zone`、`Below Buy Point`、`Extended`。Buy Point 身份由 setup rule + 权威 anchor/resistance date 识别；box type 等属于结构元数据，trigger price 只是属性，均不能单独作为身份。
 
-Change 与 Origin 可以组合；Clear 只清除这两组，不清 Status、Period、Scope 或高级 Filters。
+两组可以组合并按交集过滤。`Clear filters` 位于比较面板右上角并始终保留布局槽位，只清除这两组，不清 Status、Period、Scope 或高级 Filters。Carry / Reconfirmed / New 等 Signal Origin 只保留为内部 projection / audit 事实，不再作为用户 Quick Filter。
+
+`Changes vs Weekend` 只包含上述 Weekend Buy Point 变化或 New Buy Point。Near Breakout 不属于变化队列，在该 Scope 下保留真实计数但灰显不可点击；切换到 `All Review` 后恢复原有行为。桌面与移动端使用同一套业务逻辑。
 
 ### 4.3 Entry Status
 
@@ -130,8 +132,8 @@ Range 控件必须基于**当前 Review 语境中的实际数据范围**，不�
 ```text
 Period
 + Scope
-+ Change
-+ Origin
++ Weekend Buy Point Change
++ New Buy Point
 + Entry Status
 + Setup
 ```
@@ -240,7 +242,7 @@ Selected Overview 位于结果摘要和表格之间；选行后原地更新。�
 移动端：
 
 - Header / Snapshot 保持现有展示，不引入自动折叠或持久化展开状态；
-- Weekend 等无可切换 Scope 的语境中，`All Review · N` 仅作为 Review Queue 标题右侧的低强调状态文字；合法 Midweek comparison 的 `Review Now / All Review` 仍保留真实 Scope 交互；
+- Weekend 等无可切换 Scope 的语境中，`All Review · N` 仅作为 Review Queue 标题右侧的低强调状态文字；合法 Midweek comparison 的 `Changes vs Weekend / All Review` 仍保留真实 Scope 交互；
 - More Filters 在未展开时不占独立一级行，入口与 Copy Codes 一起收敛到 Results 上方紧凑工具栏；展开后仍使用同一组权威筛选控件；
 - Selected Overview 在窄屏将 EPS / To 52W High / RS Reference 收敛为身份区后的紧凑三列摘要；EPS 槽位固定，缺失显示 `N/A` / `—`；Base / Pullback 各占半宽并排结构块，各自允许 3–4 行上下文，在完整信息与垂直密度之间保持平衡；
 - Selected Overview 在移动端位于 Results 工具栏之前，使选中标的画像紧贴 Status → Selected → Table 的连续 Review 心流；桌面布局顺序不变；
@@ -289,7 +291,7 @@ python security_scan.py --history
 - Quick filters、Status、More Filters 不互相误重置；
 - 默认 Range 显示当前语境真实边界，完整范围不显示 `Any`；
 - Range 拖动后 active 状态与结果数量一致；
-- Midweek Changes 默认 Review Priority，其余 Review 默认 Code；
+- Midweek Changes vs Weekend 默认 Review Priority，其余 Review 默认 Code；
 - 主体页面在 RS 请求开始前即可正常使用；
 - RS 首次加载时显示 `—`；Current / Older / Newer 状态可辨识；请求失败或 ticker 缺失时为 `N/A`；
 - RS 表头 popover 可查看来源、RS update、Pool snapshot，并支持 Refresh / Retry；来源链接可跳转到 `Fred6725 / rs-log`；

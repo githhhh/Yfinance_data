@@ -10,7 +10,7 @@ INTERACTION = (DASHBOARD / "interaction_runtime.js").read_text(encoding="utf-8")
 
 
 def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -> None:
-    for label in ("Review Queue", "What Changed", "Signal Source", "Watch Stage", "Entry Status"):
+    for label in ("Review Queue", "What Changed", "New Buy Points", "Watch Stage", "Entry Status"):
         assert label in APP
 
     assert 'columns.map(([field, label]) => `<th data-field="${esc(field)}">' in APP

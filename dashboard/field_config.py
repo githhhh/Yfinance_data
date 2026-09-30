@@ -195,6 +195,12 @@ FLOW_CARD_META = {
             "点击：只看这类标的，并保留其他已选条件。",
         ),
     },
+    "ENTERED_BUY_ZONE": {"label": "Entered Buy Zone", "symbol": "→", "color": "#22c55e", **_tooltip_meta("Entered Buy Zone", "含义：相对同一个 Weekend Buy Point，当前价格进入买点上方 0%–5% 区域。", "数量：当前范围内符合条件的标的数。", "点击：只看这类标的。")},
+    "BELOW_BUY_POINT": {"label": "Below Buy Point", "symbol": "↓", "color": "#f04444", **_tooltip_meta("Below Buy Point", "含义：相对同一个 Weekend Buy Point，当前价格已位于买点下方。", "数量：当前范围内符合条件的标的数。", "点击：只看这类标的。")},
+    "BECAME_EXTENDED": {"label": "Became Extended", "symbol": "↑", "color": "#2791ff", **_tooltip_meta("Became Extended", "含义：相对同一个 Weekend Buy Point，当前价格已超过买点 +5%。", "数量：当前范围内符合条件的标的数。", "点击：只看这类标的。")},
+    "NEW_BP_BUY_ZONE": {"label": "In Buy Zone", "symbol": "•", "color": "#22c55e", **_tooltip_meta("In Buy Zone", "含义：本周形成了不同于 Weekend anchor 的新 Buy Point，当前价格位于其上方 0%–5%。", "数量：当前范围内符合条件的新 Buy Point 标的数。", "点击：与 What Changed 按交集组合。")},
+    "NEW_BP_BELOW_BUY_POINT": {"label": "Below Buy Point", "symbol": "↓", "color": "#f04444", **_tooltip_meta("Below Buy Point", "含义：本周新增 Buy Point 已形成，但当前价格位于该买点下方。", "数量：当前范围内符合条件的新 Buy Point 标的数。", "点击：与 What Changed 按交集组合。")},
+    "NEW_BP_EXTENDED": {"label": "Extended", "symbol": "↑", "color": "#2791ff", **_tooltip_meta("Extended", "含义：本周新增 Buy Point 已形成，当前价格已超过该买点 +5%。", "数量：当前范围内符合条件的新 Buy Point 标的数。", "点击：与 What Changed 按交集组合。")},
 }
 
 

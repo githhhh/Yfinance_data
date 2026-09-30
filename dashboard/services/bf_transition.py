@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import json
 from typing import Any
 
 import numpy as np
@@ -195,6 +196,150 @@ def _calculate_status(entry_valid: Any, candidate: float, latest_close: float) -
     return "EXTENDED"
 
 
+def _clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    return text if text and text.lower() not in {"nan", "none"} else None
+
+
+def _candidate_extra(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    text = _clean_text(value)
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _same_price(left: Any, right: Any) -> bool:
+    lhs = pd.to_numeric(left, errors="coerce")
+    rhs = pd.to_numeric(right, errors="coerce")
+    if pd.isna(lhs) or pd.isna(rhs):
+        return False
+    return bool(np.isclose(float(lhs), float(rhs), rtol=1e-9, atol=1e-4))
+
+
+def _iso_date(value: Any) -> str | None:
+    parsed = pd.to_datetime(value, errors="coerce")
+    return None if pd.isna(parsed) else parsed.date().isoformat()
+
+
+def _anchor(*, rule: str, trigger_price: float, anchor_date: str | None, anchor_type: str | None) -> dict[str, Any] | None:
+    if not anchor_date:
+        return None
+    kind = _clean_text(anchor_type)
+    return {
+        "identity": "|".join((rule, anchor_date)),
+        "rule": rule,
+        "trigger_price": trigger_price,
+        "anchor_date": anchor_date,
+        "anchor_type": kind,
+    }
+
+
+def _buy_point_anchor(row: pd.Series | None) -> dict[str, Any] | None:
+    """Return structural buy-point identity; trigger price is not the identity."""
+    if row is None:
+        return None
+    rule = (_clean_text(row.get("ibd_candidate_rule")) or "").lower()
+    candidate = pd.to_numeric(row.get("ibd_candidate_price"), errors="coerce")
+    if not rule or pd.isna(candidate) or not np.isfinite(candidate) or float(candidate) <= 0:
+        return None
+    trigger = float(candidate)
+    extra = _candidate_extra(row.get("ibd_candidate_extra"))
+    if rule in {"ceiling", "ceiling_breakout"}:
+        if not _same_price(trigger, row.get("ceiling")):
+            return None
+        return _anchor(rule="ceiling", trigger_price=trigger, anchor_date=_iso_date(row.get("ceiling_date")), anchor_type="CEILING")
+    if rule == "pivot":
+        selected = extra.get("selected_pivot")
+        if isinstance(selected, dict) and _same_price(trigger, selected.get("price")):
+            resolved = _anchor(rule=rule, trigger_price=trigger, anchor_date=_iso_date(selected.get("resistance_date")), anchor_type=_clean_text(selected.get("box_type")) or "BOX")
+            if resolved is not None:
+                return resolved
+        matches: list[tuple[str, str]] = []
+        for item in extra.get("pivot_candidates", []):
+            if not isinstance(item, dict) or not _same_price(trigger, item.get("price")):
+                continue
+            anchor_date = _iso_date(item.get("resistance_date"))
+            if anchor_date:
+                matches.append((_clean_text(item.get("box_type")) or "BOX", anchor_date))
+        if not matches:
+            return None
+        dates = {item[1] for item in matches}
+        if len(dates) != 1:
+            return None
+        return _anchor(rule=rule, trigger_price=trigger, anchor_date=next(iter(dates)), anchor_type="+".join(sorted({item[0] for item in matches})))
+    if rule == "ceiling_pullback":
+        pending_high = extra.get("pending_high")
+        if pending_high is not None and not _same_price(trigger, pending_high):
+            return None
+        anchor_date = _iso_date(extra.get("pending_high_date"))
+        touch_high = extra.get("touch_high")
+        if not anchor_date and touch_high is not None and _same_price(trigger, touch_high) and _same_price(pending_high, touch_high):
+            anchor_date = _iso_date(extra.get("touch_date"))
+        return _anchor(rule=rule, trigger_price=trigger, anchor_date=anchor_date, anchor_type="PULLBACK_HIGH")
+    if rule == "ma10_touch_confirm":
+        pending_high = extra.get("pending_high")
+        if pending_high is not None and not _same_price(trigger, pending_high):
+            return None
+        return _anchor(rule=rule, trigger_price=trigger, anchor_date=_iso_date(extra.get("pending_high_date")), anchor_type="PENDING_HIGH")
+    if rule == "three_weeks_tight":
+        twk_high = extra.get("twk_high")
+        if twk_high is not None and not _same_price(trigger, twk_high):
+            return None
+        return _anchor(rule=rule, trigger_price=trigger, anchor_date=_iso_date(extra.get("twk_high_date")), anchor_type="TIGHT_HIGH")
+    return None
+
+
+def _price_zone(candidate: Any, latest_close: Any) -> str | None:
+    trigger = pd.to_numeric(candidate, errors="coerce")
+    close = pd.to_numeric(latest_close, errors="coerce")
+    if pd.isna(trigger) or pd.isna(close):
+        return None
+    if not np.isfinite(trigger) or not np.isfinite(close) or float(trigger) <= 0 or float(close) <= 0:
+        return None
+    distance = round((float(close) / float(trigger) - 1.0) * 100.0, 2)
+    if distance < 0:
+        return "BELOW_BUY_POINT"
+    if distance <= 5.0:
+        return "BUY_ZONE"
+    return "EXTENDED"
+
+
+def _tracked_buy_point_change(previous_zone: str | None, current_zone: str | None) -> str:
+    if not previous_zone or not current_zone or previous_zone == current_zone:
+        return "UNCHANGED"
+    return {"BUY_ZONE": "ENTERED_BUY_ZONE", "BELOW_BUY_POINT": "BELOW_BUY_POINT", "EXTENDED": "BECAME_EXTENDED"}[current_zone]
+
+
+def _buy_point_change_label(weekend_change: str, new_zone: str | None) -> str:
+    parts = []
+    weekend_label = {"ENTERED_BUY_ZONE": "Entered Buy Zone", "BELOW_BUY_POINT": "Below Buy Point", "BECAME_EXTENDED": "Became Extended"}.get(weekend_change)
+    if weekend_label:
+        parts.append(weekend_label)
+    if new_zone:
+        new_label = {"BUY_ZONE": "In Buy Zone", "BELOW_BUY_POINT": "Below Buy Point", "EXTENDED": "Extended"}[new_zone]
+        parts.append(f"New BP · {new_label}")
+    return " · ".join(parts)
+
+
+def _buy_point_priority(weekend_change: str, new_zone: str | None) -> int:
+    ranks: list[int] = []
+    ranks.extend({"ENTERED_BUY_ZONE": [0], "BELOW_BUY_POINT": [1], "BECAME_EXTENDED": [2]}.get(weekend_change, []))
+    ranks.extend({"BUY_ZONE": [0], "BELOW_BUY_POINT": [1], "EXTENDED": [2]}.get(new_zone, []))
+    return min(ranks) if ranks else 9
+
 def _entry_change(baseline: str | None, effective: str | None) -> tuple[str, str]:
     # Stable Dashboard contract: extraction must not change these labels.
     if baseline != "ACTIONABLE" and effective == "ACTIONABLE":
@@ -271,6 +416,7 @@ def _project(
         candidate = None
         current_vs_candidate = None
         entry_valid = None
+        latest_close = None
         if watch_active:
             latest_close = _positive_number(current_row.get("latest_close"), field="latest_close", code=code)
             candidate = _positive_number(selected_row.get("ibd_candidate_price"), field="candidate", code=code)
@@ -291,6 +437,36 @@ def _project(
         else:
             entry_change, change_group, change_label = "UNAVAILABLE", "UNCHANGED", ""
 
+        weekend_anchor = _buy_point_anchor(complete_row) if signal_complete else None
+        current_anchor = _buy_point_anchor(current_row) if signal_current else None
+        weekend_candidate = None
+        weekend_previous_zone = None
+        weekend_current_zone = None
+        weekend_change = "UNCHANGED"
+        if signal_complete:
+            weekend_candidate = _positive_number(complete_row.get("ibd_candidate_price"), field="weekend candidate", code=code)
+            weekend_close = _positive_number(complete_row.get("latest_close"), field="weekend latest_close", code=code)
+            weekend_previous_zone = _price_zone(weekend_candidate, weekend_close)
+            weekend_current_zone = _price_zone(weekend_candidate, latest_close)
+            weekend_change = _tracked_buy_point_change(weekend_previous_zone, weekend_current_zone)
+        new_buy_point = False
+        if signal_current and current_anchor is not None:
+            if not signal_complete:
+                new_buy_point = True
+            elif weekend_anchor is not None:
+                new_buy_point = current_anchor["identity"] != weekend_anchor["identity"]
+            else:
+                # Some legacy candidates (notably MA10 pending-high) do not yet
+                # expose the bar that supplied the high. A different setup rule
+                # is still sufficient evidence that the current structural buy
+                # point is not the Weekend one; same-rule ambiguity fails closed.
+                weekend_rule = (_clean_text(complete_row.get("ibd_candidate_rule")) or "").lower()
+                new_buy_point = bool(weekend_rule and current_anchor["rule"] != weekend_rule)
+        new_buy_point_zone = _price_zone(current_anchor["trigger_price"], latest_close) if new_buy_point and current_anchor is not None else None
+        has_value_change = bool(weekend_change != "UNCHANGED" or new_buy_point_zone is not None)
+        buy_point_change_label = _buy_point_change_label(weekend_change, new_buy_point_zone)
+        buy_point_priority = _buy_point_priority(weekend_change, new_buy_point_zone)
+
         projected.update(
             {
                 "review_candidate_price": candidate,
@@ -302,6 +478,21 @@ def _project(
                 "review_change_group": change_group,
                 "review_change_label": change_label,
                 "review_futu_actionable": bool(watch_active and effective_status == "ACTIONABLE"),
+                "review_weekend_buy_point_change": weekend_change,
+                "review_weekend_buy_point_previous_zone": weekend_previous_zone,
+                "review_weekend_buy_point_zone": weekend_current_zone,
+                "review_weekend_buy_point_price": weekend_candidate,
+                "review_weekend_buy_point_date": weekend_anchor["anchor_date"] if weekend_anchor is not None else None,
+                "review_weekend_buy_point_rule": weekend_anchor["rule"] if weekend_anchor is not None else None,
+                "review_new_buy_point": bool(new_buy_point),
+                "review_new_buy_point_zone": new_buy_point_zone,
+                "review_new_buy_point_price": current_anchor["trigger_price"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_date": current_anchor["anchor_date"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_rule": current_anchor["rule"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_anchor_type": current_anchor["anchor_type"] if new_buy_point and current_anchor is not None else None,
+                "review_has_value_change": has_value_change,
+                "review_buy_point_change_label": buy_point_change_label,
+                "review_buy_point_priority": buy_point_priority,
             }
         )
         change_rank = {
