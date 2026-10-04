@@ -13,7 +13,6 @@ from data_providers import DataProviderFactory, YahooDataProvider
 from data_providers.ohlcv_validation import (
     DataIntegrityError,
     MARKET_REFERENCE_SYMBOLS,
-    find_latest_bar_mismatches,
     validate_download_batch,
     validate_ohlcv_frame,
 )
@@ -63,11 +62,11 @@ def save_stock_data(
 ):
     """Validate, round-trip verify, then atomically publish a pickle file."""
     # Fail closed before touching the output file. This is the final provider-agnostic
-    # guard against partial downloads, NaN/inf OHLCV rows, or stale latest bars.
+    # guard against partial downloads or invalid OHLCV rows. Date freshness is
+    # handled by analysis-stage sanitization, not PKL publication.
     validate_download_batch(
         stock_data,
         expected_symbols=expected_symbols,
-        interval=interval,
     )
 
     if not os.path.exists(save_dir):
@@ -98,7 +97,6 @@ def save_stock_data(
         validate_download_batch(
             round_trip_data,
             expected_symbols=expected_symbols,
-            interval=interval,
         )
 
         os.replace(temp_filepath, filepath)
@@ -178,18 +176,9 @@ def filter_schwab_stock_data(
             f"Schwab market reference missing or invalid: {missing_references}"
         )
 
-    if interval in {"1d", "1wk"}:
-        for symbol, latest in sorted(find_latest_bar_mismatches(valid).items()):
-            excluded.add(symbol)
-            valid.pop(symbol)
-            print(
-                f"[Schwab Filter] {symbol}: latest bar {latest} "
-                "differs from market references"
-            )
-
     if not set(valid) - set(MARKET_REFERENCE_SYMBOLS):
         raise DataIntegrityError("Schwab batch has no valid equity symbols")
-    validate_download_batch(valid, expected_symbols=valid.keys(), interval=interval)
+    validate_download_batch(valid, expected_symbols=valid.keys())
     print(
         f"[Schwab Filter] kept {len(valid)} symbols; "
         f"excluded {len(excluded)}: {sorted(excluded)}"
@@ -308,7 +297,7 @@ if __name__ == "__main__":
                     f"publish PKL. Failed symbols ({len(failed)}): {failed[:50]}"
                 )
             validate_download_batch(
-                stock_data, expected_symbols=tickers, interval=args.interval
+                stock_data, expected_symbols=tickers
             )
             expected_saved_symbols = tickers
 
@@ -324,7 +313,6 @@ if __name__ == "__main__":
         validate_download_batch(
             loaded_data,
             expected_symbols=expected_saved_symbols,
-            interval=args.interval,
         )
         print(
             f"[DataStore] Integrity verification passed after PKL round-trip: "

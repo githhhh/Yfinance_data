@@ -1,6 +1,3 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,7 +6,6 @@ import DataStore
 import data_providers.yahoo_provider as yahoo_module
 from data_providers.ohlcv_validation import (
     DataIntegrityError,
-    expected_latest_us_session,
     validate_download_batch,
     validate_ohlcv_frame,
 )
@@ -34,25 +30,6 @@ def _frame(dates, *, nan_close=False):
     return data
 
 
-def test_expected_latest_us_session_handles_weekend_and_exchange_holiday():
-    eastern = ZoneInfo("America/New_York")
-
-    assert expected_latest_us_session(
-        datetime(2026, 9, 12, 12, tzinfo=eastern)
-    ).isoformat() == "2026-09-11"
-
-    # Labor Day was Monday 2026-09-07; the latest completed regular
-    # session remained Friday 2026-09-04.
-    assert expected_latest_us_session(
-        datetime(2026, 9, 7, 20, tzinfo=eastern)
-    ).isoformat() == "2026-09-04"
-
-    # NYSE does not move a Saturday New Year's Day closure back to Friday.
-    assert expected_latest_us_session(
-        datetime(2021, 12, 31, 20, tzinfo=eastern)
-    ).isoformat() == "2021-12-31"
-
-
 def test_validate_ohlcv_frame_rejects_any_null_required_value():
     data = _frame(["2026-09-10", "2026-09-11"], nan_close=True)
 
@@ -67,7 +44,6 @@ def test_validate_download_batch_rejects_missing_expected_symbol():
         validate_download_batch(
             data,
             expected_symbols=["AAPL", "MSFT"],
-            interval="1d",
         )
 
 
@@ -90,11 +66,11 @@ def test_schwab_filters_invalid_ohlc_but_yahoo_validation_remains_strict(capsys)
 
     with pytest.raises(DataIntegrityError, match="inconsistent OHLC rows"):
         validate_download_batch(
-            data, expected_symbols=list(data), interval="1wk"
+            data, expected_symbols=list(data)
         )
 
 
-def test_schwab_filters_reported_download_failure_and_stale_symbol(capsys):
+def test_schwab_filters_reported_failure_but_keeps_valid_older_history(capsys):
     current = _frame(["2026-09-11"])
     data = {symbol: current.copy() for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
     data["AAPL"] = _frame(["2026-09-04"])
@@ -102,11 +78,11 @@ def test_schwab_filters_reported_download_failure_and_stale_symbol(capsys):
     filtered, excluded = DataStore.filter_schwab_stock_data(
         data, failed=["IVZ"], expected_symbols=[*data, "IVZ"], interval="1wk"
     )
-    assert set(filtered) == {"^GSPC", "^IXIC", "^DJI", "MSFT"}
-    assert excluded == ["AAPL", "IVZ"]
+    assert set(filtered) == set(data)
+    assert excluded == ["IVZ"]
     output = capsys.readouterr().out
     assert "IVZ" in output and "filtered" in output
-    assert "AAPL" in output and "2026-09-04" in output
+    assert "AAPL: latest bar" not in output
 
 
 def test_schwab_does_not_hide_unreported_missing_or_missing_market_reference():
@@ -122,30 +98,18 @@ def test_schwab_does_not_hide_unreported_missing_or_missing_market_reference():
         )
 
 
-def test_schwab_does_not_filter_disagreeing_market_references():
+def test_schwab_keeps_valid_histories_with_different_reference_dates():
     data = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "MSFT")}
     data["^DJI"] = _frame(["2026-09-10"])
 
-    with pytest.raises(DataIntegrityError, match="market reference latest-bar dates disagree"):
-        DataStore.filter_schwab_stock_data(
-            data, failed=[], expected_symbols=list(data), interval="1wk"
-        )
-
-
-def test_schwab_does_not_filter_globally_stale_daily_batch(monkeypatch):
-    data = {symbol: _frame(["2026-09-10"]) for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
-    monkeypatch.setattr(
-        "data_providers.ohlcv_validation.expected_latest_us_session",
-        lambda now=None: pd.Timestamp("2026-09-11").date(),
+    filtered, excluded = DataStore.filter_schwab_stock_data(
+        data, failed=[], expected_symbols=list(data), interval="1wk"
     )
-
-    with pytest.raises(DataIntegrityError, match="latest completed US session 2026-09-11"):
-        DataStore.filter_schwab_stock_data(
-            data, failed=[], expected_symbols=list(data), interval="1d"
-        )
+    assert set(filtered) == set(data)
+    assert excluded == []
 
 
-def test_validate_download_batch_rejects_missing_latest_session_bar():
+def test_validate_download_batch_accepts_valid_older_symbol_history():
     current = _frame(["2026-09-10", "2026-09-11"])
     stale = _frame(["2026-09-10"])
     data = {
@@ -155,19 +119,8 @@ def test_validate_download_batch_rejects_missing_latest_session_bar():
         "AAPL": stale,
     }
 
-    with pytest.raises(DataIntegrityError, match="do not reach latest market bar"):
-        validate_download_batch(
-            data,
-            expected_symbols=list(data),
-            interval="1d",
-            now=datetime(
-                2026,
-                9,
-                12,
-                12,
-                tzinfo=ZoneInfo("America/New_York"),
-            ),
-        )
+    validate_download_batch(data, expected_symbols=list(data))
+
 
 @pytest.mark.parametrize(
     ("column", "value", "reason"),
@@ -184,31 +137,6 @@ def test_schwab_still_rejects_other_invalid_rows(column, value, reason):
     with pytest.raises(DataIntegrityError, match=reason):
         validate_ohlcv_frame(
             "AAPL", invalid,
-        )
-
-
-def test_validate_download_batch_rejects_globally_stale_consensus():
-    stale = _frame(["2026-09-10"])
-    data = {
-        symbol: stale.copy()
-        for symbol in ["^GSPC", "^IXIC", "^DJI", "AAPL"]
-    }
-
-    with pytest.raises(
-        DataIntegrityError,
-        match="latest completed US session 2026-09-11",
-    ):
-        validate_download_batch(
-            data,
-            expected_symbols=list(data),
-            interval="1d",
-            now=datetime(
-                2026,
-                9,
-                12,
-                12,
-                tzinfo=ZoneInfo("America/New_York"),
-            ),
         )
 
 
@@ -235,19 +163,16 @@ def test_yahoo_single_download_fails_fast_on_invalid_partial_row(monkeypatch):
     assert FakeTicker.calls == 1
 
 
-def test_yahoo_batch_retries_one_stale_latest_bar(monkeypatch):
-    current = _frame(["2026-09-10", "2026-09-11"])
-    stale = _frame(["2026-09-10"])
+@pytest.mark.parametrize("interval", ["1d", "1wk"])
+def test_yahoo_batch_keeps_valid_older_history_without_date_retry(monkeypatch, interval):
+    previous = "2026-09-10" if interval == "1d" else "2026-09-04"
+    current = _frame([previous, "2026-09-11"])
+    stale = _frame([previous])
     calls = {}
     provider = YahooDataProvider(
         batch_size=4,
         max_workers=1,
         max_retries=0,
-    )
-    monkeypatch.setattr(
-        yahoo_module,
-        "expected_latest_us_session",
-        lambda: pd.Timestamp("2026-09-11").date(),
     )
 
     def fake_download(symbol, period="1y", interval="1d", *, abort_event=None):
@@ -260,26 +185,23 @@ def test_yahoo_batch_retries_one_stale_latest_bar(monkeypatch):
 
     data, failed = provider.download_batch_stocks(
         ["^GSPC", "^IXIC", "^DJI", "AAPL"],
-        interval="1d",
+        interval=interval,
     )
 
     assert failed == []
-    assert calls["AAPL"] == 2
-    assert data["AAPL"].index[-1].date().isoformat() == "2026-09-11"
+    assert calls == {symbol: 1 for symbol in data}
+    assert data["AAPL"].index[-1].date().isoformat() == previous
 
 
-def test_yahoo_batch_rejects_persistently_stale_latest_bar(monkeypatch):
-    current = _frame(["2026-09-10", "2026-09-11"])
-    stale = _frame(["2026-09-10"])
+@pytest.mark.parametrize("interval", ["1d", "1wk"])
+def test_yahoo_batch_keeps_valid_older_history_through_pkl_publication(tmp_path, monkeypatch, interval):
+    previous = "2026-09-10" if interval == "1d" else "2026-09-04"
+    current = _frame([previous, "2026-09-11"])
+    stale = _frame([previous])
     provider = YahooDataProvider(
         batch_size=4,
         max_workers=1,
         max_retries=0,
-    )
-    monkeypatch.setattr(
-        yahoo_module,
-        "expected_latest_us_session",
-        lambda: pd.Timestamp("2026-09-11").date(),
     )
 
     def fake_download(symbol, period="1y", interval="1d", *, abort_event=None):
@@ -292,11 +214,20 @@ def test_yahoo_batch_rejects_persistently_stale_latest_bar(monkeypatch):
 
     data, failed = provider.download_batch_stocks(
         ["^GSPC", "^IXIC", "^DJI", "AAPL"],
-        interval="1d",
+        interval=interval,
     )
 
-    assert failed == ["AAPL"]
-    assert "AAPL" not in data
+    assert failed == []
+    assert "AAPL" in data
+    output = tmp_path / f"stock_data_120926_{interval}.pkl"
+    monkeypatch.setattr(DataStore, "get_stock_pkl_path", lambda interval: str(output))
+    saved = DataStore.save_stock_data(
+        data, save_dir=str(tmp_path), interval=interval, expected_symbols=list(data)
+    )
+    assert saved == str(output)
+    loaded = DataStore.load_stock_data(saved)
+    assert set(loaded) == set(data)
+    assert loaded["AAPL"].index[-1].date().isoformat() == previous
 
 
 def test_save_stock_data_rejects_invalid_frame_before_writing(

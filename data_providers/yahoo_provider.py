@@ -12,9 +12,6 @@ from yfinance.exceptions import YFRateLimitError
 from data_providers.base_provider import BaseDataProvider
 from data_providers.ohlcv_validation import (
     DataIntegrityError,
-    expected_latest_us_session,
-    find_latest_bar_mismatches,
-    reference_latest_dates,
     validate_ohlcv_frame,
 )
 
@@ -335,121 +332,6 @@ class YahooDataProvider(BaseDataProvider):
 
         return downloaded, failed
 
-    def _redownload_symbols(
-        self,
-        symbols: Sequence[str],
-        all_data: Dict[str, pd.DataFrame],
-        period: str,
-        interval: str,
-    ) -> None:
-        if not symbols:
-            return
-
-        # Recovery is intentionally lower-concurrency even if the normal path is 8.
-        self._wait_for_rate_limit_cooldown()
-        downloaded, _ = self._run_parallel_downloads(
-            symbols,
-            period,
-            interval,
-            max_workers=self.recovery_max_workers,
-        )
-        all_data.update(downloaded)
-
-    def _retry_stale_latest_bars(
-        self,
-        all_data: Dict[str, pd.DataFrame],
-        period: str,
-        interval: str,
-    ) -> List[str]:
-        """Retry incomplete latest bars without trusting a single stale reference."""
-        if interval not in {"1d", "1wk"}:
-            return []
-
-        reference_dates = reference_latest_dates(all_data)
-        if not reference_dates:
-            # Missing reference symbols are already represented in the normal failed
-            # list; final batch validation will fail closed before PKL publication.
-            return []
-
-        if len(set(reference_dates.values())) != 1:
-            newest_reference_date = max(reference_dates.values())
-            lagging_references = [
-                symbol
-                for symbol, value in reference_dates.items()
-                if value != newest_reference_date
-            ]
-            print(
-                "[Yahoo Batch] Market references disagree; retrying only lagging "
-                f"references first: {reference_dates}"
-            )
-            self._redownload_symbols(
-                lagging_references, all_data, period=period, interval=interval
-            )
-            reference_dates = reference_latest_dates(all_data)
-            if len(set(reference_dates.values())) != 1:
-                failed_references = sorted(reference_dates)
-                for symbol in failed_references:
-                    all_data.pop(symbol, None)
-                print(
-                    "[Yahoo Batch] Market references still disagree after retry; "
-                    f"failing closed: {reference_dates}"
-                )
-                return failed_references
-
-        reference_date = next(iter(reference_dates.values()))
-
-        # A consensus can still be globally stale. For daily data, compare it with
-        # the latest regular US session that should already be fully closed.
-        if interval == "1d":
-            expected_session = expected_latest_us_session()
-            if reference_date < expected_session:
-                retry_symbols = list(all_data)
-                print(
-                    "[Yahoo Batch] Entire daily batch appears stale "
-                    f"({reference_date} < {expected_session}); retrying all "
-                    f"{len(retry_symbols)} symbols once"
-                )
-                self._redownload_symbols(
-                    retry_symbols, all_data, period=period, interval=interval
-                )
-                reference_dates = reference_latest_dates(all_data)
-                if (
-                    not reference_dates
-                    or len(set(reference_dates.values())) != 1
-                    or next(iter(reference_dates.values())) != expected_session
-                ):
-                    failed_symbols = sorted(all_data)
-                    all_data.clear()
-                    print(
-                        "[Yahoo Batch] Daily batch still does not reach latest "
-                        f"completed session {expected_session}; failing closed"
-                    )
-                    return failed_symbols
-                reference_date = expected_session
-
-        mismatches = find_latest_bar_mismatches(all_data)
-        if not mismatches:
-            return []
-
-        print(
-            f"[Yahoo Batch] Retrying {len(mismatches)} symbols with stale latest bars "
-            f"vs {reference_date}: {list(mismatches.items())[:10]}"
-        )
-        self._redownload_symbols(
-            list(mismatches), all_data, period=period, interval=interval
-        )
-
-        remaining = find_latest_bar_mismatches(all_data)
-        for symbol in remaining:
-            all_data.pop(symbol, None)
-
-        if remaining:
-            print(
-                f"[Yahoo Batch] Rejecting {len(remaining)} symbols still stale after retry: "
-                f"{list(remaining.items())[:10]}"
-            )
-        return sorted(remaining)
-
     def download_batch_stocks(
         self, symbols: List[str], period: str = "1y", interval: str = "1d"
     ) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
@@ -511,10 +393,7 @@ class YahooDataProvider(BaseDataProvider):
             )
             failed = retry_failed
 
-        stale_failed = self._retry_stale_latest_bars(
-            all_data, period=period, interval=interval
-        )
-        failed = sorted(set(failed).union(stale_failed))
+        failed = sorted(set(failed))
 
         overall_end = time.time()
         print(

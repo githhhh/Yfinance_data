@@ -175,11 +175,6 @@ def test_batch_retry_keeps_normal_workers_and_uses_low_concurrency(monkeypatch):
         return next(responses)
 
     monkeypatch.setattr(provider, "_run_parallel_downloads", fake_parallel)
-    monkeypatch.setattr(
-        provider,
-        "_retry_stale_latest_bars",
-        lambda all_data, period, interval: [],
-    )
 
     all_data, failed = provider.download_batch_stocks(["AAA", "BBB"])
 
