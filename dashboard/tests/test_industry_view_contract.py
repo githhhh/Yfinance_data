@@ -33,7 +33,11 @@ def test_reference_uses_fred6725_same_commit_without_changing_pool() -> None:
 
 def test_mobile_views_share_filtering_but_isolate_sort_and_copy() -> None:
     assert 'view: "STOCK"' in APP
-    assert 'state.view === "INDUSTRY" ? industryHtml(rows) : tableHtml(rows)' in APP
+    assert "tableHtml(rows).replace(" in APP
+    assert "industryHtml(rows).replace(" in APP
+    assert "switchReviewView(currentRows)" in APP
+    assert "toggleIndustryCard(button)" in APP
+    assert 'app.addEventListener("bf-rs-updated", refreshIndustryReference);' in APP
     assert "industryStockRows(currentRows).map((row) => row.code)" in APP
     assert "industrySelected: { WEEKEND: null, MIDWEEK: null }" in APP
     assert "expandedIndustries: new Set()" in APP
@@ -41,7 +45,7 @@ def test_mobile_views_share_filtering_but_isolate_sort_and_copy() -> None:
     assert 'data-action="toggle-industry"' in APP
     assert 'data-action="toggle-view"' in APP
     assert 'class="industry-stock-table"' in APP
-    assert 'grid-template-columns: 16% 11% 15% 34% 24%;' in CSS
+    assert 'grid-template-columns: 18% 18% 11% 34% 19%;' in CSS
     assert "IND RS" not in TABLE  # No header sorter for industry RS.
     assert 'app.querySelectorAll("[data-table-shell]").forEach(decorateTable)' in TABLE
     assert '[data-industry-list]' in APP
@@ -89,6 +93,52 @@ if (mode === "parse") {
   eq(result.groups.map(group => group.name), ["Semiconductors","Software","Unclassified"]);
   eq(result.groups[0].rows.map(row => row.code), ["MPWR","SMTC","NVDA"]);
   eq(result.all.map(row => row.code), ["MPWR","SMTC","NVDA","CRWD","PANW","OXY"]);
+} else if (mode === "interaction") {
+  const toggle = part("  function toggleIndustryCard(", "  function refreshIndustryReference(");
+  const state = { expandedIndustries: new Set() };
+  const preview = { hidden: false }, detail = { hidden: true };
+  const card = { querySelector: selector => selector === ".industry-top3" ? preview : detail };
+  const button = {
+    dataset: { industry: "Semiconductors" }, expanded: "false",
+    getAttribute() { return this.expanded; },
+    setAttribute(_, v) { this.expanded = v; },
+    closest: () => card
+  };
+  const click = new Function("state", "button", toggle + "\nreturn toggleIndustryCard(button);");
+  click(state, button);
+  eq([button.expanded, preview.hidden, detail.hidden, state.expandedIndustries.has("Semiconductors")],
+     ["true", true, false, true]);
+  click(state, button);
+  eq([button.expanded, preview.hidden, detail.hidden, state.expandedIndustries.has("Semiconductors")],
+     ["false", false, true, false]);
+  // Both DOM subtrees keep object identity across expand / collapse.
+  eq(card.querySelector(".industry-top3") === preview, true);
+  eq(card.querySelector(".industry-group-body") === detail, true);
+
+  const change = part("  function switchReviewView(", "  function toggleIndustryCard(");
+  const stock = {hidden:false, scrollTop:12};
+  const industry = {hidden:true, scrollTop:0};
+  const label = {textContent:"Stock"};
+  const viewButton = {querySelector: () => label, setAttribute(){}, title:""};
+  const selectedStrip = {replaceWith(x){this.replacement=x;}};
+  const section = {
+    dataset: {view:"STOCK"},
+    querySelector(s) {
+      return {".table-shell":stock,"[data-industry-list]":industry,
+              '[data-action="toggle-view"]':viewButton,".selected-strip":selectedStrip}[s];
+    }
+  };
+  const app = {innerHTML:"ORIGINAL",querySelector:()=>section};
+  const doc = {createElement:()=>({set innerHTML(x) { this.content={firstElementChild:x}; }})};
+  const s = {view:"INDUSTRY",period:"MIDWEEK",
+    selected:{MIDWEEK:null},industrySelected:{MIDWEEK:null},
+    viewScroll:{INDUSTRY:35,STOCK:12}};
+  const switcher = new Function("state","app","document","selectedHtml","rows",
+    change + "\nreturn switchReviewView(rows);");
+  switcher(s,app,doc,() => "<div></div>",[]);
+  eq([stock.hidden,industry.hidden,industry.scrollTop,label.textContent,section.dataset.view],
+     [true,false,35,"Industry","INDUSTRY"]);
+  eq(app.innerHTML, "ORIGINAL");
 }
 """
 
@@ -96,6 +146,7 @@ if (mode === "parse") {
 @pytest.mark.parametrize("filename,mode", [
     ("rs_runtime.js", "parse"),
     ("app.js", "groups"),
+    ("app.js", "interaction"),
 ])
 def test_executable_reference_fixtures(filename: str, mode: str) -> None:
     if not shutil.which("node"):
@@ -130,3 +181,29 @@ def test_industry_keyboard_navigation() -> None:
     assert 'visibleRows.findIndex' in APP
     assert "industryShell.scrollTop += rowRect.top - shellRect.top;" in APP
     assert "scrollIntoView" not in APP
+
+
+
+def test_view_switch_and_industry_accordion_do_not_rebuild_dashboard() -> None:
+    switch = APP.split("function switchReviewView(", 1)[1].split("function toggleIndustryCard(", 1)[0]
+    toggle = APP.split("function toggleIndustryCard(", 1)[1].split("function refreshIndustryReference(", 1)[0]
+    assert "app.innerHTML" not in switch + toggle
+    assert "render();" not in switch + toggle
+    assert "window.scrollTo" not in switch + toggle
+    assert "stock.hidden = state.view !== \"STOCK\"" in switch
+    assert "industry.hidden = state.view !== \"INDUSTRY\"" in switch
+    assert "preview.hidden = expanded;" in toggle
+    assert "detail.hidden = !expanded;" in toggle
+    assert "industry-group-metrics" in APP
+    assert 'Results</div>' in APP
+    assert 'results · Sorted by' not in APP
+    assert '.industry-group-body[hidden]' in CSS
+    assert '.industry-top3[hidden]' in CSS
+
+
+def test_rs_interaction_budget_and_vs_reference_centering() -> None:
+    assert 'grid-template-columns: 18% 18% 11% 34% 19%;' in CSS
+    assert 'width: 18px; flex: 0 0 18px;' in CSS
+    assert 'th[data-field="current_vs_ibd_candidate_pct"] .table-sort-button' in CSS
+    assert 'justify-content: center !important;' in CSS
+    assert 'setTextIfChanged(summary, `${count} Results`)' in TABLE

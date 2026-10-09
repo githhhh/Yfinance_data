@@ -973,7 +973,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .view-switch svg { width: 14px; height: 14px; flex-basis: 14px; }
   .results-section[data-view="STOCK"] .review-table thead tr,
   .results-section[data-view="STOCK"] .review-table tbody tr[data-code] {
-    grid-template-columns: 16% 11% 15% 34% 24%;
+    grid-template-columns: 18% 18% 11% 34% 19%;
   }
   .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"],
   .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="industry_rs"] {
@@ -1025,5 +1025,52 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button { position: relative; }
   .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button::after {
     content: ""; position: absolute; inset: -5px -7px;
+  }
+}
+
+/* Both result panes remain mounted. Hidden panes and collapsed industry detail
+   must not participate in layout or hit testing. */
+.results-section > .table-shell[hidden],
+.results-section > .industry-list[hidden],
+.industry-top3[hidden],
+.industry-group-body[hidden] { display: none !important; }
+
+.results-summary { white-space: nowrap; }
+.industry-group-metrics {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.industry-group-rs strong { color: #76d8ec; font-size: inherit; font-weight: 750; }
+.industry-group-count { color: #7b91a5; font-size: 9px; line-height: 1.15; }
+.industry-chevron { display: inline-block; transition: none; transform-origin: center; }
+.industry-group-toggle[aria-expanded="true"] .industry-chevron { transform: rotate(90deg); }
+
+@media (width <= 760px) {
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button {
+    width: 18px; flex: 0 0 18px;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button svg {
+    width: 13px; height: 13px;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"] {
+    font-size: 8px;
+    padding-left: 0; padding-right: 0;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="current_vs_ibd_candidate_pct"],
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="current_vs_ibd_candidate_pct"] {
+    justify-content: center;
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-header-control,
+  .results-section[data-view="STOCK"] .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-sort-button {
+    justify-content: center !important;
+    text-align: center !important;
   }
 }

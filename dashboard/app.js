@@ -122,7 +122,7 @@
       view: "STOCK",
       expandedIndustries: new Set(),
       viewScroll: { STOCK: 0, INDUSTRY: 0 },
-      viewPageScroll: { STOCK: 0, INDUSTRY: 0 },
+
       periodContexts: { [period]: { ...context } },
     };
   }
@@ -542,7 +542,7 @@
   }
 
   function industryHtml(rows) {
-    if (!rows.length) return '<div class="industry-list"><div class="no-results">No matching records.</div></div>';
+    if (!rows.length) return '<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results"><div class="no-results">No matching records.</div></div>';
     const provider = window.BFIndustryRS;
     const loading = !provider || provider.status() === "loading";
     if (loading) return '<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results"><div class="industry-notice" role="status">Loading rs-log industry reference…</div></div>';
@@ -572,19 +572,19 @@
         const rs = group.rs === null ? "N/A" : String(group.rs);
         return `<section class="industry-group">
           <button type="button" class="industry-group-toggle" data-action="toggle-industry" data-industry="${esc(group.name)}" aria-expanded="${opened}">
-            <span class="industry-chevron" aria-hidden="true">${opened ? "⌄" : "›"}</span>
+            <span class="industry-chevron" aria-hidden="true">›</span>
             <span class="industry-group-main">
-              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-rs">RS ${esc(rs)} · ${group.rows.length}</span></span>
-              ${opened ? "" : `<span class="industry-top3">${group.rows.slice(0, 3).map((row) => {
+              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} stocks</span></span></span>
+              <span class="industry-top3" ${opened ? "hidden" : ""}>${group.rows.slice(0, 3).map((row) => {
                 const value = provider?.stockRS(row.code);
                 return `<span class="industry-chip">${esc(row.code)} <small>${value === null || value === undefined ? "N/A" : esc(String(value))}</small></span>`;
-              }).join("")}</span>`}
+              }).join("")}</span>
             </span>
           </button>
-          ${opened ? `<div class="industry-group-body"><table class="industry-stock-table" aria-label="${esc(group.name)} stocks">
+          <div class="industry-group-body" ${opened ? "" : "hidden"}><table class="industry-stock-table" aria-label="${esc(group.name)} stocks">
             <thead><tr><th>CODE</th><th>RS</th><th>STATUS</th><th>VS REF</th></tr></thead>
             <tbody>${group.rows.map(codeRow).join("")}</tbody>
-          </table></div>` : ""}
+          </table></div>
         </section>`;
       }).join("")}
     </div>`;
@@ -594,7 +594,7 @@
     if (!state) return;
     const shell = app.querySelector(state.view === "STOCK" ? "[data-table-shell]" : "[data-industry-list]");
     if (shell) state.viewScroll[state.view] = shell.scrollTop;
-    state.viewPageScroll[state.view] = window.scrollY || 0;
+
   }
 
   function resultsHtml(rows, sortedLabel) {
@@ -604,7 +604,7 @@
     return `
       <section class="results-section" data-view="${state.view}">
         <div class="results-toolbar">
-          <div class="results-summary">${rows.length} results${state.view === "INDUSTRY" ? "" : ` · Sorted by ${esc(sortedLabel)}`}</div>
+          <div class="results-summary">${rows.length} Results</div>
           <div class="results-order-slot"></div>
           <button type="button" class="view-switch" data-action="toggle-view" aria-label="Switch to ${state.view === "STOCK" ? "Industry" : "Stock"} view" title="Switch to ${state.view === "STOCK" ? "Industry" : "Stock"} view">
             <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14M5 2v6M13 10v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>${state.view === "STOCK" ? "Stock" : "Industry"}</span>
@@ -613,7 +613,8 @@
           <button class="mobile-filter-button" data-action="toggle-filters" data-count="${activeFilters || ""}" aria-expanded="${state.filtersExpanded}" aria-label="More Filters${activeFilters ? `, ${activeFilters} active` : ""}" title="More Filters">Filters${activeFilters ? ` · ${activeFilters}` : ""}</button>
         </div>
         ${selectedHtml(selectedRow)}
-        ${state.view === "INDUSTRY" ? industryHtml(rows) : tableHtml(rows)}
+        ${tableHtml(rows).replace('class="table-shell"', `class="table-shell"${state.view !== "STOCK" ? " hidden" : ""}`)}
+        ${industryHtml(rows).replace('class="industry-list"', `class="industry-list"${state.view !== "INDUSTRY" ? " hidden" : ""}`)}
       </section>`;
   }
 
@@ -809,7 +810,7 @@
       if (replacement) strip.replaceWith(replacement);
     }
 
-    app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
+    app.querySelectorAll("[data-table-shell] tbody tr[data-code]").forEach((row) => {
       const selected = String(row.dataset.code) === String(selectedCode);
       row.classList.toggle("selected", selected);
       row.setAttribute("aria-expanded", isMobileReview() && selected ? "true" : "false");
@@ -910,6 +911,73 @@
     return `<div class="footer-note">Static snapshot · source: Yfinance_data authoritative BreakoutFollow pool · RS reference: Fred6725/rs-log</div>`;
   }
 
+
+  // Keep both result panes mounted: view changes only switch visibility, not app.innerHTML.
+  function switchReviewView(rows) {
+    const section = app.querySelector(".results-section");
+    if (!section) return;
+    section.dataset.view = state.view;
+    const stock = section.querySelector(".table-shell");
+    const industry = section.querySelector("[data-industry-list]");
+    if (stock) stock.hidden = state.view !== "STOCK";
+    if (industry) industry.hidden = state.view !== "INDUSTRY";
+    const toggle = section.querySelector('[data-action="toggle-view"]');
+    if (toggle) {
+      const next = state.view === "STOCK" ? "Industry" : "Stock";
+      const label = toggle.querySelector("span");
+      if (label) label.textContent = state.view === "STOCK" ? "Stock" : "Industry";
+      toggle.setAttribute("aria-label", "Switch to " + next + " view");
+      toggle.title = "Switch to " + next + " view";
+    }
+    const selection = state.view === "STOCK" ? state.selected : state.industrySelected;
+    const code = selection[state.period];
+    const selectedRow = rows.find((row) => String(row.code) === String(code)) || null;
+    const strip = section.querySelector(".selected-strip");
+    if (strip) {
+      const template = document.createElement("template");
+      template.innerHTML = selectedHtml(selectedRow).trim();
+      const replacement = template.content.firstElementChild;
+      if (replacement) strip.replaceWith(replacement);
+    }
+    const active = state.view === "STOCK" ? stock : industry;
+    if (active) active.scrollTop = state.viewScroll[state.view];
+    if (state.view === "INDUSTRY" && state.industrySelected[state.period]) {
+      renderIndustrySelection(rows);
+    } else if (state.view === "STOCK" && state.selected[state.period]) {
+      renderMobileDetail(rows);
+    }
+  }
+
+  function toggleIndustryCard(button) {
+    const name = button.dataset.industry;
+    const expanded = button.getAttribute("aria-expanded") !== "true";
+    if (expanded) state.expandedIndustries.add(name);
+    else state.expandedIndustries.delete(name);
+    button.setAttribute("aria-expanded", String(expanded));
+    const card = button.closest(".industry-group");
+    const preview = card?.querySelector(".industry-top3");
+    const detail = card?.querySelector(".industry-group-body");
+    if (preview) preview.hidden = expanded;
+    if (detail) detail.hidden = !expanded;
+  }
+
+  // A source refresh replaces only the industry data pane, never the entire Dashboard.
+  function refreshIndustryReference() {
+    if (!data || !state) return;
+    const prior = app.querySelector("[data-industry-list]");
+    if (!prior) return;
+    const rows = sortRows(filterRows(rowsForPeriod())).rows;
+    const template = document.createElement("template");
+    template.innerHTML = industryHtml(rows).trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) return;
+    replacement.hidden = state.view !== "INDUSTRY";
+    const position = prior.scrollTop;
+    prior.replaceWith(replacement);
+    replacement.scrollTop = position;
+    bindIndustryEvents(rows);
+  }
+
   function render() {
     if (!data || !state) return;
 
@@ -930,8 +998,42 @@
     if (shell) shell.scrollTop = state.viewScroll[state.view];
   }
 
+  function bindIndustryEvents(currentRows) {
+    app.querySelectorAll('.industry-group-toggle').forEach((button) => {
+      button.addEventListener("click", () => toggleIndustryCard(button));
+    });
+    app.querySelectorAll(".industry-stock-table tbody tr[data-code]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const code = row.dataset.code;
+        state.industrySelected[state.period] =
+          String(state.industrySelected[state.period]) === String(code) ? null : code;
+        renderIndustrySelection(currentRows);
+      });
+    });
+    const industryShell = app.querySelector("[data-industry-list]");
+    if (industryShell) industryShell.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")];
+      if (!visibleRows.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const current = state.industrySelected[state.period];
+      let index = visibleRows.findIndex((row) => row.dataset.code === current);
+      if (index < 0) index = event.key === "ArrowDown" ? -1 : visibleRows.length;
+      index = Math.min(visibleRows.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
+      const target = visibleRows[index];
+      target.click();
+      // Scroll the industry container only; never move the entire Review page.
+      const shellRect = industryShell.getBoundingClientRect();
+      const rowRect = target.getBoundingClientRect();
+      if (rowRect.top < shellRect.top) industryShell.scrollTop += rowRect.top - shellRect.top;
+      else if (rowRect.bottom > shellRect.bottom) industryShell.scrollTop += rowRect.bottom - shellRect.bottom;
+    });
+  }
+
   function bindEvents(currentRows = []) {
     app.querySelectorAll("[data-action]").forEach((element) => {
+      if (element.dataset.action === "toggle-industry") return;
       element.addEventListener("click", async () => {
         const action = element.dataset.action;
         if (action === "period") {
@@ -958,13 +1060,8 @@
         } else if (action === "toggle-view") {
           rememberViewScroll();
           state.view = state.view === "STOCK" ? "INDUSTRY" : "STOCK";
-          render();
-          requestAnimationFrame(() => window.scrollTo(0, state.viewPageScroll[state.view]));
-        } else if (action === "toggle-industry") {
-          const name = element.dataset.industry;
-          if (state.expandedIndustries.has(name)) state.expandedIndustries.delete(name);
-          else state.expandedIndustries.add(name);
-          render();
+          switchReviewView(currentRows);
+
         } else if (action === "copy-codes") {
           if (state.view === "INDUSTRY") {
             await copyCodes(industryStockRows(currentRows).map((row) => row.code), element);
@@ -994,6 +1091,7 @@
     bindRange("weekly-volume", (value, element) => { state.weeklyVolumeMin = Math.abs(value - Number(element.min)) < 1e-9 ? null : value; });
 
     app.querySelectorAll("tbody tr[data-code]").forEach((row) => {
+      if (!row.closest("[data-table-shell]")) return;
       row.addEventListener("click", () => {
         const code = row.dataset.code;
         if (isMobileReview()) {
@@ -1006,33 +1104,7 @@
       });
     });
 
-    app.querySelectorAll(".industry-stock-table tbody tr[data-code]").forEach((row) => {
-      row.addEventListener("click", () => {
-        const code = row.dataset.code;
-        state.industrySelected[state.period] =
-          String(state.industrySelected[state.period]) === String(code) ? null : code;
-        renderIndustrySelection(currentRows);
-      });
-    });
-    const industryShell = app.querySelector("[data-industry-list]");
-    if (industryShell) industryShell.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")];
-      if (!visibleRows.length) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const current = state.industrySelected[state.period];
-      let index = visibleRows.findIndex((row) => row.dataset.code === current);
-      if (index < 0) index = event.key === "ArrowDown" ? -1 : visibleRows.length;
-      index = Math.min(visibleRows.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
-      const target = visibleRows[index];
-      target.click();
-      // Scroll the industry container only; never move the entire Review page.
-      const shellRect = industryShell.getBoundingClientRect();
-      const rowRect = target.getBoundingClientRect();
-      if (rowRect.top < shellRect.top) industryShell.scrollTop += rowRect.top - shellRect.top;
-      else if (rowRect.bottom > shellRect.bottom) industryShell.scrollTop += rowRect.bottom - shellRect.bottom;
-    });
+    bindIndustryEvents(currentRows);
     const reviewShell = app.querySelector("[data-table-shell]");
     if (reviewShell) reviewShell.addEventListener("keydown", (event) => handleArrow(event, currentRows, state.period));
   }
@@ -1102,6 +1174,6 @@
     }
   }
 
-  app.addEventListener("bf-rs-updated", () => { if (data && state) render(); });
+  app.addEventListener("bf-rs-updated", refreshIndustryReference);
   boot();
 })();
