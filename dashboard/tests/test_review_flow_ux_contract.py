@@ -218,7 +218,7 @@ def test_breakout_quality_sort_uses_strength_descending_semantics_and_info_icon(
     assert 'controls.appendChild(info);' in TABLE
     assert 'button.appendChild(info);' not in TABLE
     assert 'qualityTooltipAnchor === info' in TABLE
-    assert 'sortState.direction === "asc" ? "↑" : "↓"' in TABLE
+    assert 'setTextIfChanged(icon, isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "");' in TABLE
 
 
 def test_rs_and_quality_info_controls_are_separate_from_sort_hit_zones() -> None:

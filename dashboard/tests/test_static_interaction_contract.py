@@ -61,7 +61,7 @@ def test_manual_sort_updates_are_idempotent_under_the_table_observer():
     assert "function setTextIfChanged(element, value)" in TABLE
     assert 'if (element && element.textContent !== value) element.textContent = value;' in TABLE
     assert 'setTextIfChanged(icon, isActive ? (sortState.direction === "asc" ? "▲" : "▼") : "");' in TABLE
-    assert 'setTextIfChanged(summary, `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`);' in TABLE
+    assert 'setTextIfChanged(summary, `${count} Results`);' in TABLE
 
 
 def test_manual_sort_keyboard_review_stays_inside_table_viewport():

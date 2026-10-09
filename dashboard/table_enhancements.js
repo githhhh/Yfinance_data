@@ -165,15 +165,12 @@
   }
 
   function updateSummary(shell) {
-    const sortState = currentSortState();
-    if (!sortState) return;
-    const label = shell.querySelector(
-      `thead th[data-sort-field="${sortState.field}"] .table-header-label`,
-    )?.textContent;
+    // The active header arrow already communicates sort direction.
+    // Keep the compact Results count identical in both review views.
     const summary = app.querySelector(".results-summary");
-    const count = shell.querySelectorAll("tbody tr[data-code]").length;
-    if (summary && label) {
-      setTextIfChanged(summary, `${count} results · Sorted by ${label} ${sortState.direction === "asc" ? "↑" : "↓"}`);
+    if (summary) {
+      const count = shell.querySelectorAll("tbody tr[data-code]").length;
+      setTextIfChanged(summary, `${count} Results`);
     }
   }
 
