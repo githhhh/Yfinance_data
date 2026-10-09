@@ -118,6 +118,11 @@
       period,
       ...context,
       selected: { WEEKEND: null, MIDWEEK: null },
+      industrySelected: { WEEKEND: null, MIDWEEK: null },
+      view: "STOCK",
+      expandedIndustries: new Set(),
+      viewScroll: { STOCK: 0, INDUSTRY: 0 },
+      viewPageScroll: { STOCK: 0, INDUSTRY: 0 },
       periodContexts: { [period]: { ...context } },
     };
   }
@@ -505,20 +510,110 @@
       </section>`;
   }
 
+
+  // Industry RS is display-only. The authoritative Review filters always run first.
+  function industryGroups(rows) {
+    const provider = window.BFIndustryRS;
+    const grouped = new Map();
+    for (const row of rows) {
+      const industry = provider?.industryForCode(row.code) || "Unclassified";
+      if (!grouped.has(industry)) grouped.set(industry, { name: industry, rs: provider?.industryRS(industry) ?? null, rows: [] });
+      grouped.get(industry).rows.push(row);
+    }
+    const rank = (value) => value === null || value === undefined ? -1 : value;
+    for (const group of grouped.values()) {
+      group.rows.sort((a, b) => {
+        const delta = rank(provider?.stockRS(b.code)) - rank(provider?.stockRS(a.code));
+        return delta || String(a.code).localeCompare(String(b.code));
+      });
+    }
+    return [...grouped.values()].sort((a, b) => (
+      rank(b.rs) - rank(a.rs) || a.name.localeCompare(b.name)
+    ));
+  }
+
+  function reviewIndustry(row) {
+    if (state?.view === "INDUSTRY") return window.BFIndustryRS?.industryForCode(row.code) || "Unclassified";
+    return row.industry;
+  }
+
+  function industryStockRows(rows) {
+    return industryGroups(rows).flatMap((group) => group.rows);
+  }
+
+  function industryHtml(rows) {
+    if (!rows.length) return '<div class="industry-list"><div class="no-results">No matching records.</div></div>';
+    const provider = window.BFIndustryRS;
+    const loading = !provider || provider.status() === "loading";
+    if (loading) return '<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results"><div class="industry-notice" role="status">Loading rs-log industry reference…</div></div>';
+    const groups = industryGroups(rows);
+    const message = loading ? "Loading rs-log industry reference…" :
+      provider.status() !== "ready" ? "Industry RS unavailable · showing available stock classifications." : "";
+    const codeRow = (row) => {
+      const code = esc(row.code);
+      const rs = provider?.stockRS(row.code);
+      const status = displayStatus(row);
+      const selected = String(state.industrySelected[state.period]) === String(row.code);
+      const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
+        <td class="industry-code">${code}</td>
+        <td class="industry-stock-rs">${rs === null || rs === undefined ? "N/A" : esc(String(rs))}</td>
+        <td><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></td>
+        <td class="industry-vs-ref${num(reviewDistance(row)) !== null && reviewDistance(row) < 0 ? " negative" : ""}">${esc(fmt(reviewDistance(row), "pct"))}</td>
+      </tr>`;
+      const detail = selected && isMobileReview()
+        ? `<tr class="industry-detail-row"><td colspan="4">${mobileDetailHtml(row)}</td></tr>`
+        : "";
+      return main + detail;
+    };
+    return `<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results">
+      ${message ? `<div class="industry-notice" role="status">${esc(message)}</div>` : ""}
+      ${groups.map((group) => {
+        const opened = state.expandedIndustries.has(group.name);
+        const rs = group.rs === null ? "N/A" : String(group.rs);
+        return `<section class="industry-group">
+          <button type="button" class="industry-group-toggle" data-action="toggle-industry" data-industry="${esc(group.name)}" aria-expanded="${opened}">
+            <span class="industry-chevron" aria-hidden="true">${opened ? "⌄" : "›"}</span>
+            <span class="industry-group-main">
+              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-rs">RS ${esc(rs)} · ${group.rows.length}</span></span>
+              ${opened ? "" : `<span class="industry-top3">${group.rows.slice(0, 3).map((row) => {
+                const value = provider?.stockRS(row.code);
+                return `<span class="industry-chip">${esc(row.code)} <small>${value === null || value === undefined ? "N/A" : esc(String(value))}</small></span>`;
+              }).join("")}</span>`}
+            </span>
+          </button>
+          ${opened ? `<div class="industry-group-body"><table class="industry-stock-table" aria-label="${esc(group.name)} stocks">
+            <thead><tr><th>CODE</th><th>RS</th><th>STATUS</th><th>VS REF</th></tr></thead>
+            <tbody>${group.rows.map(codeRow).join("")}</tbody>
+          </table></div>` : ""}
+        </section>`;
+      }).join("")}
+    </div>`;
+  }
+
+  function rememberViewScroll() {
+    if (!state) return;
+    const shell = app.querySelector(state.view === "STOCK" ? "[data-table-shell]" : "[data-industry-list]");
+    if (shell) state.viewScroll[state.view] = shell.scrollTop;
+    state.viewPageScroll[state.view] = window.scrollY || 0;
+  }
+
   function resultsHtml(rows, sortedLabel) {
-    const selectedCode = state.selected[state.period];
+    const selectedCode = state.view === "INDUSTRY" ? state.industrySelected[state.period] : state.selected[state.period];
     const selectedRow = rows.find((row) => String(row.code) === String(selectedCode)) || null;
     const activeFilters = advancedCount();
     return `
-      <section class="results-section">
+      <section class="results-section" data-view="${state.view}">
         <div class="results-toolbar">
-          <div class="results-summary">${rows.length} results · Sorted by ${esc(sortedLabel)}</div>
+          <div class="results-summary">${rows.length} results${state.view === "INDUSTRY" ? "" : ` · Sorted by ${esc(sortedLabel)}`}</div>
           <div class="results-order-slot"></div>
+          <button type="button" class="view-switch" data-action="toggle-view" aria-label="Switch to ${state.view === "STOCK" ? "Industry" : "Stock"} view" title="Switch to ${state.view === "STOCK" ? "Industry" : "Stock"} view">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14M5 2v6M13 10v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>${state.view === "STOCK" ? "Stock" : "Industry"}</span>
+          </button>
           <button class="copy-button" data-action="copy-codes" aria-label="Copy ${rows.length} visible codes" title="Copy visible codes">Copy ${rows.length} Codes</button>
           <button class="mobile-filter-button" data-action="toggle-filters" data-count="${activeFilters || ""}" aria-expanded="${state.filtersExpanded}" aria-label="More Filters${activeFilters ? `, ${activeFilters} active` : ""}" title="More Filters">Filters${activeFilters ? ` · ${activeFilters}` : ""}</button>
         </div>
         ${selectedHtml(selectedRow)}
-        ${tableHtml(rows)}
+        ${state.view === "INDUSTRY" ? industryHtml(rows) : tableHtml(rows)}
       </section>`;
   }
 
@@ -570,7 +665,7 @@
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
-      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(row.industry))}">${esc(text(row.industry, "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
+      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
       <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
       <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
@@ -639,7 +734,7 @@
     ].filter(Boolean).join(" · ");
   
     return `<div class="mobile-inline-review" aria-label="Review details for ${esc(row.code)}">
-      <div class="mobile-detail-industry">${esc(text(row.industry, "Industry N/A"))}</div>
+      <div class="mobile-detail-industry">${esc(text(reviewIndustry(row), "Industry N/A"))}</div>
       <div class="mobile-detail-price">
         <div><span>${referenceKey}</span><strong>${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? `<small>${referenceContextLabel} ${esc(referenceContext)}</small>` : ""}</div>
         <div><span>Latest</span><strong>${fmt(row.latest_close)}</strong></div>
@@ -730,6 +825,36 @@
     if (focusTable) shell?.focus({ preventScroll: true });
   }
 
+  // Selecting an industry stock is an in-place update, just like the Stock view.
+  // Do not rerender the page: preserve group expansion and the user's scroll position.
+  function renderIndustrySelection(currentRows) {
+    const selectedCode = state.industrySelected[state.period];
+    const selectedRow = currentRows.find((row) => String(row.code) === String(selectedCode)) || null;
+    const strip = app.querySelector(".selected-strip");
+    if (strip) {
+      const template = document.createElement("template");
+      template.innerHTML = selectedHtml(selectedRow).trim();
+      const replacement = template.content.firstElementChild;
+      if (replacement) strip.replaceWith(replacement);
+    }
+    app.querySelectorAll(".industry-stock-table tbody tr[data-code]").forEach((row) => {
+      const selected = String(row.dataset.code) === String(selectedCode);
+      row.classList.toggle("selected", selected);
+      row.setAttribute("aria-expanded", isMobileReview() && selected ? "true" : "false");
+    });
+    app.querySelectorAll(".industry-detail-row").forEach((detail) => detail.remove());
+    if (!selectedRow || !isMobileReview()) return;
+    const mainRow = app.querySelector(`.industry-stock-table tbody tr[data-code="${CSS.escape(String(selectedCode))}"]`);
+    if (!mainRow) return;
+    const detail = document.createElement("tr");
+    detail.className = "industry-detail-row";
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.innerHTML = mobileDetailHtml(selectedRow);
+    detail.appendChild(cell);
+    mainRow.insertAdjacentElement("afterend", detail);
+  }
+
   function tableHtml(rows) {
     if (!rows.length) return `<div class="table-shell"><div class="no-results">No matching records.</div></div>`;
     const comparison = currentHasComparison();
@@ -744,6 +869,7 @@
       ["ibd_entry_vol_or_reject", "Entry / Reason"],
       ["volume_ratio", "Weekly Vol"],
       ["rs_percentile", "RS"],
+      ["industry_rs", "IND RS"],
     ];
     const selected = state.selected[state.period];
     return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -765,6 +891,7 @@
     if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
     if (field === "latest_close") return esc(fmt(value));
     if (field === "volume_ratio") return esc(fmt(value, "x"));
+    if (field === "industry_rs") return '<span class="industry-rs-cell">—</span>';
     if (field === "rs_percentile") {
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
@@ -790,13 +917,17 @@
     const counts = filterCounts(sourceRows);
     const filtered = filterRows(sourceRows);
     const sorted = sortRows(filtered);
-    const selectedCode = state.selected[state.period];
+    const selection = state.view === "INDUSTRY" ? state.industrySelected : state.selected;
+    const selectedCode = selection[state.period];
     if (selectedCode && !sorted.rows.some((row) => String(row.code) === String(selectedCode))) {
-      state.selected[state.period] = null;
+      selection[state.period] = null;
     }
+    if (app.querySelector(".results-section")?.dataset.view === state.view) rememberViewScroll();
     app.innerHTML = `${headerHtml(sourceRows)}${warningsHtml()}${queueHtml(sourceRows, counts)}${filtersHtml(sourceRows)}${resultsHtml(sorted.rows, sorted.label)}${footerHtml()}`;
     bindEvents(sorted.rows);
-    renderMobileDetail(sorted.rows);
+    if (state.view === "STOCK") renderMobileDetail(sorted.rows);
+    const shell = app.querySelector(state.view === "STOCK" ? "[data-table-shell]" : "[data-industry-list]");
+    if (shell) shell.scrollTop = state.viewScroll[state.view];
   }
 
   function bindEvents(currentRows = []) {
@@ -824,11 +955,24 @@
         } else if (action === "reset-filters") {
           resetAdvanced();
           render();
+        } else if (action === "toggle-view") {
+          rememberViewScroll();
+          state.view = state.view === "STOCK" ? "INDUSTRY" : "STOCK";
+          render();
+          requestAnimationFrame(() => window.scrollTo(0, state.viewPageScroll[state.view]));
+        } else if (action === "toggle-industry") {
+          const name = element.dataset.industry;
+          if (state.expandedIndustries.has(name)) state.expandedIndustries.delete(name);
+          else state.expandedIndustries.add(name);
+          render();
         } else if (action === "copy-codes") {
-          const visible = [...app.querySelectorAll("[data-table-shell] tbody tr[data-code]")]
-            .map((row) => row.dataset.code)
-            .filter(Boolean);
-          await copyCodes(visible.length ? visible : currentRows.map((row) => row.code), element);
+          if (state.view === "INDUSTRY") {
+            await copyCodes(industryStockRows(currentRows).map((row) => row.code), element);
+          } else {
+            const visible = [...app.querySelectorAll("[data-table-shell] tbody tr[data-code]")]
+              .map((row) => row.dataset.code).filter(Boolean);
+            await copyCodes(visible.length ? visible : currentRows.map((row) => row.code), element);
+          }
         }
       });
     });
@@ -862,6 +1006,33 @@
       });
     });
 
+    app.querySelectorAll(".industry-stock-table tbody tr[data-code]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const code = row.dataset.code;
+        state.industrySelected[state.period] =
+          String(state.industrySelected[state.period]) === String(code) ? null : code;
+        renderIndustrySelection(currentRows);
+      });
+    });
+    const industryShell = app.querySelector("[data-industry-list]");
+    if (industryShell) industryShell.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")];
+      if (!visibleRows.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const current = state.industrySelected[state.period];
+      let index = visibleRows.findIndex((row) => row.dataset.code === current);
+      if (index < 0) index = event.key === "ArrowDown" ? -1 : visibleRows.length;
+      index = Math.min(visibleRows.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
+      const target = visibleRows[index];
+      target.click();
+      // Scroll the industry container only; never move the entire Review page.
+      const shellRect = industryShell.getBoundingClientRect();
+      const rowRect = target.getBoundingClientRect();
+      if (rowRect.top < shellRect.top) industryShell.scrollTop += rowRect.top - shellRect.top;
+      else if (rowRect.bottom > shellRect.bottom) industryShell.scrollTop += rowRect.bottom - shellRect.bottom;
+    });
     const reviewShell = app.querySelector("[data-table-shell]");
     if (reviewShell) reviewShell.addEventListener("keydown", (event) => handleArrow(event, currentRows, state.period));
   }
@@ -931,5 +1102,6 @@
     }
   }
 
+  app.addEventListener("bf-rs-updated", () => { if (data && state) render(); });
   boot();
 })();
