@@ -8,6 +8,7 @@
   const RS_SOURCE_URL = "https://github.com/Fred6725/rs-log";
   const COMMIT_URL = "https://api.github.com/repos/Fred6725/rs-log/commits?path=output/rs_stocks.csv&per_page=1";
   const CSV_URL = (sha) => `https://raw.githubusercontent.com/Fred6725/rs-log/${sha}/output/rs_stocks.csv`;
+  const INDUSTRY_CSV_URL = (sha) => `https://raw.githubusercontent.com/Fred6725/rs-log/${sha}/output/rs_industries.csv`;
 
   // Contract: Reference only; never used by Pool, Gate, Top3 or default ordering.
   let dashboard = null;
@@ -20,6 +21,7 @@
     error: null,
     checkedAt: null,
   };
+  let industries = { status: "loading", ratings: new Map(), members: new Map(), error: null };
   let refreshQueued = false;
   let popover = null;
   let popoverAnchor = null;
@@ -197,6 +199,7 @@
       const code = String(cells[index.Ticker] ?? "").trim().toUpperCase();
       if (!code) continue;
       ratings.set(code, {
+        industry: index.Industry === undefined ? "" : String(cells[index.Industry] ?? "").trim(),
         current: percentile(cells[index.Percentile]),
         m1: percentile(cells[index["1M_RS_Percentile"]]),
         m3: percentile(cells[index["3M_RS_Percentile"]]),
@@ -206,6 +209,62 @@
     if (!ratings.size) throw new Error("RS CSV contains no ticker rows");
     return ratings;
   }
+
+
+  function industryKey(name) {
+    return String(name ?? "").normalize("NFKC")
+      .replace(/[‐‑‒–—−]/g, "-")
+      .replace(/\s*-\s*/g, " - ")
+      .replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function parseIndustries(csvText) {
+    const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
+    if (!lines.length) throw new Error("Industry RS CSV is empty");
+    const headers = parseCsvLine(lines[0]).map((value) => value.trim());
+    const index = Object.fromEntries(headers.map((name, position) => [name, position]));
+    for (const required of ["Industry", "Percentile", "Tickers"]) {
+      if (!(required in index)) throw new Error(`Industry RS CSV missing ${required}`);
+    }
+    const ratings = new Map();
+    const members = new Map();
+    for (const line of lines.slice(1)) {
+      const cells = parseCsvLine(line);
+      const name = String(cells[index.Industry] ?? "").trim();
+      const key = industryKey(name);
+      if (!key || ratings.has(key)) continue;
+      const rank = percentile(cells[index.Percentile]);
+      ratings.set(key, { name, rs: rank });
+      for (const token of String(cells[index.Tickers] ?? "").split(",")) {
+        const code = token.trim().toUpperCase();
+        if (code && !members.has(code)) members.set(code, name);
+      }
+    }
+    if (!ratings.size) throw new Error("Industry RS CSV contains no industries");
+    return { ratings, members };
+  }
+
+  function industryForCode(code) {
+    const ticker = String(code ?? "").trim().toUpperCase();
+    const stockIndustry = ratingFor(ticker)?.industry || "";
+    const memberIndustry = industries.members.get(ticker) || "";
+    const industry = stockIndustry || memberIndustry;
+    if (!industry) return "Unclassified";
+    return industries.ratings.get(industryKey(industry))?.name || industry;
+  }
+
+  function industryRank(name) {
+    return industries.ratings.get(industryKey(name))?.rs ?? null;
+  }
+
+  // Display-only reference API. It never participates in the authoritative Pool projection.
+  window.BFIndustryRS = Object.freeze({
+    stockRS: (code) => ratingFor(code)?.current ?? null,
+    industryForCode,
+    industryRS: industryRank,
+    status: () => industries.status,
+    sourceDate: () => reference.sourceDate,
+  });
 
   function currentPoolDate() {
     if (!dashboard) return null;
@@ -395,6 +454,12 @@
         }
         const display = displayValue(row.dataset.code);
         if (target.textContent !== display) target.textContent = display;
+        const indCell = row.querySelector('[data-field="industry_rs"]');
+        if (indCell) {
+          const rank = industryRank(industryForCode(row.dataset.code));
+          const indValue = industries.status === "loading" ? "—" : rank === null ? "N/A" : String(rank);
+          if (indCell.textContent !== indValue) indCell.textContent = indValue;
+        }
       });
     });
   }
@@ -635,17 +700,37 @@
       const sourceDate = marketSessionDateForCommit(timestamp);
       if (!publishedDate || !sourceDate) throw new Error("RS publication date is invalid");
 
-      const csvResponse = await fetch(CSV_URL(sha), { cache: "force-cache" });
+      const [csvResponse, industryResponse] = await Promise.all([
+        fetch(CSV_URL(sha), { cache: "force-cache" }),
+        fetch(INDUSTRY_CSV_URL(sha), { cache: "force-cache" }).catch(() => null),
+      ]);
       if (!csvResponse.ok) throw new Error(`RS CSV HTTP ${csvResponse.status}`);
+      const stockRatings = parseRatings(await csvResponse.text());
+      // Both snapshots are pinned to one repository commit. Industry failures do not hide stocks.
+      try {
+        if (!industryResponse?.ok) throw new Error(`Industry RS HTTP ${industryResponse?.status ?? "unavailable"}`);
+        const parsed = parseIndustries(await industryResponse.text());
+        industries = { status: "ready", ...parsed, error: null };
+      } catch (industryError) {
+        industries = {
+          // Do not mix new stock RS with an older industry's RS after partial refresh.
+          status: "error", ratings: new Map(),
+          members: new Map(),
+          error: String(industryError?.message || industryError),
+        };
+      }
       reference = {
         status: "ready",
         sourceDate,
         publishedDate,
-        ratings: parseRatings(await csvResponse.text()),
+        ratings: stockRatings,
         error: null,
         checkedAt: new Date(),
       };
     } catch (error) {
+      industries = preserve
+        ? { ...industries, status: "error", error: String(error?.message || error) }
+        : { status: "error", ratings: new Map(), members: new Map(), error: String(error?.message || error) };
       reference = preserve
         ? { ...previous, status: "error", error: String(error?.message || error), checkedAt: new Date() }
         : {
@@ -659,6 +744,7 @@
     } finally {
       loading = false;
       scheduleRefresh();
+      app.dispatchEvent(new CustomEvent("bf-rs-updated"));
     }
   }
 

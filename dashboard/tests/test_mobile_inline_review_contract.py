@@ -9,7 +9,7 @@ STYLES = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
 INTERACTION = (DASHBOARD / "interaction_runtime.js").read_text(encoding="utf-8")
 
 
-def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -> None:
+def test_mobile_results_contract_is_five_columns_without_changing_queue_flow() -> None:
     for label in ("Review Queue", "What Changed", "New Buy Points", "Watch Stage", "Entry Status"):
         assert label in APP
 
@@ -19,7 +19,11 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
     assert '.review-table [data-field="rs_percentile"] { grid-column: 2; }' in STYLES
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
     assert '.review-table [data-field="current_vs_ibd_candidate_pct"] {\n    grid-column: 4;\n    justify-content: flex-end;' in STYLES
-    assert "grid-template-columns: 22% 21% 35% 22%;" in STYLES
+    assert "grid-template-columns: 22% 21% 35% 22%;" in STYLES  # Original fallback grid.
+    assert "grid-template-columns: 16% 11% 15% 34% 24%;" in STYLES
+    assert '["industry_rs", "IND RS"]' in APP
+    assert 'if (field === "industry_rs")' in APP
+    assert 'grid-column: 5;' in STYLES
     assert 'td[data-field="rs_percentile"] {' in STYLES
     assert "justify-content: center;" in STYLES
     assert '.review-table th[data-field="rs_percentile"] .table-sort-button {' in STYLES
@@ -47,16 +51,17 @@ def test_mobile_results_contract_is_four_columns_without_changing_queue_flow() -
 
 
 def test_mobile_column_budget_fits_rs_info_and_long_status_at_min_viewport() -> None:
-    # 320px viewport - 20px app padding - 2px table border = 298px table content.
+    # At 320px: content width 298px, mobile Stock columns 16/11/15/34/24.
     table_width = 298
-    rs_outer = table_width * 0.21
-    rs_content = rs_outer - 4  # 2px left/right RS header padding.
-    rs_controls = 30 + 4 + 24  # RS+sort arrow budget + gap + info hit area.
-    status_outer = table_width * 0.35
-    status_content = status_outer - 16  # standard 8px left/right cell padding.
+    rs_content = table_width * 0.11 - 4  # Compact RS header padding.
+    rs_controls = 12 + 5 + 11  # RS, sort arrow and retained source info control.
+    ind_content = table_width * 0.15 - 4
+    status_content = table_width * 0.34 - 6
     assert rs_content >= rs_controls
+    assert ind_content >= 35
     assert status_content >= 88
-
+    assert "width: 11px; height: 27px; flex: 0 0 11px;" in STYLES
+    assert 'data-view="STOCK"' in STYLES
 
 def test_mobile_table_header_is_fixed_without_rubber_band_overscroll() -> None:
     assert 'overscroll-behavior-y: none !important;' in INTERACTION

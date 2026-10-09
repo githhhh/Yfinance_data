@@ -900,3 +900,130 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+
+/* The two views share the Review filter model; IND RS is never sortable. */
+.view-switch {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 36px; padding: 0 12px; white-space: nowrap;
+  border: 1px solid #00c9a7; border-radius: 6px;
+  background: #06332e; color: #1ce8c7; font: inherit;
+  font-size: 11px; font-weight: 750; cursor: pointer;
+}
+.view-switch svg { width: 17px; height: 17px; flex: 0 0 17px; }
+.results-toolbar { grid-template-columns: minmax(0,1fr) auto auto 34px 34px; gap: 6px; }
+.review-table [data-field="industry_rs"] { text-align: center; font-variant-numeric: tabular-nums; }
+.review-table td[data-field="industry_rs"] { font-weight: 650; color: #b6c6d8; }
+
+/* Industry card: header and background are identical when expanded or collapsed. */
+.industry-list {
+  display: flex; flex-direction: column; gap: 4px; min-height: 80px;
+  max-height: 58vh; overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain; padding: 1px;
+}
+.industry-group {
+  overflow: hidden; flex: 0 0 auto; min-width: 0;
+  background: #0d1d26; border: 1px solid #304352; border-radius: 7px;
+}
+.industry-group-toggle {
+  display: flex; align-items: center; width: 100%; min-width: 0;
+  gap: 12px; padding: 10px 12px; border: 0; background: transparent;
+  color: #eaf3fb; text-align: left; cursor: pointer; font: inherit;
+}
+.industry-group-toggle:focus-visible { outline: 2px solid #04daba; outline-offset: -2px; }
+.industry-chevron { flex: 0 0 17px; font-size: 24px; line-height: 1; color: #d5e6f7; }
+.industry-group-main { display: grid; gap: 7px; flex: 1; min-width: 0; }
+.industry-group-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.industry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 730; }
+.industry-group-rs { flex-shrink: 0; white-space: nowrap; font-size: 11px; color: #adc3dc; font-variant-numeric: tabular-nums; }
+.industry-top3 { display: flex; gap: 6px; flex-wrap: wrap; }
+.industry-chip {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 22px;
+  padding: 2px 7px; border: 1px solid #254d77; border-radius: 4px;
+  background: #123153; color: #e3ecfa; font-size: 10px; font-variant-numeric: tabular-nums;
+}
+.industry-chip small { font-size: 10px; color: #8ad9fa; }
+.industry-notice { padding: 8px 12px; border: 1px solid #495664; border-radius: 6px; font-size: 11px; color: #b5c5d5; }
+.industry-group-body { border-top: 1px solid #304352; overflow-x: hidden; }
+.industry-stock-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+.industry-stock-table th {
+  height: 32px; background: #0b1b25; color: #b6c5d8; font-size: 10px; font-weight: 600; text-align: left;
+  border-bottom: 1px solid #253747; cursor: default;
+}
+.industry-stock-table td { height: 39px; color: #d6e1ef; border-top: 1px solid #233544; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.industry-stock-table th, .industry-stock-table td { padding: 0 11px; }
+.industry-stock-table th:nth-child(1), .industry-stock-table td:nth-child(1) { width: 20%; }
+.industry-stock-table th:nth-child(2), .industry-stock-table td:nth-child(2) { width: 15%; text-align: center; }
+.industry-stock-table th:nth-child(3), .industry-stock-table td:nth-child(3) { width: 37%; }
+.industry-stock-table th:nth-child(4), .industry-stock-table td:nth-child(4) { width: 28%; text-align: right; }
+.industry-stock-table tr[data-code] { cursor: pointer; }
+.industry-stock-table tr[data-code]:hover, .industry-stock-table tr[data-code].selected { background: #142e39; }
+.industry-stock-table td.industry-code { color: #16e5de; font-weight: 750; }
+.industry-stock-table td.industry-vs-ref { font-variant-numeric: tabular-nums; }
+.industry-stock-table .status-text { font-size: 10px; font-weight: 750; }
+.industry-detail-row td { height: auto; padding: 0; white-space: normal; }
+.industry-detail-row .mobile-inline-review { border: 0; border-radius: 0; }
+
+@media (width <= 760px) {
+  .results-toolbar {
+    grid-template-columns: minmax(0,1fr) 50px 90px 34px 34px;
+    gap: 5px;
+  }
+  .view-switch { width: 90px; min-width: 0; min-height: 34px; padding: 0 5px; font-size: 10px; }
+  .view-switch svg { width: 14px; height: 14px; flex-basis: 14px; }
+  .results-section[data-view="STOCK"] .review-table thead tr,
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] {
+    grid-template-columns: 16% 11% 15% 34% 24%;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"],
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="industry_rs"] {
+    display: flex; align-items: center; justify-content: center; grid-row: 1; grid-column: 3;
+    padding: 0 2px; font-size: 10px;
+  }
+  .results-section[data-view="STOCK"] .review-table [data-field="ibd_entry_status"] { grid-column: 4; }
+  .results-section[data-view="STOCK"] .review-table [data-field="current_vs_ibd_candidate_pct"] {
+    grid-column: 5; padding-left: 2px; padding-right: 7px; font-size: 10px;
+  }
+  .results-section[data-view="STOCK"] .review-table [data-field="code"] { padding-left: 5px; padding-right: 2px; }
+  .results-section[data-view="STOCK"] .review-table [data-field="rs_percentile"] { padding: 0 1px; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"] { font-size: 9px; white-space: nowrap; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="ibd_entry_status"] { padding-left: 3px; }
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="ibd_entry_status"] { padding: 0 3px; font-size: 9px; }
+  .results-section > .industry-list { order: 3; }
+  .industry-list { max-height: 58vh; }
+  .industry-group-toggle { padding: 10px 8px; gap: 9px; }
+  .industry-name { font-size: 11px; }
+  .industry-group-rs { font-size: 10px; }
+  .industry-stock-table th, .industry-stock-table td { padding: 0 6px; font-size: 10px; }
+  .industry-stock-table .status-text { font-size: 9px; }
+  .industry-stock-table th:nth-child(1), .industry-stock-table td:nth-child(1) { width: 19%; }
+  .industry-stock-table th:nth-child(2), .industry-stock-table td:nth-child(2) { width: 13%; }
+  .industry-stock-table th:nth-child(3), .industry-stock-table td:nth-child(3) { width: 43%; }
+  .industry-stock-table th:nth-child(4), .industry-stock-table td:nth-child(4) { width: 25%; }
+}
+@media (width <= 350px) {
+  .results-toolbar { grid-template-columns: minmax(0,1fr) 45px 80px 32px 32px; gap: 3px; }
+  .view-switch { width: 80px; font-size: 9px; }
+  .results-order-slot { width: 45px; min-width: 45px; }
+}
+
+/* Retain the RS provenance control in the narrow five-column mobile header. */
+@media (width <= 760px) {
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-header-control.with-info { gap: 0; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-sort-button { gap: 0 !important; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-header-label { font-size: 9px; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-sort-icon { min-width: 5px !important; font-size: 7px !important; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button {
+    width: 11px; height: 27px; flex: 0 0 11px; padding: 0;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button svg { width: 10px; height: 10px; }
+}
+
+.industry-stock-table td.industry-vs-ref.negative { color: #fb454c; }
+
+@media (width <= 760px) {
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button { position: relative; }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button::after {
+    content: ""; position: absolute; inset: -5px -7px;
+  }
+}
