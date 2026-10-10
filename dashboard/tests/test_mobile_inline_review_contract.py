@@ -20,7 +20,7 @@ def test_mobile_results_contract_is_five_columns_without_changing_queue_flow() -
     assert '.review-table [data-field="ibd_entry_status"] { grid-column: 3; }' in STYLES
     assert '.review-table [data-field="current_vs_ibd_candidate_pct"] {\n    grid-column: 4;\n    justify-content: flex-end;' in STYLES
     assert "grid-template-columns: 22% 21% 35% 22%;" in STYLES  # Original fallback grid.
-    assert "grid-template-columns: 18% 18% 11% 34% 19%;" in STYLES
+    assert "grid-template-columns: 16% 28% 10% 26% 20%;" in STYLES
     assert '["industry_rs", "IND RS"]' in APP
     assert 'if (field === "industry_rs")' in APP
     assert 'grid-column: 5;' in STYLES
@@ -51,16 +51,17 @@ def test_mobile_results_contract_is_five_columns_without_changing_queue_flow() -
 
 
 def test_mobile_column_budget_fits_rs_info_and_long_status_at_min_viewport() -> None:
-    # 320px viewport - 22px borders/padding = 298px of usable table width.
+    # At 320px viewport, 298px usable after mobile table margins/borders.
     table_width = 298
-    rs_content = table_width * 0.18 - 4
-    rs_controls = 12 + 5 + 18  # RS label, sort arrow and info control.
-    ind_content = table_width * 0.11
-    status_content = table_width * 0.34 - 6
+    rs_content = table_width * 0.28 - 4
+    rs_controls = 12 + 8 + 24 + 4  # Label, sort arrow, info hit target, gap.
+    ind_content = table_width * 0.10
+    status_content = table_width * 0.26 - 2
     assert rs_content >= rs_controls
-    assert ind_content >= 30
-    assert status_content >= 88
-    assert "width: 18px; flex: 0 0 18px;" in STYLES
+    assert ind_content >= 28
+    assert status_content >= 75
+    assert "width: 24px; flex: 0 0 24px;" in STYLES
+    assert "font-size: clamp(8px, 2.35vw, 10px);" in STYLES
     assert 'data-view="STOCK"' in STYLES
 
 

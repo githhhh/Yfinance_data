@@ -45,7 +45,7 @@ def test_mobile_views_share_filtering_but_isolate_sort_and_copy() -> None:
     assert 'data-action="toggle-industry"' in APP
     assert 'data-action="toggle-view"' in APP
     assert 'class="industry-stock-table"' in APP
-    assert 'grid-template-columns: 18% 18% 11% 34% 19%;' in CSS
+    assert 'grid-template-columns: 16% 28% 10% 26% 20%;' in CSS
     assert "IND RS" not in TABLE  # No header sorter for industry RS.
     assert 'app.querySelectorAll("[data-table-shell]").forEach(decorateTable)' in TABLE
     assert '[data-industry-list]' in APP
@@ -202,8 +202,43 @@ def test_view_switch_and_industry_accordion_do_not_rebuild_dashboard() -> None:
 
 
 def test_rs_interaction_budget_and_vs_reference_centering() -> None:
-    assert 'grid-template-columns: 18% 18% 11% 34% 19%;' in CSS
-    assert 'width: 18px; flex: 0 0 18px;' in CSS
+    assert 'grid-template-columns: 16% 28% 10% 26% 20%;' in CSS
+    assert 'width: 24px; flex: 0 0 24px;' in CSS
     assert 'th[data-field="current_vs_ibd_candidate_pct"] .table-sort-button' in CSS
     assert 'justify-content: center !important;' in CSS
     assert 'setTextIfChanged(summary, `${count} Results`)' in TABLE
+
+
+def test_stock_only_reset_keeps_toolbar_controls_in_place() -> None:
+    # Stock's sortable table retains its Reset state while Industry never offers
+    # sorting; the summary grows into that grid slot so controls stay anchored.
+    assert '.results-section[data-view="INDUSTRY"] .results-order-slot { display: none; }' in CSS
+    assert '.results-section[data-view="INDUSTRY"] .results-summary { grid-column: 1 / span 2; }' in CSS
+    for selector, col in (("view-switch", 3), ("copy-button", 4), ("mobile-filter-button", 5)):
+        assert f'.results-section[data-view="INDUSTRY"] .{selector} {{ grid-column: {col}; }}' in CSS
+    assert "state.view = state.view === \"STOCK\" ? \"INDUSTRY\" : \"STOCK\";" in APP
+    assert "switchReviewView(currentRows)" in APP
+    assert "const sortStates = new Map();" in TABLE
+    assert "syncDefaultSortButton(shell)" in TABLE
+
+
+def test_industry_chevron_stays_on_title_row_and_count_is_grammatical() -> None:
+    assert 'class="industry-chevron" viewBox="0 0 24 24" width="18" height="18"' in APP
+    assert 'stroke-linecap="round" stroke-linejoin="round"' in APP
+    assert "group.rows.length === 1 ? \"stock\" : \"stocks\"" in APP
+    assert ".industry-group-toggle {" in CSS
+    assert "display: flex; align-items: flex-start; width: 100%;" in CSS
+    assert "flex: 0 0 18px; width: 18px; height: 18px;" in CSS
+    assert "transform-origin: 50% 50%;" in CSS
+    assert '.industry-group-toggle[aria-expanded="true"] .industry-chevron { transform: rotate(90deg); }' in CSS
+
+
+def test_industry_rs_is_neutral_and_mobile_status_header_and_value_share_center() -> None:
+    assert ".industry-group-rs strong { color: #B8D5E2;" in CSS
+    assert 'grid-template-columns: 16% 28% 10% 26% 20%;' in CSS
+    assert 'th[data-field="ibd_entry_status"] .table-header-control' in CSS
+    assert 'th[data-field="ibd_entry_status"] .table-sort-button' in CSS
+    assert 'td[data-field="ibd_entry_status"]' in CSS
+    assert "justify-content: center !important;" in CSS
+    assert "font-size: clamp(8px, 2.35vw, 10px);" in CSS
+    assert "letter-spacing: -0.2px;" in CSS

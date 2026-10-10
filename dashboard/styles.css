@@ -926,12 +926,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   background: #0d1d26; border: 1px solid #304352; border-radius: 7px;
 }
 .industry-group-toggle {
-  display: flex; align-items: center; width: 100%; min-width: 0;
+  display: flex; align-items: flex-start; width: 100%; min-width: 0;
   gap: 12px; padding: 10px 12px; border: 0; background: transparent;
   color: #eaf3fb; text-align: left; cursor: pointer; font: inherit;
 }
 .industry-group-toggle:focus-visible { outline: 2px solid #04daba; outline-offset: -2px; }
-.industry-chevron { flex: 0 0 17px; font-size: 24px; line-height: 1; color: #d5e6f7; }
+.industry-chevron { display: block; flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; color: #d5e6f7; }
 .industry-group-main { display: grid; gap: 7px; flex: 1; min-width: 0; }
 .industry-group-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .industry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 730; }
@@ -973,7 +973,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .view-switch svg { width: 14px; height: 14px; flex-basis: 14px; }
   .results-section[data-view="STOCK"] .review-table thead tr,
   .results-section[data-view="STOCK"] .review-table tbody tr[data-code] {
-    grid-template-columns: 18% 18% 11% 34% 19%;
+    grid-template-columns: 16% 28% 10% 26% 20%;
   }
   .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"],
   .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="industry_rs"] {
@@ -1045,9 +1045,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.industry-group-rs strong { color: #76d8ec; font-size: inherit; font-weight: 750; }
+.industry-group-rs strong { color: #B8D5E2; font-size: inherit; font-weight: 750; }
 .industry-group-count { color: #7b91a5; font-size: 9px; line-height: 1.15; }
-.industry-chevron { display: inline-block; transition: none; transform-origin: center; }
+.industry-chevron { transition: none; transform-origin: 50% 50%; }
 .industry-group-toggle[aria-expanded="true"] .industry-chevron { transform: rotate(90deg); }
 
 @media (width <= 760px) {
@@ -1072,5 +1072,50 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .results-section[data-view="STOCK"] .review-table th[data-field="current_vs_ibd_candidate_pct"] .table-sort-button {
     justify-content: center !important;
     text-align: center !important;
+  }
+}
+
+/* Industry view owns no manual sort. Keep the shared Stock Reset state intact,
+   but let Results occupy its grid slot so the view/Copy/Filter controls never move. */
+.results-section[data-view="INDUSTRY"] .results-order-slot { display: none; }
+.results-section[data-view="INDUSTRY"] .results-summary { grid-column: 1 / span 2; }
+.results-section[data-view="INDUSTRY"] .view-switch { grid-column: 3; }
+.results-section[data-view="INDUSTRY"] .copy-button { grid-column: 4; }
+.results-section[data-view="INDUSTRY"] .mobile-filter-button { grid-column: 5; }
+
+@media (width <= 760px) {
+  /* 16 / 28 / 10 / 26 / 20: interactive RS gets the widest numeric column.
+     STATUS and VS REF header/content share the same visual center. */
+  .results-section[data-view="STOCK"] .review-table th[data-field="ibd_entry_status"],
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="ibd_entry_status"] {
+    justify-content: center;
+    text-align: center;
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="ibd_entry_status"] .table-header-control,
+  .results-section[data-view="STOCK"] .review-table th[data-field="ibd_entry_status"] .table-sort-button {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="ibd_entry_status"] {
+    font-size: clamp(8px, 2.35vw, 10px);
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="industry_rs"] {
+    font-size: 8px;
+    letter-spacing: -0.35px;
+    padding: 0;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-header-control.with-info {
+    gap: 4px;
+    justify-content: center;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .rs-info-button {
+    width: 24px; flex: 0 0 24px; height: 32px;
+  }
+  .results-section[data-view="STOCK"] .review-table th[data-field="rs_percentile"] .table-sort-icon {
+    min-width: 8px !important; font-size: 9px !important;
   }
 }

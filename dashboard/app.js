@@ -572,9 +572,9 @@
         const rs = group.rs === null ? "N/A" : String(group.rs);
         return `<section class="industry-group">
           <button type="button" class="industry-group-toggle" data-action="toggle-industry" data-industry="${esc(group.name)}" aria-expanded="${opened}">
-            <span class="industry-chevron" aria-hidden="true">›</span>
+            <svg class="industry-chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="industry-group-main">
-              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} stocks</span></span></span>
+              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} ${group.rows.length === 1 ? "stock" : "stocks"}</span></span></span>
               <span class="industry-top3" ${opened ? "hidden" : ""}>${group.rows.slice(0, 3).map((row) => {
                 const value = provider?.stockRS(row.code);
                 return `<span class="industry-chip">${esc(row.code)} <small>${value === null || value === undefined ? "N/A" : esc(String(value))}</small></span>`;
