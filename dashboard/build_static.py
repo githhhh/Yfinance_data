@@ -66,6 +66,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_a_zone",
     "review_a_as_of",
     "review_a_event",
+    "review_a_path",
     "review_a_week_event",
     "review_data_available",
     "review_membership",
