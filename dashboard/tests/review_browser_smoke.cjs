@@ -94,7 +94,9 @@ async function ready() {
       if (viewport.width <= 760) {
         const detail = page.locator(".mobile-inline-review");
         await detail.waitFor();
-        assert((await detail.innerText()).includes("Midweek BP"), "Mobile B label");
+        const mobileText = await detail.innerText();
+        console.log("MOBILE DETAILS:", JSON.stringify(mobileText.slice(0, 900)));
+        assert(mobileText.includes("Midweek BP"), "Mobile B label");
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
       } else {
         const selected = page.locator(".selected-strip");
