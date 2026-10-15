@@ -185,9 +185,20 @@
   }
 
   function reviewFacts(row) {
-    return reviewUsesB(row) && row.review_b_details
-      ? { ...row, ...row.review_b_details }
-      : row;
+    if (!reviewUsesB(row)) return row;
+    const b = row.review_b_details || {};
+    // Missing B structure facts are unavailable, never inherited from A.
+    // Stock identity and display metadata may still fall back to the row.
+    const fields = [
+      "ibd_entry_date", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio",
+      "base_depth_pct", "base_duration_weeks", "ceiling", "ceiling_date",
+      "breakout_date", "pullback_pct", "pullback_duration_weeks",
+      "pullback_peak_date", "pullback_peak_price", "pullback_v_is_dry",
+      "eps_yoy_growth", "dist_to_52w_high_pct", "volume_ratio",
+    ];
+    return { ...row, ...Object.fromEntries(fields.map((field) =>
+      [field, Object.hasOwn(b, field) ? b[field] : null]
+    )) };
   }
 
   function displayStatus(row) {
