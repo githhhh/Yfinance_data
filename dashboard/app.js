@@ -633,7 +633,9 @@
   function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
     const near = isNearBreakout(row);
-    const referenceKey = near ? "Watch Trigger" : "Buy Point";
+    const referenceKey = near ? "Watch Trigger" :
+      reviewUsesB(row) ? "Midweek BP" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
     const entryDate = dateText(row.ibd_entry_date);
     const buyPointDate = dateText(row.buy_point_date);
     const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
@@ -701,7 +703,9 @@
   
   function mobileDetailHtml(row) {
     const near = isNearBreakout(row);
-    const referenceKey = near ? "Watch Trigger" : "Buy Point";
+    const referenceKey = near ? "Watch Trigger" :
+      reviewUsesB(row) ? "Midweek BP" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
     const referenceContext = near
       ? watchTargetSource(row)
       : dateText(row.ibd_entry_date) || dateText(row.buy_point_date);
