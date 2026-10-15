@@ -264,6 +264,15 @@
     return num(reviewUsesB(row) ? row.review_b_details?.volume_ratio : row.volume_ratio);
   }
 
+  function reviewEntryText(row) {
+    if (!reviewUsesB(row)) return text(row.ibd_entry_vol_or_reject, "—");
+    if (!bool(row.review_b_entry_valid)) {
+      return text(row.review_b_entry_reason, "Volume not confirmed");
+    }
+    const ratio = num(row.review_b_entry_volume);
+    return ratio === null ? "n/a" : fmt(ratio, "x");
+  }
+
   function displayChange(row) {
     if (isNearBreakout(row)) return "";
     const a = text(row.review_buy_point_change_label, "");
@@ -769,9 +778,7 @@
     ].filter(Boolean).join(" · ");
     const entryVolume = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
     const weeklyVolume = num(facts.volume_ratio);
-    const entryPrimary = near
-      ? "Pre-signal"
-      : text(reviewUsesB(row) ? (entryVolume === null ? row.review_b_entry_reason : fmt(entryVolume, "x")) : row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
+    const entryPrimary = near ? "Pre-signal" : reviewEntryText(row).replace(/x$/, "×");
     const entryFacts = [
       entryVolume === null ? "" : `Entry Vol ${fmt(entryVolume, "x")}`,
       weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
@@ -982,7 +989,7 @@
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
     }
-    if (field === "ibd_entry_vol_or_reject") { const entry = reviewUsesB(row) ? (num(row.review_b_entry_volume) === null ? row.review_b_entry_reason : fmt(row.review_b_entry_volume, "x")) : value; return isNearBreakout(row) ? "Pre-signal" : esc(text(entry).replace(/x$/, "×")); }
+    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(reviewEntryText(row).replace(/x$/, "×"));
     return esc(text(value));
   }
 
