@@ -28,7 +28,7 @@ def test_weekend_signal_out_of_pool_remains_tracked_from_daily_prices():
     complete = pd.DataFrame([row("OUT", close=108)])
     current = pd.DataFrame([row("OTHER", snapshot="2026-10-13", trigger=50, close=52)])
     daily = {"OUT": pd.DataFrame(
-        {"Close": [104, 99, 103]},
+        {"Close": [108, 99, 103]},
         index=pd.to_datetime(["2026-10-09", "2026-10-12", "2026-10-13"]),
     )}
     result = build_observation_view(
@@ -140,3 +140,27 @@ def test_unconfirmed_weekend_zone_never_auto_confirms():
     ).iloc[0]
     assert result["review_a_zone"] == "ZONE"
     assert result["ibd_entry_status"] == "UNCONFIRMED"
+
+
+def test_daily_rebased_against_weekend_snapshot_fails_closed():
+    weekend = row("SPLIT", trigger=100, close=105)
+    daily = pd.DataFrame(
+        {"Close": [52.5, 53.0]},
+        index=pd.to_datetime(["2026-10-09", "2026-10-13"]),
+    )
+    result = _price_path(weekend, None, daily, as_of=date(2026, 10, 13))
+    assert result["close"] is None
+    assert result["latest_event"] == ""
+
+
+def test_previous_day_unchanged_does_not_repeat_old_price_event():
+    complete = pd.DataFrame([row("STALE", trigger=100, close=108)])
+    previous = pd.DataFrame([row("STALE", snapshot="2026-10-12", signal=False, close=99)])
+    current = pd.DataFrame([row("STALE", snapshot="2026-10-13", signal=False, close=99)])
+    daily = {"STALE": pd.DataFrame({"Close": [108, 99]},
+             index=pd.to_datetime(["2026-10-09", "2026-10-12"]))}
+    events = build_observation_attention(
+        current, complete, pd.DataFrame(), previous=previous,
+        daily=daily, as_of=date(2026, 10, 13),
+    )
+    assert events == []
