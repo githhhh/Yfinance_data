@@ -191,7 +191,7 @@
 
   function setupHtml(row) {
     const primary = routeLabel(reviewSetup(row));
-    const overridden = isNearBreakout(row) ? "" : text(row.overridden_signal_source, "");
+    const overridden = isNearBreakout(row) || reviewUsesB(row) ? "" : text(row.overridden_signal_source, "");
     if (!overridden) return esc(primary);
     return `${esc(primary)}<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>`;
   }
@@ -300,7 +300,7 @@
       if (state.route !== "All") result = result.filter((row) => reviewSetup(row) === state.route);
       if (state.distanceMin !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value >= state.distanceMin; });
       if (state.distanceMax !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value <= state.distanceMax; });
-      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
+      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
       if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = num(row.volume_ratio); return value !== null && value >= state.weeklyVolumeMin; });
     }
     return result;
@@ -754,7 +754,7 @@
       <div class="mobile-detail-industry">${esc(text(reviewIndustry(row), "Industry N/A"))}</div>
       <div class="mobile-detail-price">
         <div><span>${referenceKey}</span><strong>${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? `<small>${referenceContextLabel} ${esc(referenceContext)}</small>` : ""}</div>
-        <div><span>Latest</span><strong>${fmt(row.latest_close)}</strong></div>
+        <div><span>Latest</span><strong>${fmt(reviewUsesB(row) ? row.review_b_close : row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
       ${bool(row.review_a_active) && bool(row.review_b_active)
@@ -910,15 +910,15 @@
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
-    if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
-    if (field === "latest_close") return esc(fmt(value));
+    if (field === "ibd_breakout_quality") { const quality = reviewUsesB(row) ? row.review_b_quality : value; return `<span class="quality-text ${qualityClass(quality)}">${esc(text(quality))}</span>`; }
+    if (field === "latest_close") return esc(fmt(reviewUsesB(row) ? row.review_b_close : value));
     if (field === "volume_ratio") return esc(fmt(value, "x"));
     if (field === "industry_rs") return '<span class="industry-rs-cell">—</span>';
     if (field === "rs_percentile") {
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
     }
-    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(text(value).replace(/x$/, "×"));
+    if (field === "ibd_entry_vol_or_reject") { const entry = reviewUsesB(row) ? (num(row.review_b_entry_volume) === null ? row.review_b_entry_reason : fmt(row.review_b_entry_volume, "x")) : value; return isNearBreakout(row) ? "Pre-signal" : esc(text(entry).replace(/x$/, "×")); }
     return esc(text(value));
   }
 
