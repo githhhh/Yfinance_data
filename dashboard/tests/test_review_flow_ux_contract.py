@@ -33,7 +33,7 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
     assert 'if (isNearBreakout(row)) return "";' in APP
     assert 'return text(row.review_change_label, "");' in APP
-    assert 'return text(row.review_buy_point_change_label, "");' in APP
+    assert 'const a = text(row.review_buy_point_change_label, "");' in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
     assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
     assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
@@ -61,18 +61,18 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
     assert 'Selected Overview' in APP
     for field in (
         "row.industry",
-        "row.eps_yoy_growth",
-        "row.base_depth_pct",
-        "row.base_duration_weeks",
-        "row.ceiling",
-        "row.ceiling_date",
-        "row.breakout_date",
-        "row.dist_to_52w_high_pct",
-        "row.pullback_pct",
-        "row.pullback_duration_weeks",
-        "row.pullback_peak_date",
-        "row.pullback_peak_price",
-        "row.pullback_v_is_dry",
+        "facts.eps_yoy_growth",
+        "facts.base_depth_pct",
+        "facts.base_duration_weeks",
+        "facts.ceiling",
+        "facts.ceiling_date",
+        "facts.breakout_date",
+        "facts.dist_to_52w_high_pct",
+        "facts.pullback_pct",
+        "facts.pullback_duration_weeks",
+        "facts.pullback_peak_date",
+        "facts.pullback_peak_price",
+        "facts.pullback_v_is_dry",
         "row.rs_1m_percentile",
         "row.rs_3m_percentile",
         "row.rs_6m_percentile",
@@ -80,8 +80,8 @@ def test_selected_overview_keeps_quality_facts_without_detail_panel() -> None:
         assert field in APP
     assert 'Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}' in APP
     assert 'BO ${esc(breakoutDate)}' in APP
-    assert "pullbackPeakDate = dateText(row.pullback_peak_date)" in APP
-    assert "pullbackPeakPrice = num(row.pullback_peak_price)" in APP
+    assert "pullbackPeakDate = dateText(facts.pullback_peak_date)" in APP
+    assert "pullbackPeakPrice = num(facts.pullback_peak_price)" in APP
     assert 'Start ${esc(pullbackPeakDate || "—")}' in APP
     assert 'pullback_start_date' not in APP
     assert "detailOpen" not in APP
