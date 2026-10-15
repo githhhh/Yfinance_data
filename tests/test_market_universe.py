@@ -51,3 +51,26 @@ def test_weekend_signal_final_pick_only_in_next_review_week(tmp_path):
     assert pick_active_weekend_signal_codes(data_root=tmp_path, review_date=date(2026, 10, 10)) == []
     fallback = ["OTHER", "ALPHA"]
     assert set([*fallback, *pick]) == {"OTHER", "ALPHA", "BETA"}
+
+
+def test_weekend_signal_pick_matches_snapshot_boolean_and_rejects_bad_date(tmp_path):
+    from datetime import date
+    from market_universe import pick_active_weekend_signal_codes
+
+    file = tmp_path / "us/breakout_follow_pool.csv"
+    file.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([
+        {"code": "YES", "signal": "1.0", "snapshot_date": "2026-10-09"},
+        {"code": "CONF", "signal": "yes", "snapshot_date": "2026-10-09"},
+        {"code": "NO", "signal": "no", "snapshot_date": "2026-10-09"},
+    ]).to_csv(file, index=False)
+    assert pick_active_weekend_signal_codes(
+        data_root=tmp_path, review_date=date(2026, 10, 13)
+    ) == ["CONF", "YES"]
+    pd.DataFrame([
+        {"code": "YES", "signal": True, "snapshot_date": "2026-10-09"},
+        {"code": "BAD", "signal": True, "snapshot_date": "bad-date"},
+    ]).to_csv(file, index=False)
+    assert pick_active_weekend_signal_codes(
+        data_root=tmp_path, review_date=date(2026, 10, 13)
+    ) == []
