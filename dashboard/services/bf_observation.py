@@ -261,6 +261,7 @@ def build_observation_view(
         row["review_b_event"] = ""
         row["review_b_price"] = None
         row["review_b_status"] = None
+        row["review_b_entry_valid"] = None
         row["review_b_rule"] = None
         row["review_b_date"] = None
         row["review_b_zone"] = None
@@ -341,6 +342,7 @@ def build_observation_view(
             row["review_b_event"] = event
             row["review_b_price"] = bp
             row["review_b_status"] = midweek.get("ibd_entry_status")
+            row["review_b_entry_valid"] = to_bool(midweek.get("ibd_entry_valid"))
             row["review_b_rule"] = midweek.get("ibd_candidate_rule")
             row["review_b_date"] = midweek.get("snapshot_date")
             row["review_b_close"] = _number(midweek.get("latest_close"))
