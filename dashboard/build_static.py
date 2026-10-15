@@ -409,7 +409,7 @@ def build_dashboard_payload(
     )
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "window_date": window_date.isoformat(),
         "default_period": default_period,
