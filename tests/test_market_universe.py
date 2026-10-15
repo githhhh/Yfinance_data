@@ -32,3 +32,22 @@ def test_download_universe_uses_only_explicit_strategy_input_sources(tmp_path):
     assert "us/signal_eps_pit.csv" not in DOWNLOAD_UNIVERSE_SOURCE_FILES
     assert "us/ibd_double_bottom_snapshot.csv" not in DOWNLOAD_UNIVERSE_SOURCE_FILES
     assert "us/ibd_double_bottom_snapshot_midweek.csv" not in DOWNLOAD_UNIVERSE_SOURCE_FILES
+
+
+def test_weekend_signal_final_pick_only_in_next_review_week(tmp_path):
+    from datetime import date
+    from market_universe import pick_active_weekend_signal_codes
+
+    _write_codes(tmp_path, "us/52wk_new_high_results.csv", [])
+    pd.DataFrame([
+        {"code": "ALPHA", "snapshot_date": "2026-10-09", "signal": True},
+        {"code": "BETA", "snapshot_date": "2026-10-09", "signal": True},
+        {"code": "NO", "snapshot_date": "2026-10-09", "signal": False},
+    ]).to_csv(tmp_path / "us/breakout_follow_pool.csv", index=False)
+
+    pick = pick_active_weekend_signal_codes(data_root=tmp_path, review_date=date(2026, 10, 13))
+    assert pick == ["ALPHA", "BETA"]
+    assert pick_active_weekend_signal_codes(data_root=tmp_path, review_date=date(2026, 10, 20)) == []
+    assert pick_active_weekend_signal_codes(data_root=tmp_path, review_date=date(2026, 10, 10)) == []
+    fallback = ["OTHER", "ALPHA"]
+    assert set([*fallback, *pick]) == {"OTHER", "ALPHA", "BETA"}
