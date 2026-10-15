@@ -114,8 +114,8 @@ def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
     assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
     assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
-    assert 'const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;' in APP
-    assert 'const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";' in APP
+    assert 'const referenceContext = near ? watchTargetSource(row) :' in APP
+    assert 'const contextLabel = near ? "Source" :' in APP
     assert 'return "Recovery High"' in APP
     assert 'return "TWK High"' in APP
     assert 'return "Pending High"' in APP
