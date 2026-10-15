@@ -301,7 +301,7 @@ def build_observation_view(
                 row["review_a_event"] = path["latest_event"]
                 row["review_a_week_event"] = path["week_event"]
                 a_change = path["change"]
-                a_changed = bool(path["week_event"] or path["latest_event"] or path["path_changed"])
+                a_changed = bool(path["week_event"] or path["latest_event"])
                 focus = path["latest_event"] or path["week_event"] or ""
                 membership_label = membership_event or ("OUT" if membership == "OUT" else "")
                 row["review_change_label"] = " · ".join(
