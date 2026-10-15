@@ -129,7 +129,7 @@ def _price_path(weekend, current, daily, *, as_of: date):
             val = _number(close)
             if day is not None and baseline_date < day <= as_of and val is not None:
                 points.append((day, val))
-    elif current is not None:
+    if current is not None and not any(day > baseline_date for day, _ in points):
         # Fallback only gives a present zone, never a fabricated daily path.
         fallback_date = _day(current.get("snapshot_date"))
         fallback_close = _number(current.get("latest_close"))
@@ -236,6 +236,8 @@ def build_observation_view(
         row["review_b_event"] = ""
         row["review_b_price"] = None
         row["review_b_status"] = None
+        row["review_b_rule"] = None
+        row["review_b_date"] = None
         row["review_b_zone"] = None
         row["review_b_pct"] = None
         row["review_a_as_of"] = None
@@ -278,9 +280,8 @@ def build_observation_view(
                                                ("OUT · " + row["review_a_zone"] if membership == "OUT" else "")))
             row["review_weekend_buy_point_change"] = a_change
             row["review_futu_actionable"] = trade_rows.get(code, {}).get("review_futu_actionable", False)
-        event = _b_event(weekend, midweek, prev_by_code.get(code), comparison_available=prev_valid or
-                         (current_date is not None and weekend is not None and
-                          _day(weekend.get("snapshot_date")) is not None))
+        event = _b_event(weekend, midweek, prev_by_code.get(code),
+                         comparison_available=prev_valid or not complete.empty)
         # A's anchor may coincide with B; that is not a new buy point.
         if event:
             bp = _number(midweek.get("ibd_candidate_price"))
@@ -289,6 +290,8 @@ def build_observation_view(
             row["review_b_event"] = event
             row["review_b_price"] = bp
             row["review_b_status"] = midweek.get("ibd_entry_status")
+            row["review_b_rule"] = midweek.get("ibd_candidate_rule")
+            row["review_b_date"] = midweek.get("snapshot_date")
             row["review_b_zone"] = _ZONES.get(zone)
             row["review_b_pct"] = (round((_number(midweek.get("latest_close")) / bp - 1) * 100, 2)
                                    if bp and _number(midweek.get("latest_close")) else None)
