@@ -83,12 +83,19 @@ def pick_active_weekend_signal_codes(
         required = {"code", "signal", "snapshot_date"}
         if not required.issubset(frame.columns):
             raise ValueError(f"missing columns: {sorted(required - set(frame.columns))}")
-        dates = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date.dropna().unique()
+        parsed_dates = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+        if parsed_dates.isna().any():
+            return []
+        dates = parsed_dates.dt.date.unique()
         if len(dates) != 1 or complete_target_week(dates[0]) != monday_of_week(today):
             return []
-        mask = frame["signal"].astype(str).str.strip().str.lower().isin(("true", "1"))
+        # Match the existing BF to_bool() conventions; this pick must not
+        # redefine which complete-week rows count as signal=True.
+        mask = frame["signal"].astype(str).str.strip().str.lower().isin(
+            ("true", "t", "yes", "y", "1", "1.0")
+        )
         return sorted({
-            code for code in ( _normalize_code(v) for v in frame.loc[mask, "code"] )
+            code for code in (_normalize_code(v) for v in frame.loc[mask, "code"])
             if code is not None
         })
     except (OSError, ValueError, KeyError, TypeError) as exc:
