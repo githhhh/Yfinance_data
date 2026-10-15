@@ -55,6 +55,7 @@ function entry(code) {
     review_membership: "IN",
     review_b_active: true, review_b_price: 185, review_b_close: 180,
     review_b_pct: -2.70, review_b_zone: "BELOW", review_b_rule: "pivot",
+    review_b_entry_valid: false,
     review_b_date: "2026-10-14", review_b_status: "UNCONFIRMED",
     review_b_event: "NEW BP", review_b_quality: "Constructive",
     review_b_entry_volume: null, review_b_entry_reason: "Volume not confirmed",
@@ -103,6 +104,12 @@ assert(bDetail.includes("181"), "B ceiling, not A ceiling");
 assert(bDetail.includes("11W"), "B base duration");
 assert(!bDetail.includes("22W"), "A base must not leak into B context");
 assert(bDetail.includes("↳ Weekend BP 170"));
+const unconfirmedWithVolume = { ...bOnly, review_b_entry_volume: 2.5,
+  review_b_entry_reason: "resolver_rejected", review_b_entry_valid: false };
+assert(app.mobileDetailHtml(unconfirmedWithVolume).includes("resolver_rejected"),
+  "B rejected resolver reason must not be hidden by positive volume");
+assert(app.tableHtml([unconfirmedWithVolume]).includes("resolver_rejected"),
+  "B rejected resolver reason must be visible in table");
 const mobile = app.mobileDetailHtml(bOnly);
 assert(mobile.includes("Midweek BP"));
 assert(mobile.includes("pos 0.80"), "B geometry");
