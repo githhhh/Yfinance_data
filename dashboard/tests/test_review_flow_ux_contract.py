@@ -34,7 +34,9 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     assert 'if (isNearBreakout(row)) return "";' in APP
     assert 'return text(row.review_change_label, "");' in APP
     assert 'return text(row.review_buy_point_change_label, "");' in APP
-    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
+    assert 'const referenceKey = near ? "Watch Trigger" :' in APP
+    assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
+    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
     assert 'class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
