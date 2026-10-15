@@ -179,6 +179,9 @@ def _b_event(weekend, today, previous, *, comparison_available):
         return "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
+    # The preceding snapshot may have matched A, so no separate B existed.
+    if weekend is not None and _same_identity(weekend, previous) is True:
+        return "NEW BP"
     same = _same_identity(previous, today)
     if same is False:
         return "BP CHANGED"
@@ -285,9 +288,11 @@ def build_observation_view(
                 row["review_a_week_event"] = path["week_event"]
                 a_change = path["change"]
                 a_changed = bool(path["week_event"] or path["latest_event"] or path["path_changed"])
-                row["review_change_label"] = (path["latest_event"] or path["week_event"] or
-                                              (membership_event + " · " + row["review_a_zone"] if membership_event else
-                                               ("OUT · " + row["review_a_zone"] if membership == "OUT" else "")))
+                focus = path["latest_event"] or path["week_event"] or ""
+                membership_label = membership_event or ("OUT" if membership == "OUT" else "")
+                row["review_change_label"] = " · ".join(
+                    part for part in (focus, membership_label, row["review_a_zone"] if membership_event and not focus else "") if part
+                )
             row["review_weekend_buy_point_change"] = a_change
             row["review_futu_actionable"] = trade_rows.get(code, {}).get("review_futu_actionable", False)
         event = _b_event(weekend, midweek, prev_by_code.get(code),
