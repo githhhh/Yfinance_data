@@ -39,6 +39,7 @@ def test_weekend_signal_out_of_pool_remains_tracked_from_daily_prices():
     assert out["review_membership"] == "OUT"
     assert out["review_a_price"] == 100
     assert out["review_a_event"] == "BELOW → ZONE"
+    assert out["review_a_path"] == "EXT → BELOW → ZONE"
     assert out["review_a_week_event"] == "EXT → ZONE"
     assert out["review_a_zone"] == "ZONE"
     assert out["review_a_as_of"] == "2026-10-13"
@@ -164,3 +165,20 @@ def test_previous_day_unchanged_does_not_repeat_old_price_event():
         daily=daily, as_of=date(2026, 10, 13),
     )
     assert events == []
+
+
+def test_stable_b_with_unconfirmed_entry_still_tracks_price_zone_movement():
+    complete = pd.DataFrame([row("ABC", trigger=100)])
+    previous = pd.DataFrame([row("ABC", snapshot="2026-10-12", trigger=120,
+                                 close=121, valid=False, status="UNCONFIRMED",
+                                 anchor="2026-10-12")])
+    current = pd.DataFrame([row("ABC", snapshot="2026-10-13", trigger=120,
+                                close=127, valid=False, status="UNCONFIRMED",
+                                anchor="2026-10-12")])
+    result = build_observation_view(
+        complete, current, pd.DataFrame(), previous=previous, daily={},
+        as_of=date(2026, 10, 13),
+    ).iloc[0]
+    assert result["review_b_event"] == "ZONE → EXT"
+    assert result["review_b_status"] == "UNCONFIRMED"
+    assert result["review_b_zone"] == "EXT"
