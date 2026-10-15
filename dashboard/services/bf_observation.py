@@ -268,7 +268,10 @@ def build_observation_view(
         row["review_b_quality"] = None
         row["review_b_entry_volume"] = None
         row["review_b_entry_reason"] = None
+        row["review_b_details"] = None
         row["review_b_pct"] = None
+        row["review_a_has_value_change"] = False
+        row["review_b_has_value_change"] = False
         row["review_a_as_of"] = None
         row["review_a_zone"] = None
         row["review_a_event"] = ""
@@ -283,6 +286,15 @@ def build_observation_view(
             row["review_watch_active"] = True
             row["signal"] = True
             for field in SOURCE_FACT_FIELDS:
+                row[field] = weekend.get(field)
+            # A's structural review facts must not silently inherit B's
+            # different setup when current midweek has a new trigger.
+            for field in (
+                "base_depth_pct", "base_duration_weeks", "ceiling",
+                "ceiling_date", "breakout_date", "pullback_pct",
+                "pullback_duration_weeks", "pullback_peak_date",
+                "pullback_peak_price", "pullback_v_is_dry",
+            ):
                 row[field] = weekend.get(field)
             row["ibd_breakout_quality"] = weekend.get("ibd_breakout_quality")
             if to_bool(weekend.get("ibd_entry_valid")) is not True:
@@ -335,6 +347,14 @@ def build_observation_view(
             row["review_b_quality"] = midweek.get("ibd_breakout_quality")
             row["review_b_entry_volume"] = _number(midweek.get("ibd_entry_volume_ratio"))
             row["review_b_entry_reason"] = midweek.get("ibd_entry_reject_reason")
+            row["review_b_details"] = {field: midweek.get(field) for field in (
+                "ibd_entry_date", "ibd_entry_close_position",
+                "ibd_entry_breakout_range_ratio", "base_depth_pct",
+                "base_duration_weeks", "ceiling", "ceiling_date",
+                "breakout_date", "pullback_pct", "pullback_duration_weeks",
+                "pullback_peak_date", "pullback_peak_price", "pullback_v_is_dry",
+                "eps_yoy_growth", "dist_to_52w_high_pct", "volume_ratio",
+            )}
             row["review_b_zone"] = _ZONES.get(zone)
             row["review_b_pct"] = (round((_number(midweek.get("latest_close")) / bp - 1) * 100, 2)
                                    if bp and _number(midweek.get("latest_close")) else None)
@@ -345,9 +365,10 @@ def build_observation_view(
         else:
             row["review_new_buy_point"] = False
             row["review_new_buy_point_zone"] = None
+        row["review_a_has_value_change"] = bool(a_changed or (membership_event and weekend is not None))
+        row["review_b_has_value_change"] = bool(event and event not in {"CURRENT", "SNAPSHOT"})
         row["review_has_value_change"] = bool(
-            a_changed or membership_event and weekend is not None or
-            event and event not in {"CURRENT", "SNAPSHOT"}
+            row["review_a_has_value_change"] or row["review_b_has_value_change"]
         )
         row["review_buy_point_change_label"] = row.get("review_change_label") or ""
         row["review_buy_point_priority"] = (
