@@ -637,6 +637,8 @@
     const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
     const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
     const referenceNote = `<strong class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
+    const pathNote = bool(row.review_a_active) && text(row.review_a_path, "").includes("→")
+      ? `<span class="selected-reference">Path ${esc(row.review_a_path)}</span>` : "";
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
       ? `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
@@ -682,7 +684,7 @@
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
-      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}${asOf}</div>${bNote}</div>
+      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}${asOf}</div>${pathNote}${bNote}</div>
       <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
       <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
@@ -757,6 +759,7 @@
         <div><span>Latest</span><strong>${fmt(reviewUsesB(row) ? row.review_b_close : row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
+      ${bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
       ${bool(row.review_a_active) && bool(row.review_b_active)
         ? `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
         : ""}
