@@ -239,6 +239,10 @@ def build_observation_view(
         row["review_b_rule"] = None
         row["review_b_date"] = None
         row["review_b_zone"] = None
+        row["review_b_close"] = None
+        row["review_b_quality"] = None
+        row["review_b_entry_volume"] = None
+        row["review_b_entry_reason"] = None
         row["review_b_pct"] = None
         row["review_a_as_of"] = None
         row["review_a_zone"] = None
@@ -254,6 +258,12 @@ def build_observation_view(
             row["signal"] = True
             for field in SOURCE_FACT_FIELDS:
                 row[field] = weekend.get(field)
+            row["ibd_breakout_quality"] = weekend.get("ibd_breakout_quality")
+            if to_bool(weekend.get("ibd_entry_valid")) is not True:
+                row["ibd_entry_vol_or_reject"] = str(weekend.get("ibd_entry_reject_reason") or "Volume not confirmed")
+            else:
+                volume = _number(weekend.get("ibd_entry_volume_ratio"))
+                row["ibd_entry_vol_or_reject"] = f"{volume:.2f}x" if volume else "n/a"
             trigger = _number(weekend.get("ibd_candidate_price"))
             row["review_a_price"] = trigger
             path = _price_path(weekend, midweek, (daily or {}).get(code), as_of=as_of)
@@ -292,6 +302,10 @@ def build_observation_view(
             row["review_b_status"] = midweek.get("ibd_entry_status")
             row["review_b_rule"] = midweek.get("ibd_candidate_rule")
             row["review_b_date"] = midweek.get("snapshot_date")
+            row["review_b_close"] = _number(midweek.get("latest_close"))
+            row["review_b_quality"] = midweek.get("ibd_breakout_quality")
+            row["review_b_entry_volume"] = _number(midweek.get("ibd_entry_volume_ratio"))
+            row["review_b_entry_reason"] = midweek.get("ibd_entry_reject_reason")
             row["review_b_zone"] = _ZONES.get(zone)
             row["review_b_pct"] = (round((_number(midweek.get("latest_close")) / bp - 1) * 100, 2)
                                    if bp and _number(midweek.get("latest_close")) else None)
