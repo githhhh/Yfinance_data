@@ -96,7 +96,8 @@ async function ready() {
         await detail.waitFor();
         const mobileText = await detail.innerText();
         console.log("MOBILE DETAILS:", JSON.stringify(mobileText.slice(0, 900)));
-        assert(mobileText.includes("Midweek BP"), "Mobile B label");
+        assert(mobileText.toUpperCase().includes("MIDWEEK BP"), "Mobile B label");
+        assert(!mobileText.includes("4W"), "Missing B pullback must not borrow A history");
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
       } else {
         const selected = page.locator(".selected-strip");
