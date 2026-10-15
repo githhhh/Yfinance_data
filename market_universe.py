@@ -7,7 +7,8 @@ artifacts such as EPS PIT caches are deliberately not inferred from ``us/``.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import pandas as pd
@@ -73,7 +74,7 @@ def pick_active_weekend_signal_codes(
     """
     from bf_snapshot import complete_target_week, monday_of_week
 
-    today = review_date or date.today()
+    today = review_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     if today.weekday() > 4:
         return []
     path = Path(data_root) / "us" / "breakout_follow_pool.csv"
