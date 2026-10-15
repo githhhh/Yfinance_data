@@ -79,6 +79,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_b_pct",
     "review_b_zone",
     "review_b_status",
+    "review_b_entry_valid",
     "review_b_rule",
     "review_b_date",
     "review_b_close",
