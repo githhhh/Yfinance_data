@@ -487,7 +487,9 @@
 
   function bounds(rows, field, floor, ceiling) {
     const values = rows.map((row) => (
-      field === "review_distance_pct" ? reviewDistance(row) : num(row[field])
+      field === "review_distance_pct" ? reviewDistance(row)
+        : field === "ibd_entry_volume_ratio" && reviewUsesB(row) ? num(row.review_b_entry_volume)
+        : num(row[field])
     )).filter((value) => value !== null);
     if (!values.length) return null;
     const low = Math.min(floor, Math.floor(Math.min(...values) * 10) / 10);
@@ -710,11 +712,11 @@
       position === null ? "" : `pos ${position.toFixed(2)}`,
       rangeRatio === null ? "" : `rr ${rangeRatio.toFixed(2)}`,
     ].filter(Boolean).join(" · ");
-    const entryVolume = num(row.ibd_entry_volume_ratio);
+    const entryVolume = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
     const weeklyVolume = num(row.volume_ratio);
     const entryPrimary = near
       ? "Pre-signal"
-      : text(row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
+      : text(reviewUsesB(row) ? (entryVolume === null ? row.review_b_entry_reason : fmt(entryVolume, "x")) : row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
     const entryFacts = [
       entryVolume === null ? "" : `Entry Vol ${fmt(entryVolume, "x")}`,
       weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
@@ -766,7 +768,7 @@
       ${bool(row.review_a_active) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` : ""}
       <div class="mobile-detail-review-grid">
         <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
-        <div><span>Geometry</span><strong>${esc(text(row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
+        <div><span>Geometry</span><strong>${esc(text(reviewUsesB(row) ? row.review_b_quality : row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
         <div><span>Entry</span><strong>${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
       </div>
       <div class="mobile-detail-structure">
