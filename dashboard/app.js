@@ -640,8 +640,8 @@
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
       ? `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
-    const asOf = bool(row.review_a_active) && row.review_a_as_of
-      ? ` · As of ${esc(dateText(row.review_a_as_of))}`
+    const asOf = bool(row.review_a_active)
+      ? `${row.review_membership === "OUT" ? " · OUT" : ""}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}`
       : "";
     const baseDepth = num(row.base_depth_pct);
     const baseDuration = num(row.base_duration_weeks);
