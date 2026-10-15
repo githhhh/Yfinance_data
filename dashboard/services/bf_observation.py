@@ -317,3 +317,47 @@ def build_observation_view(
         # remain visible for observation, never automatically enter Futu.
         output.append(row)
     return pd.DataFrame(output)
+
+
+def build_observation_attention(
+    current: pd.DataFrame,
+    complete: pd.DataFrame,
+    trade_review: pd.DataFrame,
+    *, previous: pd.DataFrame | None,
+    daily: dict | None,
+    as_of: date,
+) -> list[dict]:
+    """Small, date-grounded events for Telegram; no persistent state.
+
+    Pool membership transitions require the previous actual pool snapshot;
+    price transitions are replayed independently from daily K lines.
+    """
+    view = build_observation_view(
+        complete, current, trade_review, previous=previous, daily=daily, as_of=as_of,
+    )
+    events = []
+    for _, row in view.iterrows():
+        code = str(row["code"])
+        membership = str(row.get("review_membership_event") or "")
+        if bool(row.get("review_a_active")) and bool(row.get("review_data_available")):
+            price_event = str(row.get("review_a_event") or "")
+            zone = str(row.get("review_a_zone") or "")
+            if price_event or membership:
+                labels = [part for part in (membership, price_event or (zone if membership else "")) if part]
+                events.append({
+                    "source": "WEEKEND", "code": code, "event": " · ".join(labels),
+                    "vs_candidate_pct": row.get("review_a_pct"),
+                    "as_of": row.get("review_a_as_of"),
+                })
+        if bool(row.get("review_b_active")):
+            event = str(row.get("review_b_event") or "")
+            if event not in ("", "CURRENT", "SNAPSHOT"):
+                labels = [event]
+                if row.get("review_b_status"):
+                    labels.append(str(row["review_b_status"]))
+                events.append({
+                    "source": "MIDWEEK", "code": code, "event": " · ".join(labels),
+                    "vs_candidate_pct": row.get("review_b_pct"),
+                    "as_of": row.get("review_b_date"),
+                })
+    return events
