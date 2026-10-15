@@ -654,30 +654,36 @@
   function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
     const near = isNearBreakout(row);
+    const facts = reviewFacts(row);
     const referenceKey = near ? "Watch Trigger" :
       reviewUsesB(row) ? "Midweek BP" :
       currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
-    const entryDate = dateText(row.ibd_entry_date);
+    const entryDate = dateText(facts.ibd_entry_date);
     const buyPointDate = dateText(row.buy_point_date);
-    const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
-    const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
+    const referenceContext = near ? watchTargetSource(row) :
+      reviewUsesB(row) ? dateText(row.review_b_date) : entryDate || buyPointDate;
+    const contextLabel = near ? "Source" :
+      reviewUsesB(row) ? "Snapshot" : entryDate ? "Entry" : "Buy Point Date";
     const referenceNote = `<strong class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
-    const pathNote = bool(row.review_a_active) && text(row.review_a_path, "").includes("→")
+    const pathNote = !reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→")
       ? `<span class="selected-reference">Path ${esc(row.review_a_path)}</span>` : "";
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
-      ? `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
+      ? reviewUsesB(row)
+        ? `<span class="selected-reference">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
+        : `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
-    const asOf = bool(row.review_a_active)
-      ? `${row.review_membership === "OUT" ? " · OUT" : ""}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}`
-      : "";
-    const baseDepth = num(row.base_depth_pct);
-    const baseDuration = num(row.base_duration_weeks);
+    const asOf = reviewUsesB(row) ? ` · As of ${esc(dateText(row.review_b_date))}` :
+      bool(row.review_a_active)
+        ? `${row.review_membership === "OUT" ? " · OUT" : ""}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}`
+        : "";
+    const baseDepth = num(facts.base_depth_pct);
+    const baseDuration = num(facts.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
       : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
-    const ceiling = num(row.ceiling);
-    const ceilingDate = dateText(row.ceiling_date);
-    const breakoutDate = dateText(row.breakout_date);
+    const ceiling = num(facts.ceiling);
+    const ceilingDate = dateText(facts.ceiling_date);
+    const breakoutDate = dateText(facts.breakout_date);
     const ceilingContext = ceiling === null && !ceilingDate
       ? ""
       : `Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}${ceilingDate ? ` · ${esc(ceilingDate)}` : ""}`;
@@ -687,12 +693,12 @@
       ceilingDate ? `<div>Start ${esc(ceilingDate)}</div>` : "",
       breakoutDate ? `<div>BO ${esc(breakoutDate)}</div>` : "",
     ].filter(Boolean).join("");
-    const pullbackDepth = num(row.pullback_pct);
-    const pullbackDuration = num(row.pullback_duration_weeks);
-    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
-      ? null : bool(row.pullback_v_is_dry);
-    const pullbackPeakDate = dateText(row.pullback_peak_date);
-    const pullbackPeakPrice = num(row.pullback_peak_price);
+    const pullbackDepth = num(facts.pullback_pct);
+    const pullbackDuration = num(facts.pullback_duration_weeks);
+    const pullbackDry = facts.pullback_v_is_dry === null || facts.pullback_v_is_dry === undefined
+      ? null : bool(facts.pullback_v_is_dry);
+    const pullbackPeakDate = dateText(facts.pullback_peak_date);
+    const pullbackPeakPrice = num(facts.pullback_peak_price);
     const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
     const pullbackAnchor = pullbackPeakDate || pullbackPeakPrice !== null
       ? `Start ${esc(pullbackPeakDate || "—")}${pullbackPeakPrice === null ? "" : ` · Peak ${fmt(pullbackPeakPrice)}`}`
@@ -710,9 +716,9 @@
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
       <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}${asOf}</div>${pathNote}${bNote}</div>
-      <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
+      <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(facts.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
-      <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
+      <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(facts.dist_to_52w_high_pct, "pct1")}</div></div>
       <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint selected-structure-compact">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint selected-structure-compact">No evidence</div>'}<div class="selected-structure-mobile">${pullbackMobileLines || (pullbackVisible ? "" : "<div>No evidence</div>")}</div></div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
@@ -724,21 +730,23 @@
   
   function mobileDetailHtml(row) {
     const near = isNearBreakout(row);
+    const facts = reviewFacts(row);
     const referenceKey = near ? "Watch Trigger" :
       reviewUsesB(row) ? "Midweek BP" :
       currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
-    const referenceContext = near
-      ? watchTargetSource(row)
-      : dateText(row.ibd_entry_date) || dateText(row.buy_point_date);
-    const referenceContextLabel = near ? "Source" : dateText(row.ibd_entry_date) ? "Entry" : "Buy Point Date";
-    const position = num(row.ibd_entry_close_position);
-    const rangeRatio = num(row.ibd_entry_breakout_range_ratio);
+    const referenceContext = near ? watchTargetSource(row) :
+      reviewUsesB(row) ? dateText(row.review_b_date) :
+      dateText(facts.ibd_entry_date) || dateText(row.buy_point_date);
+    const referenceContextLabel = near ? "Source" :
+      reviewUsesB(row) ? "Snapshot" : dateText(facts.ibd_entry_date) ? "Entry" : "Buy Point Date";
+    const position = num(facts.ibd_entry_close_position);
+    const rangeRatio = num(facts.ibd_entry_breakout_range_ratio);
     const geometryFacts = [
       position === null ? "" : `pos ${position.toFixed(2)}`,
       rangeRatio === null ? "" : `rr ${rangeRatio.toFixed(2)}`,
     ].filter(Boolean).join(" · ");
     const entryVolume = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
-    const weeklyVolume = num(row.volume_ratio);
+    const weeklyVolume = num(facts.volume_ratio);
     const entryPrimary = near
       ? "Pre-signal"
       : text(reviewUsesB(row) ? (entryVolume === null ? row.review_b_entry_reason : fmt(entryVolume, "x")) : row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
@@ -747,24 +755,24 @@
       weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
     ].filter(Boolean).join(" · ");
   
-    const baseDepth = num(row.base_depth_pct);
-    const baseDuration = num(row.base_duration_weeks);
+    const baseDepth = num(facts.base_depth_pct);
+    const baseDuration = num(facts.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
       : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
-    const ceiling = num(row.ceiling);
-    const ceilingDate = dateText(row.ceiling_date);
-    const breakoutDate = dateText(row.breakout_date);
+    const ceiling = num(facts.ceiling);
+    const ceilingDate = dateText(facts.ceiling_date);
+    const breakoutDate = dateText(facts.breakout_date);
     const baseContext = [
       ceiling === null ? "" : `Ceiling ${fmt(ceiling)}`,
       ceilingDate ? `Start ${ceilingDate}` : "",
       breakoutDate ? `BO ${breakoutDate}` : "",
     ].filter(Boolean).join(" · ");
   
-    const pullbackDepth = num(row.pullback_pct);
-    const pullbackDuration = num(row.pullback_duration_weeks);
-    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
-      ? null : bool(row.pullback_v_is_dry);
+    const pullbackDepth = num(facts.pullback_pct);
+    const pullbackDuration = num(facts.pullback_duration_weeks);
+    const pullbackDry = facts.pullback_v_is_dry === null || facts.pullback_v_is_dry === undefined
+      ? null : bool(facts.pullback_v_is_dry);
     const pullbackValue = pullbackDepth === null && pullbackDuration === null && pullbackDry === null
       ? "—"
       : [
@@ -772,8 +780,8 @@
         pullbackDuration === null ? "" : `${fmt(pullbackDuration, "int")}W`,
         pullbackDry === null ? "" : pullbackDry ? "Dry" : "Not Dry",
       ].filter(Boolean).join(" · ");
-    const pullbackPeakDate = dateText(row.pullback_peak_date);
-    const pullbackPeakPrice = num(row.pullback_peak_price);
+    const pullbackPeakDate = dateText(facts.pullback_peak_date);
+    const pullbackPeakPrice = num(facts.pullback_peak_price);
     const pullbackContext = [
       pullbackPeakDate ? `Start ${pullbackPeakDate}` : "",
       pullbackPeakPrice === null ? "" : `Peak ${fmt(pullbackPeakPrice)}`,
@@ -786,19 +794,22 @@
         <div><span>Latest</span><strong>${fmt(reviewUsesB(row) ? row.review_b_close : row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
-      ${bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
+      ${!reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
       ${bool(row.review_a_active) && bool(row.review_b_active)
-        ? `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
+        ? reviewUsesB(row)
+          ? `<div class="mobile-detail-industry">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
+          : `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
         : ""}
-      ${bool(row.review_a_active) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` : ""}
+      ${bool(row.review_a_active) && !reviewUsesB(row) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` :
+        reviewUsesB(row) ? `<div class="mobile-detail-industry">As of ${esc(dateText(row.review_b_date))}</div>` : ""}
       <div class="mobile-detail-review-grid">
         <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
         <div><span>Geometry</span><strong>${esc(text(reviewUsesB(row) ? row.review_b_quality : row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
         <div><span>Entry</span><strong>${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
       </div>
       <div class="mobile-detail-structure">
-        <div><span>EPS YoY</span><strong>${fmt(row.eps_yoy_growth, "pct1")}</strong></div>
-        <div><span>To 52W High</span><strong>${fmt(row.dist_to_52w_high_pct, "pct1")}</strong></div>
+        <div><span>EPS YoY</span><strong>${fmt(facts.eps_yoy_growth, "pct1")}</strong></div>
+        <div><span>To 52W High</span><strong>${fmt(facts.dist_to_52w_high_pct, "pct1")}</strong></div>
         <div class="mobile-detail-base"><span>Base</span><strong>${baseValue}</strong>${baseContext ? `<small>${esc(baseContext)}</small>` : ""}</div>
         <div class="mobile-detail-pullback"><span>Pullback</span><strong>${pullbackValue}</strong>${pullbackContext ? `<small>${esc(pullbackContext)}</small>` : ""}</div>
         <div class="mobile-detail-wide mobile-detail-rs"><span>RS Reference</span><strong data-mobile-rs-reference>—</strong></div>
