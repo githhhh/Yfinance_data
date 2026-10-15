@@ -73,7 +73,7 @@ def test_near_breakout_is_a_ui_stage_not_an_ibd_entry_status() -> None:
     assert "NEAR_BREAKOUT" not in ENTRY_STATUSES
     assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
     assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
-    assert 'return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;' in APP
+    assert 'if (isNearBreakout(row)) return WATCH_STAGE;' in APP
     assert 'const status = displayStatus(row);' in APP
     assert '["ibd_entry_status", "Stage / Status"]' in APP
 
