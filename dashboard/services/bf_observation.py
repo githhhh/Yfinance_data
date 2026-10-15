@@ -124,6 +124,20 @@ def _price_path(weekend, current, daily, *, as_of: date):
     if baseline_close is not None:
         points.append((baseline_date, baseline_close))
     if isinstance(daily, pd.DataFrame) and "Close" in daily.columns:
+        # Yahoo raw OHLC is split-adjusted. A later split may rebase the
+        # complete-week bar but not the immutable Pool trigger. In that case,
+        # refuse a false replay instead of reporting a fabricated breakout.
+        baseline_bars = [
+            _number(close) for ts, close in daily["Close"].items()
+            if _day(ts) == baseline_date
+        ]
+        if baseline_close and baseline_bars and baseline_bars[-1] and abs(
+            baseline_bars[-1] / baseline_close - 1
+        ) > 0.02:
+            return {"as_of": None, "close": None, "zone": None,
+                    "baseline_zone": _zone(trigger, baseline_close),
+                    "latest_event": "", "week_event": "", "path_changed": False,
+                    "change": "UNCHANGED", "pct": None}
         for timestamp, close in daily["Close"].items():
             day = _day(timestamp)
             val = _number(close)
