@@ -365,6 +365,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .review-table th:first-child { z-index: 7; background: #151c24; }
 .review-table tr.selected td:first-child, .review-table tbody tr:hover td:first-child { background: #16252a; }
 .code-cell { color: #70e8d6 !important; font-weight: 800; }
+.pool-out-indicator { display: block; color: #91a2b2; font-size: 8px; font-weight: 750; line-height: 1.05; letter-spacing: .05em; }
 .change-badge, .origin-badge {
   display: inline-flex;
   align-items: center;
