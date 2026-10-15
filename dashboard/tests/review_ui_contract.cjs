@@ -124,6 +124,11 @@ assert(stock.includes("UNCONFIRMED"));
 state.newBuyPoint = "BELOW_BUY_POINT";
 assert.equal(app.reviewUsesB(aChanged), true, "B quick filter selects B facts");
 assert.equal(app.reviewReferencePrice(aChanged), 185);
+state.weeklyVolumeMin = 1.3;
+assert.equal(app.filterRows([bOnly, aChanged]).length, 2,
+  "B weekly volume (1.5×) is used in B quick filter, not weekend 0.7×");
+assert(app.tableHtml([bOnly]).includes("1.50×"), "B Weekly Vol cell must use 1.5×");
+state.weeklyVolumeMin = null;
 let counts = app.filterCounts([bOnly, aChanged]);
 assert.equal(counts.change.ENTERED_BUY_ZONE, 1, "A quick counts stay independent");
 assert.equal(counts.newBuyPoint.BELOW_BUY_POINT, 2, "B quick counts stay independent");
@@ -135,6 +140,10 @@ assert.equal(counts.newBuyPoint.BELOW_BUY_POINT, 2, "switching A quick group mus
 state.scope = "ALL_SIGNALS";
 assert.equal(app.reviewUsesB(bOnly), false, "All Review keeps the A primary");
 assert.equal(app.reviewReferencePrice(bOnly), 170);
+state.weeklyVolumeMin = 1.3;
+assert.equal(app.filterRows([bOnly, aChanged]).length, 0,
+  "All Review weekly-volume filter must use weekend A 0.7×");
+state.weeklyVolumeMin = null;
 assert.equal(app.displayStatus(bOnly), "ACTIONABLE");
 
 console.log("BF Review A/B interaction contract passed");
