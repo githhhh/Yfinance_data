@@ -175,7 +175,19 @@
   }
 
   function reviewUsesB(row) {
-    return currentHasComparison() && state.newBuyPoint !== "ALL" && bool(row.review_b_active);
+    if (!currentHasComparison() || !bool(row.review_b_active)) return false;
+    if (state.newBuyPoint !== "ALL") return true;
+    // When B alone made this ticker actionable for Review Now, all visible
+    // fields must describe B, not the unchanged weekend buy point.
+    return state.scope === "CHANGES"
+      && bool(row.review_b_has_value_change)
+      && !bool(row.review_a_has_value_change);
+  }
+
+  function reviewFacts(row) {
+    return reviewUsesB(row) && row.review_b_details
+      ? { ...row, ...row.review_b_details }
+      : row;
   }
 
   function displayStatus(row) {
@@ -233,9 +245,14 @@
 
   function displayChange(row) {
     if (isNearBreakout(row)) return "";
-    if (reviewUsesB(row)) return text(row.review_b_event, "");
+    const a = text(row.review_buy_point_change_label, "");
+    const b = text(row.review_b_event, "");
+    if (reviewUsesB(row)) return bool(row.review_a_active) ? `B · ${b}` : b;
     if (currentHasComparison() && state.scope === "CHANGES") {
-      return text(row.review_buy_point_change_label, "");
+      if (bool(row.review_a_has_value_change) && bool(row.review_b_has_value_change)) {
+        return [a, `B · ${b}`].filter(Boolean).join(" · ");
+      }
+      return a || (bool(row.review_b_has_value_change) ? `B · ${b}` : "");
     }
     return text(row.review_change_label, "");
   }
@@ -284,10 +301,10 @@
     if (comparison && state.scope === "CHANGES") {
       result = result.filter((row) => bool(row.review_has_value_change));
     }
-    if (comparison && exclude !== "change" && state.change !== "ALL") {
+    if (comparison && exclude !== "change" && exclude !== "bothQuick" && state.change !== "ALL") {
       result = result.filter((row) => row.review_weekend_buy_point_change === state.change);
     }
-    if (comparison && exclude !== "newBuyPoint" && state.newBuyPoint !== "ALL") {
+    if (comparison && exclude !== "newBuyPoint" && exclude !== "bothQuick" && state.newBuyPoint !== "ALL") {
       result = result.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint);
     }
     const effectiveStatus = (
@@ -308,8 +325,10 @@
 
   function filterCounts(rows) {
     const statusBase = filterRows(rows, "status");
-    const changeBase = filterRows(rows, "change");
-    const newBuyPointBase = filterRows(rows, "newBuyPoint");
+    // A/B quick groups are alternative buy-point contexts, not cumulative
+    // filters. Each group's count must not depend on the other quick group.
+    const changeBase = filterRows(rows, "bothQuick");
+    const newBuyPointBase = changeBase;
     const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length]));
     if (currentHasComparison() && state.scope === "CHANGES") {
       status[WATCH_STAGE] = rows.filter(isNearBreakout).length;
@@ -383,6 +402,8 @@
     const snapshot = isMidweek ? data.meta.midweek_snapshot_date : data.meta.complete_snapshot_date;
     const signalCount = rows.filter(isSignalActive).length;
     const nearCount = rows.filter(isNearBreakout).length;
+    const inPool = isMidweek ? rows.filter((row) => row.review_membership !== "OUT").length : rows.length;
+    const trackedOut = isMidweek ? rows.filter((row) => row.review_membership === "OUT").length : 0;
     const fresh = freshness(snapshot);
     const badge = isMidweek
       ? `<span class="data-badge loaded">Data Loaded</span>`
@@ -394,7 +415,7 @@
       <header class="dashboard-header">
         <div>
           <div class="dashboard-title-row"><div class="dashboard-title">Breakout Pool</div>${badge}</div>
-          <div class="dashboard-snapshot">${snapshotText} · <b>${rows.length}</b> Total Pool · <b>${signalCount}</b> Active Signals · <b>${nearCount}</b> Near Breakout</div>
+          <div class="dashboard-snapshot">${snapshotText} · <b>${inPool}</b> Pool · <b>${trackedOut}</b> Tracked OUT · <b>${signalCount}</b> Signals · <b>${nearCount}</b> Near Breakout</div>
         </div>
       </header>`;
   }
