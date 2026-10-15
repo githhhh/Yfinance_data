@@ -182,3 +182,39 @@ def test_stable_b_with_unconfirmed_entry_still_tracks_price_zone_movement():
     assert result["review_b_event"] == "ZONE → EXT"
     assert result["review_b_status"] == "UNCONFIRMED"
     assert result["review_b_zone"] == "EXT"
+
+
+def test_daily_loader_reads_production_split_pickle_and_actual_trade_date(tmp_path):
+    import pickle
+    from dashboard.services.bf_observation import load_daily_snapshot
+
+    pkl_dir = tmp_path / "results_pkl"
+    pkl_dir.mkdir()
+    us_dates = pd.to_datetime(["2026-10-09", "2026-10-13"]).tz_localize("US/Eastern")
+    content = {"LIVE": pd.DataFrame({"Close": [105.0, 102.4]}, index=us_dates).to_dict("split")}
+    with (pkl_dir / "stock_data_141026_1d.pkl").open("wb") as handle:
+        pickle.dump(content, handle)
+    snapshot = load_daily_snapshot(tmp_path, window_date=date(2026, 10, 14))
+    assert set(snapshot) == {"LIVE"}
+    assert snapshot["LIVE"]["Close"].iloc[-1] == 102.4
+    assert str(snapshot["LIVE"].index[-1].date()) == "2026-10-13"
+    assert load_daily_snapshot(tmp_path, window_date=date(2026, 10, 13)) == {}
+
+
+def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    for market_date in ["2026-10-12", "2026-10-13", "2026-10-14"]:
+        pd.DataFrame([row("HISTORY", snapshot=market_date)]).to_csv(pool, index=False)
+        subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", market_date], cwd=tmp_path, check=True)
+    previous = load_previous_midweek(tmp_path, date(2026, 10, 14))
+    assert previous is not None
+    assert previous.iloc[0]["snapshot_date"] == "2026-10-13"
+    assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
