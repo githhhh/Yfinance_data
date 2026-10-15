@@ -354,12 +354,22 @@ def build_observation_attention(
     view = build_observation_view(
         complete, current, trade_review, previous=previous, daily=daily, as_of=as_of,
     )
+    previous_date = None
+    if previous is not None and not previous.empty and "snapshot_date" in previous:
+        dates = pd.to_datetime(previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+        if len(dates) == 1 and dates[0] < as_of and monday_of_week(dates[0]) == monday_of_week(as_of):
+            previous_date = dates[0]
     events = []
     for _, row in view.iterrows():
         code = str(row["code"])
         membership = str(row.get("review_membership_event") or "")
         if bool(row.get("review_a_active")) and bool(row.get("review_data_available")):
             price_event = str(row.get("review_a_event") or "")
+            # A's cached last daily bar must not be notified again if no
+            # new dated daily observation followed the previous snapshot.
+            observed = _day(row.get("review_a_as_of"))
+            if previous_date is not None and (observed is None or observed <= previous_date):
+                price_event = ""
             zone = str(row.get("review_a_zone") or "")
             if price_event or membership:
                 labels = [part for part in (membership, price_event or (zone if membership else "")) if part]
