@@ -186,7 +186,7 @@
   }
 
   function reviewSetup(row) {
-    return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : row.ibd_candidate_rule;
+    return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : reviewUsesB(row) ? row.review_b_rule : row.ibd_candidate_rule;
   }
 
   function setupHtml(row) {
