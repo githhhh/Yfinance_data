@@ -17,6 +17,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.data_utils import build_snapshot_freshness
+from dashboard.services.bf_observation import (
+    build_observation_view,
+    load_daily_snapshot,
+    load_previous_midweek,
+)
 from dashboard.field_config import FLOW_CARD_META, STATUS_META
 from dashboard.services.bf_midweek_review import (
     PoolMode,
@@ -55,6 +60,22 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "signal",
     "snapshot_date",
     "review_watch_active",
+    "review_a_active",
+    "review_a_price",
+    "review_a_pct",
+    "review_a_zone",
+    "review_a_as_of",
+    "review_a_event",
+    "review_a_week_event",
+    "review_data_available",
+    "review_membership",
+    "review_membership_event",
+    "review_b_active",
+    "review_b_price",
+    "review_b_pct",
+    "review_b_zone",
+    "review_b_status",
+    "review_b_event",
     "review_effective_entry_status",
     "review_priority",
     "review_baseline_entry_status",
@@ -333,6 +354,8 @@ def build_dashboard_payload(
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
+    daily: dict | None = None,
+    previous_pool: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     analysis = analyze_breakout_follow_pool(
         complete_path,
@@ -341,11 +364,23 @@ def build_dashboard_payload(
     )
 
     complete = _complete_view(analysis.complete_pool)
-    midweek = (
-        materialize_review_view(analysis.midweek_review)
-        if analysis.midweek_available
-        else pd.DataFrame()
-    )
+    midweek = pd.DataFrame()
+    if analysis.midweek_available:
+        # Futu uses the original trade projection; public Review uses an
+        # independent A/B observation projection with immutable weekend anchor.
+        base = materialize_review_view(analysis.midweek_review)
+        snapshot_date = analysis.midweek_snapshot_date
+        effective_previous = previous_pool
+        if effective_previous is None and snapshot_date is not None:
+            effective_previous = load_previous_midweek(PROJECT_ROOT, snapshot_date)
+        midweek = build_observation_view(
+            analysis.complete_pool if analysis.midweek_baseline_available else pd.DataFrame(),
+            analysis.midweek_pool,
+            base,
+            daily=daily if daily is not None else load_daily_snapshot(PROJECT_ROOT, window_date=window_date),
+            previous=effective_previous,
+            as_of=window_date,
+        )
 
     complete_snapshot = (
         analysis.complete_snapshot_date.isoformat()
