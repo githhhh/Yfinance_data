@@ -87,6 +87,8 @@ async function ready() {
       assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 2, "Review Now excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
+      const outRow = page.locator('.review-table tbody tr[data-code="AWEEK"]');
+      assert((await outRow.innerText()).includes("OUT"), "OUT must be visible without expanding");
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
