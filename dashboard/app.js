@@ -260,6 +260,10 @@
     return reviewUsesB(row) ? num(row.review_b_price) : num(row.ibd_candidate_price);
   }
 
+  function reviewWeeklyVolume(row) {
+    return num(reviewUsesB(row) ? row.review_b_details?.volume_ratio : row.volume_ratio);
+  }
+
   function displayChange(row) {
     if (isNearBreakout(row)) return "";
     const a = text(row.review_buy_point_change_label, "");
@@ -335,7 +339,7 @@
       if (state.distanceMin !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value >= state.distanceMin; });
       if (state.distanceMax !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value <= state.distanceMax; });
       if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
-      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = num(row.volume_ratio); return value !== null && value >= state.weeklyVolumeMin; });
+      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = reviewWeeklyVolume(row); return value !== null && value >= state.weeklyVolumeMin; });
     }
     return result;
   }
@@ -527,6 +531,7 @@
     const values = rows.map((row) => (
       field === "review_distance_pct" ? reviewDistance(row)
         : field === "ibd_entry_volume_ratio" && reviewUsesB(row) ? num(row.review_b_entry_volume)
+        : field === "volume_ratio" ? reviewWeeklyVolume(row)
         : num(row[field])
     )).filter((value) => value !== null);
     if (!values.length) return null;
@@ -971,7 +976,7 @@
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
     if (field === "ibd_breakout_quality") { const quality = reviewUsesB(row) ? row.review_b_quality : value; return `<span class="quality-text ${qualityClass(quality)}">${esc(text(quality))}</span>`; }
     if (field === "latest_close") return esc(fmt(reviewUsesB(row) ? row.review_b_close : value));
-    if (field === "volume_ratio") return esc(fmt(value, "x"));
+    if (field === "volume_ratio") return esc(fmt(reviewWeeklyVolume(row), "x"));
     if (field === "industry_rs") return '<span class="industry-rs-cell">—</span>';
     if (field === "rs_percentile") {
       const current = num(value);
