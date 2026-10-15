@@ -313,12 +313,12 @@ def test_static_site_build_is_self_contained(tmp_path: Path) -> None:
     assert "Selected Overview" in app
     assert "RS Reference" in app
     assert "Buy Point Date" in app
-    assert 'row.base_depth_pct' in app
-    assert 'row.base_duration_weeks' in app
-    assert 'row.pullback_peak_date' in app
-    assert 'row.pullback_peak_price' in app
-    assert 'row.eps_yoy_growth' in app
-    assert 'row.dist_to_52w_high_pct' in app
+    assert 'facts.base_depth_pct' in app
+    assert 'facts.base_duration_weeks' in app
+    assert 'facts.pullback_peak_date' in app
+    assert 'facts.pullback_peak_price' in app
+    assert 'facts.eps_yoy_growth' in app
+    assert 'facts.dist_to_52w_high_pct' in app
     assert 'data-action="detail"' not in app
     assert "C Rank" not in app
     assert "rank_C_continuous" not in app
