@@ -163,11 +163,16 @@ def _price_path(weekend, current, daily, *, as_of: date):
     latest_event = _arrow(previous_zone, latest_zone)
     week_event = _arrow(base_zone, latest_zone)
     history_changed = any(left[1] != right[1] for left, right in zip(zones, zones[1:]))
+    path_zones = []
+    for _, zone, _ in zones:
+        if zone and (not path_zones or zone != path_zones[-1]):
+            path_zones.append(zone)
+    short_path = " → ".join(_ZONES[zone] for zone in path_zones)
     focus_from = previous_zone if latest_event else base_zone
     focus_change = _CHANGES.get(latest_zone, "UNCHANGED") if focus_from != latest_zone else "UNCHANGED"
     return {"as_of": latest_day.isoformat(), "close": latest_close, "zone": latest_zone,
             "baseline_zone": base_zone, "latest_event": latest_event, "week_event": week_event,
-            "path_changed": history_changed, "change": focus_change,
+            "path_changed": history_changed, "path": short_path, "change": focus_change,
             "pct": round((latest_close / trigger - 1) * 100, 2)}
 
 
@@ -207,7 +212,10 @@ def _b_event(weekend, today, previous, *, comparison_available):
     new_status = str(today.get("ibd_entry_status") or "")
     if old_status != new_status:
         return f"{old_status} → {new_status}"
-    return "CURRENT"
+    return _arrow(
+        _zone(previous.get("ibd_candidate_price"), previous.get("latest_close")),
+        _zone(today.get("ibd_candidate_price"), today.get("latest_close")),
+    ) or "CURRENT"
 
 
 def build_observation_view(
@@ -265,6 +273,7 @@ def build_observation_view(
         row["review_a_zone"] = None
         row["review_a_event"] = ""
         row["review_a_week_event"] = ""
+        row["review_a_path"] = ""
         row["review_a_price"] = None
         row["review_a_pct"] = None
         row["review_data_available"] = True
@@ -300,6 +309,7 @@ def build_observation_view(
                 row["review_a_zone"] = _ZONES.get(path["zone"])
                 row["review_a_event"] = path["latest_event"]
                 row["review_a_week_event"] = path["week_event"]
+                row["review_a_path"] = path["path"]
                 a_change = path["change"]
                 a_changed = bool(path["week_event"] or path["latest_event"])
                 focus = path["latest_event"] or path["week_event"] or ""
