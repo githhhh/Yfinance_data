@@ -174,8 +174,15 @@
     return isSignalActive(row) || isNearBreakout(row);
   }
 
+  function reviewUsesB(row) {
+    return currentHasComparison() && state.newBuyPoint !== "ALL" && bool(row.review_b_active);
+  }
+
   function displayStatus(row) {
-    return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;
+    if (isNearBreakout(row)) return WATCH_STAGE;
+    if (reviewUsesB(row)) return row.review_b_status;
+    if (bool(row.review_a_active) && row.review_data_available === false) return "NO_DATA";
+    return row.ibd_entry_status;
   }
 
   function reviewSetup(row) {
@@ -215,15 +222,18 @@
   }
 
   function reviewDistance(row) {
-    return isNearBreakout(row) ? nearBreakoutDistance(row) : num(row.current_vs_ibd_candidate_pct);
+    if (isNearBreakout(row)) return nearBreakoutDistance(row);
+    return reviewUsesB(row) ? num(row.review_b_pct) : num(row.current_vs_ibd_candidate_pct);
   }
 
   function reviewReferencePrice(row) {
-    return isNearBreakout(row) ? nearBreakoutTarget(row) : num(row.ibd_candidate_price);
+    if (isNearBreakout(row)) return nearBreakoutTarget(row);
+    return reviewUsesB(row) ? num(row.review_b_price) : num(row.ibd_candidate_price);
   }
 
   function displayChange(row) {
     if (isNearBreakout(row)) return "";
+    if (reviewUsesB(row)) return text(row.review_b_event, "");
     if (currentHasComparison() && state.scope === "CHANGES") {
       return text(row.review_buy_point_change_label, "");
     }
@@ -627,6 +637,12 @@
     const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
     const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
     const referenceNote = `<strong class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
+    const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
+      ? `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
+      : "";
+    const asOf = bool(row.review_a_active) && row.review_a_as_of
+      ? ` · As of ${esc(dateText(row.review_a_as_of))}`
+      : "";
     const baseDepth = num(row.base_depth_pct);
     const baseDuration = num(row.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
@@ -666,7 +682,7 @@
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
-      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
+      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}${asOf}</div>${bNote}</div>
       <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
       <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
@@ -741,6 +757,10 @@
         <div><span>Latest</span><strong>${fmt(row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
+      ${bool(row.review_a_active) && bool(row.review_b_active)
+        ? `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
+        : ""}
+      ${bool(row.review_a_active) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` : ""}
       <div class="mobile-detail-review-grid">
         <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
         <div><span>Geometry</span><strong>${esc(text(row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
@@ -885,7 +905,8 @@
     }
     if (field === "ibd_entry_status") {
       const status = displayStatus(row);
-      return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+      return status === "NO_DATA" ? '<span class="status-text">NO DATA</span>'
+        : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
@@ -1046,6 +1067,9 @@
           const field = element.dataset.field;
           const value = element.dataset.value;
           state[field] = state[field] === value ? "ALL" : value;
+          // A and B filters refer to different buy points; never intersect them.
+          if (field === "change" && state.change !== "ALL") state.newBuyPoint = "ALL";
+          if (field === "newBuyPoint" && state.newBuyPoint !== "ALL") state.change = "ALL";
           render();
         } else if (action === "status") {
           const value = element.dataset.value;
