@@ -95,7 +95,6 @@ async function ready() {
         const detail = page.locator(".mobile-inline-review");
         await detail.waitFor();
         const mobileText = await detail.innerText();
-        console.log("MOBILE DETAILS:", JSON.stringify(mobileText.slice(0, 900)));
         assert(mobileText.toUpperCase().includes("MIDWEEK BP"), "Mobile B label");
         assert(!mobileText.includes("4W"), "Missing B pullback must not borrow A history");
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
@@ -107,7 +106,8 @@ async function ready() {
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
       assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 3, "All Review includes Near");
-      await page.locator('.review-table tbody tr[data-code="BONLY"]').click();
+      // Scope changes retain selection; clicking the same mobile row again
+      // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
       assert(selected.includes("Weekend BP 170"), "All Review restores A primary");
 
