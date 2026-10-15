@@ -111,7 +111,9 @@ def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() 
 
 def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
     assert "function nearBreakoutDetailHtml(row)" not in APP
-    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
+    assert 'const referenceKey = near ? "Watch Trigger" :' in APP
+    assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
+    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
     assert 'const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;' in APP
     assert 'const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";' in APP
     assert 'return "Recovery High"' in APP
