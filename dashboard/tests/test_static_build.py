@@ -29,7 +29,7 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
     )
     normalized = load_pool_csv(COMPLETE)
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert len(payload["views"]["weekend"]["rows"]) == len(normalized)
     assert payload["meta"]["complete_snapshot_date"] is not None
     assert payload["default_period"] in {"WEEKEND", "MIDWEEK"}
