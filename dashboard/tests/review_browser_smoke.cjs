@@ -42,6 +42,7 @@ const bOnly = row("BONLY", {
   review_has_value_change: true, review_b_has_value_change: true,
 });
 const aOnly = row("AWEEK", {
+  ibd_entry_status: "UNCONFIRMED",
   review_membership: "OUT", review_a_has_value_change: true,
   review_has_value_change: true, review_a_event: "BELOW → ZONE",
   review_change_label: "BELOW → ZONE · OUT",
@@ -89,6 +90,14 @@ async function ready() {
 
       const outRow = page.locator('.review-table tbody tr[data-code="AWEEK"]');
       assert((await outRow.innerText()).includes("OUT"), "OUT must be visible without expanding");
+      const stockStatus = outRow.locator('td[data-field="ibd_entry_status"]');
+      const mainStatusRect = await stockStatus.locator(".status-stack .status-text").boundingBox();
+      const outRect = await stockStatus.locator(".status-stack .pool-out-indicator").boundingBox();
+      assert(mainStatusRect && outRect, "Stock status and OUT are visible");
+      assert(outRect.y >= mainStatusRect.y + mainStatusRect.height - 1,
+        "Stock OUT must occupy its own line below UNCONFIRMED");
+      assert(Math.abs((outRect.x + outRect.width / 2) - (mainStatusRect.x + mainStatusRect.width / 2)) <= 2,
+        "Stock OUT must be centered below the status");
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
@@ -127,6 +136,12 @@ async function ready() {
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true");
       assert(await page.locator('.industry-stock-table tbody tr[data-code]').count() >= 2);
+      const industryOut = page.locator('.industry-stock-table tbody tr[data-code="AWEEK"]');
+      const industryStatusRect = await industryOut.locator(".status-stack .status-text").boundingBox();
+      const industryOutRect = await industryOut.locator(".status-stack .pool-out-indicator").boundingBox();
+      assert(industryStatusRect && industryOutRect, "Industry status and OUT must be visible");
+      assert(industryOutRect.y >= industryStatusRect.y + industryStatusRect.height - 1,
+        "Industry OUT must occupy its own line");
       const after = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!after, "Industry view overflow at " + viewport.width);
       await page.close();
