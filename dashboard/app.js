@@ -190,6 +190,11 @@
       : "";
   }
 
+  function statusWithOut(row, statusHtml) {
+    const out = reviewOutLabel(row);
+    return out ? `<span class="status-stack">${statusHtml}${out}</span>` : statusHtml;
+  }
+
   function reviewFacts(row) {
     if (!reviewUsesB(row)) return row;
     const b = row.review_b_details || {};
@@ -617,11 +622,12 @@
       const code = esc(row.code);
       const rs = provider?.stockRS(row.code);
       const status = displayStatus(row);
+      const statusHtml = `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       const selected = String(state.industrySelected[state.period]) === String(row.code);
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
         <td class="industry-code">${code}</td>
         <td class="industry-stock-rs">${rs === null || rs === undefined ? "N/A" : esc(String(rs))}</td>
-        <td><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>${reviewOutLabel(row)}</td>
+        <td>${statusWithOut(row, statusHtml)}</td>
         <td class="industry-vs-ref${num(reviewDistance(row)) !== null && reviewDistance(row) < 0 ? " negative" : ""}">${esc(fmt(reviewDistance(row), "pct"))}</td>
       </tr>`;
       const detail = selected && isMobileReview()
@@ -977,7 +983,7 @@
       const status = displayStatus(row);
       const statusText = status === "NO_DATA" ? '<span class="status-text">NO DATA</span>'
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
-      return statusText + reviewOutLabel(row);
+      return statusWithOut(row, statusText);
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
