@@ -50,6 +50,15 @@ const aOnly = row("AWEEK", {
   review_weekend_buy_point_change: "ENTERED_BUY_ZONE",
   review_buy_point_priority: 0,
 });
+const belowOut = row("BELOWOUT", {
+  ibd_entry_status: "BELOW_TRIGGER",
+  review_membership: "OUT", review_a_active: true,
+  review_a_has_value_change: true, review_has_value_change: true,
+  review_a_event: "ZONE → BELOW",
+  review_weekend_buy_point_change: "BELOW_BUY_POINT",
+  review_buy_point_change_label: "ZONE → BELOW",
+  review_buy_point_priority: 1,
+});
 const near = row("NEAR", {
   signal: false, review_watch_active: false,
   bf_watch_active: true, review_a_active: false, review_b_active: false,
@@ -58,7 +67,7 @@ const near = row("NEAR", {
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
-payload.views.midweek.rows = [aOnly, bOnly, near];
+payload.views.midweek.rows = [aOnly, belowOut, bOnly, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
 async function ready() {
@@ -77,7 +86,11 @@ async function ready() {
     .find(p => fs.existsSync(p));
   const browser = await chromium.launch(executablePath ? { executablePath, headless: true, args: ["--no-sandbox"] } : { channel: "chrome", headless: true });
   try {
-    for (const viewport of [{ width: 1360, height: 900 }, { width: 390, height: 844 }]) {
+    for (const viewport of [
+      { width: 1360, height: 900 }, { width: 760, height: 844 },
+      { width: 430, height: 844 }, { width: 390, height: 844 },
+      { width: 350, height: 844 }, { width: 320, height: 844 },
+    ]) {
       const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
       page.on("pageerror", error => { throw error; });
       await page.route("**/data/dashboard.json", route => route.fulfill({
@@ -85,19 +98,27 @@ async function ready() {
       }));
       await page.goto("http://127.0.0.1:8765/", { waitUntil: "domcontentloaded" });
       await page.locator(".review-section").waitFor();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 2, "Review Now excludes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 3, "Changes scope excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
-      const outRow = page.locator('.review-table tbody tr[data-code="AWEEK"]');
-      assert((await outRow.innerText()).includes("OUT"), "OUT must be visible without expanding");
-      const stockStatus = outRow.locator('td[data-field="ibd_entry_status"]');
-      const mainStatusRect = await stockStatus.locator(".status-stack .status-text").boundingBox();
-      const outRect = await stockStatus.locator(".status-stack .pool-out-indicator").boundingBox();
-      assert(mainStatusRect && outRect, "Stock status and OUT are visible");
-      assert(outRect.y >= mainStatusRect.y + mainStatusRect.height - 1,
-        "Stock OUT must occupy its own line below UNCONFIRMED");
-      assert(Math.abs((outRect.x + outRect.width / 2) - (mainStatusRect.x + mainStatusRect.width / 2)) <= 2,
-        "Stock OUT must be centered below the status");
+      for (const outCode of ["AWEEK", "BELOWOUT"]) {
+        const outRow = page.locator(`.review-table tbody tr[data-code="${outCode}"]`);
+        assert((await outRow.innerText()).includes("OUT"), "OUT must be visible without expanding");
+        const statusCell = outRow.locator('td[data-field="ibd_entry_status"]');
+        const statusBox = await statusCell.boundingBox();
+        const statusRect = await statusCell.locator(".status-stack .status-text").boundingBox();
+        const outRect = await statusCell.locator(".status-stack .pool-out-indicator").boundingBox();
+        assert(statusBox && statusRect && outRect, "Status and OUT must be visible");
+        assert(outRect.y >= statusRect.y + statusRect.height - 1,
+          `${outCode} OUT must appear on the second line (${viewport.width}px)`);
+        assert(Math.abs((outRect.x + outRect.width / 2) - (statusRect.x + statusRect.width / 2)) <= 2,
+          `${outCode} OUT must be centered below status (${viewport.width}px)`);
+        assert(statusRect.x >= statusBox.x - 1 &&
+          statusRect.x + statusRect.width <= statusBox.x + statusBox.width + 1,
+          `${outCode} status must not be horizontally clipped (${viewport.width}px)`);
+        assert(outRect.y + outRect.height <= statusBox.y + statusBox.height + 1,
+          `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
+      }
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
@@ -116,7 +137,7 @@ async function ready() {
       }
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 3, "All Review includes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 4, "All Review includes Near");
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
@@ -127,7 +148,7 @@ async function ready() {
       await page.evaluate(() => {
         window.BFIndustryRS = {
           status: () => "ready", industryForCode: () => "Software",
-          industryRS: () => 92, stockRS: code => ({ BONLY: 99, AWEEK: 96, NEAR: 90 })[code],
+          industryRS: () => 92, stockRS: code => ({ BONLY: 99, AWEEK: 96, BELOWOUT: 93, NEAR: 90 })[code],
         };
       });
       await page.locator('[data-action="toggle-view"]').click();
@@ -136,16 +157,25 @@ async function ready() {
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true");
       assert(await page.locator('.industry-stock-table tbody tr[data-code]').count() >= 2);
-      const industryOut = page.locator('.industry-stock-table tbody tr[data-code="AWEEK"]');
-      const industryStatusRect = await industryOut.locator(".status-stack .status-text").boundingBox();
-      const industryOutRect = await industryOut.locator(".status-stack .pool-out-indicator").boundingBox();
-      assert(industryStatusRect && industryOutRect, "Industry status and OUT must be visible");
-      assert(industryOutRect.y >= industryStatusRect.y + industryStatusRect.height - 1,
-        "Industry OUT must occupy its own line");
+      for (const outCode of ["AWEEK", "BELOWOUT"]) {
+        const industryOut = page.locator(`.industry-stock-table tbody tr[data-code="${outCode}"]`);
+        const cell = industryOut.locator("td:nth-child(3)");
+        const cellRect = await cell.boundingBox();
+        const labelRect = await cell.locator(".status-stack .status-text").boundingBox();
+        const outRect = await cell.locator(".status-stack .pool-out-indicator").boundingBox();
+        assert(cellRect && labelRect && outRect, "Industry status and OUT must be visible");
+        assert(outRect.y >= labelRect.y + labelRect.height - 1,
+          `${outCode} Industry OUT must appear below the status (${viewport.width}px)`);
+        assert(labelRect.x >= cellRect.x - 1 &&
+          labelRect.x + labelRect.width <= cellRect.x + cellRect.width + 1,
+          `${outCode} Industry status must not clip (${viewport.width}px)`);
+        assert(outRect.y + outRect.height <= cellRect.y + cellRect.height + 1,
+          `${outCode} Industry OUT must fit within row height (${viewport.width}px)`);
+      }
       const after = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!after, "Industry view overflow at " + viewport.width);
       await page.close();
     }
   } finally { await browser.close(); }
-  console.log("Desktop + 390px mobile browser smoke passed");
+  console.log("Desktop + 320/350/390/430/760px browser status-layout smoke passed");
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.kill());
