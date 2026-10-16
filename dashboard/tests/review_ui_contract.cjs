@@ -124,6 +124,8 @@ out.review_b_active = false;
 out.review_membership = "OUT";
 assert(app.tableHtml([out]).includes("pool-out-indicator"), "Stock OUT visible");
 assert(app.industryHtml([out]).includes("pool-out-indicator"), "Industry OUT visible");
+assert(app.tableHtml([out]).includes('<span class="status-stack">'), "Stock OUT below status");
+assert(app.industryHtml([out]).includes('<span class="status-stack">'), "Industry OUT below status");
 const stock = app.tableHtml([bOnly]);
 assert(stock.includes("B · NEW BP"));
 assert(stock.includes("UNCONFIRMED"));
