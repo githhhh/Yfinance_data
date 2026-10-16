@@ -113,7 +113,8 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
     return None
 
 
-def _price_path(weekend, current, daily, *, as_of: date, previous=None):
+def _price_path(weekend, current, daily, *, as_of: date, previous=None,
+                previous_date: date | None = None):
     """Compare the latest two *observed* prices within one review week.
 
     Missing trading days do not prevent a transition. The complete-week
@@ -154,7 +155,6 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None):
                 prices[day] = value
                 daily_dates.add(day)
 
-    snapshot_dates = set()
     for snapshot in (previous, current):
         if snapshot is None:
             continue
@@ -165,7 +165,6 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None):
             # The actual 1D candle wins if both sources observe the same day.
             if day not in prices:
                 prices[day] = value
-                snapshot_dates.add(day)
 
     observations = sorted(
         (day, _zone(trigger, value), value)
@@ -180,9 +179,29 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None):
 
     latest_day, latest_zone, latest_close = observations[-1]
     base_zone = _zone(trigger, baseline_close)
-    previous_zone = observations[-2][1] if len(observations) >= 2 else None
-    # No consecutive-session requirement: an intervening missing day is
-    # unknown, not evidence against comparing two real observations.
+    previous_zone = None
+    if (previous_date is not None
+            and monday_of_week(previous_date) == week_start):
+        # The last successful midweek snapshot is the comparison boundary.
+        # Intermediate PKL bars may exist, but must not change the baseline
+        # of the user's last-versus-current increment.
+        if previous_date < latest_day:
+            previous_close = (
+                _number(previous.get("latest_close"))
+                if previous is not None
+                and _day(previous.get("snapshot_date")) == previous_date
+                else None
+            )
+            if previous_close is not None:
+                previous_zone = _zone(trigger, previous_close)
+            else:
+                earlier = [z for z in observations if z[0] <= previous_date]
+                if earlier:
+                    previous_zone = earlier[-1][1]
+    elif len(observations) >= 2:
+        # No published prior snapshot: use the last genuine in-week bar.
+        previous_zone = observations[-2][1]
+    # No consecutive-session requirement or backfill of missing prices.
     latest_event = _arrow(previous_zone, latest_zone)
     week_event = _arrow(base_zone, latest_zone)
     observed_path = []
@@ -338,6 +357,7 @@ def build_observation_view(
             path = _price_path(
                 weekend, midweek, (daily or {}).get(code), as_of=as_of,
                 previous=prev_by_code.get(code),
+                previous_date=prev_date if prev_valid else None,
             )
             if path is None or path["close"] is None:
                 row["review_data_available"] = False
