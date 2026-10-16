@@ -489,6 +489,10 @@ def build_observation_attention(
             event = str(row.get("review_b_event") or "")
             status = str(row.get("review_b_status") or "")
             zone = str(row.get("review_b_zone") or "")
+            # ACT is a confirmed *entry*, never an alias for price merely
+            # being in ZONE. Fail closed if status and resolver validity disagree.
+            if status == "ACTIONABLE" and to_bool(row.get("review_b_entry_valid")) is not True:
+                status = "UNCONFIRMED"
             if (
                 event in {"NEW BP", "BP CHANGED"}
                 and zone == "ZONE"
