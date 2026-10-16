@@ -5,7 +5,7 @@ used to build Futu ACTIONABLE codes. No persisted event/price cache is needed.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import pickle
 import subprocess
@@ -13,7 +13,7 @@ from io import StringIO
 
 import pandas as pd
 
-from bf_snapshot import monday_of_week
+from bf_snapshot import monday_of_week, _is_market_trading_day
 from dashboard.services.bf_transition import (
     SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone, to_bool,
 )
@@ -121,6 +121,7 @@ def _price_path(weekend, current, daily, *, as_of: date):
     if trigger is None or baseline_date is None:
         return None
     points = []
+    used_snapshot_fallback = False
     if baseline_close is not None:
         points.append((baseline_date, baseline_close))
     if isinstance(daily, pd.DataFrame) and "Close" in daily.columns:
@@ -149,6 +150,7 @@ def _price_path(weekend, current, daily, *, as_of: date):
         fallback_close = _number(current.get("latest_close"))
         if fallback_date and baseline_date < fallback_date <= as_of and fallback_close:
             points.append((fallback_date, fallback_close))
+            used_snapshot_fallback = True
     # The complete-week close is the baseline, not evidence of live freshness.
     has_new_price = any(day > baseline_date for day, _ in points)
     if not has_new_price:
@@ -160,19 +162,31 @@ def _price_path(weekend, current, daily, *, as_of: date):
     latest_day, latest_zone, latest_close = zones[-1]
     base_zone = _zone(trigger, baseline_close)
     previous_zone = zones[-2][1] if len(zones) >= 2 else None
-    latest_event = _arrow(previous_zone, latest_zone)
+    previous_market_day = latest_day - timedelta(days=1)
+    while previous_market_day > baseline_date and not _is_market_trading_day(previous_market_day):
+        previous_market_day -= timedelta(days=1)
+    # Snapshot fallback has no intervening daily bars: it can establish only
+    # the current zone / net vs weekend, never a latest daily transition.
+    # Likewise missing previous trading-day K must not fake a daily event.
+    has_contiguous_pair = (
+        not used_snapshot_fallback and len(zones) >= 2
+        and zones[-2][0] == previous_market_day
+    )
+    latest_event = _arrow(previous_zone, latest_zone) if has_contiguous_pair else ""
     week_event = _arrow(base_zone, latest_zone)
     history_changed = any(left[1] != right[1] for left, right in zip(zones, zones[1:]))
     path_zones = []
     for _, zone, _ in zones:
         if zone and (not path_zones or zone != path_zones[-1]):
             path_zones.append(zone)
-    short_path = " → ".join(_ZONES[zone] for zone in path_zones)
+    short_path = (_ZONES.get(latest_zone, "") if used_snapshot_fallback
+                  else " → ".join(_ZONES[zone] for zone in path_zones))
     focus_from = previous_zone if latest_event else base_zone
     focus_change = _CHANGES.get(latest_zone, "UNCHANGED") if focus_from != latest_zone else "UNCHANGED"
     return {"as_of": latest_day.isoformat(), "close": latest_close, "zone": latest_zone,
             "baseline_zone": base_zone, "latest_event": latest_event, "week_event": week_event,
-            "path_changed": history_changed, "path": short_path, "change": focus_change,
+            "path_changed": history_changed and not used_snapshot_fallback,
+            "path": short_path, "change": focus_change,
             "pct": round((latest_close / trigger - 1) * 100, 2)}
 
 
