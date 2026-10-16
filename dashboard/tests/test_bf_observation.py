@@ -92,7 +92,9 @@ def test_fallback_current_snapshot_gives_zone_but_not_fake_daily_history():
     ).iloc[0]
     assert result["review_a_zone"] == "BELOW"
     assert result["review_a_as_of"] == "2026-10-13"
-    assert result["review_a_event"] == "EXT → BELOW"
+    assert result["review_a_event"] == ""
+    assert result["review_a_week_event"] == "EXT → BELOW"
+    assert result["review_a_path"] == "BELOW"
 
 
 def test_b_snapshot_does_not_keep_yesterday_buy_point():
@@ -218,3 +220,22 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     assert previous is not None
     assert previous.iloc[0]["snapshot_date"] == "2026-10-13"
     assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
+
+
+def test_no_yesterday_bar_never_invents_latest_daily_transition():
+    complete = pd.DataFrame([row("GAP", trigger=100, close=108)])
+    # 10/12 was an open US trading day, but it is absent from the PKL.
+    daily = pd.DataFrame({"Close": [108, 97]},
+                         index=pd.to_datetime(["2026-10-09", "2026-10-13"]))
+    path = _price_path(complete.iloc[0], None, daily, as_of=date(2026, 10, 13))
+    assert path["zone"] == "BELOW_BUY_POINT"
+    assert path["week_event"] == "EXT → BELOW"
+    assert path["latest_event"] == ""
+
+
+def test_previous_market_session_allows_friday_to_monday_change():
+    complete = pd.DataFrame([row("MON", trigger=100, close=108)])
+    daily = pd.DataFrame({"Close": [108, 97]},
+                         index=pd.to_datetime(["2026-10-09", "2026-10-12"]))
+    path = _price_path(complete.iloc[0], None, daily, as_of=date(2026, 10, 12))
+    assert path["latest_event"] == "EXT → BELOW"
