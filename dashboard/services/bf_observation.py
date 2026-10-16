@@ -460,32 +460,43 @@ def build_observation_attention(
         if len(dates) == 1 and dates[0] < as_of and monday_of_week(dates[0]) == monday_of_week(as_of):
             previous_date = dates[0]
     events = []
+    actionable_statuses = {"ACTIONABLE", "UNCONFIRMED"}
     for _, row in view.iterrows():
         code = str(row["code"])
-        membership = str(row.get("review_membership_event") or "")
         if bool(row.get("review_a_active")) and bool(row.get("review_data_available")):
-            price_event = str(row.get("review_a_event") or "")
-            # A's cached last daily bar must not be notified again if no
-            # new dated daily observation followed the previous snapshot.
-            observed = _day(row.get("review_a_as_of"))
-            if previous_date is not None and (observed is None or observed <= previous_date):
-                price_event = ""
+            # Telegram is an entry-opportunity alert, not an A lifecycle log.
+            # Only a *real* return to the fixed weekend buy zone is useful.
+            event = str(row.get("review_a_event") or "")
+            status = str(row.get("ibd_entry_status") or "")
             zone = str(row.get("review_a_zone") or "")
-            if price_event or membership:
-                labels = [part for part in (membership, price_event or (zone if membership else "")) if part]
+            observed = _day(row.get("review_a_as_of"))
+            if (
+                event in {"BELOW → ZONE", "EXT → ZONE"}
+                and zone == "ZONE"
+                and status in actionable_statuses
+                and (previous_date is None or (observed is not None and observed > previous_date))
+            ):
                 events.append({
-                    "source": "WEEKEND", "code": code, "event": " · ".join(labels),
+                    "source": "WEEKEND", "code": code, "event": event,
+                    "zone": zone, "status": status,
+                    "membership": row.get("review_membership"),
                     "vs_candidate_pct": row.get("review_a_pct"),
                     "as_of": row.get("review_a_as_of"),
                 })
         if bool(row.get("review_b_active")):
+            # A new independent buy-point anchor is a NEW opportunity,
+            # but a changed price for the same anchor (BP UPDATED) is not.
             event = str(row.get("review_b_event") or "")
-            if event not in ("", "CURRENT", "SNAPSHOT"):
-                labels = [event]
-                if row.get("review_b_status"):
-                    labels.append(str(row["review_b_status"]))
+            status = str(row.get("review_b_status") or "")
+            zone = str(row.get("review_b_zone") or "")
+            if (
+                event in {"NEW BP", "BP CHANGED"}
+                and zone == "ZONE"
+                and status in actionable_statuses
+            ):
                 events.append({
-                    "source": "MIDWEEK", "code": code, "event": " · ".join(labels),
+                    "source": "MIDWEEK", "code": code, "event": "NEW BP",
+                    "zone": zone, "status": status,
                     "vs_candidate_pct": row.get("review_b_pct"),
                     "as_of": row.get("review_b_date"),
                 })
