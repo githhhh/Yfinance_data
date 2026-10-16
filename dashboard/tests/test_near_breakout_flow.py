@@ -103,7 +103,7 @@ def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() 
     assert 'result = result.filter((row) => bool(row.review_has_value_change));' in APP
     assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
     assert "Current pre-signal candidates. Available in All Review only." in APP
-    assert "Review Now" in APP
+    assert "Changes vs Weekend" in APP
     assert "All Review" in APP
     assert "function isActive(row)" in APP
     assert "return isSignalActive(row) || isNearBreakout(row);" in APP
