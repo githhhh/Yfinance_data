@@ -129,8 +129,9 @@ def test_pool_reentry_requires_previous_snapshot_and_shows_zone():
         current, complete, pd.DataFrame(), previous=previous, daily=daily,
         as_of=date(2026, 10, 13),
     )
-    assert any(event["event"].startswith("OUT → IN") and
-               "ZONE" in event["event"] for event in events)
+    # Pool re-entry remains a dashboard fact; it is not a Telegram entry
+    # opportunity unless the fixed weekend price zone really changes.
+    assert events == []
 
 
 def test_unconfirmed_weekend_zone_never_auto_confirms():
@@ -335,3 +336,75 @@ def test_missing_intermediate_bars_never_invent_multiple_transitions():
     assert view["review_a_path"] == "BELOW → ZONE"
     assert view["review_a_event"] == "BELOW → ZONE"
     assert "EXT" not in view["review_a_path"]
+
+
+def test_telegram_weekend_only_price_returns_to_zone_with_original_confirmation():
+    complete = pd.DataFrame([
+        row("RECLAIM", close=97, status="UNCONFIRMED", valid=False),
+        row("CHASING", close=103, valid=True),
+        row("FALL", close=103, valid=True),
+    ])
+    previous = pd.DataFrame([
+        row("RECLAIM", snapshot="2026-10-12", close=98, signal=False),
+        row("CHASING", snapshot="2026-10-12", close=104, signal=False),
+        row("FALL", snapshot="2026-10-12", close=102, signal=False),
+    ])
+    current = pd.DataFrame([
+        row("RECLAIM", snapshot="2026-10-15", close=102, signal=False),
+        row("CHASING", snapshot="2026-10-15", close=107, signal=False),
+        row("FALL", snapshot="2026-10-15", close=98, signal=False),
+    ])
+    events = build_observation_attention(
+        current, complete, pd.DataFrame(), previous=previous, daily={},
+        as_of=date(2026, 10, 15),
+    )
+    assert len(events) == 1
+    assert events[0]["code"] == "RECLAIM"
+    assert events[0]["event"] == "BELOW → ZONE"
+    assert events[0]["zone"] == "ZONE"
+    assert events[0]["status"] == "UNCONFIRMED"
+    assert events[0]["membership"] == "IN"
+
+
+def test_telegram_midweek_only_new_independent_in_zone_buy_points():
+    complete = pd.DataFrame([row("SEED", signal=False)])
+    previous = pd.DataFrame([
+        row("UPDATE", snapshot="2026-10-12", trigger=110, anchor="2026-10-12"),
+        row("CHANGED", snapshot="2026-10-12", trigger=110, anchor="2026-10-12"),
+    ])
+    current = pd.DataFrame([
+        row("NEW", snapshot="2026-10-15", trigger=100, close=102,
+            status="UNCONFIRMED", valid=False),
+        row("NEWEXT", snapshot="2026-10-15", trigger=100, close=108),
+        row("UPDATE", snapshot="2026-10-15", trigger=112, close=113,
+            anchor="2026-10-12"),
+        row("CHANGED", snapshot="2026-10-15", trigger=105, close=106,
+            anchor="2026-10-15"),
+    ])
+    events = build_observation_attention(
+        current, complete, current, previous=previous, daily={},
+        as_of=date(2026, 10, 15),
+    )
+    assert {event["code"] for event in events} == {"NEW", "CHANGED"}
+    for event in events:
+        assert event["event"] == "NEW BP"
+        assert event["zone"] == "ZONE"
+        assert event["status"] in {"ACTIONABLE", "UNCONFIRMED"}
+
+
+def test_telegram_does_not_repeat_stale_weekend_price_and_ignores_pool_only_transitions():
+    complete = pd.DataFrame([row("S", close=97)])
+    previous = pd.DataFrame([row("S", snapshot="2026-10-12", close=98, signal=False)])
+    current = pd.DataFrame([row("S", snapshot="2026-10-15", close=102, signal=False)])
+    daily = {"S": pd.DataFrame(
+        {"Close": [97, 102]},
+        index=pd.to_datetime(["2026-10-09", "2026-10-12"]),
+    )}
+    # No later market candle: the actual latest observed bar is from 10/12.
+    events = build_observation_attention(
+        current, complete, pd.DataFrame(), previous=previous,
+        daily=daily, as_of=date(2026, 10, 15),
+    )
+    # The dated current Pool close (10/15) legitimately supplies this observation.
+    assert len(events) == 1
+    assert events[0]["as_of"] == "2026-10-15"
