@@ -5,7 +5,7 @@ used to build Futu ACTIONABLE codes. No persisted event/price cache is needed.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 import pickle
 import subprocess
@@ -13,7 +13,7 @@ from io import StringIO
 
 import pandas as pd
 
-from bf_snapshot import monday_of_week, _is_market_trading_day
+from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
     SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone, to_bool,
 )
@@ -113,21 +113,28 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
     return None
 
 
-def _price_path(weekend, current, daily, *, as_of: date):
-    """Reconstruct A's zone path from its fixed complete-week trigger."""
+def _price_path(weekend, current, daily, *, as_of: date, previous=None):
+    """Compare the latest two *observed* prices within one review week.
+
+    Missing trading days do not prevent a transition. The complete-week
+    baseline is used only for Vs Weekend, never as the previous midweek
+    observation. Pool snapshots can fill holes in the 1D PKL, but neither
+    source may manufacture prices for dates on which none was observed.
+    """
     trigger = _number(weekend.get("ibd_candidate_price"))
     baseline_date = _day(weekend.get("snapshot_date"))
     baseline_close = _number(weekend.get("latest_close"))
     if trigger is None or baseline_date is None:
         return None
-    points = []
-    used_snapshot_fallback = False
+
+    week_start = monday_of_week(as_of)
+    prices = {}
     if baseline_close is not None:
-        points.append((baseline_date, baseline_close))
+        prices[baseline_date] = baseline_close
+
+    daily_dates = set()
     if isinstance(daily, pd.DataFrame) and "Close" in daily.columns:
-        # Yahoo raw OHLC is split-adjusted. A later split may rebase the
-        # complete-week bar but not the immutable Pool trigger. In that case,
-        # refuse a false replay instead of reporting a fabricated breakout.
+        # Preserve the current fail-closed protection for split-rebased bars.
         baseline_bars = [
             _number(close) for ts, close in daily["Close"].items()
             if _day(ts) == baseline_date
@@ -141,52 +148,61 @@ def _price_path(weekend, current, daily, *, as_of: date):
                     "change": "UNCHANGED", "pct": None}
         for timestamp, close in daily["Close"].items():
             day = _day(timestamp)
-            val = _number(close)
-            if day is not None and baseline_date < day <= as_of and val is not None:
-                points.append((day, val))
-    if current is not None and not any(day > baseline_date for day, _ in points):
-        # Fallback only gives a present zone, never a fabricated daily path.
-        fallback_date = _day(current.get("snapshot_date"))
-        fallback_close = _number(current.get("latest_close"))
-        if fallback_date and baseline_date < fallback_date <= as_of and fallback_close:
-            points.append((fallback_date, fallback_close))
-            used_snapshot_fallback = True
-    # The complete-week close is the baseline, not evidence of live freshness.
-    has_new_price = any(day > baseline_date for day, _ in points)
-    if not has_new_price:
-        return {"as_of": None, "close": None, "zone": None, "baseline_zone": _zone(trigger, baseline_close),
+            value = _number(close)
+            if (day is not None and baseline_date < day <= as_of
+                    and monday_of_week(day) == week_start and value is not None):
+                prices[day] = value
+                daily_dates.add(day)
+
+    snapshot_dates = set()
+    for snapshot in (previous, current):
+        if snapshot is None:
+            continue
+        day = _day(snapshot.get("snapshot_date"))
+        value = _number(snapshot.get("latest_close"))
+        if (day is not None and baseline_date < day <= as_of
+                and monday_of_week(day) == week_start and value is not None):
+            # The actual 1D candle wins if both sources observe the same day.
+            if day not in prices:
+                prices[day] = value
+                snapshot_dates.add(day)
+
+    observations = sorted(
+        (day, _zone(trigger, value), value)
+        for day, value in prices.items()
+        if day > baseline_date and monday_of_week(day) == week_start
+    )
+    if not observations:
+        return {"as_of": None, "close": None, "zone": None,
+                "baseline_zone": _zone(trigger, baseline_close),
                 "latest_event": "", "week_event": "", "path_changed": False,
                 "change": "UNCHANGED", "pct": None}
-    ordered = sorted(dict(points).items())
-    zones = [(day, _zone(trigger, close), close) for day, close in ordered]
-    latest_day, latest_zone, latest_close = zones[-1]
+
+    latest_day, latest_zone, latest_close = observations[-1]
     base_zone = _zone(trigger, baseline_close)
-    previous_zone = zones[-2][1] if len(zones) >= 2 else None
-    previous_market_day = latest_day - timedelta(days=1)
-    while previous_market_day > baseline_date and not _is_market_trading_day(previous_market_day):
-        previous_market_day -= timedelta(days=1)
-    # Snapshot fallback has no intervening daily bars: it can establish only
-    # the current zone / net vs weekend, never a latest daily transition.
-    # Likewise missing previous trading-day K must not fake a daily event.
-    has_contiguous_pair = (
-        not used_snapshot_fallback and len(zones) >= 2
-        and zones[-2][0] == previous_market_day
-    )
-    latest_event = _arrow(previous_zone, latest_zone) if has_contiguous_pair else ""
+    previous_zone = observations[-2][1] if len(observations) >= 2 else None
+    # No consecutive-session requirement: an intervening missing day is
+    # unknown, not evidence against comparing two real observations.
+    latest_event = _arrow(previous_zone, latest_zone)
     week_event = _arrow(base_zone, latest_zone)
-    history_changed = any(left[1] != right[1] for left, right in zip(zones, zones[1:]))
-    path_zones = []
-    for _, zone, _ in zones:
-        if zone and (not path_zones or zone != path_zones[-1]):
-            path_zones.append(zone)
-    short_path = (_ZONES.get(latest_zone, "") if used_snapshot_fallback
-                  else " → ".join(_ZONES[zone] for zone in path_zones))
+    observed_path = []
+    path_zones = (
+        [(baseline_date, base_zone, baseline_close)] + observations
+        if daily_dates else observations
+    )
+    for _, zone, _ in path_zones:
+        if zone and (not observed_path or zone != observed_path[-1]):
+            observed_path.append(zone)
+    short_path = " → ".join(_ZONES[zone] for zone in observed_path)
     focus_from = previous_zone if latest_event else base_zone
-    focus_change = _CHANGES.get(latest_zone, "UNCHANGED") if focus_from != latest_zone else "UNCHANGED"
-    return {"as_of": latest_day.isoformat(), "close": latest_close, "zone": latest_zone,
-            "baseline_zone": base_zone, "latest_event": latest_event, "week_event": week_event,
-            "path_changed": history_changed and not used_snapshot_fallback,
-            "path": short_path, "change": focus_change,
+    focus_change = (_CHANGES.get(latest_zone, "UNCHANGED")
+                    if focus_from != latest_zone else "UNCHANGED")
+    history_changed = len(observed_path) > 1
+    return {"as_of": latest_day.isoformat(), "close": latest_close,
+            "zone": latest_zone, "baseline_zone": base_zone,
+            "latest_event": latest_event, "week_event": week_event,
+            "path_changed": history_changed, "path": short_path,
+            "change": focus_change,
             "pct": round((latest_close / trigger - 1) * 100, 2)}
 
 
@@ -319,7 +335,10 @@ def build_observation_view(
                 row["ibd_entry_vol_or_reject"] = f"{volume:.2f}x" if volume else "n/a"
             trigger = _number(weekend.get("ibd_candidate_price"))
             row["review_a_price"] = trigger
-            path = _price_path(weekend, midweek, (daily or {}).get(code), as_of=as_of)
+            path = _price_path(
+                weekend, midweek, (daily or {}).get(code), as_of=as_of,
+                previous=prev_by_code.get(code),
+            )
             if path is None or path["close"] is None:
                 row["review_data_available"] = False
                 row["ibd_entry_status"] = None
