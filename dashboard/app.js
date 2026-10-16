@@ -177,7 +177,7 @@
   function reviewUsesB(row) {
     if (!currentHasComparison() || !bool(row.review_b_active)) return false;
     if (state.newBuyPoint !== "ALL") return true;
-    // When B alone made this ticker actionable for Review Now, all visible
+    // When B alone made this ticker relevant to Changes vs Weekend, all visible
     // fields must describe B, not the unchanged weekend buy point.
     return state.scope === "CHANGES"
       && bool(row.review_b_has_value_change)
@@ -459,7 +459,7 @@
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend BP changes and current Midweek BP deltas">Review Now · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Changes vs Weekend · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
