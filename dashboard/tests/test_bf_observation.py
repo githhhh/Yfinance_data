@@ -408,3 +408,25 @@ def test_telegram_does_not_repeat_stale_weekend_price_and_ignores_pool_only_tran
     # The dated current Pool close (10/15) legitimately supplies this observation.
     assert len(events) == 1
     assert events[0]["as_of"] == "2026-10-15"
+
+
+def test_midweek_telegram_act_requires_both_actionable_status_and_valid_resolver():
+    complete = pd.DataFrame([row("SEED", signal=False)])
+    current = pd.DataFrame([
+        row("GOOD", snapshot="2026-10-15", trigger=100, close=102,
+            status="ACTIONABLE", valid=True),
+        row("BAD", snapshot="2026-10-15", trigger=100, close=102,
+            status="ACTIONABLE", valid=False),
+        row("WAIT", snapshot="2026-10-15", trigger=100, close=102,
+            status="UNCONFIRMED", valid=False),
+    ])
+    events = build_observation_attention(
+        current, complete, current, previous=None, daily={},
+        as_of=date(2026, 10, 15),
+    )
+    statuses = {event["code"]: event["status"] for event in events}
+    assert statuses == {
+        "GOOD": "ACTIONABLE",
+        "BAD": "UNCONFIRMED",
+        "WAIT": "UNCONFIRMED",
+    }
