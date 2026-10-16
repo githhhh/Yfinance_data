@@ -366,6 +366,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .review-table tr.selected td:first-child, .review-table tbody tr:hover td:first-child { background: #16252a; }
 .code-cell { color: #70e8d6 !important; font-weight: 800; }
 .pool-out-indicator { display: block; color: #91a2b2; font-size: 8px; font-weight: 750; line-height: 1.05; letter-spacing: .05em; }
+/* Status and Pool membership are separate facts. Keep OUT centered below
+   the status text even when the mobile Status cell uses display:flex. */
+.status-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+  line-height: 1.05;
+}
+.status-stack .status-text { display: block; white-space: nowrap; }
+.status-stack .pool-out-indicator { display: block; width: 100%; text-align: center; }
 .change-badge, .origin-badge {
   display: inline-flex;
   align-items: center;
