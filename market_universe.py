@@ -7,6 +7,8 @@ artifacts such as EPS PIT caches are deliberately not inferred from ``us/``.
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import pandas as pd
@@ -60,3 +62,42 @@ def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
     result = sorted(tickers)
     logging.info("Download universe total: %s codes", len(result))
     return result
+
+
+def pick_active_weekend_signal_codes(
+    *, data_root: str | Path = ".", review_date: date | None = None
+) -> list[str]:
+    """Protect complete-week signals during their *next* review week only.
+
+    This is a final download eligibility pick, not a scan, provider retry or
+    data-quality policy. The ordinary five-source universe is unchanged.
+    """
+    from bf_snapshot import complete_target_week, monday_of_week
+
+    today = review_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    if today.weekday() > 4:
+        return []
+    path = Path(data_root) / "us" / "breakout_follow_pool.csv"
+    try:
+        frame = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
+        required = {"code", "signal", "snapshot_date"}
+        if not required.issubset(frame.columns):
+            raise ValueError(f"missing columns: {sorted(required - set(frame.columns))}")
+        parsed_dates = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+        if parsed_dates.isna().any():
+            return []
+        dates = parsed_dates.dt.date.unique()
+        if len(dates) != 1 or complete_target_week(dates[0]) != monday_of_week(today):
+            return []
+        # Match the existing BF to_bool() conventions; this pick must not
+        # redefine which complete-week rows count as signal=True.
+        mask = frame["signal"].astype(str).str.strip().str.lower().isin(
+            ("true", "t", "yes", "y", "1", "1.0")
+        )
+        return sorted({
+            code for code in (_normalize_code(v) for v in frame.loc[mask, "code"])
+            if code is not None
+        })
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        logging.warning("Weekend Signal Final Pick unavailable: %s", exc)
+        return []

@@ -16,7 +16,7 @@ from data_providers.ohlcv_validation import (
     validate_download_batch,
     validate_ohlcv_frame,
 )
-from market_universe import build_download_universe
+from market_universe import build_download_universe, pick_active_weekend_signal_codes
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
@@ -259,6 +259,16 @@ if __name__ == "__main__":
         else:
             tickers = read_stock_list()
             print(f"[DataStore] Fallback 快照不存在，使用显式输入集合: {len(tickers)} 只")
+
+    # Final 1D eligibility guard: Stage2 fallback must not drop this week's
+    # complete-week BF signals. Preserve original pick ordering and behavior.
+    if args.interval == "1d":
+        protected = pick_active_weekend_signal_codes()
+        original = set(tickers)
+        tickers = list(dict.fromkeys([*tickers, *protected]))
+        added = sorted(set(protected) - original)
+        if added:
+            print(f"[Weekend Pick] restored {len(added)} BF signals: {added[:20]}")
 
     if not tickers:
         print("No tickers to download.")

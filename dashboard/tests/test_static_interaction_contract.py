@@ -144,7 +144,7 @@ def test_rs_popover_is_visibly_modal_closeable_and_non_clickthrough():
 
 
 def test_midweek_changes_use_buy_point_flow_not_signal_origin():
-    assert 'Changes vs Weekend · ${changeTotal}' in APP
+    assert 'Review Now · ${changeTotal}' in APP
     assert 'const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"]' in APP
     assert 'const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"]' in APP
     assert "Signal Source</div>" not in APP

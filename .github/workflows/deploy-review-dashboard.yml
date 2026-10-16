@@ -6,6 +6,7 @@ on:
     paths:
       - 'us/breakout_follow_pool.csv'
       - 'us/breakout_follow_pool_midweek.csv'
+      - 'results_pkl/stock_data_*_1d.pkl'
       - 'dashboard/**'
       - 'yfinance_data/**'
       - 'bf_snapshot.py'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'us/breakout_follow_pool.csv'
       - 'us/breakout_follow_pool_midweek.csv'
+      - 'results_pkl/stock_data_*_1d.pkl'
       - 'dashboard/**'
       - 'yfinance_data/**'
       - 'bf_snapshot.py'
@@ -38,6 +40,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -56,6 +59,7 @@ jobs:
           node --check dashboard/app.js
           node --check dashboard/table_enhancements.js
           node --check dashboard/rs_runtime.js
+          node dashboard/tests/review_ui_contract.cjs
           python -m py_compile dashboard/build_static.py
 
       - name: Validate authoritative pool projection
@@ -67,6 +71,11 @@ jobs:
 
       - name: Build static dashboard
         run: python dashboard/build_static.py --output _site
+
+      - name: Audit desktop and mobile browser flow
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          node dashboard/tests/review_browser_smoke.cjs
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'

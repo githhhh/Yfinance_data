@@ -174,17 +174,53 @@
     return isSignalActive(row) || isNearBreakout(row);
   }
 
+  function reviewUsesB(row) {
+    if (!currentHasComparison() || !bool(row.review_b_active)) return false;
+    if (state.newBuyPoint !== "ALL") return true;
+    // When B alone made this ticker actionable for Review Now, all visible
+    // fields must describe B, not the unchanged weekend buy point.
+    return state.scope === "CHANGES"
+      && bool(row.review_b_has_value_change)
+      && !bool(row.review_a_has_value_change);
+  }
+
+  function reviewOutLabel(row) {
+    return bool(row.review_a_active) && row.review_membership === "OUT" && !reviewUsesB(row)
+      ? '<small class="pool-out-indicator">OUT</small>'
+      : "";
+  }
+
+  function reviewFacts(row) {
+    if (!reviewUsesB(row)) return row;
+    const b = row.review_b_details || {};
+    // Missing B structure facts are unavailable, never inherited from A.
+    // Stock identity and display metadata may still fall back to the row.
+    const fields = [
+      "ibd_entry_date", "ibd_entry_close_position", "ibd_entry_breakout_range_ratio",
+      "base_depth_pct", "base_duration_weeks", "ceiling", "ceiling_date",
+      "breakout_date", "pullback_pct", "pullback_duration_weeks",
+      "pullback_peak_date", "pullback_peak_price", "pullback_v_is_dry",
+      "eps_yoy_growth", "dist_to_52w_high_pct", "volume_ratio",
+    ];
+    return { ...row, ...Object.fromEntries(fields.map((field) =>
+      [field, Object.hasOwn(b, field) ? b[field] : null]
+    )) };
+  }
+
   function displayStatus(row) {
-    return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;
+    if (isNearBreakout(row)) return WATCH_STAGE;
+    if (reviewUsesB(row)) return row.review_b_status;
+    if (bool(row.review_a_active) && row.review_data_available === false) return "NO_DATA";
+    return row.ibd_entry_status;
   }
 
   function reviewSetup(row) {
-    return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : row.ibd_candidate_rule;
+    return isNearBreakout(row) ? text(row.bf_watch_type, "pivot") : reviewUsesB(row) ? row.review_b_rule : row.ibd_candidate_rule;
   }
 
   function setupHtml(row) {
     const primary = routeLabel(reviewSetup(row));
-    const overridden = isNearBreakout(row) ? "" : text(row.overridden_signal_source, "");
+    const overridden = isNearBreakout(row) || reviewUsesB(row) ? "" : text(row.overridden_signal_source, "");
     if (!overridden) return esc(primary);
     return `${esc(primary)}<br><small>↳ ${esc(signalSourceLabel(overridden))}</small>`;
   }
@@ -215,17 +251,38 @@
   }
 
   function reviewDistance(row) {
-    return isNearBreakout(row) ? nearBreakoutDistance(row) : num(row.current_vs_ibd_candidate_pct);
+    if (isNearBreakout(row)) return nearBreakoutDistance(row);
+    return reviewUsesB(row) ? num(row.review_b_pct) : num(row.current_vs_ibd_candidate_pct);
   }
 
   function reviewReferencePrice(row) {
-    return isNearBreakout(row) ? nearBreakoutTarget(row) : num(row.ibd_candidate_price);
+    if (isNearBreakout(row)) return nearBreakoutTarget(row);
+    return reviewUsesB(row) ? num(row.review_b_price) : num(row.ibd_candidate_price);
+  }
+
+  function reviewWeeklyVolume(row) {
+    return num(reviewUsesB(row) ? row.review_b_details?.volume_ratio : row.volume_ratio);
+  }
+
+  function reviewEntryText(row) {
+    if (!reviewUsesB(row)) return text(row.ibd_entry_vol_or_reject, "—");
+    if (!bool(row.review_b_entry_valid)) {
+      return text(row.review_b_entry_reason, "Volume not confirmed");
+    }
+    const ratio = num(row.review_b_entry_volume);
+    return ratio === null ? "n/a" : fmt(ratio, "x");
   }
 
   function displayChange(row) {
     if (isNearBreakout(row)) return "";
+    const a = text(row.review_buy_point_change_label, "");
+    const b = text(row.review_b_event, "");
+    if (reviewUsesB(row)) return bool(row.review_a_active) ? `B · ${b}` : b;
     if (currentHasComparison() && state.scope === "CHANGES") {
-      return text(row.review_buy_point_change_label, "");
+      if (bool(row.review_a_has_value_change) && bool(row.review_b_has_value_change)) {
+        return [a, `B · ${b}`].filter(Boolean).join(" · ");
+      }
+      return a || (bool(row.review_b_has_value_change) ? `B · ${b}` : "");
     }
     return text(row.review_change_label, "");
   }
@@ -274,10 +331,10 @@
     if (comparison && state.scope === "CHANGES") {
       result = result.filter((row) => bool(row.review_has_value_change));
     }
-    if (comparison && exclude !== "change" && state.change !== "ALL") {
+    if (comparison && exclude !== "change" && exclude !== "bothQuick" && state.change !== "ALL") {
       result = result.filter((row) => row.review_weekend_buy_point_change === state.change);
     }
-    if (comparison && exclude !== "newBuyPoint" && state.newBuyPoint !== "ALL") {
+    if (comparison && exclude !== "newBuyPoint" && exclude !== "bothQuick" && state.newBuyPoint !== "ALL") {
       result = result.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint);
     }
     const effectiveStatus = (
@@ -290,16 +347,18 @@
       if (state.route !== "All") result = result.filter((row) => reviewSetup(row) === state.route);
       if (state.distanceMin !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value >= state.distanceMin; });
       if (state.distanceMax !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value <= state.distanceMax; });
-      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
-      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = num(row.volume_ratio); return value !== null && value >= state.weeklyVolumeMin; });
+      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
+      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = reviewWeeklyVolume(row); return value !== null && value >= state.weeklyVolumeMin; });
     }
     return result;
   }
 
   function filterCounts(rows) {
     const statusBase = filterRows(rows, "status");
-    const changeBase = filterRows(rows, "change");
-    const newBuyPointBase = filterRows(rows, "newBuyPoint");
+    // A/B quick groups are alternative buy-point contexts, not cumulative
+    // filters. Each group's count must not depend on the other quick group.
+    const changeBase = filterRows(rows, "bothQuick");
+    const newBuyPointBase = changeBase;
     const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length]));
     if (currentHasComparison() && state.scope === "CHANGES") {
       status[WATCH_STAGE] = rows.filter(isNearBreakout).length;
@@ -373,6 +432,8 @@
     const snapshot = isMidweek ? data.meta.midweek_snapshot_date : data.meta.complete_snapshot_date;
     const signalCount = rows.filter(isSignalActive).length;
     const nearCount = rows.filter(isNearBreakout).length;
+    const inPool = isMidweek ? rows.filter((row) => row.review_membership !== "OUT").length : rows.length;
+    const trackedOut = isMidweek ? rows.filter((row) => row.review_membership === "OUT").length : 0;
     const fresh = freshness(snapshot);
     const badge = isMidweek
       ? `<span class="data-badge loaded">Data Loaded</span>`
@@ -384,7 +445,7 @@
       <header class="dashboard-header">
         <div>
           <div class="dashboard-title-row"><div class="dashboard-title">Breakout Pool</div>${badge}</div>
-          <div class="dashboard-snapshot">${snapshotText} · <b>${rows.length}</b> Total Pool · <b>${signalCount}</b> Active Signals · <b>${nearCount}</b> Near Breakout</div>
+          <div class="dashboard-snapshot">${snapshotText} · <b>${inPool}</b> Pool · <b>${trackedOut}</b> Tracked OUT · <b>${signalCount}</b> Signals · <b>${nearCount}</b> Near Breakout</div>
         </div>
       </header>`;
   }
@@ -398,7 +459,7 @@
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Changes vs Weekend · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend BP changes and current Midweek BP deltas">Review Now · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
@@ -477,7 +538,10 @@
 
   function bounds(rows, field, floor, ceiling) {
     const values = rows.map((row) => (
-      field === "review_distance_pct" ? reviewDistance(row) : num(row[field])
+      field === "review_distance_pct" ? reviewDistance(row)
+        : field === "ibd_entry_volume_ratio" && reviewUsesB(row) ? num(row.review_b_entry_volume)
+        : field === "volume_ratio" ? reviewWeeklyVolume(row)
+        : num(row[field])
     )).filter((value) => value !== null);
     if (!values.length) return null;
     const low = Math.min(floor, Math.floor(Math.min(...values) * 10) / 10);
@@ -557,7 +621,7 @@
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
         <td class="industry-code">${code}</td>
         <td class="industry-stock-rs">${rs === null || rs === undefined ? "N/A" : esc(String(rs))}</td>
-        <td><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></td>
+        <td><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>${reviewOutLabel(row)}</td>
         <td class="industry-vs-ref${num(reviewDistance(row)) !== null && reviewDistance(row) < 0 ? " negative" : ""}">${esc(fmt(reviewDistance(row), "pct"))}</td>
       </tr>`;
       const detail = selected && isMobileReview()
@@ -621,20 +685,36 @@
   function selectedHtml(row) {
     if (!row) return `<div class="selected-strip empty"><span>${filterRows(rowsForPeriod()).length ? "Select a row · Use ↑↓ to review" : "No matching records found with current filter criteria."}</span></div>`;
     const near = isNearBreakout(row);
-    const referenceKey = near ? "Watch Trigger" : "Buy Point";
-    const entryDate = dateText(row.ibd_entry_date);
+    const facts = reviewFacts(row);
+    const referenceKey = near ? "Watch Trigger" :
+      reviewUsesB(row) ? "Midweek BP" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
+    const entryDate = dateText(facts.ibd_entry_date);
     const buyPointDate = dateText(row.buy_point_date);
-    const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;
-    const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";
+    const referenceContext = near ? watchTargetSource(row) :
+      reviewUsesB(row) ? dateText(row.review_b_date) : entryDate || buyPointDate;
+    const contextLabel = near ? "Source" :
+      reviewUsesB(row) ? "Snapshot" : entryDate ? "Entry" : "Buy Point Date";
     const referenceNote = `<strong class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? ` · ${contextLabel} ${esc(referenceContext)}` : ""}`;
-    const baseDepth = num(row.base_depth_pct);
-    const baseDuration = num(row.base_duration_weeks);
+    const pathNote = !reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→")
+      ? `<span class="selected-reference">Path ${esc(row.review_a_path)}</span>` : "";
+    const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
+      ? reviewUsesB(row)
+        ? `<span class="selected-reference">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
+        : `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
+      : "";
+    const asOf = reviewUsesB(row) ? ` · As of ${esc(dateText(row.review_b_date))}` :
+      bool(row.review_a_active)
+        ? `${row.review_membership === "OUT" ? " · OUT" : ""}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}`
+        : "";
+    const baseDepth = num(facts.base_depth_pct);
+    const baseDuration = num(facts.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
       : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
-    const ceiling = num(row.ceiling);
-    const ceilingDate = dateText(row.ceiling_date);
-    const breakoutDate = dateText(row.breakout_date);
+    const ceiling = num(facts.ceiling);
+    const ceilingDate = dateText(facts.ceiling_date);
+    const breakoutDate = dateText(facts.breakout_date);
     const ceilingContext = ceiling === null && !ceilingDate
       ? ""
       : `Ceiling${ceiling === null ? "" : ` ${fmt(ceiling)}`}${ceilingDate ? ` · ${esc(ceilingDate)}` : ""}`;
@@ -644,12 +724,12 @@
       ceilingDate ? `<div>Start ${esc(ceilingDate)}</div>` : "",
       breakoutDate ? `<div>BO ${esc(breakoutDate)}</div>` : "",
     ].filter(Boolean).join("");
-    const pullbackDepth = num(row.pullback_pct);
-    const pullbackDuration = num(row.pullback_duration_weeks);
-    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
-      ? null : bool(row.pullback_v_is_dry);
-    const pullbackPeakDate = dateText(row.pullback_peak_date);
-    const pullbackPeakPrice = num(row.pullback_peak_price);
+    const pullbackDepth = num(facts.pullback_pct);
+    const pullbackDuration = num(facts.pullback_duration_weeks);
+    const pullbackDry = facts.pullback_v_is_dry === null || facts.pullback_v_is_dry === undefined
+      ? null : bool(facts.pullback_v_is_dry);
+    const pullbackPeakDate = dateText(facts.pullback_peak_date);
+    const pullbackPeakPrice = num(facts.pullback_peak_price);
     const pullbackVisible = pullbackDepth !== null || pullbackDuration !== null || pullbackDry !== null;
     const pullbackAnchor = pullbackPeakDate || pullbackPeakPrice !== null
       ? `Start ${esc(pullbackPeakDate || "—")}${pullbackPeakPrice === null ? "" : ` · Peak ${fmt(pullbackPeakPrice)}`}`
@@ -666,10 +746,10 @@
       ? "N/A"
       : `${currentRs} <small>1M ${num(row.rs_1m_percentile) ?? "N/A"} · 3M ${num(row.rs_3m_percentile) ?? "N/A"} · 6M ${num(row.rs_6m_percentile) ?? "N/A"}</small>`;
     return `<div class="selected-strip" aria-label="Selected overview for ${esc(row.code)}">
-      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}</div></div>
-      <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(row.eps_yoy_growth, "pct1")}</div></div>
+      <div class="selected-cell selected-identity"><div class="selected-key">Selected Overview</div><div class="selected-value selected-code">${esc(row.code)}</div><div class="selected-industry" title="${esc(text(reviewIndustry(row)))}">${esc(text(reviewIndustry(row), "Industry N/A"))}</div><div class="selected-reference">${referenceNote}${asOf}</div>${pathNote}${bNote}</div>
+      <div class="selected-cell selected-eps"><div class="selected-key">EPS YoY</div><div class="selected-value">${fmt(facts.eps_yoy_growth, "pct1")}</div></div>
       <div class="selected-cell selected-base"><div class="selected-key">Base</div><div class="selected-value">${baseValue}</div><div class="selected-hint selected-structure-compact">${baseContext || "Depth · Duration"}</div><div class="selected-structure-mobile">${baseMobileLines || "<div>Depth · Duration</div>"}</div></div>
-      <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(row.dist_to_52w_high_pct, "pct1")}</div></div>
+      <div class="selected-cell selected-high"><div class="selected-key">To 52W High</div><div class="selected-value">${fmt(facts.dist_to_52w_high_pct, "pct1")}</div></div>
       <div class="selected-cell selected-pullback"><div class="selected-key">Pullback</div><div class="selected-value">${pullbackValue}</div>${pullbackAnchor ? `<div class="selected-hint selected-structure-compact">${pullbackAnchor}</div>` : pullbackVisible ? "" : '<div class="selected-hint selected-structure-compact">No evidence</div>'}<div class="selected-structure-mobile">${pullbackMobileLines || (pullbackVisible ? "" : "<div>No evidence</div>")}</div></div>
       <div class="selected-cell selected-rs"><div class="selected-key">RS Reference</div><div class="selected-value" title="${esc(rsTitle(row))}">${rsValue}</div></div>
     </div>`;
@@ -681,45 +761,47 @@
   
   function mobileDetailHtml(row) {
     const near = isNearBreakout(row);
-    const referenceKey = near ? "Watch Trigger" : "Buy Point";
-    const referenceContext = near
-      ? watchTargetSource(row)
-      : dateText(row.ibd_entry_date) || dateText(row.buy_point_date);
-    const referenceContextLabel = near ? "Source" : dateText(row.ibd_entry_date) ? "Entry" : "Buy Point Date";
-    const position = num(row.ibd_entry_close_position);
-    const rangeRatio = num(row.ibd_entry_breakout_range_ratio);
+    const facts = reviewFacts(row);
+    const referenceKey = near ? "Watch Trigger" :
+      reviewUsesB(row) ? "Midweek BP" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
+    const referenceContext = near ? watchTargetSource(row) :
+      reviewUsesB(row) ? dateText(row.review_b_date) :
+      dateText(facts.ibd_entry_date) || dateText(row.buy_point_date);
+    const referenceContextLabel = near ? "Source" :
+      reviewUsesB(row) ? "Snapshot" : dateText(facts.ibd_entry_date) ? "Entry" : "Buy Point Date";
+    const position = num(facts.ibd_entry_close_position);
+    const rangeRatio = num(facts.ibd_entry_breakout_range_ratio);
     const geometryFacts = [
       position === null ? "" : `pos ${position.toFixed(2)}`,
       rangeRatio === null ? "" : `rr ${rangeRatio.toFixed(2)}`,
     ].filter(Boolean).join(" · ");
-    const entryVolume = num(row.ibd_entry_volume_ratio);
-    const weeklyVolume = num(row.volume_ratio);
-    const entryPrimary = near
-      ? "Pre-signal"
-      : text(row.ibd_entry_vol_or_reject, "—").replace(/x$/, "×");
+    const entryVolume = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
+    const weeklyVolume = num(facts.volume_ratio);
+    const entryPrimary = near ? "Pre-signal" : reviewEntryText(row).replace(/x$/, "×");
     const entryFacts = [
       entryVolume === null ? "" : `Entry Vol ${fmt(entryVolume, "x")}`,
       weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
     ].filter(Boolean).join(" · ");
   
-    const baseDepth = num(row.base_depth_pct);
-    const baseDuration = num(row.base_duration_weeks);
+    const baseDepth = num(facts.base_depth_pct);
+    const baseDuration = num(facts.base_duration_weeks);
     const baseValue = baseDepth === null && baseDuration === null
       ? "—"
       : `${baseDepth === null ? "—" : fmt(baseDepth, "pct1")} · ${baseDuration === null ? "—" : `${fmt(baseDuration, "int")}W`}`;
-    const ceiling = num(row.ceiling);
-    const ceilingDate = dateText(row.ceiling_date);
-    const breakoutDate = dateText(row.breakout_date);
+    const ceiling = num(facts.ceiling);
+    const ceilingDate = dateText(facts.ceiling_date);
+    const breakoutDate = dateText(facts.breakout_date);
     const baseContext = [
       ceiling === null ? "" : `Ceiling ${fmt(ceiling)}`,
       ceilingDate ? `Start ${ceilingDate}` : "",
       breakoutDate ? `BO ${breakoutDate}` : "",
     ].filter(Boolean).join(" · ");
   
-    const pullbackDepth = num(row.pullback_pct);
-    const pullbackDuration = num(row.pullback_duration_weeks);
-    const pullbackDry = row.pullback_v_is_dry === null || row.pullback_v_is_dry === undefined
-      ? null : bool(row.pullback_v_is_dry);
+    const pullbackDepth = num(facts.pullback_pct);
+    const pullbackDuration = num(facts.pullback_duration_weeks);
+    const pullbackDry = facts.pullback_v_is_dry === null || facts.pullback_v_is_dry === undefined
+      ? null : bool(facts.pullback_v_is_dry);
     const pullbackValue = pullbackDepth === null && pullbackDuration === null && pullbackDry === null
       ? "—"
       : [
@@ -727,8 +809,8 @@
         pullbackDuration === null ? "" : `${fmt(pullbackDuration, "int")}W`,
         pullbackDry === null ? "" : pullbackDry ? "Dry" : "Not Dry",
       ].filter(Boolean).join(" · ");
-    const pullbackPeakDate = dateText(row.pullback_peak_date);
-    const pullbackPeakPrice = num(row.pullback_peak_price);
+    const pullbackPeakDate = dateText(facts.pullback_peak_date);
+    const pullbackPeakPrice = num(facts.pullback_peak_price);
     const pullbackContext = [
       pullbackPeakDate ? `Start ${pullbackPeakDate}` : "",
       pullbackPeakPrice === null ? "" : `Peak ${fmt(pullbackPeakPrice)}`,
@@ -738,17 +820,25 @@
       <div class="mobile-detail-industry">${esc(text(reviewIndustry(row), "Industry N/A"))}</div>
       <div class="mobile-detail-price">
         <div><span>${referenceKey}</span><strong>${fmt(reviewReferencePrice(row))}</strong>${referenceContext ? `<small>${referenceContextLabel} ${esc(referenceContext)}</small>` : ""}</div>
-        <div><span>Latest</span><strong>${fmt(row.latest_close)}</strong></div>
+        <div><span>Latest</span><strong>${fmt(reviewUsesB(row) ? row.review_b_close : row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
+      ${!reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
+      ${bool(row.review_a_active) && bool(row.review_b_active)
+        ? reviewUsesB(row)
+          ? `<div class="mobile-detail-industry">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
+          : `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
+        : ""}
+      ${bool(row.review_a_active) && !reviewUsesB(row) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` :
+        reviewUsesB(row) ? `<div class="mobile-detail-industry">As of ${esc(dateText(row.review_b_date))}</div>` : ""}
       <div class="mobile-detail-review-grid">
         <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
-        <div><span>Geometry</span><strong>${esc(text(row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
+        <div><span>Geometry</span><strong>${esc(text(reviewUsesB(row) ? row.review_b_quality : row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
         <div><span>Entry</span><strong>${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
       </div>
       <div class="mobile-detail-structure">
-        <div><span>EPS YoY</span><strong>${fmt(row.eps_yoy_growth, "pct1")}</strong></div>
-        <div><span>To 52W High</span><strong>${fmt(row.dist_to_52w_high_pct, "pct1")}</strong></div>
+        <div><span>EPS YoY</span><strong>${fmt(facts.eps_yoy_growth, "pct1")}</strong></div>
+        <div><span>To 52W High</span><strong>${fmt(facts.dist_to_52w_high_pct, "pct1")}</strong></div>
         <div class="mobile-detail-base"><span>Base</span><strong>${baseValue}</strong>${baseContext ? `<small>${esc(baseContext)}</small>` : ""}</div>
         <div class="mobile-detail-pullback"><span>Pullback</span><strong>${pullbackValue}</strong>${pullbackContext ? `<small>${esc(pullbackContext)}</small>` : ""}</div>
         <div class="mobile-detail-wide mobile-detail-rs"><span>RS Reference</span><strong data-mobile-rs-reference>—</strong></div>
@@ -885,19 +975,21 @@
     }
     if (field === "ibd_entry_status") {
       const status = displayStatus(row);
-      return `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+      const statusText = status === "NO_DATA" ? '<span class="status-text">NO DATA</span>'
+        : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+      return statusText + reviewOutLabel(row);
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
-    if (field === "ibd_breakout_quality") return `<span class="quality-text ${qualityClass(value)}">${esc(text(value))}</span>`;
-    if (field === "latest_close") return esc(fmt(value));
-    if (field === "volume_ratio") return esc(fmt(value, "x"));
+    if (field === "ibd_breakout_quality") { const quality = reviewUsesB(row) ? row.review_b_quality : value; return `<span class="quality-text ${qualityClass(quality)}">${esc(text(quality))}</span>`; }
+    if (field === "latest_close") return esc(fmt(reviewUsesB(row) ? row.review_b_close : value));
+    if (field === "volume_ratio") return esc(fmt(reviewWeeklyVolume(row), "x"));
     if (field === "industry_rs") return '<span class="industry-rs-cell">—</span>';
     if (field === "rs_percentile") {
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
     }
-    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(text(value).replace(/x$/, "×"));
+    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(reviewEntryText(row).replace(/x$/, "×"));
     return esc(text(value));
   }
 
@@ -1046,6 +1138,9 @@
           const field = element.dataset.field;
           const value = element.dataset.value;
           state[field] = state[field] === value ? "ALL" : value;
+          // A and B filters refer to different buy points; never intersect them.
+          if (field === "change" && state.change !== "ALL") state.newBuyPoint = "ALL";
+          if (field === "newBuyPoint" && state.newBuyPoint !== "ALL") state.change = "ALL";
           render();
         } else if (action === "status") {
           const value = element.dataset.value;

@@ -73,7 +73,7 @@ def test_near_breakout_is_a_ui_stage_not_an_ibd_entry_status() -> None:
     assert "NEAR_BREAKOUT" not in ENTRY_STATUSES
     assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
     assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
-    assert 'return isNearBreakout(row) ? WATCH_STAGE : row.ibd_entry_status;' in APP
+    assert 'if (isNearBreakout(row)) return WATCH_STAGE;' in APP
     assert 'const status = displayStatus(row);' in APP
     assert '["ibd_entry_status", "Stage / Status"]' in APP
 
@@ -103,7 +103,7 @@ def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() 
     assert 'result = result.filter((row) => bool(row.review_has_value_change));' in APP
     assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
     assert "Current pre-signal candidates. Available in All Review only." in APP
-    assert "Changes vs Weekend" in APP
+    assert "Review Now" in APP
     assert "All Review" in APP
     assert "function isActive(row)" in APP
     assert "return isSignalActive(row) || isNearBreakout(row);" in APP
@@ -111,9 +111,11 @@ def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() 
 
 def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
     assert "function nearBreakoutDetailHtml(row)" not in APP
-    assert 'const referenceKey = near ? "Watch Trigger" : "Buy Point";' in APP
-    assert 'const referenceContext = near ? watchTargetSource(row) : entryDate || buyPointDate;' in APP
-    assert 'const contextLabel = near ? "Source" : entryDate ? "Entry" : "Buy Point Date";' in APP
+    assert 'const referenceKey = near ? "Watch Trigger" :' in APP
+    assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
+    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
+    assert 'const referenceContext = near ? watchTargetSource(row) :' in APP
+    assert 'const contextLabel = near ? "Source" :' in APP
     assert 'return "Recovery High"' in APP
     assert 'return "TWK High"' in APP
     assert 'return "Pending High"' in APP

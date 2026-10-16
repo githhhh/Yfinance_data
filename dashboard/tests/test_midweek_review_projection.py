@@ -634,3 +634,42 @@ def test_analyze_fails_closed_to_complete_when_midweek_projection_is_invalid(
     assert result.midweek_available is False
     assert result.actionable_codes == ("BASE",)
     assert any("projection failed closed" in warning for warning in result.warnings)
+
+
+def test_static_review_v2_keeps_out_of_pool_weekend_anchor_and_current_b(tmp_path):
+    from dashboard.build_static import build_dashboard_payload
+
+    complete_path = tmp_path / "breakout_follow_pool.csv"
+    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
+    complete = pd.DataFrame([
+        _row("OUT", snapshot_date="2026-07-24", signal=True,
+             status="EXTENDED", valid=True, candidate=100, close=108, rule="pivot"),
+    ])
+    midweek = pd.DataFrame([
+        _row("NEW", snapshot_date="2026-07-28", signal=True,
+             status="ACTIONABLE", valid=True, candidate=50, close=51, rule="pivot"),
+    ])
+    complete.to_csv(complete_path, index=False)
+    midweek.to_csv(midweek_path, index=False)
+
+    daily = {"OUT": pd.DataFrame(
+        {"Close": [99, 103]},
+        index=pd.to_datetime(["2026-07-27", "2026-07-28"]),
+    )}
+    payload = build_dashboard_payload(
+        complete_path=complete_path, midweek_path=midweek_path,
+        window_date=date(2026, 7, 29), daily=daily,
+    )
+    review = {item["code"]: item for item in payload["views"]["midweek"]["rows"]}
+
+    assert payload["default_period"] == "MIDWEEK"
+    assert set(review) == {"OUT", "NEW"}
+    assert review["OUT"]["review_a_active"] is True
+    assert review["OUT"]["review_a_price"] == 100
+    assert review["OUT"]["review_a_event"] == "BELOW → ZONE"
+    assert review["OUT"]["review_membership"] == "OUT"
+    assert review["OUT"]["ibd_entry_status"] == "ACTIONABLE"
+    assert review["NEW"]["review_b_active"] is True
+    assert review["NEW"]["review_b_event"] == "NEW BP"
+    assert review["NEW"]["review_b_price"] == 50
+    assert build_midweek_review(midweek, complete).actionable_codes == ("NEW",)
