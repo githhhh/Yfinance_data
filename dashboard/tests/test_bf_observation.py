@@ -233,9 +233,105 @@ def test_no_yesterday_bar_never_invents_latest_daily_transition():
     assert path["latest_event"] == ""
 
 
-def test_previous_market_session_allows_friday_to_monday_change():
+def test_first_midweek_observation_is_weekend_net_not_latest_change():
     complete = pd.DataFrame([row("MON", trigger=100, close=108)])
     daily = pd.DataFrame({"Close": [108, 97]},
                          index=pd.to_datetime(["2026-10-09", "2026-10-12"]))
     path = _price_path(complete.iloc[0], None, daily, as_of=date(2026, 10, 12))
-    assert path["latest_event"] == "EXT → BELOW"
+    assert path["latest_event"] == ""
+    assert path["week_event"] == "EXT → BELOW"
+
+
+def test_nonconsecutive_same_week_daily_bars_still_produce_latest_change():
+    weekend = row("GAP", close=108)
+    daily = pd.DataFrame(
+        {"Close": [108, 97, 103]},
+        index=pd.to_datetime(["2026-10-09", "2026-10-12", "2026-10-15"]),
+    )
+    result = _price_path(weekend, None, daily, as_of=date(2026, 10, 15))
+    assert result["latest_event"] == "BELOW → ZONE"
+    assert result["week_event"] == "EXT → ZONE"
+    assert result["path"] == "EXT → BELOW → ZONE"
+    assert result["as_of"] == "2026-10-15"
+
+
+def test_previous_snapshot_is_comparison_boundary_even_with_intermediate_daily_k():
+    complete = pd.DataFrame([row("A", close=108)])
+    previous = pd.DataFrame([
+        row("A", snapshot="2026-10-12", close=97, signal=False),
+    ])
+    current = pd.DataFrame([
+        row("A", snapshot="2026-10-15", close=104, signal=False),
+    ])
+    # Tue/Wed bars are real, but this run compares the last published snapshot
+    # on Monday with the current Thursday state.
+    daily = {"A": pd.DataFrame(
+        {"Close": [108, 97, 108, 103, 104]},
+        index=pd.to_datetime([
+            "2026-10-09", "2026-10-12", "2026-10-13",
+            "2026-10-14", "2026-10-15",
+        ]),
+    )}
+    result = build_observation_view(
+        complete, current, pd.DataFrame(),
+        previous=previous, daily=daily, as_of=date(2026, 10, 15),
+    ).iloc[0]
+    assert result["review_a_event"] == "BELOW → ZONE"
+    assert result["review_a_week_event"] == "EXT → ZONE"
+    events = build_observation_attention(
+        current, complete, pd.DataFrame(),
+        previous=previous, daily=daily, as_of=date(2026, 10, 15),
+    )
+    assert [event["event"] for event in events
+            if event["source"] == "WEEKEND"] == ["BELOW → ZONE"]
+
+
+def test_previous_and_current_same_week_pool_close_work_without_daily_pkl():
+    complete = pd.DataFrame([row("POOL", close=108)])
+    previous = pd.DataFrame([
+        row("POOL", snapshot="2026-10-12", close=97, signal=False),
+    ])
+    current = pd.DataFrame([
+        row("POOL", snapshot="2026-10-15", close=103, signal=False),
+    ])
+    view = build_observation_view(
+        complete, current, pd.DataFrame(),
+        previous=previous, daily={}, as_of=date(2026, 10, 15),
+    ).iloc[0]
+    assert view["review_a_event"] == "BELOW → ZONE"
+    assert view["review_a_path"] == "BELOW → ZONE"
+    assert view["review_a_zone"] == "ZONE"
+
+
+def test_previous_midweek_snapshot_from_different_week_never_generates_transition():
+    complete = pd.DataFrame([row("CROSS", close=108)])
+    previous = pd.DataFrame([
+        row("CROSS", snapshot="2026-10-08", close=97, signal=False),
+    ])
+    current = pd.DataFrame([
+        row("CROSS", snapshot="2026-10-12", close=103, signal=False),
+    ])
+    view = build_observation_view(
+        complete, current, pd.DataFrame(),
+        previous=previous, daily={}, as_of=date(2026, 10, 12),
+    ).iloc[0]
+    assert view["review_a_event"] == ""
+    assert view["review_a_week_event"] == "EXT → ZONE"
+    assert view["review_membership_event"] == ""
+
+
+def test_missing_intermediate_bars_never_invent_multiple_transitions():
+    complete = pd.DataFrame([row("SPARSE", close=108)])
+    previous = pd.DataFrame([
+        row("SPARSE", snapshot="2026-10-12", close=97, signal=False),
+    ])
+    current = pd.DataFrame([
+        row("SPARSE", snapshot="2026-10-15", close=103, signal=False),
+    ])
+    view = build_observation_view(
+        complete, current, pd.DataFrame(),
+        previous=previous, daily={}, as_of=date(2026, 10, 15),
+    ).iloc[0]
+    assert view["review_a_path"] == "BELOW → ZONE"
+    assert view["review_a_event"] == "BELOW → ZONE"
+    assert "EXT" not in view["review_a_path"]
