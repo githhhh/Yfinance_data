@@ -550,9 +550,15 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
                 continue
             raw = git("show", f"{sha}:{path}")
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
-            if "snapshot_date" not in frame or "code" not in frame:
+            required = {"snapshot_date", "code", "signal", "latest_close"}
+            if not required.issubset(frame.columns):
                 return unavailable("history file lacks required columns")
-            days = pd.to_datetime(frame["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+            parsed_dates = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+            if parsed_dates.isna().any() or frame["code"].isna().any() or (
+                frame["code"].astype(str).str.strip().eq("")
+            ).any() or frame["code"].duplicated().any():
+                return unavailable("history contains invalid dates, codes or duplicates")
+            days = parsed_dates.dt.date.unique()
             if len(days) != 1:
                 return unavailable("mixed/invalid historical market date")
             day = days[0]
@@ -589,7 +595,7 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
                 return unavailable("captured previous does not match committed version")
             # Previous must be the most recent published snapshot, not merely
             # any valid older snapshot.
-            if prev_days[0] != rows[-1]["date"] and prev_days[0].isoformat() != rows[-1]["date"]:
+            if prev_days[0].isoformat() != rows[-1]["date"]:
                 return unavailable("captured previous is not latest committed midweek")
         result = [{"date": x["date"], "frame": x["frame"], "source_ref": x["source_ref"],
                    "verified": True, "origin": "MIDWEEK"} for x in rows]
