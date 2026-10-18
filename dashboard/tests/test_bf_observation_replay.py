@@ -539,3 +539,28 @@ def test_even_minor_pkl_pool_zone_disagreement_must_fail_closed():
         diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
     )
     assert out == []
+
+
+def test_missing_previous_pool_close_uses_verified_daily_without_inventing_signal():
+    previous = pivot("MISSING", "2026-10-14", 0, 99, signal=False)
+    previous["latest_close"] = None
+    current = pivot("MISSING", "2026-10-15", 100, 102, status="UNCONFIRMED")
+    baseline = pivot("MISSING", "2026-10-09", 0, 98, signal=False)
+    daily = pd.DataFrame(
+        {"Close": [99.0, 102.0]},
+        index=pd.to_datetime(["2026-10-14", "2026-10-15"]),
+    )
+    events = build_observation_events_v2(
+        pd.DataFrame([current]), pd.DataFrame([baseline]),
+        as_of=date(2026, 10, 15),
+        history_snapshots=[{
+            "date": "2026-10-14", "frame": pd.DataFrame([previous]),
+            "source_ref": "published", "verified": True, "origin": "MIDWEEK",
+        }],
+        diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
+        daily={"MISSING": daily},
+    )
+    assert len(events) == 1
+    assert events[0]["price"]["previous_zone"] == "BELOW"
+    assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
+    assert events[0]["price"]["basis"] == "RETROSPECTIVE"
