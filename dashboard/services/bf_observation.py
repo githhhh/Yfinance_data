@@ -575,6 +575,22 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
                            "source_ref": sha, "signature": signature}
         rows = [by_day[d] for d in sorted(by_day)]
         week_start = monday_of_week(as_of)
+        # On the first trading day the fixed MIDWEEK file normally still
+        # contains last week's old snapshot. It is not a same-week prior.
+        previous_same_week = False
+        if previous is not None and not previous.empty:
+            if "snapshot_date" not in previous or "code" not in previous:
+                return unavailable("captured previous snapshot missing required columns")
+            dates = pd.to_datetime(previous["snapshot_date"], errors="coerce")
+            if dates.isna().any() or len(set(dates.dt.date)) != 1:
+                return unavailable("captured previous has mixed or invalid dates")
+            previous_day = dates.dt.date.iloc[0]
+            if previous_day >= as_of:
+                return unavailable("captured previous is not older than current")
+            if monday_of_week(previous_day) == week_start:
+                previous_same_week = True
+            elif previous_day >= week_start:
+                return unavailable("captured previous is not a valid earlier snapshot")
         # Missing history after the first US trading session cannot
         # masquerade as an authoritative first B observation.
         prior_sessions = [week_start + timedelta(days=i)
@@ -582,16 +598,16 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
                           if _is_market_trading_day(week_start + timedelta(days=i))]
         first_session = _is_market_trading_day(as_of) and not prior_sessions
         if not rows:
-            if first_session and (previous is None or previous.empty):
+            if first_session and not previous_same_week:
                 return [], {"usable": True, "history_coverage": "AVAILABLE",
                             "reason": "first market session, complete Pool baseline required",
                             "snapshot_dates": []}
             return unavailable("missing prior published midweek history")
-        if previous is None or previous.empty:
-            return unavailable("captured previous Pool missing despite committed prior history")
+        if not previous_same_week:
+            return unavailable("captured same-week Pool missing despite committed prior history")
 
-        if previous is not None and not previous.empty:
-            prev_days = pd.to_datetime(previous.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
+        if previous_same_week:
+            prev_days = pd.to_datetime(previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
             if len(prev_days) != 1 or prev_days[0] >= as_of or monday_of_week(prev_days[0]) != monday_of_week(as_of):
                 return unavailable("captured previous date is not in the review week")
             git_previous = by_day.get(prev_days[0])
