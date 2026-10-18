@@ -562,7 +562,13 @@ def load_observation_history(data_root, *, as_of, previous=None):
                            "source_ref": sha, "signature": signature}
         rows = [by_day[d] for d in sorted(by_day)]
         if not rows:
-            return unavailable("no earlier same-week committed Pool")
+            # First midweek market session: the published complete-week Pool
+            # is the historical baseline; there need not be an earlier B CSV.
+            if previous is None or previous.empty:
+                return [], {"usable": True, "history_coverage": "AVAILABLE",
+                            "reason": "first published midweek observation",
+                            "snapshot_dates": []}
+            return unavailable("captured previous exists but no committed history")
 
         if previous is not None and not previous.empty:
             prev_days = pd.to_datetime(previous.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
@@ -587,7 +593,7 @@ def load_observation_history(data_root, *, as_of, previous=None):
         return unavailable(f"history preflight failed: {exc}")
 
 
-def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic):
+def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic, daily=None):
     """Current B only; A continues through the unchanged v1 event path."""
     from dashboard.services.bf_observation_replay import observe_midweek_buy_point, identity_v2
     if not diagnostic.get("usable"):
@@ -609,21 +615,54 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
         history = [{**{k: v for k, v in item.items() if k != "rows"},
                     "row": item["rows"].get(code)} for item in history_maps]
         weekend = weekend_by_code.get(code)
-        # Weekend WATCH is valid provenance even if that stock had no
-        # weekend buy point. It is a dated ticker-level fact, not evidence
-        # that the same B structure already existed.
-        if weekend is not None and to_bool(weekend.get("bf_watch_active")) is True:
+        # The last complete Pool is a *published observation* even when
+        # there was no active Watch; it provides a valid first-day price
+        # baseline. This is not a B tracking-list membership.
+        if weekend is not None:
             weekend_date = _day(weekend.get("snapshot_date"))
             if weekend_date is not None and weekend_date < as_of:
-                history.insert(0, {"date": weekend_date.isoformat(),
-                                   "row": weekend, "verified": True,
-                                   "origin": "WEEKEND", "source_ref": "complete-baseline"})
+                if monday_of_week(weekend_date + pd.Timedelta(days=3)) == monday_of_week(as_of):
+                    history.insert(0, {"date": weekend_date.isoformat(),
+                                       "row": weekend, "verified": True,
+                                       "origin": "WEEKEND", "source_ref": "complete-baseline"})
+        daily_closes = []
+        frame = (daily or {}).get(code)
+        if isinstance(frame, pd.DataFrame) and "Close" in frame:
+            for timestamp, raw_close in frame["Close"].items():
+                trade_day = _day(timestamp)
+                observed_close = _number(raw_close)
+                if (trade_day is not None and observed_close is not None
+                        and trade_day <= as_of and
+                        trade_day >= monday_of_week(as_of) - pd.Timedelta(days=3)):
+                    daily_closes.append((trade_day.isoformat(), observed_close))
+        # Missing row in a *full* published Pool is not a signal, but may
+        # have an observable EOD price in the daily PKL. Keep provenance
+        # separate: populate price_close without inventing a Pool row.
+        daily_by_day = dict(daily_closes)
+        coherent = True
+        for observation in history:
+            row = observation.get("row")
+            daily_close = daily_by_day.get(observation["date"])
+            if row is None:
+                observation["price_close"] = daily_close
+            elif daily_close is not None:
+                pool_close = _number(row.get("latest_close"))
+                if pool_close is not None and abs(daily_close / pool_close - 1) > 0.02:
+                    coherent = False
+                    break
+        current_close = _number(current_row.get("latest_close"))
+        current_daily_close = daily_by_day.get(as_of.isoformat())
+        if current_close is not None and current_daily_close is not None:
+            coherent = coherent and abs(current_daily_close / current_close - 1) <= 0.02
+        if not coherent:
+            continue
         event = observe_midweek_buy_point(
             code=code, current=current_row.to_dict(),
             history=history, weekend=weekend.to_dict() if weekend is not None else None,
             as_of=as_of.isoformat(), review_week=week,
             baseline_verified=True,
             history_coverage=diagnostic["history_coverage"],
+            daily_closes=daily_closes,
         )
         if event is not None:
             results.append(event)
