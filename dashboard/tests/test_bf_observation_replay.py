@@ -317,3 +317,59 @@ def test_a_legacy_v1_event_remains_eligible_after_v2_import():
     assert [(e["source"], e["event"], e["status"]) for e in events] == [
         ("WEEKEND", "BELOW → ZONE", "UNCONFIRMED")
     ]
+
+
+def test_real_october_published_history_and_1d_replay():
+    """Historical evidence integration: no invented A/B/WATCH states.
+
+    All Pool inputs are pinned 2026-10-16 Git objects, not the mutable
+    current CSV. Git history is cut off before later publications.
+    """
+    from datetime import datetime, timezone
+    from io import StringIO
+    from pathlib import Path
+    import pytest
+    from dashboard.services.bf_observation import load_daily_snapshot
+
+    root = Path(__file__).resolve().parents[2]
+    sha_current = "25839698482295ee2a076df5e0cdf590f12e03db"
+    sha_previous = "451ffb7f0fdc5e8c5be29803d54e613e67724a2e"
+
+    def pool(sha, filename):
+        r = subprocess.run(["git", "show", f"{sha}:us/{filename}"],
+                           cwd=root, capture_output=True, text=True)
+        if r.returncode:
+            pytest.skip("full historical fixture not available in this checkout")
+        return pd.read_csv(StringIO(r.stdout), dtype={"code": str})
+
+    current = pool(sha_current, "breakout_follow_pool_midweek.csv")
+    complete = pool(sha_current, "breakout_follow_pool.csv")
+    previous = pool(sha_previous, "breakout_follow_pool_midweek.csv")
+    cutoff = datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc)
+    snapshots, preflight = load_observation_history(
+        root, as_of=date(2026, 10, 15), previous=previous, run_cutoff=cutoff)
+    assert preflight["usable"] is True, preflight
+    assert {"2026-10-12", "2026-10-14"} <= set(preflight["snapshot_dates"])
+
+    daily = load_daily_snapshot(root, window_date=date(2026, 10, 16))
+    if not daily:
+        pytest.skip("pinned 1D PKL not included in this checkout")
+    events = build_observation_events_v2(
+        current, complete, as_of=date(2026, 10, 15),
+        history_snapshots=snapshots, diagnostic=preflight, daily=daily)
+    by_code = {item["code"]: item for item in events}
+    andg = by_code["ANDG"]
+    assert andg["identity"]["lifecycle"] == "REAPPEARED"
+    assert andg["price"]["transition"] == "BELOW_TO_ZONE"
+    assert andg["price"]["basis"] == "TRACKED_ANCHOR"
+    assert andg["watch"]["latest"]["type"] == "ma10_pullback"
+    assert andg["watch"]["latest"]["origin"] == "MIDWEEK"
+    assert andg["watch"]["latest"]["relation"] == "TICKER_CONTEXT"
+    aout = by_code["AOUT"]
+    assert aout["identity"]["lifecycle"] == "FIRST_OBSERVED"
+    assert aout["price"]["basis"] == "RETROSPECTIVE"
+    assert aout["watch"]["active_prior"] is False
+    assert aout["price"]["transition"] == "BELOW_TO_ZONE"
+    ko = by_code["KO"]
+    assert ko["identity"]["lifecycle"] == "FIRST_OBSERVED"
+    assert ko["anchor_key_v2"] == "pivot|2026-10-12|M_BOX"
