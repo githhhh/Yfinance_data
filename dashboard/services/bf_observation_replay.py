@@ -121,7 +121,8 @@ def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
     return out
 
 
-def watch_provenance(history: list[dict], *, as_of: str) -> dict:
+def watch_provenance(history: list[dict], *, as_of: str,
+                     price_boundary_date: str | None = None) -> dict:
     watches = []
     for observation in history:
         when = observation.get("date")
@@ -136,7 +137,10 @@ def watch_provenance(history: list[dict], *, as_of: str) -> dict:
                         "relation": "TICKER_CONTEXT",
                         "source_ref": observation.get("source_ref")})
     watches.sort(key=lambda x: x["date"])
-    return {"active_prior": bool(watches), "latest": watches[-1] if watches else None,
+    return {"active_prior": bool(watches),
+            "active_at_price_boundary": bool(price_boundary_date and any(
+                watch["date"] == price_boundary_date for watch in watches)),
+            "latest": watches[-1] if watches else None,
             "observations": watches}
 
 
@@ -175,6 +179,13 @@ def observe_midweek_buy_point(*, code: str, current: dict,
 
     snapshot_zone = zone(ident["trigger"], current.get("latest_close"))
     if snapshot_zone != "ZONE":
+        return None
+    # Do not manufacture a candidate merely because its close projects
+    # into ZONE when the authoritative resolver rejects the entry state.
+    state = str(current.get("ibd_entry_status") or "")
+    is_valid = to_bool(current.get("ibd_entry_valid")) is True
+    if (state not in {"ACTIONABLE", "UNCONFIRMED"}
+            or (state == "ACTIONABLE") != is_valid):
         return None
     ordered = sorted([r for r in history if r.get("date") and r["date"] < as_of],
                      key=lambda r: r["date"])
@@ -218,7 +229,8 @@ def observe_midweek_buy_point(*, code: str, current: dict,
         previous_trigger=prior_trigger if same else None,
         daily_closes=daily_closes,
     )
-    watches = watch_provenance(ordered, as_of=as_of)
+    watches = watch_provenance(ordered, as_of=as_of,
+                                price_boundary_date=price["previous_date"])
     entry = entry_confirmation(current, current_zone=snapshot_zone,
                                previous_same_anchor=prior_record["row"] if prior_record else None)
     transition = price["transition"]
