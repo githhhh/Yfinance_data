@@ -189,7 +189,9 @@ def test_git_history_read_only_and_duplicate_date_conflicts_fail_closed(tmp_path
         pd.DataFrame([pivot("X", dated, 100, price)]).to_csv(output, index=False)
         subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
         subprocess.run(["git", "commit", "-qm", dated], cwd=tmp_path, check=True)
-    snapshots, diagnostics = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
+    previous = pd.DataFrame([pivot("X", "2026-10-14", 100, 101)])
+    snapshots, diagnostics = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 15), previous=previous)
     assert diagnostics["usable"] is True
     assert [x["date"] for x in snapshots] == ["2026-10-12", "2026-10-14"]
 
@@ -198,7 +200,8 @@ def test_git_history_read_only_and_duplicate_date_conflicts_fail_closed(tmp_path
     pd.DataFrame([pivot("X", "2026-10-14", 100, 103)]).to_csv(output, index=False)
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "conflicting 2026-10-14"], cwd=tmp_path, check=True)
-    snapshots, diagnostics = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
+    snapshots, diagnostics = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 15), previous=previous)
     assert snapshots == []
     assert diagnostics["usable"] is False
     assert "conflicting" in diagnostics["reason"]
