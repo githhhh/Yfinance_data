@@ -190,9 +190,18 @@ def test_git_history_read_only_and_duplicate_date_conflicts_fail_closed(tmp_path
         subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
         subprocess.run(["git", "commit", "-qm", dated], cwd=tmp_path, check=True)
     snapshots, diagnostics = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
-    # Synthetic commits created today may fall outside an old as_of scan;
-    # real production commits retain their historical commit timestamps.
-    assert isinstance(snapshots, list) and isinstance(diagnostics, dict)
+    assert diagnostics["usable"] is True
+    assert [x["date"] for x in snapshots] == ["2026-10-12", "2026-10-14"]
+
+    # Same market date, incompatible published revisions: never choose one
+    # arbitrarily and call it an authoritative prior observation.
+    pd.DataFrame([pivot("X", "2026-10-14", 100, 103)]).to_csv(output, index=False)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "conflicting 2026-10-14"], cwd=tmp_path, check=True)
+    snapshots, diagnostics = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
+    assert snapshots == []
+    assert diagnostics["usable"] is False
+    assert "conflicting" in diagnostics["reason"]
 
 
 def test_zone_boundary_rounding_is_shared_with_v1():
@@ -200,3 +209,54 @@ def test_zone_boundary_rounding_is_shared_with_v1():
     assert zone(100, 100) == "ZONE"
     assert zone(100, 105) == "ZONE"
     assert zone(100, 105.01) == "EXT"
+
+
+def test_git_preflight_rejects_shallow_and_previous_unverified(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    output = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    output.parent.mkdir()
+    pd.DataFrame([pivot("X", "2026-10-14", 100, 101)]).to_csv(output, index=False)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "published"], cwd=tmp_path, check=True)
+    bad_previous = pd.DataFrame([pivot("X", "2026-10-14", 100, 999)])
+    _, state = load_observation_history(tmp_path, as_of=date(2026, 10, 15),
+                                        previous=bad_previous)
+    assert state["usable"] is False and "does not match" in state["reason"]
+    good_previous = pd.DataFrame([pivot("X", "2026-10-14", 100, 101)])
+    _, state = load_observation_history(tmp_path, as_of=date(2026, 10, 15),
+                                        previous=good_previous)
+    assert state["usable"] is True
+
+
+def test_retrospective_daily_price_does_not_create_a_past_signal():
+    current = pd.DataFrame([pivot("FIRST", "2026-10-15", 100, 102)])
+    complete = pd.DataFrame([pivot("OTHER", "2026-10-09", 100, 103)])
+    previous = pd.DataFrame([pivot("OTHER", "2026-10-14", 100, 102)])
+    frame = pd.DataFrame({"Close": [97, 102]},
+                         index=pd.to_datetime(["2026-10-14", "2026-10-15"]))
+    events = build_observation_events_v2(
+        current, complete, as_of=date(2026, 10, 15),
+        history_snapshots=[{"date": "2026-10-14", "frame": previous,
+                            "source_ref": "commit", "verified": True, "origin": "MIDWEEK"}],
+        diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
+        daily={"FIRST": frame},
+    )
+    assert len(events) == 1
+    assert events[0]["identity"]["lifecycle"] == "FIRST_OBSERVED"
+    assert events[0]["price"]["basis"] == "RETROSPECTIVE"
+    assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
+    assert events[0]["price"]["daily_path"][-1]["zone"] == "ZONE"
+
+
+def test_last_complete_week_baseline_permits_first_midweek_session():
+    current = pd.DataFrame([pivot("FIRST", "2026-10-12", 100, 101)])
+    baseline = pd.DataFrame([pivot("FIRST", "2026-10-09", 0, 99, signal=False)])
+    events = build_observation_events_v2(
+        current, baseline, as_of=date(2026, 10, 12),
+        history_snapshots=[],
+        diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
+    )
+    assert len(events) == 1
+    assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
