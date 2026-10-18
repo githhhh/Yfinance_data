@@ -609,6 +609,15 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
         history = [{**{k: v for k, v in item.items() if k != "rows"},
                     "row": item["rows"].get(code)} for item in history_maps]
         weekend = weekend_by_code.get(code)
+        # Weekend WATCH is valid provenance even if that stock had no
+        # weekend buy point. It is a dated ticker-level fact, not evidence
+        # that the same B structure already existed.
+        if weekend is not None and to_bool(weekend.get("bf_watch_active")) is True:
+            weekend_date = _day(weekend.get("snapshot_date"))
+            if weekend_date is not None and weekend_date < as_of:
+                history.insert(0, {"date": weekend_date.isoformat(),
+                                   "row": weekend, "verified": True,
+                                   "origin": "WEEKEND", "source_ref": "complete-baseline"})
         event = observe_midweek_buy_point(
             code=code, current=current_row.to_dict(),
             history=history, weekend=weekend.to_dict() if weekend is not None else None,
