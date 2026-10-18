@@ -31,7 +31,9 @@ def report(root: Path, as_of: date) -> dict:
         if len(dates) != 1 or not is_valid_complete_baseline(dates[0], as_of):
             return {"usable": False, "reason": "invalid complete-week baseline",
                     "as_of": as_of.isoformat()}
-        snapshots, diagnostics = load_observation_history(root, as_of=as_of)
+        snapshots, diagnostics = load_observation_history(
+            root, as_of=as_of, require_previous=False,
+        )
         return {"as_of": as_of.isoformat(), "complete_date": dates[0].isoformat(),
                 "previous_midweek_dates": [x["date"] for x in snapshots],
                 **diagnostics}
