@@ -9,7 +9,7 @@ from datetime import date
 import math
 from typing import Any
 
-from dashboard.services.bf_transition import _buy_point_anchor, to_bool
+from dashboard.services.bf_transition import _buy_point_anchor, _price_zone, to_bool
 
 
 def _num(value: Any) -> float | None:
@@ -34,8 +34,9 @@ def zone(trigger: Any, close: Any) -> str | None:
     p, c = _num(trigger), _num(close)
     if p is None or c is None:
         return None
-    pct = round((c / p - 1) * 100, 2)
-    return "BELOW" if pct < 0 else ("ZONE" if pct <= 5 else "EXT")
+    # A and B must use one authoritative rounding/zone classifier.
+    return {"BELOW_BUY_POINT": "BELOW", "BUY_ZONE": "ZONE",
+            "EXTENDED": "EXT"}.get(_price_zone(p, c))
 
 
 def identity_v2(row: Any) -> dict:
@@ -155,16 +156,16 @@ def entry_confirmation(current: Any, *, current_zone: str | None,
             "upgrade": bool(act and previous_status == "UNCONFIRMED")}
 
 
-def observe_midweek_buy_point(*, code: str, current: dict,
-                              history: list[dict], weekend: dict | None,
-                              as_of: str, review_week: str,
-                              baseline_verified: bool,
-                              history_coverage: str = "AVAILABLE",
-                              daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
-    """Derive orthogonal B facts; no presentation or external side effects.
+def resolve_midweek_facts(*, code: str, current: dict,
+                          history: list[dict], weekend: dict | None,
+                          as_of: str, review_week: str,
+                          baseline_verified: bool,
+                          history_coverage: str = "AVAILABLE",
+                          daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
+    """Resolve the four orthogonal facts; never decide Telegram eligibility.
 
-    history consists of verified *published* snapshots before as_of. Every
-    observation may contain a row=None when code absent in the full Pool.
+    Historical identity is independent of the current price and ACT. This
+    function also returns facts for EXT / BELOW B signals when evidence exists.
     """
     if to_bool(current.get("signal")) is not True:
         return None
@@ -173,92 +174,123 @@ def observe_midweek_buy_point(*, code: str, current: dict,
         return None
     if weekend is not None and to_bool(weekend.get("signal")) is True:
         wk = identity_v2(weekend)
-        # Cannot prove independence when the weekend identity is unresolved.
         if wk["resolution"] != "EXACT" or wk["key"] == ident["key"]:
             return None
 
-    snapshot_zone = zone(ident["trigger"], current.get("latest_close"))
-    if snapshot_zone != "ZONE":
-        return None
-    # Do not manufacture a candidate merely because its close projects
-    # into ZONE when the authoritative resolver rejects the entry state.
-    state = str(current.get("ibd_entry_status") or "")
-    is_valid = to_bool(current.get("ibd_entry_valid")) is True
-    if (state not in {"ACTIONABLE", "UNCONFIRMED"}
-            or (state == "ACTIONABLE") != is_valid):
+    if not baseline_verified or history_coverage != "AVAILABLE":
         return None
     ordered = sorted([r for r in history if r.get("date") and r["date"] < as_of],
-                     key=lambda r: r["date"])
-    if not ordered or not baseline_verified or history_coverage != "AVAILABLE":
+                     key=lambda record: record["date"])
+    if not ordered or any(not record.get("verified") for record in ordered):
         return None
-    # A missing row does not prove a negative signal unless this is a complete,
-    # verified published Pool for that date. All accepted history inputs here
-    # must be full published snapshots.
-    if any(not record.get("verified") for record in ordered):
-        return None
+
     same = []
-    uncertain = False
     for record in ordered:
-        candidate = record.get("row")
-        if candidate is None or to_bool(candidate.get("signal")) is not True:
+        row = record.get("row")
+        if row is None or to_bool(row.get("signal")) is not True:
             continue
-        prev_id = identity_v2(candidate)
-        if prev_id["resolution"] != "EXACT":
-            uncertain = True
-            continue
-        if prev_id["key"] == ident["key"]:
-            same.append((record, prev_id))
-    if uncertain:
-        return None
+        old = identity_v2(row)
+        if old["resolution"] != "EXACT":
+            # Never infer first-observed from an ambiguous earlier signal.
+            return None
+        if old["key"] == ident["key"]:
+            same.append((record, old))
+
     last = ordered[-1]
     last_row = last.get("row")
-    last_anchor = identity_v2(last_row) if last_row is not None and to_bool(last_row.get("signal")) is True else None
+    last_anchor = (identity_v2(last_row)
+                   if last_row is not None and to_bool(last_row.get("signal")) is True
+                   else None)
     same_on_last = bool(last_anchor and last_anchor["resolution"] == "EXACT"
                         and last_anchor["key"] == ident["key"])
-    lifecycle = "CONTINUING" if same_on_last else "REAPPEARED" if same else "FIRST_OBSERVED"
+    lifecycle = ("CONTINUING" if same_on_last else
+                 "REAPPEARED" if same else "FIRST_OBSERVED")
     basis = "TRACKED_ANCHOR" if same else "RETROSPECTIVE"
     prior_trigger = same[-1][1]["trigger"] if same else None
     prior_record = same[-1][0] if same else None
-    last_price = last_row.get("latest_close") if last_row is not None else last.get("price_close")
-    # If the ticker is absent from the prior Pool, historical daily close
-    # evidence needs to be supplied independently; do not fabricate a crossing.
+    last_close = last_row.get("latest_close") if last_row is not None else last.get("price_close")
     price = price_replay(
-        trigger=ident["trigger"], previous_close=last_price,
+        trigger=ident["trigger"], previous_close=last_close,
         current_close=current.get("latest_close"), previous_date=last["date"],
-        current_date=as_of, basis=basis,
-        previous_trigger=prior_trigger if same else None,
+        current_date=as_of, basis=basis, previous_trigger=prior_trigger,
         daily_closes=daily_closes,
     )
     watches = watch_provenance(ordered, as_of=as_of,
-                                price_boundary_date=price["previous_date"])
-    entry = entry_confirmation(current, current_zone=snapshot_zone,
-                               previous_same_anchor=prior_record["row"] if prior_record else None)
-    transition = price["transition"]
-    if same:
-        primary = "ZONE_REENTRY" if transition in {"BELOW_TO_ZONE", "EXT_TO_ZONE"} else None
-    else:
-        primary = "FIRST_OBSERVED_BP"
-    if not primary:
+                               price_boundary_date=price["previous_date"])
+    entry = entry_confirmation(
+        current, current_zone=price["current_zone"],
+        previous_same_anchor=prior_record["row"] if prior_record else None,
+    )
+    return {
+        "schema_version": 2, "source": "MIDWEEK", "code": code,
+        "market_date": as_of, "review_week": review_week,
+        "anchor_key_v2": ident["key"],
+        "identity": {
+            "resolution": ident["resolution"], "lifecycle": lifecycle,
+            "trigger_revision": price["trigger_revision"],
+            "first_observed_date": same[0][0]["date"] if same else as_of,
+        },
+        "price": price, "watch": watches, "entry": entry,
+        "evidence": {
+            "history_coverage": history_coverage,
+            "prior_snapshot_verified": True,
+            "price_observation_verified": bool(price["previous_zone"]),
+        },
+    }
+
+
+def midweek_opportunity_policy(facts: dict | None) -> dict | None:
+    """Midweek B is a current-snapshot opportunity, not another A watch list."""
+    if not facts:
         return None
+    price, identity = facts["price"], facts["identity"]
+    entry, watch = facts["entry"], facts["watch"]
+    if price["current_zone"] != "ZONE":
+        return None
+    # Entry state is an independent resolver fact. Reject contradictions;
+    # neither ZONE nor a historical WATCH implies ACT.
+    state = entry["status"]
+    if (state not in {"ACTIONABLE", "UNCONFIRMED"}
+            or (state == "ACTIONABLE") != entry["valid"]):
+        return None
+    existing = identity["lifecycle"] in {"REAPPEARED", "CONTINUING"}
+    if existing:
+        if price["transition"] not in {"BELOW_TO_ZONE", "EXT_TO_ZONE"}:
+            return None
+        primary = "ZONE_REENTRY"
+    else:
+        if identity["lifecycle"] != "FIRST_OBSERVED":
+            return None
+        primary = "FIRST_OBSERVED_BP"
+
     modifiers = []
-    if watches["active_prior"]:
+    if watch["active_prior"]:
         modifiers.append("PRIOR_WATCH")
-    if lifecycle == "REAPPEARED":
+    if identity["lifecycle"] == "REAPPEARED":
         modifiers.append("REAPPEARED")
     if entry["act"]:
         modifiers.append("ACT")
     import hashlib
     import json
-    event_identity = [2, review_week, as_of, code, ident["key"], primary]
-    event_key = hashlib.sha256(json.dumps(event_identity, separators=(",", ":")).encode()).hexdigest()
-    return {"schema_version": 2, "source": "MIDWEEK", "code": code,
-            "review_week": review_week, "market_date": as_of,
-            "anchor_key_v2": ident["key"],
-            "identity": {"resolution": ident["resolution"], "lifecycle": lifecycle,
-                         "trigger_revision": price["trigger_revision"],
-                         "first_observed_date": same[0][0]["date"] if same else as_of},
-            "price": price, "watch": watches, "entry": entry, "primary": primary,
-            "modifiers": modifiers, "evidence": {
-                "history_coverage": history_coverage, "prior_snapshot_verified": True,
-                "price_observation_verified": bool(price["previous_zone"])},
+    event_identity = [2, facts["review_week"], facts["market_date"],
+                      facts["code"], facts["anchor_key_v2"], primary]
+    event_key = hashlib.sha256(
+        json.dumps(event_identity, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {**facts, "primary": primary, "modifiers": modifiers,
             "event_key": event_key}
+
+
+def observe_midweek_buy_point(*, code: str, current: dict,
+                              history: list[dict], weekend: dict | None,
+                              as_of: str, review_week: str,
+                              baseline_verified: bool,
+                              history_coverage: str = "AVAILABLE",
+                              daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
+    """Compatibility facade: resolve facts first, then apply B policy."""
+    return midweek_opportunity_policy(resolve_midweek_facts(
+        code=code, current=current, history=history, weekend=weekend,
+        as_of=as_of, review_week=review_week,
+        baseline_verified=baseline_verified, history_coverage=history_coverage,
+        daily_closes=daily_closes,
+    ))
