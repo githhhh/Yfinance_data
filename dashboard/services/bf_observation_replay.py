@@ -193,7 +193,7 @@ def observe_midweek_buy_point(*, code: str, current: dict,
         return None
     last = ordered[-1]
     last_row = last.get("row")
-    last_anchor = identity_v2(last_row) if last_row and to_bool(last_row.get("signal")) is True else None
+    last_anchor = identity_v2(last_row) if last_row is not None and to_bool(last_row.get("signal")) is True else None
     same_on_last = bool(last_anchor and last_anchor["resolution"] == "EXACT"
                         and last_anchor["key"] == ident["key"])
     lifecycle = "CONTINUING" if same_on_last else "REAPPEARED" if same else "FIRST_OBSERVED"
