@@ -388,3 +388,64 @@ def test_git_history_duplicate_ticker_cannot_be_authoritative(tmp_path):
     found, diagnostic = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
     assert found == [] and diagnostic["usable"] is False
     assert "duplicates" in diagnostic["reason"]
+
+
+def test_missing_history_after_first_market_day_fails_closed(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "--allow-empty", "-qm", "initial"], cwd=tmp_path, check=True)
+    stale = pd.DataFrame([pivot("X", "2026-10-09", 0, 100, signal=False)])
+    current_week = pd.DataFrame([pivot("X", "2026-10-12", 100, 102)])
+    _, state = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 14), previous=stale)
+    assert state["usable"] is False and "missing prior" in state["reason"]
+    _, state = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 12), previous=stale)
+    assert state["usable"] is True
+    assert state["snapshot_dates"] == []
+    # An uncommitted same-week prior must NOT be treated as a first session.
+    _, state = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 14), previous=current_week)
+    assert state["usable"] is False
+
+
+def test_monday_market_holiday_first_session_is_tuesday(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "--allow-empty", "-qm", "initial"], cwd=tmp_path, check=True)
+    # Memorial Day 2026: Monday May 25 closed; Tuesday May 26 is first session.
+    old = pd.DataFrame([pivot("X", "2026-05-22", 0, 99, signal=False)])
+    _, state = load_observation_history(
+        tmp_path, as_of=date(2026, 5, 26), previous=old)
+    assert state["usable"] is True
+
+
+def test_thursday_complete_on_good_friday_week_is_valid_for_monday_review():
+    # April 3, 2026 was Good Friday; April 2 is the complete snapshot.
+    prior = pivot("HOL", "2026-04-02", 0, 99, signal=False)
+    current = pivot("HOL", "2026-04-06", 100, 102)
+    events = build_observation_events_v2(
+        pd.DataFrame([current]), pd.DataFrame([prior]),
+        as_of=date(2026, 4, 6),
+        history_snapshots=[], diagnostic={
+            "usable": True, "history_coverage": "AVAILABLE",
+        },
+    )
+    assert len(events) == 1
+    assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
+
+
+def test_bad_complete_snapshot_cannot_seed_b_replay():
+    current = pivot("X", "2026-10-15", 100, 102)
+    prior = pivot("X", "2026-10-02", 0, 99, signal=False)
+    events = build_observation_events_v2(
+        pd.DataFrame([current]), pd.DataFrame([prior]),
+        as_of=date(2026, 10, 15),
+        history_snapshots=[], diagnostic={
+            "usable": True, "history_coverage": "AVAILABLE",
+        },
+    )
+    assert events == []
+
