@@ -509,7 +509,8 @@ def build_observation_attention(
 
 # V2 intentionally supplements the existing A/B projection. Neither
 # build_observation_view nor the v1 A admission contract is rewritten.
-def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None):
+def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None,
+                             require_previous=True):
     """Read only previously committed, same-week MIDWEEK Pool snapshots.
 
     No fetch, no write and no assumption that the user's live checkout has
@@ -603,10 +604,10 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
                             "reason": "first market session, complete Pool baseline required",
                             "snapshot_dates": []}
             return unavailable("missing prior published midweek history")
-        if not previous_same_week:
+        if require_previous and not previous_same_week:
             return unavailable("captured same-week Pool missing despite committed prior history")
 
-        if previous_same_week:
+        if require_previous and previous_same_week:
             prev_days = pd.to_datetime(previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
             if len(prev_days) != 1 or prev_days[0] >= as_of or monday_of_week(prev_days[0]) != monday_of_week(as_of):
                 return unavailable("captured previous date is not in the review week")
@@ -623,6 +624,7 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
         result = [{"date": x["date"], "frame": x["frame"], "source_ref": x["source_ref"],
                    "verified": True, "origin": "MIDWEEK"} for x in rows]
         return result, {"usable": True, "history_coverage": "AVAILABLE",
+                        "previous_boundary_verified": previous_same_week,
                         "reason": None, "snapshot_dates": [x["date"] for x in rows]}
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError,
             subprocess.TimeoutExpired, pd.errors.ParserError) as exc:
