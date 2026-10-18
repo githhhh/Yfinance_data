@@ -195,6 +195,14 @@ def test_git_history_read_only_and_duplicate_date_conflicts_fail_closed(tmp_path
     assert diagnostics["usable"] is True
     assert [x["date"] for x in snapshots] == ["2026-10-12", "2026-10-14"]
 
+    # The standalone preflight has no captured previous Pool; it validates
+    # archive availability, while LIVE replay verifies the actual capture.
+    probe, inspection = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 15), require_previous=False)
+    assert inspection["usable"] is True
+    assert inspection["previous_boundary_verified"] is False
+    assert len(probe) == 2
+
     # Same market date, incompatible published revisions: never choose one
     # arbitrarily and call it an authoritative prior observation.
     pd.DataFrame([pivot("X", "2026-10-14", 100, 103)]).to_csv(output, index=False)
