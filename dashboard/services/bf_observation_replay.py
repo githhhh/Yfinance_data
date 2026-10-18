@@ -208,7 +208,10 @@ def resolve_midweek_facts(*, code: str, current: dict,
     basis = "TRACKED_ANCHOR" if same else "RETROSPECTIVE"
     prior_trigger = same[-1][1]["trigger"] if same else None
     prior_record = same[-1][0] if same else None
-    last_close = last_row.get("latest_close") if last_row is not None else last.get("price_close")
+    last_close = (_num(last_row.get("latest_close"))
+                  if last_row is not None else None)
+    if last_close is None:
+        last_close = last.get("price_close")
     price = price_replay(
         trigger=ident["trigger"], previous_close=last_close,
         current_close=current.get("latest_close"), previous_date=last["date"],
