@@ -509,15 +509,18 @@ def build_observation_attention(
 
 # V2 intentionally supplements the existing A/B projection. Neither
 # build_observation_view nor the v1 A admission contract is rewritten.
-def load_observation_history(data_root, *, as_of, previous=None):
+def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None):
     """Read only previously committed, same-week MIDWEEK Pool snapshots.
 
     No fetch, no write and no assumption that the user's live checkout has
     complete Git history. A captured previous snapshot is trusted as a
     publication boundary only when it matches a committed snapshot.
     """
-    import json
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
+    from bf_snapshot import is_valid_complete_baseline
+    run_cutoff = run_cutoff or datetime.now(timezone.utc)
+    if run_cutoff.tzinfo is None:
+        raise ValueError("run_cutoff must be timezone-aware")
     root = Path(data_root)
     path = "us/breakout_follow_pool_midweek.csv"
 
@@ -537,10 +540,14 @@ def load_observation_history(data_root, *, as_of, previous=None):
         # Commit timestamps follow *publication* time, not EOD market_date.
         # Scan only the relevant week, without an arbitrary last-N truncation.
         earliest = monday_of_week(as_of) - timedelta(days=3)
-        shas = git("log", f"--since={earliest.isoformat()}T00:00:00", "--format=%H",
-                   "--", path).splitlines()
+        commits = git("log", f"--since={earliest.isoformat()}T00:00:00",
+                      "--format=%H%x09%cI", "--", path).splitlines()
         by_day = {}
-        for sha in shas:
+        for commit in commits:
+            sha, published_at = commit.split("\t", 1)
+            when = datetime.fromisoformat(published_at)
+            if when > run_cutoff:
+                continue
             raw = git("show", f"{sha}:{path}")
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
             if "snapshot_date" not in frame or "code" not in frame:
