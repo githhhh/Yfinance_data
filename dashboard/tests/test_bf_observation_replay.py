@@ -330,7 +330,7 @@ def test_a_legacy_v1_event_remains_eligible_after_v2_import():
     ]
 
 
-def test_real_october_published_history_and_1d_replay():
+def test_real_october_published_history_and_1d_replay(tmp_path):
     """Historical evidence integration: no invented A/B/WATCH states.
 
     All Pool inputs are pinned 2026-10-16 Git objects, not the mutable
@@ -339,7 +339,6 @@ def test_real_october_published_history_and_1d_replay():
     from datetime import datetime, timezone
     from io import StringIO
     from pathlib import Path
-    import pytest
     from dashboard.services.bf_observation import load_daily_snapshot
 
     root = Path(__file__).resolve().parents[2]
@@ -349,8 +348,7 @@ def test_real_october_published_history_and_1d_replay():
     def pool(sha, filename):
         r = subprocess.run(["git", "show", f"{sha}:us/{filename}"],
                            cwd=root, capture_output=True, text=True)
-        if r.returncode:
-            pytest.skip("full historical fixture not available in this checkout")
+        assert r.returncode == 0, r.stderr
         return pd.read_csv(StringIO(r.stdout), dtype={"code": str})
 
     current = pool(sha_current, "breakout_follow_pool_midweek.csv")
@@ -362,9 +360,18 @@ def test_real_october_published_history_and_1d_replay():
     assert preflight["usable"] is True, preflight
     assert {"2026-10-12", "2026-10-14"} <= set(preflight["snapshot_dates"])
 
-    daily = load_daily_snapshot(root, window_date=date(2026, 10, 16))
-    if not daily:
-        pytest.skip("pinned 1D PKL not included in this checkout")
+    # Use the *historically pinned* 1D PKL even when main rotates to newer
+    # artifacts. This regression must not silently skip as data files roll.
+    raw_pkl = subprocess.run(
+        ["git", "show", f"{sha_current}:results_pkl/stock_data_161026_1d.pkl"],
+        cwd=root, capture_output=True, check=False,
+    )
+    assert raw_pkl.returncode == 0, raw_pkl.stderr.decode(errors="replace")
+    results = tmp_path / "results_pkl"
+    results.mkdir()
+    (results / "stock_data_161026_1d.pkl").write_bytes(raw_pkl.stdout)
+    daily = load_daily_snapshot(tmp_path, window_date=date(2026, 10, 16))
+    assert daily, "pinned historical 1D PKL is required for real replay"
     events = build_observation_events_v2(
         current, complete, as_of=date(2026, 10, 15),
         history_snapshots=snapshots, diagnostic=preflight, daily=daily)
