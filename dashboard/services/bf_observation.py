@@ -631,7 +631,7 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
 
 def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic, daily=None):
     """Current B only; A continues through the unchanged v1 event path."""
-    from dashboard.services.bf_observation_replay import observe_midweek_buy_point
+    from dashboard.services.bf_observation_replay import observe_midweek_buy_point, zone as b_zone
     from bf_snapshot import is_valid_complete_baseline
     if not diagnostic.get("usable") or current.empty or complete.empty:
         return []
@@ -686,6 +686,7 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
         # separate: populate price_close without inventing a Pool row.
         daily_by_day = dict(daily_closes)
         coherent = True
+        active_trigger = current_row.get("ibd_candidate_price")
         for observation in history:
             row = observation.get("row")
             daily_close = daily_by_day.get(observation["date"])
@@ -693,13 +694,20 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
                 observation["price_close"] = daily_close
             elif daily_close is not None:
                 pool_close = _number(row.get("latest_close"))
-                if pool_close is not None and abs(daily_close / pool_close - 1) > 0.02:
+                if pool_close is not None and (
+                    abs(daily_close / pool_close - 1) > 0.02
+                    or b_zone(active_trigger, daily_close) != b_zone(active_trigger, pool_close)
+                ):
                     coherent = False
                     break
         current_close = _number(current_row.get("latest_close"))
         current_daily_close = daily_by_day.get(as_of.isoformat())
         if current_close is not None and current_daily_close is not None:
-            coherent = coherent and abs(current_daily_close / current_close - 1) <= 0.02
+            coherent = coherent and (
+                abs(current_daily_close / current_close - 1) <= 0.02
+                and b_zone(active_trigger, current_daily_close) ==
+                b_zone(active_trigger, current_close)
+            )
         if not coherent:
             continue
         event = observe_midweek_buy_point(
