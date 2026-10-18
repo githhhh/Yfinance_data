@@ -696,7 +696,12 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
                 observation["price_close"] = daily_close
             elif daily_close is not None:
                 pool_close = _number(row.get("latest_close"))
-                if pool_close is not None and (
+                if pool_close is None:
+                    # Retain a genuinely observed PKL close even if the
+                    # published Pool row exists without a valid latest_close.
+                    # This fills price evidence only, never signal/Watch.
+                    observation["price_close"] = daily_close
+                elif (
                     abs(daily_close / pool_close - 1) > 0.02
                     or b_zone(active_trigger, daily_close) != b_zone(active_trigger, pool_close)
                 ):
