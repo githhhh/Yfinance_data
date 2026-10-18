@@ -449,3 +449,36 @@ def test_bad_complete_snapshot_cannot_seed_b_replay():
     )
     assert events == []
 
+
+
+def test_watch_combines_only_with_same_previous_price_observation():
+    old = pivot("W", "2026-10-12", 100, 98, valid=False)
+    watched = pivot("W", "2026-10-13", 0, 99, signal=False)
+    watched.update(bf_watch_active=True, bf_watch_type="pivot")
+    no_watch = pivot("W", "2026-10-14", 0, 99, signal=False)
+    current = pivot("W", "2026-10-15", 100, 102)
+    event = observe("W", current, [
+        hist("2026-10-12", old), hist("2026-10-13", watched),
+        hist("2026-10-14", no_watch),
+    ])
+    assert event["watch"]["active_prior"] is True
+    assert event["watch"]["active_at_price_boundary"] is False
+    watched["snapshot_date"] = "2026-10-14"
+    event = observe("W", current, [
+        hist("2026-10-12", old), hist("2026-10-14", watched),
+    ])
+    assert event["watch"]["active_at_price_boundary"] is True
+
+
+def test_v2_rejects_inconsistent_resolver_state_even_with_zone_price():
+    before = pivot("INVALID", "2026-10-14", 0, 99, signal=False)
+    current = pivot("INVALID", "2026-10-15", 100, 102)
+    for status, valid in (
+        ("EXTENDED", False),
+        ("BELOW_TRIGGER", False),
+        ("ACTIONABLE", False),
+        ("UNCONFIRMED", True),
+    ):
+        current["ibd_entry_status"] = status
+        current["ibd_entry_valid"] = valid
+        assert observe("INVALID", current, [hist("2026-10-14", before)]) is None
