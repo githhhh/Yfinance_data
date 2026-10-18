@@ -373,3 +373,18 @@ def test_real_october_published_history_and_1d_replay():
     ko = by_code["KO"]
     assert ko["identity"]["lifecycle"] == "FIRST_OBSERVED"
     assert ko["anchor_key_v2"] == "pivot|2026-10-12|M_BOX"
+
+
+def test_git_history_duplicate_ticker_cannot_be_authoritative(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    path = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    path.parent.mkdir()
+    entry = pivot("DUP", "2026-10-14", 100, 102)
+    pd.DataFrame([entry, entry]).to_csv(path, index=False)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "invalid published pool"], cwd=tmp_path, check=True)
+    found, diagnostic = load_observation_history(tmp_path, as_of=date(2026, 10, 15))
+    assert found == [] and diagnostic["usable"] is False
+    assert "duplicates" in diagnostic["reason"]
