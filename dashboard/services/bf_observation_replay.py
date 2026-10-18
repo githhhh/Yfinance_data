@@ -81,7 +81,8 @@ def identity_v2(row: Any) -> dict:
 
 def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
                  previous_date: str | None, current_date: str | None,
-                 basis: str, previous_trigger: Any = None) -> dict:
+                 basis: str, previous_trigger: Any = None,
+                 daily_closes: list[tuple[str, float]] | None = None) -> dict:
     """Compare *published* boundary prices. Daily bars are separate path evidence."""
     old_close, new_close, now_trigger = _num(previous_close), _num(current_close), _num(trigger)
     before = zone(trigger, old_close)
@@ -89,9 +90,15 @@ def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
     out = {"previous_zone": before, "current_zone": after, "transition": None,
            "previous_date": previous_date, "current_date": current_date,
            "basis": basis, "trigger": now_trigger, "pct": None,
-           "trigger_revision": "UNKNOWN"}
+           "trigger_revision": "UNKNOWN", "daily_path": []}
     if now_trigger is None or new_close is None:
         return out
+    if daily_closes:
+        out["daily_path"] = [
+            {"date": day, "zone": zone(now_trigger, close)}
+            for day, close in sorted(daily_closes)
+            if day <= current_date and _num(close) is not None
+        ]
     out["pct"] = round((new_close / now_trigger - 1) * 100, 2)
     old_trigger = _num(previous_trigger)
     out["trigger_revision"] = (
@@ -148,7 +155,8 @@ def observe_midweek_buy_point(*, code: str, current: dict,
                               history: list[dict], weekend: dict | None,
                               as_of: str, review_week: str,
                               baseline_verified: bool,
-                              history_coverage: str = "AVAILABLE") -> dict | None:
+                              history_coverage: str = "AVAILABLE",
+                              daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
     """Derive orthogonal B facts; no presentation or external side effects.
 
     history consists of verified *published* snapshots before as_of. Every
@@ -200,7 +208,7 @@ def observe_midweek_buy_point(*, code: str, current: dict,
     basis = "TRACKED_ANCHOR" if same else "RETROSPECTIVE"
     prior_trigger = same[-1][1]["trigger"] if same else None
     prior_record = same[-1][0] if same else None
-    last_price = last_row.get("latest_close") if last_row else None
+    last_price = last_row.get("latest_close") if last_row is not None else last.get("price_close")
     # If the ticker is absent from the prior Pool, historical daily close
     # evidence needs to be supplied independently; do not fabricate a crossing.
     price = price_replay(
@@ -209,6 +217,7 @@ def observe_midweek_buy_point(*, code: str, current: dict,
         current_date=as_of, basis=basis,
         previous_trigger=prior_trigger if same_on_last else
         (prior_trigger if same else ident["trigger"]),
+        daily_closes=daily_closes,
     )
     watches = watch_provenance(ordered, as_of=as_of)
     entry = entry_confirmation(current, current_zone=snapshot_zone,
