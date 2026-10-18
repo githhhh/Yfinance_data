@@ -485,3 +485,49 @@ def test_v2_rejects_inconsistent_resolver_state_even_with_zone_price():
         current["ibd_entry_status"] = status
         current["ibd_entry_valid"] = valid
         assert observe("INVALID", current, [hist("2026-10-14", before)]) is None
+
+
+def test_b_price_zone_is_shared_with_authoritative_a_classifier():
+    from dashboard.services.bf_transition import _price_zone
+    aliases = {"BELOW_BUY_POINT": "BELOW", "BUY_ZONE": "ZONE", "EXTENDED": "EXT"}
+    for close in (99.999, 100, 101, 104.994, 105, 105.004, 105.011):
+        assert zone(100, close) == aliases[_price_zone(100, close)]
+
+
+def test_midweek_facts_are_independent_of_telegram_policy():
+    from dashboard.services.bf_observation_replay import (
+        resolve_midweek_facts, midweek_opportunity_policy,
+    )
+    prior = pivot("X", "2026-10-14", 100, 103, valid=True, status="ACTIONABLE")
+    extended = pivot("X", "2026-10-15", 100, 108, valid=True, status="EXTENDED")
+    facts = resolve_midweek_facts(
+        code="X", current=extended, history=[hist("2026-10-14", prior)],
+        weekend=None, as_of="2026-10-15", review_week="2026-10-12",
+        baseline_verified=True,
+    )
+    assert facts["identity"]["lifecycle"] == "CONTINUING"
+    assert facts["price"]["current_zone"] == "EXT"
+    assert facts["entry"]["status"] == "EXTENDED"
+    assert midweek_opportunity_policy(facts) is None
+
+
+def test_even_minor_pkl_pool_zone_disagreement_must_fail_closed():
+    current = pivot("MISMATCH", "2026-10-15", 100, 100.2)
+    complete = pivot("MISMATCH", "2026-10-09", 0, 98, signal=False)
+    prior = pivot("MISMATCH", "2026-10-14", 0, 99, signal=False)
+    daily = pd.DataFrame(
+        {"Close": [99.0, 99.9]},
+        index=pd.to_datetime(["2026-10-14", "2026-10-15"]),
+    )
+    # The current PKL vs Pool difference is < 2% but crosses the actual
+    # buy point boundary (BELOW vs ZONE).
+    assert abs(99.9 / 100.2 - 1) < 0.02
+    out = build_observation_events_v2(
+        pd.DataFrame([current]), pd.DataFrame([complete]),
+        as_of=date(2026, 10, 15), daily={"MISMATCH": daily},
+        history_snapshots=[{"date": "2026-10-14", "frame": pd.DataFrame([prior]),
+                            "source_ref": "published", "verified": True,
+                            "origin": "MIDWEEK"}],
+        diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
+    )
+    assert out == []
