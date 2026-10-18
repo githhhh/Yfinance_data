@@ -215,8 +215,7 @@ def observe_midweek_buy_point(*, code: str, current: dict,
         trigger=ident["trigger"], previous_close=last_price,
         current_close=current.get("latest_close"), previous_date=last["date"],
         current_date=as_of, basis=basis,
-        previous_trigger=prior_trigger if same_on_last else
-        (prior_trigger if same else ident["trigger"]),
+        previous_trigger=prior_trigger if same else None,
         daily_closes=daily_closes,
     )
     watches = watch_provenance(ordered, as_of=as_of)
