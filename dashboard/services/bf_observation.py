@@ -616,12 +616,14 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
                     "row": item["rows"].get(code)} for item in history_maps]
         weekend = weekend_by_code.get(code)
         # The last complete Pool is a *published observation* even when
-        # there was no active Watch; it provides a valid first-day price
-        # baseline. This is not a B tracking-list membership.
-        if weekend is not None:
-            weekend_date = _day(weekend.get("snapshot_date"))
-            if weekend_date is not None and weekend_date < as_of:
-                if monday_of_week(weekend_date + pd.Timedelta(days=3)) == monday_of_week(as_of):
+        # this ticker was absent; it provides the first-day price boundary.
+        # Absence creates row=None (not an invented signal/Watch).
+        if not complete.empty and "snapshot_date" in complete:
+            complete_dates = pd.to_datetime(complete["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+            if len(complete_dates) == 1:
+                weekend_date = complete_dates[0]
+                if (weekend_date < as_of and
+                        monday_of_week(weekend_date + pd.Timedelta(days=3)) == monday_of_week(as_of)):
                     history.insert(0, {"date": weekend_date.isoformat(),
                                        "row": weekend, "verified": True,
                                        "origin": "WEEKEND", "source_ref": "complete-baseline"})
