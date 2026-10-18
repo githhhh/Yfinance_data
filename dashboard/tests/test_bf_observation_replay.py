@@ -260,3 +260,60 @@ def test_last_complete_week_baseline_permits_first_midweek_session():
     )
     assert len(events) == 1
     assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
+
+
+def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
+    """Shadow-safety gate: A's entire legacy implementation is unchanged."""
+    import ast
+    from pathlib import Path
+    import pytest
+
+    repo = Path(__file__).resolve().parents[2]
+    relative = "dashboard/services/bf_observation.py"
+    original = subprocess.run(["git", "show", f"origin/main:{relative}"],
+                              cwd=repo, capture_output=True, text=True)
+    if original.returncode:
+        pytest.skip("origin/main unavailable in non-full local checkout")
+    latest = (repo / relative).read_text()
+    def functions(text):
+        return {node.name: ast.dump(node, include_attributes=False)
+                for node in ast.parse(text).body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    original_api = functions(original.stdout)
+    current_api = functions(latest)
+    assert all(current_api.get(name) == impl for name, impl in original_api.items())
+    # No legacy A function may be removed or changed by V2.
+    assert {"_price_path", "_b_event", "build_observation_view",
+            "build_observation_attention"} <= original_api.keys()
+
+
+def test_publication_cutoff_excludes_future_history(tmp_path):
+    from datetime import datetime, timezone
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    p = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    p.parent.mkdir()
+    pd.DataFrame([pivot("X", "2026-10-12", 100, 102)]).to_csv(p, index=False)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "published later"], cwd=tmp_path, check=True)
+    old_cutoff = datetime(2026, 10, 12, 0, 0, tzinfo=timezone.utc)
+    history, diagnostics = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 15), run_cutoff=old_cutoff)
+    assert history == []
+    assert diagnostics["snapshot_dates"] == []
+
+
+def test_a_legacy_v1_event_remains_eligible_after_v2_import():
+    from dashboard.services.bf_observation import build_observation_attention
+    weekend = pivot("FIXED", "2026-10-09", 100, 108, valid=False)
+    previous = pivot("FIXED", "2026-10-14", 0, 98, signal=False)
+    current = pivot("FIXED", "2026-10-15", 0, 102, signal=False)
+    events = build_observation_attention(
+        pd.DataFrame([current]), pd.DataFrame([weekend]),
+        pd.DataFrame(), previous=pd.DataFrame([previous]),
+        daily={}, as_of=date(2026, 10, 15),
+    )
+    assert [(e["source"], e["event"], e["status"]) for e in events] == [
+        ("WEEKEND", "BELOW → ZONE", "UNCONFIRMED")
+    ]
