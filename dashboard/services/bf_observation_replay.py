@@ -1,0 +1,244 @@
+"""Pure, read-only BF buy-point observation facts (schema v2).
+
+No git, filesystem, trading eligibility, Futu, Pool mutation or Telegram I/O.
+A's published v1 path/identity semantics remain in bf_observation/bf_transition.
+"""
+from __future__ import annotations
+
+from datetime import date
+import math
+from typing import Any
+
+from dashboard.services.bf_transition import _buy_point_anchor, to_bool
+
+
+def _num(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _day(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(value).split("T")[0]).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def zone(trigger: Any, close: Any) -> str | None:
+    p, c = _num(trigger), _num(close)
+    if p is None or c is None:
+        return None
+    pct = round((c / p - 1) * 100, 2)
+    return "BELOW" if pct < 0 else ("ZONE" if pct <= 5 else "EXT")
+
+
+def identity_v2(row: Any) -> dict:
+    """Resolve a selected, structurally identified buy point.
+
+    Distinct Pivot S_BOX/M_BOX on the same resistance date are not identical.
+    Multi-box candidates with no authoritative selected_pivot are ambiguous.
+    """
+    from dashboard.services.bf_transition import _candidate_extra
+    rule = str(row.get("ibd_candidate_rule") or "").strip().lower()
+    trigger = _num(row.get("ibd_candidate_price"))
+    if not rule or trigger is None:
+        return {"resolution": "UNKNOWN", "key": None, "trigger": trigger}
+    if rule == "pivot":
+        extra = _candidate_extra(row.get("ibd_candidate_extra"))
+        def match(item):
+            p = _num(item.get("price"))
+            return (p is not None and math.isclose(p, trigger, rel_tol=1e-9, abs_tol=1e-4)
+                    and _day(item.get("resistance_date"))
+                    and str(item.get("box_type") or "").strip())
+        selected = extra.get("selected_pivot")
+        if isinstance(selected, dict):
+            if not match(selected):
+                return {"resolution": "AMBIGUOUS", "key": None, "trigger": trigger}
+            match_set = [selected]
+        else:
+            match_set = [x for x in extra.get("pivot_candidates", [])
+                         if isinstance(x, dict) and match(x)]
+        identifiers = {(str(x["box_type"]).strip().upper(), _day(x["resistance_date"]))
+                       for x in match_set}
+        if len(identifiers) != 1:
+            return {"resolution": "AMBIGUOUS" if identifiers else "UNKNOWN",
+                    "key": None, "trigger": trigger}
+        box, when = next(iter(identifiers))
+        return {"resolution": "EXACT", "key": f"pivot|{when}|{box}",
+                "trigger": trigger, "anchor_type": box}
+    old = _buy_point_anchor(row)
+    if not old:
+        return {"resolution": "UNKNOWN", "key": None, "trigger": trigger}
+    return {"resolution": "EXACT", "key": old["identity"],
+            "trigger": trigger, "anchor_type": old.get("anchor_type")}
+
+
+def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
+                 previous_date: str | None, current_date: str | None,
+                 basis: str, previous_trigger: Any = None) -> dict:
+    """Compare *published* boundary prices. Daily bars are separate path evidence."""
+    old_close, new_close, now_trigger = _num(previous_close), _num(current_close), _num(trigger)
+    before = zone(trigger, old_close)
+    after = zone(trigger, new_close)
+    out = {"previous_zone": before, "current_zone": after, "transition": None,
+           "previous_date": previous_date, "current_date": current_date,
+           "basis": basis, "trigger": now_trigger, "pct": None,
+           "trigger_revision": "UNKNOWN"}
+    if now_trigger is None or new_close is None:
+        return out
+    out["pct"] = round((new_close / now_trigger - 1) * 100, 2)
+    old_trigger = _num(previous_trigger)
+    out["trigger_revision"] = (
+        "UNKNOWN" if old_trigger is None else
+        "REVISED" if not math.isclose(old_trigger, now_trigger, rel_tol=1e-9, abs_tol=1e-4)
+        else "UNCHANGED"
+    )
+    if before is None or after is None or previous_date is None or current_date is None:
+        return out
+    if previous_date >= current_date:
+        return out
+    # A changed trigger that independently changes either classification
+    # cannot be presented as a pure price crossing.
+    if out["trigger_revision"] == "REVISED" and (
+        zone(old_trigger, old_close) != before or zone(old_trigger, new_close) != after
+    ):
+        return out
+    if before != after:
+        out["transition"] = f"{before}_TO_{after}"
+    return out
+
+
+def watch_provenance(history: list[dict], *, as_of: str) -> dict:
+    watches = []
+    for observation in history:
+        when = observation.get("date")
+        row = observation.get("row")
+        if not when or when >= as_of or row is None:
+            continue
+        if to_bool(row.get("bf_watch_active")) is not True:
+            continue
+        watches.append({"date": when, "type": row.get("bf_watch_type"),
+                        "trigger": _num(row.get("bf_watch_trigger_price")),
+                        "origin": observation.get("origin", "MIDWEEK"),
+                        "relation": "TICKER_CONTEXT",
+                        "source_ref": observation.get("source_ref")})
+    watches.sort(key=lambda x: x["date"])
+    return {"active_prior": bool(watches), "latest": watches[-1] if watches else None,
+            "observations": watches}
+
+
+def entry_confirmation(current: Any, *, current_zone: str | None,
+                       previous_same_anchor: Any = None) -> dict:
+    valid = to_bool(current.get("ibd_entry_valid")) is True
+    status = str(current.get("ibd_entry_status") or "")
+    act = valid and status == "ACTIONABLE" and current_zone == "ZONE"
+    previous_status = (str(previous_same_anchor.get("ibd_entry_status") or "")
+                       if previous_same_anchor is not None else "")
+    return {"valid": valid, "status": status, "act": act,
+            "upgrade": bool(act and previous_status == "UNCONFIRMED")}
+
+
+def observe_midweek_buy_point(*, code: str, current: dict,
+                              history: list[dict], weekend: dict | None,
+                              as_of: str, review_week: str,
+                              baseline_verified: bool,
+                              history_coverage: str = "AVAILABLE") -> dict | None:
+    """Derive orthogonal B facts; no presentation or external side effects.
+
+    history consists of verified *published* snapshots before as_of. Every
+    observation may contain a row=None when code absent in the full Pool.
+    """
+    if to_bool(current.get("signal")) is not True:
+        return None
+    ident = identity_v2(current)
+    if ident["resolution"] != "EXACT":
+        return None
+    if weekend is not None and to_bool(weekend.get("signal")) is True:
+        wk = identity_v2(weekend)
+        # Cannot prove independence when the weekend identity is unresolved.
+        if wk["resolution"] != "EXACT" or wk["key"] == ident["key"]:
+            return None
+
+    snapshot_zone = zone(ident["trigger"], current.get("latest_close"))
+    if snapshot_zone != "ZONE":
+        return None
+    ordered = sorted([r for r in history if r.get("date") and r["date"] < as_of],
+                     key=lambda r: r["date"])
+    if not ordered or not baseline_verified or history_coverage != "AVAILABLE":
+        return None
+    # A missing row does not prove a negative signal unless this is a complete,
+    # verified published Pool for that date. All accepted history inputs here
+    # must be full published snapshots.
+    if any(not record.get("verified") for record in ordered):
+        return None
+    same = []
+    uncertain = False
+    for record in ordered:
+        candidate = record.get("row")
+        if candidate is None or to_bool(candidate.get("signal")) is not True:
+            continue
+        prev_id = identity_v2(candidate)
+        if prev_id["resolution"] != "EXACT":
+            uncertain = True
+            continue
+        if prev_id["key"] == ident["key"]:
+            same.append((record, prev_id))
+    if uncertain:
+        return None
+    last = ordered[-1]
+    last_row = last.get("row")
+    last_anchor = identity_v2(last_row) if last_row and to_bool(last_row.get("signal")) is True else None
+    same_on_last = bool(last_anchor and last_anchor["resolution"] == "EXACT"
+                        and last_anchor["key"] == ident["key"])
+    lifecycle = "CONTINUING" if same_on_last else "REAPPEARED" if same else "FIRST_OBSERVED"
+    basis = "TRACKED_ANCHOR" if same else "RETROSPECTIVE"
+    prior_trigger = same[-1][1]["trigger"] if same else None
+    prior_record = same[-1][0] if same else None
+    last_price = last_row.get("latest_close") if last_row else None
+    # If the ticker is absent from the prior Pool, historical daily close
+    # evidence needs to be supplied independently; do not fabricate a crossing.
+    price = price_replay(
+        trigger=ident["trigger"], previous_close=last_price,
+        current_close=current.get("latest_close"), previous_date=last["date"],
+        current_date=as_of, basis=basis,
+        previous_trigger=prior_trigger if same_on_last else
+        (prior_trigger if same else ident["trigger"]),
+    )
+    watches = watch_provenance(ordered, as_of=as_of)
+    entry = entry_confirmation(current, current_zone=snapshot_zone,
+                               previous_same_anchor=prior_record["row"] if prior_record else None)
+    transition = price["transition"]
+    if same:
+        primary = "ZONE_REENTRY" if transition in {"BELOW_TO_ZONE", "EXT_TO_ZONE"} else None
+    else:
+        primary = "FIRST_OBSERVED_BP"
+    if not primary:
+        return None
+    modifiers = []
+    if watches["active_prior"]:
+        modifiers.append("PRIOR_WATCH")
+    if lifecycle == "REAPPEARED":
+        modifiers.append("REAPPEARED")
+    if entry["act"]:
+        modifiers.append("ACT")
+    import hashlib
+    import json
+    event_identity = [2, review_week, as_of, code, ident["key"], primary]
+    event_key = hashlib.sha256(json.dumps(event_identity, separators=(",", ":")).encode()).hexdigest()
+    return {"schema_version": 2, "source": "MIDWEEK", "code": code,
+            "review_week": review_week, "market_date": as_of,
+            "anchor_key_v2": ident["key"],
+            "identity": {"resolution": ident["resolution"], "lifecycle": lifecycle,
+                         "trigger_revision": price["trigger_revision"],
+                         "first_observed_date": same[0][0]["date"] if same else as_of},
+            "price": price, "watch": watches, "entry": entry, "primary": primary,
+            "modifiers": modifiers, "evidence": {
+                "history_coverage": history_coverage, "prior_snapshot_verified": True,
+                "price_observation_verified": bool(price["previous_zone"])},
+            "event_key": event_key}
