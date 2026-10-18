@@ -505,3 +505,117 @@ def build_observation_attention(
                     "as_of": row.get("review_b_date"),
                 })
     return events
+
+
+# V2 intentionally supplements the existing A/B projection. Neither
+# build_observation_view nor the v1 A admission contract is rewritten.
+def load_observation_history(data_root, *, as_of, previous=None):
+    """Read only previously committed, same-week MIDWEEK Pool snapshots.
+
+    No fetch, no write and no assumption that the user's live checkout has
+    complete Git history. A captured previous snapshot is trusted as a
+    publication boundary only when it matches a committed snapshot.
+    """
+    import json
+    from datetime import timedelta
+    root = Path(data_root)
+    path = "us/breakout_follow_pool_midweek.csv"
+
+    def unavailable(reason):
+        return [], {"usable": False, "history_coverage": "UNAVAILABLE",
+                    "reason": reason, "snapshot_dates": []}
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=root, capture_output=True,
+                              text=True, check=True, timeout=20).stdout.strip()
+
+    try:
+        if git("rev-parse", "--is-inside-work-tree") != "true":
+            return unavailable("DATA_ROOT is not a git checkout")
+        if git("rev-parse", "--is-shallow-repository") != "false":
+            return unavailable("shallow git checkout")
+        # Commit timestamps follow *publication* time, not EOD market_date.
+        # Scan only the relevant week, without an arbitrary last-N truncation.
+        earliest = monday_of_week(as_of) - timedelta(days=3)
+        shas = git("log", f"--since={earliest.isoformat()}T00:00:00", "--format=%H",
+                   "--", path).splitlines()
+        by_day = {}
+        for sha in shas:
+            raw = git("show", f"{sha}:{path}")
+            frame = pd.read_csv(StringIO(raw), dtype={"code": str})
+            if "snapshot_date" not in frame or "code" not in frame:
+                return unavailable("history file lacks required columns")
+            days = pd.to_datetime(frame["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+            if len(days) != 1:
+                return unavailable("mixed/invalid historical market date")
+            day = days[0]
+            if not (monday_of_week(as_of) <= day < as_of):
+                continue
+            # Multiple edited versions of a date cannot silently be treated
+            # as one published fact; don't choose a revision arbitrarily.
+            signature = frame.sort_values("code").fillna("").astype(str).to_json(orient="records")
+            if day in by_day:
+                if by_day[day]["signature"] != signature:
+                    return unavailable(f"ambiguous conflicting snapshot for {day}")
+                continue
+            by_day[day] = {"date": day.isoformat(), "frame": frame,
+                           "source_ref": sha, "signature": signature}
+        rows = [by_day[d] for d in sorted(by_day)]
+        if not rows:
+            return unavailable("no earlier same-week committed Pool")
+
+        if previous is not None and not previous.empty:
+            prev_days = pd.to_datetime(previous.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
+            if len(prev_days) != 1 or prev_days[0] >= as_of or monday_of_week(prev_days[0]) != monday_of_week(as_of):
+                return unavailable("captured previous date is not in the review week")
+            git_previous = by_day.get(prev_days[0])
+            if git_previous is None:
+                return unavailable("captured previous not in committed history")
+            signature = previous.sort_values("code").fillna("").astype(str).to_json(orient="records")
+            if signature != git_previous["signature"]:
+                return unavailable("captured previous does not match committed version")
+            # Previous must be the most recent published snapshot, not merely
+            # any valid older snapshot.
+            if prev_days[0] != rows[-1]["date"] and prev_days[0].isoformat() != rows[-1]["date"]:
+                return unavailable("captured previous is not latest committed midweek")
+        result = [{"date": x["date"], "frame": x["frame"], "source_ref": x["source_ref"],
+                   "verified": True, "origin": "MIDWEEK"} for x in rows]
+        return result, {"usable": True, "history_coverage": "AVAILABLE",
+                        "reason": None, "snapshot_dates": [x["date"] for x in rows]}
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired, pd.errors.ParserError) as exc:
+        return unavailable(f"history preflight failed: {exc}")
+
+
+def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic):
+    """Current B only; A continues through the unchanged v1 event path."""
+    from dashboard.services.bf_observation_replay import observe_midweek_buy_point, identity_v2
+    if not diagnostic.get("usable"):
+        return []
+    current_by_code = {str(r["code"]): r for _, r in current.iterrows()}
+    weekend_by_code = {str(r["code"]): r for _, r in complete.iterrows()}
+    history_maps = [{
+        "date": snap["date"], "source_ref": snap["source_ref"],
+        "origin": snap["origin"], "verified": snap["verified"],
+        "rows": {str(r["code"]): r for _, r in snap["frame"].iterrows()}
+    } for snap in history_snapshots]
+    # Only current signal rows are B candidates; historical B is not a
+    # persistent tracking list, and never influences Futu eligibility.
+    results = []
+    week = monday_of_week(as_of).isoformat()
+    for code, current_row in current_by_code.items():
+        if to_bool(current_row.get("signal")) is not True:
+            continue
+        history = [{**{k: v for k, v in item.items() if k != "rows"},
+                    "row": item["rows"].get(code)} for item in history_maps]
+        weekend = weekend_by_code.get(code)
+        event = observe_midweek_buy_point(
+            code=code, current=current_row.to_dict(),
+            history=history, weekend=weekend.to_dict() if weekend is not None else None,
+            as_of=as_of.isoformat(), review_week=week,
+            baseline_verified=True,
+            history_coverage=diagnostic["history_coverage"],
+        )
+        if event is not None:
+            results.append(event)
+    return results
