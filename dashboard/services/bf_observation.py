@@ -517,7 +517,7 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
     publication boundary only when it matches a committed snapshot.
     """
     from datetime import datetime, timedelta, timezone
-    from bf_snapshot import is_valid_complete_baseline
+    from bf_snapshot import _is_market_trading_day
     run_cutoff = run_cutoff or datetime.now(timezone.utc)
     if run_cutoff.tzinfo is None:
         raise ValueError("run_cutoff must be timezone-aware")
@@ -574,14 +574,21 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
             by_day[day] = {"date": day.isoformat(), "frame": frame,
                            "source_ref": sha, "signature": signature}
         rows = [by_day[d] for d in sorted(by_day)]
+        week_start = monday_of_week(as_of)
+        # Missing history after the first US trading session cannot
+        # masquerade as an authoritative first B observation.
+        prior_sessions = [week_start + timedelta(days=i)
+                          for i in range((as_of - week_start).days)
+                          if _is_market_trading_day(week_start + timedelta(days=i))]
+        first_session = _is_market_trading_day(as_of) and not prior_sessions
         if not rows:
-            # First midweek market session: the published complete-week Pool
-            # is the historical baseline; there need not be an earlier B CSV.
-            if previous is None or previous.empty:
+            if first_session and (previous is None or previous.empty):
                 return [], {"usable": True, "history_coverage": "AVAILABLE",
-                            "reason": "first published midweek observation",
+                            "reason": "first market session, complete Pool baseline required",
                             "snapshot_dates": []}
-            return unavailable("captured previous exists but no committed history")
+            return unavailable("missing prior published midweek history")
+        if previous is None or previous.empty:
+            return unavailable("captured previous Pool missing despite committed prior history")
 
         if previous is not None and not previous.empty:
             prev_days = pd.to_datetime(previous.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
@@ -608,8 +615,22 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
 
 def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic, daily=None):
     """Current B only; A continues through the unchanged v1 event path."""
-    from dashboard.services.bf_observation_replay import observe_midweek_buy_point, identity_v2
-    if not diagnostic.get("usable"):
+    from dashboard.services.bf_observation_replay import observe_midweek_buy_point
+    from bf_snapshot import is_valid_complete_baseline
+    if not diagnostic.get("usable") or current.empty or complete.empty:
+        return []
+    required = {"code", "snapshot_date", "signal"}
+    if not required.issubset(current.columns) or not required.issubset(complete.columns):
+        return []
+    current_dates = pd.to_datetime(current["snapshot_date"], errors="coerce")
+    complete_dates = pd.to_datetime(complete["snapshot_date"], errors="coerce")
+    if (current_dates.isna().any() or complete_dates.isna().any()
+            or set(current_dates.dt.date) != {as_of}
+            or len(set(complete_dates.dt.date)) != 1
+            or current["code"].isna().any() or complete["code"].isna().any()
+            or current["code"].duplicated().any() or complete["code"].duplicated().any()):
+        return []
+    if not is_valid_complete_baseline(complete_dates.dt.date.iloc[0], as_of):
         return []
     current_by_code = {str(r["code"]): r for _, r in current.iterrows()}
     weekend_by_code = {str(r["code"]): r for _, r in complete.iterrows()}
@@ -628,18 +649,12 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
         history = [{**{k: v for k, v in item.items() if k != "rows"},
                     "row": item["rows"].get(code)} for item in history_maps]
         weekend = weekend_by_code.get(code)
-        # The last complete Pool is a *published observation* even when
-        # this ticker was absent; it provides the first-day price boundary.
-        # Absence creates row=None (not an invented signal/Watch).
-        if not complete.empty and "snapshot_date" in complete:
-            complete_dates = pd.to_datetime(complete["snapshot_date"], errors="coerce").dropna().dt.date.unique()
-            if len(complete_dates) == 1:
-                weekend_date = complete_dates[0]
-                if (weekend_date < as_of and
-                        monday_of_week(weekend_date + pd.Timedelta(days=3)) == monday_of_week(as_of)):
-                    history.insert(0, {"date": weekend_date.isoformat(),
-                                       "row": weekend, "verified": True,
-                                       "origin": "WEEKEND", "source_ref": "complete-baseline"})
+        # The verified COMPLETE snapshot is also a historical price/watch
+        # observation. A missing ticker remains row=None (not a signal).
+        weekend_date = complete_dates.dt.date.iloc[0]
+        history.insert(0, {"date": weekend_date.isoformat(),
+                           "row": weekend, "verified": True,
+                           "origin": "WEEKEND", "source_ref": "complete-baseline"})
         daily_closes = []
         frame = (daily or {}).get(code)
         if isinstance(frame, pd.DataFrame) and "Close" in frame:
