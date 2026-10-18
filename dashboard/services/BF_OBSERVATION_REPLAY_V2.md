@@ -43,10 +43,20 @@ consumers and must never be modified by Replay.
    suppresses the supposed price-only crossing.
 3. `watch_provenance`: preserves dated earlier `bf_watch_active=True`
    observations, distinguishing Weekend and Midweek sources.
-   `TICKER_CONTEXT` **does not claim causal same-structure confirmation**.
+   `active_prior` (ever seen earlier) differs from `active_at_price_boundary`
+   (Watch active on the prior price observation date); only the latter
+   authorizes `BELOW/EXT • WATCH → ZONE`. `TICKER_CONTEXT` **does not claim
+   causal same-structure confirmation**.
 4. `entry_confirmation`: ACT iff current resolver validity is true,
    status is ACTIONABLE and current price is in ZONE. Missing data is not
    equivalent to UNCONFIRMED.
+
+`resolve_midweek_facts()` returns independent historical facts even when the
+current B is outside ZONE. `midweek_opportunity_policy()` alone decides
+Telegram eligibility; the compatibility façade only composes them. The legacy
+A `_price_path` remains untouched; both A and B use authoritative
+`bf_transition._price_zone` rounding through their adapters. This is a staged
+compatibility boundary, not a claim that A's whole timeline is reimplemented.
 
 Facts combine into exactly one B opportunity: `ZONE_REENTRY` for a verified
 existing B Anchor crossing BELOW/EXT → ZONE; `FIRST_OBSERVED_BP` for a
@@ -81,7 +91,10 @@ python dashboard/replay_preflight.py --as-of YYYY-MM-DD --root /absolute/path/to
 ```
 
 Return code 0 means Git and COMPLETE-baseline evidence are sufficient for
-that `as_of`; code 2 indicates failed preflight. For the **first** midweek
+that `as_of`; code 2 indicates failed preflight. Standalone preflight passes
+`require_previous=False` because it has no run-scoped Previous capture. The
+actual LIVE bridge retains strict `require_previous=True` verification. A
+preflight passing must never be misreported as proof of LIVE capture integrity. For the **first** midweek
 session, zero earlier MIDWEEK commits is legitimate (the complete-week Pool
 is the baseline). This check does not prove future LIVE executions will
 always have complete history or exactly-once Telegram delivery.
