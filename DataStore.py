@@ -134,29 +134,42 @@ def get_stock_pkl_path(interval="1d"):
     return filepath
 
 
-def filter_schwab_stock_data(
-    stock_data, *, failed, expected_symbols, interval, failure_reasons=None
+def filter_downloaded_stock_data(
+    stock_data, *, failed, expected_symbols, interval,
+    failure_reasons=None, provider_name="Schwab", allowed_failed_symbols=None,
 ):
-    """Exclude reported Schwab symbol failures, then strictly validate survivors."""
+    """Shared per-symbol quarantine; always strictly validate surviving frames.
+
+    Yahoo allows only known OHLCV validation failures to be excluded. Schwab
+    retains its existing retry/failure policy by leaving allowed_failed_symbols
+    unset. Neither may suppress missing indices or an empty equity universe.
+    """
     expected = set(expected_symbols)
     actual = set(stock_data)
     failed_set = set(failed)
     if actual & failed_set:
         raise DataIntegrityError(
-            f"Schwab symbols both downloaded and failed: {sorted(actual & failed_set)}"
+            f"{provider_name} symbols both downloaded and failed: {sorted(actual & failed_set)}"
         )
     unexpected = (actual | failed_set) - expected
     unreported = expected - (actual | failed_set)
     if unexpected:
-        raise DataIntegrityError(f"Schwab unexpected symbols: {sorted(unexpected)}")
+        raise DataIntegrityError(f"{provider_name} unexpected symbols: {sorted(unexpected)}")
     if unreported:
-        raise DataIntegrityError(f"Schwab unreported missing symbols: {sorted(unreported)}")
+        raise DataIntegrityError(f"{provider_name} unreported missing symbols: {sorted(unreported)}")
+    if allowed_failed_symbols is not None:
+        non_validation = sorted(failed_set - set(allowed_failed_symbols))
+        if non_validation:
+            raise DataIntegrityError(
+                f"{provider_name} non-validation download failures: {non_validation[:50]}; "
+                "refusing to publish incomplete PKL"
+            )
 
     excluded = set(failed_set)
     reasons = failure_reasons or {}
     for symbol in sorted(failed_set):
         print(
-            f"[Schwab Filter] {symbol}: filtered after retries; "
+            f"[{provider_name} Filter] {symbol}: filtered; "
             f"{reasons.get(symbol, 'provider returned no validated history')}"
         )
 
@@ -166,24 +179,34 @@ def filter_schwab_stock_data(
             validate_ohlcv_frame(symbol, data)
         except DataIntegrityError as exc:
             excluded.add(symbol)
-            print(f"[Schwab Filter] {exc}")
+            print(f"[{provider_name} Filter] {exc}")
         else:
             valid[symbol] = data
 
     missing_references = sorted(set(MARKET_REFERENCE_SYMBOLS) - set(valid))
     if missing_references:
         raise DataIntegrityError(
-            f"Schwab market reference missing or invalid: {missing_references}"
+            f"{provider_name} market reference missing or invalid: {missing_references}"
         )
 
     if not set(valid) - set(MARKET_REFERENCE_SYMBOLS):
-        raise DataIntegrityError("Schwab batch has no valid equity symbols")
+        raise DataIntegrityError(f"{provider_name} batch has no valid equity symbols")
     validate_download_batch(valid, expected_symbols=valid.keys())
     print(
-        f"[Schwab Filter] kept {len(valid)} symbols; "
+        f"[{provider_name} Filter] kept {len(valid)} symbols; "
         f"excluded {len(excluded)}: {sorted(excluded)}"
     )
     return valid, sorted(excluded)
+
+
+def filter_schwab_stock_data(
+    stock_data, *, failed, expected_symbols, interval, failure_reasons=None
+):
+    """Compatibility wrapper for the existing Schwab filter entry point."""
+    return filter_downloaded_stock_data(
+        stock_data, failed=failed, expected_symbols=expected_symbols,
+        interval=interval, failure_reasons=failure_reasons,
+    )
 
 
 if __name__ == "__main__":
@@ -291,25 +314,18 @@ if __name__ == "__main__":
             tickers, period=args.period, interval=args.interval
         )
 
-        if args.provider == "schwab":
-            stock_data, _excluded = filter_schwab_stock_data(
-                stock_data,
-                failed=failed,
-                expected_symbols=tickers,
-                interval=args.interval,
-                failure_reasons=provider.failure_reasons,
-            )
-            expected_saved_symbols = list(stock_data)
-        else:
-            if failed:
-                raise RuntimeError(
-                    "Market-data download failed integrity requirements; refusing to "
-                    f"publish PKL. Failed symbols ({len(failed)}): {failed[:50]}"
-                )
-            validate_download_batch(
-                stock_data, expected_symbols=tickers
-            )
-            expected_saved_symbols = tickers
+        stock_data, _excluded = filter_downloaded_stock_data(
+            stock_data,
+            failed=failed,
+            expected_symbols=tickers,
+            interval=args.interval,
+            failure_reasons=provider.failure_reasons,
+            provider_name=args.provider.capitalize(),
+            allowed_failed_symbols=(
+                provider.validation_failure_symbols if args.provider == "yahoo" else None
+            ),
+        )
+        expected_saved_symbols = list(stock_data)
 
         save_path = save_stock_data(
             stock_data,

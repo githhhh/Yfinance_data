@@ -60,8 +60,10 @@ class TestYahooDataProvider:
         mock_ticker_cls.return_value = mock_instance
 
         provider = YahooDataProvider(max_retries=0)
-        with pytest.raises(DataIntegrityError, match="missing required OHLCV columns"):
-            provider.download_single_stock("AAPL", period="1y", interval="1d")
+        symbol, frame = provider.download_single_stock("AAPL", period="1y", interval="1d")
+        assert (symbol, frame) == ("AAPL", None)
+        assert provider.validation_failure_symbols == {"AAPL"}
+        assert "missing required OHLCV columns" in provider.failure_reasons["AAPL"]
 
     @patch("yfinance.Ticker")
     def test_download_batch_stocks(self, mock_ticker_cls):
