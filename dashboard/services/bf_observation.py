@@ -562,6 +562,11 @@ def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None
             days = parsed_dates.dt.date.unique()
             if len(days) != 1:
                 return unavailable("mixed/invalid historical market date")
+            # Invalid published truth values are not equivalent to signal=False.
+            # Otherwise the replay could invent FIRST_OBSERVED_BP when a
+            # previous historical B signal is corrupt or unparseable.
+            if frame["signal"].map(to_bool).isna().any():
+                return unavailable("historical signal contains invalid booleans")
             day = days[0]
             if not (monday_of_week(as_of) <= day < as_of):
                 continue
