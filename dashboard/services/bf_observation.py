@@ -691,7 +691,19 @@ def build_observation_events_v2(current, complete, *, as_of, history_snapshots, 
         # Missing row in a *full* published Pool is not a signal, but may
         # have an observable EOD price in the daily PKL. Keep provenance
         # separate: populate price_close without inventing a Pool row.
-        daily_by_day = dict(daily_closes)
+        # A 1D artifact must have one unambiguous close per market date.
+        # Collapsing contradictory duplicate bars through dict() would
+        # silently pick an arbitrary price and possibly reverse direction.
+        daily_by_day = {}
+        conflicting_daily_bar = False
+        for trading_day, observed_close in daily_closes:
+            prior_close = daily_by_day.get(trading_day)
+            if prior_close is not None and abs(observed_close / prior_close - 1) > 1e-9:
+                conflicting_daily_bar = True
+                break
+            daily_by_day[trading_day] = observed_close
+        if conflicting_daily_bar:
+            continue
         coherent = True
         active_trigger = current_row.get("ibd_candidate_price")
         for observation in history:
