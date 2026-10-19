@@ -79,8 +79,12 @@ An older data repo without V2 still uses the previous v1 formatter.
 
 Telegram displays full `Weekend Buy Point` and `Midweek Buy Point` headings,
 no emojis, +xx.xx%, descending RS and max 3 per group. Its Weekend A display
-is unchanged; B second line is the price crossing, optional WATCH, and
-optional ACT. Neither WATCH nor ZONE implies ACT.
+is unchanged. Only a verified ZONE_REENTRY B is labeled as an existing Anchor's
+BELOW/EXT → ZONE price crossing. FIRST_OBSERVED_BP instead displays
+WATCH → BUY POINT or NEW BUY POINT; its RETROSPECTIVE daily price path is
+evidence, not a historical B crossing. A reentry without boundary crossing is
+suppressed, not mislabeled as NEW. ACT remains independently confirmed;
+neither WATCH nor ZONE implies ACT.
 
 ## P0: local LIVE preflight
 
