@@ -594,3 +594,24 @@ def test_invalid_historical_signal_never_becomes_false_first_observed(tmp_path):
     assert snapshots == []
     assert diagnostics["usable"] is False
     assert "invalid booleans" in diagnostics["reason"]
+
+
+def test_duplicate_daily_dates_with_conflicting_closes_fail_closed():
+    """Conflicting 1D bars must not be flattened into an arbitrary direction."""
+    current = pivot("DUPDAY", "2026-10-15", 100, 102)
+    baseline = pivot("DUPDAY", "2026-10-09", 0, 98, signal=False)
+    prior = pivot("DUPDAY", "2026-10-14", 0, None, signal=False)
+    conflicting = pd.DataFrame(
+        {"Close": [99.0, 101.0, 102.0]},
+        index=pd.to_datetime(["2026-10-14", "2026-10-14", "2026-10-15"]),
+    )
+    result = build_observation_events_v2(
+        pd.DataFrame([current]), pd.DataFrame([baseline]),
+        as_of=date(2026, 10, 15),
+        history_snapshots=[{"date": "2026-10-14", "frame": pd.DataFrame([prior]),
+                            "source_ref": "published", "verified": True,
+                            "origin": "MIDWEEK"}],
+        diagnostic={"usable": True, "history_coverage": "AVAILABLE"},
+        daily={"DUPDAY": conflicting},
+    )
+    assert result == []
