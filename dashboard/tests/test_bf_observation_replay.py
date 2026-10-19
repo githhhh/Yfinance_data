@@ -571,3 +571,26 @@ def test_missing_previous_pool_close_uses_verified_daily_without_inventing_signa
     assert events[0]["price"]["previous_zone"] == "BELOW"
     assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
     assert events[0]["price"]["basis"] == "RETROSPECTIVE"
+
+
+def test_invalid_historical_signal_never_becomes_false_first_observed(tmp_path):
+    """An unparseable historical signal must fail closed, not erase identity."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"],
+                   cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    target = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    target.parent.mkdir()
+    historical = pivot("CORRUPT", "2026-10-14", 100, 102)
+    historical["signal"] = "UNKNOWN"
+    published = pd.DataFrame([historical])
+    published.to_csv(target, index=False)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "historical bad boolean"],
+                   cwd=tmp_path, check=True)
+
+    snapshots, diagnostics = load_observation_history(
+        tmp_path, as_of=date(2026, 10, 15), previous=published)
+    assert snapshots == []
+    assert diagnostics["usable"] is False
+    assert "invalid booleans" in diagnostics["reason"]
