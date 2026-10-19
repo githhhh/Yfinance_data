@@ -12,6 +12,7 @@ from yfinance.exceptions import YFRateLimitError
 from data_providers.base_provider import BaseDataProvider
 from data_providers.ohlcv_validation import (
     DataIntegrityError,
+    MARKET_REFERENCE_SYMBOLS,
     validate_ohlcv_frame,
 )
 
@@ -28,7 +29,7 @@ RECOVERY_MAX_WORKERS = 2
 
 
 class YahooDataProvider(BaseDataProvider):
-    """基于 yfinance 的雅虎数据提供者，严格拒绝缺失或损坏的 OHLCV 数据。"""
+    """基于 yfinance 的雅虎数据提供者；无效 OHLCV 单标的隔离，不进入 PKL。"""
 
     def __init__(
         self,
@@ -65,6 +66,47 @@ class YahooDataProvider(BaseDataProvider):
         self._recovery_mode = False
         self._active_requests = 0
         self._recovery_gate = threading.BoundedSemaphore(self.recovery_max_workers)
+        self._failure_lock = threading.Lock()
+        self._last_failure_reasons: Dict[str, str] = {}
+        self._validation_failures: set[str] = set()
+        # Sticky within a batch: transport failures must never be reclassified
+        # as safe exclusions by a later empty/malformed response.
+        self._request_failure_symbols: set[str] = set()
+
+    @property
+    def failure_reasons(self) -> Dict[str, str]:
+        """Snapshot of terminal/latest per-symbol download errors."""
+        with self._failure_lock:
+            return dict(self._last_failure_reasons)
+
+    @property
+    def validation_failure_symbols(self) -> set[str]:
+        """Only these failures are permitted to be excluded at publication."""
+        with self._failure_lock:
+            return set(self._validation_failures)
+
+    def _record_failure(
+        self, symbol: str, reason: str, *,
+        invalid_data: bool = False, request_failure: bool = False,
+    ) -> None:
+        with self._failure_lock:
+            if request_failure:
+                self._request_failure_symbols.add(symbol)
+            elif symbol in self._request_failure_symbols:
+                # Preserve the request error across the low-concurrency batch
+                # recovery pass; later empty/bad history cannot hide an outage.
+                return
+            self._last_failure_reasons[symbol] = reason
+            if invalid_data:
+                self._validation_failures.add(symbol)
+            else:
+                self._validation_failures.discard(symbol)
+
+    def _clear_failure(self, symbol: str) -> None:
+        with self._failure_lock:
+            self._last_failure_reasons.pop(symbol, None)
+            self._validation_failures.discard(symbol)
+            self._request_failure_symbols.discard(symbol)
 
     def _cooldown_remaining(self) -> float:
         with self._rate_limit_lock:
@@ -181,7 +223,7 @@ class YahooDataProvider(BaseDataProvider):
         *,
         abort_event: Optional[threading.Event] = None,
     ) -> Tuple[str, Optional[pd.DataFrame]]:
-        """抓取单只股票数据；数据完整性错误立即失败，429 沿用共享熔断。"""
+        """抓取单只股票数据；坏 K 线隔离、无重试，429 沿用共享熔断。"""
         attempt = 0
         while attempt <= self.max_retries:
             if abort_event is not None and abort_event.is_set():
@@ -213,12 +255,15 @@ class YahooDataProvider(BaseDataProvider):
                         )
                     data = data[req_cols].copy()
                     validate_ohlcv_frame(symbol, data)
+                    self._clear_failure(symbol)
                     return symbol, data
+                self._record_failure(symbol, "empty price history")
                 print(
                     f"[Yahoo] Empty history for {symbol} "
                     f"(attempt {attempt + 1}/{self.max_retries + 1})"
                 )
             except YFRateLimitError as e:
+                self._record_failure(symbol, f"YFRateLimitError: {e}", request_failure=True)
                 print(
                     f"[Yahoo] Rate limited for {symbol} "
                     f"(attempt {attempt + 1}/{self.max_retries + 1}): {e}"
@@ -236,11 +281,15 @@ class YahooDataProvider(BaseDataProvider):
                     continue
                 return symbol, None
             except DataIntegrityError as e:
-                if abort_event is not None:
-                    abort_event.set()
-                print(f"[Yahoo] Invalid history for {symbol}; aborting batch: {e}")
-                raise
+                self._record_failure(symbol, f"{type(e).__name__}: {e}", invalid_data=True)
+                disposition = (
+                    "filtering symbol" if symbol in self.validation_failure_symbols
+                    else "retaining prior request failure"
+                )
+                print(f"[Yahoo] Invalid history for {symbol}; {disposition}: {e}")
+                return symbol, None
             except Exception as e:
+                self._record_failure(symbol, f"{type(e).__name__}: {e}", request_failure=True)
                 print(
                     f"[Yahoo] Error downloading {symbol} "
                     f"(attempt {attempt + 1}/{self.max_retries + 1}): {e}"
@@ -253,6 +302,8 @@ class YahooDataProvider(BaseDataProvider):
                 # Preserve the existing retry cadence for non-rate-limit failures.
                 time.sleep(0.5 * attempt)
 
+        # Empty histories remain retryable in the batch recovery pass. Only
+        # after all recovery attempts may a clean empty response be quarantined.
         return symbol, None
 
     def _run_parallel_downloads(
@@ -335,7 +386,12 @@ class YahooDataProvider(BaseDataProvider):
     def download_batch_stocks(
         self, symbols: List[str], period: str = "1y", interval: str = "1d"
     ) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
-        """多线程抓取并严格校验；正常路径保持 8 并发，429 后降级恢复。"""
+        """多线程抓取；坏数据只过滤单标的，其他失败保留恢复流程。"""
+        with self._failure_lock:
+            self._last_failure_reasons.clear()
+            self._validation_failures.clear()
+            self._request_failure_symbols.clear()
+        terminal_validation_failures: set[str] = set()
         all_data: Dict[str, pd.DataFrame] = {}
         failed: List[str] = []
         total = len(symbols)
@@ -360,7 +416,9 @@ class YahooDataProvider(BaseDataProvider):
                 max_workers=self.max_workers,
             )
             all_data.update(downloaded)
-            failed.extend(batch_failed)
+            invalid = self.validation_failure_symbols
+            terminal_validation_failures.update(set(batch_failed) & invalid)
+            failed.extend(symbol for symbol in batch_failed if symbol not in invalid)
 
             batch_end_time = time.time()
             print(
@@ -393,7 +451,30 @@ class YahooDataProvider(BaseDataProvider):
             )
             failed = retry_failed
 
-        failed = sorted(set(failed))
+        failed = sorted(set(failed) | terminal_validation_failures)
+
+        # Empty-but-successful histories are ambiguous until the original
+        # low-concurrency batch recovery finishes. Transport errors are sticky
+        # and cannot be reclassified as a safe data exclusion.
+        empty_histories = []
+        for symbol in failed:
+            if self.failure_reasons.get(symbol) == "empty price history":
+                reason = f"DataIntegrityError: {symbol}: empty price history after all retries"
+                self._record_failure(symbol, reason, invalid_data=True)
+                empty_histories.append(symbol)
+                print(f"[Yahoo] {symbol}: filtered after exhausted empty-history retries")
+
+        # A majority of invalid equities suggests a provider-wide failure
+        # (including Yahoo silently returning empty frames on a bad session).
+        # Isolated bad symbols remain filterable; severe truncation never is.
+        quarantined_equities = self.validation_failure_symbols - set(MARKET_REFERENCE_SYMBOLS)
+        valid_equities = set(all_data) - set(MARKET_REFERENCE_SYMBOLS)
+        if len(quarantined_equities) > len(valid_equities):
+            raise DataIntegrityError(
+                "Yahoo suspected systemic data-quality outage: "
+                f"{len(quarantined_equities)} invalid equity histories vs "
+                f"{len(valid_equities)} successful equities; refusing partial PKL"
+            )
 
         overall_end = time.time()
         print(

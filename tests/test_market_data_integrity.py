@@ -47,7 +47,7 @@ def test_validate_download_batch_rejects_missing_expected_symbol():
         )
 
 
-def test_schwab_filters_invalid_ohlc_but_yahoo_validation_remains_strict(capsys):
+def test_shared_filter_quarantines_invalid_ohlc_for_both_providers(capsys):
     invalid = _frame(["2026-09-11"])
     invalid.loc[:, "Close"] = 11.5  # Above High; retain the source value.
     data = {symbol: _frame(["2026-09-11"]) for symbol in ("^GSPC", "^IXIC", "^DJI", "MSFT")}
@@ -64,10 +64,16 @@ def test_schwab_filters_invalid_ohlc_but_yahoo_validation_remains_strict(capsys)
     assert "Close=11.5" in output
     assert "High<Close" in output
 
+    yahoo_filtered, yahoo_excluded = DataStore.filter_downloaded_stock_data(
+        data, failed=[], expected_symbols=list(data), interval="1wk",
+        provider_name="Yahoo", allowed_failed_symbols=set(),
+    )
+    assert set(yahoo_filtered) == set(filtered)
+    assert yahoo_excluded == ["AAPL"]
+
+    # The final storage guard is still strict when called with unfiltered frames.
     with pytest.raises(DataIntegrityError, match="inconsistent OHLC rows"):
-        validate_download_batch(
-            data, expected_symbols=list(data)
-        )
+        validate_download_batch(data, expected_symbols=list(data))
 
 
 def test_schwab_filters_reported_failure_but_keeps_valid_older_history(capsys):
@@ -157,9 +163,10 @@ def test_yahoo_single_download_fails_fast_on_invalid_partial_row(monkeypatch):
     monkeypatch.setattr(yahoo_module.time, "sleep", lambda _: None)
 
     provider = YahooDataProvider(max_retries=1)
-    with pytest.raises(DataIntegrityError, match="null/non-numeric OHLCV"):
-        provider.download_single_stock("AAPL", period="2y", interval="1d")
-
+    symbol, frame = provider.download_single_stock("AAPL", period="2y", interval="1d")
+    assert (symbol, frame) == ("AAPL", None)
+    assert provider.validation_failure_symbols == {"AAPL"}
+    assert "null/non-numeric OHLCV" in provider.failure_reasons["AAPL"]
     assert FakeTicker.calls == 1
 
 
