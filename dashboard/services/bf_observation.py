@@ -505,3 +505,243 @@ def build_observation_attention(
                     "as_of": row.get("review_b_date"),
                 })
     return events
+
+
+# V2 intentionally supplements the existing A/B projection. Neither
+# build_observation_view nor the v1 A admission contract is rewritten.
+def load_observation_history(data_root, *, as_of, previous=None, run_cutoff=None,
+                             require_previous=True):
+    """Read only previously committed, same-week MIDWEEK Pool snapshots.
+
+    No fetch, no write and no assumption that the user's live checkout has
+    complete Git history. A captured previous snapshot is trusted as a
+    publication boundary only when it matches a committed snapshot.
+    """
+    from datetime import datetime, timedelta, timezone
+    from bf_snapshot import _is_market_trading_day
+    run_cutoff = run_cutoff or datetime.now(timezone.utc)
+    if run_cutoff.tzinfo is None:
+        raise ValueError("run_cutoff must be timezone-aware")
+    root = Path(data_root)
+    path = "us/breakout_follow_pool_midweek.csv"
+
+    def unavailable(reason):
+        return [], {"usable": False, "history_coverage": "UNAVAILABLE",
+                    "reason": reason, "snapshot_dates": []}
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=root, capture_output=True,
+                              text=True, check=True, timeout=20).stdout.strip()
+
+    try:
+        if git("rev-parse", "--is-inside-work-tree") != "true":
+            return unavailable("DATA_ROOT is not a git checkout")
+        if git("rev-parse", "--is-shallow-repository") != "false":
+            return unavailable("shallow git checkout")
+        # Commit timestamps follow *publication* time, not EOD market_date.
+        # Scan only the relevant week, without an arbitrary last-N truncation.
+        earliest = monday_of_week(as_of) - timedelta(days=3)
+        commits = git("log", f"--since={earliest.isoformat()}T00:00:00",
+                      "--format=%H%x09%cI", "--", path).splitlines()
+        by_day = {}
+        for commit in commits:
+            sha, published_at = commit.split("\t", 1)
+            when = datetime.fromisoformat(published_at)
+            if when > run_cutoff:
+                continue
+            raw = git("show", f"{sha}:{path}")
+            frame = pd.read_csv(StringIO(raw), dtype={"code": str})
+            required = {"snapshot_date", "code", "signal", "latest_close"}
+            if not required.issubset(frame.columns):
+                return unavailable("history file lacks required columns")
+            parsed_dates = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+            if parsed_dates.isna().any() or frame["code"].isna().any() or (
+                frame["code"].astype(str).str.strip().eq("")
+            ).any() or frame["code"].duplicated().any():
+                return unavailable("history contains invalid dates, codes or duplicates")
+            days = parsed_dates.dt.date.unique()
+            if len(days) != 1:
+                return unavailable("mixed/invalid historical market date")
+            # Invalid published truth values are not equivalent to signal=False.
+            # Otherwise the replay could invent FIRST_OBSERVED_BP when a
+            # previous historical B signal is corrupt or unparseable.
+            if frame["signal"].map(to_bool).isna().any():
+                return unavailable("historical signal contains invalid booleans")
+            day = days[0]
+            if not (monday_of_week(as_of) <= day < as_of):
+                continue
+            # Multiple edited versions of a date cannot silently be treated
+            # as one published fact; don't choose a revision arbitrarily.
+            signature = frame.sort_values("code").fillna("").astype(str).to_json(orient="records")
+            if day in by_day:
+                if by_day[day]["signature"] != signature:
+                    return unavailable(f"ambiguous conflicting snapshot for {day}")
+                continue
+            by_day[day] = {"date": day.isoformat(), "frame": frame,
+                           "source_ref": sha, "signature": signature}
+        rows = [by_day[d] for d in sorted(by_day)]
+        week_start = monday_of_week(as_of)
+        # On the first trading day the fixed MIDWEEK file normally still
+        # contains last week's old snapshot. It is not a same-week prior.
+        previous_same_week = False
+        if previous is not None and not previous.empty:
+            if "snapshot_date" not in previous or "code" not in previous:
+                return unavailable("captured previous snapshot missing required columns")
+            dates = pd.to_datetime(previous["snapshot_date"], errors="coerce")
+            if dates.isna().any() or len(set(dates.dt.date)) != 1:
+                return unavailable("captured previous has mixed or invalid dates")
+            previous_day = dates.dt.date.iloc[0]
+            if previous_day >= as_of:
+                return unavailable("captured previous is not older than current")
+            if monday_of_week(previous_day) == week_start:
+                previous_same_week = True
+            elif previous_day >= week_start:
+                return unavailable("captured previous is not a valid earlier snapshot")
+        # Missing history after the first US trading session cannot
+        # masquerade as an authoritative first B observation.
+        prior_sessions = [week_start + timedelta(days=i)
+                          for i in range((as_of - week_start).days)
+                          if _is_market_trading_day(week_start + timedelta(days=i))]
+        first_session = _is_market_trading_day(as_of) and not prior_sessions
+        if not rows:
+            if first_session and not previous_same_week:
+                return [], {"usable": True, "history_coverage": "AVAILABLE",
+                            "reason": "first market session, complete Pool baseline required",
+                            "snapshot_dates": []}
+            return unavailable("missing prior published midweek history")
+        if require_previous and not previous_same_week:
+            return unavailable("captured same-week Pool missing despite committed prior history")
+
+        if require_previous and previous_same_week:
+            prev_days = pd.to_datetime(previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+            if len(prev_days) != 1 or prev_days[0] >= as_of or monday_of_week(prev_days[0]) != monday_of_week(as_of):
+                return unavailable("captured previous date is not in the review week")
+            git_previous = by_day.get(prev_days[0])
+            if git_previous is None:
+                return unavailable("captured previous not in committed history")
+            signature = previous.sort_values("code").fillna("").astype(str).to_json(orient="records")
+            if signature != git_previous["signature"]:
+                return unavailable("captured previous does not match committed version")
+            # Previous must be the most recent published snapshot, not merely
+            # any valid older snapshot.
+            if prev_days[0].isoformat() != rows[-1]["date"]:
+                return unavailable("captured previous is not latest committed midweek")
+        result = [{"date": x["date"], "frame": x["frame"], "source_ref": x["source_ref"],
+                   "verified": True, "origin": "MIDWEEK"} for x in rows]
+        return result, {"usable": True, "history_coverage": "AVAILABLE",
+                        "previous_boundary_verified": previous_same_week,
+                        "reason": None, "snapshot_dates": [x["date"] for x in rows]}
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired, pd.errors.ParserError) as exc:
+        return unavailable(f"history preflight failed: {exc}")
+
+
+def build_observation_events_v2(current, complete, *, as_of, history_snapshots, diagnostic, daily=None):
+    """Current B only; A continues through the unchanged v1 event path."""
+    from dashboard.services.bf_observation_replay import observe_midweek_buy_point, zone as b_zone
+    from bf_snapshot import is_valid_complete_baseline
+    if not diagnostic.get("usable") or current.empty or complete.empty:
+        return []
+    required = {"code", "snapshot_date", "signal"}
+    if not required.issubset(current.columns) or not required.issubset(complete.columns):
+        return []
+    current_dates = pd.to_datetime(current["snapshot_date"], errors="coerce")
+    complete_dates = pd.to_datetime(complete["snapshot_date"], errors="coerce")
+    if (current_dates.isna().any() or complete_dates.isna().any()
+            or set(current_dates.dt.date) != {as_of}
+            or len(set(complete_dates.dt.date)) != 1
+            or current["code"].isna().any() or complete["code"].isna().any()
+            or current["code"].duplicated().any() or complete["code"].duplicated().any()):
+        return []
+    if not is_valid_complete_baseline(complete_dates.dt.date.iloc[0], as_of):
+        return []
+    current_by_code = {str(r["code"]): r for _, r in current.iterrows()}
+    weekend_by_code = {str(r["code"]): r for _, r in complete.iterrows()}
+    history_maps = [{
+        "date": snap["date"], "source_ref": snap["source_ref"],
+        "origin": snap["origin"], "verified": snap["verified"],
+        "rows": {str(r["code"]): r for _, r in snap["frame"].iterrows()}
+    } for snap in history_snapshots]
+    # Only current signal rows are B candidates; historical B is not a
+    # persistent tracking list, and never influences Futu eligibility.
+    results = []
+    week = monday_of_week(as_of).isoformat()
+    for code, current_row in current_by_code.items():
+        if to_bool(current_row.get("signal")) is not True:
+            continue
+        history = [{**{k: v for k, v in item.items() if k != "rows"},
+                    "row": item["rows"].get(code)} for item in history_maps]
+        weekend = weekend_by_code.get(code)
+        # The verified COMPLETE snapshot is also a historical price/watch
+        # observation. A missing ticker remains row=None (not a signal).
+        weekend_date = complete_dates.dt.date.iloc[0]
+        history.insert(0, {"date": weekend_date.isoformat(),
+                           "row": weekend, "verified": True,
+                           "origin": "WEEKEND", "source_ref": "complete-baseline"})
+        daily_closes = []
+        frame = (daily or {}).get(code)
+        if isinstance(frame, pd.DataFrame) and "Close" in frame:
+            for timestamp, raw_close in frame["Close"].items():
+                trade_day = _day(timestamp)
+                observed_close = _number(raw_close)
+                if (trade_day is not None and observed_close is not None
+                        and trade_day <= as_of and
+                        trade_day >= monday_of_week(as_of) - pd.Timedelta(days=3)):
+                    daily_closes.append((trade_day.isoformat(), observed_close))
+        # Missing row in a *full* published Pool is not a signal, but may
+        # have an observable EOD price in the daily PKL. Keep provenance
+        # separate: populate price_close without inventing a Pool row.
+        # A 1D artifact must have one unambiguous close per market date.
+        # Collapsing contradictory duplicate bars through dict() would
+        # silently pick an arbitrary price and possibly reverse direction.
+        daily_by_day = {}
+        conflicting_daily_bar = False
+        for trading_day, observed_close in daily_closes:
+            prior_close = daily_by_day.get(trading_day)
+            if prior_close is not None and abs(observed_close / prior_close - 1) > 1e-9:
+                conflicting_daily_bar = True
+                break
+            daily_by_day[trading_day] = observed_close
+        if conflicting_daily_bar:
+            continue
+        coherent = True
+        active_trigger = current_row.get("ibd_candidate_price")
+        for observation in history:
+            row = observation.get("row")
+            daily_close = daily_by_day.get(observation["date"])
+            if row is None:
+                observation["price_close"] = daily_close
+            elif daily_close is not None:
+                pool_close = _number(row.get("latest_close"))
+                if pool_close is None:
+                    # Retain a genuinely observed PKL close even if the
+                    # published Pool row exists without a valid latest_close.
+                    # This fills price evidence only, never signal/Watch.
+                    observation["price_close"] = daily_close
+                elif (
+                    abs(daily_close / pool_close - 1) > 0.02
+                    or b_zone(active_trigger, daily_close) != b_zone(active_trigger, pool_close)
+                ):
+                    coherent = False
+                    break
+        current_close = _number(current_row.get("latest_close"))
+        current_daily_close = daily_by_day.get(as_of.isoformat())
+        if current_close is not None and current_daily_close is not None:
+            coherent = coherent and (
+                abs(current_daily_close / current_close - 1) <= 0.02
+                and b_zone(active_trigger, current_daily_close) ==
+                b_zone(active_trigger, current_close)
+            )
+        if not coherent:
+            continue
+        event = observe_midweek_buy_point(
+            code=code, current=current_row.to_dict(),
+            history=history, weekend=weekend.to_dict() if weekend is not None else None,
+            as_of=as_of.isoformat(), review_week=week,
+            baseline_verified=True,
+            history_coverage=diagnostic["history_coverage"],
+            daily_closes=daily_closes,
+        )
+        if event is not None:
+            results.append(event)
+    return results
