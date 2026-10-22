@@ -194,7 +194,7 @@
     return src === "WATCH" ? nearBreakoutDistance(row) : src === "B" ? num(row.review_b_pct) : num(row.current_vs_ibd_candidate_pct);
   }
   function contextMatch(row, src, {skipStatus=false, status=null, skipAdvanced=false}={}) {
-    const wanted = status || (skipStatus ? "ALL" : state.status);
+    const wanted = status || (skipStatus || currentHasComparison() && state.scope === "CHANGES" && state.status === WATCH_STAGE ? "ALL" : state.status);
     if (wanted !== "ALL" && contextStatus(row, src) !== wanted) return false;
     if (skipAdvanced) return true;
     if (state.route !== "All" && contextRule(row, src) !== state.route) return false;
@@ -332,7 +332,10 @@
     if (bool(row.review_a_active)) {
       const event = row.review_data_available === false ? "NO DATA" :
         text(row.review_a_event,"") || text(row.review_a_week_event,"") || "NO CHANGE";
-      parts.push(["Weekend Buy Point",event,row.review_a_event ? "Vs Previous" : "Vs Weekend"]);
+      const basis = row.review_a_event
+        ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
+        : "Vs Weekend";
+      parts.push(["Weekend Buy Point",event,basis]);
     }
     if (bool(row.review_b_active)) {
       const raw = text(row.review_b_display_event || row.review_b_event,"");
@@ -1028,8 +1031,10 @@
     if (field === "code") {
       if (!currentHasComparison() || !bool(row.review_has_value_change)) return esc(row.code);
       const e = displayChange(row);
+      const member = text(row.review_membership_event, "");
       const symbol = /→ BELOW$/.test(e) ? "↓" : /→ EXT$/.test(e) ? "↑" : "→";
-      return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(e)}">${symbol} Change</small>`;
+      const label = e === "NO CHANGE" && member ? member : `${symbol} Change`;
+      return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(e)}">${esc(label)}</small>`;
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));

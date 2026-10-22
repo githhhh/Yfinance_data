@@ -385,8 +385,8 @@ def build_observation_view(
                 a_changed = bool(path["week_event"] or path["latest_event"])
                 focus = path["latest_event"] or path["week_event"] or ""
                 row["review_a_focus_basis"] = (
-                    "PREVIOUS" if path["latest_event"] else
-                    "WEEKEND" if path["week_event"] else None
+                    ("PREVIOUS_SNAPSHOT" if prev_valid else "PRIOR_SESSION")
+                    if path["latest_event"] else "WEEKEND" if path["week_event"] else None
                 )
                 membership_label = membership_event or ("OUT" if membership == "OUT" else "")
                 row["review_change_label"] = " · ".join(
@@ -396,13 +396,16 @@ def build_observation_view(
             row["review_futu_actionable"] = trade_rows.get(code, {}).get("review_futu_actionable", False)
         event = _b_event(weekend, midweek, prev_by_code.get(code),
                          comparison_available=prev_valid or not complete.empty)
+        legacy_event = event
         # The public Dashboard uses the stricter V2 structural identity. Keep
         # legacy review_b_event unchanged for the v1 alert compatibility path.
         identity = identity_v2(midweek) if midweek is not None and to_bool(midweek.get("signal")) is True else {"resolution": "NONE", "key": None}
         previous_midweek = prev_by_code.get(code)
         previous_identity = identity_v2(previous_midweek) if previous_midweek is not None and to_bool(previous_midweek.get("signal")) is True else {"key": None}
         weekend_identity = identity_v2(weekend) if weekend is not None else {"key": None}
-        if (event is None and identity["resolution"] == "EXACT"
+        if identity["resolution"] == "EXACT" and weekend_identity.get("key") == identity.get("key"):
+            event = None
+        elif (event is None and identity["resolution"] == "EXACT"
                 and weekend_identity.get("key")
                 and identity["key"] != weekend_identity["key"]):
             event = "NEW BP" if previous_identity.get("key") == weekend_identity["key"] else "BP CHANGED"
@@ -411,7 +414,7 @@ def build_observation_view(
             bp = _number(midweek.get("ibd_candidate_price"))
             zone = _zone(bp, midweek.get("latest_close"))
             row["review_b_active"] = True
-            row["review_b_event"] = event
+            row["review_b_event"] = legacy_event or ""
             verified = identity["resolution"] == "EXACT"
             row["review_b_verified"] = verified
             row["review_b_identity_state"] = identity["resolution"]
