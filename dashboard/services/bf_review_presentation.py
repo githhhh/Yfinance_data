@@ -8,7 +8,11 @@ Nothing here is used by Futu or the Telegram v1/v2 event producers.
 from __future__ import annotations
 
 import math
+from datetime import timedelta
+
 import pandas as pd
+
+from bf_snapshot import monday_of_week, _is_market_trading_day
 
 from dashboard.services.bf_observation_replay import identity_v2, price_replay, zone as classify_zone
 from dashboard.services.bf_transition import to_bool
@@ -19,6 +23,16 @@ def _observed_date(frame: pd.DataFrame):
         return None
     parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce").dropna().dt.date.unique()
     return parsed[0] if len(parsed) == 1 else None
+
+
+def _first_trading_session(day):
+    if not day or not _is_market_trading_day(day):
+        return False
+    start = monday_of_week(day)
+    return not any(
+        _is_market_trading_day(start + timedelta(days=i))
+        for i in range((day - start).days)
+    )
 
 
 def _event_for_verified_b(
@@ -90,6 +104,18 @@ def decorate_observation_view(
         has_a = bool(row.get("review_a_active"))
         a_event = str(row.get("review_a_event") or "")
         a_week = str(row.get("review_a_week_event") or "")
+        membership_event = str(row.get("review_membership_event") or "")
+        # Show persistent Vs Weekend state in What Changed / All Review, but
+        # do not repeatedly inject an old difference into Review Now.
+        # On the first US trading session, comparison against Weekend is new.
+        first_session = _first_trading_session(current_day)
+        a_attention = bool(
+            a_event or membership_event or (first_session and a_week)
+        ) if has_a else False
+        result.at[index, "review_a_has_value_change"] = a_attention
+        result.at[index, "review_has_value_change"] = bool(
+            a_attention or row.get("review_b_has_value_change")
+        )
         result.at[index, "review_a_focus_basis"] = (
             "PREVIOUS_SNAPSHOT" if a_event and prior_valid and code in prior
             and pd.notna(pd.to_numeric(prior[code].get("latest_close"), errors="coerce"))
@@ -159,7 +185,7 @@ def decorate_observation_view(
         )
         result.at[index, "review_b_display_basis"] = (
             "PREVIOUS_SNAPSHOT" if prior_valid else
-            "WEEKEND" if current_day and current_day.weekday() == 0 and not complete.empty
+            "WEEKEND" if _first_trading_session(current_day) and not complete.empty
             else "UNAVAILABLE"
         )
         event = "UNVERIFIED"
@@ -173,7 +199,7 @@ def decorate_observation_view(
             event = _event_for_verified_b(
                 fresh, previous_row, new_id, previous_identity,
                 has_previous_snapshot=prior_valid,
-                first_midweek_day=bool(current_day and current_day.weekday() == 0),
+                first_midweek_day=_first_trading_session(current_day),
                 weekend_identity=a_id if has_a else None,
             )
         verified = verified and event != "UNVERIFIED"
