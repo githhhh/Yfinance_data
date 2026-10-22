@@ -678,3 +678,33 @@ def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
     assert bool(view.loc["FIRST_B", "review_b_verified"])
     assert view.loc["FIRST_B", "review_b_display_event"] == "NEW BP"
     assert view.loc["FIRST_B", "review_b_display_basis"] == "WEEKEND"
+
+
+def test_exact_current_midweek_point_not_lost_when_previous_identity_ambiguous():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
+    yesterday = row("HISTORY", snapshot="2026-10-19", trigger=100,
+                    close=103, anchor="2026-10-19")
+    yesterday["ibd_candidate_extra"] = (
+        '{"pivot_candidates":['
+        '{"box_type":"S_BOX","price":100,"resistance_date":"2026-10-19"},'
+        '{"box_type":"M_BOX","price":100,"resistance_date":"2026-10-19"}]}'
+    )
+    today = row("HISTORY", snapshot="2026-10-20", trigger=100,
+                close=104, anchor="2026-10-19")
+    current, previous = pd.DataFrame([today]), pd.DataFrame([yesterday])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 20), daily={},
+    )
+    actual = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).set_index("code").loc["HISTORY"]
+    assert actual["review_b_active"]
+    assert actual["review_b_verified"], "Current exact B must stay in its snapshot"
+    assert actual["review_b_identity_state"] == "EXACT"
+    assert actual["review_new_buy_point"]
+    assert actual["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert actual["review_b_display_event"] == "HISTORY_UNVERIFIED"
+    assert not actual["review_b_has_value_change"], "Do not invent the prior transition"
+    assert not actual["review_has_value_change"]

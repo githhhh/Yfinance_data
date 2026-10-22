@@ -47,7 +47,9 @@ def _event_for_verified_b(
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
     if previous_identity["resolution"] != "EXACT":
-        return "UNVERIFIED"
+        # A current exact B is still a valid snapshot observation; only the
+        # historical transition cannot be asserted from ambiguous history.
+        return "HISTORY_UNVERIFIED"
     if (weekend_identity and weekend_identity.get("resolution") == "EXACT"
             and previous_identity["key"] == weekend_identity["key"]
             and now_identity["key"] != weekend_identity["key"]):
@@ -202,7 +204,6 @@ def decorate_observation_view(
                 first_midweek_day=_first_trading_session(current_day),
                 weekend_identity=a_id if has_a else None,
             )
-        verified = verified and event != "UNVERIFIED"
         result.at[index, "review_b_verified"] = bool(verified)
         result.at[index, "review_b_display_event"] = event
         # Always derive the B zone from B's own authoritative trigger / close,
@@ -214,7 +215,7 @@ def decorate_observation_view(
         result.at[index, "review_new_buy_point_zone"] = (
             enum_zone.get(observed_zone) if verified else None
         )
-        changed = verified and event not in {"CURRENT", "SNAPSHOT", ""}
+        changed = verified and event not in {"CURRENT", "SNAPSHOT", "HISTORY_UNVERIFIED", "UNVERIFIED", ""}
         result.at[index, "review_b_has_value_change"] = bool(changed)
         result.at[index, "review_has_value_change"] = bool(
             result.at[index, "review_a_has_value_change"] or changed
