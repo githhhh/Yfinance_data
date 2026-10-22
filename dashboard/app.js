@@ -336,7 +336,7 @@
   function eventTone(event) {
     if (/→ BELOW$/.test(event)) return "danger";
     if (/→ EXT$/.test(event) || /→ EXTENDED$/.test(event)) return "extended";
-    if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT") return "success";
+    if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT" || event === "NEW") return "success";
     return /UNVERIFIED/.test(event) || event === "NO DATA" ? "warning" : "muted";
   }
   function readableMidweekEvent(raw) {
@@ -348,29 +348,53 @@
     if (raw === "HISTORY_UNVERIFIED") return "PREVIOUS CHANGE UNVERIFIED";
     return raw || "NO DATA";
   }
+  // Compact main-table copy is deliberately separate from the complete
+  // evidence in the tooltip / mobile expanded details.
+  function compactChangeEvent(raw) {
+    if (raw === "NEW BP") return "NEW";
+    if (raw === "BP UPDATED") return "UPDATED";
+    if (raw === "BP CHANGED") return "CHANGED";
+    if (raw === "HISTORY_UNVERIFIED") return "PRIOR UNVERIFIED";
+    if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
+    return raw || "";
+  }
   function changeLines(row) {
-    if (isNearBreakout(row)) return '<span class="change-badge">—</span>';
-    const parts = [];
-    if (bool(row.review_a_active)) {
-      const event = row.review_data_available === false ? "NO DATA" :
-        text(row.review_a_event,"") || text(row.review_a_week_event,"") || "NO CHANGE";
+    if (isNearBreakout(row)) {
+      return '<span class="change-empty" title="Near Breakout · no confirmed buy-point transition">—</span>';
+    }
+    const items = [];
+    // Change is the reason this filtered row is visible, not a catalogue of
+    // unrelated historical differences. Explicit Weekend/Midweek quick groups
+    // retain their own cumulative/snapshot semantics.
+    const sources = contextSources(row).filter((source) => contextMatch(row, source));
+    const incremental = currentHasComparison() && state.scope === "CHANGES" &&
+      state.change === "ALL" && state.newBuyPoint === "ALL";
+    if (bool(row.review_a_active) && sources.includes("A") &&
+        (!incremental || bool(row.review_a_has_value_change))) {
+      const raw = row.review_data_available === false ? "NO DATA" :
+        text(row.review_a_event, "") || text(row.review_a_week_event, "");
       const basis = row.review_a_event
         ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
-      parts.push(["Weekend Buy Point",event,basis]);
+      const event = compactChangeEvent(raw);
+      if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
     }
-    if (bool(row.review_b_active)) {
-      const raw = text(row.review_b_display_event || row.review_b_event,"");
-      const event = readableMidweekEvent(raw);
+    if (bool(row.review_b_active) && sources.includes("B") &&
+        (!incremental || bool(row.review_b_has_value_change))) {
+      const raw = text(row.review_b_display_event || row.review_b_event, "");
       const basis = row.review_b_display_basis === "PREVIOUS_SNAPSHOT" ? "Vs Previous Snapshot" :
         row.review_b_display_basis === "WEEKEND" ? "Vs Weekend" :
         "Previous Snapshot Unavailable";
-      parts.push(["Midweek Buy Point",event,basis]);
+      const event = compactChangeEvent(raw);
+      if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
     }
-    if (!parts.length) return '<span class="change-badge">—</span>';
-    return '<div class="change-lines">'+parts.map(([source,event,basis]) =>
-      `<div class="change-line"><span class="change-origin">${esc(source)}</span><span class="change-event ${eventTone(event)}">${esc(event)}</span><small>${esc(basis)}</small></div>`
-    ).join("")+'</div>';
+    if (!items.length) {
+      return '<span class="change-empty" title="No reported buy-point change">—</span>';
+    }
+    return '<div class="change-lines">'+items.map(([shortSource, fullSource, event, meaning, basis]) => {
+      const context = `${fullSource} · ${meaning} · ${basis}`;
+      return `<div class="change-line" title="${esc(context)}" aria-label="${esc(context)}"><span class="change-origin">${esc(shortSource)}</span><span class="change-event ${eventTone(event)}">${esc(event)}</span><small class="change-basis">${esc(basis)}</small></div>`;
+    }).join("")+'</div>';
   }
 
   function currentHasComparison() {
@@ -715,7 +739,7 @@
       const rs = provider?.stockRS(row.code);
       const status = displayStatus(row);
       const statusHtml = currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)
-        ? `<div class="bp-status-lines"><div class="bp-status-line ${reviewUsesB(row) ? "" : "is-active"}"><small>Weekend Buy Point</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line ${reviewUsesB(row) ? "is-active" : ""}"><small>Midweek Buy Point</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
+        ? `<div class="bp-status-lines"><div class="bp-status-line ${reviewUsesB(row) ? "" : "is-active"}"><small title="Weekend Buy Point">Weekend</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line ${reviewUsesB(row) ? "is-active" : ""}"><small title="Midweek Buy Point">Midweek</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       const selected = String(state.industrySelected[state.period]) === String(row.code);
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
@@ -1076,8 +1100,8 @@
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       if (currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)) {
         const weekend = row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status;
-        const make = (src,status,active) => `<div class="bp-status-line ${active ? "is-active" : ""}"><small>${src}</small><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></div>`;
-        return statusWithOut(row,`<div class="bp-status-lines">${make("Weekend Buy Point",weekend,!reviewUsesB(row))}${make("Midweek Buy Point",contextStatus(row,"B"),reviewUsesB(row))}</div>`);
+        const make = (src,status,active) => `<div class="bp-status-line ${active ? "is-active" : ""}"><small title="${src} Buy Point">${src}</small><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></div>`;
+        return statusWithOut(row,`<div class="bp-status-lines">${make("Weekend",weekend,!reviewUsesB(row))}${make("Midweek",contextStatus(row,"B"),reviewUsesB(row))}</div>`);
       }
       return statusWithOut(row, statusText);
     }

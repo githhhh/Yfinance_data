@@ -60,6 +60,15 @@ const belowOut = row("BELOWOUT", {
   review_buy_point_change_label: "ZONE → BELOW",
   review_buy_point_priority: 1,
 });
+const dual = row("DUAL", {
+  review_membership: "OUT", review_a_active: true,
+  review_a_event: "ZONE → EXT", review_a_has_value_change: true,
+  review_b_active: true, review_b_verified: true,
+  review_b_status: "ACTIONABLE", review_b_entry_valid: true,
+  review_b_display_event: "UNCONFIRMED → ACTIONABLE", review_b_has_value_change: true,
+  review_b_price: 171, review_b_pct: 2.34, review_b_close: 175,
+  review_has_value_change: true, review_weekend_buy_point_change: "BECAME_EXTENDED",
+});
 const near = row("NEAR", {
   signal: false, review_watch_active: false,
   bf_watch_active: true, review_a_active: false, review_b_active: false,
@@ -68,7 +77,7 @@ const near = row("NEAR", {
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
-payload.views.midweek.rows = [aOnly, belowOut, bOnly, near];
+payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
 async function ready() {
@@ -88,7 +97,8 @@ async function ready() {
   const browser = await chromium.launch(executablePath ? { executablePath, headless: true, args: ["--no-sandbox"] } : { channel: "chrome", headless: true });
   try {
     for (const viewport of [
-      { width: 1360, height: 900 }, { width: 760, height: 844 },
+      { width: 1680, height: 960 }, { width: 1360, height: 900 },
+      { width: 1024, height: 900 }, { width: 760, height: 844 },
       { width: 430, height: 844 }, { width: 390, height: 844 },
       { width: 350, height: 844 }, { width: 320, height: 844 },
     ]) {
@@ -99,7 +109,7 @@ async function ready() {
       }));
       await page.goto("http://127.0.0.1:8765/", { waitUntil: "domcontentloaded" });
       await page.locator(".review-section").waitFor();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 3, "Changes scope excludes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 4, "Changes scope excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
@@ -120,7 +130,44 @@ async function ready() {
         assert(outRect.y + outRect.height <= statusBox.y + statusBox.height + 1,
           `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
       }
+      const dualRow = page.locator('.review-table tbody tr[data-code="DUAL"]');
+      if (viewport.width > 760) {
+        const changeCell = dualRow.locator('td[data-field="review_change_label"]');
+        const changeBounds = await changeCell.boundingBox();
+        const dualLines = changeCell.locator(".change-line");
+        assert.equal(await dualLines.count(), 2, "Two sources produce exactly two rows");
+        assert(changeBounds, "Dual-event Change cell exists");
+        for (let i = 0; i < 2; i++) {
+          const line = await dualLines.nth(i).boundingBox();
+          assert(line && line.y >= changeBounds.y - 1 &&
+            line.y + line.height <= changeBounds.y + changeBounds.height + 1,
+            "Dual Change line must stay within its compact row");
+          assert(line.x + line.width <= changeBounds.x + changeBounds.width + 1,
+            "Dual Change line must not spill into Stage or neighboring cells");
+        }
+        const rowBounds = await dualRow.boundingBox();
+        assert(rowBounds && rowBounds.height <= 72,
+          `Dual-event + OUT may grow only enough to show all three facts (${rowBounds?.height}px)`);
+        const status = dualRow.locator('td[data-field="ibd_entry_status"]');
+        const statusBounds = await status.boundingBox();
+        const out = await status.locator(".pool-out-indicator").boundingBox();
+        assert(statusBounds && out && out.y + out.height <= statusBounds.y + statusBounds.height + 1,
+          "Dual-BP + OUT stack must fit the compact status cell");
+      } else {
+        const active = dualRow.locator(".bp-status-line.is-active .status-text");
+        assert.equal(await active.count(), 1, "Mobile dual-BP row marks one active status");
+        assert(await active.isVisible(), "Mobile dual-BP status is visible");
+      }
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
+      if (viewport.width > 760) {
+        const mainChange = bRow.locator('td[data-field="review_change_label"]');
+        assert((await mainChange.locator(".change-origin").innerText()) === "Midweek");
+        assert((await mainChange.locator(".change-event").innerText()) === "NEW");
+        assert(await mainChange.locator(".change-basis").isHidden(),
+          "Historical comparison belongs to hover or details, not the table");
+        const rect = await bRow.boundingBox();
+        assert(rect && rect.height <= 48, `Single-event row must stay compact at ${viewport.width}px (was ${rect?.height}px)`);
+      }
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
       await bRow.click();
@@ -138,7 +185,7 @@ async function ready() {
       }
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 4, "All Review includes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 5, "All Review includes Near");
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
@@ -188,5 +235,5 @@ async function ready() {
       await page.close();
     }
   } finally { await browser.close(); }
-  console.log("Desktop + 320/350/390/430/760px browser status-layout smoke passed");
+  console.log("1680/1360/1024 desktop + 320/350/390/430/760px browser status-layout smoke passed");
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.kill());
