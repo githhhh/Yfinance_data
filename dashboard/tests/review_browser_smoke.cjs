@@ -121,6 +121,15 @@ async function ready() {
           `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
       }
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
+      if (viewport.width > 760) {
+        const mainChange = bRow.locator('td[data-field="review_change_label"]');
+        assert((await mainChange.locator(".change-origin").innerText()) === "Midweek");
+        assert((await mainChange.locator(".change-event").innerText()) === "NEW");
+        assert(await mainChange.locator(".change-basis").isHidden(),
+          "Historical comparison belongs to hover or details, not the table");
+        const rect = await bRow.boundingBox();
+        assert(rect && rect.height <= 48, "Single-event rows remain compact");
+      }
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
       await bRow.click();

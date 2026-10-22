@@ -22,7 +22,7 @@ const hooked = script.replace(marker, `
   state = initialState();
   globalThis.__reviewAudit = {
     getState: () => state, displayStatus, displayChange, reviewUsesB,
-    reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml,
+    reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml, changeLines,
     filterRows, filterCounts, tableHtml, industryHtml, headerHtml, bounds, sortRows,
   };
 })();`);
@@ -128,7 +128,7 @@ assert(app.industryHtml([out]).includes("pool-out-indicator"), "Industry OUT vis
 assert(app.tableHtml([out]).includes('<span class="status-stack">'), "Stock OUT below status");
 assert(app.industryHtml([out]).includes('<span class="status-stack">'), "Industry OUT below status");
 const stock = app.tableHtml([bOnly]);
-assert(stock.includes("NEW BUY POINT"));
+assert(stock.includes('>NEW</span>'), "Short NEW event in main table");
 assert(stock.includes("UNCONFIRMED"));
 
 state.newBuyPoint = "BELOW_BUY_POINT";
@@ -260,6 +260,25 @@ state.change = "BELOW_BUY_POINT";
 assert.equal(app.filterRows([oldBelow]).length,1,
   "Explicit What Changed selection reveals cumulative Weekend difference");
 state.change = "ALL";
+
+// Visual compression must preserve structural origin and comparison evidence
+// without making the main table a verbose audit log.
+state.change="ALL"; state.newBuyPoint="ALL"; state.status="ALL";
+const onlyB={...entry("COMPACT"),review_a_active:false,
+  review_b_display_event:"NEW BP",review_b_display_basis:"PREVIOUS_SNAPSHOT"};
+const compact=app.changeLines(onlyB);
+assert(compact.includes(">Midweek</span>"));
+assert(compact.includes(">NEW</span>"));
+assert(!compact.includes(">Midweek Buy Point</span>"));
+assert(compact.includes('title="Midweek Buy Point · NEW BUY POINT · Vs Previous Snapshot"'));
+const stable={...onlyB,review_b_display_event:"CURRENT"};
+assert(app.changeLines(stable).includes("change-empty"));
+assert(!app.changeLines(stable).includes("NO CHANGE"));
+const uncertain={...onlyB,review_b_display_event:"UNVERIFIED"};
+assert(app.changeLines(uncertain).includes(">UNVERIFIED</span>"));
+const both={...entry("DUAL"),review_a_event:"ZONE → EXT",review_b_display_event:"NEW BP"};
+assert.equal((app.changeLines(both).match(/class="change-line"/g)||[]).length,2,
+  "Only two meaningful source events create two visual lines");
 
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.

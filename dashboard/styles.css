@@ -1136,12 +1136,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   }
 }
 
-/* Independent Weekend/Midweek Buy Point states and dated changes. */
-.change-lines,.bp-status-lines { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.change-line { display:flex; flex-wrap:wrap; gap:2px 7px; align-items:baseline; line-height:1.25; }
-.change-origin { color:#a6b4c3; font-size:9px; font-weight:750; }
-.change-event { font-size:10px; font-weight:800; }
-.change-line small { font-size:8px; color:#8292a5; }
+/* Main review table: one glance, one event. Provenance stays in hover
+   text and the mobile expanded details, not repeated in every table cell. */
+.change-lines,.bp-status-lines { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.change-line { display:flex; flex-wrap:nowrap; gap:7px; align-items:center; min-height:14px; line-height:1.2; white-space:nowrap; }
+.change-origin { color:#8798aa; font-size:10px; font-weight:550; white-space:nowrap; }
+.change-event { font-size:10px; font-weight:750; white-space:nowrap; }
+.change-basis { display:none; color:#8292a5; font-size:9px; }
+.change-empty { color:#66798b; font-size:12px; font-weight:500; }
+.mobile-event-breakdown .change-basis { display:inline; }
+.mobile-event-breakdown .change-line { flex-wrap:wrap; }
 .change-event.success,.mobile-change-hint.success { color:#35df65; }
 .change-event.danger,.mobile-change-hint.danger { color:#f04444; }
 .change-event.extended,.mobile-change-hint.extended { color:#2791ff; }
@@ -1149,14 +1153,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .change-event.muted,.mobile-change-hint.muted { color:#91a2b2; }
 .bp-status-line { display:flex; flex-wrap:wrap; gap:2px 7px; align-items:baseline; }
 .bp-status-line small { font-size:9px; color:#8da0b2; }
-.review-table td[data-field="review_change_label"] { white-space:normal; }
-.review-table tbody tr[data-code]:has(.change-lines),.review-table tbody tr[data-code]:has(.change-lines) td { height:auto; min-height:58px; }
+.review-table td[data-field="review_change_label"] { white-space:nowrap; }
+.review-table tbody tr[data-code]:has(.change-lines) td { height:42px; min-height:0; }
 .mobile-change-hint { display:none; }
 @media (width <= 760px) {
   .mobile-change-hint { display:block; font-size:8px; margin-top:2px; white-space:nowrap; }
   .results-section[data-view="STOCK"] .review-table td[data-field="code"] { flex-direction:column; align-items:flex-start; justify-content:center; }
   .bp-status-line:not(.is-active),.bp-status-line small { display:none; }
-  .review-table tbody tr[data-code]:has(.change-lines),.review-table tbody tr[data-code]:has(.change-lines) td { min-height:44px; }
+  .review-table tbody tr[data-code]:has(.change-lines) td { height:44px; min-height:0; }
   .mobile-event-breakdown { border-top:1px solid #27313d; padding:8px 0; }
 }
 

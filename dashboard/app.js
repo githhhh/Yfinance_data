@@ -336,7 +336,7 @@
   function eventTone(event) {
     if (/→ BELOW$/.test(event)) return "danger";
     if (/→ EXT$/.test(event) || /→ EXTENDED$/.test(event)) return "extended";
-    if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT") return "success";
+    if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT" || event === "NEW") return "success";
     return /UNVERIFIED/.test(event) || event === "NO DATA" ? "warning" : "muted";
   }
   function readableMidweekEvent(raw) {
@@ -348,29 +348,45 @@
     if (raw === "HISTORY_UNVERIFIED") return "PREVIOUS CHANGE UNVERIFIED";
     return raw || "NO DATA";
   }
+  // Compact main-table copy is deliberately separate from the complete
+  // evidence in the tooltip / mobile expanded details.
+  function compactChangeEvent(raw) {
+    if (raw === "NEW BP") return "NEW";
+    if (raw === "BP UPDATED") return "UPDATED";
+    if (raw === "BP CHANGED") return "CHANGED";
+    if (raw === "HISTORY_UNVERIFIED") return "PRIOR UNVERIFIED";
+    if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
+    return raw || "";
+  }
   function changeLines(row) {
-    if (isNearBreakout(row)) return '<span class="change-badge">—</span>';
-    const parts = [];
+    if (isNearBreakout(row)) {
+      return '<span class="change-empty" title="Near Breakout · no confirmed buy-point transition">—</span>';
+    }
+    const items = [];
     if (bool(row.review_a_active)) {
-      const event = row.review_data_available === false ? "NO DATA" :
-        text(row.review_a_event,"") || text(row.review_a_week_event,"") || "NO CHANGE";
+      const raw = row.review_data_available === false ? "NO DATA" :
+        text(row.review_a_event, "") || text(row.review_a_week_event, "");
       const basis = row.review_a_event
         ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
-      parts.push(["Weekend Buy Point",event,basis]);
+      const event = compactChangeEvent(raw);
+      if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
     }
     if (bool(row.review_b_active)) {
-      const raw = text(row.review_b_display_event || row.review_b_event,"");
-      const event = readableMidweekEvent(raw);
+      const raw = text(row.review_b_display_event || row.review_b_event, "");
       const basis = row.review_b_display_basis === "PREVIOUS_SNAPSHOT" ? "Vs Previous Snapshot" :
         row.review_b_display_basis === "WEEKEND" ? "Vs Weekend" :
         "Previous Snapshot Unavailable";
-      parts.push(["Midweek Buy Point",event,basis]);
+      const event = compactChangeEvent(raw);
+      if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
     }
-    if (!parts.length) return '<span class="change-badge">—</span>';
-    return '<div class="change-lines">'+parts.map(([source,event,basis]) =>
-      `<div class="change-line"><span class="change-origin">${esc(source)}</span><span class="change-event ${eventTone(event)}">${esc(event)}</span><small>${esc(basis)}</small></div>`
-    ).join("")+'</div>';
+    if (!items.length) {
+      return '<span class="change-empty" title="No reported buy-point change">—</span>';
+    }
+    return '<div class="change-lines">'+items.map(([shortSource, fullSource, event, meaning, basis]) => {
+      const context = `${fullSource} · ${meaning} · ${basis}`;
+      return `<div class="change-line" title="${esc(context)}" aria-label="${esc(context)}"><span class="change-origin">${esc(shortSource)}</span><span class="change-event ${eventTone(event)}">${esc(event)}</span><small class="change-basis">${esc(basis)}</small></div>`;
+    }).join("")+'</div>';
   }
 
   function currentHasComparison() {
