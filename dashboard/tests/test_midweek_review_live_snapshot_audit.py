@@ -56,6 +56,17 @@ def test_current_authoritative_midweek_records_preserve_buy_point_boundaries():
                 assert not bool(observed["review_new_buy_point"]), source["code"]
                 assert not bool(observed["review_b_has_value_change"]), source["code"]
 
+    # A historical Weekend-vs-now difference remains visible cumulatively,
+    # but if there is no latest price-zone or membership transition it must
+    # not repeatedly enter Review Now on a later trading session.
+    from dashboard.services.bf_review_presentation import _first_trading_session
+    if not _first_trading_session(as_of):
+        for _, observation in result[result["review_a_active"].eq(True)].iterrows():
+            if (bool(observation.get("review_a_week_event"))
+                    and not bool(observation.get("review_a_event"))
+                    and not bool(observation.get("review_membership_event"))):
+                assert not bool(observation["review_a_has_value_change"]), observation["code"]
+
     # Exactly one immutable Weekend anchor per fixed weekend signal.
     tracked = weekend[weekend["signal"].map(to_bool).eq(True)]
     for _, source in tracked.iterrows():
