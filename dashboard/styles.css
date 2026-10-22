@@ -1135,3 +1135,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     min-width: 8px !important; font-size: 9px !important;
   }
 }
+
+/* Independent Weekend/Midweek Buy Point states and dated changes. */
+.change-lines,.bp-status-lines { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.change-line { display:flex; flex-wrap:wrap; gap:2px 7px; align-items:baseline; line-height:1.25; }
+.change-origin { color:#a6b4c3; font-size:9px; font-weight:750; }
+.change-event { font-size:10px; font-weight:800; }
+.change-line small { font-size:8px; color:#8292a5; }
+.change-event.success,.mobile-change-hint.success { color:#35df65; }
+.change-event.danger,.mobile-change-hint.danger { color:#f04444; }
+.change-event.extended,.mobile-change-hint.extended { color:#2791ff; }
+.change-event.warning,.mobile-change-hint.warning { color:#ffd21f; }
+.change-event.muted,.mobile-change-hint.muted { color:#91a2b2; }
+.bp-status-line { display:flex; flex-wrap:wrap; gap:2px 7px; align-items:baseline; }
+.bp-status-line small { font-size:9px; color:#8da0b2; }
+.review-table td[data-field="review_change_label"] { white-space:normal; }
+.review-table tbody tr[data-code]:has(.change-lines),.review-table tbody tr[data-code]:has(.change-lines) td { height:auto; min-height:58px; }
+.mobile-change-hint { display:none; }
+@media (width <= 760px) {
+  .mobile-change-hint { display:block; font-size:8px; margin-top:2px; white-space:nowrap; }
+  .results-section[data-view="STOCK"] .review-table td[data-field="code"] { flex-direction:column; align-items:flex-start; justify-content:center; }
+  .bp-status-line:not(.is-active),.bp-status-line small { display:none; }
+  .review-table tbody tr[data-code]:has(.change-lines),.review-table tbody tr[data-code]:has(.change-lines) td { min-height:44px; }
+  .mobile-event-breakdown { border-top:1px solid #27313d; padding:8px 0; }
+}
+
+/* Filter-grounded industry concentration: no RS momentum inference. */
+.industry-group-pulse { font-size:9px; line-height:1.15; color:#9caabb; white-space:nowrap; }
+@media (width <= 760px) {
+  .industry-group-pulse { font-size:8px; letter-spacing:-0.1px; }
+}

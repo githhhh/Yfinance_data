@@ -100,10 +100,10 @@ def test_v2_watch_types_are_available_to_setup_filter() -> None:
 
 
 def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() -> None:
-    assert 'result = result.filter((row) => bool(row.review_has_value_change));' in APP
+    assert '!bool(row.review_has_value_change)' in APP
     assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
     assert "Current pre-signal candidates. Available in All Review only." in APP
-    assert "Changes vs Weekend" in APP
+    assert "Review Now" in APP
     assert "All Review" in APP
     assert "function isActive(row)" in APP
     assert "return isSignalActive(row) || isNearBreakout(row);" in APP
@@ -112,8 +112,8 @@ def test_midweek_changes_scope_excludes_near_breakout_but_all_review_keeps_it() 
 def test_near_breakout_overview_keeps_watch_reference_and_source() -> None:
     assert "function nearBreakoutDetailHtml(row)" not in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
-    assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
-    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
+    assert 'reviewUsesB(row) ? "Midweek Buy Point" :' in APP
+    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend Buy Point" : "Buy Point";' in APP
     assert 'const referenceContext = near ? watchTargetSource(row) :' in APP
     assert 'const contextLabel = near ? "Source" :' in APP
     assert 'return "Recovery High"' in APP

@@ -29,6 +29,7 @@ function row(code, rest) {
 }
 const bOnly = row("BONLY", {
   review_b_active: true, review_b_price: 185, review_b_status: "UNCONFIRMED",
+  review_b_verified: true,
   review_b_rule: "pivot", review_b_close: 180, review_b_pct: -2.70,
   review_b_zone: "BELOW", review_b_event: "NEW BP",
   review_b_date: "2026-10-14", review_b_entry_reason: "Volume not confirmed",
@@ -127,12 +128,12 @@ async function ready() {
         const detail = page.locator(".mobile-inline-review");
         await detail.waitFor();
         const mobileText = await detail.innerText();
-        assert(mobileText.toUpperCase().includes("MIDWEEK BP"), "Mobile B label");
+        assert(mobileText.toUpperCase().includes("MIDWEEK BUY POINT"), "Mobile B label");
         assert(!mobileText.includes("4W"), "Missing B pullback must not borrow A history");
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
       } else {
         const selected = page.locator(".selected-strip");
-        assert((await selected.innerText()).includes("Midweek BP 185"), "Desktop B label");
+        assert((await selected.innerText()).includes("Midweek Buy Point 185"), "Desktop B label");
         assert((await selected.innerText()).includes("11W"), "Desktop B base, not A");
       }
 
@@ -141,7 +142,7 @@ async function ready() {
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
-      assert(selected.includes("Weekend BP 170"), "All Review restores A primary");
+      assert(selected.includes("Weekend Buy Point 170"), "All Review restores A primary");
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!overflow, "No body-level horizontal overflow at " + viewport.width);
@@ -156,7 +157,17 @@ async function ready() {
       await toggle.waitFor();
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+      const industryPulse = page.locator(".industry-group-pulse").first();
+      assert((await industryPulse.innerText()).includes("Actionable"), "Industry shows verified actionable concentration");
+      assert((await industryPulse.innerText()).includes("Changed"), "Industry shows active review concentration");
       assert(await page.locator('.industry-stock-table tbody tr[data-code]').count() >= 2);
+      // At <=760px all inactive BP status lines are CSS-hidden. The Industry
+      // row must tag exactly one active source, otherwise dual-BP status
+      // becomes entirely invisible while the rest of the row is present.
+      const dualIndustry = page.locator('.industry-stock-table tbody tr[data-code="BONLY"]');
+      const dualStatus = dualIndustry.locator(".bp-status-line.is-active .status-text");
+      assert.equal(await dualStatus.count(), 1, "Industry dual-BP row must designate one visible status");
+      assert(await dualStatus.isVisible(), `Industry dual-BP status is visible at ${viewport.width}px`);
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
         const industryOut = page.locator(`.industry-stock-table tbody tr[data-code="${outCode}"]`);
         const cell = industryOut.locator("td:nth-child(3)");

@@ -430,3 +430,281 @@ def test_midweek_telegram_act_requires_both_actionable_status_and_valid_resolver
         "BAD": "UNCONFIRMED",
         "WAIT": "UNCONFIRMED",
     }
+
+
+def test_unverified_pivot_does_not_claim_new_buy_point():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    candidate = row("SN", snapshot="2026-10-20", trigger=194.54, close=198.72)
+    candidate["ibd_candidate_extra"] = (
+        '{"pivot_candidates":['
+        '{"box_type":"M_BOX","resistance_date":"2026-10-19","price":194.54},'
+        '{"box_type":"S_BOX","resistance_date":"2026-10-19","price":194.54}]}'
+    )
+    current = pd.DataFrame([candidate])
+    raw = build_observation_view(
+        pd.DataFrame(), current, current, daily={}, as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=pd.DataFrame(), current=current, previous=None,
+    ).iloc[0]
+    assert actual["review_b_active"]
+    assert actual["review_b_identity_state"] == "AMBIGUOUS"
+    assert actual["review_b_display_event"] == "UNVERIFIED"
+    assert not actual["review_b_verified"]
+    assert not actual["review_new_buy_point"]
+
+
+def test_dual_buy_point_statuses_remain_independent():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = row("TALO", snapshot="2026-10-16", trigger=17.005, close=17.77,
+                  anchor="2026-10-12", status="ACTIONABLE")
+    midweek = row("TALO", snapshot="2026-10-20", trigger=17.92, close=18.05,
+                  anchor="2026-10-19", status="ACTIONABLE")
+    complete, current = pd.DataFrame([weekend]), pd.DataFrame([midweek])
+    raw = build_observation_view(
+        complete, current, pd.DataFrame(), daily={}, as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=None,
+    ).iloc[0]
+    assert actual["ibd_entry_status"] == "EXTENDED"
+    assert actual["review_b_status"] == "ACTIONABLE"
+    assert actual["review_b_verified"]
+    assert actual["review_a_price"] == 17.005
+    assert actual["review_b_price"] == 17.92
+
+
+def test_daily_candles_after_as_of_are_excluded():
+    weekend = row("CLIP", snapshot="2026-10-16", trigger=100, close=101)
+    midweek = row("CLIP", snapshot="2026-10-20", signal=False, close=103)
+    daily = {"CLIP": pd.DataFrame(
+        {"Close": [101, 103, 120]},
+        index=pd.to_datetime(["2026-10-16", "2026-10-20", "2026-10-21"]),
+    )}
+    actual = build_observation_view(
+        pd.DataFrame([weekend]), pd.DataFrame([midweek]), pd.DataFrame(),
+        daily=daily, as_of=date(2026, 10, 20),
+    ).iloc[0]
+    assert actual["latest_close"] == 103
+    assert actual["review_a_as_of"] == "2026-10-20"
+    assert actual["ibd_entry_status"] == "ACTIONABLE"
+
+
+def test_midweek_b_trigger_revision_is_reported_even_if_status_unchanged():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
+    first = row("REVISED", snapshot="2026-10-19", trigger=100, close=102,
+                anchor="2026-10-19")
+    changed = row("REVISED", snapshot="2026-10-20", trigger=101, close=103,
+                  anchor="2026-10-19")
+    base = pd.DataFrame([changed])
+    raw = build_observation_view(weekend, base, base, as_of=date(2026, 10, 20))
+    result = decorate_observation_view(
+        raw, complete=weekend, current=base, previous=pd.DataFrame([first])
+    ).set_index("code").loc["REVISED"]
+    assert result["review_b_verified"]
+    assert result["review_b_display_event"] == "BP UPDATED"
+    assert result["review_b_has_value_change"]
+    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
+
+
+def test_no_prior_midweek_snapshot_must_not_repeat_new_event():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
+    current = pd.DataFrame([row("B", snapshot="2026-10-21", trigger=100,
+                                close=103, anchor="2026-10-19")])
+    raw = build_observation_view(weekend, current, current, as_of=date(2026, 10, 21))
+    result = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None
+    ).set_index("code").loc["B"]
+    assert result["review_b_verified"]
+    assert result["review_b_display_event"] == "SNAPSHOT"
+    assert result["review_b_display_basis"] == "UNAVAILABLE"
+    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert not result["review_b_has_value_change"]
+
+
+def test_v2_recovered_b_populates_zone_and_filter_source():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    # V1 sees same pivot date and calls it A; V2 distinguishes the box type.
+    weekend_row = row("BOX", snapshot="2026-10-16", trigger=100,
+                      close=101, anchor="2026-10-15")
+    current_row = row("BOX", snapshot="2026-10-19", trigger=100,
+                      close=102, anchor="2026-10-15")
+    current_row["ibd_candidate_extra"] = (
+        '{"selected_pivot":{"price":100,"resistance_date":"2026-10-15",'
+        '"box_type":"S_BOX"}}'
+    )
+    wk, mid = pd.DataFrame([weekend_row]), pd.DataFrame([current_row])
+    raw = build_observation_view(wk, mid, mid, as_of=date(2026, 10, 19))
+    result = decorate_observation_view(
+        raw, complete=wk, current=mid, previous=None
+    ).iloc[0]
+    assert result["review_b_active"]
+    assert result["review_b_verified"]
+    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert result["review_b_zone"] == "ZONE"
+    assert result["review_b_display_event"] == "NEW BP"
+
+
+def test_weekend_unknown_identity_must_not_create_verified_new_b():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend_row = row("UNK", snapshot="2026-10-16", trigger=100, close=101,
+                      anchor="2026-10-15")
+    weekend_row["ibd_candidate_extra"] = "{}"  # weekend identity unknown
+    now = row("UNK", snapshot="2026-10-19", trigger=110, close=112,
+              anchor="2026-10-19")
+    w, m = pd.DataFrame([weekend_row]), pd.DataFrame([now])
+    raw = build_observation_view(w, m, m, as_of=date(2026, 10, 19))
+    result = decorate_observation_view(
+        raw, complete=w, current=m, previous=None
+    ).iloc[0]
+    assert not result["review_new_buy_point"]
+    assert not result["review_b_has_value_change"]
+    assert not result["review_b_verified"]
+
+
+def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    wk = row("SWITCH", snapshot="2026-10-16", trigger=100, close=102,
+             anchor="2026-10-15")
+    yesterday = row("SWITCH", snapshot="2026-10-19", trigger=100, close=103,
+                    anchor="2026-10-15")
+    today = row("SWITCH", snapshot="2026-10-20", trigger=105, close=106,
+                anchor="2026-10-20")
+    complete, current, previous = (
+        pd.DataFrame([wk]), pd.DataFrame([today]), pd.DataFrame([yesterday])
+    )
+    raw = build_observation_view(
+        complete, current, current, previous=previous,
+        as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous
+    ).iloc[0]
+    assert actual["review_b_verified"]
+    assert actual["review_b_display_event"] == "NEW BP"
+    assert actual["review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
+    assert actual["review_b_has_value_change"]
+
+
+def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    complete = pd.DataFrame([row("GABC", snapshot="2026-10-16",
+                                 trigger=100, close=102)])
+    previous = pd.DataFrame([row("OTHER", snapshot="2026-10-19")])
+    current = pd.DataFrame([row("OTHER", snapshot="2026-10-20")])
+    daily = {"GABC": pd.DataFrame(
+        {"Close": [99, 102]},
+        index=pd.to_datetime(["2026-10-19", "2026-10-20"]),
+    )}
+    raw = build_observation_view(
+        complete, current, current, previous=previous, daily=daily,
+        as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous
+    ).set_index("code").loc["GABC"]
+    assert actual["review_membership"] == "OUT"
+    assert actual["review_a_event"] == "BELOW → ZONE"
+    assert actual["review_a_focus_basis"] == "PRIOR_SESSION"
+
+
+def test_stable_below_weekend_anchor_stays_in_cumulative_not_review_now():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("BSVN", snapshot="2026-10-16",
+                                trigger=100, close=103)])
+    previous = pd.DataFrame([row("BSVN", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=98)])
+    current = pd.DataFrame([row("BSVN", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=98)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    assert bool(raw.iloc[0]["review_a_has_value_change"]), "Legacy cumulative remains unchanged"
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_week_event"] == "ZONE → BELOW"
+    assert view["review_weekend_buy_point_change"] == "BELOW_BUY_POINT"
+    assert view["review_a_event"] == ""
+    assert not view["review_a_has_value_change"]
+    assert not view["review_has_value_change"]
+
+
+def test_new_weekend_move_still_enters_review_now():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("TMO", snapshot="2026-10-16",
+                                trigger=100, close=101)])
+    previous = pd.DataFrame([row("TMO", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=98)])
+    current = pd.DataFrame([row("TMO", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=102)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_event"] == "BELOW → ZONE"
+    assert view["review_a_has_value_change"]
+    assert view["review_has_value_change"]
+
+
+def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    from dashboard.services.bf_review_presentation import _first_trading_session
+    assert not _first_trading_session(date(2026, 9, 7))
+    assert _first_trading_session(date(2026, 9, 8))
+    weekend = pd.DataFrame([row("SEED", snapshot="2026-09-04",
+                                trigger=100, close=103)])
+    current = pd.DataFrame([
+        row("SEED", snapshot="2026-09-08", trigger=100,
+            close=98, signal=False),
+        row("FIRST_B", snapshot="2026-09-08", trigger=120,
+            close=122, anchor="2026-09-08"),
+    ])
+    raw = build_observation_view(
+        weekend, current, current,
+        as_of=date(2026, 9, 8), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+    ).set_index("code")
+    assert view.loc["SEED", "review_a_week_event"] == "ZONE → BELOW"
+    assert bool(view.loc["SEED", "review_a_has_value_change"])
+    assert bool(view.loc["FIRST_B", "review_b_verified"])
+    assert view.loc["FIRST_B", "review_b_display_event"] == "NEW BP"
+    assert view.loc["FIRST_B", "review_b_display_basis"] == "WEEKEND"
+
+
+def test_exact_current_midweek_point_not_lost_when_previous_identity_ambiguous():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
+    yesterday = row("HISTORY", snapshot="2026-10-19", trigger=100,
+                    close=103, anchor="2026-10-19")
+    yesterday["ibd_candidate_extra"] = (
+        '{"pivot_candidates":['
+        '{"box_type":"S_BOX","price":100,"resistance_date":"2026-10-19"},'
+        '{"box_type":"M_BOX","price":100,"resistance_date":"2026-10-19"}]}'
+    )
+    today = row("HISTORY", snapshot="2026-10-20", trigger=100,
+                close=104, anchor="2026-10-19")
+    current, previous = pd.DataFrame([today]), pd.DataFrame([yesterday])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 20), daily={},
+    )
+    actual = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).set_index("code").loc["HISTORY"]
+    assert actual["review_b_active"]
+    assert actual["review_b_verified"], "Current exact B must stay in its snapshot"
+    assert actual["review_b_identity_state"] == "EXACT"
+    assert actual["review_new_buy_point"]
+    assert actual["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert actual["review_b_display_event"] == "HISTORY_UNVERIFIED"
+    assert not actual["review_b_has_value_change"], "Do not invent the prior transition"
+    assert not actual["review_has_value_change"]

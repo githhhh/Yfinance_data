@@ -22,6 +22,7 @@ from dashboard.services.bf_observation import (
     load_daily_snapshot,
     load_previous_midweek,
 )
+from dashboard.services.bf_review_presentation import decorate_observation_view
 from dashboard.field_config import FLOW_CARD_META, STATUS_META
 from dashboard.services.bf_midweek_review import (
     PoolMode,
@@ -87,6 +88,11 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_b_entry_volume",
     "review_b_entry_reason",
     "review_b_event",
+    "review_b_display_event",
+    "review_b_display_basis",
+    "review_b_verified",
+    "review_b_identity_state",
+    "review_a_focus_basis",
     "review_effective_entry_status",
     "review_priority",
     "review_baseline_entry_status",
@@ -384,13 +390,22 @@ def build_dashboard_payload(
         effective_previous = previous_pool
         if effective_previous is None and snapshot_date is not None:
             effective_previous = load_previous_midweek(PROJECT_ROOT, snapshot_date)
+        # Keep all compared prices within the MIDWEEK Pool's market session.
+        # The latest 1D PKL can be newer than the published Pool.
+        observation_date = snapshot_date or window_date
         midweek = build_observation_view(
             analysis.complete_pool if analysis.midweek_baseline_available else pd.DataFrame(),
             analysis.midweek_pool,
             base,
-            daily=daily if daily is not None else load_daily_snapshot(PROJECT_ROOT, window_date=window_date),
+            daily=daily if daily is not None else load_daily_snapshot(PROJECT_ROOT, window_date=observation_date),
             previous=effective_previous,
-            as_of=window_date,
+            as_of=observation_date,
+        )
+        midweek = decorate_observation_view(
+            midweek,
+            complete=analysis.complete_pool if analysis.midweek_baseline_available else pd.DataFrame(),
+            current=analysis.midweek_pool,
+            previous=effective_previous,
         )
 
     complete_snapshot = (
@@ -420,6 +435,7 @@ def build_dashboard_payload(
         "meta": {
             "complete_snapshot_date": complete_snapshot,
             "midweek_snapshot_date": midweek_snapshot,
+            "midweek_current_signal_count": int(analysis.midweek_pool["signal"].map(lambda x: str(x).lower() in {"true", "1", "1.0"}).sum()) if not analysis.midweek_pool.empty else 0,
             "review_week_start": (
                 analysis.review_week_start.isoformat()
                 if analysis.review_week_start is not None

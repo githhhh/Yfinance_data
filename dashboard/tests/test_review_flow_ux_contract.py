@@ -31,17 +31,17 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 
 
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
-    assert 'if (isNearBreakout(row)) return "";' in APP
-    assert 'return text(row.review_change_label, "");' in APP
-    assert 'const a = text(row.review_buy_point_change_label, "");' in APP
+    assert 'if (isNearBreakout(row)) return \'<span class="change-badge">—</span>\';' in APP
+    assert 'function changeLines(row)' in APP
+    assert 'function contextMatch(row, src' in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
-    assert 'reviewUsesB(row) ? "Midweek BP" :' in APP
-    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";' in APP
+    assert 'reviewUsesB(row) ? "Midweek Buy Point" :' in APP
+    assert 'currentHasComparison() && bool(row.review_a_active) ? "Weekend Buy Point" : "Buy Point";' in APP
     assert 'class="selected-reference-primary">${referenceKey} ${fmt(reviewReferencePrice(row))}' in APP
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
-    assert "signal transition labels do not apply yet" in APP
+    assert 'if (isNearBreakout(row)) return \'<span class="change-badge">—</span>\';' in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 
@@ -94,7 +94,7 @@ def test_selected_overview_never_renders_nat_as_a_date() -> None:
 
 
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:
-    assert "if (isNearBreakout(row)) return true;" in APP
+    assert 'src !== "WATCH" && state.entryVolumeMin !== null' in APP
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio", 0, 1)' in APP
     assert "Signal stage only · Watch candidates stay visible as N/A" in APP
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio")' in TABLE
@@ -107,7 +107,7 @@ def test_scope_switch_changes_population_without_resetting_review_intent() -> No
     assert 'state.newBuyPoint = "ALL"' not in scope_block
     assert 'state.status = "ALL"' not in scope_block
     assert 'state.scope === "CHANGES" && state.status === WATCH_STAGE' in APP
-    assert ') ? "ALL" : state.status;' in APP
+    assert 'skipStatus || currentHasComparison()' in APP
 
 
 def test_manual_sort_is_context_scoped_and_has_explicit_default_order() -> None:

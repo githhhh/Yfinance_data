@@ -100,7 +100,6 @@
     const normalized = normalizeText(label).replace(/[▲▼▾]/g, "").trim();
     return {
       Code: "code",
-      Change: "review_change_label",
       Status: "ibd_entry_status",
       "Stage / Status": "ibd_entry_status",
       Setup: "ibd_candidate_rule",
@@ -122,8 +121,8 @@
 
     const rows = [...body.querySelectorAll("tr[data-code]")];
     const sortedRows = [...rows].sort((a, b) => {
-      const left = a.children[index]?.textContent || "";
-      const right = b.children[index]?.textContent || "";
+      const left = a.children[index]?.dataset.sortValue || a.children[index]?.textContent || "";
+      const right = b.children[index]?.dataset.sortValue || b.children[index]?.textContent || "";
       const compared = compareValues(field, left, right, direction);
       if (compared !== 0) return compared;
       return normalizeText(a.dataset.code).localeCompare(normalizeText(b.dataset.code));
