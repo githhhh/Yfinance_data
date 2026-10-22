@@ -1170,6 +1170,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .industry-group-pulse { font-size:8px; letter-spacing:-0.1px; }
 }
 
+/* A source label and its stage must never wrap into multiple subrows
+   when the desktop table is narrower than the user's full monitor. */
+@media (width > 760px) {
+  .bp-status-line { flex-wrap: nowrap; white-space: nowrap; }
+}
+
 /* The uncommon dual Buy Point + OUT case has three independent facts.
    Keep ordinary rows dense, but never cut off the membership indicator. */
 @media (width > 760px) {

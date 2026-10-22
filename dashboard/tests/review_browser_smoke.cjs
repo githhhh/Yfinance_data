@@ -166,7 +166,7 @@ async function ready() {
         assert(await mainChange.locator(".change-basis").isHidden(),
           "Historical comparison belongs to hover or details, not the table");
         const rect = await bRow.boundingBox();
-        assert(rect && rect.height <= 48, "Single-event rows remain compact");
+        assert(rect && rect.height <= 48, `Single-event row must stay compact at ${viewport.width}px (was ${rect?.height}px)`);
       }
       assert((await bRow.innerText()).includes("UNCONFIRMED"), "B-only event uses B status");
       assert((await bRow.innerText()).includes("-2.70%"), "B-only event uses B reference");
