@@ -31,7 +31,7 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 
 
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
-    assert 'Near Breakout · no confirmed buy-point transition' in APP
+    assert 'Near Breakout · watch only; no formal buy-point change' in APP
     assert 'function changeLines(row)' in APP
     assert 'function contextMatch(row, src' in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
