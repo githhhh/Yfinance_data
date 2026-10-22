@@ -1159,3 +1159,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .review-table tbody tr[data-code]:has(.change-lines),.review-table tbody tr[data-code]:has(.change-lines) td { min-height:44px; }
   .mobile-event-breakdown { border-top:1px solid #27313d; padding:8px 0; }
 }
+
+/* Filter-grounded industry concentration: no RS momentum inference. */
+.industry-group-pulse { font-size:9px; line-height:1.15; color:#9caabb; white-space:nowrap; }
+@media (width <= 760px) {
+  .industry-group-pulse { font-size:8px; letter-spacing:-0.1px; }
+}

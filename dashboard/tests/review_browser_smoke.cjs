@@ -156,6 +156,9 @@ async function ready() {
       await toggle.waitFor();
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+      const industryPulse = page.locator(".industry-group-pulse").first();
+      assert((await industryPulse.innerText()).includes("Actionable"), "Industry shows verified actionable concentration");
+      assert((await industryPulse.innerText()).includes("Changed"), "Industry shows active review concentration");
       assert(await page.locator('.industry-stock-table tbody tr[data-code]').count() >= 2);
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
         const industryOut = page.locator(`.industry-stock-table tbody tr[data-code="${outCode}"]`);
