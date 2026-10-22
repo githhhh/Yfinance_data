@@ -144,7 +144,7 @@ def test_rs_popover_is_visibly_modal_closeable_and_non_clickthrough():
 
 
 def test_midweek_changes_use_buy_point_flow_not_signal_origin():
-    assert 'Changes vs Weekend · ${changeTotal}' in APP
+    assert 'Review Now · ${changeTotal}' in APP
     assert 'const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"]' in APP
     assert 'const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"]' in APP
     assert "Signal Source</div>" not in APP
@@ -157,7 +157,7 @@ def test_midweek_near_breakout_is_disabled_only_in_changes_scope():
     assert 'const watchDisabled = currentHasComparison() && state.scope === "CHANGES";' in APP
     assert "Current pre-signal candidates. Available in All Review only." in APP
     assert 'state.scope === "CHANGES" && state.status === WATCH_STAGE' in APP
-    assert ') ? "ALL" : state.status;' in APP
+    assert 'skipStatus || currentHasComparison()' in APP
     scope_block = APP.split('} else if (action === "scope") {', 1)[1].split('} else if (action === "quick") {', 1)[0]
     assert 'state.status = "ALL"' not in scope_block
 

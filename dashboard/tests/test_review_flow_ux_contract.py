@@ -41,7 +41,7 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
-    assert "signal transition labels do not apply yet" in APP
+    assert 'if (isNearBreakout(row)) return \'<span class="change-badge">—</span>\';' in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 
@@ -94,7 +94,7 @@ def test_selected_overview_never_renders_nat_as_a_date() -> None:
 
 
 def test_entry_volume_filters_signals_without_hiding_watch_candidates() -> None:
-    assert "if (isNearBreakout(row)) return true;" in APP
+    assert 'src !== "WATCH" && state.entryVolumeMin !== null' in APP
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio", 0, 1)' in APP
     assert "Signal stage only · Watch candidates stay visible as N/A" in APP
     assert 'bounds(rows.filter(isSignalActive), "ibd_entry_volume_ratio")' in TABLE

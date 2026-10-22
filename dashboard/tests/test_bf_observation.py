@@ -433,15 +433,19 @@ def test_midweek_telegram_act_requires_both_actionable_status_and_valid_resolver
 
 
 def test_unverified_pivot_does_not_claim_new_buy_point():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
     candidate = row("SN", snapshot="2026-10-20", trigger=194.54, close=198.72)
     candidate["ibd_candidate_extra"] = (
         '{"pivot_candidates":['
         '{"box_type":"M_BOX","resistance_date":"2026-10-19","price":194.54},'
         '{"box_type":"S_BOX","resistance_date":"2026-10-19","price":194.54}]}'
     )
-    actual = build_observation_view(
-        pd.DataFrame(), pd.DataFrame([candidate]), pd.DataFrame(),
-        daily={}, as_of=date(2026, 10, 20),
+    current = pd.DataFrame([candidate])
+    raw = build_observation_view(
+        pd.DataFrame(), current, current, daily={}, as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=pd.DataFrame(), current=current, previous=None,
     ).iloc[0]
     assert actual["review_b_active"]
     assert actual["review_b_identity_state"] == "AMBIGUOUS"
@@ -451,13 +455,17 @@ def test_unverified_pivot_does_not_claim_new_buy_point():
 
 
 def test_dual_buy_point_statuses_remain_independent():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend = row("TALO", snapshot="2026-10-16", trigger=17.005, close=17.77,
                   anchor="2026-10-12", status="ACTIONABLE")
     midweek = row("TALO", snapshot="2026-10-20", trigger=17.92, close=18.05,
                   anchor="2026-10-19", status="ACTIONABLE")
-    actual = build_observation_view(
-        pd.DataFrame([weekend]), pd.DataFrame([midweek]), pd.DataFrame(),
-        daily={}, as_of=date(2026, 10, 20),
+    complete, current = pd.DataFrame([weekend]), pd.DataFrame([midweek])
+    raw = build_observation_view(
+        complete, current, pd.DataFrame(), daily={}, as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=None,
     ).iloc[0]
     assert actual["ibd_entry_status"] == "EXTENDED"
     assert actual["review_b_status"] == "ACTIONABLE"
