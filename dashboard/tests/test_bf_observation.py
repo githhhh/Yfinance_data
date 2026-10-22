@@ -608,3 +608,73 @@ def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot
     assert actual["review_membership"] == "OUT"
     assert actual["review_a_event"] == "BELOW → ZONE"
     assert actual["review_a_focus_basis"] == "PRIOR_SESSION"
+
+
+def test_stable_below_weekend_anchor_stays_in_cumulative_not_review_now():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("BSVN", snapshot="2026-10-16",
+                                trigger=100, close=103)])
+    previous = pd.DataFrame([row("BSVN", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=98)])
+    current = pd.DataFrame([row("BSVN", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=98)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    assert bool(raw.iloc[0]["review_a_has_value_change"]), "Legacy cumulative remains unchanged"
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_week_event"] == "ZONE → BELOW"
+    assert view["review_weekend_buy_point_change"] == "BELOW_BUY_POINT"
+    assert view["review_a_event"] == ""
+    assert not view["review_a_has_value_change"]
+    assert not view["review_has_value_change"]
+
+
+def test_new_weekend_move_still_enters_review_now():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("TMO", snapshot="2026-10-16",
+                                trigger=100, close=101)])
+    previous = pd.DataFrame([row("TMO", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=98)])
+    current = pd.DataFrame([row("TMO", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=102)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_event"] == "BELOW → ZONE"
+    assert view["review_a_has_value_change"]
+    assert view["review_has_value_change"]
+
+
+def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    from dashboard.services.bf_review_presentation import _first_trading_session
+    assert not _first_trading_session(date(2026, 9, 7))
+    assert _first_trading_session(date(2026, 9, 8))
+    weekend = pd.DataFrame([row("SEED", snapshot="2026-09-04",
+                                trigger=100, close=103)])
+    current = pd.DataFrame([
+        row("SEED", snapshot="2026-09-08", trigger=100,
+            close=98, signal=False),
+        row("FIRST_B", snapshot="2026-09-08", trigger=120,
+            close=122, anchor="2026-09-08"),
+    ])
+    raw = build_observation_view(
+        weekend, current, current,
+        as_of=date(2026, 9, 8), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+    ).set_index("code")
+    assert view.loc["SEED", "review_a_week_event"] == "ZONE → BELOW"
+    assert bool(view.loc["SEED", "review_a_has_value_change"])
+    assert bool(view.loc["FIRST_B", "review_b_verified"])
+    assert view.loc["FIRST_B", "review_b_display_event"] == "NEW BP"
+    assert view.loc["FIRST_B", "review_b_display_basis"] == "WEEKEND"
