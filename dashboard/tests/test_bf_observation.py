@@ -562,3 +562,27 @@ def test_weekend_unknown_identity_must_not_create_verified_new_b():
     assert not result["review_new_buy_point"]
     assert not result["review_b_has_value_change"]
     assert not result["review_b_verified"]
+
+
+def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    wk = row("SWITCH", snapshot="2026-10-16", trigger=100, close=102,
+             anchor="2026-10-15")
+    yesterday = row("SWITCH", snapshot="2026-10-19", trigger=100, close=103,
+                    anchor="2026-10-15")
+    today = row("SWITCH", snapshot="2026-10-20", trigger=105, close=106,
+                anchor="2026-10-20")
+    complete, current, previous = (
+        pd.DataFrame([wk]), pd.DataFrame([today]), pd.DataFrame([yesterday])
+    )
+    raw = build_observation_view(
+        complete, current, current, previous=previous,
+        as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous
+    ).iloc[0]
+    assert actual["review_b_verified"]
+    assert actual["review_b_display_event"] == "NEW BP"
+    assert actual["review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
+    assert actual["review_b_has_value_change"]

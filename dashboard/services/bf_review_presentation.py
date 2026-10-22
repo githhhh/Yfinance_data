@@ -24,6 +24,7 @@ def _observed_date(frame: pd.DataFrame):
 def _event_for_verified_b(
     current, previous, now_identity, previous_identity, *,
     has_previous_snapshot: bool, first_midweek_day: bool,
+    weekend_identity: dict | None = None,
 ):
     # No prior published snapshot on Tuesday-Thursday is not evidence of a
     # NEW event. The B still belongs to this week's snapshot collection.
@@ -33,6 +34,10 @@ def _event_for_verified_b(
         return "NEW BP"
     if previous_identity["resolution"] != "EXACT":
         return "UNVERIFIED"
+    if (weekend_identity and weekend_identity.get("resolution") == "EXACT"
+            and previous_identity["key"] == weekend_identity["key"]
+            and now_identity["key"] != weekend_identity["key"]):
+        return "NEW BP"
     if previous_identity["key"] != now_identity["key"]:
         return "BP CHANGED"
 
@@ -168,6 +173,7 @@ def decorate_observation_view(
                 fresh, previous_row, new_id, previous_identity,
                 has_previous_snapshot=prior_valid,
                 first_midweek_day=bool(current_day and current_day.weekday() == 0),
+                weekend_identity=a_id if has_a else None,
             )
         verified = verified and event != "UNVERIFIED"
         result.at[index, "review_b_verified"] = bool(verified)
