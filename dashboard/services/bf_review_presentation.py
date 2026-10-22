@@ -91,7 +91,8 @@ def decorate_observation_view(
         a_event = str(row.get("review_a_event") or "")
         a_week = str(row.get("review_a_week_event") or "")
         result.at[index, "review_a_focus_basis"] = (
-            "PREVIOUS_SNAPSHOT" if a_event and prior_valid
+            "PREVIOUS_SNAPSHOT" if a_event and prior_valid and code in prior
+            and pd.notna(pd.to_numeric(prior[code].get("latest_close"), errors="coerce"))
             else "PRIOR_SESSION" if a_event else "WEEKEND" if a_week else None
         )
         result.at[index, "review_b_verified"] = False

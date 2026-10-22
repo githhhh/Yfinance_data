@@ -586,3 +586,25 @@ def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed()
     assert actual["review_b_display_event"] == "NEW BP"
     assert actual["review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
     assert actual["review_b_has_value_change"]
+
+
+def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    complete = pd.DataFrame([row("GABC", snapshot="2026-10-16",
+                                 trigger=100, close=102)])
+    previous = pd.DataFrame([row("OTHER", snapshot="2026-10-19")])
+    current = pd.DataFrame([row("OTHER", snapshot="2026-10-20")])
+    daily = {"GABC": pd.DataFrame(
+        {"Close": [99, 102]},
+        index=pd.to_datetime(["2026-10-19", "2026-10-20"]),
+    )}
+    raw = build_observation_view(
+        complete, current, current, previous=previous, daily=daily,
+        as_of=date(2026, 10, 20),
+    )
+    actual = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous
+    ).set_index("code").loc["GABC"]
+    assert actual["review_membership"] == "OUT"
+    assert actual["review_a_event"] == "BELOW → ZONE"
+    assert actual["review_a_focus_basis"] == "PRIOR_SESSION"
