@@ -145,7 +145,8 @@ async function ready() {
             "Dual Change line must not spill into Stage or neighboring cells");
         }
         const rowBounds = await dualRow.boundingBox();
-        assert(rowBounds && rowBounds.height <= 48, "Dual-event compact row must not inflate");
+        assert(rowBounds && rowBounds.height <= 72,
+          `Dual-event + OUT may grow only enough to show all three facts (${rowBounds?.height}px)`);
         const status = dualRow.locator('td[data-field="ibd_entry_status"]');
         const statusBounds = await status.boundingBox();
         const out = await status.locator(".pool-out-indicator").boundingBox();

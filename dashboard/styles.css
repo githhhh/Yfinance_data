@@ -1169,3 +1169,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (width <= 760px) {
   .industry-group-pulse { font-size:8px; letter-spacing:-0.1px; }
 }
+
+/* The uncommon dual Buy Point + OUT case has three independent facts.
+   Keep ordinary rows dense, but never cut off the membership indicator. */
+@media (width > 760px) {
+  .review-table tbody tr[data-code]:has(.bp-status-lines):has(.pool-out-indicator) td {
+    height: auto;
+    min-height: 52px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
