@@ -13,6 +13,7 @@ const fixture = {
     rs_reference: {},
   },
   views: { weekend: { rows: [] }, midweek: { rows: [] } },
+  ui: { status_meta: {} },
 };
 const script = fs.readFileSync("dashboard/app.js", "utf8");
 const marker = "  boot();\n})();";
