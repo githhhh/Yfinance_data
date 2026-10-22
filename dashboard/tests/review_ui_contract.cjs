@@ -23,7 +23,7 @@ const hooked = script.replace(marker, `
   globalThis.__reviewAudit = {
     getState: () => state, displayStatus, displayChange, reviewUsesB,
     reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml,
-    filterRows, filterCounts, tableHtml, industryHtml, headerHtml, bounds,
+    filterRows, filterCounts, tableHtml, industryHtml, headerHtml, bounds, sortRows,
   };
 })();`);
 const scope = {
@@ -212,6 +212,22 @@ assert(app.tableHtml([updatedPoint]).includes("BUY POINT UPDATED"),
 const changedPoint = {...updatedPoint,review_b_display_event:"BP CHANGED"};
 assert(app.tableHtml([changedPoint]).includes("BUY POINT CHANGED"),
   "Raw BP CHANGED token must not leak to table");
+
+// A-only What Changed scope cannot be reprioritized by an unrelated B
+// ACTIONABLE. Both visible Weekend signals are EXTENDED, so ticker order
+// is the tie-breaker instead of the hidden B status.
+state.scope = "CHANGES"; state.change = "BECAME_EXTENDED";
+state.newBuyPoint = "ALL"; state.status = "ALL";
+const firstA = {...entry("ALPHA"),review_a_event:"ZONE → EXT",
+  review_weekend_buy_point_change:"BECAME_EXTENDED",
+  review_b_active:false,review_b_verified:false};
+const hiddenB = {...entry("ZETA"),review_a_event:"ZONE → EXT",
+  review_weekend_buy_point_change:"BECAME_EXTENDED",
+  review_b_status:"ACTIONABLE",review_b_verified:true,
+  review_b_display_event:"NEW BP"};
+assert.equal(app.sortRows([hiddenB, firstA]).rows[0].code, "ALPHA",
+  "Review Priority must respect selected Weekend Buy Point context");
+state.change = "ALL";
 
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.

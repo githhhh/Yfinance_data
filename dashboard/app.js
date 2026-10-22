@@ -437,11 +437,14 @@
     const result = [...rows];
     if (currentHasComparison() && state.scope==="CHANGES") {
       const rank = (row) => {
-        const a = text(row.review_a_event,"") || text(row.review_a_week_event,"");
-        const b = text(row.review_b_display_event || row.review_b_event,"");
-        if (bool(row.review_b_verified) && row.review_b_status==="ACTIONABLE" && b!=="CURRENT") return 0;
+        // Only rank the buy-point event that the user can actually see in
+        // the selected quick/status/advanced filter context.
+        const visible = contextSources(row).filter((source) => contextMatch(row,source));
+        const a = visible.includes("A") ? text(row.review_a_event,"") || text(row.review_a_week_event,"") : "";
+        const b = visible.includes("B") ? text(row.review_b_display_event || row.review_b_event,"") : "";
+        if (b && bool(row.review_b_verified) && row.review_b_status==="ACTIONABLE" && b!=="CURRENT") return 0;
         if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
-        if (bool(row.review_b_verified) && row.review_b_status==="UNCONFIRMED" && b!=="CURRENT") return 2;
+        if (b && bool(row.review_b_verified) && row.review_b_status==="UNCONFIRMED" && b!=="CURRENT") return 2;
         if (/→ ZONE$/.test(a)) return 3;
         if (/→ BELOW$/.test(a) || /→ BELOW$/.test(b)) return 4;
         if (/→ EXT$/.test(a) || /→ EXT$/.test(b)) return 5;
