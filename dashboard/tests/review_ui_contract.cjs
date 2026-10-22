@@ -242,6 +242,25 @@ assert.equal(app.filterRows([rejected]).length,0,
   "Invalid resolver must not appear as ACTIONABLE in filters");
 state.status = "ALL";
 
+// Review Now is the latest increment, but Weekend quick filters keep the
+// cumulative Vs Weekend position, so a stable below-BP ticker remains
+// findable in What Changed even when it is not a new daily event.
+state.status = "ALL"; state.scope = "CHANGES";
+state.change = "ALL"; state.newBuyPoint = "ALL";
+const oldBelow = {...entry("STABLE_A"),review_a_active:true,
+  review_b_active:false,review_has_value_change:false,
+  review_a_has_value_change:false,review_a_event:"",
+  review_a_week_event:"ZONE → BELOW",review_weekend_buy_point_change:"BELOW_BUY_POINT",
+  ibd_entry_status:"BELOW_TRIGGER"};
+assert.equal(app.filterRows([oldBelow]).length,0,
+  "Stable cumulative Weekend difference is not a daily Review Now event");
+assert.equal(app.filterCounts([oldBelow]).change.BELOW_BUY_POINT,1,
+  "Weekend cumulative quick-filter count must include stable difference");
+state.change = "BELOW_BUY_POINT";
+assert.equal(app.filterRows([oldBelow]).length,1,
+  "Explicit What Changed selection reveals cumulative Weekend difference");
+state.change = "ALL";
+
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.
 state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";

@@ -416,7 +416,11 @@
     const aQuick = cmp && state.change !== "ALL" && !["change","bothQuick"].includes(exclude);
     return rows.filter((row) => {
       if (!isActive(row)) return false;
-      if (cmp && state.scope === "CHANGES" && !opts.ignoreScope && !newQuick && !bool(row.review_has_value_change)) return false;
+      // Quick groups are source-specific collections: Weekend tracks the
+      // cumulative fixed buy-point position; Midweek lists the current B
+      // snapshot. Neither is limited to today's Review Now increment.
+      if (cmp && state.scope === "CHANGES" && !opts.ignoreScope &&
+          !newQuick && !aQuick && !bool(row.review_has_value_change)) return false;
       if (aQuick && row.review_weekend_buy_point_change !== state.change) return false;
       if (newQuick && !(bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint)) return false;
       const forced = opts.forceSource || (newQuick ? "B" : aQuick ? "A" : null);
@@ -427,7 +431,7 @@
   }
   function filterCounts(rows) {
     const statusBase = filterRows(rows,"status");
-    const aBase = filterRows(rows,"bothQuick",{forceSource:"A"});
+    const aBase = filterRows(rows,"bothQuick",{forceSource:"A",ignoreScope:true});
     const bBase = filterRows(rows,"bothQuick",{forceSource:"B",ignoreScope:true});
     const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key)=>[
       key,statusBase.filter((row)=>contextSources(row).some((src)=>contextMatch(row,src,{status:key}))).length
