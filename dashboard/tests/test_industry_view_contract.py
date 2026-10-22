@@ -81,7 +81,10 @@ if (mode === "parse") {
   eq(result.ratings.get("oil, gas").name, "Oil, Gas");
 } else if (mode === "groups") {
   const methods = part("  function industryGroups(", "  function industryHtml(");
-  const fixture = new Function("window", "rows", methods + "\nreturn { groups: industryGroups(rows), all: industryStockRows(rows) };");
+  const fixture = new Function(
+    "window", "rows", "contextSources", "contextMatch", "contextStatus", "bool",
+    methods + "\nreturn { groups: industryGroups(rows), all: industryStockRows(rows) };"
+  );
   const rs = { SMTC:98, MPWR:98, NVDA:91, CRWD:88, PANW:86, OXY:null };
   const inds = { SMTC:"Semiconductors", MPWR:"Semiconductors", NVDA:"Semiconductors",
     CRWD:"Software", PANW:"Software", OXY:"Unclassified" };
@@ -89,7 +92,7 @@ if (mode === "parse") {
   const input = ["OXY","NVDA","PANW","CRWD","SMTC","MPWR"].map(code => ({code}));
   const result = fixture({ BFIndustryRS: {
     stockRS: code => rs[code], industryForCode: code => inds[code], industryRS: name => ranks[name]
-  } }, input);
+  } }, input, () => [], () => false, () => null, Boolean);
   eq(result.groups.map(group => group.name), ["Semiconductors","Software","Unclassified"]);
   eq(result.groups[0].rows.map(row => row.code), ["MPWR","SMTC","NVDA"]);
   eq(result.all.map(row => row.code), ["MPWR","SMTC","NVDA","CRWD","PANW","OXY"]);
