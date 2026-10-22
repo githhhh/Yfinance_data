@@ -430,3 +430,53 @@ def test_midweek_telegram_act_requires_both_actionable_status_and_valid_resolver
         "BAD": "UNCONFIRMED",
         "WAIT": "UNCONFIRMED",
     }
+
+
+def test_unverified_pivot_does_not_claim_new_buy_point():
+    candidate = row("SN", snapshot="2026-10-20", trigger=194.54, close=198.72)
+    candidate["ibd_candidate_extra"] = (
+        '{"pivot_candidates":['
+        '{"box_type":"M_BOX","resistance_date":"2026-10-19","price":194.54},'
+        '{"box_type":"S_BOX","resistance_date":"2026-10-19","price":194.54}]}'
+    )
+    actual = build_observation_view(
+        pd.DataFrame(), pd.DataFrame([candidate]), pd.DataFrame(),
+        daily={}, as_of=date(2026, 10, 20),
+    ).iloc[0]
+    assert actual["review_b_active"]
+    assert actual["review_b_identity_state"] == "AMBIGUOUS"
+    assert actual["review_b_display_event"] == "UNVERIFIED"
+    assert not actual["review_b_verified"]
+    assert not actual["review_new_buy_point"]
+
+
+def test_dual_buy_point_statuses_remain_independent():
+    weekend = row("TALO", snapshot="2026-10-16", trigger=17.005, close=17.77,
+                  anchor="2026-10-12", status="ACTIONABLE")
+    midweek = row("TALO", snapshot="2026-10-20", trigger=17.92, close=18.05,
+                  anchor="2026-10-19", status="ACTIONABLE")
+    actual = build_observation_view(
+        pd.DataFrame([weekend]), pd.DataFrame([midweek]), pd.DataFrame(),
+        daily={}, as_of=date(2026, 10, 20),
+    ).iloc[0]
+    assert actual["ibd_entry_status"] == "EXTENDED"
+    assert actual["review_b_status"] == "ACTIONABLE"
+    assert actual["review_b_verified"]
+    assert actual["review_a_price"] == 17.005
+    assert actual["review_b_price"] == 17.92
+
+
+def test_daily_candles_after_as_of_are_excluded():
+    weekend = row("CLIP", snapshot="2026-10-16", trigger=100, close=101)
+    midweek = row("CLIP", snapshot="2026-10-20", signal=False, close=103)
+    daily = {"CLIP": pd.DataFrame(
+        {"Close": [101, 103, 120]},
+        index=pd.to_datetime(["2026-10-16", "2026-10-20", "2026-10-21"]),
+    )}
+    actual = build_observation_view(
+        pd.DataFrame([weekend]), pd.DataFrame([midweek]), pd.DataFrame(),
+        daily=daily, as_of=date(2026, 10, 20),
+    ).iloc[0]
+    assert actual["latest_close"] == 103
+    assert actual["review_a_as_of"] == "2026-10-20"
+    assert actual["ibd_entry_status"] == "ACTIONABLE"

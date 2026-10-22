@@ -132,7 +132,7 @@ async function ready() {
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
       } else {
         const selected = page.locator(".selected-strip");
-        assert((await selected.innerText()).includes("Midweek BP 185"), "Desktop B label");
+        assert((await selected.innerText()).includes("Midweek Buy Point 185"), "Desktop B label");
         assert((await selected.innerText()).includes("11W"), "Desktop B base, not A");
       }
 
@@ -141,7 +141,7 @@ async function ready() {
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
-      assert(selected.includes("Weekend BP 170"), "All Review restores A primary");
+      assert(selected.includes("Weekend Buy Point 170"), "All Review restores A primary");
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!overflow, "No body-level horizontal overflow at " + viewport.width);

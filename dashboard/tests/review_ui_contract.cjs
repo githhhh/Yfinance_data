@@ -91,19 +91,19 @@ assert.equal(app.reviewUsesB(bOnly), true, "B-only delta must select B facts");
 assert.equal(app.reviewReferencePrice(bOnly), 185);
 assert.equal(app.reviewDistance(bOnly), -2.7);
 assert.equal(app.displayStatus(bOnly), "UNCONFIRMED");
-assert.equal(app.displayChange(bOnly), "B · NEW BP");
+assert.equal(app.displayChange(bOnly), "NEW BP");
 assert.equal(app.reviewUsesB(aChanged), false, "A delta keeps fixed A reference");
 assert.equal(app.reviewReferencePrice(aChanged), 170);
 assert.equal(app.displayStatus(aChanged), "ACTIONABLE");
-assert(app.displayChange(aChanged).includes("B · NEW BP"));
+assert(app.displayChange(aChanged).includes("BELOW → ZONE"));
 
 const bDetail = app.selectedHtml(bOnly);
-assert(bDetail.includes("Midweek BP 185"));
+assert(bDetail.includes("Midweek Buy Point 185"));
 assert(bDetail.includes("Snapshot 2026-10-14"));
 assert(bDetail.includes("181"), "B ceiling, not A ceiling");
 assert(bDetail.includes("11W"), "B base duration");
 assert(!bDetail.includes("22W"), "A base must not leak into B context");
-assert(bDetail.includes("↳ Weekend BP 170"));
+assert(bDetail.includes("↳ Weekend Buy Point 170"));
 const unconfirmedWithVolume = { ...bOnly, review_b_entry_volume: 2.5,
   review_b_entry_reason: "resolver_rejected", review_b_entry_valid: false };
 assert(app.mobileDetailHtml(unconfirmedWithVolume).includes("resolver_rejected"),
@@ -111,7 +111,7 @@ assert(app.mobileDetailHtml(unconfirmedWithVolume).includes("resolver_rejected")
 assert(app.tableHtml([unconfirmedWithVolume]).includes("resolver_rejected"),
   "B rejected resolver reason must be visible in table");
 const mobile = app.mobileDetailHtml(bOnly);
-assert(mobile.includes("Midweek BP"));
+assert(mobile.includes("Midweek Buy Point"));
 assert(mobile.includes("pos 0.80"), "B geometry");
 assert(mobile.includes("181"), "B base facts");
 assert(!mobile.includes("pos 0.35"), "A geometry must not leak");
@@ -127,7 +127,7 @@ assert(app.industryHtml([out]).includes("pool-out-indicator"), "Industry OUT vis
 assert(app.tableHtml([out]).includes('<span class="status-stack">'), "Stock OUT below status");
 assert(app.industryHtml([out]).includes('<span class="status-stack">'), "Industry OUT below status");
 const stock = app.tableHtml([bOnly]);
-assert(stock.includes("B · NEW BP"));
+assert(stock.includes("NEW BUY POINT"));
 assert(stock.includes("UNCONFIRMED"));
 
 state.newBuyPoint = "BELOW_BUY_POINT";
@@ -155,4 +155,22 @@ assert.equal(app.filterRows([bOnly, aChanged]).length, 0,
 state.weeklyVolumeMin = null;
 assert.equal(app.displayStatus(bOnly), "ACTIONABLE");
 
-console.log("BF Review A/B interaction contract passed");
+state.change = "ALL"; state.scope = "CHANGES"; state.status = "ACTIONABLE";
+const talo = {...entry("TALO"),ibd_entry_status:"EXTENDED",
+  current_vs_ibd_candidate_pct:6.15,review_b_status:"ACTIONABLE",
+  review_b_pct:0.73,review_b_zone:"ZONE",review_b_verified:true,
+  review_new_buy_point_zone:"BUY_ZONE"};
+assert.equal(app.filterRows([talo]).length,1,"TALO qualifies through its Midweek Buy Point");
+assert.equal(app.reviewUsesB(talo),true);
+assert.equal(app.reviewReferencePrice(talo),185);
+
+state.status = "ALL"; state.newBuyPoint = "BUY_ZONE";
+const arqt = {...entry("ARQT"),review_a_active:false,
+  review_b_status:"ACTIONABLE",review_b_pct:4.36,review_b_zone:"ZONE",
+  review_b_verified:true,review_b_display_event:"CURRENT",
+  review_new_buy_point_zone:"BUY_ZONE",review_b_has_value_change:false,
+  review_has_value_change:false};
+assert.equal(app.filterRows([arqt]).length,1,"Stable Midweek BP is in New Buy Points snapshot");
+assert.equal(app.filterCounts([arqt]).newBuyPoint.BUY_ZONE,1);
+
+console.log("BF Review buy-point-centric interaction contract passed");
