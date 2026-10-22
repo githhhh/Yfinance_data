@@ -173,4 +173,17 @@ const arqt = {...entry("ARQT"),review_a_active:false,
 assert.equal(app.filterRows([arqt]).length,1,"Stable Midweek BP is in New Buy Points snapshot");
 assert.equal(app.filterCounts([arqt]).newBuyPoint.BUY_ZONE,1);
 
+// Industry aggregates must reflect the *selected* buy point, not the
+// other source's hidden status or event.
+state.newBuyPoint = "ALL"; state.status = "UNCONFIRMED";
+const mixed = {...entry("MIXED"),ibd_entry_status:"UNCONFIRMED",
+  review_b_status:"ACTIONABLE",review_b_verified:true,
+  review_a_has_value_change:true,review_b_has_value_change:false};
+assert(app.industryHtml([mixed]).includes("0 Actionable"),
+  "UNCONFIRMED filter cannot count a hidden B ACTIONABLE as a selected opportunity");
+state.status = "ALL"; state.newBuyPoint = "BUY_ZONE";
+mixed.review_new_buy_point_zone = "BUY_ZONE";
+assert(app.industryHtml([mixed]).includes("0 Changed"),
+  "New Buy Points context cannot count unrelated A changes");
+
 console.log("BF Review buy-point-centric interaction contract passed");
