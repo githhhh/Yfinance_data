@@ -4,7 +4,7 @@
   const app = document.getElementById("app");
   const WATCH_STAGE = "NEAR_BREAKOUT";
   const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
-  const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER];
+  const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER, "UNVERIFIED"];
   const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"];
   const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"];
   const ROUTE_LABELS = {
@@ -327,6 +327,20 @@
     const ratio = num(row.review_b_entry_volume);
     return ratio === null ? "n/a" : fmt(ratio, "x");
   }
+  // UI-only vocabulary; preserve the raw reject reason in a hover title.
+  function briefEntryReason(raw) {
+    const exact = {
+      daily_volume_not_confirmed: "Vol Unconfirmed",
+      resolver_rejected: "Entry Rejected",
+      provider_error: "Data Error",
+      Volume_not_confirmed: "Vol Unconfirmed",
+      "Volume not confirmed": "Vol Unconfirmed",
+    };
+    if (Object.hasOwn(exact, raw)) return exact[raw];
+    return /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(raw)
+      ? raw.split("_").map((word) => word[0].toUpperCase() + word.slice(1)).join(" ")
+      : raw;
+  }
 
   function displayChange(row) {
     const a = text(row.review_a_event, "") || text(row.review_a_week_event, "");
@@ -354,13 +368,36 @@
     if (raw === "NEW BP") return "NEW";
     if (raw === "BP UPDATED") return "UPDATED";
     if (raw === "BP CHANGED") return "CHANGED";
-    if (raw === "HISTORY_UNVERIFIED") return "PRIOR UNVERIFIED";
+    if (raw === "HISTORY_UNVERIFIED") return "PRIOR ?";
     if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
     return raw || "";
   }
+  function stillLabel(row, sources) {
+    const preferred = reviewUsesB(row) ? "B" : "A";
+    const source = sources.includes(preferred) ? preferred : sources[0];
+    if (!source) return ["No History", "No comparable buy-point source"];
+    if (source === "B") {
+      const event = text(row.review_b_display_event || row.review_b_event, "");
+      if (event === "SNAPSHOT" || !event) {
+        return ["No Prior", "Current Midweek Buy Point · previous comparison unavailable"];
+      }
+    } else if (row.review_data_available === false) {
+      return ["No Data", "Weekend Buy Point · market price unavailable"];
+    }
+    const status = contextStatus(row, source);
+    if (status === "UNVERIFIED") return ["Unverified", "Buy-point identity unverified"];
+    if (status === "NO_DATA") return ["No Data", "Price or status unavailable"];
+    const labels = {
+      ACTIONABLE: "Actionable", UNCONFIRMED: "Unconfirmed",
+      EXTENDED: "Extended", BELOW_TRIGGER: "Below",
+      NEAR_BREAKOUT: "Near Breakout",
+    };
+    const name = labels[status] || statusLabel(status);
+    return [`Still ${name}`, `${source === "B" ? "Midweek" : "Weekend"} Buy Point · no new reportable event · ${statusLabel(status)}`];
+  }
   function changeLines(row) {
     if (isNearBreakout(row)) {
-      return '<span class="change-empty" title="Near Breakout · no confirmed buy-point transition">—</span>';
+      return '<span class="change-still" title="Near Breakout · watch only; no formal buy-point change">Still Near Breakout</span>';
     }
     const items = [];
     // Change is the reason this filtered row is visible, not a catalogue of
@@ -378,6 +415,10 @@
         : "Vs Weekend";
       const event = compactChangeEvent(raw);
       if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
+      else if (row.review_membership_event) {
+        const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
+        items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
+      }
     }
     if (bool(row.review_b_active) && sources.includes("B") &&
         (!incremental || bool(row.review_b_has_value_change))) {
@@ -389,7 +430,8 @@
       if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
     }
     if (!items.length) {
-      return '<span class="change-empty" title="No reported buy-point change">—</span>';
+      const [label, detail] = stillLabel(row, sources);
+      return `<span class="change-still" title="${esc(detail)}">${esc(label)}</span>`;
     }
     return '<div class="change-lines">'+items.map(([shortSource, fullSource, event, meaning, basis]) => {
       const context = `${fullSource} · ${meaning} · ${basis}`;
@@ -631,7 +673,7 @@
         <div class="status-grid review-watch-grid">${watch}</div>
       </div>
       <div class="review-flow-group">
-        <div class="review-flow-label">Entry Status <span>active signals</span></div>
+        <div class="review-flow-label">Entry Status <span>active signals</span>${(counts.UNVERIFIED > 0 || state.status === "UNVERIFIED") ? ` <button class="unverified-quick" data-action="status" data-value="UNVERIFIED" aria-pressed="${state.status === "UNVERIFIED"}" title="Midweek structural identity not confirmed; filter these stocks">Unverified · ${counts.UNVERIFIED ?? 0}</button>` : ""}</div>
         <div class="status-grid review-entry-grid">${entries}</div>
       </div>
     </div>`;
@@ -902,7 +944,7 @@
     ].filter(Boolean).join(" · ");
     const entryVolume = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
     const weeklyVolume = num(facts.volume_ratio);
-    const entryPrimary = near ? "Pre-signal" : reviewEntryText(row).replace(/x$/, "×");
+    const entryPrimary = near ? "Pre-signal" : briefEntryReason(reviewEntryText(row).replace(/x$/, "×"));
     const entryFacts = [
       entryVolume === null ? "" : `Entry Vol ${fmt(entryVolume, "x")}`,
       weeklyVolume === null ? "" : `Weekly ${fmt(weeklyVolume, "x")}`,
@@ -1088,7 +1130,7 @@
       ["industry_rs", "IND RS"],
     ];
     const selected = state.selected[state.period];
-    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" data-sort-value="${field === "ibd_entry_status" ? esc(statusLabel(displayStatus(row))) : ""}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}${field === "review_change_label" ? '<span class="change-help" title="Still = same reported stage · NEW = new buy point · No Prior = cannot compare · Unverified = identity uncertain">ⓘ</span>' : ""}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" data-sort-value="${field === "ibd_entry_status" ? esc(statusLabel(displayStatus(row))) : ""}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function cellHtml(row, field) {
@@ -1128,7 +1170,12 @@
       const current = num(value);
       return `<span title="${esc(rsTitle(row))}">${current === null ? "N/A" : esc(String(current))}</span>`;
     }
-    if (field === "ibd_entry_vol_or_reject") return isNearBreakout(row) ? "Pre-signal" : esc(reviewEntryText(row).replace(/x$/, "×"));
+    if (field === "ibd_entry_vol_or_reject") {
+      if (isNearBreakout(row)) return "Pre-signal";
+      const raw = reviewEntryText(row).replace(/x$/, "×");
+      const label = briefEntryReason(raw);
+      return label === raw ? esc(label) : `<span title="${esc(raw)}">${esc(label)}</span>`;
+    }
     return esc(text(value));
   }
 

@@ -22,7 +22,7 @@ const hooked = script.replace(marker, `
   state = initialState();
   globalThis.__reviewAudit = {
     getState: () => state, displayStatus, displayChange, reviewUsesB,
-    reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml, changeLines,
+    reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml, changeLines, statusCardsHtml,
     filterRows, filterCounts, tableHtml, industryHtml, headerHtml, bounds, sortRows,
   };
 })();`);
@@ -272,7 +272,7 @@ assert(compact.includes(">NEW</span>"));
 assert(!compact.includes(">Midweek Buy Point</span>"));
 assert(compact.includes('title="Midweek Buy Point · NEW BUY POINT · Vs Previous Snapshot"'));
 const stable={...onlyB,review_b_display_event:"CURRENT"};
-assert(app.changeLines(stable).includes("change-empty"));
+assert(app.changeLines(stable).includes("Still Unconfirmed"));
 assert(!app.changeLines(stable).includes("NO CHANGE"));
 const uncertain={...onlyB,review_b_display_event:"UNVERIFIED"};
 assert(app.changeLines(uncertain).includes(">UNVERIFIED</span>"));
@@ -310,6 +310,36 @@ const selectedHtml = app.changeLines(focusRow);
 assert(!selectedHtml.includes(">Weekend</span>"),
   "The ACTIONABLE-selected B reference must not display an A EXTENDED event");
 state.status = "ALL";
+
+// An unchanged row describes its current status; it never uses an
+// ambiguous dash. Snapshot-only and absent data must not imply continuity.
+state.scope = "ALL_SIGNALS"; state.change = "ALL"; state.newBuyPoint = "ALL"; state.status = "ALL";
+const stillNear = {...entry("WATCH"),review_watch_active:false,bf_watch_active:true};
+assert(app.changeLines(stillNear).includes("Still Near Breakout"));
+const stillA = {...entry("STILL_A"),review_a_active:true,review_b_active:false,
+  review_a_event:"",review_a_week_event:"",ibd_entry_status:"EXTENDED"};
+assert(app.changeLines(stillA).includes("Still Extended"));
+const noData = {...stillA,review_data_available:false};
+assert(app.changeLines(noData).includes("No Data"));
+const noPrior = {...entry("NO_PRIOR"),review_a_active:false,review_b_display_event:"SNAPSHOT"};
+assert(app.changeLines(noPrior).includes("No Prior"));
+const joined = {...stillA,review_membership_event:"IN → OUT",review_membership:"OUT"};
+assert(app.changeLines(joined).includes("POOL OUT"),
+  "Membership-only change must not masquerade as an unchanged status");
+const entryReason = {...entry("REASON"),ibd_entry_vol_or_reject:"daily_volume_not_confirmed"};
+const entryHtml = app.tableHtml([entryReason]);
+assert(entryHtml.includes(">Vol Unconfirmed</span>"));
+assert(entryHtml.includes('title="daily_volume_not_confirmed"'));
+assert(!entryHtml.includes(">daily_volume_not_confirmed<"));
+const noSelection = app.selectedHtml(null);
+assert(noSelection.includes("selected-strip empty"));
+assert(app.statusCardsHtml({NEAR_BREAKOUT:0,ACTIONABLE:1,UNCONFIRMED:1,
+  BELOW_TRIGGER:0,EXTENDED:0,UNVERIFIED:3}).includes("Unverified · 3"),
+  "Unverified identities must be discoverable without a sixth large card");
+assert.equal(app.filterCounts([{...entry("AMBIG"),review_a_active:false,
+  review_b_active:true,review_b_verified:false,review_b_status:"ACTIONABLE"}]).status.UNVERIFIED,1,
+  "Unverified status tally must use the same source filter predicate");
+state.scope = "CHANGES";
 
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.

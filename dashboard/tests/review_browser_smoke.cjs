@@ -158,6 +158,12 @@ async function ready() {
         assert.equal(await active.count(), 1, "Mobile dual-BP row marks one active status");
         assert(await active.isVisible(), "Mobile dual-BP status is visible");
       }
+      if (viewport.width > 760) {
+        const empty = page.locator(".selected-strip.empty");
+        const emptyBox = await empty.boundingBox();
+        assert(emptyBox && emptyBox.height <= 44,
+          `Empty Selected Overview must be compact (${emptyBox?.height}px)`);
+      }
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
       if (viewport.width > 760) {
         const mainChange = bRow.locator('td[data-field="review_change_label"]');
