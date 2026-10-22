@@ -17,6 +17,7 @@ from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
     SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone, to_bool,
 )
+from dashboard.services.bf_observation_replay import identity_v2
 
 _ZONES = {"BELOW_BUY_POINT": "BELOW", "BUY_ZONE": "ZONE", "EXTENDED": "EXT"}
 _CHANGES = {"BUY_ZONE": "ENTERED_BUY_ZONE", "BELOW_BUY_POINT": "BELOW_BUY_POINT",
@@ -308,6 +309,10 @@ def build_observation_view(
         row["review_a_active"] = weekend is not None
         row["review_b_active"] = False
         row["review_b_event"] = ""
+        row["review_b_display_event"] = ""
+        row["review_b_verified"] = False
+        row["review_b_identity_state"] = "NONE"
+        row["review_a_focus_basis"] = None
         row["review_b_price"] = None
         row["review_b_status"] = None
         row["review_b_entry_valid"] = None
@@ -379,6 +384,10 @@ def build_observation_view(
                 a_change = path["change"]
                 a_changed = bool(path["week_event"] or path["latest_event"])
                 focus = path["latest_event"] or path["week_event"] or ""
+                row["review_a_focus_basis"] = (
+                    "PREVIOUS" if path["latest_event"] else
+                    "WEEKEND" if path["week_event"] else None
+                )
                 membership_label = membership_event or ("OUT" if membership == "OUT" else "")
                 row["review_change_label"] = " · ".join(
                     part for part in (focus, membership_label, row["review_a_zone"] if membership_event and not focus else "") if part
@@ -387,12 +396,38 @@ def build_observation_view(
             row["review_futu_actionable"] = trade_rows.get(code, {}).get("review_futu_actionable", False)
         event = _b_event(weekend, midweek, prev_by_code.get(code),
                          comparison_available=prev_valid or not complete.empty)
+        # The public Dashboard uses the stricter V2 structural identity. Keep
+        # legacy review_b_event unchanged for the v1 alert compatibility path.
+        identity = identity_v2(midweek) if midweek is not None and to_bool(midweek.get("signal")) is True else {"resolution": "NONE", "key": None}
+        previous_midweek = prev_by_code.get(code)
+        previous_identity = identity_v2(previous_midweek) if previous_midweek is not None and to_bool(previous_midweek.get("signal")) is True else {"key": None}
+        weekend_identity = identity_v2(weekend) if weekend is not None else {"key": None}
+        if (event is None and identity["resolution"] == "EXACT"
+                and weekend_identity.get("key")
+                and identity["key"] != weekend_identity["key"]):
+            event = "NEW BP" if previous_identity.get("key") == weekend_identity["key"] else "BP CHANGED"
         # A's anchor may coincide with B; that is not a new buy point.
         if event:
             bp = _number(midweek.get("ibd_candidate_price"))
             zone = _zone(bp, midweek.get("latest_close"))
             row["review_b_active"] = True
             row["review_b_event"] = event
+            verified = identity["resolution"] == "EXACT"
+            row["review_b_verified"] = verified
+            row["review_b_identity_state"] = identity["resolution"]
+            display_event = event if verified else "UNVERIFIED"
+            if verified and previous_identity.get("key") == identity.get("key"):
+                # A persistent buy point is not "new" on every review day.
+                if event in {"NEW BP", "BP CHANGED", "SNAPSHOT"}:
+                    previous_status = str(previous_midweek.get("ibd_entry_status") or "")
+                    current_status = str(midweek.get("ibd_entry_status") or "")
+                    previous_zone = _zone(previous_midweek.get("ibd_candidate_price"), previous_midweek.get("latest_close"))
+                    current_zone = _zone(midweek.get("ibd_candidate_price"), midweek.get("latest_close"))
+                    display_event = (
+                        f"{previous_status} → {current_status}" if previous_status != current_status else
+                        _arrow(previous_zone, current_zone) or "CURRENT"
+                    )
+            row["review_b_display_event"] = display_event
             row["review_b_price"] = bp
             row["review_b_status"] = midweek.get("ibd_entry_status")
             row["review_b_entry_valid"] = to_bool(midweek.get("ibd_entry_valid"))
@@ -413,15 +448,18 @@ def build_observation_view(
             row["review_b_zone"] = _ZONES.get(zone)
             row["review_b_pct"] = (round((_number(midweek.get("latest_close")) / bp - 1) * 100, 2)
                                    if bp and _number(midweek.get("latest_close")) else None)
-            row["review_new_buy_point"] = True
-            row["review_new_buy_point_zone"] = zone
+            row["review_new_buy_point"] = verified
+            row["review_new_buy_point_zone"] = zone if verified else None
             if weekend is None:
                 row["review_change_label"] = event
         else:
             row["review_new_buy_point"] = False
             row["review_new_buy_point_zone"] = None
         row["review_a_has_value_change"] = bool(a_changed or (membership_event and weekend is not None))
-        row["review_b_has_value_change"] = bool(event and event not in {"CURRENT", "SNAPSHOT"})
+        row["review_b_has_value_change"] = bool(
+            row["review_b_verified"]
+            and row["review_b_display_event"] not in {"", "CURRENT", "SNAPSHOT", "UNVERIFIED"}
+        )
         row["review_has_value_change"] = bool(
             row["review_a_has_value_change"] or row["review_b_has_value_change"]
         )
