@@ -23,7 +23,7 @@ const hooked = script.replace(marker, `
   globalThis.__reviewAudit = {
     getState: () => state, displayStatus, displayChange, reviewUsesB,
     reviewReferencePrice, reviewDistance, selectedHtml, mobileDetailHtml,
-    filterRows, filterCounts, tableHtml, industryHtml, headerHtml,
+    filterRows, filterCounts, tableHtml, industryHtml, headerHtml, bounds,
   };
 })();`);
 const scope = {
@@ -204,5 +204,19 @@ assert(app.tableHtml([dualUnverified]).includes("Weekend Buy Point"));
 assert(app.industryHtml([dualUnverified]).includes("Midweek Buy Point"));
 assert(app.industryHtml([dualUnverified]).includes("UNVERIFIED"),
   "Industry and Stock use consistent buy-point source disclosure");
+
+// The range controls must include B even when A is the primary display.
+// A=+6.15%, B=+0.73%; entry and weekly volumes can differ.
+state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const rangeCase = {...entry("RANGE"), current_vs_ibd_candidate_pct:6.15,
+  review_b_pct:-11.8,ibd_entry_volume_ratio:0.6,
+  review_b_entry_volume:3.4,volume_ratio:0.8,
+  review_b_details:{volume_ratio:4.2}};
+const distances = app.bounds([rangeCase],"review_distance_pct",-5,5);
+const entryVolumes = app.bounds([rangeCase],"ibd_entry_volume_ratio",0,1);
+const weeklyVolumes = app.bounds([rangeCase],"volume_ratio",0,1);
+assert(distances[0] <= -11.8 && distances[1] >= 6.15);
+assert(entryVolumes[1] >= 3.4, "B entry volume must be selectable");
+assert(weeklyVolumes[1] >= 4.2, "B weekly volume must be selectable");
 
 console.log("BF Review buy-point-centric interaction contract passed");

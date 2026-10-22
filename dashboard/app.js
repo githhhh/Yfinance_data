@@ -597,12 +597,19 @@
   }
 
   function bounds(rows, field, floor, ceiling) {
-    const values = rows.map((row) => (
-      field === "review_distance_pct" ? reviewDistance(row)
-        : field === "ibd_entry_volume_ratio" && reviewUsesB(row) ? num(row.review_b_entry_volume)
-        : field === "volume_ratio" ? reviewWeeklyVolume(row)
-        : num(row[field])
-    )).filter((value) => value !== null);
+    // Slider range must cover every possible source that its filter can match,
+    // not merely the source currently chosen for the row's status cell.
+    // Otherwise an A EXTENDED / B ACTIONABLE ticker can have B values
+    // outside the selectable slider bounds.
+    const values = rows.flatMap((row) => contextSources(row).map((source) => {
+      if (field === "review_distance_pct") return contextDistance(row, source);
+      if (field === "ibd_entry_volume_ratio") return source === "WATCH" ? null :
+        num(source === "B" ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
+      if (field === "volume_ratio") return num(
+        source === "B" ? row.review_b_details?.volume_ratio : row.volume_ratio
+      );
+      return num(row[field]);
+    })).filter((value) => value !== null);
     if (!values.length) return null;
     const low = Math.min(floor, Math.floor(Math.min(...values) * 10) / 10);
     const high = Math.max(ceiling, Math.ceil(Math.max(...values) * 10) / 10);
