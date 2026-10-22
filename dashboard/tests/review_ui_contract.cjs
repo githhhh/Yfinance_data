@@ -276,7 +276,9 @@ assert(app.changeLines(stable).includes("change-empty"));
 assert(!app.changeLines(stable).includes("NO CHANGE"));
 const uncertain={...onlyB,review_b_display_event:"UNVERIFIED"};
 assert(app.changeLines(uncertain).includes(">UNVERIFIED</span>"));
-const both={...entry("DUAL"),review_a_event:"ZONE → EXT",review_b_display_event:"NEW BP"};
+const both={...entry("DUAL"),review_a_event:"ZONE → EXT",
+  review_a_has_value_change:true,review_b_has_value_change:true,
+  review_b_display_event:"NEW BP"};
 assert.equal((app.changeLines(both).match(/class="change-line"/g)||[]).length,2,
   "Only two meaningful source events create two visual lines");
 
