@@ -419,10 +419,7 @@
       // Vs Weekend difference must not be shown as today's change reason.
       const membershipOnly = incremental && !text(row.review_a_event, "") &&
         !!text(row.review_membership_event, "") && row.review_data_available !== false;
-      if (membershipOnly) {
-        const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
-        items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
-      } else if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
+      if (event && !membershipOnly) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
       else if (row.review_membership_event) {
         const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
         items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
