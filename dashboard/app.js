@@ -190,7 +190,14 @@
     // Structural identity and entry confirmation are separate facts. An
     // unresolved B may retain its raw entry status for diagnosis, but must
     // not be advertised as a verified ACTIONABLE opportunity.
-    if (src === "B") return bool(row.review_b_verified) ? row.review_b_status : "UNVERIFIED";
+    if (src === "B") {
+      if (!bool(row.review_b_verified)) return "UNVERIFIED";
+      // Mirror the observation alert's fail-closed resolver rule.
+      if (row.review_b_status === "ACTIONABLE" && !bool(row.review_b_entry_valid)) {
+        return "UNCONFIRMED";
+      }
+      return row.review_b_status;
+    }
     return row.ibd_entry_status;
   }
   function contextRule(row, src) {
@@ -442,9 +449,9 @@
         const visible = contextSources(row).filter((source) => contextMatch(row,source));
         const a = visible.includes("A") ? text(row.review_a_event,"") || text(row.review_a_week_event,"") : "";
         const b = visible.includes("B") ? text(row.review_b_display_event || row.review_b_event,"") : "";
-        if (b && bool(row.review_b_verified) && row.review_b_status==="ACTIONABLE" && b!=="CURRENT") return 0;
+        if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="ACTIONABLE" && b!=="CURRENT") return 0;
         if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
-        if (b && bool(row.review_b_verified) && row.review_b_status==="UNCONFIRMED" && b!=="CURRENT") return 2;
+        if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="UNCONFIRMED" && b!=="CURRENT") return 2;
         if (/→ ZONE$/.test(a)) return 3;
         if (/→ BELOW$/.test(a) || /→ BELOW$/.test(b)) return 4;
         if (/→ EXT$/.test(a) || /→ EXT$/.test(b)) return 5;

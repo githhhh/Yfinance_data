@@ -229,6 +229,19 @@ assert.equal(app.sortRows([hiddenB, firstA]).rows[0].code, "ALPHA",
   "Review Priority must respect selected Weekend Buy Point context");
 state.change = "ALL";
 
+// Entry confirmation cannot be inferred from the price zone or the status
+// string when resolver validity disagrees.
+state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const rejected = {...entry("REJECT"),review_a_active:false,
+  review_b_verified:true,review_b_status:"ACTIONABLE",
+  review_b_entry_valid:false,review_b_entry_reason:"resolver_rejected"};
+assert.equal(app.displayStatus(rejected),"UNCONFIRMED",
+  "Invalid resolver must downgrade the displayed ACTIONABLE B stage");
+state.status = "ACTIONABLE";
+assert.equal(app.filterRows([rejected]).length,0,
+  "Invalid resolver must not appear as ACTIONABLE in filters");
+state.status = "ALL";
+
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.
 state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
