@@ -161,6 +161,13 @@ async function ready() {
       assert((await industryPulse.innerText()).includes("Actionable"), "Industry shows verified actionable concentration");
       assert((await industryPulse.innerText()).includes("Changed"), "Industry shows active review concentration");
       assert(await page.locator('.industry-stock-table tbody tr[data-code]').count() >= 2);
+      // At <=760px all inactive BP status lines are CSS-hidden. The Industry
+      // row must tag exactly one active source, otherwise dual-BP status
+      // becomes entirely invisible while the rest of the row is present.
+      const dualIndustry = page.locator('.industry-stock-table tbody tr[data-code="BONLY"]');
+      const dualStatus = dualIndustry.locator(".bp-status-line.is-active .status-text");
+      assert.equal(await dualStatus.count(), 1, "Industry dual-BP row must designate one visible status");
+      assert(await dualStatus.isVisible(), `Industry dual-BP status is visible at ${viewport.width}px`);
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
         const industryOut = page.locator(`.industry-stock-table tbody tr[data-code="${outCode}"]`);
         const cell = industryOut.locator("td:nth-child(3)");

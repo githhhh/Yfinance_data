@@ -714,7 +714,7 @@
       const rs = provider?.stockRS(row.code);
       const status = displayStatus(row);
       const statusHtml = currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)
-        ? `<div class="bp-status-lines"><div class="bp-status-line"><small>Weekend Buy Point</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line"><small>Midweek Buy Point</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
+        ? `<div class="bp-status-lines"><div class="bp-status-line ${reviewUsesB(row) ? "" : "is-active"}"><small>Weekend Buy Point</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line ${reviewUsesB(row) ? "is-active" : ""}"><small>Midweek Buy Point</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       const selected = String(state.industrySelected[state.period]) === String(row.code);
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
