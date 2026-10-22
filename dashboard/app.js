@@ -643,10 +643,16 @@
       // Aggregates reflect the exact currently filtered ticker population.
       // B is counted as actionable only when its structural identity is verified.
       group.actionable = group.rows.filter((row) => contextSources(row).some((source) =>
+        contextMatch(row, source) &&
         contextStatus(row, source) === "ACTIONABLE" &&
         (source !== "B" || bool(row.review_b_verified))
       )).length;
-      group.changed = group.rows.filter((row) => bool(row.review_has_value_change)).length;
+      group.changed = group.rows.filter((row) => contextSources(row).some((source) =>
+        contextMatch(row, source) && (
+          source === "A" && bool(row.review_a_has_value_change) ||
+          source === "B" && bool(row.review_b_has_value_change)
+        )
+      )).length;
       group.rows.sort((a, b) => {
         const delta = rank(provider?.stockRS(b.code)) - rank(provider?.stockRS(a.code));
         return delta || String(a.code).localeCompare(String(b.code));
