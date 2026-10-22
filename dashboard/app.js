@@ -1001,7 +1001,7 @@
       <div class="mobile-detail-review-grid">
         <div><span>Setup</span><strong class="mobile-detail-setup">${setupHtml(row)}</strong></div>
         <div><span>Geometry</span><strong>${esc(text(reviewUsesB(row) ? row.review_b_quality : row.ibd_breakout_quality, "—"))}</strong>${geometryFacts ? `<small>${esc(geometryFacts)}</small>` : ""}</div>
-        <div><span>Entry</span><strong>${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
+        <div><span>Entry</span><strong title="${esc(near ? "Pre-signal" : reviewEntryText(row))}">${esc(entryPrimary)}</strong>${entryFacts ? `<small>${esc(entryFacts)}</small>` : ""}</div>
       </div>
       <div class="mobile-detail-structure">
         <div><span>EPS YoY</span><strong>${fmt(facts.eps_yoy_growth, "pct1")}</strong></div>

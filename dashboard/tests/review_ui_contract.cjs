@@ -107,10 +107,12 @@ assert(bDetail.includes("↳ Weekend Buy Point 170"));
 assert(bDetail.includes("ACTIONABLE · ZONE"), "Alternate Weekend Buy Point has its own status");
 const unconfirmedWithVolume = { ...bOnly, review_b_entry_volume: 2.5,
   review_b_entry_reason: "resolver_rejected", review_b_entry_valid: false };
-assert(app.mobileDetailHtml(unconfirmedWithVolume).includes("resolver_rejected"),
-  "B rejected resolver reason must not be hidden by positive volume");
-assert(app.tableHtml([unconfirmedWithVolume]).includes("resolver_rejected"),
-  "B rejected resolver reason must be visible in table");
+assert(app.mobileDetailHtml(unconfirmedWithVolume).includes('title="resolver_rejected"'),
+  "B rejected resolver reason must remain recoverable in mobile details");
+assert(app.tableHtml([unconfirmedWithVolume]).includes('title="resolver_rejected"'),
+  "B rejection code remains in tooltip");
+assert(app.tableHtml([unconfirmedWithVolume]).includes("Entry Rejected"),
+  "B rejection receives concise visible wording");
 const mobile = app.mobileDetailHtml(bOnly);
 assert(mobile.includes("Midweek Buy Point"));
 assert(mobile.includes("pos 0.80"), "B geometry");
