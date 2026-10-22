@@ -351,7 +351,7 @@
     if (/→ BELOW$/.test(event)) return "danger";
     if (/→ EXT$/.test(event) || /→ EXTENDED$/.test(event)) return "extended";
     if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT" || event === "NEW") return "success";
-    return /UNVERIFIED/.test(event) || event === "NO DATA" ? "warning" : "muted";
+    return /UNVERIFIED/.test(event) || event === "NO DATA" || event === "No Data" ? "warning" : "muted";
   }
   function readableMidweekEvent(raw) {
     if (raw === "NEW BP") return "NEW BUY POINT";
@@ -369,6 +369,7 @@
     if (raw === "BP UPDATED") return "UPDATED";
     if (raw === "BP CHANGED") return "CHANGED";
     if (raw === "HISTORY_UNVERIFIED") return "PRIOR ?";
+    if (raw === "NO DATA") return "No Data";
     if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
     return raw || "";
   }
