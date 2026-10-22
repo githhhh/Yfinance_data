@@ -329,6 +329,23 @@ assert(app.changeLines(noPrior).includes("No Prior"));
 const joined = {...stillA,review_membership_event:"IN → OUT",review_membership:"OUT"};
 assert(app.changeLines(joined).includes("POOL OUT"),
   "Membership-only change must not masquerade as an unchanged status");
+// The older cumulative Weekend event is not the cause of today's membership
+// change in Review Now. Outside Review Now the cumulative event remains useful.
+state.scope = "CHANGES";
+const membershipOnly = {...stillA, review_a_event:"", review_a_week_event:"ZONE → EXT",
+  review_a_has_value_change:true, review_has_value_change:true,
+  review_membership_event:"IN → OUT", review_membership:"OUT"};
+assert.equal(app.filterRows([membershipOnly]).length, 1);
+assert(app.changeLines(membershipOnly).includes("POOL OUT"),
+  "Review Now must show today's membership transition");
+assert(!app.changeLines(membershipOnly).includes("ZONE → EXT"),
+  "Review Now must not misrepresent a past Weekend cumulative change as today's event");
+const membershipAndPrice = {...membershipOnly, review_a_event:"BELOW → ZONE"};
+assert(app.changeLines(membershipAndPrice).includes("BELOW → ZONE"),
+  "A genuine new price transition takes priority over membership");
+state.scope = "ALL_SIGNALS";
+assert(app.changeLines(membershipOnly).includes("ZONE → EXT"),
+  "All Review keeps the useful cumulative Weekend comparison");
 const entryReason = {...entry("REASON"),ibd_entry_vol_or_reject:"daily_volume_not_confirmed"};
 const entryHtml = app.tableHtml([entryReason]);
 assert(entryHtml.includes(">Vol Unconfirmed</span>"));

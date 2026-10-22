@@ -415,7 +415,14 @@
         ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
       const event = compactChangeEvent(raw);
-      if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
+      // In Review Now, a membership-only change is the new event; an older
+      // Vs Weekend difference must not be shown as today's change reason.
+      const membershipOnly = incremental && !text(row.review_a_event, "") &&
+        bool(row.review_membership_event) && row.review_data_available !== false;
+      if (membershipOnly) {
+        const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
+        items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
+      } else if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
       else if (row.review_membership_event) {
         const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
         items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
