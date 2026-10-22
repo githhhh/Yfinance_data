@@ -104,6 +104,7 @@ assert(bDetail.includes("181"), "B ceiling, not A ceiling");
 assert(bDetail.includes("11W"), "B base duration");
 assert(!bDetail.includes("22W"), "A base must not leak into B context");
 assert(bDetail.includes("↳ Weekend Buy Point 170"));
+assert(bDetail.includes("ACTIONABLE · ZONE"), "Alternate Weekend Buy Point has its own status");
 const unconfirmedWithVolume = { ...bOnly, review_b_entry_volume: 2.5,
   review_b_entry_reason: "resolver_rejected", review_b_entry_valid: false };
 assert(app.mobileDetailHtml(unconfirmedWithVolume).includes("resolver_rejected"),
@@ -204,6 +205,13 @@ assert(app.tableHtml([dualUnverified]).includes("Weekend Buy Point"));
 assert(app.industryHtml([dualUnverified]).includes("Midweek Buy Point"));
 assert(app.industryHtml([dualUnverified]).includes("UNVERIFIED"),
   "Industry and Stock use consistent buy-point source disclosure");
+
+const updatedPoint = {...entry("UPDATED"),review_b_display_event:"BP UPDATED",review_b_verified:true};
+assert(app.tableHtml([updatedPoint]).includes("BUY POINT UPDATED"),
+  "Raw BP UPDATED token must not leak to table");
+const changedPoint = {...updatedPoint,review_b_display_event:"BP CHANGED"};
+assert(app.tableHtml([changedPoint]).includes("BUY POINT CHANGED"),
+  "Raw BP CHANGED token must not leak to table");
 
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.

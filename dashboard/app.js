@@ -334,6 +334,8 @@
   }
   function readableMidweekEvent(raw) {
     if (raw === "NEW BP") return "NEW BUY POINT";
+    if (raw === "BP CHANGED") return "BUY POINT CHANGED";
+    if (raw === "BP UPDATED") return "BUY POINT UPDATED";
     if (raw === "CURRENT") return "NO CHANGE";
     if (raw === "SNAPSHOT") return "CURRENT SNAPSHOT";
     return raw || "NO DATA";
@@ -783,7 +785,7 @@
       ? `<span class="selected-reference">Path ${esc(row.review_a_path)}</span>` : "";
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
       ? reviewUsesB(row)
-        ? `<span class="selected-reference">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
+        ? `<span class="selected-reference">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(statusLabel(row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status))} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
         : `<span class="selected-reference">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(readableMidweekEvent(text(row.review_b_display_event || row.review_b_event, "")))} · ${esc(statusLabel(contextStatus(row,"B")))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
     const asOf = reviewUsesB(row) ? ` · As of ${esc(dateText(row.review_b_date))}` :
@@ -910,7 +912,7 @@
       ${!reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
       ${bool(row.review_a_active) && bool(row.review_b_active)
         ? reviewUsesB(row)
-          ? `<div class="mobile-detail-industry">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
+          ? `<div class="mobile-detail-industry">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(statusLabel(row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status))} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
           : `<div class="mobile-detail-industry">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(readableMidweekEvent(text(row.review_b_display_event || row.review_b_event, "")))} · ${esc(statusLabel(contextStatus(row,"B")))} · ${esc(text(row.review_b_zone))}</div>`
         : ""}
       ${bool(row.review_a_active) && !reviewUsesB(row) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` :
@@ -1070,7 +1072,8 @@
       const member = text(row.review_membership_event, "");
       const label = e === "NO CHANGE" && member ? member :
         e === "NEW BP" ? "New Point" :
-        e === "BP UPDATED" ? "Updated" :
+        e === "BP CHANGED" ? "Point Changed" :
+        e === "BP UPDATED" ? "Point Updated" :
         /→ BELOW$/.test(e) ? "↓ Below" :
         /→ EXT$/.test(e) || /→ EXTENDED$/.test(e) ? "↑ Extended" :
         /→ ZONE$/.test(e) || /→ ACTIONABLE$/.test(e) ? "→ Buy Zone" : "→ Changed";
