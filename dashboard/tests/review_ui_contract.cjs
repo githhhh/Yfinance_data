@@ -280,6 +280,35 @@ const both={...entry("DUAL"),review_a_event:"ZONE → EXT",review_b_display_even
 assert.equal((app.changeLines(both).match(/class="change-line"/g)||[]).length,2,
   "Only two meaningful source events create two visual lines");
 
+// In Review Now, don't visually append a stale Weekend cumulative
+// transition to a newly changed Midweek Buy Point. Explicit Weekend quick
+// grouping still exposes that cumulative transition.
+state.status = "ALL"; state.scope = "CHANGES";
+state.change = "ALL"; state.newBuyPoint = "ALL";
+const focusRow = {...entry("FOCUS"), review_a_active:true,
+  review_b_active:true, review_a_event:"",
+  review_a_week_event:"ZONE → EXT", review_a_has_value_change:false,
+  review_b_has_value_change:true, review_b_display_event:"NEW BP",
+  review_b_verified:true,review_b_entry_valid:true,
+  review_has_value_change:true,review_weekend_buy_point_change:"BECAME_EXTENDED"};
+const focusHtml=app.changeLines(focusRow);
+assert.equal((focusHtml.match(/class="change-line"/g)||[]).length,1,
+  "Review Now should only show the changed buy-point source");
+assert(focusHtml.includes(">Midweek</span>"));
+assert(!focusHtml.includes(">Weekend</span>"));
+state.change = "BECAME_EXTENDED";
+const historicalHtml = app.changeLines(focusRow);
+assert(historicalHtml.includes(">Weekend</span>"),
+  "What Changed still shows the fixed Weekend cumulative change");
+assert(!historicalHtml.includes(">Midweek</span>"),
+  "Weekend quick filter must not show unrelated Midweek event");
+state.change = "ALL";state.status = "ACTIONABLE";
+focusRow.ibd_entry_status = "EXTENDED";
+const selectedHtml = app.changeLines(focusRow);
+assert(!selectedHtml.includes(">Weekend</span>"),
+  "The ACTIONABLE-selected B reference must not display an A EXTENDED event");
+state.status = "ALL";
+
 // The range controls must include B even when A is the primary display.
 // A=+6.15%, B=+0.73%; entry and weekly volumes can differ.
 state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";

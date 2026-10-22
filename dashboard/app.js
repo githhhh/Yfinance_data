@@ -363,7 +363,14 @@
       return '<span class="change-empty" title="Near Breakout · no confirmed buy-point transition">—</span>';
     }
     const items = [];
-    if (bool(row.review_a_active)) {
+    // Change is the reason this filtered row is visible, not a catalogue of
+    // unrelated historical differences. Explicit Weekend/Midweek quick groups
+    // retain their own cumulative/snapshot semantics.
+    const sources = contextSources(row).filter((source) => contextMatch(row, source));
+    const incremental = currentHasComparison() && state.scope === "CHANGES" &&
+      state.change === "ALL" && state.newBuyPoint === "ALL";
+    if (bool(row.review_a_active) && sources.includes("A") &&
+        (!incremental || bool(row.review_a_has_value_change))) {
       const raw = row.review_data_available === false ? "NO DATA" :
         text(row.review_a_event, "") || text(row.review_a_week_event, "");
       const basis = row.review_a_event
@@ -372,7 +379,8 @@
       const event = compactChangeEvent(raw);
       if (event) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
     }
-    if (bool(row.review_b_active)) {
+    if (bool(row.review_b_active) && sources.includes("B") &&
+        (!incremental || bool(row.review_b_has_value_change))) {
       const raw = text(row.review_b_display_event || row.review_b_event, "");
       const basis = row.review_b_display_basis === "PREVIOUS_SNAPSHOT" ? "Vs Previous Snapshot" :
         row.review_b_display_basis === "WEEKEND" ? "Vs Weekend" :
