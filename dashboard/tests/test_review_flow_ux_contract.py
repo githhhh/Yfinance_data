@@ -31,7 +31,7 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 
 
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
-    assert 'if (isNearBreakout(row)) return \'<span class="change-badge">—</span>\';' in APP
+    assert 'Near Breakout · no confirmed buy-point transition' in APP
     assert 'function changeLines(row)' in APP
     assert 'function contextMatch(row, src' in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
@@ -41,7 +41,7 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
-    assert 'if (isNearBreakout(row)) return \'<span class="change-badge">—</span>\';' in APP
+    assert 'change-empty' in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 
