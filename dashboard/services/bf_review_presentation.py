@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import pandas as pd
 
-from dashboard.services.bf_observation_replay import identity_v2, price_replay, zone
+from dashboard.services.bf_observation_replay import identity_v2, price_replay, zone as classify_zone
 from dashboard.services.bf_transition import to_bool
 
 
@@ -173,7 +173,7 @@ def decorate_observation_view(
         result.at[index, "review_b_display_event"] = event
         # Always derive the B zone from B's own authoritative trigger / close,
         # including a B that V2 recovered after V1 suppressed it.
-        observed_zone = zone(fresh.get("ibd_candidate_price"), fresh.get("latest_close"))
+        observed_zone = classify_zone(fresh.get("ibd_candidate_price"), fresh.get("latest_close"))
         enum_zone = {"BELOW": "BELOW_BUY_POINT", "ZONE": "BUY_ZONE", "EXT": "EXTENDED"}
         result.at[index, "review_b_zone"] = observed_zone
         result.at[index, "review_new_buy_point"] = bool(verified and observed_zone)
