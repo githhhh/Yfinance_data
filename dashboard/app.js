@@ -75,6 +75,7 @@
   }
 
   function statusColor(status) {
+    if (status === "UNVERIFIED") return "#ffd21f";
     return data?.ui?.status_meta?.[status]?.color || "#f4f5f7";
   }
 
@@ -185,7 +186,12 @@
       ...(currentHasComparison() && bool(row.review_b_active) ? ["B"] : [])];
   }
   function contextStatus(row, src) {
-    return src === "WATCH" ? WATCH_STAGE : src === "B" ? row.review_b_status : row.ibd_entry_status;
+    if (src === "WATCH") return WATCH_STAGE;
+    // Structural identity and entry confirmation are separate facts. An
+    // unresolved B may retain its raw entry status for diagnosis, but must
+    // not be advertised as a verified ACTIONABLE opportunity.
+    if (src === "B") return bool(row.review_b_verified) ? row.review_b_status : "UNVERIFIED";
+    return row.ibd_entry_status;
   }
   function contextRule(row, src) {
     return src === "WATCH" ? text(row.bf_watch_type, "pivot") : src === "B" ? row.review_b_rule : row.ibd_candidate_rule;
@@ -251,7 +257,7 @@
 
   function displayStatus(row) {
     if (isNearBreakout(row)) return WATCH_STAGE;
-    if (reviewUsesB(row)) return row.review_b_status;
+    if (reviewUsesB(row)) return contextStatus(row, "B");
     if (bool(row.review_a_active) && row.review_data_available === false) return "NO_DATA";
     return row.ibd_entry_status;
   }
@@ -684,7 +690,9 @@
       const code = esc(row.code);
       const rs = provider?.stockRS(row.code);
       const status = displayStatus(row);
-      const statusHtml = `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+      const statusHtml = currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)
+        ? `<div class="bp-status-lines"><div class="bp-status-line"><small>Weekend Buy Point</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line"><small>Midweek Buy Point</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
+        : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       const selected = String(state.industrySelected[state.period]) === String(row.code);
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
         <td class="industry-code">${code}</td>
@@ -769,7 +777,7 @@
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
       ? reviewUsesB(row)
         ? `<span class="selected-reference">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
-        : `<span class="selected-reference">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
+        : `<span class="selected-reference">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(readableMidweekEvent(text(row.review_b_display_event || row.review_b_event, "")))} · ${esc(statusLabel(contextStatus(row,"B")))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
     const asOf = reviewUsesB(row) ? ` · As of ${esc(dateText(row.review_b_date))}` :
       bool(row.review_a_active)
@@ -896,7 +904,7 @@
       ${bool(row.review_a_active) && bool(row.review_b_active)
         ? reviewUsesB(row)
           ? `<div class="mobile-detail-industry">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
-          : `<div class="mobile-detail-industry">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
+          : `<div class="mobile-detail-industry">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(readableMidweekEvent(text(row.review_b_display_event || row.review_b_event, "")))} · ${esc(statusLabel(contextStatus(row,"B")))} · ${esc(text(row.review_b_zone))}</div>`
         : ""}
       ${bool(row.review_a_active) && !reviewUsesB(row) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` :
         reviewUsesB(row) ? `<div class="mobile-detail-industry">As of ${esc(dateText(row.review_b_date))}</div>` : ""}
@@ -1045,7 +1053,7 @@
       if (currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)) {
         const weekend = row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status;
         const make = (src,status,active) => `<div class="bp-status-line ${active ? "is-active" : ""}"><small>${src}</small><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></div>`;
-        return statusWithOut(row,`<div class="bp-status-lines">${make("Weekend Buy Point",weekend,!reviewUsesB(row))}${make("Midweek Buy Point",row.review_b_status,reviewUsesB(row))}</div>`);
+        return statusWithOut(row,`<div class="bp-status-lines">${make("Weekend Buy Point",weekend,!reviewUsesB(row))}${make("Midweek Buy Point",contextStatus(row,"B"),reviewUsesB(row))}</div>`);
       }
       return statusWithOut(row, statusText);
     }

@@ -55,7 +55,7 @@ function entry(code) {
     review_membership: "IN",
     review_b_active: true, review_b_price: 185, review_b_close: 180,
     review_b_pct: -2.70, review_b_zone: "BELOW", review_b_rule: "pivot",
-    review_b_entry_valid: false,
+    review_b_entry_valid: false, review_b_verified: true,
     review_b_date: "2026-10-14", review_b_status: "UNCONFIRMED",
     review_b_event: "NEW BP", review_b_quality: "Constructive",
     review_b_entry_volume: null, review_b_entry_reason: "Volume not confirmed",
@@ -185,5 +185,24 @@ state.status = "ALL"; state.newBuyPoint = "BUY_ZONE";
 mixed.review_new_buy_point_zone = "BUY_ZONE";
 assert(app.industryHtml([mixed]).includes("0 Changed"),
   "New Buy Points context cannot count unrelated A changes");
+
+// An unverified structural identity is not a tradable ACTIONABLE B even
+// when its raw price/volume status happens to be ACTIONABLE.
+state.status = "ALL"; state.newBuyPoint = "ALL"; state.scope = "ALL_SIGNALS";
+const ambiguous = {...entry("SN"), review_a_active:false,
+  review_b_verified:false, review_b_status:"ACTIONABLE",
+  review_b_display_event:"UNVERIFIED",review_new_buy_point:false,
+  review_b_identity_state:"AMBIGUOUS"};
+assert.equal(app.displayStatus(ambiguous),"UNVERIFIED");
+assert(app.tableHtml([ambiguous]).includes("UNVERIFIED"));
+state.status = "ACTIONABLE";
+assert.equal(app.filterRows([ambiguous]).length,0,
+  "Ambiguous Midweek Buy Point must not pass ACTIONABLE screening");
+state.status = "ALL";
+const dualUnverified = {...ambiguous, review_a_active:true,ibd_entry_status:"UNCONFIRMED"};
+assert(app.tableHtml([dualUnverified]).includes("Weekend Buy Point"));
+assert(app.industryHtml([dualUnverified]).includes("Midweek Buy Point"));
+assert(app.industryHtml([dualUnverified]).includes("UNVERIFIED"),
+  "Industry and Stock use consistent buy-point source disclosure");
 
 console.log("BF Review buy-point-centric interaction contract passed");

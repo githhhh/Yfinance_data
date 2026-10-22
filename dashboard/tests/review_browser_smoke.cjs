@@ -29,6 +29,7 @@ function row(code, rest) {
 }
 const bOnly = row("BONLY", {
   review_b_active: true, review_b_price: 185, review_b_status: "UNCONFIRMED",
+  review_b_verified: true,
   review_b_rule: "pivot", review_b_close: 180, review_b_pct: -2.70,
   review_b_zone: "BELOW", review_b_event: "NEW BP",
   review_b_date: "2026-10-14", review_b_entry_reason: "Volume not confirmed",
