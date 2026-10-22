@@ -340,8 +340,11 @@
     if (bool(row.review_b_active)) {
       const raw = text(row.review_b_display_event || row.review_b_event,"");
       const event = raw === "NEW BP" ? "NEW BUY POINT" : raw === "CURRENT" ? "NO CHANGE" :
-        raw === "SNAPSHOT" || !raw ? "NO DATA" : raw;
-      parts.push(["Midweek Buy Point",event,"Vs Previous"]);
+        raw === "SNAPSHOT" ? "CURRENT SNAPSHOT" : !raw ? "NO DATA" : raw;
+      const basis = row.review_b_display_basis === "PREVIOUS_SNAPSHOT" ? "Vs Previous Snapshot" :
+        row.review_b_display_basis === "WEEKEND" ? "Vs Weekend" :
+        "Previous Snapshot Unavailable";
+      parts.push(["Midweek Buy Point",event,basis]);
     }
     if (!parts.length) return '<span class="change-badge">—</span>';
     return '<div class="change-lines">'+parts.map(([source,event,basis]) =>
@@ -505,7 +508,7 @@
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Review Now · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Changed Weekend Buy Points and verified changes to Midweek Buy Points; current unchanged Midweek Buy Points remain available under New Buy Points">Review Now · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;

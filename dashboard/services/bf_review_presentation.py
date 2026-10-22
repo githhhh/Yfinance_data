@@ -7,9 +7,10 @@ Nothing here is used by Futu or the Telegram v1/v2 event producers.
 """
 from __future__ import annotations
 
+import math
 import pandas as pd
 
-from dashboard.services.bf_observation_replay import identity_v2, price_replay
+from dashboard.services.bf_observation_replay import identity_v2, price_replay, zone
 from dashboard.services.bf_transition import to_bool
 
 
@@ -20,7 +21,14 @@ def _observed_date(frame: pd.DataFrame):
     return parsed[0] if len(parsed) == 1 else None
 
 
-def _event_for_verified_b(current, previous, now_identity, previous_identity):
+def _event_for_verified_b(
+    current, previous, now_identity, previous_identity, *,
+    has_previous_snapshot: bool, first_midweek_day: bool,
+):
+    # No prior published snapshot on Tuesday-Thursday is not evidence of a
+    # NEW event. The B still belongs to this week's snapshot collection.
+    if not has_previous_snapshot:
+        return "NEW BP" if first_midweek_day else "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
     if previous_identity["resolution"] != "EXACT":
@@ -28,6 +36,10 @@ def _event_for_verified_b(current, previous, now_identity, previous_identity):
     if previous_identity["key"] != now_identity["key"]:
         return "BP CHANGED"
 
+    previous_trigger, current_trigger = previous_identity["trigger"], now_identity["trigger"]
+    if (previous_trigger is None or current_trigger is None or not
+            math.isclose(previous_trigger, current_trigger, rel_tol=1e-9, abs_tol=1e-4)):
+        return "BP UPDATED"
     old_status = str(previous.get("ibd_entry_status") or "")
     new_status = str(current.get("ibd_entry_status") or "")
     if old_status != new_status:
@@ -80,6 +92,7 @@ def decorate_observation_view(
         result.at[index, "review_b_verified"] = False
         result.at[index, "review_b_identity_state"] = "NONE"
         result.at[index, "review_b_display_event"] = ""
+        result.at[index, "review_b_display_basis"] = None
 
         fresh = today.get(code)
         if fresh is None or to_bool(fresh.get("signal")) is not True:
@@ -127,20 +140,49 @@ def decorate_observation_view(
                 result.at[index, "review_b_zone"] = {"BELOW_BUY_POINT":"BELOW", "BUY_ZONE":"ZONE", "EXTENDED":"EXT"}[zone]
         if not bool(result.at[index,"review_b_active"]):
             continue
-        verified = new_id["resolution"] == "EXACT"
-        result.at[index, "review_b_identity_state"] = new_id["resolution"]
+        identity_exact = new_id["resolution"] == "EXACT"
+        weekend_distinct = (not has_a or
+                            a_id["resolution"] == "EXACT" and
+                            a_id.get("key") != new_id.get("key"))
+        verified = identity_exact and weekend_distinct and not complete.empty
+        result.at[index, "review_b_identity_state"] = (
+            "UNVERIFIED_WEEKEND" if has_a and a_id["resolution"] != "EXACT"
+            else "NO_WEEKEND_BASELINE" if complete.empty
+            else new_id["resolution"]
+        )
+        result.at[index, "review_b_display_basis"] = (
+            "PREVIOUS_SNAPSHOT" if prior_valid else
+            "WEEKEND" if current_day and current_day.weekday() == 0 and not complete.empty
+            else "UNAVAILABLE"
+        )
         event = "UNVERIFIED"
         if verified:
             previous_row = prior.get(code) if prior_valid else None
-            previous_identity = identity_v2(previous_row) if previous_row is not None and to_bool(previous_row.get("signal")) is True else {"resolution":"NONE", "key":None}
-            event = _event_for_verified_b(fresh, previous_row, new_id, previous_identity)
+            previous_identity = (
+                identity_v2(previous_row)
+                if previous_row is not None and to_bool(previous_row.get("signal")) is True
+                else {"resolution": "NONE", "key": None}
+            )
+            event = _event_for_verified_b(
+                fresh, previous_row, new_id, previous_identity,
+                has_previous_snapshot=prior_valid,
+                first_midweek_day=bool(current_day and current_day.weekday() == 0),
+            )
         verified = verified and event != "UNVERIFIED"
-        result.at[index, "review_b_verified"] = verified
+        result.at[index, "review_b_verified"] = bool(verified)
         result.at[index, "review_b_display_event"] = event
-        result.at[index, "review_new_buy_point"] = verified
-        if not verified:
-            result.at[index, "review_new_buy_point_zone"] = None
-        changed = verified and event not in {"CURRENT","SNAPSHOT",""}
+        # Always derive the B zone from B's own authoritative trigger / close,
+        # including a B that V2 recovered after V1 suppressed it.
+        observed_zone = zone(fresh.get("ibd_candidate_price"), fresh.get("latest_close"))
+        enum_zone = {"BELOW": "BELOW_BUY_POINT", "ZONE": "BUY_ZONE", "EXT": "EXTENDED"}
+        result.at[index, "review_b_zone"] = observed_zone
+        result.at[index, "review_new_buy_point"] = bool(verified and observed_zone)
+        result.at[index, "review_new_buy_point_zone"] = (
+            enum_zone.get(observed_zone) if verified else None
+        )
+        changed = verified and event not in {"CURRENT", "SNAPSHOT", ""}
         result.at[index, "review_b_has_value_change"] = bool(changed)
-        result.at[index, "review_has_value_change"] = bool(result.at[index,"review_a_has_value_change"] or changed)
+        result.at[index, "review_has_value_change"] = bool(
+            result.at[index, "review_a_has_value_change"] or changed
+        )
     return result

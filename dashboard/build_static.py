@@ -89,6 +89,7 @@ PUBLIC_DASHBOARD_ROW_FIELDS = (
     "review_b_entry_reason",
     "review_b_event",
     "review_b_display_event",
+    "review_b_display_basis",
     "review_b_verified",
     "review_b_identity_state",
     "review_a_focus_basis",
