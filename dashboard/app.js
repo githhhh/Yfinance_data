@@ -174,14 +174,51 @@
     return isSignalActive(row) || isNearBreakout(row);
   }
 
+  // Evaluate independent buy points before collapsing them to one ticker row.
+  function contextSources(row, forced = null) {
+    if (isNearBreakout(row)) return forced === "B" ? [] : ["WATCH"];
+    if (forced === "B") return bool(row.review_b_active) ? ["B"] : [];
+    if (forced === "A") return (bool(row.review_a_active) || !currentHasComparison()) ? ["A"] : [];
+    if (state.newBuyPoint !== "ALL") return bool(row.review_b_active) ? ["B"] : [];
+    if (state.change !== "ALL") return bool(row.review_a_active) ? ["A"] : [];
+    return [...(bool(row.review_a_active) || !currentHasComparison() ? ["A"] : []),
+      ...(currentHasComparison() && bool(row.review_b_active) ? ["B"] : [])];
+  }
+  function contextStatus(row, src) {
+    return src === "WATCH" ? WATCH_STAGE : src === "B" ? row.review_b_status : row.ibd_entry_status;
+  }
+  function contextRule(row, src) {
+    return src === "WATCH" ? text(row.bf_watch_type, "pivot") : src === "B" ? row.review_b_rule : row.ibd_candidate_rule;
+  }
+  function contextDistance(row, src) {
+    return src === "WATCH" ? nearBreakoutDistance(row) : src === "B" ? num(row.review_b_pct) : num(row.current_vs_ibd_candidate_pct);
+  }
+  function contextMatch(row, src, {skipStatus=false, status=null, skipAdvanced=false}={}) {
+    const wanted = status || (skipStatus ? "ALL" : state.status);
+    if (wanted !== "ALL" && contextStatus(row, src) !== wanted) return false;
+    if (skipAdvanced) return true;
+    if (state.route !== "All" && contextRule(row, src) !== state.route) return false;
+    const pct = contextDistance(row, src);
+    if (state.distanceMin !== null && (pct === null || pct < state.distanceMin)) return false;
+    if (state.distanceMax !== null && (pct === null || pct > state.distanceMax)) return false;
+    if (src !== "WATCH" && state.entryVolumeMin !== null) {
+      const v = num(src === "B" ? row.review_b_entry_volume : row.ibd_entry_volume_ratio);
+      if (v === null || v < state.entryVolumeMin) return false;
+    }
+    if (state.weeklyVolumeMin !== null) {
+      const v = num(src === "B" ? row.review_b_details?.volume_ratio : row.volume_ratio);
+      if (v === null || v < state.weeklyVolumeMin) return false;
+    }
+    return true;
+  }
   function reviewUsesB(row) {
     if (!currentHasComparison() || !bool(row.review_b_active)) return false;
-    if (state.newBuyPoint !== "ALL") return true;
-    // When B alone made this ticker relevant to Changes vs Weekend, all visible
-    // fields must describe B, not the unchanged weekend buy point.
-    return state.scope === "CHANGES"
-      && bool(row.review_b_has_value_change)
-      && !bool(row.review_a_has_value_change);
+    if (!bool(row.review_a_active) || state.newBuyPoint !== "ALL") return true;
+    if (state.change !== "ALL") return false;
+    if (state.status !== "ALL" || advancedCount()) {
+      if (contextMatch(row,"B") && !contextMatch(row,"A")) return true;
+    }
+    return state.scope === "CHANGES" && bool(row.review_b_has_value_change) && !bool(row.review_a_has_value_change);
   }
 
   function reviewOutLabel(row) {
@@ -279,17 +316,34 @@
   }
 
   function displayChange(row) {
-    if (isNearBreakout(row)) return "";
-    const a = text(row.review_buy_point_change_label, "");
-    const b = text(row.review_b_event, "");
-    if (reviewUsesB(row)) return bool(row.review_a_active) ? `B · ${b}` : b;
-    if (currentHasComparison() && state.scope === "CHANGES") {
-      if (bool(row.review_a_has_value_change) && bool(row.review_b_has_value_change)) {
-        return [a, `B · ${b}`].filter(Boolean).join(" · ");
-      }
-      return a || (bool(row.review_b_has_value_change) ? `B · ${b}` : "");
+    const a = text(row.review_a_event, "") || text(row.review_a_week_event, "");
+    const b = text(row.review_b_display_event || row.review_b_event, "");
+    return reviewUsesB(row) ? b || "NO CHANGE" : a || b || "NO CHANGE";
+  }
+  function eventTone(event) {
+    if (/→ BELOW$/.test(event)) return "danger";
+    if (/→ EXT$/.test(event) || /→ EXTENDED$/.test(event)) return "extended";
+    if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT") return "success";
+    return event === "UNVERIFIED" || event === "NO DATA" ? "warning" : "muted";
+  }
+  function changeLines(row) {
+    if (isNearBreakout(row)) return '<span class="change-badge">—</span>';
+    const parts = [];
+    if (bool(row.review_a_active)) {
+      const event = row.review_data_available === false ? "NO DATA" :
+        text(row.review_a_event,"") || text(row.review_a_week_event,"") || "NO CHANGE";
+      parts.push(["Weekend Buy Point",event,row.review_a_event ? "Vs Previous" : "Vs Weekend"]);
     }
-    return text(row.review_change_label, "");
+    if (bool(row.review_b_active)) {
+      const raw = text(row.review_b_display_event || row.review_b_event,"");
+      const event = raw === "NEW BP" ? "NEW BUY POINT" : raw === "CURRENT" ? "NO CHANGE" :
+        raw === "SNAPSHOT" || !raw ? "NO DATA" : raw;
+      parts.push(["Midweek Buy Point",event,"Vs Previous"]);
+    }
+    if (!parts.length) return '<span class="change-badge">—</span>';
+    return '<div class="change-lines">'+parts.map(([source,event,basis]) =>
+      `<div class="change-line"><span class="change-origin">${esc(source)}</span><span class="change-event ${eventTone(event)}">${esc(event)}</span><small>${esc(basis)}</small></div>`
+    ).join("")+'</div>';
   }
 
   function currentHasComparison() {
@@ -330,70 +384,55 @@
     ].join("\n");
   }
 
-  function filterRows(rows, exclude = "") {
-    let result = rows.filter(isActive);
-    const comparison = currentHasComparison();
-    if (comparison && state.scope === "CHANGES") {
-      result = result.filter((row) => bool(row.review_has_value_change));
-    }
-    if (comparison && exclude !== "change" && exclude !== "bothQuick" && state.change !== "ALL") {
-      result = result.filter((row) => row.review_weekend_buy_point_change === state.change);
-    }
-    if (comparison && exclude !== "newBuyPoint" && exclude !== "bothQuick" && state.newBuyPoint !== "ALL") {
-      result = result.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint);
-    }
-    const effectiveStatus = (
-      comparison && state.scope === "CHANGES" && state.status === WATCH_STAGE
-    ) ? "ALL" : state.status;
-    if (exclude !== "status" && effectiveStatus !== "ALL") {
-      result = result.filter((row) => displayStatus(row) === effectiveStatus);
-    }
-    if (exclude !== "advanced") {
-      if (state.route !== "All") result = result.filter((row) => reviewSetup(row) === state.route);
-      if (state.distanceMin !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value >= state.distanceMin; });
-      if (state.distanceMax !== null) result = result.filter((row) => { const value = reviewDistance(row); return value !== null && value <= state.distanceMax; });
-      if (state.entryVolumeMin !== null) result = result.filter((row) => { if (isNearBreakout(row)) return true; const value = num(reviewUsesB(row) ? row.review_b_entry_volume : row.ibd_entry_volume_ratio); return value !== null && value >= state.entryVolumeMin; });
-      if (state.weeklyVolumeMin !== null) result = result.filter((row) => { const value = reviewWeeklyVolume(row); return value !== null && value >= state.weeklyVolumeMin; });
-    }
-    return result;
+  function filterRows(rows, exclude = "", opts = {}) {
+    const cmp = currentHasComparison();
+    const newQuick = cmp && state.newBuyPoint !== "ALL" && !["newBuyPoint","bothQuick"].includes(exclude);
+    const aQuick = cmp && state.change !== "ALL" && !["change","bothQuick"].includes(exclude);
+    return rows.filter((row) => {
+      if (!isActive(row)) return false;
+      if (cmp && state.scope === "CHANGES" && !opts.ignoreScope && !newQuick && !bool(row.review_has_value_change)) return false;
+      if (aQuick && row.review_weekend_buy_point_change !== state.change) return false;
+      if (newQuick && !(bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint)) return false;
+      const forced = opts.forceSource || (newQuick ? "B" : aQuick ? "A" : null);
+      return contextSources(row, forced).some((src) => contextMatch(row, src, {
+        skipStatus:exclude==="status", skipAdvanced:exclude==="advanced"
+      }));
+    });
   }
-
   function filterCounts(rows) {
-    const statusBase = filterRows(rows, "status");
-    // A/B quick groups are alternative buy-point contexts, not cumulative
-    // filters. Each group's count must not depend on the other quick group.
-    const changeBase = filterRows(rows, "bothQuick");
-    const newBuyPointBase = changeBase;
-    const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key) => [key, statusBase.filter((row) => displayStatus(row) === key).length]));
-    if (currentHasComparison() && state.scope === "CHANGES") {
-      status[WATCH_STAGE] = rows.filter(isNearBreakout).length;
-    }
+    const statusBase = filterRows(rows,"status");
+    const aBase = filterRows(rows,"bothQuick",{forceSource:"A"});
+    const bBase = filterRows(rows,"bothQuick",{forceSource:"B",ignoreScope:true});
+    const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key)=>[
+      key,statusBase.filter((row)=>contextSources(row).some((src)=>contextMatch(row,src,{status:key}))).length
+    ]));
+    if (currentHasComparison() && state.scope==="CHANGES") status[WATCH_STAGE]=rows.filter(isNearBreakout).length;
     return {
       status,
-      change: Object.fromEntries(CHANGE_ORDER.map((key) => [key, changeBase.filter((row) => row.review_weekend_buy_point_change === key).length])),
-      newBuyPoint: Object.fromEntries(NEW_BUY_POINT_ORDER.map((key) => [key, newBuyPointBase.filter((row) => bool(row.review_new_buy_point) && row.review_new_buy_point_zone === key).length])),
+      change:Object.fromEntries(CHANGE_ORDER.map((key)=>[key,aBase.filter((row)=>row.review_weekend_buy_point_change===key).length])),
+      newBuyPoint:Object.fromEntries(NEW_BUY_POINT_ORDER.map((key)=>[key,bBase.filter((row)=>
+        bool(row.review_new_buy_point)&&row.review_new_buy_point_zone===key).length]))
     };
   }
-
   function sortRows(rows) {
     const result = [...rows];
-    if (currentHasComparison() && state.scope === "CHANGES") {
-      result.sort((a, b) => {
-        const ap = num(a.review_buy_point_priority) ?? 9999;
-        const bp = num(b.review_buy_point_priority) ?? 9999;
-        if (ap !== bp) return ap - bp;
-        const as = REVIEW_STATE_ORDER.indexOf(displayStatus(a));
-        const bs = REVIEW_STATE_ORDER.indexOf(displayStatus(b));
-        if (as !== bs) return as - bs;
-        return String(a.code).localeCompare(String(b.code));
-      });
-      return { rows: result, label: "Review Priority" };
+    if (currentHasComparison() && state.scope==="CHANGES") {
+      const rank = (row) => {
+        const a = text(row.review_a_event,"") || text(row.review_a_week_event,"");
+        const b = text(row.review_b_display_event || row.review_b_event,"");
+        if (bool(row.review_b_verified) && row.review_b_status==="ACTIONABLE" && b!=="CURRENT") return 0;
+        if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
+        if (bool(row.review_b_verified) && row.review_b_status==="UNCONFIRMED" && b!=="CURRENT") return 2;
+        if (/→ ZONE$/.test(a)) return 3;
+        if (/→ BELOW$/.test(a) || /→ BELOW$/.test(b)) return 4;
+        if (/→ EXT$/.test(a) || /→ EXT$/.test(b)) return 5;
+        return 6;
+      };
+      result.sort((a,b)=>rank(a)-rank(b)||String(a.code).localeCompare(String(b.code)));
+      return {rows:result,label:"Review Priority"};
     }
-    result.sort((a, b) => String(a.code).localeCompare(String(b.code), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }));
-    return { rows: result, label: "Code" };
+    result.sort((a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true,sensitivity:"base"}));
+    return {rows:result,label:"Code"};
   }
 
   function advancedCount() {
@@ -435,14 +474,13 @@
   function headerHtml(rows) {
     const isMidweek = state.period === "MIDWEEK";
     const snapshot = isMidweek ? data.meta.midweek_snapshot_date : data.meta.complete_snapshot_date;
-    const signalCount = rows.filter(isSignalActive).length;
+    const signalCount = isMidweek ? Number(data.meta.midweek_current_signal_count ?? 0) : rows.filter((row)=>bool(row.signal)).length;
+    const trackedCount = isMidweek ? rows.filter((row)=>bool(row.review_a_active)||bool(row.review_b_active)).length : signalCount;
     const nearCount = rows.filter(isNearBreakout).length;
     const inPool = isMidweek ? rows.filter((row) => row.review_membership !== "OUT").length : rows.length;
     const trackedOut = isMidweek ? rows.filter((row) => row.review_membership === "OUT").length : 0;
     const fresh = freshness(snapshot);
-    const badge = isMidweek
-      ? `<span class="data-badge loaded">Data Loaded</span>`
-      : `<span class="data-badge ${fresh.status.toLowerCase()}">Data ${esc(fresh.label)}</span>`;
+    const badge = `<span class="data-badge ${fresh.status.toLowerCase()}">Data ${esc(fresh.label)}</span>`;
     const snapshotText = isMidweek
       ? `Snapshot <b>${esc(snapshot || "N/A")}</b> · Midweek · baseline <b>${esc(data.meta.midweek_baseline_available ? data.meta.complete_snapshot_date : "unavailable")}</b>`
       : `Snapshot <b>${esc(snapshot || "N/A")}</b>${fresh.age === null ? "" : ` · ${fresh.age}d old`}`;
@@ -450,7 +488,7 @@
       <header class="dashboard-header">
         <div>
           <div class="dashboard-title-row"><div class="dashboard-title">Breakout Pool</div>${badge}</div>
-          <div class="dashboard-snapshot">${snapshotText} · <b>${inPool}</b> Pool · <b>${trackedOut}</b> Tracked OUT · <b>${signalCount}</b> Signals · <b>${nearCount}</b> Near Breakout</div>
+          <div class="dashboard-snapshot">${snapshotText} · <b>${inPool}</b> Pool · <b>${trackedOut}</b> Tracked OUT · <b>${signalCount}</b> Current Signals · <b>${trackedCount}</b> Tracked Stocks · <b>${nearCount}</b> Near Breakout</div>
         </div>
       </header>`;
   }
@@ -464,7 +502,7 @@
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Changes vs Weekend · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend Buy Point changes plus new Buy Points formed this week">Review Now · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
@@ -498,7 +536,7 @@
       <div class="context-panel">
         <div class="quick-groups">
           <div><div class="eyebrow">What Changed <span>Weekend Buy Point</span></div><div class="quick-grid">${changeButtons}</div></div>
-          <div><div class="eyebrow">New Buy Points <span>This Week</span></div><div class="quick-grid">${newBuyPointButtons}</div></div>
+          <div><div class="eyebrow">New Buy Points <span>Current Snapshot</span></div><div class="quick-grid">${newBuyPointButtons}</div></div>
         </div>
       </div>`;
   }
@@ -693,8 +731,8 @@
     const near = isNearBreakout(row);
     const facts = reviewFacts(row);
     const referenceKey = near ? "Watch Trigger" :
-      reviewUsesB(row) ? "Midweek BP" :
-      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
+      reviewUsesB(row) ? "Midweek Buy Point" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend Buy Point" : "Buy Point";
     const entryDate = dateText(facts.ibd_entry_date);
     const buyPointDate = dateText(row.buy_point_date);
     const referenceContext = near ? watchTargetSource(row) :
@@ -706,8 +744,8 @@
       ? `<span class="selected-reference">Path ${esc(row.review_a_path)}</span>` : "";
     const bNote = !near && bool(row.review_a_active) && bool(row.review_b_active)
       ? reviewUsesB(row)
-        ? `<span class="selected-reference">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
-        : `<span class="selected-reference">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
+        ? `<span class="selected-reference">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</span>`
+        : `<span class="selected-reference">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</span>`
       : "";
     const asOf = reviewUsesB(row) ? ` · As of ${esc(dateText(row.review_b_date))}` :
       bool(row.review_a_active)
@@ -769,8 +807,8 @@
     const near = isNearBreakout(row);
     const facts = reviewFacts(row);
     const referenceKey = near ? "Watch Trigger" :
-      reviewUsesB(row) ? "Midweek BP" :
-      currentHasComparison() && bool(row.review_a_active) ? "Weekend BP" : "Buy Point";
+      reviewUsesB(row) ? "Midweek Buy Point" :
+      currentHasComparison() && bool(row.review_a_active) ? "Weekend Buy Point" : "Buy Point";
     const referenceContext = near ? watchTargetSource(row) :
       reviewUsesB(row) ? dateText(row.review_b_date) :
       dateText(facts.ibd_entry_date) || dateText(row.buy_point_date);
@@ -829,11 +867,12 @@
         <div><span>Latest</span><strong>${fmt(reviewUsesB(row) ? row.review_b_close : row.latest_close)}</strong></div>
         <div><span>Vs Ref</span><strong>${fmt(reviewDistance(row), "pct")}</strong></div>
       </div>
+      ${currentHasComparison() ? `<div class="mobile-event-breakdown">${changeLines(row)}</div>` : ""}
       ${!reviewUsesB(row) && bool(row.review_a_active) && text(row.review_a_path, "").includes("→") ? `<div class="mobile-detail-industry">Path ${esc(row.review_a_path)}</div>` : ""}
       ${bool(row.review_a_active) && bool(row.review_b_active)
         ? reviewUsesB(row)
-          ? `<div class="mobile-detail-industry">↳ Weekend BP ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
-          : `<div class="mobile-detail-industry">↳ Midweek BP ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
+          ? `<div class="mobile-detail-industry">↳ Weekend Buy Point ${fmt(row.review_a_price)} · ${esc(text(row.review_a_zone, "NO DATA"))}</div>`
+          : `<div class="mobile-detail-industry">↳ Midweek Buy Point ${fmt(row.review_b_price)} · ${esc(text(row.review_b_event))} · ${esc(text(row.review_b_zone))}</div>`
         : ""}
       ${bool(row.review_a_active) && !reviewUsesB(row) ? `<div class="mobile-detail-industry">${esc(text(row.review_membership))}${row.review_a_as_of ? ` · As of ${esc(dateText(row.review_a_as_of))}` : " · NO DATA"}</div>` :
         reviewUsesB(row) ? `<div class="mobile-detail-industry">As of ${esc(dateText(row.review_b_date))}</div>` : ""}
@@ -969,21 +1008,28 @@
       ["industry_rs", "IND RS"],
     ];
     const selected = state.selected[state.period];
-    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" data-sort-value="${field === "ibd_entry_status" ? esc(statusLabel(displayStatus(row))) : ""}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function cellHtml(row, field) {
     const value = row[field];
-    if (field === "review_change_label") {
-      return isNearBreakout(row)
-        ? `<span class="change-badge" title="Current watch-stage candidate; signal transition labels do not apply yet.">—</span>`
-        : `<span class="change-badge">${esc(displayChange(row) || "n/a")}</span>`;
-    }
+    if (field === "review_change_label") return changeLines(row);
     if (field === "ibd_entry_status") {
       const status = displayStatus(row);
       const statusText = status === "NO_DATA" ? '<span class="status-text">NO DATA</span>'
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
+      if (currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)) {
+        const weekend = row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status;
+        const make = (src,status,active) => `<div class="bp-status-line ${active ? "is-active" : ""}"><small>${src}</small><span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span></div>`;
+        return statusWithOut(row,`<div class="bp-status-lines">${make("Weekend Buy Point",weekend,!reviewUsesB(row))}${make("Midweek Buy Point",row.review_b_status,reviewUsesB(row))}</div>`);
+      }
       return statusWithOut(row, statusText);
+    }
+    if (field === "code") {
+      if (!currentHasComparison() || !bool(row.review_has_value_change)) return esc(row.code);
+      const e = displayChange(row);
+      const symbol = /→ BELOW$/.test(e) ? "↓" : /→ EXT$/.test(e) ? "↑" : "→";
+      return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(e)}">${symbol} Change</small>`;
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
