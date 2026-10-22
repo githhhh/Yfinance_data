@@ -97,7 +97,8 @@ async function ready() {
   const browser = await chromium.launch(executablePath ? { executablePath, headless: true, args: ["--no-sandbox"] } : { channel: "chrome", headless: true });
   try {
     for (const viewport of [
-      { width: 1360, height: 900 }, { width: 760, height: 844 },
+      { width: 1680, height: 960 }, { width: 1360, height: 900 },
+      { width: 1024, height: 900 }, { width: 760, height: 844 },
       { width: 430, height: 844 }, { width: 390, height: 844 },
       { width: 350, height: 844 }, { width: 320, height: 844 },
     ]) {
@@ -234,5 +235,5 @@ async function ready() {
       await page.close();
     }
   } finally { await browser.close(); }
-  console.log("Desktop + 320/350/390/430/760px browser status-layout smoke passed");
+  console.log("1680/1360/1024 desktop + 320/350/390/430/760px browser status-layout smoke passed");
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.kill());
