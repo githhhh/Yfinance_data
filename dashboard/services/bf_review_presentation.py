@@ -146,7 +146,8 @@ def decorate_observation_view(
                             a_id.get("key") != new_id.get("key"))
         verified = identity_exact and weekend_distinct and not complete.empty
         result.at[index, "review_b_identity_state"] = (
-            "UNVERIFIED_WEEKEND" if has_a and a_id["resolution"] != "EXACT"
+            new_id["resolution"] if new_id["resolution"] != "EXACT"
+            else "UNVERIFIED_WEEKEND" if has_a and a_id["resolution"] != "EXACT"
             else "NO_WEEKEND_BASELINE" if complete.empty
             else new_id["resolution"]
         )

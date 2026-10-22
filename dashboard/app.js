@@ -326,6 +326,12 @@
     if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT") return "success";
     return event === "UNVERIFIED" || event === "NO DATA" ? "warning" : "muted";
   }
+  function readableMidweekEvent(raw) {
+    if (raw === "NEW BP") return "NEW BUY POINT";
+    if (raw === "CURRENT") return "NO CHANGE";
+    if (raw === "SNAPSHOT") return "CURRENT SNAPSHOT";
+    return raw || "NO DATA";
+  }
   function changeLines(row) {
     if (isNearBreakout(row)) return '<span class="change-badge">—</span>';
     const parts = [];
@@ -339,8 +345,7 @@
     }
     if (bool(row.review_b_active)) {
       const raw = text(row.review_b_display_event || row.review_b_event,"");
-      const event = raw === "NEW BP" ? "NEW BUY POINT" : raw === "CURRENT" ? "NO CHANGE" :
-        raw === "SNAPSHOT" ? "CURRENT SNAPSHOT" : !raw ? "NO DATA" : raw;
+      const event = readableMidweekEvent(raw);
       const basis = row.review_b_display_basis === "PREVIOUS_SNAPSHOT" ? "Vs Previous Snapshot" :
         row.review_b_display_basis === "WEEKEND" ? "Vs Weekend" :
         "Previous Snapshot Unavailable";
@@ -1035,8 +1040,12 @@
       if (!currentHasComparison() || !bool(row.review_has_value_change)) return esc(row.code);
       const e = displayChange(row);
       const member = text(row.review_membership_event, "");
-      const symbol = /→ BELOW$/.test(e) ? "↓" : /→ EXT$/.test(e) ? "↑" : "→";
-      const label = e === "NO CHANGE" && member ? member : `${symbol} Change`;
+      const label = e === "NO CHANGE" && member ? member :
+        e === "NEW BP" ? "New Point" :
+        e === "BP UPDATED" ? "Updated" :
+        /→ BELOW$/.test(e) ? "↓ Below" :
+        /→ EXT$/.test(e) || /→ EXTENDED$/.test(e) ? "↑ Extended" :
+        /→ ZONE$/.test(e) || /→ ACTIONABLE$/.test(e) ? "→ Buy Zone" : "→ Changed";
       return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(e)}">${esc(label)}</small>`;
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
