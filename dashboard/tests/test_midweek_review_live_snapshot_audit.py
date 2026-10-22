@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from bf_snapshot import monday_of_week
 
 from dashboard.services.bf_observation import build_observation_view, load_previous_midweek
 from dashboard.services.bf_observation_replay import identity_v2, zone
@@ -26,8 +27,8 @@ def test_current_authoritative_midweek_records_preserve_buy_point_boundaries():
     as_of = snapshot[0]
     weekend_dates = pd.to_datetime(weekend["snapshot_date"], errors="coerce").dropna().dt.date.unique()
     if (len(weekend_dates) != 1 or as_of <= weekend_dates[0]
-            or as_of.isocalendar()[:2] != weekend_dates[0].isocalendar()[:2]):
-        pytest.skip("Current Pool is not in a comparable Midweek review window")
+            or (monday_of_week(as_of) - monday_of_week(weekend_dates[0])).days != 7):
+        pytest.skip("Current Pool does not follow the previous complete trading week")
 
     previous = load_previous_midweek(ROOT, as_of)
     raw = build_observation_view(
