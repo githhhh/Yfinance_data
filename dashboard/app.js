@@ -418,7 +418,7 @@
       // In Review Now, a membership-only change is the new event; an older
       // Vs Weekend difference must not be shown as today's change reason.
       const membershipOnly = incremental && !text(row.review_a_event, "") &&
-        bool(row.review_membership_event) && row.review_data_available !== false;
+        !!text(row.review_membership_event, "") && row.review_data_available !== false;
       if (membershipOnly) {
         const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
         items.push(["Weekend", "Weekend Buy Point", "POOL " + changedTo, "Pool " + row.review_membership_event, "Vs Previous Snapshot"]);
