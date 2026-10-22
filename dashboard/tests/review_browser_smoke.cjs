@@ -127,7 +127,7 @@ async function ready() {
         const detail = page.locator(".mobile-inline-review");
         await detail.waitFor();
         const mobileText = await detail.innerText();
-        assert(mobileText.toUpperCase().includes("MIDWEEK BP"), "Mobile B label");
+        assert(mobileText.toUpperCase().includes("MIDWEEK BUY POINT"), "Mobile B label");
         assert(!mobileText.includes("4W"), "Missing B pullback must not borrow A history");
         assert((await detail.innerText()).includes("11W"), "Mobile B base, not A");
       } else {
