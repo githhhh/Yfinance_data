@@ -160,7 +160,7 @@ state.change = "ALL"; state.scope = "CHANGES"; state.status = "ACTIONABLE";
 const talo = {...entry("TALO"),ibd_entry_status:"EXTENDED",
   current_vs_ibd_candidate_pct:6.15,review_b_status:"ACTIONABLE",
   review_b_pct:0.73,review_b_zone:"ZONE",review_b_verified:true,
-  review_new_buy_point_zone:"BUY_ZONE"};
+  review_b_entry_valid:true,review_new_buy_point_zone:"BUY_ZONE"};
 assert.equal(app.filterRows([talo]).length,1,"TALO qualifies through its Midweek Buy Point");
 assert.equal(app.reviewUsesB(talo),true);
 assert.equal(app.reviewReferencePrice(talo),185);
