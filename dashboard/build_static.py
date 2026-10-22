@@ -22,6 +22,7 @@ from dashboard.services.bf_observation import (
     load_daily_snapshot,
     load_previous_midweek,
 )
+from dashboard.services.bf_review_presentation import decorate_observation_view
 from dashboard.field_config import FLOW_CARD_META, STATUS_META
 from dashboard.services.bf_midweek_review import (
     PoolMode,
@@ -398,6 +399,12 @@ def build_dashboard_payload(
             daily=daily if daily is not None else load_daily_snapshot(PROJECT_ROOT, window_date=observation_date),
             previous=effective_previous,
             as_of=observation_date,
+        )
+        midweek = decorate_observation_view(
+            midweek,
+            complete=analysis.complete_pool if analysis.midweek_baseline_available else pd.DataFrame(),
+            current=analysis.midweek_pool,
+            previous=effective_previous,
         )
 
     complete_snapshot = (
