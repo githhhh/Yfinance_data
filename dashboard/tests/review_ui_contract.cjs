@@ -342,6 +342,11 @@ assert(app.tableHtml([membershipOnly]).includes("Pool OUT</small>"),
   "Mobile Ticker hint must use the same Pool OUT event as Change");
 assert(!app.changeLines(membershipOnly).includes("ZONE → EXT"),
   "Review Now must not misrepresent a past Weekend cumulative change as today's event");
+const membershipRank = {...membershipOnly,code:"A_MEMBER"};
+const realPriceRank = {...membershipOnly,code:"Z_PRICE",review_a_event:"ZONE → EXT",
+  review_membership_event:""};
+assert.equal(app.sortRows([membershipRank,realPriceRank]).rows[0].code,"Z_PRICE",
+  "Review priority must not rank historical EXT as a new price event on membership-only rows");
 const membershipAndPrice = {...membershipOnly, review_a_event:"BELOW → ZONE"};
 assert(app.changeLines(membershipAndPrice).includes("BELOW → ZONE"),
   "A genuine new price transition takes priority over membership");

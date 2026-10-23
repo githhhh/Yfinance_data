@@ -537,9 +537,11 @@
       const rank = (row) => {
         // Only rank the buy-point event that the user can actually see in
         // the selected quick/status/advanced filter context.
-        const visible = eligibleSources(row).filter((source) => contextMatch(row,source));
-        const a = visible.includes("A") ? text(row.review_a_event,"") || text(row.review_a_week_event,"") : "";
-        const b = visible.includes("B") ? text(row.review_b_display_event || row.review_b_event,"") : "";
+        // Prioritize the *displayed* change, not an older cumulative
+        // Weekend transition shadowed by today's membership-only event.
+        const items = changeItems(row).items;
+        const a = items.find((item) => item[0] === "Weekend")?.[2] || "";
+        const b = items.find((item) => item[0] === "Midweek")?.[2] || "";
         if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="ACTIONABLE" && b!=="CURRENT") return 0;
         if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
         if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="UNCONFIRMED" && b!=="CURRENT") return 2;
