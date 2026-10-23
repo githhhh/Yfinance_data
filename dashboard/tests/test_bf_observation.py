@@ -524,6 +524,23 @@ def test_no_prior_midweek_snapshot_must_not_repeat_new_event():
     assert not result["review_b_has_value_change"]
 
 
+def test_same_selected_price_different_strategy_never_creates_b():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    w = row("CROSS", snapshot="2026-10-16", trigger=100, close=102,
+            rule="pivot")
+    m = row("CROSS", snapshot="2026-10-19", trigger=100, close=103,
+            rule="ceiling")
+    weekend, midweek = pd.DataFrame([w]), pd.DataFrame([m])
+    raw = build_observation_view(weekend, midweek, midweek,
+                                 as_of=date(2026, 10, 19))
+    presented = decorate_observation_view(raw, complete=weekend,
+                                          current=midweek, previous=None).iloc[0]
+    assert presented["review_a_active"]
+    assert not presented["review_b_active"]
+    assert not presented["review_new_buy_point"]
+    assert presented["review_a_price"] == 100
+
+
 def test_same_price_different_pivot_box_does_not_create_b():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend_row = row("BOX", snapshot="2026-10-16", trigger=100,

@@ -475,8 +475,8 @@ def build_observation_attention(
                     "as_of": row.get("review_a_as_of"),
                 })
         if bool(row.get("review_b_active")):
-            # A new independent buy-point anchor is a NEW opportunity,
-            # but a changed price for the same anchor (BP UPDATED) is not.
+            # A distinct selected buy-point price may be a NEW opportunity,
+            # independent of setup names, structural dates or box metadata.
             event = str(row.get("review_b_event") or "")
             status = str(row.get("review_b_status") or "")
             zone = str(row.get("review_b_zone") or "")

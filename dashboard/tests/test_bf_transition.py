@@ -574,6 +574,40 @@ def test_midweek_buy_point_review_tracks_weekend_and_new_anchor_independently():
     assert row["review_effective_entry_status"] == "UNCONFIRMED"
 
 
+def test_different_rule_same_selected_price_is_not_new():
+    complete = pd.DataFrame([_row(
+        "CROSS", snapshot_date="2026-07-24", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100,
+        close=102, rule="pivot",
+    )])
+    current = pd.DataFrame([_row(
+        "CROSS", snapshot_date="2026-07-27", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100,
+        close=103, rule="ceiling",
+    )])
+    result = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert result["review_new_buy_point"] == False
+    assert result["review_new_buy_point_price"] is None
+
+
+def test_changed_price_is_new_even_without_structural_anchor():
+    complete = pd.DataFrame([_row(
+        "LEGACY", snapshot_date="2026-07-24", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100,
+        close=102, rule="pivot",
+    )])
+    current = pd.DataFrame([_row(
+        "LEGACY", snapshot_date="2026-07-27", signal=True,
+        status="UNCONFIRMED", valid=False, candidate=103,
+        close=104, rule="pivot",
+    )])
+    result = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert result["review_new_buy_point"] == True
+    assert result["review_new_buy_point_price"] == 103
+    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert result["review_new_buy_point_date"] is None
+
+
 def test_same_price_new_anchor_is_not_a_new_buy_point():
     complete = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=102.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-24"}]})])
     current = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-27", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=103.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-27"}]})])
