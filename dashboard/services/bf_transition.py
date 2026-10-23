@@ -449,20 +449,15 @@ def _project(
             weekend_previous_zone = _price_zone(weekend_candidate, weekend_close)
             weekend_current_zone = _price_zone(weekend_candidate, latest_close)
             weekend_change = _tracked_buy_point_change(weekend_previous_zone, weekend_current_zone)
-        new_buy_point = False
-        if signal_current and current_anchor is not None:
-            if not signal_complete:
-                new_buy_point = True
-            elif weekend_anchor is not None:
-                new_buy_point = current_anchor["identity"] != weekend_anchor["identity"]
-            else:
-                # Some legacy candidates (notably MA10 pending-high) do not yet
-                # expose the bar that supplied the high. A different setup rule
-                # is still sufficient evidence that the current structural buy
-                # point is not the Weekend one; same-rule ambiguity fails closed.
-                weekend_rule = (_clean_text(complete_row.get("ibd_candidate_rule")) or "").lower()
-                new_buy_point = bool(weekend_rule and current_anchor["rule"] != weekend_rule)
-        new_buy_point_zone = _price_zone(current_anchor["trigger_price"], latest_close) if new_buy_point and current_anchor is not None else None
+        # Only the selected price identifies a trading buy point.
+        # Structural anchors remain explanatory metadata, never identity.
+        current_price = (_positive_number(current_row.get("ibd_candidate_price"),
+                                          field="current candidate", code=code)
+                         if signal_current else None)
+        new_buy_point = bool(
+            signal_current and (not signal_complete or current_price != weekend_candidate)
+        )
+        new_buy_point_zone = _price_zone(current_price, latest_close) if new_buy_point else None
         has_value_change = bool(weekend_change != "UNCHANGED" or new_buy_point_zone is not None)
         buy_point_change_label = _buy_point_change_label(weekend_change, new_buy_point_zone)
         buy_point_priority = _buy_point_priority(weekend_change, new_buy_point_zone)
@@ -486,7 +481,7 @@ def _project(
                 "review_weekend_buy_point_rule": weekend_anchor["rule"] if weekend_anchor is not None else None,
                 "review_new_buy_point": bool(new_buy_point),
                 "review_new_buy_point_zone": new_buy_point_zone,
-                "review_new_buy_point_price": current_anchor["trigger_price"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_price": current_price if new_buy_point else None,
                 "review_new_buy_point_date": current_anchor["anchor_date"] if new_buy_point and current_anchor is not None else None,
                 "review_new_buy_point_rule": current_anchor["rule"] if new_buy_point and current_anchor is not None else None,
                 "review_new_buy_point_anchor_type": current_anchor["anchor_type"] if new_buy_point and current_anchor is not None else None,

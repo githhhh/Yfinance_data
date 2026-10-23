@@ -7,14 +7,13 @@ Nothing here is used by Futu or the Telegram v1/v2 event producers.
 """
 from __future__ import annotations
 
-import math
 from datetime import timedelta
 
 import pandas as pd
 
 from bf_snapshot import monday_of_week, _is_market_trading_day
 
-from dashboard.services.bf_observation_replay import identity_v2, price_replay, zone as classify_zone
+from dashboard.services.bf_observation_replay import zone as classify_zone
 from dashboard.services.bf_transition import to_bool
 
 
@@ -35,49 +34,34 @@ def _first_trading_session(day):
     )
 
 
-def _event_for_verified_b(
-    current, previous, now_identity, previous_identity, *,
-    has_previous_snapshot: bool, first_midweek_day: bool,
-    weekend_identity: dict | None = None,
-):
-    # No prior published snapshot on Tuesday-Thursday is not evidence of a
-    # NEW event. The B still belongs to this week's snapshot collection.
+def _midweek_price_event(current, previous, *,
+                         has_previous_snapshot: bool, first_midweek_day: bool,
+                         weekend_price: float | None = None):
+    """Events follow snapshots of selected price and entry status."""
     if not has_previous_snapshot:
         return "NEW BP" if first_midweek_day else "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
-    if previous_identity["resolution"] != "EXACT":
-        # A current exact B is still a valid snapshot observation; only the
-        # historical transition cannot be asserted from ambiguous history.
-        return "HISTORY_UNVERIFIED"
-    if (weekend_identity and weekend_identity.get("resolution") == "EXACT"
-            and previous_identity["key"] == weekend_identity["key"]
-            and now_identity["key"] != weekend_identity["key"]):
+    previous_price = pd.to_numeric(previous.get("ibd_candidate_price"), errors="coerce")
+    current_price = pd.to_numeric(current.get("ibd_candidate_price"), errors="coerce")
+    if pd.isna(previous_price) or previous_price <= 0:
+        raise ValueError("Previous active Midweek signal has no valid buy-point price")
+    if pd.isna(current_price) or current_price <= 0:
+        raise ValueError("Current active Midweek signal has no valid buy-point price")
+    if weekend_price is not None and previous_price == weekend_price:
         return "NEW BP"
-    if previous_identity["key"] != now_identity["key"]:
+    if previous_price != current_price:
         return "BP CHANGED"
-
-    previous_trigger, current_trigger = previous_identity["trigger"], now_identity["trigger"]
-    if (previous_trigger is None or current_trigger is None or not
-            math.isclose(previous_trigger, current_trigger, rel_tol=1e-9, abs_tol=1e-4)):
-        return "BP UPDATED"
-    old_status = str(previous.get("ibd_entry_status") or "")
-    new_status = str(current.get("ibd_entry_status") or "")
-    if old_status != new_status:
-        return f"{old_status} → {new_status}"
-    p = price_replay(
-        trigger=current.get("ibd_candidate_price"),
-        previous_close=previous.get("latest_close"),
-        current_close=current.get("latest_close"),
-        previous_date=str(previous.get("snapshot_date") or "")[:10],
-        current_date=str(current.get("snapshot_date") or "")[:10],
-        basis="TRACKED_ANCHOR",
-        previous_trigger=previous.get("ibd_candidate_price"),
-    )
-    translation = {"BELOW_BUY_POINT":"BELOW", "BUY_ZONE":"ZONE", "EXTENDED":"EXT"}
-    if p["transition"]:
-        before, after = p["transition"].split("_TO_")
-        return f"{translation.get(before, before)} → {translation.get(after, after)}"
+    previous_status = str(previous.get("ibd_entry_status") or "")
+    current_status = str(current.get("ibd_entry_status") or "")
+    if previous_status != current_status:
+        return f"{previous_status} → {current_status}"
+    previous_close = pd.to_numeric(previous.get("latest_close"), errors="coerce")
+    current_close = pd.to_numeric(current.get("latest_close"), errors="coerce")
+    before = classify_zone(current_price, previous_close)
+    after = classify_zone(current_price, current_close)
+    if before and after and before != after:
+        return f"{before} → {after}"
     return "CURRENT"
 
 
@@ -123,19 +107,22 @@ def decorate_observation_view(
             and pd.notna(pd.to_numeric(prior[code].get("latest_close"), errors="coerce"))
             else "PRIOR_SESSION" if a_event else "WEEKEND" if a_week else None
         )
-        result.at[index, "review_b_verified"] = False
-        result.at[index, "review_b_identity_state"] = "NONE"
         result.at[index, "review_b_display_event"] = ""
         result.at[index, "review_b_display_basis"] = None
 
         fresh = today.get(code)
         if fresh is None or to_bool(fresh.get("signal")) is not True:
             continue
-        new_id = identity_v2(fresh)
+        current_price = pd.to_numeric(fresh.get("ibd_candidate_price"), errors="coerce")
         old_a = weekend.get(code) if has_a else None
-        a_id = identity_v2(old_a) if old_a is not None else {"resolution":"NONE","key":None}
-        # Same buy point as the fixed weekend anchor: it is A, not a second B.
-        if new_id["resolution"] == "EXACT" and a_id.get("key") == new_id.get("key"):
+        weekend_price = (pd.to_numeric(old_a.get("ibd_candidate_price"), errors="coerce")
+                         if old_a is not None else None)
+        if pd.isna(current_price) or current_price <= 0:
+            raise ValueError(f"{code}: active Midweek signal has no valid buy-point price")
+        if old_a is not None and (pd.isna(weekend_price) or weekend_price <= 0):
+            raise ValueError(f"{code}: active Weekend signal has no valid buy-point price")
+        # Same selected price means the same buy point, regardless of setup.
+        if old_a is not None and current_price == weekend_price:
             result.at[index, "review_b_active"] = False
             result.at[index, "review_new_buy_point"] = False
             result.at[index, "review_new_buy_point_zone"] = None
@@ -143,12 +130,8 @@ def decorate_observation_view(
             result.at[index, "review_has_value_change"] = bool(row.get("review_a_has_value_change"))
             continue
 
-        # A v1 may collapse a pivot S_BOX and M_BOX with the same date.
-        # Restore the independent B observation using current, not A, facts.
-        if not bool(row.get("review_b_active")) and (
-            not has_a or new_id["resolution"] == "EXACT" and a_id.get("key")
-            and new_id.get("key") != a_id.get("key")
-        ):
+        # Recover a distinct selected-price B even when v1 lacked metadata.
+        if not bool(row.get("review_b_active")):
             result.at[index, "review_b_active"] = True
             result.at[index, "review_b_price"] = fresh.get("ibd_candidate_price")
             result.at[index, "review_b_close"] = fresh.get("latest_close")
@@ -174,48 +157,28 @@ def decorate_observation_view(
                 result.at[index, "review_b_zone"] = {"BELOW_BUY_POINT":"BELOW", "BUY_ZONE":"ZONE", "EXTENDED":"EXT"}[zone]
         if not bool(result.at[index,"review_b_active"]):
             continue
-        identity_exact = new_id["resolution"] == "EXACT"
-        weekend_distinct = (not has_a or
-                            a_id["resolution"] == "EXACT" and
-                            a_id.get("key") != new_id.get("key"))
-        verified = identity_exact and weekend_distinct and not complete.empty
-        result.at[index, "review_b_identity_state"] = (
-            new_id["resolution"] if new_id["resolution"] != "EXACT"
-            else "UNVERIFIED_WEEKEND" if has_a and a_id["resolution"] != "EXACT"
-            else "NO_WEEKEND_BASELINE" if complete.empty
-            else new_id["resolution"]
-        )
         result.at[index, "review_b_display_basis"] = (
             "PREVIOUS_SNAPSHOT" if prior_valid else
             "WEEKEND" if _first_trading_session(current_day) and not complete.empty
             else "UNAVAILABLE"
         )
-        event = "UNVERIFIED"
-        if verified:
-            previous_row = prior.get(code) if prior_valid else None
-            previous_identity = (
-                identity_v2(previous_row)
-                if previous_row is not None and to_bool(previous_row.get("signal")) is True
-                else {"resolution": "NONE", "key": None}
-            )
-            event = _event_for_verified_b(
-                fresh, previous_row, new_id, previous_identity,
-                has_previous_snapshot=prior_valid,
-                first_midweek_day=_first_trading_session(current_day),
-                weekend_identity=a_id if has_a else None,
-            )
-        result.at[index, "review_b_verified"] = bool(verified)
+        previous_row = prior.get(code) if prior_valid else None
+        event = _midweek_price_event(
+            fresh, previous_row, has_previous_snapshot=prior_valid,
+            first_midweek_day=_first_trading_session(current_day),
+            weekend_price=weekend_price if old_a is not None else None,
+        )
         result.at[index, "review_b_display_event"] = event
         # Always derive the B zone from B's own authoritative trigger / close,
         # including a B that V2 recovered after V1 suppressed it.
         observed_zone = classify_zone(fresh.get("ibd_candidate_price"), fresh.get("latest_close"))
         enum_zone = {"BELOW": "BELOW_BUY_POINT", "ZONE": "BUY_ZONE", "EXT": "EXTENDED"}
         result.at[index, "review_b_zone"] = observed_zone
-        result.at[index, "review_new_buy_point"] = bool(verified and observed_zone)
+        result.at[index, "review_new_buy_point"] = bool(observed_zone)
         result.at[index, "review_new_buy_point_zone"] = (
-            enum_zone.get(observed_zone) if verified else None
+            enum_zone.get(observed_zone)
         )
-        changed = verified and event not in {"CURRENT", "SNAPSHOT", "HISTORY_UNVERIFIED", "UNVERIFIED", ""}
+        changed = event not in {"CURRENT", "SNAPSHOT", ""}
         result.at[index, "review_b_has_value_change"] = bool(changed)
         result.at[index, "review_has_value_change"] = bool(
             result.at[index, "review_a_has_value_change"] or changed
