@@ -109,6 +109,30 @@ def test_b_snapshot_does_not_keep_yesterday_buy_point():
     ).iloc[0]
     assert not result["review_b_active"]
     assert not result["review_new_buy_point"]
+    # B=120 returning to Weekend A=100 is a selected-price event, not A movement.
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    shown = decorate_observation_view(
+        result.to_frame().T, complete=complete, current=current, previous=previous
+    ).iloc[0]
+    assert shown["review_selected_price_event"] == "BP CHANGED"
+    assert not shown["review_a_has_value_change"]
+    assert shown["review_has_value_change"]
+    assert not shown["review_b_active"]
+    assert not shown["review_new_buy_point"]
+
+
+def test_reverted_price_is_not_reannounced_on_next_snapshot():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    complete = pd.DataFrame([row("STABLE", trigger=100, close=102)])
+    previous = pd.DataFrame([row("STABLE", snapshot="2026-10-13", trigger=100, close=102)])
+    current = pd.DataFrame([row("STABLE", snapshot="2026-10-14", trigger=100, close=102)])
+    raw = build_observation_view(complete, current, pd.DataFrame(),
+                                 previous=previous, daily={}, as_of=date(2026, 10, 14))
+    shown = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous
+    ).iloc[0]
+    assert shown["review_selected_price_event"] == ""
+    assert not shown["review_has_value_change"]
 
 
 def test_pool_reentry_requires_previous_snapshot_and_shows_zone():

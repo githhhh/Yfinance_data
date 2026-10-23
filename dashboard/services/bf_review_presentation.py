@@ -114,6 +114,7 @@ def decorate_observation_view(
         )
         result.at[index, "review_b_display_event"] = ""
         result.at[index, "review_b_display_basis"] = None
+        result.at[index, "review_selected_price_event"] = ""
 
         fresh = today.get(code)
         if fresh is None or to_bool(fresh.get("signal")) is not True:
@@ -122,11 +123,21 @@ def decorate_observation_view(
         weekend_price = weekend[code].get("ibd_candidate_price") if has_a else None
         # An identical selected price is still Weekend A, regardless of setup.
         if has_a and _same_buy_point_price(current_price, weekend_price):
+            # The previously selected B can return to fixed Weekend A.
+            # This is a price-identity transition, not an A-zone movement.
+            previous_row = prior.get(code) if prior_valid else None
+            if (previous_row is not None
+                    and to_bool(previous_row.get("signal")) is True
+                    and not _same_buy_point_price(previous_row.get("ibd_candidate_price"), current_price)):
+                result.at[index, "review_selected_price_event"] = "BP CHANGED"
             result.at[index, "review_b_active"] = False
             result.at[index, "review_new_buy_point"] = False
             result.at[index, "review_new_buy_point_zone"] = None
             result.at[index, "review_b_has_value_change"] = False
-            result.at[index, "review_has_value_change"] = bool(row.get("review_a_has_value_change"))
+            result.at[index, "review_has_value_change"] = bool(
+                result.at[index, "review_a_has_value_change"]
+                or result.at[index, "review_selected_price_event"]
+            )
             continue
 
         # A distinct current price is B even when its structural metadata

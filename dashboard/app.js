@@ -193,7 +193,8 @@
     if (forced || !reviewNowMode() || isNearBreakout(row)) return sources;
     // A single ticker may have two independent references. Review Now and
     // its status/advanced filters must match the reference that actually changed.
-    return sources.filter((src) => src === "A" ? bool(row.review_a_has_value_change)
+    return sources.filter((src) => src === "A" ?
+      (bool(row.review_a_has_value_change) || row.review_selected_price_event === "BP CHANGED")
       : src === "B" ? bool(row.review_b_has_value_change) : false);
   }
   function contextStatus(row, src) {
@@ -434,6 +435,13 @@
       const event = compactChangeEvent(raw);
       if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
     }
+    // A fixed Weekend buy point did not move; only today's selected
+    // Midweek price changed back from B to A. Keep the two facts separate.
+    if (state.change === "ALL" && state.newBuyPoint === "ALL" &&
+        row.review_selected_price_event === "BP CHANGED" && sources.includes("A")) {
+      items.push(["Selected", "Selected Buy Point", "TO WEEKEND",
+        "BP CHANGED · selected price returned to Weekend", "Vs Previous Snapshot"]);
+    }
     return {items, sources};
   }
   function changeLines(row) {
@@ -538,6 +546,7 @@
         if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
         if (b && contextStatus(row,"B")==="UNCONFIRMED" && b!=="CURRENT") return 2;
         if (/→ ZONE$/.test(a)) return 3;
+        if (items.some((item) => item[2] === "TO WEEKEND")) return 3;
         if (/→ BELOW$/.test(a) || /→ BELOW$/.test(b)) return 4;
         if (/→ EXT$/.test(a) || /→ EXT$/.test(b)) return 5;
         return 6;
@@ -757,7 +766,8 @@
       )).length;
       group.changed = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) && (
-          source === "A" && bool(row.review_a_has_value_change) ||
+          source === "A" && (bool(row.review_a_has_value_change) ||
+            (reviewNowMode() && row.review_selected_price_event === "BP CHANGED")) ||
           source === "B" && bool(row.review_b_has_value_change)
         )
       )).length;
@@ -1173,6 +1183,7 @@
         event === "POOL OUT" ? "Pool OUT" :
         event === "POOL IN" ? "Pool IN" :
         event === "PRIOR ?" ? "Prior ?" :
+        event === "TO WEEKEND" ? "To Weekend" :
         /→ BELOW$/.test(event) ? "↓ Below" :
         /→ EXT$/.test(event) || /→ EXTENDED$/.test(event) ? "↑ Extended" :
         /→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) ? "→ Buy Zone" : "→ Changed";

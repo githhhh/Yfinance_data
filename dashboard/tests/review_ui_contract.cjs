@@ -238,6 +238,29 @@ assert.equal(app.filterRows([rejected]).length,0,
   "Invalid resolver must not appear as ACTIONABLE in filters");
 state.status = "ALL";
 
+// B returning to fixed Weekend A must remain visible as a selected-price
+// event without manufacturing an A zone transition or a phantom B snapshot.
+state.scope = "CHANGES"; state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const returned = {...entry("RETURNED"), review_b_active:false,
+  review_new_buy_point:false, review_new_buy_point_zone:null,
+  review_b_has_value_change:false, review_a_has_value_change:false,
+  review_a_event:"", review_a_week_event:"",
+  review_selected_price_event:"BP CHANGED", review_has_value_change:true};
+assert.equal(app.filterRows([returned]).length, 1,
+  "Price reverting B → A is a daily Review Now event");
+assert(app.changeLines(returned).includes(">TO WEEKEND</span>"));
+assert(app.tableHtml([returned]).includes("To Weekend</small>"));
+assert(app.industryHtml([returned]).includes("1 Changed"));
+assert.equal(app.filterCounts([returned]).newBuyPoint.BUY_ZONE, 0);
+assert.equal(app.filterCounts([returned]).status.ACTIONABLE, 1);
+state.change = "ENTERED_BUY_ZONE";
+assert.equal(app.filterRows([returned]).length, 0,
+  "Price reversion is not a Weekend A price-zone change");
+state.change = "ALL";
+const persisted = {...returned, review_selected_price_event:"", review_has_value_change:false};
+assert.equal(app.filterRows([persisted]).length, 0,
+  "Return to A is not repeated on an unchanged later session");
+
 // Review Now is the latest increment, but Weekend quick filters keep the
 // cumulative Vs Weekend position, so a stable below-BP ticker remains
 // findable in What Changed even when it is not a new daily event.
