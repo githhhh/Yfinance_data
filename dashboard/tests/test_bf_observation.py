@@ -432,7 +432,7 @@ def test_midweek_telegram_act_requires_both_actionable_status_and_valid_resolver
     }
 
 
-def test_unverified_pivot_does_not_claim_new_buy_point():
+def test_multi_box_pivot_price_exists_even_without_selected_structure():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     candidate = row("SN", snapshot="2026-10-20", trigger=194.54, close=198.72)
     candidate["ibd_candidate_extra"] = (
@@ -448,10 +448,11 @@ def test_unverified_pivot_does_not_claim_new_buy_point():
         raw, complete=pd.DataFrame(), current=current, previous=None,
     ).iloc[0]
     assert actual["review_b_active"]
-    assert actual["review_b_identity_state"] == "AMBIGUOUS"
-    assert actual["review_b_display_event"] == "UNVERIFIED"
-    assert not actual["review_b_verified"]
-    assert not actual["review_new_buy_point"]
+    assert actual["review_new_buy_point"]
+    assert actual["review_new_buy_point_zone"] == "BUY_ZONE"
+    assert actual["review_b_display_event"] == "SNAPSHOT"
+    assert "review_b_identity_state" not in actual.index
+    assert "review_b_verified" not in actual.index
 
 
 def test_dual_buy_point_statuses_remain_independent():
@@ -469,7 +470,6 @@ def test_dual_buy_point_statuses_remain_independent():
     ).iloc[0]
     assert actual["ibd_entry_status"] == "EXTENDED"
     assert actual["review_b_status"] == "ACTIONABLE"
-    assert actual["review_b_verified"]
     assert actual["review_a_price"] == 17.005
     assert actual["review_b_price"] == 17.92
 
@@ -502,8 +502,7 @@ def test_midweek_b_trigger_revision_is_reported_even_if_status_unchanged():
     result = decorate_observation_view(
         raw, complete=weekend, current=base, previous=pd.DataFrame([first])
     ).set_index("code").loc["REVISED"]
-    assert result["review_b_verified"]
-    assert result["review_b_display_event"] == "BP UPDATED"
+    assert result["review_b_display_event"] == "BP CHANGED"
     assert result["review_b_has_value_change"]
     assert result["review_new_buy_point_zone"] == "BUY_ZONE"
 
@@ -517,16 +516,14 @@ def test_no_prior_midweek_snapshot_must_not_repeat_new_event():
     result = decorate_observation_view(
         raw, complete=weekend, current=current, previous=None
     ).set_index("code").loc["B"]
-    assert result["review_b_verified"]
     assert result["review_b_display_event"] == "SNAPSHOT"
     assert result["review_b_display_basis"] == "UNAVAILABLE"
     assert result["review_new_buy_point_zone"] == "BUY_ZONE"
     assert not result["review_b_has_value_change"]
 
 
-def test_v2_recovered_b_populates_zone_and_filter_source():
+def test_same_price_different_pivot_box_does_not_create_b():
     from dashboard.services.bf_review_presentation import decorate_observation_view
-    # V1 sees same pivot date and calls it A; V2 distinguishes the box type.
     weekend_row = row("BOX", snapshot="2026-10-16", trigger=100,
                       close=101, anchor="2026-10-15")
     current_row = row("BOX", snapshot="2026-10-19", trigger=100,
@@ -540,18 +537,16 @@ def test_v2_recovered_b_populates_zone_and_filter_source():
     result = decorate_observation_view(
         raw, complete=wk, current=mid, previous=None
     ).iloc[0]
-    assert result["review_b_active"]
-    assert result["review_b_verified"]
-    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
-    assert result["review_b_zone"] == "ZONE"
-    assert result["review_b_display_event"] == "NEW BP"
+    assert result["review_a_active"]
+    assert not result["review_b_active"]
+    assert not result["review_new_buy_point"]
 
 
-def test_weekend_unknown_identity_must_not_create_verified_new_b():
+def test_different_price_creates_b_even_when_weekend_structure_metadata_missing():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend_row = row("UNK", snapshot="2026-10-16", trigger=100, close=101,
                       anchor="2026-10-15")
-    weekend_row["ibd_candidate_extra"] = "{}"  # weekend identity unknown
+    weekend_row["ibd_candidate_extra"] = "{}"
     now = row("UNK", snapshot="2026-10-19", trigger=110, close=112,
               anchor="2026-10-19")
     w, m = pd.DataFrame([weekend_row]), pd.DataFrame([now])
@@ -559,9 +554,11 @@ def test_weekend_unknown_identity_must_not_create_verified_new_b():
     result = decorate_observation_view(
         raw, complete=w, current=m, previous=None
     ).iloc[0]
-    assert not result["review_new_buy_point"]
-    assert not result["review_b_has_value_change"]
-    assert not result["review_b_verified"]
+    assert result["review_b_active"]
+    assert result["review_b_price"] == 110
+    assert result["review_new_buy_point"]
+    assert result["review_b_display_event"] == "NEW BP"
+    assert result["review_b_has_value_change"]
 
 
 def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed():
@@ -582,7 +579,6 @@ def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed()
     actual = decorate_observation_view(
         raw, complete=complete, current=current, previous=previous
     ).iloc[0]
-    assert actual["review_b_verified"]
     assert actual["review_b_display_event"] == "NEW BP"
     assert actual["review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
     assert actual["review_b_has_value_change"]
@@ -675,12 +671,11 @@ def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
     ).set_index("code")
     assert view.loc["SEED", "review_a_week_event"] == "ZONE → BELOW"
     assert bool(view.loc["SEED", "review_a_has_value_change"])
-    assert bool(view.loc["FIRST_B", "review_b_verified"])
     assert view.loc["FIRST_B", "review_b_display_event"] == "NEW BP"
     assert view.loc["FIRST_B", "review_b_display_basis"] == "WEEKEND"
 
 
-def test_exact_current_midweek_point_not_lost_when_previous_identity_ambiguous():
+def test_previous_same_price_is_same_point_despite_ambiguous_structure():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
     yesterday = row("HISTORY", snapshot="2026-10-19", trigger=100,
@@ -701,10 +696,8 @@ def test_exact_current_midweek_point_not_lost_when_previous_identity_ambiguous()
         raw, complete=weekend, current=current, previous=previous,
     ).set_index("code").loc["HISTORY"]
     assert actual["review_b_active"]
-    assert actual["review_b_verified"], "Current exact B must stay in its snapshot"
-    assert actual["review_b_identity_state"] == "EXACT"
     assert actual["review_new_buy_point"]
     assert actual["review_new_buy_point_zone"] == "BUY_ZONE"
-    assert actual["review_b_display_event"] == "HISTORY_UNVERIFIED"
-    assert not actual["review_b_has_value_change"], "Do not invent the prior transition"
+    assert actual["review_b_display_event"] == "CURRENT"
+    assert not actual["review_b_has_value_change"]
     assert not actual["review_has_value_change"]
