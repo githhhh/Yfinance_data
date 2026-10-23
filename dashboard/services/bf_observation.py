@@ -6,6 +6,7 @@ used to build Futu ACTIONABLE codes. No persisted event/price cache is needed.
 from __future__ import annotations
 
 from datetime import date, datetime
+from math import isfinite
 from pathlib import Path
 import pickle
 import subprocess
@@ -15,7 +16,8 @@ import pandas as pd
 
 from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
-    SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone, to_bool,
+    ENTRY_STATUSES, SOURCE_FACT_FIELDS, _calculate_status, _price_zone,
+    _same_buy_point_price, to_bool,
 )
 
 _ZONES = {"BELOW_BUY_POINT": "BELOW", "BUY_ZONE": "ZONE", "EXTENDED": "EXT"}
@@ -93,7 +95,8 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
     path = "us/breakout_follow_pool_midweek.csv"
     try:
         history = subprocess.run(
-            ["git", "log", "-20", "--format=%H", "--", path],
+            ["git", "log", f"--since={monday_of_week(current_date).isoformat()}T00:00:00",
+             "--format=%H", "--", path],
             cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
         ).stdout.splitlines()
         for sha in history:
@@ -102,13 +105,45 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
                 cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
             ).stdout
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
-            dates = pd.to_datetime(frame.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
+            required = {"snapshot_date", "code", "signal"}
+            if frame.empty or not required.issubset(frame.columns):
+                return None
+            parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+            signals = frame["signal"].map(to_bool)
+            if (parsed.isna().any() or frame["code"].isna().any()
+                    or frame["code"].astype(str).str.strip().eq("").any()
+                    or frame["code"].duplicated().any()
+                    or signals.isna().any()):
+                return None
+            # Corrupted prior selected prices/statuses are not evidence of a
+            # buy-point revision or a confirmation transition. Do not silently
+            # skip one bad commit and compare against an older stale version.
+            active = frame.loc[signals.eq(True)]
+            if not active.empty:
+                signal_fields = {
+                    "ibd_candidate_price", "latest_close",
+                    "ibd_entry_status", "ibd_entry_valid",
+                }
+                if not signal_fields.issubset(frame.columns):
+                    return None
+                if (active["ibd_entry_valid"].map(to_bool).isna().any()
+                        or not active["ibd_entry_status"].isin(ENTRY_STATUSES).all()):
+                    return None
+                for field in ("ibd_candidate_price", "latest_close"):
+                    prices = pd.to_numeric(active[field], errors="coerce")
+                    if not prices.map(
+                        lambda value: pd.notna(value) and
+                        isfinite(float(value)) and float(value) > 0
+                    ).all():
+                        return None
+            dates = parsed.dt.date.unique()
             if len(dates) != 1:
-                continue
+                return None
             previous_date = dates[0]
             if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
                 return frame
-    except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired, pd.errors.ParserError):
         return None
     return None
 
@@ -226,12 +261,10 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None,
 
 
 def _same_identity(a, b):
-    left = _buy_point_anchor(a) if a is not None else None
-    right = _buy_point_anchor(b) if b is not None else None
-    if left and right:
-        return left["identity"] == right["identity"]
-    # Missing source identity must not be invented from an approximate price.
-    return None
+    """Compatibility name: compare the selected buy-point prices only."""
+    if a is None or b is None:
+        return None
+    return _same_buy_point_price(a.get("ibd_candidate_price"), b.get("ibd_candidate_price"))
 
 
 def _b_event(weekend, today, previous, *, comparison_available):
@@ -239,10 +272,6 @@ def _b_event(weekend, today, previous, *, comparison_available):
         return None
     if weekend is not None and _same_identity(weekend, today) is True:
         return None
-    if weekend is not None and _same_identity(weekend, today) is None:
-        if (str(weekend.get("ibd_candidate_rule") or "") ==
-                str(today.get("ibd_candidate_rule") or "")):
-            return None  # fail closed on ambiguous same-rule anchors
     if not comparison_available:
         return "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
@@ -253,10 +282,6 @@ def _b_event(weekend, today, previous, *, comparison_available):
     same = _same_identity(previous, today)
     if same is False:
         return "BP CHANGED"
-    if same is None:
-        return "SNAPSHOT"
-    if _number(previous.get("ibd_candidate_price")) != _number(today.get("ibd_candidate_price")):
-        return "BP UPDATED"
     old_status = str(previous.get("ibd_entry_status") or "")
     new_status = str(today.get("ibd_entry_status") or "")
     if old_status != new_status:

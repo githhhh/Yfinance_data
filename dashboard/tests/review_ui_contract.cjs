@@ -56,8 +56,7 @@ function entry(code) {
     review_membership: "IN",
     review_b_active: true, review_b_price: 185, review_b_close: 180,
     review_b_pct: -2.70, review_b_zone: "BELOW", review_b_rule: "pivot",
-    review_b_entry_valid: false, review_b_verified: true,
-    review_b_date: "2026-10-14", review_b_status: "UNCONFIRMED",
+    review_b_entry_valid: false, review_b_date: "2026-10-14", review_b_status: "UNCONFIRMED",
     review_b_event: "NEW BP", review_b_quality: "Constructive",
     review_b_entry_volume: null, review_b_entry_reason: "Volume not confirmed",
     review_b_details: {
@@ -162,8 +161,7 @@ assert.equal(app.displayStatus(bOnly), "ACTIONABLE");
 state.change = "ALL"; state.scope = "CHANGES"; state.status = "ACTIONABLE";
 const talo = {...entry("TALO"),ibd_entry_status:"EXTENDED",
   current_vs_ibd_candidate_pct:6.15,review_b_status:"ACTIONABLE",
-  review_b_pct:0.73,review_b_zone:"ZONE",review_b_verified:true,
-  review_b_entry_valid:true,review_new_buy_point_zone:"BUY_ZONE"};
+  review_b_pct:0.73,review_b_zone:"ZONE",review_b_entry_valid:true,review_new_buy_point_zone:"BUY_ZONE"};
 assert.equal(app.filterRows([talo]).length,1,"TALO qualifies through its Midweek Buy Point");
 assert.equal(app.reviewUsesB(talo),true);
 assert.equal(app.reviewReferencePrice(talo),185);
@@ -171,7 +169,7 @@ assert.equal(app.reviewReferencePrice(talo),185);
 state.status = "ALL"; state.newBuyPoint = "BUY_ZONE";
 const arqt = {...entry("ARQT"),review_a_active:false,
   review_b_status:"ACTIONABLE",review_b_pct:4.36,review_b_zone:"ZONE",
-  review_b_verified:true,review_b_display_event:"CURRENT",
+  review_b_display_event:"CURRENT",
   review_new_buy_point_zone:"BUY_ZONE",review_b_has_value_change:false,
   review_has_value_change:false};
 assert.equal(app.filterRows([arqt]).length,1,"Stable Midweek BP is in New Buy Points snapshot");
@@ -181,8 +179,7 @@ assert.equal(app.filterCounts([arqt]).newBuyPoint.BUY_ZONE,1);
 // other source's hidden status or event.
 state.newBuyPoint = "ALL"; state.status = "UNCONFIRMED";
 const mixed = {...entry("MIXED"),ibd_entry_status:"UNCONFIRMED",
-  review_b_status:"ACTIONABLE",review_b_verified:true,
-  review_a_has_value_change:true,review_b_has_value_change:false};
+  review_b_status:"ACTIONABLE",review_a_has_value_change:true,review_b_has_value_change:false};
 assert(app.industryHtml([mixed]).includes("0 Actionable"),
   "UNCONFIRMED filter cannot count a hidden B ACTIONABLE as a selected opportunity");
 state.status = "ALL"; state.newBuyPoint = "BUY_ZONE";
@@ -190,29 +187,38 @@ mixed.review_new_buy_point_zone = "BUY_ZONE";
 assert(app.industryHtml([mixed]).includes("0 Changed"),
   "New Buy Points context cannot count unrelated A changes");
 
-// An unverified structural identity is not a tradable ACTIONABLE B even
-// when its raw price/volume status happens to be ACTIONABLE.
+// Entry validity remains independent from the identity of the selected price.
+// Missing Pivot box metadata must not demote a valid ACTIONABLE buy point.
 state.status = "ALL"; state.newBuyPoint = "ALL"; state.scope = "ALL_SIGNALS";
-const ambiguous = {...entry("SN"), review_a_active:false,
-  review_b_verified:false, review_b_status:"ACTIONABLE",
-  review_b_display_event:"UNVERIFIED",review_new_buy_point:false,
-  review_b_identity_state:"AMBIGUOUS"};
-assert.equal(app.displayStatus(ambiguous),"UNVERIFIED");
-assert(app.tableHtml([ambiguous]).includes("UNVERIFIED"));
+const priceOnly = {...entry("PRICE_ONLY"), review_a_active:false,
+  review_b_status:"ACTIONABLE", review_b_entry_valid:true,
+  review_b_display_event:"CURRENT",review_new_buy_point:true};
+assert.equal(app.displayStatus(priceOnly),"ACTIONABLE");
 state.status = "ACTIONABLE";
-assert.equal(app.filterRows([ambiguous]).length,0,
-  "Ambiguous Midweek Buy Point must not pass ACTIONABLE screening");
+assert.equal(app.filterRows([priceOnly]).length,1,
+  "Selected buy-point price is actionable when its independent resolver is valid");
 state.status = "ALL";
-const dualUnverified = {...ambiguous, review_a_active:true,ibd_entry_status:"UNCONFIRMED"};
-assert(app.tableHtml([dualUnverified]).includes("Weekend Buy Point"));
-assert(app.industryHtml([dualUnverified]).includes("Midweek Buy Point"));
-assert(app.industryHtml([dualUnverified]).includes("UNVERIFIED"),
-  "Industry and Stock use consistent buy-point source disclosure");
+const dualPrices = {...priceOnly, review_a_active:true,ibd_entry_status:"UNCONFIRMED"};
+assert(app.tableHtml([dualPrices]).includes("Weekend Buy Point"));
+assert(app.industryHtml([dualPrices]).includes("Midweek Buy Point"));
+assert(!app.industryHtml([dualPrices]).includes("UNVERIFIED"));
 
-const updatedPoint = {...entry("UPDATED"),review_b_display_event:"BP UPDATED",review_b_verified:true};
-assert(app.tableHtml([updatedPoint]).includes("BUY POINT UPDATED"),
-  "Raw BP UPDATED token must not leak to table");
-const changedPoint = {...updatedPoint,review_b_display_event:"BP CHANGED"};
+// Industry and Stock must show the same explicit missing-data label for
+// a fixed Weekend A even when current Midweek B is otherwise actionable.
+const missingWeekendA = {...entry("A_NO_DATA"),review_a_active:true,
+  review_b_active:true,review_data_available:false,ibd_entry_status:null,
+  review_b_status:"ACTIONABLE",review_b_entry_valid:true,
+  review_b_display_event:"NEW BP",review_b_has_value_change:true};
+state.scope = "CHANGES"; state.status = "ALL"; state.newBuyPoint = "ALL";
+assert(app.tableHtml([missingWeekendA]).includes("NO DATA"));
+assert(app.industryHtml([missingWeekendA]).includes("NO DATA"),
+  "Industry Weekend status must agree with Stock when A has no price data");
+assert(app.industryHtml([missingWeekendA]).includes("ACTIONABLE"),
+  "Missing Weekend A data must not suppress independent B entry confirmation");
+
+assert(!script.includes("BP UPDATED") && !script.includes("PRIOR ?"),
+  "Obsolete structural price-update and ambiguous identity labels stay retired");
+const changedPoint = {...entry("CHANGED"),review_b_display_event:"BP CHANGED"};
 assert(app.tableHtml([changedPoint]).includes("BUY POINT CHANGED"),
   "Raw BP CHANGED token must not leak to table");
 
@@ -223,20 +229,32 @@ state.scope = "CHANGES"; state.change = "BECAME_EXTENDED";
 state.newBuyPoint = "ALL"; state.status = "ALL";
 const firstA = {...entry("ALPHA"),review_a_event:"ZONE → EXT",
   review_weekend_buy_point_change:"BECAME_EXTENDED",
-  review_b_active:false,review_b_verified:false};
+  review_b_active:false,};
 const hiddenB = {...entry("ZETA"),review_a_event:"ZONE → EXT",
   review_weekend_buy_point_change:"BECAME_EXTENDED",
-  review_b_status:"ACTIONABLE",review_b_verified:true,
-  review_b_display_event:"NEW BP"};
+  review_b_status:"ACTIONABLE",review_b_display_event:"NEW BP"};
 assert.equal(app.sortRows([hiddenB, firstA]).rows[0].code, "ALPHA",
   "Review Priority must respect selected Weekend Buy Point context");
 state.change = "ALL";
+
+// Industry group pulse in Weekend quick mode reports Vs Weekend, not
+// yesterday's incremental review count.
+state.scope = "CHANGES"; state.change = "BECAME_EXTENDED";
+state.newBuyPoint = "ALL"; state.status = "ALL";
+const cumulativeIndustry = {...entry("CUMULATIVE"), review_b_active:false,
+  review_weekend_buy_point_change:"BECAME_EXTENDED",
+  review_a_week_event:"ZONE → EXT",review_a_event:"",
+  review_a_has_value_change:false,review_has_value_change:false,
+  ibd_entry_status:"EXTENDED"};
+assert(app.industryHtml([cumulativeIndustry]).includes("1 Vs Weekend"));
+state.change = "ALL";
+assert(app.industryHtml([cumulativeIndustry]).includes("0 Changed"));
 
 // Entry confirmation cannot be inferred from the price zone or the status
 // string when resolver validity disagrees.
 state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
 const rejected = {...entry("REJECT"),review_a_active:false,
-  review_b_verified:true,review_b_status:"ACTIONABLE",
+  review_b_status:"ACTIONABLE",
   review_b_entry_valid:false,review_b_entry_reason:"resolver_rejected"};
 assert.equal(app.displayStatus(rejected),"UNCONFIRMED",
   "Invalid resolver must downgrade the displayed ACTIONABLE B stage");
@@ -244,6 +262,63 @@ state.status = "ACTIONABLE";
 assert.equal(app.filterRows([rejected]).length,0,
   "Invalid resolver must not appear as ACTIONABLE in filters");
 state.status = "ALL";
+
+// B returning to fixed Weekend A must remain visible as a selected-price
+// event without manufacturing an A zone transition or a phantom B snapshot.
+state.scope = "CHANGES"; state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const returned = {...entry("RETURNED"), review_b_active:false,
+  review_new_buy_point:false, review_new_buy_point_zone:null,
+  review_b_has_value_change:false, review_a_has_value_change:false,
+  review_a_event:"", review_a_week_event:"",
+  review_selected_price_event:"BP CHANGED", review_has_value_change:true};
+assert.equal(app.filterRows([returned]).length, 1,
+  "Price reverting B → A is a daily Review Now event");
+assert(app.changeLines(returned).includes(">TO WEEKEND</span>"));
+assert(app.tableHtml([returned]).includes("To Weekend</small>"));
+assert(app.industryHtml([returned]).includes("1 Changed"));
+state.scope = "ALL_SIGNALS";
+assert(app.changeLines(returned).includes("TO WEEKEND"));
+assert(app.industryHtml([returned]).includes("1 Changed"),
+  "All Review Industry pulse must count the visible return-to-Weekend event");
+state.scope = "CHANGES";
+assert.equal(app.filterCounts([returned]).newBuyPoint.BUY_ZONE, 0);
+assert.equal(app.filterCounts([returned]).status.ACTIONABLE, 1);
+state.change = "ENTERED_BUY_ZONE";
+assert.equal(app.filterRows([returned]).length, 0,
+  "Price reversion is not a Weekend A price-zone change");
+state.change = "ALL";
+const persisted = {...returned, review_selected_price_event:"", review_has_value_change:false};
+assert.equal(app.filterRows([persisted]).length, 0,
+  "Return to A is not repeated on an unchanged later session");
+
+// Weekend What Changed always explains the cumulative comparison, even
+// when a separate previous-snapshot arrow exists on the same day.
+state.scope = "CHANGES"; state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const basisCase = {...entry("BASIS"),review_a_active:true,review_b_active:false,
+  review_a_event:"BELOW → ZONE",review_a_week_event:"EXT → ZONE",
+  review_weekend_buy_point_change:"ENTERED_BUY_ZONE",
+  review_a_has_value_change:true,review_has_value_change:true};
+assert(app.changeLines(basisCase).includes("BELOW → ZONE"),
+  "Review Now reports the actual previous-snapshot transition");
+state.change = "ENTERED_BUY_ZONE";
+const cumulativeCase = app.changeLines(basisCase);
+assert(cumulativeCase.includes("EXT → ZONE"),
+  "Weekend What Changed reports the fixed Weekend comparison");
+assert(!cumulativeCase.includes("BELOW → ZONE"),
+  "Weekend What Changed must not accidentally describe yesterday");
+assert(cumulativeCase.includes("Vs Weekend"));
+state.change = "ALL";
+
+// No Data is not a historical change; a simultaneous actual Pool exit is.
+const missingOnExit = {...entry("MISSING_OUT"),review_a_active:true,
+  review_b_active:false,review_data_available:false,
+  review_membership:"OUT",review_membership_event:"IN → OUT",
+  review_a_event:"",review_a_week_event:"",
+  review_a_has_value_change:true,review_has_value_change:true};
+assert(app.changeLines(missingOnExit).includes("POOL OUT"),
+  "Review Now must show actual Pool exit even without a price observation");
+assert(!app.changeLines(missingOnExit).includes(">No Data</span>"),
+  "No Data cannot hide the real membership change");
 
 // Review Now is the latest increment, but Weekend quick filters keep the
 // cumulative Vs Weekend position, so a stable below-BP ticker remains
@@ -277,8 +352,8 @@ assert(compact.includes('title="Midweek Buy Point · NEW BUY POINT · Vs Previou
 const stable={...onlyB,review_b_display_event:"CURRENT"};
 assert(app.changeLines(stable).includes("Still Unconfirmed"));
 assert(!app.changeLines(stable).includes("NO CHANGE"));
-const uncertain={...onlyB,review_b_display_event:"UNVERIFIED"};
-assert(app.changeLines(uncertain).includes(">UNVERIFIED</span>"));
+const changed={...onlyB,review_b_display_event:"BP CHANGED"};
+assert(app.changeLines(changed).includes(">CHANGED</span>"));
 const both={...entry("DUAL"),review_a_event:"ZONE → EXT",
   review_a_has_value_change:true,review_b_has_value_change:true,
   review_b_display_event:"NEW BP"};
@@ -294,7 +369,7 @@ const focusRow = {...entry("FOCUS"), review_a_active:true,
   review_b_active:true, review_a_event:"",
   review_a_week_event:"ZONE → EXT", review_a_has_value_change:false,
   review_b_has_value_change:true, review_b_display_event:"NEW BP",
-  review_b_verified:true,review_b_entry_valid:true,
+  review_b_entry_valid:true,
   review_has_value_change:true,review_weekend_buy_point_change:"BECAME_EXTENDED"};
 const focusHtml=app.changeLines(focusRow);
 assert.equal((focusHtml.match(/class="change-line"/g)||[]).length,1,
@@ -358,7 +433,7 @@ assert(app.changeLines(membershipOnly).includes("ZONE → EXT"),
 // a misleading "Still Actionable" row or ACTIONABLE badge count.
 const changedAStableB = {...entry("A_CHANGED"), ibd_entry_status:"EXTENDED",
   review_a_active:true, review_a_has_value_change:true, review_a_event:"ZONE → EXT",
-  review_b_active:true, review_b_verified:true, review_b_entry_valid:true,
+  review_b_active:true, review_b_entry_valid:true,
   review_b_status:"ACTIONABLE", review_b_display_event:"CURRENT",
   review_b_has_value_change:false, review_has_value_change:true};
 state.scope = "CHANGES"; state.status = "ACTIONABLE";
@@ -416,12 +491,12 @@ assert(entryHtml.includes('title="daily_volume_not_confirmed"'));
 assert(!entryHtml.includes(">daily_volume_not_confirmed<"));
 const noSelection = app.selectedHtml(null);
 assert(noSelection.includes("selected-strip empty"));
-assert(app.statusCardsHtml({NEAR_BREAKOUT:0,ACTIONABLE:1,UNCONFIRMED:1,
-  BELOW_TRIGGER:0,EXTENDED:0,UNVERIFIED:3}).includes("Unverified · 3"),
-  "Unverified identities must be discoverable without a sixth large card");
-assert.equal(app.filterCounts([{...entry("AMBIG"),review_a_active:false,
-  review_b_active:true,review_b_verified:false,review_b_status:"ACTIONABLE"}]).status.UNVERIFIED,1,
-  "Unverified status tally must use the same source filter predicate");
+assert(!app.statusCardsHtml({NEAR_BREAKOUT:0,ACTIONABLE:1,UNCONFIRMED:1,
+  BELOW_TRIGGER:0,EXTENDED:0}).includes("Unverified"),
+  "No identity-verification status may appear in Entry Status");
+assert.equal(app.filterCounts([{...entry("VALID"),review_a_active:false,
+  review_b_active:true,review_b_entry_valid:true,review_b_status:"ACTIONABLE"}]).status.ACTIONABLE,1,
+  "ACTIONABLE status counts follow resolver facts without structural gates");
 state.scope = "CHANGES";
 
 // The range controls must include B even when A is the primary display.

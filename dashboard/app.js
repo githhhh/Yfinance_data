@@ -4,7 +4,7 @@
   const app = document.getElementById("app");
   const WATCH_STAGE = "NEAR_BREAKOUT";
   const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"];
-  const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER, "UNVERIFIED"];
+  const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER];
   const CHANGE_ORDER = ["ENTERED_BUY_ZONE", "BELOW_BUY_POINT", "BECAME_EXTENDED"];
   const NEW_BUY_POINT_ORDER = ["BUY_ZONE", "BELOW_BUY_POINT", "EXTENDED"];
   const ROUTE_LABELS = {
@@ -75,7 +75,6 @@
   }
 
   function statusColor(status) {
-    if (status === "UNVERIFIED") return "#ffd21f";
     return data?.ui?.status_meta?.[status]?.color || "#f4f5f7";
   }
 
@@ -194,17 +193,14 @@
     if (forced || !reviewNowMode() || isNearBreakout(row)) return sources;
     // A single ticker may have two independent references. Review Now and
     // its status/advanced filters must match the reference that actually changed.
-    return sources.filter((src) => src === "A" ? bool(row.review_a_has_value_change)
+    return sources.filter((src) => src === "A" ?
+      (bool(row.review_a_has_value_change) || row.review_selected_price_event === "BP CHANGED")
       : src === "B" ? bool(row.review_b_has_value_change) : false);
   }
   function contextStatus(row, src) {
     if (src === "WATCH") return WATCH_STAGE;
-    // Structural identity and entry confirmation are separate facts. An
-    // unresolved B may retain its raw entry status for diagnosis, but must
-    // not be advertised as a verified ACTIONABLE opportunity.
     if (src === "B") {
-      if (!bool(row.review_b_verified)) return "UNVERIFIED";
-      // Mirror the observation alert's fail-closed resolver rule.
+      // Entry confirmation is independent of selected buy-point price.
       if (row.review_b_status === "ACTIONABLE" && !bool(row.review_b_entry_valid)) {
         return "UNCONFIRMED";
       }
@@ -363,24 +359,20 @@
     if (/→ BELOW$/.test(event)) return "danger";
     if (/→ EXT$/.test(event) || /→ EXTENDED$/.test(event)) return "extended";
     if (/→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) || event === "NEW BUY POINT" || event === "NEW") return "success";
-    return /UNVERIFIED/.test(event) || event === "NO DATA" || event === "No Data" ? "warning" : "muted";
+    return event === "NO DATA" || event === "No Data" ? "warning" : "muted";
   }
   function readableMidweekEvent(raw) {
     if (raw === "NEW BP") return "NEW BUY POINT";
     if (raw === "BP CHANGED") return "BUY POINT CHANGED";
-    if (raw === "BP UPDATED") return "BUY POINT UPDATED";
     if (raw === "CURRENT") return "NO CHANGE";
     if (raw === "SNAPSHOT") return "CURRENT SNAPSHOT";
-    if (raw === "HISTORY_UNVERIFIED") return "PREVIOUS CHANGE UNVERIFIED";
     return raw || "NO DATA";
   }
   // Compact main-table copy is deliberately separate from the complete
   // evidence in the tooltip / mobile expanded details.
   function compactChangeEvent(raw) {
     if (raw === "NEW BP") return "NEW";
-    if (raw === "BP UPDATED") return "UPDATED";
     if (raw === "BP CHANGED") return "CHANGED";
-    if (raw === "HISTORY_UNVERIFIED") return "PRIOR ?";
     if (raw === "NO DATA") return "No Data";
     if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
     return raw || "";
@@ -398,7 +390,6 @@
       return ["No Data", "Weekend Buy Point · market price unavailable"];
     }
     const status = contextStatus(row, source);
-    if (status === "UNVERIFIED") return ["Unverified", "Buy-point identity unverified"];
     if (status === "NO_DATA") return ["No Data", "Price or status unavailable"];
     const labels = {
       ACTIONABLE: "Actionable", UNCONFIRMED: "Unconfirmed",
@@ -417,16 +408,20 @@
     const incremental = reviewNowMode();
     if (bool(row.review_a_active) && sources.includes("A") &&
         (!incremental || bool(row.review_a_has_value_change))) {
+      // Explicit What Changed is anchored to the immutable Weekend price.
+      // Only Review Now prioritizes the latest published/observed increment.
+      const cumulative = state.change !== "ALL";
       const raw = row.review_data_available === false ? "NO DATA" :
+        cumulative ? text(row.review_a_week_event, "") :
         text(row.review_a_event, "") || text(row.review_a_week_event, "");
-      const basis = row.review_a_event
+      const basis = !cumulative && row.review_a_event
         ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
       const event = compactChangeEvent(raw);
       // In Review Now, a membership-only change is the new event; an older
       // Vs Weekend difference must not be shown as today's change reason.
       const membershipOnly = incremental && !text(row.review_a_event, "") &&
-        !!text(row.review_membership_event, "") && row.review_data_available !== false;
+        !!text(row.review_membership_event, "");
       if (event && !membershipOnly) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
       else if (row.review_membership_event) {
         const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
@@ -441,6 +436,13 @@
         "Previous Snapshot Unavailable";
       const event = compactChangeEvent(raw);
       if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
+    }
+    // A fixed Weekend buy point did not move; only today's selected
+    // Midweek price changed back from B to A. Keep the two facts separate.
+    if (state.change === "ALL" && state.newBuyPoint === "ALL" &&
+        row.review_selected_price_event === "BP CHANGED" && sources.includes("A")) {
+      items.push(["Selected", "Selected Buy Point", "TO WEEKEND",
+        "BP CHANGED · selected price returned to Weekend", "Vs Previous Snapshot"]);
     }
     return {items, sources};
   }
@@ -542,10 +544,11 @@
         const items = changeItems(row).items;
         const a = items.find((item) => item[0] === "Weekend")?.[2] || "";
         const b = items.find((item) => item[0] === "Midweek")?.[2] || "";
-        if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="ACTIONABLE" && b!=="CURRENT") return 0;
+        if (b && contextStatus(row,"B")==="ACTIONABLE" && b!=="CURRENT") return 0;
         if (/→ ZONE$/.test(a) && row.ibd_entry_status==="ACTIONABLE") return 1;
-        if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="UNCONFIRMED" && b!=="CURRENT") return 2;
+        if (b && contextStatus(row,"B")==="UNCONFIRMED" && b!=="CURRENT") return 2;
         if (/→ ZONE$/.test(a)) return 3;
+        if (items.some((item) => item[2] === "TO WEEKEND")) return 3;
         if (/→ BELOW$/.test(a) || /→ BELOW$/.test(b)) return 4;
         if (/→ EXT$/.test(a) || /→ EXT$/.test(b)) return 5;
         return 6;
@@ -624,7 +627,7 @@
     const midweekDisabled = !data.meta.midweek_available;
     const scope = comparison
       ? `<div class="scope-block scope-switch"><div class="control-group-label">Scope</div><div class="segmented">
-           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Changed Weekend Buy Points and verified changes to Midweek Buy Points; current unchanged Midweek Buy Points remain available under New Buy Points">Review Now · ${changeTotal}</button>
+           <button data-action="scope" data-value="CHANGES" aria-pressed="${state.scope === "CHANGES"}" title="Weekend changes and selected Midweek buy-point price changes; stable Midweek points stay available in New Buy Points">Review Now · ${changeTotal}</button>
            <button data-action="scope" data-value="ALL_SIGNALS" aria-pressed="${state.scope === "ALL_SIGNALS"}">All Review · ${activeTotal}</button>
          </div></div>`
       : `<div class="scope-block scope-static-block"><div class="control-group-label">Scope</div><div class="scope-static">All Review · ${activeTotal}</div></div>`;
@@ -695,7 +698,7 @@
         <div class="status-grid review-watch-grid">${watch}</div>
       </div>
       <div class="review-flow-group">
-        <div class="review-flow-label">Entry Status <span>active signals</span>${(counts.UNVERIFIED > 0 || state.status === "UNVERIFIED") ? ` <button class="unverified-quick" data-action="status" data-value="UNVERIFIED" aria-pressed="${state.status === "UNVERIFIED"}" title="Midweek structural identity not confirmed; filter these stocks">Unverified · ${counts.UNVERIFIED ?? 0}</button>` : ""}</div>
+        <div class="review-flow-label">Entry Status <span>active signals</span></div>
         <div class="status-grid review-entry-grid">${entries}</div>
       </div>
     </div>`;
@@ -759,15 +762,16 @@
     const rank = (value) => value === null || value === undefined ? -1 : value;
     for (const group of grouped.values()) {
       // Aggregates reflect the exact currently filtered ticker population.
-      // B is counted as actionable only when its structural identity is verified.
       group.actionable = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) &&
-        contextStatus(row, source) === "ACTIONABLE" &&
-        (source !== "B" || bool(row.review_b_verified))
+        contextStatus(row, source) === "ACTIONABLE"
       )).length;
       group.changed = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) && (
-          source === "A" && bool(row.review_a_has_value_change) ||
+          source === "A" && (state.change !== "ALL"
+            ? row.review_weekend_buy_point_change === state.change
+            : bool(row.review_a_has_value_change) ||
+              (state.newBuyPoint === "ALL" && row.review_selected_price_event === "BP CHANGED")) ||
           source === "B" && bool(row.review_b_has_value_change)
         )
       )).length;
@@ -796,6 +800,7 @@
     const loading = !provider || provider.status() === "loading";
     if (loading) return '<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results"><div class="industry-notice" role="status">Loading rs-log industry reference…</div></div>';
     const groups = industryGroups(rows);
+    const changedLabel = currentHasComparison() && state.change !== "ALL" ? "Vs Weekend" : "Changed";
     const message = loading ? "Loading rs-log industry reference…" :
       provider.status() !== "ready" ? "Industry RS unavailable · showing available stock classifications." : "";
     const codeRow = (row) => {
@@ -803,7 +808,7 @@
       const rs = provider?.stockRS(row.code);
       const status = displayStatus(row);
       const statusHtml = currentHasComparison() && bool(row.review_a_active) && bool(row.review_b_active)
-        ? `<div class="bp-status-lines"><div class="bp-status-line ${reviewUsesB(row) ? "" : "is-active"}"><small title="Weekend Buy Point">Weekend</small><span class="status-text" style="color:${statusColor(row.ibd_entry_status)}">${esc(statusLabel(row.ibd_entry_status))}</span></div><div class="bp-status-line ${reviewUsesB(row) ? "is-active" : ""}"><small title="Midweek Buy Point">Midweek</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
+        ? `<div class="bp-status-lines"><div class="bp-status-line ${reviewUsesB(row) ? "" : "is-active"}"><small title="Weekend Buy Point">Weekend</small><span class="status-text" style="color:${statusColor(row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status)}">${esc(statusLabel(row.review_data_available === false ? "NO_DATA" : row.ibd_entry_status))}</span></div><div class="bp-status-line ${reviewUsesB(row) ? "is-active" : ""}"><small title="Midweek Buy Point">Midweek</small><span class="status-text" style="color:${statusColor(contextStatus(row,"B"))}">${esc(statusLabel(contextStatus(row,"B")))}</span></div></div>`
         : `<span class="status-text" style="color:${statusColor(status)}">${esc(statusLabel(status))}</span>`;
       const selected = String(state.industrySelected[state.period]) === String(row.code);
       const main = `<tr data-code="${code}" aria-expanded="${selected && isMobileReview()}" class="${selected ? "selected" : ""}">
@@ -826,7 +831,7 @@
           <button type="button" class="industry-group-toggle" data-action="toggle-industry" data-industry="${esc(group.name)}" aria-expanded="${opened}">
             <svg class="industry-chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="industry-group-main">
-              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} ${group.rows.length === 1 ? "stock" : "stocks"}</span><span class="industry-group-pulse">${group.actionable} Actionable · ${group.changed} Changed</span></span></span>
+              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} ${group.rows.length === 1 ? "stock" : "stocks"}</span><span class="industry-group-pulse">${group.actionable} Actionable · ${group.changed} ${changedLabel}</span></span></span>
               <span class="industry-top3" ${opened ? "hidden" : ""}>${group.rows.slice(0, 3).map((row) => {
                 const value = provider?.stockRS(row.code);
                 return `<span class="industry-chip">${esc(row.code)} <small>${value === null || value === undefined ? "N/A" : esc(String(value))}</small></span>`;
@@ -1152,7 +1157,7 @@
       ["industry_rs", "IND RS"],
     ];
     const selected = state.selected[state.period];
-    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}${field === "review_change_label" ? '<span class="change-help" title="Still = same reported stage · NEW = new buy point · No Prior = cannot compare · Unverified = identity uncertain">ⓘ</span>' : ""}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" data-sort-value="${field === "ibd_entry_status" ? esc(statusLabel(displayStatus(row))) : ""}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-shell" tabindex="0" data-table-shell><table class="review-table"><thead><tr>${columns.map(([field, label]) => `<th data-field="${esc(field)}">${esc(label)}${field === "review_change_label" ? '<span class="change-help" title="Still = unchanged since the previous snapshot · NEW = first observed Midweek buy point · No Prior = comparison unavailable">ⓘ</span>' : ""}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr data-code="${esc(row.code)}" aria-expanded="false" class="${String(row.code) === String(selected) ? "selected" : ""}">${columns.map(([field]) => `<td data-field="${esc(field)}" data-sort-value="${field === "ibd_entry_status" ? esc(statusLabel(displayStatus(row))) : ""}" class="${field === "code" ? "code-cell" : ""}">${cellHtml(row, field)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function cellHtml(row, field) {
@@ -1179,11 +1184,9 @@
       const event = picked[2];
       const label = event === "NEW" ? "New Point" :
         event === "CHANGED" ? "Point Changed" :
-        event === "UPDATED" ? "Point Updated" :
         event === "POOL OUT" ? "Pool OUT" :
         event === "POOL IN" ? "Pool IN" :
-        event === "PRIOR ?" ? "Prior ?" :
-        event === "UNVERIFIED" ? "Unverified" :
+        event === "TO WEEKEND" ? "To Weekend" :
         /→ BELOW$/.test(event) ? "↓ Below" :
         /→ EXT$/.test(event) || /→ EXTENDED$/.test(event) ? "↑ Extended" :
         /→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) ? "→ Buy Zone" : "→ Changed";
@@ -1320,7 +1323,9 @@
     const industryShell = app.querySelector("[data-industry-list]");
     if (industryShell) industryShell.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")];
+      // Collapsed group rows remain mounted in the DOM but are not reviewable.
+      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")]
+        .filter((row) => !row.closest(".industry-group-body")?.hidden);
       if (!visibleRows.length) return;
       event.preventDefault();
       event.stopPropagation();
@@ -1329,7 +1334,9 @@
       if (index < 0) index = event.key === "ArrowDown" ? -1 : visibleRows.length;
       index = Math.min(visibleRows.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
       const target = visibleRows[index];
-      target.click();
+      // Clicking the current row toggles selection off; arrow-key clamping
+      // at either boundary must instead leave the selection in place.
+      if (target.dataset.code !== current) target.click();
       // Scroll the industry container only; never move the entire Review page.
       const shellRect = industryShell.getBoundingClientRect();
       const rowRect = target.getBoundingClientRect();

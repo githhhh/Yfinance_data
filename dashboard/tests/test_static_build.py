@@ -81,6 +81,45 @@ def test_static_payload_uses_authoritative_normalized_complete_pool() -> None:
         assert field not in payload_text
 
 
+def test_selected_price_reversion_survives_public_json_projection() -> None:
+    from dashboard.services.bf_observation import build_observation_view
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    def signal(price: float, day: str) -> dict:
+        return {
+            "code": "RETURNED", "snapshot_date": day, "signal": True,
+            "ibd_candidate_rule": "pivot", "ibd_candidate_price": price,
+            "ibd_candidate_extra": "{}", "ibd_entry_valid": True,
+            "ibd_entry_status": "ACTIONABLE", "latest_close": 102.0,
+        }
+
+    complete = pd.DataFrame([signal(100.0, "2026-10-16")])
+    previous = pd.DataFrame([signal(103.0, "2026-10-19")])
+    current = pd.DataFrame([signal(100.0, "2026-10-20")])
+    raw = build_observation_view(
+        complete, current, current, previous=previous, daily={},
+        as_of=date(2026, 10, 20),
+    )
+    decorated = decorate_observation_view(
+        raw, complete=complete, current=current, previous=previous,
+    )
+    assert not decorated.iloc[0]["review_a_has_value_change"]
+    assert not decorated.iloc[0]["review_b_active"]
+
+    # The public whitelist must pass the selected-price event to the browser
+    # while rejecting both old structural-verification business fields.
+    injected = decorated.assign(
+        review_b_verified=True, review_b_identity_state="EXACT",
+    )
+    exported = _records(injected)[0]
+    assert exported["review_selected_price_event"] == "BP CHANGED"
+    assert exported["review_has_value_change"] is True
+    assert "review_b_verified" not in exported
+    assert "review_b_identity_state" not in exported
+    assert "review_b_verified" not in PUBLIC_DASHBOARD_ROW_FIELDS
+    assert "review_b_identity_state" not in PUBLIC_DASHBOARD_ROW_FIELDS
+
+
 def test_static_records_fail_closed_on_new_pool_columns() -> None:
     frame = pd.DataFrame(
         [

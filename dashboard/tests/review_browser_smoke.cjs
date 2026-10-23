@@ -29,7 +29,6 @@ function row(code, rest) {
 }
 const bOnly = row("BONLY", {
   review_b_active: true, review_b_price: 185, review_b_status: "UNCONFIRMED",
-  review_b_verified: true,
   review_b_rule: "pivot", review_b_close: 180, review_b_pct: -2.70,
   review_b_zone: "BELOW", review_b_event: "NEW BP",
   review_b_date: "2026-10-14", review_b_entry_reason: "Volume not confirmed",
@@ -42,10 +41,24 @@ const bOnly = row("BONLY", {
   review_new_buy_point: true, review_new_buy_point_zone: "BELOW_BUY_POINT",
   review_has_value_change: true, review_b_has_value_change: true,
 });
+const returned = row("RETURNED", {
+  review_selected_price_event: "BP CHANGED",
+  review_a_active: true, review_b_active: false,
+  review_a_has_value_change: false, review_b_has_value_change: false,
+  review_has_value_change: true, review_a_event: "", review_a_week_event: "",
+  review_weekend_buy_point_change: "UNCHANGED",
+});
+const revertedZone = row("REVERTZONE", {
+  review_a_active:true, review_b_active:false,
+  review_a_event:"BELOW → ZONE", review_a_week_event:"",
+  review_a_has_value_change:true, review_has_value_change:true,
+  review_weekend_buy_point_change:"UNCHANGED",
+});
 const aOnly = row("AWEEK", {
   ibd_entry_status: "UNCONFIRMED",
   review_membership: "OUT", review_a_has_value_change: true,
   review_has_value_change: true, review_a_event: "BELOW → ZONE",
+  review_a_week_event: "EXT → ZONE",
   review_change_label: "BELOW → ZONE · OUT",
   review_buy_point_change_label: "BELOW → ZONE · OUT",
   review_weekend_buy_point_change: "ENTERED_BUY_ZONE",
@@ -63,8 +76,7 @@ const belowOut = row("BELOWOUT", {
 const dual = row("DUAL", {
   review_membership: "OUT", review_a_active: true,
   review_a_event: "ZONE → EXT", review_a_has_value_change: true,
-  review_b_active: true, review_b_verified: true,
-  review_b_status: "ACTIONABLE", review_b_entry_valid: true,
+  review_b_active: true, review_b_status: "ACTIONABLE", review_b_entry_valid: true,
   review_b_display_event: "UNCONFIRMED → ACTIONABLE", review_b_has_value_change: true,
   review_b_price: 171, review_b_pct: 2.34, review_b_close: 175,
   review_has_value_change: true, review_weekend_buy_point_change: "BECAME_EXTENDED",
@@ -75,8 +87,7 @@ const poolOnly = row("POOLONLY", {
   review_a_event: "", review_a_week_event: "ZONE → EXT",
   review_a_has_value_change: true, review_has_value_change: true,
   review_weekend_buy_point_change: "BECAME_EXTENDED",
-  review_b_active: true, review_b_verified: true,
-  review_b_entry_valid: true, review_b_status: "ACTIONABLE",
+  review_b_active: true, review_b_entry_valid: true, review_b_status: "ACTIONABLE",
   review_b_display_event: "CURRENT", review_b_has_value_change: false,
 });
 const near = row("NEAR", {
@@ -87,7 +98,7 @@ const near = row("NEAR", {
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
-payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, near];
+payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, returned, revertedZone, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
 async function ready() {
@@ -119,7 +130,7 @@ async function ready() {
       }));
       await page.goto("http://127.0.0.1:8765/", { waitUntil: "domcontentloaded" });
       await page.locator(".review-section").waitFor();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 5, "Changes scope excludes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 7, "Changes scope excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
@@ -139,6 +150,15 @@ async function ready() {
           `${outCode} status must not be horizontally clipped (${viewport.width}px)`);
         assert(outRect.y + outRect.height <= statusBox.y + statusBox.height + 1,
           `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
+      }
+      const reverted = page.locator('.review-table tbody tr[data-code="REVERTZONE"]');
+      assert((await reverted.locator('td[data-field="review_change_label"]').innerText()).includes("BELOW → ZONE"),
+        "A daily re-entry is visible in Review Now even after returning to the Weekend zone");
+      const returnedRow = page.locator('.review-table tbody tr[data-code="RETURNED"]');
+      assert((await returnedRow.locator('td[data-field="review_change_label"]').innerText()).includes("TO WEEKEND"),
+        "A return from B to the immutable Weekend price is a visible one-day event");
+      if (viewport.width <= 760) {
+        assert.equal((await returnedRow.locator(".mobile-change-hint").innerText()).trim(), "To Weekend");
       }
       const poolRow = page.locator('.review-table tbody tr[data-code="POOLONLY"]');
       const poolChange = poolRow.locator('td[data-field="review_change_label"]');
@@ -217,7 +237,7 @@ async function ready() {
       }
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 6, "All Review includes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 8, "All Review includes Near");
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
@@ -264,6 +284,43 @@ async function ready() {
       }
       const after = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!after, "Industry view overflow at " + viewport.width);
+
+      // Re-sort groups so a CLOSED higher-RS industry precedes the expanded
+      // group. Arrow navigation must skip its DOM-mounted hidden stock rows.
+      await page.evaluate(() => {
+        window.BFIndustryRS.industryForCode = code => code === "NEAR" ? "Energy" : "Software";
+        window.BFIndustryRS.industryRS = industry => industry === "Energy" ? 99 : 92;
+        document.getElementById("app").dispatchEvent(new Event("bf-rs-updated"));
+      });
+      // The earlier view can have expanded a stale/unclassified group
+      // before the synthetic RS source was installed. Expand the actual
+      // newly resolved Software group after the reference refresh.
+      const softwareToggle = page.locator('.industry-group-toggle[data-industry="Software"]');
+      assert.equal(await softwareToggle.count(), 1, "Refreshed Industry groups have their real labels");
+      if ((await softwareToggle.getAttribute("aria-expanded")) !== "true") await softwareToggle.click();
+      const industryShell = page.locator("[data-industry-list]");
+      assert(await industryShell.locator('.industry-group-body:not([hidden]) tbody tr[data-code]').count() > 0,
+        "Keyboard test requires visible stock rows in the expanded group");
+      assert(await industryShell.locator('.industry-group-body[hidden] tbody tr[data-code]').count() > 0,
+        "Keyboard test requires an additional collapsed industry group");
+      await industryShell.focus();
+      await page.keyboard.press("ArrowUp");
+      const lastVisible = page.locator(".industry-stock-table tbody tr.selected");
+      assert.equal(await lastVisible.count(), 1, "ArrowUp selects one visible industry ticker");
+      assert(await lastVisible.isVisible(), "Keyboard may not select a collapsed group row");
+      const originalCode = await lastVisible.getAttribute("data-code");
+      await page.keyboard.press("ArrowDown");
+      assert.equal(await page.locator(".industry-stock-table tbody tr.selected").getAttribute("data-code"), originalCode,
+        "ArrowDown at the last visible ticker cannot deselect the row");
+      await page.locator('[data-action="quick"][data-field="change"][data-value="ENTERED_BUY_ZONE"]').click();
+      assert((await page.locator(".industry-group-pulse").first().innerText()).includes("1 Vs Weekend"),
+        "What Changed industry concentration must match the cumulative Weekend quick group");
+      const quickA = page.locator('.industry-stock-table tbody tr[data-code="AWEEK"] td').first();
+      assert((await quickA.count()) === 1);
+      assert.equal(await page.locator('.industry-stock-table tbody tr[data-code="REVERTZONE"]').count(), 0,
+        "A latest re-entry matching the fixed Weekend zone must not leak into cumulative What Changed");
+      assert(!(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)),
+        "Weekend quick group cannot cause Industry overflow");
       await page.close();
     }
   } finally { await browser.close(); }
