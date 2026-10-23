@@ -760,12 +760,12 @@
     for (const group of grouped.values()) {
       // Aggregates reflect the exact currently filtered ticker population.
       // B is counted as actionable only when its structural identity is verified.
-      group.actionable = group.rows.filter((row) => contextSources(row).some((source) =>
+      group.actionable = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) &&
         contextStatus(row, source) === "ACTIONABLE" &&
         (source !== "B" || bool(row.review_b_verified))
       )).length;
-      group.changed = group.rows.filter((row) => contextSources(row).some((source) =>
+      group.changed = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) && (
           source === "A" && bool(row.review_a_has_value_change) ||
           source === "B" && bool(row.review_b_has_value_change)

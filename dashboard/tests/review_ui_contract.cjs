@@ -372,6 +372,15 @@ assert.equal(app.filterRows([changedAStableB]).length, 1,
 assert(app.changeLines(changedAStableB).includes("ZONE → EXT"),
   "Change must expose the source responsible for the filtered row");
 state.status = "ALL";
+assert(app.industryHtml([changedAStableB]).includes("0 Actionable · 1 Changed"),
+  "Industry Review Now concentration must count changed A, not stable B ACTIONABLE");
+const changedBStableA = {...changedAStableB,code:"B_CHANGED",
+  ibd_entry_status:"ACTIONABLE",review_a_event:"",
+  review_a_has_value_change:false,review_b_has_value_change:true,
+  review_b_status:"UNCONFIRMED",review_b_display_event:"ACTIONABLE → UNCONFIRMED",
+  review_b_entry_valid:false};
+assert(app.industryHtml([changedBStableA]).includes("0 Actionable · 1 Changed"),
+  "Industry Review Now concentration must not count stable A ACTIONABLE");
 changedAStableB.ibd_entry_volume_ratio = 0.8;
 changedAStableB.review_b_entry_volume = 2.5;
 state.entryVolumeMin = 1.5;
