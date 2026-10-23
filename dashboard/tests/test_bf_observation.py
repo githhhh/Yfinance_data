@@ -288,6 +288,54 @@ def test_corrupt_latest_git_history_fails_closed_instead_of_using_older_day(tmp_
     assert load_previous_midweek(tmp_path, date(2026, 10, 16)) is None
 
 
+def test_invalid_prior_signal_price_does_not_forge_a_buy_point_change(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    stale = row("B", snapshot="2026-10-14", trigger=120)
+    stale["ibd_candidate_price"] = None
+    pd.DataFrame([stale]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "previous corrupted signal"], cwd=tmp_path, check=True)
+    assert load_previous_midweek(tmp_path, date(2026, 10, 15)) is None
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-09", trigger=100)])
+    current = pd.DataFrame([row("B", snapshot="2026-10-15", trigger=120)])
+    raw = build_observation_view(
+        weekend, current, current, previous=None, daily={},
+        as_of=date(2026, 10, 15),
+    )
+    displayed = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+    ).set_index("code").loc["B"]
+    assert displayed["review_b_display_event"] == "SNAPSHOT"
+    assert not displayed["review_b_has_value_change"]
+    assert not displayed["review_has_value_change"]
+
+
+def test_invalid_prior_confirmation_cannot_create_status_change(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    old = row("B", snapshot="2026-10-14", trigger=120)
+    old["ibd_entry_status"] = ""
+    pd.DataFrame([old]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "previous invalid status"], cwd=tmp_path, check=True)
+    assert load_previous_midweek(tmp_path, date(2026, 10, 15)) is None
+
+
 def test_no_yesterday_bar_never_invents_latest_daily_transition():
     complete = pd.DataFrame([row("GAP", trigger=100, close=108)])
     # 10/12 was an open US trading day, but it is absent from the PKL.

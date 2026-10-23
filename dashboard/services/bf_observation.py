@@ -6,6 +6,7 @@ used to build Futu ACTIONABLE codes. No persisted event/price cache is needed.
 from __future__ import annotations
 
 from datetime import date, datetime
+from math import isfinite
 from pathlib import Path
 import pickle
 import subprocess
@@ -15,7 +16,7 @@ import pandas as pd
 
 from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
-    SOURCE_FACT_FIELDS, _calculate_status, _price_zone,
+    ENTRY_STATUSES, SOURCE_FACT_FIELDS, _calculate_status, _price_zone,
     _same_buy_point_price, to_bool,
 )
 
@@ -108,11 +109,33 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
             if frame.empty or not required.issubset(frame.columns):
                 return None
             parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+            signals = frame["signal"].map(to_bool)
             if (parsed.isna().any() or frame["code"].isna().any()
                     or frame["code"].astype(str).str.strip().eq("").any()
                     or frame["code"].duplicated().any()
-                    or frame["signal"].map(to_bool).isna().any()):
+                    or signals.isna().any()):
                 return None
+            # Corrupted prior selected prices/statuses are not evidence of a
+            # buy-point revision or a confirmation transition. Do not silently
+            # skip one bad commit and compare against an older stale version.
+            active = frame.loc[signals.eq(True)]
+            if not active.empty:
+                signal_fields = {
+                    "ibd_candidate_price", "latest_close",
+                    "ibd_entry_status", "ibd_entry_valid",
+                }
+                if not signal_fields.issubset(frame.columns):
+                    return None
+                if (active["ibd_entry_valid"].map(to_bool).isna().any()
+                        or not active["ibd_entry_status"].isin(ENTRY_STATUSES).all()):
+                    return None
+                for field in ("ibd_candidate_price", "latest_close"):
+                    prices = pd.to_numeric(active[field], errors="coerce")
+                    if not prices.map(
+                        lambda value: pd.notna(value) and
+                        isfinite(float(value)) and float(value) > 0
+                    ).all():
+                        return None
             dates = parsed.dt.date.unique()
             if len(dates) != 1:
                 return None
