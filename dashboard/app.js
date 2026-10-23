@@ -364,7 +364,6 @@
   function readableMidweekEvent(raw) {
     if (raw === "NEW BP") return "NEW BUY POINT";
     if (raw === "BP CHANGED") return "BUY POINT CHANGED";
-    if (raw === "BP UPDATED") return "BUY POINT UPDATED";
     if (raw === "CURRENT") return "NO CHANGE";
     if (raw === "SNAPSHOT") return "CURRENT SNAPSHOT";
     return raw || "NO DATA";
@@ -373,7 +372,6 @@
   // evidence in the tooltip / mobile expanded details.
   function compactChangeEvent(raw) {
     if (raw === "NEW BP") return "NEW";
-    if (raw === "BP UPDATED") return "UPDATED";
     if (raw === "BP CHANGED") return "CHANGED";
     if (raw === "NO DATA") return "No Data";
     if (raw === "CURRENT" || raw === "SNAPSHOT" || raw === "NO CHANGE") return "";
@@ -1186,10 +1184,8 @@
       const event = picked[2];
       const label = event === "NEW" ? "New Point" :
         event === "CHANGED" ? "Point Changed" :
-        event === "UPDATED" ? "Point Updated" :
         event === "POOL OUT" ? "Pool OUT" :
         event === "POOL IN" ? "Pool IN" :
-        event === "PRIOR ?" ? "Prior ?" :
         event === "TO WEEKEND" ? "To Weekend" :
         /→ BELOW$/.test(event) ? "↓ Below" :
         /→ EXT$/.test(event) || /→ EXTENDED$/.test(event) ? "↑ Extended" :

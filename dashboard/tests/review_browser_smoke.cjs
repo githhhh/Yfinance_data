@@ -41,10 +41,18 @@ const bOnly = row("BONLY", {
   review_new_buy_point: true, review_new_buy_point_zone: "BELOW_BUY_POINT",
   review_has_value_change: true, review_b_has_value_change: true,
 });
+const returned = row("RETURNED", {
+  review_selected_price_event: "BP CHANGED",
+  review_a_active: true, review_b_active: false,
+  review_a_has_value_change: false, review_b_has_value_change: false,
+  review_has_value_change: true, review_a_event: "", review_a_week_event: "",
+  review_weekend_buy_point_change: "UNCHANGED",
+});
 const aOnly = row("AWEEK", {
   ibd_entry_status: "UNCONFIRMED",
   review_membership: "OUT", review_a_has_value_change: true,
   review_has_value_change: true, review_a_event: "BELOW → ZONE",
+  review_a_week_event: "EXT → ZONE",
   review_change_label: "BELOW → ZONE · OUT",
   review_buy_point_change_label: "BELOW → ZONE · OUT",
   review_weekend_buy_point_change: "ENTERED_BUY_ZONE",
@@ -84,7 +92,7 @@ const near = row("NEAR", {
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
-payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, near];
+payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, returned, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
 async function ready() {
@@ -116,7 +124,7 @@ async function ready() {
       }));
       await page.goto("http://127.0.0.1:8765/", { waitUntil: "domcontentloaded" });
       await page.locator(".review-section").waitFor();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 5, "Changes scope excludes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 6, "Changes scope excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
@@ -136,6 +144,12 @@ async function ready() {
           `${outCode} status must not be horizontally clipped (${viewport.width}px)`);
         assert(outRect.y + outRect.height <= statusBox.y + statusBox.height + 1,
           `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
+      }
+      const returnedRow = page.locator('.review-table tbody tr[data-code="RETURNED"]');
+      assert((await returnedRow.locator('td[data-field="review_change_label"]').innerText()).includes("TO WEEKEND"),
+        "A return from B to the immutable Weekend price is a visible one-day event");
+      if (viewport.width <= 760) {
+        assert.equal((await returnedRow.locator(".mobile-change-hint").innerText()).trim(), "To Weekend");
       }
       const poolRow = page.locator('.review-table tbody tr[data-code="POOLONLY"]');
       const poolChange = poolRow.locator('td[data-field="review_change_label"]');
@@ -214,7 +228,7 @@ async function ready() {
       }
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 6, "All Review includes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 7, "All Review includes Near");
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();
@@ -289,6 +303,13 @@ async function ready() {
       await page.keyboard.press("ArrowDown");
       assert.equal(await page.locator(".industry-stock-table tbody tr.selected").getAttribute("data-code"), originalCode,
         "ArrowDown at the last visible ticker cannot deselect the row");
+      await page.locator('[data-action="quick"][data-field="change"][data-value="ENTERED_BUY_ZONE"]').click();
+      assert((await page.locator(".industry-group-pulse").first().innerText()).includes("1 Vs Weekend"),
+        "What Changed industry concentration must match the cumulative Weekend quick group");
+      const quickA = page.locator('.industry-stock-table tbody tr[data-code="AWEEK"] td').first();
+      assert((await quickA.count()) === 1);
+      assert(!(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)),
+        "Weekend quick group cannot cause Industry overflow");
       await page.close();
     }
   } finally { await browser.close(); }

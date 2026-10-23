@@ -216,10 +216,9 @@ assert(app.industryHtml([missingWeekendA]).includes("NO DATA"),
 assert(app.industryHtml([missingWeekendA]).includes("ACTIONABLE"),
   "Missing Weekend A data must not suppress independent B entry confirmation");
 
-const updatedPoint = {...entry("UPDATED"),review_b_display_event:"BP UPDATED",};
-assert(app.tableHtml([updatedPoint]).includes("BUY POINT UPDATED"),
-  "Raw BP UPDATED token must not leak to table");
-const changedPoint = {...updatedPoint,review_b_display_event:"BP CHANGED"};
+assert(!script.includes("BP UPDATED") && !script.includes("PRIOR ?"),
+  "Obsolete structural price-update and ambiguous identity labels stay retired");
+const changedPoint = {...entry("CHANGED"),review_b_display_event:"BP CHANGED"};
 assert(app.tableHtml([changedPoint]).includes("BUY POINT CHANGED"),
   "Raw BP CHANGED token must not leak to table");
 
