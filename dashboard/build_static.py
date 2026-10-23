@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import re
 import shutil
 import sys
 from datetime import date, datetime, timezone
@@ -41,6 +43,28 @@ STATIC_ASSETS = (
     "styles.css",
     "manifest.webmanifest",
 )
+
+def _with_ga4_tag(index_html: str, measurement_id: str | None) -> str:
+    """Opt-in GA4 for published static HTML; unconfigured builds stay unchanged."""
+    if not measurement_id:
+        return index_html
+    if not re.fullmatch(r"G-[A-Z0-9]+", measurement_id):
+        raise ValueError("Invalid GA4_MEASUREMENT_ID: expected G- followed by letters/digits")
+    if index_html.count("<head>\n") != 1:
+        raise ValueError("Expected exactly one HTML <head> for GA4 tag insertion")
+
+    tag = (
+        "  <!-- Google tag (gtag.js) -->\n"
+        f'  <script async src="https://www.googletagmanager.com/gtag/js?id={measurement_id}"></script>\n'
+        "  <script>\n"
+        "    window.dataLayer = window.dataLayer || [];\n"
+        "    function gtag(){dataLayer.push(arguments);}\n"
+        "    gtag('js', new Date());\n"
+        f"    gtag('config', '{measurement_id}');\n"
+        "  </script>\n"
+    )
+    return index_html.replace("<head>\n", "<head>\n" + tag, 1)
+
 
 PUBLIC_REVIEW_COLUMNS = (
     "code",
@@ -481,7 +505,12 @@ def build_site(
     complete_path: str | Path,
     midweek_path: str | Path,
     window_date: date,
+    ga4_measurement_id: str | None = None,
 ) -> Path:
+    tagged_index = _with_ga4_tag(
+        (DASHBOARD_DIR / "index.html").read_text(encoding="utf-8"),
+        ga4_measurement_id,
+    )
     output = Path(output_dir).resolve()
     if output.exists():
         shutil.rmtree(output)
@@ -492,6 +521,9 @@ def build_site(
         if not source.is_file():
             raise FileNotFoundError(f"Static dashboard asset missing: {source}")
         shutil.copy2(source, output / asset)
+
+    if ga4_measurement_id:
+        (output / "index.html").write_text(tagged_index, encoding="utf-8")
 
     payload = build_dashboard_payload(
         complete_path=complete_path,
@@ -535,6 +567,7 @@ def main() -> int:
         complete_path=args.complete,
         midweek_path=args.midweek,
         window_date=_parse_date(args.window_date),
+        ga4_measurement_id=os.environ.get("GA4_MEASUREMENT_ID"),
     )
     print(f"Static dashboard built: {output}")
     return 0

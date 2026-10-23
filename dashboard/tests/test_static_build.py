@@ -5,10 +5,12 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from dashboard.build_static import (
     PUBLIC_DASHBOARD_ROW_FIELDS,
     _records,
+    _with_ga4_tag,
     build_dashboard_payload,
     build_site,
 )
@@ -367,3 +369,32 @@ def test_streamlit_runtime_has_been_removed() -> None:
     requirements = (DASHBOARD_DIR / "requirements.txt").read_text(encoding="utf-8").lower()
     for dependency in ("streamlit", "plotly", "aggrid"):
         assert dependency not in requirements
+
+
+def test_ga4_tag_is_opt_in_and_rejects_invalid_ids() -> None:
+    source = (DASHBOARD_DIR / "index.html").read_text(encoding="utf-8")
+    assert _with_ga4_tag(source, None) == source
+    assert _with_ga4_tag(source, "") == source
+
+    configured = _with_ga4_tag(source, "G-TEST1234")
+    assert configured.count("https://www.googletagmanager.com/gtag/js?id=G-TEST1234") == 1
+    assert configured.count("gtag('config', 'G-TEST1234')") == 1
+    assert configured.index("Google tag (gtag.js)") < configured.index("<title>Breakout Pool</title>")
+
+    for invalid in ("UA-12345", "G-abc123", 'G-TEST"><script>'):
+        with pytest.raises(ValueError, match="GA4_MEASUREMENT_ID"):
+            _with_ga4_tag(source, invalid)
+
+
+def test_ga4_is_injected_only_into_built_site(tmp_path: Path) -> None:
+    output = build_site(
+        tmp_path / "site",
+        complete_path=COMPLETE,
+        midweek_path=MIDWEEK,
+        window_date=date(2026, 9, 5),
+        ga4_measurement_id="G-TEST1234",
+    )
+    generated = (output / "index.html").read_text(encoding="utf-8")
+    original = (DASHBOARD_DIR / "index.html").read_text(encoding="utf-8")
+    assert "gtag('config', 'G-TEST1234')" in generated
+    assert "googletagmanager.com/gtag/js" not in original
