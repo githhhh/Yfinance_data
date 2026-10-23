@@ -770,8 +770,10 @@
       )).length;
       group.changed = group.rows.filter((row) => eligibleSources(row).some((source) =>
         contextMatch(row, source) && (
-          source === "A" && (bool(row.review_a_has_value_change) ||
-            (reviewNowMode() && row.review_selected_price_event === "BP CHANGED")) ||
+          source === "A" && (state.change !== "ALL"
+            ? row.review_weekend_buy_point_change === state.change
+            : bool(row.review_a_has_value_change) ||
+              (reviewNowMode() && row.review_selected_price_event === "BP CHANGED")) ||
           source === "B" && bool(row.review_b_has_value_change)
         )
       )).length;
@@ -800,6 +802,7 @@
     const loading = !provider || provider.status() === "loading";
     if (loading) return '<div class="industry-list" data-industry-list tabindex="0" aria-label="Industry review results"><div class="industry-notice" role="status">Loading rs-log industry reference…</div></div>';
     const groups = industryGroups(rows);
+    const changedLabel = currentHasComparison() && state.change !== "ALL" ? "Vs Weekend" : "Changed";
     const message = loading ? "Loading rs-log industry reference…" :
       provider.status() !== "ready" ? "Industry RS unavailable · showing available stock classifications." : "";
     const codeRow = (row) => {
@@ -830,7 +833,7 @@
           <button type="button" class="industry-group-toggle" data-action="toggle-industry" data-industry="${esc(group.name)}" aria-expanded="${opened}">
             <svg class="industry-chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="industry-group-main">
-              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} ${group.rows.length === 1 ? "stock" : "stocks"}</span><span class="industry-group-pulse">${group.actionable} Actionable · ${group.changed} Changed</span></span></span>
+              <span class="industry-group-line"><span class="industry-name" title="${esc(group.name)}">${esc(group.name)}</span><span class="industry-group-metrics"><span class="industry-group-rs">RS <strong>${esc(rs)}</strong></span><span class="industry-group-count">${group.rows.length} ${group.rows.length === 1 ? "stock" : "stocks"}</span><span class="industry-group-pulse">${group.actionable} Actionable · ${group.changed} ${changedLabel}</span></span></span>
               <span class="industry-top3" ${opened ? "hidden" : ""}>${group.rows.slice(0, 3).map((row) => {
                 const value = provider?.stockRS(row.code);
                 return `<span class="industry-chip">${esc(row.code)} <small>${value === null || value === undefined ? "N/A" : esc(String(value))}</small></span>`;

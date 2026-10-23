@@ -247,6 +247,30 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
 
 
+def test_previous_midweek_not_truncated_by_twenty_current_day_commits(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    pd.DataFrame([row("OLD", snapshot="2026-10-14")]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "previous day"], cwd=tmp_path, check=True)
+    for number in range(22):
+        pd.DataFrame([row("LATEST", snapshot="2026-10-15", trigger=100 + number)]).to_csv(
+            pool, index=False
+        )
+        subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", "current day revision"], cwd=tmp_path, check=True)
+
+    previous = load_previous_midweek(tmp_path, date(2026, 10, 15))
+    assert previous is not None
+    assert previous.iloc[0]["snapshot_date"] == "2026-10-14"
+    assert previous.iloc[0]["code"] == "OLD"
+
+
 def test_no_yesterday_bar_never_invents_latest_daily_transition():
     complete = pd.DataFrame([row("GAP", trigger=100, close=108)])
     # 10/12 was an open US trading day, but it is absent from the PKL.

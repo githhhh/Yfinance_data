@@ -94,7 +94,8 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
     path = "us/breakout_follow_pool_midweek.csv"
     try:
         history = subprocess.run(
-            ["git", "log", "-20", "--format=%H", "--", path],
+            ["git", "log", f"--since={monday_of_week(current_date).isoformat()}T00:00:00",
+             "--format=%H", "--", path],
             cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
         ).stdout.splitlines()
         for sha in history:
@@ -103,13 +104,23 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
                 cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
             ).stdout
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
-            dates = pd.to_datetime(frame.get("snapshot_date"), errors="coerce").dropna().dt.date.unique()
+            required = {"snapshot_date", "code", "signal"}
+            if frame.empty or not required.issubset(frame.columns):
+                return None
+            parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce")
+            if (parsed.isna().any() or frame["code"].isna().any()
+                    or frame["code"].astype(str).str.strip().eq("").any()
+                    or frame["code"].duplicated().any()
+                    or frame["signal"].map(to_bool).isna().any()):
+                return None
+            dates = parsed.dt.date.unique()
             if len(dates) != 1:
-                continue
+                return None
             previous_date = dates[0]
             if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
                 return frame
-    except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired, pd.errors.ParserError):
         return None
     return None
 

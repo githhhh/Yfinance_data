@@ -238,6 +238,19 @@ assert.equal(app.sortRows([hiddenB, firstA]).rows[0].code, "ALPHA",
   "Review Priority must respect selected Weekend Buy Point context");
 state.change = "ALL";
 
+// Industry group pulse in Weekend quick mode reports Vs Weekend, not
+// yesterday's incremental review count.
+state.scope = "CHANGES"; state.change = "BECAME_EXTENDED";
+state.newBuyPoint = "ALL"; state.status = "ALL";
+const cumulativeIndustry = {...entry("CUMULATIVE"), review_b_active:false,
+  review_weekend_buy_point_change:"BECAME_EXTENDED",
+  review_a_week_event:"ZONE → EXT",review_a_event:"",
+  review_a_has_value_change:false,review_has_value_change:false,
+  ibd_entry_status:"EXTENDED"};
+assert(app.industryHtml([cumulativeIndustry]).includes("1 Vs Weekend"));
+state.change = "ALL";
+assert(app.industryHtml([cumulativeIndustry]).includes("0 Changed"));
+
 // Entry confirmation cannot be inferred from the price zone or the status
 // string when resolver validity disagrees.
 state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
