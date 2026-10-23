@@ -29,7 +29,6 @@ function row(code, rest) {
 }
 const bOnly = row("BONLY", {
   review_b_active: true, review_b_price: 185, review_b_status: "UNCONFIRMED",
-  review_b_verified: true,
   review_b_rule: "pivot", review_b_close: 180, review_b_pct: -2.70,
   review_b_zone: "BELOW", review_b_event: "NEW BP",
   review_b_date: "2026-10-14", review_b_entry_reason: "Volume not confirmed",
@@ -63,8 +62,7 @@ const belowOut = row("BELOWOUT", {
 const dual = row("DUAL", {
   review_membership: "OUT", review_a_active: true,
   review_a_event: "ZONE → EXT", review_a_has_value_change: true,
-  review_b_active: true, review_b_verified: true,
-  review_b_status: "ACTIONABLE", review_b_entry_valid: true,
+  review_b_active: true, review_b_status: "ACTIONABLE", review_b_entry_valid: true,
   review_b_display_event: "UNCONFIRMED → ACTIONABLE", review_b_has_value_change: true,
   review_b_price: 171, review_b_pct: 2.34, review_b_close: 175,
   review_has_value_change: true, review_weekend_buy_point_change: "BECAME_EXTENDED",
@@ -75,8 +73,7 @@ const poolOnly = row("POOLONLY", {
   review_a_event: "", review_a_week_event: "ZONE → EXT",
   review_a_has_value_change: true, review_has_value_change: true,
   review_weekend_buy_point_change: "BECAME_EXTENDED",
-  review_b_active: true, review_b_verified: true,
-  review_b_entry_valid: true, review_b_status: "ACTIONABLE",
+  review_b_active: true, review_b_entry_valid: true, review_b_status: "ACTIONABLE",
   review_b_display_event: "CURRENT", review_b_has_value_change: false,
 });
 const near = row("NEAR", {

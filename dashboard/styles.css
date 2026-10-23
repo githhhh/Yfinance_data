@@ -1190,5 +1190,3 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 /* Short, self-explanatory hold states. Keep source provenance in details. */
 .change-still { color:#8f9dad; font-size:10px; font-weight:550; white-space:nowrap; }
 .change-help { margin-left:5px; color:#687c8e; font-size:10px; font-weight:normal; cursor:help; }
-.unverified-quick { display:inline-flex; align-items:center; border:0; border-radius:4px; background:transparent; color:#ad9d74; font-size:10px; padding:2px 4px; margin-left:7px; cursor:pointer; }
-.unverified-quick:hover,.unverified-quick[aria-pressed="true"] { color:#ffda71; background:rgba(255,210,31,.08); }

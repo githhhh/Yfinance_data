@@ -89,16 +89,30 @@ def test_cbll_selected_m_box_when_candidates_include_both_boxes():
     extra["pivot_candidates"].append(
         {"box_type": "S_BOX", "price": 25.07, "resistance_date": "2026-10-12"})
     current["ibd_candidate_extra"] = json.dumps(extra)
-    assert identity_v2(current)["key"] == "pivot|2026-10-12|M_BOX"
+    assert identity_v2(current)["key"] == "price|25.07"
     extra.pop("selected_pivot")
     current["ibd_candidate_extra"] = json.dumps(extra)
-    assert identity_v2(current)["resolution"] == "AMBIGUOUS"
+    assert identity_v2(current)["resolution"] == "EXACT"
+
+
+def test_same_price_different_signals_is_one_buy_point():
+    import json
+    old = pivot("ONE", "2026-10-14", 100, 101, box="S_BOX")
+    current = pivot("ONE", "2026-10-15", 100, 102, box="M_BOX")
+    current["ibd_candidate_extra"] = json.dumps({
+        "pivot_candidates": [
+            {"box_type":"M_BOX","price":100,"resistance_date":"2026-10-12"},
+            {"box_type":"S_BOX","price":100,"resistance_date":"2026-10-12"},
+        ]
+    })
+    assert identity_v2(old)["key"] == identity_v2(current)["key"]
+    assert observe("ONE", current, [hist("2026-10-14", old)]) is None
 
 
 def test_amn_small_revision_not_new_structure_and_not_in_zone():
     previous = pivot("AMN", "2026-10-14", 36.855, 37.66, box="M_BOX")
     current = pivot("AMN", "2026-10-15", 36.86, 40.0, box="M_BOX")
-    assert identity_v2(previous)["key"] == identity_v2(current)["key"]
+    assert identity_v2(previous)["key"] != identity_v2(current)["key"]
     assert observe("AMN", current, [hist("2026-10-14", previous)]) is None
     result = price_replay(trigger=36.86, previous_close=37.66,
                           current_close=40, previous_date="2026-10-14",
@@ -138,8 +152,10 @@ def test_no_repeated_in_zone_alert_or_unverified_history():
 def test_unknown_identity_cannot_be_called_new():
     current = pivot("UNRESOLVED", "2026-10-15", 100, 101)
     current["ibd_candidate_extra"] = "{}"
-    assert observe("UNRESOLVED", current,
-                   [hist("2026-10-14", pivot("X", "2026-10-14", 0, 99, signal=False))]) is None
+    event = observe("UNRESOLVED", current,
+                    [hist("2026-10-14", pivot("X", "2026-10-14", 0, 99, signal=False))])
+    assert event is not None
+    assert event["primary"] == "FIRST_OBSERVED_BP"
 
 
 def test_new_b_matching_a_is_not_independent():
@@ -273,8 +289,8 @@ def test_last_complete_week_baseline_permits_first_midweek_session():
     assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
 
 
-def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
-    """Shadow-safety gate: A's entire legacy implementation is unchanged."""
+def test_weekend_a_legacy_functions_ast_identical_to_main(tmp_path):
+    """Protect all existing A and replay functions; allow the B price event rewrite."""
     import ast
     from pathlib import Path
     import pytest
@@ -292,10 +308,18 @@ def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
     original_api = functions(original.stdout)
     current_api = functions(latest)
-    assert all(current_api.get(name) == impl for name, impl in original_api.items())
-    # No legacy A function may be removed or changed by V2.
-    assert {"_price_path", "_b_event", "build_observation_view",
+    # _same_identity (old structural helper) is deleted; _b_event is
+    # intentionally replaced with price-only B logic. Every other legacy
+    # function, especially the fixed Weekend A path, is AST-identical.
+    intentionally_changed_b_only = {"_same_identity", "_b_event"}
+    assert all(
+        current_api.get(name) == impl
+        for name, impl in original_api.items()
+        if name not in intentionally_changed_b_only
+    )
+    assert {"_price_path", "build_observation_view",
             "build_observation_attention"} <= original_api.keys()
+    assert "_same_identity" not in current_api
 
 
 def test_publication_cutoff_excludes_future_history(tmp_path):
@@ -390,7 +414,7 @@ def test_real_october_published_history_and_1d_replay(tmp_path):
     assert aout["price"]["transition"] == "BELOW_TO_ZONE"
     ko = by_code["KO"]
     assert ko["identity"]["lifecycle"] == "FIRST_OBSERVED"
-    assert ko["anchor_key_v2"] == "pivot|2026-10-12|M_BOX"
+    assert ko["anchor_key_v2"] == "price|91.87"
 
 
 def test_git_history_duplicate_ticker_cannot_be_authoritative(tmp_path):

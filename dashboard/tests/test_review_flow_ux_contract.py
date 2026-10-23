@@ -21,7 +21,7 @@ def test_review_flow_is_owned_by_existing_layers_without_override_runtime() -> N
 def test_watch_stage_is_visually_separate_from_entry_status() -> None:
     assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
     assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
-    assert 'const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER, "UNVERIFIED"]' in APP
+    assert 'const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER]' in APP
     assert "review-stage-status" in APP
     assert "Watch Stage" in APP
     assert "pre-signal · current candidates" in APP

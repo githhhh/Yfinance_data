@@ -1,7 +1,7 @@
 """Pure, read-only BF buy-point observation facts (schema v2).
 
 No git, filesystem, trading eligibility, Futu, Pool mutation or Telegram I/O.
-A's published v1 path/identity semantics remain in bf_observation/bf_transition.
+Weekend A's fixed price tracking remains independent of B identity and events.
 """
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import date
 import math
 from typing import Any
 
-from dashboard.services.bf_transition import _buy_point_anchor, _price_zone, to_bool
+from dashboard.services.bf_transition import _price_zone, to_bool
 
 
 def _num(value: Any) -> float | None:
@@ -18,16 +18,6 @@ def _num(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) and number > 0 else None
-
-
-def _day(value: Any) -> str | None:
-    if value is None:
-        return None
-    try:
-        from datetime import datetime
-        return datetime.fromisoformat(str(value).split("T")[0]).date().isoformat()
-    except (TypeError, ValueError):
-        return None
 
 
 def zone(trigger: Any, close: Any) -> str | None:
@@ -40,44 +30,15 @@ def zone(trigger: Any, close: Any) -> str | None:
 
 
 def identity_v2(row: Any) -> dict:
-    """Resolve a selected, structurally identified buy point.
+    """Price-only identity for the selected Pool buy point.
 
-    Distinct Pivot S_BOX/M_BOX on the same resistance date are not identical.
-    Multi-box candidates with no authoritative selected_pivot are ambiguous.
+    Strategy, box, resistance date and signal origin are price attributes,
+    not identity. The ticker is carried by the caller/event key.
     """
-    from dashboard.services.bf_transition import _candidate_extra
-    rule = str(row.get("ibd_candidate_rule") or "").strip().lower()
     trigger = _num(row.get("ibd_candidate_price"))
-    if not rule or trigger is None:
-        return {"resolution": "UNKNOWN", "key": None, "trigger": trigger}
-    if rule == "pivot":
-        extra = _candidate_extra(row.get("ibd_candidate_extra"))
-        def match(item):
-            p = _num(item.get("price"))
-            return (p is not None and math.isclose(p, trigger, rel_tol=1e-9, abs_tol=1e-4)
-                    and _day(item.get("resistance_date"))
-                    and str(item.get("box_type") or "").strip())
-        selected = extra.get("selected_pivot")
-        if isinstance(selected, dict):
-            if not match(selected):
-                return {"resolution": "AMBIGUOUS", "key": None, "trigger": trigger}
-            match_set = [selected]
-        else:
-            match_set = [x for x in extra.get("pivot_candidates", [])
-                         if isinstance(x, dict) and match(x)]
-        identifiers = {(str(x["box_type"]).strip().upper(), _day(x["resistance_date"]))
-                       for x in match_set}
-        if len(identifiers) != 1:
-            return {"resolution": "AMBIGUOUS" if identifiers else "UNKNOWN",
-                    "key": None, "trigger": trigger}
-        box, when = next(iter(identifiers))
-        return {"resolution": "EXACT", "key": f"pivot|{when}|{box}",
-                "trigger": trigger, "anchor_type": box}
-    old = _buy_point_anchor(row)
-    if not old:
-        return {"resolution": "UNKNOWN", "key": None, "trigger": trigger}
-    return {"resolution": "EXACT", "key": old["identity"],
-            "trigger": trigger, "anchor_type": old.get("anchor_type")}
+    if trigger is None:
+        return {"resolution": "UNKNOWN", "key": None, "trigger": None}
+    return {"resolution": "EXACT", "key": f"price|{trigger}", "trigger": trigger}
 
 
 def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
@@ -164,8 +125,8 @@ def resolve_midweek_facts(*, code: str, current: dict,
                           daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
     """Resolve the four orthogonal facts; never decide Telegram eligibility.
 
-    Historical identity is independent of the current price and ACT. This
-    function also returns facts for EXT / BELOW B signals when evidence exists.
+    Historical identity is the selected price; Entry confirmation is separate.
+    This function also returns facts for EXT / BELOW B signals when evidence exists.
     """
     if to_bool(current.get("signal")) is not True:
         return None

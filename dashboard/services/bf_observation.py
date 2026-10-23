@@ -225,45 +225,36 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None,
             "pct": round((latest_close / trigger - 1) * 100, 2)}
 
 
-def _same_identity(a, b):
-    left = _buy_point_anchor(a) if a is not None else None
-    right = _buy_point_anchor(b) if b is not None else None
-    if left and right:
-        return left["identity"] == right["identity"]
-    # Missing source identity must not be invented from an approximate price.
-    return None
-
-
 def _b_event(weekend, today, previous, *, comparison_available):
+    """Selected price determines A/B identity; historical snapshots determine events."""
     if today is None or to_bool(today.get("signal")) is not True:
         return None
-    if weekend is not None and _same_identity(weekend, today) is True:
+    price = _number(today.get("ibd_candidate_price"))
+    if price is None:
+        raise ValueError("Active Midweek signal has no valid buy-point price")
+    weekend_price = _number(weekend.get("ibd_candidate_price")) if weekend is not None else None
+    if weekend is not None and weekend_price is None:
+        raise ValueError("Active Weekend signal has no valid buy-point price")
+    if price == weekend_price:
         return None
-    if weekend is not None and _same_identity(weekend, today) is None:
-        if (str(weekend.get("ibd_candidate_rule") or "") ==
-                str(today.get("ibd_candidate_rule") or "")):
-            return None  # fail closed on ambiguous same-rule anchors
     if not comparison_available:
         return "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
-    # The preceding snapshot may have matched A, so no separate B existed.
-    if weekend is not None and _same_identity(weekend, previous) is True:
+    previous_price = _number(previous.get("ibd_candidate_price"))
+    if previous_price is None:
+        raise ValueError("Active previous Midweek signal has no valid buy-point price")
+    if weekend_price is not None and previous_price == weekend_price:
         return "NEW BP"
-    same = _same_identity(previous, today)
-    if same is False:
+    if previous_price != price:
         return "BP CHANGED"
-    if same is None:
-        return "SNAPSHOT"
-    if _number(previous.get("ibd_candidate_price")) != _number(today.get("ibd_candidate_price")):
-        return "BP UPDATED"
-    old_status = str(previous.get("ibd_entry_status") or "")
-    new_status = str(today.get("ibd_entry_status") or "")
-    if old_status != new_status:
-        return f"{old_status} → {new_status}"
+    previous_status = str(previous.get("ibd_entry_status") or "")
+    current_status = str(today.get("ibd_entry_status") or "")
+    if previous_status != current_status:
+        return f"{previous_status} → {current_status}"
     return _arrow(
-        _zone(previous.get("ibd_candidate_price"), previous.get("latest_close")),
-        _zone(today.get("ibd_candidate_price"), today.get("latest_close")),
+        _zone(previous_price, previous.get("latest_close")),
+        _zone(price, today.get("latest_close")),
     ) or "CURRENT"
 
 
@@ -484,8 +475,8 @@ def build_observation_attention(
                     "as_of": row.get("review_a_as_of"),
                 })
         if bool(row.get("review_b_active")):
-            # A new independent buy-point anchor is a NEW opportunity,
-            # but a changed price for the same anchor (BP UPDATED) is not.
+            # A distinct selected buy-point price may be a NEW opportunity,
+            # independent of setup names, structural dates or box metadata.
             event = str(row.get("review_b_event") or "")
             status = str(row.get("review_b_status") or "")
             zone = str(row.get("review_b_zone") or "")
