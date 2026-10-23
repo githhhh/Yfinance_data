@@ -96,10 +96,10 @@ def test_same_price_is_exact_even_when_box_candidates_overlap():
     assert identity_v2(current)["key"] == "price|25.07"
 
 
-def test_amn_small_revision_not_new_structure_and_not_in_zone():
+def test_amn_changed_selected_price_is_distinct_even_with_same_structure():
     previous = pivot("AMN", "2026-10-14", 36.855, 37.66, box="M_BOX")
     current = pivot("AMN", "2026-10-15", 36.86, 40.0, box="M_BOX")
-    assert identity_v2(previous)["key"] == identity_v2(current)["key"]
+    assert identity_v2(previous)["key"] != identity_v2(current)["key"]
     assert observe("AMN", current, [hist("2026-10-14", previous)]) is None
     result = price_replay(trigger=36.86, previous_close=37.66,
                           current_close=40, previous_date="2026-10-14",
