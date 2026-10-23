@@ -320,14 +320,18 @@ def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
     original_api = functions(original.stdout)
     current_api = functions(latest)
-    # This refactor changes only B price identity/event selection. The full
-    # fixed-Weekend A price path, attention pipeline and persistence stay frozen.
-    allowed_b_identity = {"_same_identity", "_b_event"}
+    # Only B identity/event projection and the read-only Git-history reader
+    # may evolve. The complete Weekend A price path and alert functions remain
+    # AST-identical to main. The history reader has dedicated commit-depth and
+    # fail-closed tests instead of a silent global exemption.
+    allowed_review_changes = {"_same_identity", "_b_event", "load_previous_midweek"}
     assert all(current_api.get(name) == impl for name, impl in original_api.items()
-               if name not in allowed_b_identity)
-    # No existing A observation function may be removed or changed by V2.
-    assert {"_price_path", "_b_event", "build_observation_view",
+               if name not in allowed_review_changes)
+    assert {"_price_path", "build_observation_view",
             "build_observation_attention"} <= original_api.keys()
+    assert all(current_api[name] == original_api[name] for name in (
+        "_price_path", "build_observation_view", "build_observation_attention"
+    ))
 
 
 def test_publication_cutoff_excludes_future_history(tmp_path):
