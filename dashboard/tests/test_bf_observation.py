@@ -704,3 +704,42 @@ def test_same_price_previous_multi_box_is_current_not_an_unknown_event():
     assert actual["review_b_display_event"] == "CURRENT"
     assert not actual["review_b_has_value_change"], "Same selected price stays stable"
     assert not actual["review_has_value_change"]
+
+
+
+def test_weekend_and_midweek_price_identity_ignores_strategy_metadata():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = row("CROSS", snapshot="2026-10-16", trigger=100, close=102)
+    weekend["ibd_candidate_extra"] = "{}"
+    midweek = row("CROSS", snapshot="2026-10-19", trigger=100, close=103,
+                  rule="ceiling_pullback")
+    complete, current = pd.DataFrame([weekend]), pd.DataFrame([midweek])
+    raw = build_observation_view(
+        complete, current, current, as_of=date(2026, 10, 19),
+    )
+    view = decorate_observation_view(
+        raw, complete=complete, current=current, previous=None,
+    ).iloc[0]
+    assert view["review_a_active"]
+    assert not view["review_b_active"]
+    assert not view["review_new_buy_point"]
+    assert view["review_a_price"] == 100
+    assert view["ibd_entry_status"] in {"ACTIONABLE", "UNCONFIRMED", "EXTENDED", "BELOW_TRIGGER"}
+
+
+def test_price_changed_with_same_structure_is_midweek_point():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    wk = row("PRICE", snapshot="2026-10-16", trigger=100, close=102,
+             anchor="2026-10-15")
+    now = row("PRICE", snapshot="2026-10-19", trigger=103, close=104,
+              anchor="2026-10-15")
+    complete, current = pd.DataFrame([wk]), pd.DataFrame([now])
+    raw = build_observation_view(complete, current, current, as_of=date(2026, 10, 19))
+    view = decorate_observation_view(
+        raw, complete=complete, current=current, previous=None,
+    ).iloc[0]
+    assert view["review_a_active"] and view["review_b_active"]
+    assert view["review_a_price"] == 100
+    assert view["review_b_price"] == 103
+    assert view["review_new_buy_point"]
+    assert view["review_b_display_event"] == "NEW BP"

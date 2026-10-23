@@ -48,7 +48,7 @@ def identity_v2(row: Any) -> dict:
     trigger = _num(row.get("ibd_candidate_price"))
     if trigger is None:
         return {"resolution": "UNKNOWN", "key": None, "trigger": None}
-    return {"resolution": "EXACT", "key": f"price|{trigger:.15g}",
+    return {"resolution": "EXACT", "key": f"price|{repr(trigger).removesuffix('.0')}",
             "trigger": trigger, "anchor_type": None}
 
 
