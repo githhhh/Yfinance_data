@@ -771,7 +771,7 @@
           source === "A" && (state.change !== "ALL"
             ? row.review_weekend_buy_point_change === state.change
             : bool(row.review_a_has_value_change) ||
-              (reviewNowMode() && row.review_selected_price_event === "BP CHANGED")) ||
+              (state.newBuyPoint === "ALL" && row.review_selected_price_event === "BP CHANGED")) ||
           source === "B" && bool(row.review_b_has_value_change)
         )
       )).length;

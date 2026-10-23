@@ -276,6 +276,11 @@ assert.equal(app.filterRows([returned]).length, 1,
 assert(app.changeLines(returned).includes(">TO WEEKEND</span>"));
 assert(app.tableHtml([returned]).includes("To Weekend</small>"));
 assert(app.industryHtml([returned]).includes("1 Changed"));
+state.scope = "ALL_SIGNALS";
+assert(app.changeLines(returned).includes("TO WEEKEND"));
+assert(app.industryHtml([returned]).includes("1 Changed"),
+  "All Review Industry pulse must count the visible return-to-Weekend event");
+state.scope = "CHANGES";
 assert.equal(app.filterCounts([returned]).newBuyPoint.BUY_ZONE, 0);
 assert.equal(app.filterCounts([returned]).status.ACTIONABLE, 1);
 state.change = "ENTERED_BUY_ZONE";
