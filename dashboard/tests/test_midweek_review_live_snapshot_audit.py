@@ -11,7 +11,7 @@ import pytest
 from bf_snapshot import monday_of_week
 
 from dashboard.services.bf_observation import build_observation_view, load_previous_midweek
-from dashboard.services.bf_observation_replay import identity_v2, zone
+from dashboard.services.bf_observation_replay import zone
 from dashboard.services.bf_review_presentation import decorate_observation_view
 from dashboard.services.bf_transition import to_bool
 
@@ -46,15 +46,18 @@ def test_current_authoritative_midweek_records_preserve_buy_point_boundaries():
         if bool(observed["review_b_active"]):
             expected_zone = zone(source["ibd_candidate_price"], source["latest_close"])
             assert observed["review_b_zone"] == expected_zone, source["code"]
-            if bool(observed["review_b_verified"]):
-                assert identity_v2(source)["resolution"] == "EXACT", source["code"]
-                assert observed["review_new_buy_point"], source["code"]
-                assert observed["review_new_buy_point_zone"] == {
-                    "BELOW": "BELOW_BUY_POINT", "ZONE": "BUY_ZONE", "EXT": "EXTENDED",
-                }[expected_zone], source["code"]
-            else:
-                assert not bool(observed["review_new_buy_point"]), source["code"]
-                assert not bool(observed["review_b_has_value_change"]), source["code"]
+            assert observed["review_new_buy_point"], source["code"]
+            assert observed["review_new_buy_point_zone"] == {
+                "BELOW": "BELOW_BUY_POINT", "ZONE": "BUY_ZONE", "EXT": "EXTENDED",
+            }[expected_zone], source["code"]
+            if bool(observed["review_a_active"]):
+                assert float(observed["review_a_price"]) != float(
+                    source["ibd_candidate_price"]
+                ), source["code"]
+        elif bool(observed["review_a_active"]):
+            assert float(observed["review_a_price"]) == float(
+                source["ibd_candidate_price"]
+            ), source["code"]
 
     # A historical Weekend-vs-now difference remains visible cumulatively,
     # but if there is no latest price-zone or membership transition it must
