@@ -14,8 +14,7 @@ import pandas as pd
 from bf_snapshot import monday_of_week, _is_market_trading_day
 
 from dashboard.services.bf_observation_replay import price_replay, zone as classify_zone
-from dashboard.services.bf_transition import _same_buy_point_price
-from dashboard.services.bf_transition import to_bool
+from dashboard.services.bf_transition import _same_buy_point_price, to_bool
 
 
 def _observed_date(frame: pd.DataFrame):

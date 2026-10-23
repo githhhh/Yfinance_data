@@ -490,7 +490,7 @@ def test_daily_candles_after_as_of_are_excluded():
     assert actual["ibd_entry_status"] == "ACTIONABLE"
 
 
-def test_midweek_b_trigger_revision_is_reported_even_if_status_unchanged():
+def test_midweek_b_selected_price_change_is_reported_even_if_status_unchanged():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
     first = row("REVISED", snapshot="2026-10-19", trigger=100, close=102,
@@ -526,7 +526,7 @@ def test_no_prior_midweek_snapshot_must_not_repeat_new_event():
 
 def test_same_price_different_pivot_box_does_not_create_b():
     from dashboard.services.bf_review_presentation import decorate_observation_view
-    # V1 sees same pivot date and calls it A; V2 distinguishes the box type.
+    # Different Pivot boxes at one selected price must never fabricate B.
     weekend_row = row("BOX", snapshot="2026-10-16", trigger=100,
                       close=101, anchor="2026-10-15")
     current_row = row("BOX", snapshot="2026-10-19", trigger=100,

@@ -72,7 +72,7 @@ def test_aout_first_observed_retrospective_with_inactive_watch():
     assert event["watch"]["active_prior"] is False
 
 
-def test_ko_s_box_to_m_box_same_date_not_trigger_revision():
+def test_ko_different_selected_prices_across_boxes_are_distinct():
     prior = pivot("KO", "2026-10-14", 88.96, 91.78, box="S_BOX")
     current = pivot("KO", "2026-10-15", 91.87, 92., box="M_BOX")
     assert identity_v2(prior)["key"] != identity_v2(current)["key"]
@@ -144,6 +144,17 @@ def test_missing_structure_does_not_hide_selected_price():
     assert event is not None
     assert event["identity"]["lifecycle"] == "FIRST_OBSERVED"
     assert event["anchor_key_v2"] == "price|100"
+
+
+def test_same_price_different_pivot_boxes_never_duplicate_b_notification():
+    weekend = pivot("DUP", "2026-10-09", 100, 101, box="S_BOX")
+    current = pivot("DUP", "2026-10-15", 100, 102, box="M_BOX")
+    assert identity_v2(weekend)["key"] == identity_v2(current)["key"]
+    assert observe(
+        "DUP", current,
+        [hist("2026-10-14", pivot("DUP", "2026-10-14", 0, 99, signal=False))],
+        weekend=weekend,
+    ) is None
 
 
 def test_new_b_matching_a_is_not_independent():

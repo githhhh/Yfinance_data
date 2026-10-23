@@ -15,7 +15,7 @@ import pandas as pd
 
 from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
-    SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone,
+    SOURCE_FACT_FIELDS, _calculate_status, _price_zone,
     _same_buy_point_price, to_bool,
 )
 

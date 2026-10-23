@@ -136,8 +136,8 @@ def resolve_midweek_facts(*, code: str, current: dict,
                           daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
     """Resolve the four orthogonal facts; never decide Telegram eligibility.
 
-    Historical identity is independent of the current price and ACT. This
-    function also returns facts for EXT / BELOW B signals when evidence exists.
+    Buy-point identity is the selected price, independent of resolver ACT.
+    This function also returns facts for EXT / BELOW B signals when evidence exists.
     """
     if to_bool(current.get("signal")) is not True:
         return None
