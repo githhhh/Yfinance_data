@@ -261,6 +261,24 @@ async function ready() {
       }
       const after = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
       assert(!after, "Industry view overflow at " + viewport.width);
+
+      // Re-sort groups so a CLOSED higher-RS industry precedes the expanded
+      // group. Arrow navigation must skip its DOM-mounted hidden stock rows.
+      await page.evaluate(() => {
+        window.BFIndustryRS.industryForCode = code => code === "NEAR" ? "Energy" : "Software";
+        window.BFIndustryRS.industryRS = industry => industry === "Energy" ? 99 : 92;
+        document.getElementById("app").dispatchEvent(new Event("bf-rs-updated"));
+      });
+      const industryShell = page.locator("[data-industry-list]");
+      await industryShell.focus();
+      await page.keyboard.press("ArrowUp");
+      const lastVisible = page.locator(".industry-stock-table tbody tr.selected");
+      assert.equal(await lastVisible.count(), 1, "ArrowUp selects one visible industry ticker");
+      assert(await lastVisible.isVisible(), "Keyboard may not select a collapsed group row");
+      const originalCode = await lastVisible.getAttribute("data-code");
+      await page.keyboard.press("ArrowDown");
+      assert.equal(await page.locator(".industry-stock-table tbody tr.selected").getAttribute("data-code"), originalCode,
+        "ArrowDown at the last visible ticker cannot deselect the row");
       await page.close();
     }
   } finally { await browser.close(); }

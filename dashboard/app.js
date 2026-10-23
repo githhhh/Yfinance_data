@@ -410,16 +410,20 @@
     const incremental = reviewNowMode();
     if (bool(row.review_a_active) && sources.includes("A") &&
         (!incremental || bool(row.review_a_has_value_change))) {
+      // Explicit What Changed is anchored to the immutable Weekend price.
+      // Only Review Now prioritizes the latest published/observed increment.
+      const cumulative = state.change !== "ALL";
       const raw = row.review_data_available === false ? "NO DATA" :
+        cumulative ? text(row.review_a_week_event, "") :
         text(row.review_a_event, "") || text(row.review_a_week_event, "");
-      const basis = row.review_a_event
+      const basis = !cumulative && row.review_a_event
         ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
       const event = compactChangeEvent(raw);
       // In Review Now, a membership-only change is the new event; an older
       // Vs Weekend difference must not be shown as today's change reason.
       const membershipOnly = incremental && !text(row.review_a_event, "") &&
-        !!text(row.review_membership_event, "") && row.review_data_available !== false;
+        !!text(row.review_membership_event, "");
       if (event && !membershipOnly) items.push(["Weekend", "Weekend Buy Point", event, raw, basis]);
       else if (row.review_membership_event) {
         const changedTo = row.review_membership === "OUT" ? "OUT" : "IN";
@@ -1320,7 +1324,9 @@
     const industryShell = app.querySelector("[data-industry-list]");
     if (industryShell) industryShell.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")];
+      // Collapsed group rows remain mounted in the DOM but are not reviewable.
+      const visibleRows = [...industryShell.querySelectorAll(".industry-stock-table tbody tr[data-code]")]
+        .filter((row) => !row.closest(".industry-group-body")?.hidden);
       if (!visibleRows.length) return;
       event.preventDefault();
       event.stopPropagation();
@@ -1329,7 +1335,9 @@
       if (index < 0) index = event.key === "ArrowDown" ? -1 : visibleRows.length;
       index = Math.min(visibleRows.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
       const target = visibleRows[index];
-      target.click();
+      // Clicking the current row toggles selection off; arrow-key clamping
+      // at either boundary must instead leave the selection in place.
+      if (target.dataset.code !== current) target.click();
       // Scroll the industry container only; never move the entire Review page.
       const shellRect = industryShell.getBoundingClientRect();
       const rowRect = target.getBoundingClientRect();

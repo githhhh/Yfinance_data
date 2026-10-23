@@ -261,6 +261,35 @@ const persisted = {...returned, review_selected_price_event:"", review_has_value
 assert.equal(app.filterRows([persisted]).length, 0,
   "Return to A is not repeated on an unchanged later session");
 
+// Weekend What Changed always explains the cumulative comparison, even
+// when a separate previous-snapshot arrow exists on the same day.
+state.scope = "CHANGES"; state.status = "ALL"; state.change = "ALL"; state.newBuyPoint = "ALL";
+const basisCase = {...entry("BASIS"),review_a_active:true,review_b_active:false,
+  review_a_event:"BELOW → ZONE",review_a_week_event:"EXT → ZONE",
+  review_weekend_buy_point_change:"ENTERED_BUY_ZONE",
+  review_a_has_value_change:true,review_has_value_change:true};
+assert(app.changeLines(basisCase).includes("BELOW → ZONE"),
+  "Review Now reports the actual previous-snapshot transition");
+state.change = "ENTERED_BUY_ZONE";
+const cumulativeCase = app.changeLines(basisCase);
+assert(cumulativeCase.includes("EXT → ZONE"),
+  "Weekend What Changed reports the fixed Weekend comparison");
+assert(!cumulativeCase.includes("BELOW → ZONE"),
+  "Weekend What Changed must not accidentally describe yesterday");
+assert(cumulativeCase.includes("Vs Weekend"));
+state.change = "ALL";
+
+// No Data is not a historical change; a simultaneous actual Pool exit is.
+const missingOnExit = {...entry("MISSING_OUT"),review_a_active:true,
+  review_b_active:false,review_data_available:false,
+  review_membership:"OUT",review_membership_event:"IN → OUT",
+  review_a_event:"",review_a_week_event:"",
+  review_a_has_value_change:true,review_has_value_change:true};
+assert(app.changeLines(missingOnExit).includes("POOL OUT"),
+  "Review Now must show actual Pool exit even without a price observation");
+assert(!app.changeLines(missingOnExit).includes(">No Data</span>"),
+  "No Data cannot hide the real membership change");
+
 // Review Now is the latest increment, but Weekend quick filters keep the
 // cumulative Vs Weekend position, so a stable below-BP ticker remains
 // findable in What Changed even when it is not a new daily event.
