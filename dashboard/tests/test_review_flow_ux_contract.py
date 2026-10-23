@@ -21,7 +21,7 @@ def test_review_flow_is_owned_by_existing_layers_without_override_runtime() -> N
 def test_watch_stage_is_visually_separate_from_entry_status() -> None:
     assert 'const WATCH_STAGE = "NEAR_BREAKOUT"' in APP
     assert 'const ENTRY_STATUS_ORDER = ["ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"]' in APP
-    assert 'const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER]' in APP
+    assert 'const REVIEW_STATE_ORDER = [WATCH_STAGE, ...ENTRY_STATUS_ORDER, "UNVERIFIED"]' in APP
     assert "review-stage-status" in APP
     assert "Watch Stage" in APP
     assert "pre-signal · current candidates" in APP
@@ -31,7 +31,7 @@ def test_watch_stage_is_visually_separate_from_entry_status() -> None:
 
 
 def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> None:
-    assert 'Near Breakout · no confirmed buy-point transition' in APP
+    assert 'Near Breakout · watch only; no formal buy-point change' in APP
     assert 'function changeLines(row)' in APP
     assert 'function contextMatch(row, src' in APP
     assert 'const referenceKey = near ? "Watch Trigger" :' in APP
@@ -41,7 +41,9 @@ def test_near_breakout_uses_watch_reference_semantics_without_fake_change() -> N
     styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
     assert '.selected-reference-primary { color: #f2f5f9; font-size: 12px; font-weight: 800; }' in styles
     assert 'if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));' in APP
-    assert 'change-empty' in APP
+    assert 'Still Near Breakout' in APP
+    assert 'function stillLabel(row, sources)' in APP
+    assert 'No Prior' in APP
     assert '["current_vs_ibd_candidate_pct", "Vs Reference"]' in APP
 
 

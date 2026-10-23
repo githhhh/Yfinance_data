@@ -278,7 +278,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   background: #29333f;
   overflow: hidden;
 }
-.selected-strip.empty { display: flex; align-items: center; padding: 0 14px; background: #11171e; color: var(--muted); font-size: 11px; }
+.selected-strip.empty { display: flex; align-items: center; height: 40px; min-height: 40px; padding: 0 14px; background: #11171e; color: var(--muted); font-size: 11px; }
 .selected-cell { min-width: 0; padding: 10px 12px; background: #11171e; }
 .selected-key { color: #8899a6; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .selected-value { margin-top: 5px; color: #f2f5f9; font-size: 14px; font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
@@ -1186,3 +1186,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     padding-bottom: 3px;
   }
 }
+
+/* Short, self-explanatory hold states. Keep source provenance in details. */
+.change-still { color:#8f9dad; font-size:10px; font-weight:550; white-space:nowrap; }
+.change-help { margin-left:5px; color:#687c8e; font-size:10px; font-weight:normal; cursor:help; }
+.unverified-quick { display:inline-flex; align-items:center; border:0; border-radius:4px; background:transparent; color:#ad9d74; font-size:10px; padding:2px 4px; margin-left:7px; cursor:pointer; }
+.unverified-quick:hover,.unverified-quick[aria-pressed="true"] { color:#ffda71; background:rgba(255,210,31,.08); }

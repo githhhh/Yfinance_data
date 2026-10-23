@@ -69,6 +69,16 @@ const dual = row("DUAL", {
   review_b_price: 171, review_b_pct: 2.34, review_b_close: 175,
   review_has_value_change: true, review_weekend_buy_point_change: "BECAME_EXTENDED",
 });
+const poolOnly = row("POOLONLY", {
+  ibd_entry_status: "EXTENDED", review_a_active: true,
+  review_membership: "OUT", review_membership_event: "IN → OUT",
+  review_a_event: "", review_a_week_event: "ZONE → EXT",
+  review_a_has_value_change: true, review_has_value_change: true,
+  review_weekend_buy_point_change: "BECAME_EXTENDED",
+  review_b_active: true, review_b_verified: true,
+  review_b_entry_valid: true, review_b_status: "ACTIONABLE",
+  review_b_display_event: "CURRENT", review_b_has_value_change: false,
+});
 const near = row("NEAR", {
   signal: false, review_watch_active: false,
   bf_watch_active: true, review_a_active: false, review_b_active: false,
@@ -77,7 +87,7 @@ const near = row("NEAR", {
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
-payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, near];
+payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
 async function ready() {
@@ -109,7 +119,7 @@ async function ready() {
       }));
       await page.goto("http://127.0.0.1:8765/", { waitUntil: "domcontentloaded" });
       await page.locator(".review-section").waitFor();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 4, "Changes scope excludes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 5, "Changes scope excludes Near");
       assert(await page.locator('[data-action="status"][data-value="NEAR_BREAKOUT"]').isDisabled());
 
       for (const outCode of ["AWEEK", "BELOWOUT"]) {
@@ -130,6 +140,22 @@ async function ready() {
         assert(outRect.y + outRect.height <= statusBox.y + statusBox.height + 1,
           `${outCode} OUT must fit inside the existing row height (${viewport.width}px)`);
       }
+      const poolRow = page.locator('.review-table tbody tr[data-code="POOLONLY"]');
+      const poolChange = poolRow.locator('td[data-field="review_change_label"]');
+      assert((await poolChange.innerText()).includes("POOL OUT"),
+        "Review Now reveals membership-only event, not older Weekend history");
+      assert(!(await poolChange.innerText()).includes("ZONE → EXT"));
+      if (viewport.width <= 760) {
+        assert.equal((await poolRow.locator(".mobile-change-hint").innerText()).trim(), "Pool OUT",
+          "Mobile Ticker hints and expanded Change must share event provenance");
+        await poolRow.click();
+        const poolDetail = page.locator(".mobile-detail-row .mobile-event-breakdown");
+        assert((await poolDetail.innerText()).includes("POOL OUT"));
+      }
+      await page.locator('[data-action="status"][data-value="ACTIONABLE"]').click();
+      assert.equal(await page.locator('.review-table tbody tr[data-code="POOLONLY"]').count(), 0,
+        "Unchanged Midweek ACTIONABLE cannot pull changed Weekend EXTENDED into Review Now");
+      await page.locator('[data-action="status"][data-value="ACTIONABLE"]').click();
       const dualRow = page.locator('.review-table tbody tr[data-code="DUAL"]');
       if (viewport.width > 760) {
         const changeCell = dualRow.locator('td[data-field="review_change_label"]');
@@ -158,6 +184,12 @@ async function ready() {
         assert.equal(await active.count(), 1, "Mobile dual-BP row marks one active status");
         assert(await active.isVisible(), "Mobile dual-BP status is visible");
       }
+      if (viewport.width > 760) {
+        const empty = page.locator(".selected-strip.empty");
+        const emptyBox = await empty.boundingBox();
+        assert(emptyBox && emptyBox.height <= 44,
+          `Empty Selected Overview must be compact (${emptyBox?.height}px)`);
+      }
       const bRow = page.locator('.review-table tbody tr[data-code="BONLY"]');
       if (viewport.width > 760) {
         const mainChange = bRow.locator('td[data-field="review_change_label"]');
@@ -185,7 +217,7 @@ async function ready() {
       }
 
       await page.locator('[data-action="scope"][data-value="ALL_SIGNALS"]').click();
-      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 5, "All Review includes Near");
+      assert.equal(await page.locator(".review-table tbody tr[data-code]").count(), 6, "All Review includes Near");
       // Scope changes retain selection; clicking the same mobile row again
       // would intentionally toggle the selection off.
       const selected = await page.locator(".selected-strip").innerText();

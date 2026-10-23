@@ -82,7 +82,7 @@ if (mode === "parse") {
 } else if (mode === "groups") {
   const methods = part("  function industryGroups(", "  function industryHtml(");
   const fixture = new Function(
-    "window", "rows", "contextSources", "contextMatch", "contextStatus", "bool",
+    "window", "rows", "eligibleSources", "contextMatch", "contextStatus", "bool",
     methods + "\nreturn { groups: industryGroups(rows), all: industryStockRows(rows) };"
   );
   const rs = { SMTC:98, MPWR:98, NVDA:91, CRWD:88, PANW:86, OXY:null };
