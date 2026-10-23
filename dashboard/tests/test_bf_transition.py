@@ -574,13 +574,11 @@ def test_midweek_buy_point_review_tracks_weekend_and_new_anchor_independently():
     assert row["review_effective_entry_status"] == "UNCONFIRMED"
 
 
-def test_new_buy_point_identity_uses_anchor_not_trigger_price():
+def test_identical_price_different_pivot_anchor_is_one_buy_point():
     complete = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-24", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=102.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-24"}]})])
     current = pd.DataFrame([_row("ANCHOR", snapshot_date="2026-07-27", signal=True, status="ACTIONABLE", valid=True, candidate=100.0, close=103.0, rule="pivot", candidate_extra={"pivot_candidates": [{"box_type": "M_BOX", "price": 100.0, "resistance_date": "2026-07-27"}]})])
     row = analyze_bf_transitions(current, complete).rows.iloc[0]
-    assert bool(row["review_new_buy_point"]) is True
-    assert row["review_new_buy_point_date"] == "2026-07-27"
-
+    assert bool(row["review_new_buy_point"]) is False
 
 
 def test_same_rule_and_anchor_date_is_not_new_when_box_metadata_changes():
@@ -664,3 +662,37 @@ def test_different_current_rule_is_new_when_legacy_weekend_anchor_date_is_missin
     row = analyze_bf_transitions(current, complete).rows.iloc[0]
     assert bool(row["review_new_buy_point"]) is True
     assert row["review_new_buy_point_zone"] == "BUY_ZONE"
+
+
+
+def test_same_price_across_strategies_does_not_create_new_buy_point():
+    complete = pd.DataFrame([_row(
+        "SOURCE", snapshot_date="2026-07-24", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100.0, close=102.0,
+        rule="pivot", candidate_extra={},
+    )])
+    current = pd.DataFrame([_row(
+        "SOURCE", snapshot_date="2026-07-27", signal=True,
+        status="UNCONFIRMED", valid=False, candidate=100.0, close=102.0,
+        rule="ceiling_pullback", candidate_extra={},
+    )])
+    result = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert not bool(result["review_new_buy_point"])
+    assert result["review_new_buy_point_price"] is None
+
+
+def test_different_price_without_anchor_metadata_remains_new():
+    complete = pd.DataFrame([_row(
+        "PRICE", snapshot_date="2026-07-24", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100.0, close=102.0,
+        rule="pivot", candidate_extra={},
+    )])
+    current = pd.DataFrame([_row(
+        "PRICE", snapshot_date="2026-07-27", signal=True,
+        status="UNCONFIRMED", valid=False, candidate=103.0, close=104.0,
+        rule="pivot", candidate_extra={},
+    )])
+    result = analyze_bf_transitions(current, complete).rows.iloc[0]
+    assert bool(result["review_new_buy_point"])
+    assert result["review_new_buy_point_price"] == 103.0
+    assert result["review_new_buy_point_zone"] == "BUY_ZONE"
