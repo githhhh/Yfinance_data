@@ -203,6 +203,19 @@ assert(app.tableHtml([dualPrices]).includes("Weekend Buy Point"));
 assert(app.industryHtml([dualPrices]).includes("Midweek Buy Point"));
 assert(!app.industryHtml([dualPrices]).includes("UNVERIFIED"));
 
+// Industry and Stock must show the same explicit missing-data label for
+// a fixed Weekend A even when current Midweek B is otherwise actionable.
+const missingWeekendA = {...entry("A_NO_DATA"),review_a_active:true,
+  review_b_active:true,review_data_available:false,ibd_entry_status:null,
+  review_b_status:"ACTIONABLE",review_b_entry_valid:true,
+  review_b_display_event:"NEW BP",review_b_has_value_change:true};
+state.scope = "CHANGES"; state.status = "ALL"; state.newBuyPoint = "ALL";
+assert(app.tableHtml([missingWeekendA]).includes("NO DATA"));
+assert(app.industryHtml([missingWeekendA]).includes("NO DATA"),
+  "Industry Weekend status must agree with Stock when A has no price data");
+assert(app.industryHtml([missingWeekendA]).includes("ACTIONABLE"),
+  "Missing Weekend A data must not suppress independent B entry confirmation");
+
 const updatedPoint = {...entry("UPDATED"),review_b_display_event:"BP UPDATED",};
 assert(app.tableHtml([updatedPoint]).includes("BUY POINT UPDATED"),
   "Raw BP UPDATED token must not leak to table");

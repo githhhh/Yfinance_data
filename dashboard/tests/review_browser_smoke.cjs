@@ -269,7 +269,17 @@ async function ready() {
         window.BFIndustryRS.industryRS = industry => industry === "Energy" ? 99 : 92;
         document.getElementById("app").dispatchEvent(new Event("bf-rs-updated"));
       });
+      // The earlier view can have expanded a stale/unclassified group
+      // before the synthetic RS source was installed. Expand the actual
+      // newly resolved Software group after the reference refresh.
+      const softwareToggle = page.locator('.industry-group-toggle[data-industry="Software"]');
+      assert.equal(await softwareToggle.count(), 1, "Refreshed Industry groups have their real labels");
+      if ((await softwareToggle.getAttribute("aria-expanded")) !== "true") await softwareToggle.click();
       const industryShell = page.locator("[data-industry-list]");
+      assert(await industryShell.locator('.industry-group-body:not([hidden]) tbody tr[data-code]').count() > 0,
+        "Keyboard test requires visible stock rows in the expanded group");
+      assert(await industryShell.locator('.industry-group-body[hidden] tbody tr[data-code]').count() > 0,
+        "Keyboard test requires an additional collapsed industry group");
       await industryShell.focus();
       await page.keyboard.press("ArrowUp");
       const lastVisible = page.locator(".industry-stock-table tbody tr.selected");
