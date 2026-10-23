@@ -96,6 +96,21 @@ def decorate_observation_view(
         a_event = str(row.get("review_a_event") or "")
         a_week = str(row.get("review_a_week_event") or "")
         membership_event = str(row.get("review_membership_event") or "")
+        # The Weekend quick groups are cumulative relative to the immutable A
+        # baseline. Legacy path["change"] chooses yesterday as its basis when
+        # today's price crosses a zone, and therefore cannot drive the
+        # Weekend quick-group membership (e.g. ZONE → BELOW → ZONE).
+        # Keep the legacy path untouched for its own price replay consumers.
+        if has_a:
+            weekend_zone_group = {
+                "ZONE": "ENTERED_BUY_ZONE",
+                "BELOW": "BELOW_BUY_POINT",
+                "EXT": "BECAME_EXTENDED",
+            }
+            result.at[index, "review_weekend_buy_point_change"] = (
+                weekend_zone_group.get(row.get("review_a_zone"), "UNCHANGED")
+                if a_week else "UNCHANGED"
+            )
         # Show persistent Vs Weekend state in What Changed / All Review, but
         # do not repeatedly inject an old difference into Review Now.
         # On the first US trading session, comparison against Weekend is new.

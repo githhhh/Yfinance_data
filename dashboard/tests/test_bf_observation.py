@@ -696,6 +696,55 @@ def test_stable_below_weekend_anchor_stays_in_cumulative_not_review_now():
     assert not view["review_has_value_change"]
 
 
+def test_return_to_weekend_zone_is_daily_change_not_cumulative_weekend_change():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("BACK", snapshot="2026-10-16",
+                                trigger=100, close=102)])
+    previous = pd.DataFrame([row("BACK", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=98)])
+    current = pd.DataFrame([row("BACK", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=102)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    assert raw.iloc[0]["review_weekend_buy_point_change"] == "ENTERED_BUY_ZONE", (
+        "Legacy replay's focus is yesterday, not the Weekend baseline"
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_event"] == "BELOW → ZONE"
+    assert view["review_a_week_event"] == ""
+    assert view["review_a_has_value_change"] and view["review_has_value_change"]
+    assert view["review_weekend_buy_point_change"] == "UNCHANGED", (
+        "What Changed is cumulative vs fixed Weekend, so no group membership"
+    )
+
+
+def test_intraday_movement_into_new_weekend_zone_keeps_cumulative_group():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("TWO", snapshot="2026-10-16",
+                                trigger=100, close=102)])
+    previous = pd.DataFrame([row("TWO", snapshot="2026-10-20",
+                                 signal=False, trigger=100, close=99)])
+    current = pd.DataFrame([row("TWO", snapshot="2026-10-21",
+                                signal=False, trigger=100, close=107)])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous,
+        as_of=date(2026, 10, 21), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+    ).iloc[0]
+    assert view["review_a_event"] == "BELOW → EXT"
+    assert view["review_a_week_event"] == "ZONE → EXT"
+    assert view["review_weekend_buy_point_change"] == "BECAME_EXTENDED"
+    assert view["review_a_has_value_change"]
+
+
 def test_new_weekend_move_still_enters_review_now():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     weekend = pd.DataFrame([row("TMO", snapshot="2026-10-16",
