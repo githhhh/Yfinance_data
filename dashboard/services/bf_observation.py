@@ -15,7 +15,8 @@ import pandas as pd
 
 from bf_snapshot import monday_of_week
 from dashboard.services.bf_transition import (
-    SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone, to_bool,
+    SOURCE_FACT_FIELDS, _buy_point_anchor, _calculate_status, _price_zone,
+    _same_buy_point_price, to_bool,
 )
 
 _ZONES = {"BELOW_BUY_POINT": "BELOW", "BUY_ZONE": "ZONE", "EXTENDED": "EXT"}
@@ -226,12 +227,10 @@ def _price_path(weekend, current, daily, *, as_of: date, previous=None,
 
 
 def _same_identity(a, b):
-    left = _buy_point_anchor(a) if a is not None else None
-    right = _buy_point_anchor(b) if b is not None else None
-    if left and right:
-        return left["identity"] == right["identity"]
-    # Missing source identity must not be invented from an approximate price.
-    return None
+    """Compatibility name: compare the selected buy-point prices only."""
+    if a is None or b is None:
+        return None
+    return _same_buy_point_price(a.get("ibd_candidate_price"), b.get("ibd_candidate_price"))
 
 
 def _b_event(weekend, today, previous, *, comparison_available):
@@ -239,10 +238,6 @@ def _b_event(weekend, today, previous, *, comparison_available):
         return None
     if weekend is not None and _same_identity(weekend, today) is True:
         return None
-    if weekend is not None and _same_identity(weekend, today) is None:
-        if (str(weekend.get("ibd_candidate_rule") or "") ==
-                str(today.get("ibd_candidate_rule") or "")):
-            return None  # fail closed on ambiguous same-rule anchors
     if not comparison_available:
         return "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
@@ -253,10 +248,6 @@ def _b_event(weekend, today, previous, *, comparison_available):
     same = _same_identity(previous, today)
     if same is False:
         return "BP CHANGED"
-    if same is None:
-        return "SNAPSHOT"
-    if _number(previous.get("ibd_candidate_price")) != _number(today.get("ibd_candidate_price")):
-        return "BP UPDATED"
     old_status = str(previous.get("ibd_entry_status") or "")
     new_status = str(today.get("ibd_entry_status") or "")
     if old_status != new_status:

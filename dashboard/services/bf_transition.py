@@ -229,6 +229,16 @@ def _same_price(left: Any, right: Any) -> bool:
     return bool(np.isclose(float(lhs), float(rhs), rtol=1e-9, atol=1e-4))
 
 
+def _same_buy_point_price(left: Any, right: Any) -> bool:
+    """The selected Pool price, not its strategy, identifies a buy point."""
+    lhs = pd.to_numeric(left, errors="coerce")
+    rhs = pd.to_numeric(right, errors="coerce")
+    if (pd.isna(lhs) or pd.isna(rhs) or not np.isfinite(lhs)
+            or not np.isfinite(rhs) or lhs <= 0 or rhs <= 0):
+        return False
+    return bool(float(lhs) == float(rhs))
+
+
 def _iso_date(value: Any) -> str | None:
     parsed = pd.to_datetime(value, errors="coerce")
     return None if pd.isna(parsed) else parsed.date().isoformat()
@@ -449,20 +459,17 @@ def _project(
             weekend_previous_zone = _price_zone(weekend_candidate, weekend_close)
             weekend_current_zone = _price_zone(weekend_candidate, latest_close)
             weekend_change = _tracked_buy_point_change(weekend_previous_zone, weekend_current_zone)
-        new_buy_point = False
-        if signal_current and current_anchor is not None:
-            if not signal_complete:
-                new_buy_point = True
-            elif weekend_anchor is not None:
-                new_buy_point = current_anchor["identity"] != weekend_anchor["identity"]
-            else:
-                # Some legacy candidates (notably MA10 pending-high) do not yet
-                # expose the bar that supplied the high. A different setup rule
-                # is still sufficient evidence that the current structural buy
-                # point is not the Weekend one; same-rule ambiguity fails closed.
-                weekend_rule = (_clean_text(complete_row.get("ibd_candidate_rule")) or "").lower()
-                new_buy_point = bool(weekend_rule and current_anchor["rule"] != weekend_rule)
-        new_buy_point_zone = _price_zone(current_anchor["trigger_price"], latest_close) if new_buy_point and current_anchor is not None else None
+        # Each published Pool selects one signal per ticker. Its price is
+        # the buy-point identity; structural anchors remain source metadata.
+        current_candidate = (
+            _positive_number(current_row.get("ibd_candidate_price"), field="current candidate", code=code)
+            if signal_current else None
+        )
+        new_buy_point = bool(
+            current_candidate is not None
+            and (not signal_complete or not _same_buy_point_price(current_candidate, weekend_candidate))
+        )
+        new_buy_point_zone = _price_zone(current_candidate, latest_close) if new_buy_point else None
         has_value_change = bool(weekend_change != "UNCHANGED" or new_buy_point_zone is not None)
         buy_point_change_label = _buy_point_change_label(weekend_change, new_buy_point_zone)
         buy_point_priority = _buy_point_priority(weekend_change, new_buy_point_zone)
@@ -486,9 +493,9 @@ def _project(
                 "review_weekend_buy_point_rule": weekend_anchor["rule"] if weekend_anchor is not None else None,
                 "review_new_buy_point": bool(new_buy_point),
                 "review_new_buy_point_zone": new_buy_point_zone,
-                "review_new_buy_point_price": current_anchor["trigger_price"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_price": current_candidate if new_buy_point else None,
                 "review_new_buy_point_date": current_anchor["anchor_date"] if new_buy_point and current_anchor is not None else None,
-                "review_new_buy_point_rule": current_anchor["rule"] if new_buy_point and current_anchor is not None else None,
+                "review_new_buy_point_rule": (_clean_text(current_row.get("ibd_candidate_rule")) or "").lower() if new_buy_point else None,
                 "review_new_buy_point_anchor_type": current_anchor["anchor_type"] if new_buy_point and current_anchor is not None else None,
                 "review_has_value_change": has_value_change,
                 "review_buy_point_change_label": buy_point_change_label,
