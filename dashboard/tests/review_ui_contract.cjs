@@ -338,6 +338,8 @@ const membershipOnly = {...stillA, review_a_event:"", review_a_week_event:"ZONE 
 assert.equal(app.filterRows([membershipOnly]).length, 1);
 assert(app.changeLines(membershipOnly).includes("POOL OUT"),
   "Review Now must show today's membership transition");
+assert(app.tableHtml([membershipOnly]).includes("Pool OUT</small>"),
+  "Mobile Ticker hint must use the same Pool OUT event as Change");
 assert(!app.changeLines(membershipOnly).includes("ZONE → EXT"),
   "Review Now must not misrepresent a past Weekend cumulative change as today's event");
 const membershipAndPrice = {...membershipOnly, review_a_event:"BELOW → ZONE"};
@@ -346,6 +348,53 @@ assert(app.changeLines(membershipAndPrice).includes("BELOW → ZONE"),
 state.scope = "ALL_SIGNALS";
 assert(app.changeLines(membershipOnly).includes("ZONE → EXT"),
   "All Review keeps the useful cumulative Weekend comparison");
+// Review Now status and advanced filters must apply to *changed* references.
+// A changed Weekend EXTENDED + stable Midweek ACTIONABLE must not produce
+// a misleading "Still Actionable" row or ACTIONABLE badge count.
+const changedAStableB = {...entry("A_CHANGED"), ibd_entry_status:"EXTENDED",
+  review_a_active:true, review_a_has_value_change:true, review_a_event:"ZONE → EXT",
+  review_b_active:true, review_b_verified:true, review_b_entry_valid:true,
+  review_b_status:"ACTIONABLE", review_b_display_event:"CURRENT",
+  review_b_has_value_change:false, review_has_value_change:true};
+state.scope = "CHANGES"; state.status = "ACTIONABLE";
+assert.equal(app.filterRows([changedAStableB]).length, 0,
+  "Review Now ACTIONABLE excludes a stable B when only A EXTENDED changed");
+assert.equal(app.filterCounts([changedAStableB]).status.ACTIONABLE, 0,
+  "Review Now status badges count changed-source opportunities only");
+state.status = "EXTENDED";
+assert.equal(app.filterRows([changedAStableB]).length, 1,
+  "Review Now EXTENDED includes the changed Weekend source");
+assert(app.changeLines(changedAStableB).includes("ZONE → EXT"),
+  "Change must expose the source responsible for the filtered row");
+state.status = "ALL";
+changedAStableB.ibd_entry_volume_ratio = 0.8;
+changedAStableB.review_b_entry_volume = 2.5;
+state.entryVolumeMin = 1.5;
+assert.equal(app.filterRows([changedAStableB]).length, 0,
+  "Review Now volume filter must not qualify using an unchanged B");
+state.entryVolumeMin = null;
+state.scope = "ALL_SIGNALS"; state.status = "ACTIONABLE";
+assert.equal(app.filterRows([changedAStableB]).length, 1,
+  "All Review retains discoverability of stable B ACTIONABLE");
+state.scope = "CHANGES"; state.newBuyPoint = "BUY_ZONE";
+changedAStableB.review_new_buy_point = true;
+changedAStableB.review_new_buy_point_zone = "BUY_ZONE";
+assert.equal(app.filterRows([changedAStableB]).length, 1,
+  "Explicit Midweek snapshot quick group is not restricted to daily changes");
+state.newBuyPoint = "ALL"; state.status = "ALL";
+const dualChanged = {...changedAStableB,review_b_display_event:"NEW BP",
+  review_b_has_value_change:true};
+assert.equal(app.filterRows([dualChanged]).length, 1);
+state.status = "ACTIONABLE";
+assert.equal(app.filterRows([dualChanged]).length, 1,
+  "Changed Midweek ACTIONABLE remains in Review Now");
+assert(app.changeLines(dualChanged).includes(">NEW</span>"));
+assert(!app.changeLines(dualChanged).includes(">Weekend</span>"),
+  "Review Now ACTIONABLE displays only the changed matching B source");
+assert(app.tableHtml([dualChanged]).includes("New Point</small>"),
+  "Ticker hint uses the filtered B event, not the unrelated A transition");
+state.status = "ALL";
+state.scope = "ALL_SIGNALS";
 const entryReason = {...entry("REASON"),ibd_entry_vol_or_reject:"daily_volume_not_confirmed"};
 const entryHtml = app.tableHtml([entryReason]);
 assert(entryHtml.includes(">Vol Unconfirmed</span>"));

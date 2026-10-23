@@ -185,6 +185,18 @@
     return [...(bool(row.review_a_active) || !currentHasComparison() ? ["A"] : []),
       ...(currentHasComparison() && bool(row.review_b_active) ? ["B"] : [])];
   }
+  function reviewNowMode() {
+    return currentHasComparison() && state.scope === "CHANGES" &&
+      state.change === "ALL" && state.newBuyPoint === "ALL";
+  }
+  function eligibleSources(row, forced = null) {
+    const sources = contextSources(row, forced);
+    if (forced || !reviewNowMode() || isNearBreakout(row)) return sources;
+    // A single ticker may have two independent references. Review Now and
+    // its status/advanced filters must match the reference that actually changed.
+    return sources.filter((src) => src === "A" ? bool(row.review_a_has_value_change)
+      : src === "B" ? bool(row.review_b_has_value_change) : false);
+  }
   function contextStatus(row, src) {
     if (src === "WATCH") return WATCH_STAGE;
     // Structural identity and entry confirmation are separate facts. An
@@ -396,17 +408,13 @@
     const name = labels[status] || statusLabel(status);
     return [`Still ${name}`, `${source === "B" ? "Midweek" : "Weekend"} Buy Point · no new reportable event · ${statusLabel(status)}`];
   }
-  function changeLines(row) {
-    if (isNearBreakout(row)) {
-      return '<span class="change-still" title="Near Breakout · watch only; no formal buy-point change">Still Near Breakout</span>';
-    }
+  function changeItems(row) {
     const items = [];
     // Change is the reason this filtered row is visible, not a catalogue of
     // unrelated historical differences. Explicit Weekend/Midweek quick groups
     // retain their own cumulative/snapshot semantics.
-    const sources = contextSources(row).filter((source) => contextMatch(row, source));
-    const incremental = currentHasComparison() && state.scope === "CHANGES" &&
-      state.change === "ALL" && state.newBuyPoint === "ALL";
+    const sources = eligibleSources(row).filter((source) => contextMatch(row, source));
+    const incremental = reviewNowMode();
     if (bool(row.review_a_active) && sources.includes("A") &&
         (!incremental || bool(row.review_a_has_value_change))) {
       const raw = row.review_data_available === false ? "NO DATA" :
@@ -434,6 +442,13 @@
       const event = compactChangeEvent(raw);
       if (event) items.push(["Midweek", "Midweek Buy Point", event, readableMidweekEvent(raw), basis]);
     }
+    return {items, sources};
+  }
+  function changeLines(row) {
+    if (isNearBreakout(row)) {
+      return '<span class="change-still" title="Near Breakout · watch only; no formal buy-point change">Still Near Breakout</span>';
+    }
+    const {items, sources} = changeItems(row);
     if (!items.length) {
       const [label, detail] = stillLabel(row, sources);
       return `<span class="change-still" title="${esc(detail)}">${esc(label)}</span>`;
@@ -496,7 +511,7 @@
       if (aQuick && row.review_weekend_buy_point_change !== state.change) return false;
       if (newQuick && !(bool(row.review_new_buy_point) && row.review_new_buy_point_zone === state.newBuyPoint)) return false;
       const forced = opts.forceSource || (newQuick ? "B" : aQuick ? "A" : null);
-      return contextSources(row, forced).some((src) => contextMatch(row, src, {
+      return eligibleSources(row, forced).some((src) => contextMatch(row, src, {
         skipStatus:exclude==="status", skipAdvanced:exclude==="advanced"
       }));
     });
@@ -506,7 +521,7 @@
     const aBase = filterRows(rows,"bothQuick",{forceSource:"A",ignoreScope:true});
     const bBase = filterRows(rows,"bothQuick",{forceSource:"B",ignoreScope:true});
     const status = Object.fromEntries(REVIEW_STATE_ORDER.map((key)=>[
-      key,statusBase.filter((row)=>contextSources(row).some((src)=>contextMatch(row,src,{status:key}))).length
+      key,statusBase.filter((row)=>eligibleSources(row).some((src)=>contextMatch(row,src,{status:key}))).length
     ]));
     if (currentHasComparison() && state.scope==="CHANGES") status[WATCH_STAGE]=rows.filter(isNearBreakout).length;
     return {
@@ -522,7 +537,7 @@
       const rank = (row) => {
         // Only rank the buy-point event that the user can actually see in
         // the selected quick/status/advanced filter context.
-        const visible = contextSources(row).filter((source) => contextMatch(row,source));
+        const visible = eligibleSources(row).filter((source) => contextMatch(row,source));
         const a = visible.includes("A") ? text(row.review_a_event,"") || text(row.review_a_week_event,"") : "";
         const b = visible.includes("B") ? text(row.review_b_display_event || row.review_b_event,"") : "";
         if (b && bool(row.review_b_verified) && contextStatus(row,"B")==="ACTIONABLE" && b!=="CURRENT") return 0;
@@ -1154,16 +1169,23 @@
     }
     if (field === "code") {
       if (!currentHasComparison() || !bool(row.review_has_value_change)) return esc(row.code);
-      const e = displayChange(row);
-      const member = text(row.review_membership_event, "");
-      const label = e === "NO CHANGE" && member ? member :
-        e === "NEW BP" ? "New Point" :
-        e === "BP CHANGED" ? "Point Changed" :
-        e === "BP UPDATED" ? "Point Updated" :
-        /→ BELOW$/.test(e) ? "↓ Below" :
-        /→ EXT$/.test(e) || /→ EXTENDED$/.test(e) ? "↑ Extended" :
-        /→ ZONE$/.test(e) || /→ ACTIONABLE$/.test(e) ? "→ Buy Zone" : "→ Changed";
-      return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(e)}">${esc(label)}</small>`;
+      // Match the same visible source/event as Change; raw cumulative Weekend
+      // history must never masquerade as today's mobile Ticker change.
+      const items = changeItems(row).items;
+      if (!items.length) return esc(row.code);
+      const picked = (reviewUsesB(row) && items.find((item) => item[0] === "Midweek")) || items[0];
+      const event = picked[2];
+      const label = event === "NEW" ? "New Point" :
+        event === "CHANGED" ? "Point Changed" :
+        event === "UPDATED" ? "Point Updated" :
+        event === "POOL OUT" ? "Pool OUT" :
+        event === "POOL IN" ? "Pool IN" :
+        event === "PRIOR ?" ? "Prior ?" :
+        event === "UNVERIFIED" ? "Unverified" :
+        /→ BELOW$/.test(event) ? "↓ Below" :
+        /→ EXT$/.test(event) || /→ EXTENDED$/.test(event) ? "↑ Extended" :
+        /→ ZONE$/.test(event) || /→ ACTIONABLE$/.test(event) ? "→ Buy Zone" : "→ Changed";
+      return `${esc(row.code)}<small class="mobile-change-hint ${eventTone(event)}">${esc(label)}</small>`;
     }
     if (field === "ibd_candidate_rule") return setupHtml(row);
     if (field === "current_vs_ibd_candidate_pct") return esc(fmt(reviewDistance(row), "pct"));
