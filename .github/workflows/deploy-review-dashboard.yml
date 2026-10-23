@@ -70,6 +70,8 @@ jobs:
           python -m pytest dashboard/tests -q
 
       - name: Build static dashboard
+        env:
+          GA4_MEASUREMENT_ID: ${{ github.event_name != 'pull_request' && vars.GA4_MEASUREMENT_ID || '' }}
         run: python dashboard/build_static.py --output _site
 
       - name: Audit desktop and mobile browser flow
