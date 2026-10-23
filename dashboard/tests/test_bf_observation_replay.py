@@ -289,8 +289,8 @@ def test_last_complete_week_baseline_permits_first_midweek_session():
     assert events[0]["price"]["transition"] == "BELOW_TO_ZONE"
 
 
-def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
-    """Shadow-safety gate: A's entire legacy implementation is unchanged."""
+def test_weekend_a_legacy_functions_ast_identical_to_main(tmp_path):
+    """Protect all existing A and replay functions; allow the B price event rewrite."""
     import ast
     from pathlib import Path
     import pytest
@@ -308,10 +308,18 @@ def test_weekend_legacy_functions_ast_identical_to_main(tmp_path):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
     original_api = functions(original.stdout)
     current_api = functions(latest)
-    assert all(current_api.get(name) == impl for name, impl in original_api.items())
-    # No legacy A function may be removed or changed by V2.
-    assert {"_price_path", "_b_event", "build_observation_view",
+    # _same_identity (old structural helper) is deleted; _b_event is
+    # intentionally replaced with price-only B logic. Every other legacy
+    # function, especially the fixed Weekend A path, is AST-identical.
+    intentionally_changed_b_only = {"_same_identity", "_b_event"}
+    assert all(
+        current_api.get(name) == impl
+        for name, impl in original_api.items()
+        if name not in intentionally_changed_b_only
+    )
+    assert {"_price_path", "build_observation_view",
             "build_observation_attention"} <= original_api.keys()
+    assert "_same_identity" not in current_api
 
 
 def test_publication_cutoff_excludes_future_history(tmp_path):

@@ -385,7 +385,9 @@ def test_telegram_midweek_only_new_independent_in_zone_buy_points():
         current, complete, current, previous=previous, daily={},
         as_of=date(2026, 10, 15),
     )
-    assert {event["code"] for event in events} == {"NEW", "CHANGED"}
+    # A different selected price is a new B candidate even if its old strategy
+    # anchor date is unchanged. The earlier UPDATE=$110 and today=$112 differ.
+    assert {event["code"] for event in events} == {"NEW", "CHANGED", "UPDATE"}
     for event in events:
         assert event["event"] == "NEW BP"
         assert event["zone"] == "ZONE"
