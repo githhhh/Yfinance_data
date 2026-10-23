@@ -1,7 +1,7 @@
 """Pure, read-only BF buy-point observation facts (schema v2).
 
 No git, filesystem, trading eligibility, Futu, Pool mutation or Telegram I/O.
-A's published v1 path/identity semantics remain in bf_observation/bf_transition.
+Weekend A's fixed price tracking remains independent of B identity and events.
 """
 from __future__ import annotations
 
@@ -125,8 +125,8 @@ def resolve_midweek_facts(*, code: str, current: dict,
                           daily_closes: list[tuple[str, float]] | None = None) -> dict | None:
     """Resolve the four orthogonal facts; never decide Telegram eligibility.
 
-    Historical identity is independent of the current price and ACT. This
-    function also returns facts for EXT / BELOW B signals when evidence exists.
+    Historical identity is the selected price; Entry confirmation is separate.
+    This function also returns facts for EXT / BELOW B signals when evidence exists.
     """
     if to_bool(current.get("signal")) is not True:
         return None

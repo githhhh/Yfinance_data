@@ -54,13 +54,16 @@ Futu trade eligibility and universe selection are not changed.
 current B is outside ZONE. `midweek_opportunity_policy()` alone decides
 Telegram eligibility; the compatibility façade only composes them. The legacy
 A `_price_path` remains untouched; both A and B use authoritative
-`bf_transition._price_zone` rounding through their adapters. This is a staged
-compatibility boundary, not a claim that A's whole timeline is reimplemented.
+`bf_transition._price_zone` rounding through their adapters. This is a staged compatibility boundary, not a claim that A's whole timeline
+is reimplemented. `UNVERIFIED` is not an Entry Status: valid selected prices
+are never blocked by unclear strategy or structural metadata.
 
-Facts combine into exactly one B opportunity: `ZONE_REENTRY` for a verified
-existing B Anchor crossing BELOW/EXT → ZONE; `FIRST_OBSERVED_BP` for a
-new-to-published-history B in ZONE. A reappearing identity is not NEW. ACT
-upgrade is recorded but cannot alone trigger a Telegram event.
+Facts combine into at most one B opportunity: `ZONE_REENTRY` for a
+previously observed selected-price B crossing BELOW/EXT → ZONE;
+`FIRST_OBSERVED_BP` for a new-to-published-history selected price in ZONE.
+The same price reappearing is not NEW. ACT upgrade alone does not create an
+event. V2 retains legacy JSON keys `anchor_key_v2` / `identity` for consumer
+compatibility, but the key's value is now derived exclusively from price.
 
 The schema-v2 event contains `source=MIDWEEK`, `anchor_key_v2`, `identity`,
 `price`, `watch`, `entry`, `primary`, `modifiers`, `evidence`,

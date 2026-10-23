@@ -2,7 +2,7 @@
 
 The original A (Weekend Buy Point) observation/alert functions in
 bf_observation.py must remain AST-identical to main. This adapter is the only
-place the public Dashboard adds source-specific labels and V2 B identity.
+place the public Dashboard adds selected-price A/B labels and event comparison.
 Nothing here is used by Futu or the Telegram v1/v2 event producers.
 """
 from __future__ import annotations
@@ -71,7 +71,7 @@ def decorate_observation_view(
     current: pd.DataFrame,
     previous: pd.DataFrame | None,
 ) -> pd.DataFrame:
-    """Add UI-only source identity, event and comparison labels.
+    """Add UI-only price-source, event and comparison labels.
 
     One Ticker remains one row. The independent Weekend and Midweek Buy Point
     facts are preserved in different fields; publication and Futu are untouched.

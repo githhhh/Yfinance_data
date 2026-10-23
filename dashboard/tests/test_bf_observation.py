@@ -1,4 +1,4 @@
-"""Regression protection for A/B observation; trading projection is untouched."""
+"""Regression protection for price-only A/B observation and immutable Weekend tracking."""
 from datetime import date
 
 import pandas as pd

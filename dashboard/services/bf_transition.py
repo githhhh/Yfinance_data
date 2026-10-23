@@ -248,7 +248,10 @@ def _anchor(*, rule: str, trigger_price: float, anchor_date: str | None, anchor_
 
 
 def _buy_point_anchor(row: pd.Series | None) -> dict[str, Any] | None:
-    """Return structural buy-point identity; trigger price is not the identity."""
+    """Return optional structural provenance; this is NOT buy-point identity.
+
+    Selected-price comparison, not this metadata, decides A/B uniqueness.
+    """
     if row is None:
         return None
     rule = (_clean_text(row.get("ibd_candidate_rule")) or "").lower()
