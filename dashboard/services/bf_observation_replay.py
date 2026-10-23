@@ -76,7 +76,7 @@ def price_replay(*, trigger: Any, previous_close: Any, current_close: Any,
     old_trigger = _num(previous_trigger)
     out["trigger_revision"] = (
         "UNKNOWN" if old_trigger is None else
-        "REVISED" if not math.isclose(old_trigger, now_trigger, rel_tol=1e-9, abs_tol=1e-4)
+        "REVISED" if old_trigger != now_trigger
         else "UNCHANGED"
     )
     if before is None or after is None or previous_date is None or current_date is None:

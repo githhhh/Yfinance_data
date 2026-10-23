@@ -665,6 +665,23 @@ def test_different_current_rule_is_new_when_legacy_weekend_anchor_date_is_missin
 
 
 
+def test_source_provenance_does_not_expose_a_structural_identity():
+    from dashboard.services.bf_transition import _buy_point_anchor
+    source = pd.Series(_row(
+        "META", snapshot_date="2026-07-24", signal=True,
+        status="ACTIONABLE", valid=True, candidate=100.0, close=102.0,
+        rule="pivot", candidate_extra={"selected_pivot": {
+            "price": 100.0, "box_type": "M_BOX",
+            "resistance_date": "2026-07-23",
+        }},
+    ))
+    provenance = _buy_point_anchor(source)
+    assert provenance is not None
+    assert provenance["anchor_date"] == "2026-07-23"
+    assert provenance["anchor_type"] == "M_BOX"
+    assert "identity" not in provenance
+
+
 def test_same_price_across_strategies_does_not_create_new_buy_point():
     complete = pd.DataFrame([_row(
         "SOURCE", snapshot_date="2026-07-24", signal=True,

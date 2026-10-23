@@ -249,7 +249,6 @@ def _anchor(*, rule: str, trigger_price: float, anchor_date: str | None, anchor_
         return None
     kind = _clean_text(anchor_type)
     return {
-        "identity": "|".join((rule, anchor_date)),
         "rule": rule,
         "trigger_price": trigger_price,
         "anchor_date": anchor_date,
@@ -258,7 +257,7 @@ def _anchor(*, rule: str, trigger_price: float, anchor_date: str | None, anchor_
 
 
 def _buy_point_anchor(row: pd.Series | None) -> dict[str, Any] | None:
-    """Return structural buy-point identity; trigger price is not the identity."""
+    """Best-effort strategy provenance for display; never a buy-point identity."""
     if row is None:
         return None
     rule = (_clean_text(row.get("ibd_candidate_rule")) or "").lower()

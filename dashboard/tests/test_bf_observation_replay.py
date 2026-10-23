@@ -109,6 +109,19 @@ def test_amn_changed_selected_price_is_distinct_even_with_same_structure():
     assert result["transition"] == "ZONE_TO_EXT"
 
 
+def test_price_revision_uses_exact_selected_price_not_legacy_tolerance():
+    previous = pivot("EXACT", "2026-10-14", 100.0, 101.0)
+    current = pivot("EXACT", "2026-10-15", 100.00001, 101.0)
+    assert identity_v2(previous)["key"] != identity_v2(current)["key"]
+    observed = price_replay(
+        trigger=100.00001, previous_trigger=100.0,
+        previous_close=101.0, current_close=101.5,
+        previous_date="2026-10-14", current_date="2026-10-15",
+        basis="TRACKED_ANCHOR",
+    )
+    assert observed["trigger_revision"] == "REVISED"
+
+
 def test_revision_cannot_fake_buy_zone_entry():
     p = price_replay(trigger=110, previous_trigger=100, previous_close=107,
                      current_close=108, previous_date="2026-10-14",
