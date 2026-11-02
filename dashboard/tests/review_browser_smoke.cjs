@@ -254,8 +254,29 @@ async function ready() {
       await page.locator('[data-action="toggle-view"]').click();
       const toggle = page.locator(".industry-group-toggle").first();
       await toggle.waitFor();
+      const alignment = async () => toggle.evaluate(button => {
+        const bounds = selector => button.querySelector(selector).getBoundingClientRect();
+        const arrow = bounds(".industry-chevron");
+        const name = bounds(".industry-name");
+        const chipRow = button.querySelector(".industry-top3");
+        return {
+          centerDelta: Math.abs((arrow.top + arrow.height / 2) - (name.top + name.height / 2)),
+          chipIndentDelta: Math.abs(chipRow.getBoundingClientRect().left + parseFloat(getComputedStyle(chipRow).paddingLeft) - name.left),
+          arrowOffset: arrow.top - button.getBoundingClientRect().top,
+        };
+      });
+      const closedAlignment = await alignment();
+      assert(closedAlignment.centerDelta <= 1.5,
+        `Collapsed Industry arrow/name must share a center line at ${viewport.width}px (delta=${closedAlignment.centerDelta})`);
+      assert(closedAlignment.chipIndentDelta <= 1.5,
+        `Collapsed Industry chips must align with name at ${viewport.width}px (delta=${closedAlignment.chipIndentDelta})`);
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+      const openAlignment = await alignment();
+      assert(openAlignment.centerDelta <= 1.5,
+        `Expanded Industry arrow/name must share a center line at ${viewport.width}px (delta=${openAlignment.centerDelta})`);
+      assert(Math.abs(openAlignment.arrowOffset - closedAlignment.arrowOffset) <= 1,
+        `Industry title must not jump when expanding at ${viewport.width}px`);
       const industryPulse = page.locator(".industry-group-pulse").first();
       assert((await industryPulse.innerText()).includes("Actionable"), "Industry shows verified actionable concentration");
       assert((await industryPulse.innerText()).includes("Changed"), "Industry shows active review concentration");

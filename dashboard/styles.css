@@ -942,17 +942,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   background: #0d1d26; border: 1px solid #304352; border-radius: 7px;
 }
 .industry-group-toggle {
-  display: flex; align-items: flex-start; width: 100%; min-width: 0;
-  gap: 12px; padding: 10px 12px; border: 0; background: transparent;
+  display: block; width: 100%; min-width: 0;
+  padding: 10px 12px; border: 0; background: transparent;
   color: #eaf3fb; text-align: left; cursor: pointer; font: inherit;
 }
 .industry-group-toggle:focus-visible { outline: 2px solid #04daba; outline-offset: -2px; }
-.industry-chevron { display: block; flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; color: #d5e6f7; }
-.industry-group-main { display: grid; gap: 7px; flex: 1; min-width: 0; }
+.industry-chevron { display: block; flex: 0 0 18px; width: 18px; height: 18px; color: #d5e6f7; }
+.industry-group-main { display: grid; gap: 7px; width: 100%; min-width: 0; }
+.industry-title { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 .industry-group-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-.industry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 730; }
+.industry-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 730; }
 .industry-group-rs { flex-shrink: 0; white-space: nowrap; font-size: 11px; color: #adc3dc; font-variant-numeric: tabular-nums; }
-.industry-top3 { display: flex; gap: 6px; flex-wrap: wrap; }
+.industry-top3 { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 30px; }
 .industry-chip {
   display: inline-flex; align-items: center; gap: 5px; min-height: 22px;
   padding: 2px 7px; border: 1px solid #254d77; border-radius: 4px;
@@ -1007,7 +1008,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .results-section[data-view="STOCK"] .review-table tbody tr[data-code] td[data-field="ibd_entry_status"] { padding: 0 3px; font-size: 9px; }
   .results-section > .industry-list { order: 3; }
   .industry-list { max-height: 58vh; }
-  .industry-group-toggle { padding: 10px 8px; gap: 9px; }
+  .industry-group-toggle { padding: 10px 8px; }
+  .industry-title { gap: 9px; }
+  .industry-top3 { padding-left: 27px; }
   .industry-name { font-size: 11px; }
   .industry-group-rs { font-size: 10px; }
   .industry-stock-table th, .industry-stock-table td { padding: 0 6px; font-size: 10px; }
