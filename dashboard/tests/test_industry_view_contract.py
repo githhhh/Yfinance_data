@@ -230,7 +230,13 @@ def test_industry_chevron_stays_on_title_row_and_count_is_grammatical() -> None:
     assert 'stroke-linecap="round" stroke-linejoin="round"' in APP
     assert "group.rows.length === 1 ? \"stock\" : \"stocks\"" in APP
     assert ".industry-group-toggle {" in CSS
-    assert "display: flex; align-items: flex-start; width: 100%;" in CSS
+    assert 'class="industry-group-line"><span class="industry-title"><svg class="industry-chevron"' in APP
+    assert '${esc(group.name)}</span></span><span class="industry-group-metrics">' in APP
+    assert "display: block; width: 100%; min-width: 0;" in CSS
+    assert ".industry-title { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }" in CSS
+    assert ".industry-top3 { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 30px; }" in CSS
+    assert ".industry-title { gap: 9px; }" in CSS
+    assert ".industry-top3 { padding-left: 27px; }" in CSS
     assert "flex: 0 0 18px; width: 18px; height: 18px;" in CSS
     assert "transform-origin: 50% 50%;" in CSS
     assert '.industry-group-toggle[aria-expanded="true"] .industry-chevron { transform: rotate(90deg); }' in CSS
