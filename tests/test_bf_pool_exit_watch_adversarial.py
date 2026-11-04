@@ -179,3 +179,52 @@ def test_deleted_published_watch_blocks_pool_only_commit(tmp_path, monkeypatch):
     monkeypatch.setattr(obj, "ensure_current_snapshot", lambda: pool)
     with pytest.raises(RuntimeError, match="requires companion"):
         obj.commit()
+
+
+def test_managed_pair_push_rejection_then_retry_keeps_foreign_staging(tmp_path, monkeypatch):
+    """A rejected remote push leaves a single local pair, never an extra file."""
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    git(root, "branch", "-M", "main")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    git(root, "remote", "add", "origin", str(remote))
+    git(root, "push", "-u", "origin", "main")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+    pool_path = root / "us" / "breakout_follow_pool.csv"
+    pool = pd.DataFrame([{"code": "B", "snapshot_date": "2026-10-30"}])
+    pool.to_csv(pool_path, index=False)
+    when, digest = store.pool_identity(pool)
+    watch_path = root / store.WATCH_COMPLETE
+    store.watch_frame([], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        watch_path, index=False)
+    foreign = root / "unrelated.txt"
+    foreign.write_text("should remain staged")
+    git(root, "add", "unrelated.txt")
+
+    # Real local bare-repo receive hook fails the network publication step.
+    hook = remote / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    monkeypatch.setattr(authority.time, "sleep", lambda *_: None)
+    try:
+        with pytest.raises(subprocess.CalledProcessError):
+            authority._commit_managed_csv(
+                [str(pool_path), str(watch_path)], message="Update test Pool Watch pair")
+        committed = git(root, "rev-parse", "HEAD")
+        assert committed != git(root, "rev-parse", "@{u}")
+        assert "unrelated.txt" not in git(root, "show", "--pretty=format:",
+                                           "--name-only", "HEAD").splitlines()
+        assert "unrelated.txt" in git(root, "diff", "--cached", "--name-only")
+    finally:
+        hook.unlink(missing_ok=True)
+
+    # With no new tracked file changes, the authority retries the unpushed
+    # managed commit; the foreign staged file must still not be published.
+    authority._commit_managed_csv(
+        [str(pool_path), str(watch_path)], message="Update test Pool Watch pair")
+    assert git(root, "rev-parse", "HEAD") == committed
+    assert git(root, "rev-parse", "@{u}") == committed
+    assert "unrelated.txt" not in git(root, "ls-tree", "--name-only", "HEAD").splitlines()
