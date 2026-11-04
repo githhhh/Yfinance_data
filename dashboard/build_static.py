@@ -501,7 +501,9 @@ def build_dashboard_payload(
 
 def build_watch_payload(data_root: Path) -> dict:
     """Keep a broken or stale Midweek artifact from hiding a valid Complete Watch."""
-    from pool_exit_watch_store import parse_watch_csv, WATCH_COMPLETE, WATCH_MIDWEEK
+    from pool_exit_watch_store import (
+        parse_watch_csv, active_watch_codes, WATCH_COMPLETE, WATCH_MIDWEEK
+    )
 
     payload = {
         "available": False, "complete": [], "midweek": [],
@@ -519,8 +521,13 @@ def build_watch_payload(data_root: Path) -> dict:
         if not source.is_file():
             continue
         try:
+            # A syntactically valid CSV is not enough: a newer unpaired Pool
+            # must not leave an old Watch displayed as current on Pages.
+            # In fixture-only directories (no Git checkout) validate schema.
+            if label == "complete" and (data_root / ".git").exists():
+                active_watch_codes(data_root, required=True)
             rows = parse_watch_csv(source)
-        except (OSError, ValueError, TypeError, KeyError) as exc:
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
             errors[label] = type(exc).__name__
             continue
         payload[label] = [{k: v for k, v in row.items() if k in allowed}
