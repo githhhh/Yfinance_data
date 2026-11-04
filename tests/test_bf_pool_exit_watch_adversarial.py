@@ -77,3 +77,48 @@ def test_companion_rejects_other_pool_source(tmp_path,monkeypatch):
         obj.register_companion(target_path=str(path),staged_path=str(staged),
                                source_pool_date="2026-10-30",
                                source_pool_codes_hash="wrong")
+
+
+
+def test_companion_survives_until_commit_and_rejects_pool_mutation(tmp_path,monkeypatch):
+    import yfinance_data as authority
+    import pool_exit_watch_store as store
+    monkeypatch.setattr(authority,"DATA_ROOT",str(tmp_path))
+    path=tmp_path/store.WATCH_COMPLETE
+    path.parent.mkdir(parents=True)
+    old_pool=pd.DataFrame([{"code":"A","snapshot_date":"2026-10-30"}])
+    d,h=store.pool_identity(old_pool)
+    staged=tmp_path/"us"/".watch.pending"
+    store.watch_frame([],snapshot_date=d,pool_codes_hash=h).to_csv(staged,index=False)
+    obj=authority.BreakoutFollowPoolRun.weekend()
+    pool=[old_pool]
+    monkeypatch.setattr(obj,"ensure_current_snapshot",lambda:pool[0])
+    obj.register_companion(target_path=str(path),staged_path=str(staged),
+                           source_pool_date=d,source_pool_codes_hash=h)
+    assert staged.exists() and not path.exists()
+    pool[0]=pd.DataFrame([{"code":"B","snapshot_date":"2026-10-30"}])
+    with pytest.raises(RuntimeError,match="Pool changed"):
+        obj.commit()
+    assert staged.exists() and not path.exists()
+    pool[0]=old_pool
+    published=[]
+    monkeypatch.setattr(authority,"_commit_pool",
+                       lambda path,extra_paths=None: published.extend(extra_paths or []))
+    obj.commit()
+    assert path.exists() and not staged.exists()
+    assert str(path) in published
+    assert obj._watch_companion is None
+
+
+def test_no_only_pool_commit_when_watch_enabled(tmp_path,monkeypatch):
+    import yfinance_data as authority
+    import pool_exit_watch_store as store
+    monkeypatch.setattr(authority,"DATA_ROOT",str(tmp_path))
+    path=tmp_path/store.WATCH_COMPLETE
+    path.parent.mkdir(parents=True)
+    store.watch_frame([],snapshot_date="2026-10-30",pool_codes_hash="x").to_csv(path,index=False)
+    obj=authority.BreakoutFollowPoolRun.weekend()
+    monkeypatch.setattr(obj,"ensure_current_snapshot",
+                        lambda:pd.DataFrame([{"code":"A","snapshot_date":"2026-10-30"}]))
+    with pytest.raises(RuntimeError,match="requires companion"):
+        obj.commit()
