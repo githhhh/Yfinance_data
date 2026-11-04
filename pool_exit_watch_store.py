@@ -14,7 +14,7 @@ COLUMNS = (
     "breakout_date", "breakout_evidence",
     "absence_week", "verified_week", "phase", "current_in_pool",
     "last_exit_reason", "exit_count", "latest_close", "price_state",
-    "vs_original_pct", "observed_weeks", "pending_status", "events",
+    "vs_original_pct", "observed_weeks", "pending_status", "pending_high", "events",
 )
 
 
