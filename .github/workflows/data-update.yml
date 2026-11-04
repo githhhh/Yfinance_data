@@ -85,7 +85,4 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           gh auth setup-git
-          python scripts/publish_owned.py --message "Update stock data [skip ci]" -- 
-            results_pkl/ us/52wk_new_high_results.csv 
-            us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv 
-            us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
+          python scripts/publish_owned.py --message "Update stock data [skip ci]" -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
