@@ -49,6 +49,14 @@ def test_midweek_stale_or_corrupt_uses_latest_valid_complete_snapshot(tmp_path):
     assert fresh["midweek_fallback"] is False
     assert fresh["midweek"][0]["code"] == "C"
 
+    # Missing/invalid complete authority may not elevate Midweek to a
+    # standalone official observation view.
+    complete.write_text("broken,columns\n1,2\n", encoding="utf-8")
+    unavailable = build_watch_payload(root)
+    assert unavailable["available"] is False
+    assert unavailable["midweek"] == []
+    assert unavailable["errors"]["complete"] == "ValueError"
+
 
 def test_midweek_page_explicitly_labels_complete_fallback():
     root = Path(__file__).parents[1]
