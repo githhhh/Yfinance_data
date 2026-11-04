@@ -546,7 +546,7 @@ def build_site(
                 rows = parse_watch_csv(source)
                 allowed = {"code", "snapshot_date", "original_ceiling", "last_exit_reason",
                            "phase", "price_state", "vs_original_pct", "latest_close",
-                           "pending_status", "events", "exit_count"}
+                           "pending_status", "pending_high", "events", "exit_count"}
                 watch_payload[label] = [{k: v for k, v in row.items() if k in allowed}
                                         for row in rows]
                 if label == "complete":
