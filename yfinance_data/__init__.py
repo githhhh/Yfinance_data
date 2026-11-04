@@ -747,3 +747,26 @@ __all__ = [
     "monday_of_week",
     "supplement_latest_pool_signal_eps",
 ]
+
+
+def bootstrap_bf_exit_watch(rows: list[dict], recent: dict) -> None:
+    """Explicit first publication before next data download."""
+    root = Path(DATA_ROOT)
+    target = root / WATCH_COMPLETE
+    if target.exists() or watch_was_ever_published(root):
+        raise RuntimeError("Watch already enabled or needs recovery")
+    latest = published_complete_pools(root, limit=2)
+    if len(latest) != 2 or latest[0]["ref"] != recent["ref"]:
+        raise RuntimeError("bootstrap Pool refs changed")
+    when, digest = pool_identity(pd.DataFrame(recent["rows"]))
+    frame = watch_frame(rows, snapshot_date=when, pool_codes_hash=digest)
+    fd, pending = tempfile.mkstemp(prefix=".bf_pool_exit_watch.",
+                                   suffix=".pending", dir=str(target.parent))
+    os.close(fd)
+    try:
+        frame.to_csv(pending, index=False, encoding="utf-8-sig")
+        os.replace(pending, target)
+        _commit_managed_csv([str(target)], message="Initialize BF Pool Exit Watch")
+    finally:
+        if os.path.exists(pending):
+            os.unlink(pending)
