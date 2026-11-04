@@ -110,3 +110,26 @@ def test_watch_csv_rejects_invalid_historical_date_field(tmp_path, field, value)
     frame.to_csv(target, index=False)
     with pytest.raises(ValueError, match=field):
         parse_watch_csv(target)
+
+
+
+@pytest.mark.parametrize("future_field", [
+    "events", "absence_week", "verified_week",
+    "last_price_observed_week", "original_pool_date",
+])
+def test_watch_csv_rejects_future_event_or_observation_anchor(tmp_path, future_field):
+    target = tmp_path / "watch.csv"
+    row = {"code": "A", "phase": "OBSERVING", "events": []}
+    if future_field == "events":
+        row["events"] = [{
+            "id": "CEILING_LOST:2026-11-02",
+            "type": "CEILING_LOST", "week": "2026-11-02",
+        }]
+    elif future_field == "original_pool_date":
+        row[future_field] = "2026-11-06"
+    else:
+        row[future_field] = "2026-11-02"
+    watch_frame([row], snapshot_date="2026-10-30",
+                pool_codes_hash="digest").to_csv(target, index=False)
+    with pytest.raises(ValueError, match="future|after snapshot"):
+        parse_watch_csv(target)
