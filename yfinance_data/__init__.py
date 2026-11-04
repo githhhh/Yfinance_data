@@ -639,7 +639,8 @@ class BreakoutFollowPoolRun:
             # Deleting the local Watch file does not disable a feature that was
             # already published. Never silently revert to Pool-only commits.
             if ((Path(DATA_ROOT) / target).exists() or
-                watch_was_ever_published(DATA_ROOT)):
+                ((Path(DATA_ROOT) / ".git").exists() and
+                 watch_was_ever_published(DATA_ROOT))):
                 raise RuntimeError("published Watch exists; BF run requires companion")
             _commit_pool(self.path)
             return
