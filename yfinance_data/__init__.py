@@ -812,8 +812,8 @@ def bootstrap_bf_exit_watch(rows: list[dict], recent: dict) -> None:
         frame.to_csv(pending, index=False, encoding="utf-8-sig")
         # Bootstrap bypasses register_companion: apply the exact same official
         # row/event contract *before* any local or remote publication.
-        parse_watch_csv(pending)
-        if any(r["phase"] == "PROVISIONAL_OUT" for r in parse_watch_csv(pending)):
+        validated_rows = parse_watch_csv(pending)
+        if any(r["phase"] == "PROVISIONAL_OUT" for r in validated_rows):
             raise ValueError("bootstrap cannot publish provisional Watch rows")
         os.replace(pending, target)
         _commit_managed_csv(
