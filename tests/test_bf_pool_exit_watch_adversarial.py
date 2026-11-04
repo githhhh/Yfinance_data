@@ -417,3 +417,60 @@ def test_bootstrap_rejects_forged_or_unreadable_initial_watch(
     assert git(root, "rev-parse", "origin/main") == initial
     assert not (root / store.WATCH_COMPLETE).exists()
     assert not list((root / "us").glob("*.pending"))
+
+
+
+def test_download_rejects_remote_pool_only_advance_despite_identical_watch_blob(tmp_path):
+    """A published Watch file is NOT authentic without the latest Pool pair."""
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A", "B"])
+    old = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(old)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([{"code": "X", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.active_watch_codes(root, required=True) == ["X"]
+
+    # Legacy or foreign publisher updates complete Pool without companion.
+    commit_pool(root, "2026-10-30", ["B"])
+    assert target.read_bytes() == subprocess.check_output([
+        "git", "-C", str(root), "show", f"origin/main:{store.WATCH_COMPLETE}"])
+    with pytest.raises(RuntimeError, match="not paired"):
+        store.active_watch_codes(root, required=True)
+
+
+def test_download_rejects_forged_pool_trailer_with_unchanged_nonempty_watch(tmp_path):
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A", "B"])
+    old = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(old)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([{"code": "A", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    commit_pool(root, "2026-10-30", ["B"], paired=True)
+    # New Pool claims a Watch companion but its rows identify an older Pool.
+    with pytest.raises(RuntimeError, match="not paired"):
+        store.active_watch_codes(root)
+
+
+def test_download_accepts_unchanged_empty_watch_when_new_pool_pair_is_signed(tmp_path):
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["B"])
+    old = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(old)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([], snapshot_date=when, pool_codes_hash=digest).to_csv(target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    commit_pool(root, "2026-10-30", ["B"], paired=True)
+    assert store.active_watch_codes(root, required=True) == []
