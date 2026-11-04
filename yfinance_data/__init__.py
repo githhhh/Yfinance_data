@@ -739,13 +739,22 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
             if pending:
                 raise RuntimeError(f"tracked Watch pending files: {pending[:8]}")
 
-            git("add", "-A", "--", *sorted(owned))
-            staged = git("diff", "--cached", "--quiet", "--", *sorted(owned),
-                         check=False)
-            if staged.returncode not in (0, 1):
-                raise subprocess.CalledProcessError(staged.returncode, staged.args)
-            if staged.returncode == 1:
-                git("commit", "--only", "-m", message, "--", *sorted(owned))
+            # Some optional screener outputs may never have been created.
+            # 'git add -A -- missing-untracked-file' is fatal (pathspec does
+            # not match), while a *tracked* missing file must still be staged
+            # as a deletion. Preserve both cases without broadening ownership.
+            staged_paths = [
+                path for path in sorted(owned)
+                if (root / path).exists() or output("ls-files", "--", path)
+            ]
+            if staged_paths:
+                git("add", "-A", "--", *staged_paths)
+                staged = git("diff", "--cached", "--quiet", "--", *staged_paths,
+                             check=False)
+                if staged.returncode not in (0, 1):
+                    raise subprocess.CalledProcessError(staged.returncode, staged.args)
+                if staged.returncode == 1:
+                    git("commit", "--only", "-m", message, "--", *staged_paths)
 
             assert_outgoing_owned()
             if output("rev-parse", "HEAD") == output("rev-parse", "origin/main"):
