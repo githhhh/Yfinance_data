@@ -48,7 +48,9 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
     source = root / WATCH_COMPLETE
     is_repo = (root / ".git").exists()
     if not source.is_file():
-        if required or (is_repo and watch_was_ever_published(root)):
+        if is_repo and watch_was_ever_published(root):
+            raise RuntimeError("published BF Watch missing; recovery required")
+        if required:
             raise RuntimeError("BF Watch must be remotely bootstrapped before market-data download")
         return []
     if is_repo:
