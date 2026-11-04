@@ -230,3 +230,94 @@ def test_managed_pair_push_rejection_then_retry_keeps_foreign_staging(tmp_path, 
     assert git(root, "rev-parse", "HEAD") == committed
     assert git(root, "rev-parse", "@{u}") == committed
     assert "unrelated.txt" not in git(root, "ls-tree", "--name-only", "HEAD").splitlines()
+
+
+def setup_bare_remote(root, tmp_path):
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    git(root, "branch", "-M", "main")
+    git(root, "remote", "add", "origin", str(remote))
+    git(root, "push", "-u", "origin", "main")
+    return remote
+
+
+def test_managed_writer_does_not_push_older_foreign_local_commits(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    (root / "owned.txt").write_text("initial")
+    (root / "foreign.txt").write_text("initial")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "initial")
+    remote = setup_bare_remote(root, tmp_path)
+
+    (root / "foreign.txt").write_text("unpublished")
+    git(root, "add", "foreign.txt")
+    git(root, "commit", "-qm", "foreign local commit")
+    (root / "owned.txt").write_text("new")
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    with pytest.raises(RuntimeError, match="foreign committed"):
+        authority._commit_managed_csv(str(root / "owned.txt"), message="owned")
+    assert git(root, "rev-parse", "@{u}") != git(root, "rev-parse", "HEAD")
+    assert subprocess.check_output(["git", "--git-dir", str(remote), "show",
+                                    "main:foreign.txt"], text=True).strip() == "initial"
+
+
+def test_external_writer_refuses_dirty_pool_watch(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    (root / "owner.txt").write_text("old")
+    (root / "us" / "breakout_follow_pool.csv").write_text("old Pool")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "initial")
+    setup_bare_remote(root, tmp_path)
+    (root / "us" / "breakout_follow_pool.csv").write_text("dirty Pool")
+    (root / "owner.txt").write_text("new")
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    with pytest.raises(RuntimeError, match="dirty Pool/Watch"):
+        authority._commit_managed_csv(str(root / "owner.txt"), message="data")
+    assert git(root, "show", "HEAD:owner.txt") == "old"
+
+
+def test_non_fast_forward_fails_before_managed_commit(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    (root / "owned.txt").write_text("initial")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "initial")
+    remote = setup_bare_remote(root, tmp_path)
+
+    # Independent writer advances remote/main after this checkout was made.
+    peer = tmp_path / "peer"
+    subprocess.run(["git", "clone", "-q", str(remote), str(peer)], check=True)
+    git(peer, "config", "user.email", "peer@example.invalid")
+    git(peer, "config", "user.name", "peer")
+    (peer / "other.txt").write_text("remote advanced")
+    git(peer, "add", "other.txt")
+    git(peer, "commit", "-qm", "peer update")
+    git(peer, "push", "origin", "HEAD:main")
+
+    (root / "owned.txt").write_text("new")
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    with pytest.raises(subprocess.CalledProcessError):
+        authority._commit_managed_csv(str(root / "owned.txt"), message="owned")
+    assert git(root, "show", "HEAD:owned.txt") == "initial"
+    assert subprocess.check_output(["git", "--git-dir", str(remote), "show",
+                                    "main:other.txt"], text=True).strip() == "remote advanced"
+
+
+def test_all_data_writers_share_single_owned_publisher():
+    root = Path(__file__).parents[1]
+    files = (
+        ".github/workflows/data-update.yml",
+        ".github/workflows/data-update-1d.yml",
+        ".github/workflows/data-update-1wk.yml",
+    )
+    for name in files:
+        source = (root / name).read_text(encoding="utf-8")
+        assert "python scripts/publish_owned.py" in source
+        assert "group: bf-stock-data-main-writers" in source
+        assert "git commit --only" not in source
+        assert "git push origin HEAD:main" not in source
+    local = (root / "scripts/run_local_data_update.sh").read_text()
+    assert "python scripts/publish_owned.py" in local
+    assert "git push origin HEAD:main" not in local
