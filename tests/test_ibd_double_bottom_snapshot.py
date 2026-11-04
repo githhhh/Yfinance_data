@@ -1,3 +1,5 @@
+import subprocess
+
 import pandas as pd
 import pytest
 
@@ -160,80 +162,57 @@ def test_breakout_follow_commit_reuses_managed_csv(monkeypatch, tmp_path):
     ]
 
 
+def _managed_publish_fixture(tmp_path, monkeypatch):
+    root = tmp_path / "checkout"
+    (root / "us").mkdir(parents=True)
+    target = root / "us" / "example.csv"
+    target.write_text("value\nold\n")
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(root), *args],
+                                       text=True).strip()
+    git("init", "-b", "main")
+    git("config", "user.email", "managed-publish@example.invalid")
+    git("config", "user.name", "Managed CI")
+    git("add", ".")
+    git("commit", "-m", "baseline")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-u", "origin", "main")
+    monkeypatch.setattr(yd, "DATA_ROOT", str(root))
+    return root, target, git
+
+
 def test_commit_managed_csv_retries_push_for_unpushed_managed_change(
-    monkeypatch,
-    tmp_path,
+    monkeypatch, tmp_path,
 ):
-    calls = []
-
-    class Result:
-        def __init__(self, returncode=0, args=None):
-            self.returncode = returncode
-            self.args = list(args or [])
-
-    def fake_run(args, cwd=None, check=False):
-        calls.append(list(args))
-        if args[:4] == ["git", "diff", "--cached", "--quiet"]:
-            return Result(0, args)
-        if args[:4] == ["git", "diff", "--quiet", "@{u}..HEAD"]:
-            return Result(1, args)
-        return Result(0, args)
-
-    monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(yd.subprocess, "run", fake_run)
-
-    yd._commit_managed_csv("us/example.csv", message="Update example")
-
-    assert ["git", "commit", "-m", "Update example"] not in calls
-    assert ["git", "push"] in calls
+    root, target, git = _managed_publish_fixture(tmp_path, monkeypatch)
+    target.write_text("value\nnew\n")
+    git("add", "us/example.csv")
+    git("commit", "-m", "owned, not yet pushed")
+    owned_commit = git("rev-parse", "HEAD")
+    assert owned_commit != git("rev-parse", "origin/main")
+    yd._commit_managed_csv(str(target), message="Update example")
+    assert git("rev-parse", "HEAD") == owned_commit
+    assert git("rev-parse", "origin/main") == owned_commit
 
 
 def test_commit_managed_csv_skips_push_when_managed_change_is_already_upstream(
-    monkeypatch,
-    tmp_path,
+    monkeypatch, tmp_path,
 ):
-    calls = []
-
-    class Result:
-        def __init__(self, returncode=0, args=None):
-            self.returncode = returncode
-            self.args = list(args or [])
-
-    def fake_run(args, cwd=None, check=False):
-        calls.append(list(args))
-        return Result(0, args)
-
-    monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(yd.subprocess, "run", fake_run)
-
-    yd._commit_managed_csv("us/example.csv", message="Update example")
-
-    assert ["git", "commit", "-m", "Update example"] not in calls
-    assert ["git", "push"] not in calls
+    root, target, git = _managed_publish_fixture(tmp_path, monkeypatch)
+    old_commit = git("rev-parse", "HEAD")
+    yd._commit_managed_csv(str(target), message="Update example")
+    assert git("rev-parse", "HEAD") == old_commit
+    assert git("rev-parse", "origin/main") == old_commit
 
 
 def test_commit_managed_csv_commits_then_pushes_when_diff_is_staged(
-    monkeypatch,
-    tmp_path,
+    monkeypatch, tmp_path,
 ):
-    calls = []
-
-    class Result:
-        def __init__(self, returncode=0, args=None):
-            self.returncode = returncode
-            self.args = list(args or [])
-
-    def fake_run(args, cwd=None, check=False):
-        calls.append(list(args))
-        if args[:4] == ["git", "diff", "--cached", "--quiet"]:
-            return Result(1, args)
-        return Result(0, args)
-
-    monkeypatch.setattr(yd, "DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(yd.subprocess, "run", fake_run)
-
-    yd._commit_managed_csv("us/example.csv", message="Update example")
-
-    commit_idx = calls.index(["git", "commit", "-m", "Update example"])
-    push_idx = calls.index(["git", "push"])
-    assert commit_idx < push_idx
+    root, target, git = _managed_publish_fixture(tmp_path, monkeypatch)
+    target.write_text("value\nnew\n")
+    yd._commit_managed_csv(str(target), message="Update example")
+    assert git("rev-parse", "HEAD") == git("rev-parse", "origin/main")
+    assert git("show", "-s", "--format=%s", "HEAD") == "Update example"
+    assert git("show", "--format=", "--name-only", "HEAD") == "us/example.csv"
