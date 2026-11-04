@@ -561,3 +561,48 @@ def test_shallow_git_history_would_hide_paired_complete_watch(tmp_path):
         store.active_watch_codes(clone, required=True)
     git(clone, "fetch", "--unshallow", "origin", "main")
     assert store.active_watch_codes(clone, required=True) == ["A"]
+
+
+
+@pytest.mark.parametrize("paired", [False, True])
+def test_managed_pool_push_checks_every_unpushed_pool_commit_for_pair_identity(
+    tmp_path, monkeypatch, paired,
+):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    pool_path = root / "us" / "breakout_follow_pool.csv"
+    watch_path = root / store.WATCH_COMPLETE
+    old = pd.read_csv(pool_path)
+    when, digest = store.pool_identity(old)
+    store.watch_frame([], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        watch_path, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    remote = setup_bare_remote(root, tmp_path)
+    remote_base = git(root, "rev-parse", "origin/main")
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+
+    changed = pd.DataFrame([{"code": "B", "snapshot_date": "2026-10-30"}])
+    when, digest = store.pool_identity(changed)
+    changed.to_csv(pool_path, index=False)
+    git(root, "add", "us/breakout_follow_pool.csv")
+    message = "new Pool only"
+    if paired:
+        message += f"\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}"
+    git(root, "commit", "-qm", message)
+    local = git(root, "rev-parse", "HEAD")
+    if not paired:
+        with pytest.raises(RuntimeError, match="unpaired historical Pool ancestor"):
+            authority._commit_managed_csv(
+                [str(pool_path), str(watch_path)], message="new paired run")
+        assert git(root, "rev-parse", "origin/main") == remote_base
+    else:
+        # A legitimate empty Watch has unchanged bytes: the signed Pool
+        # revision is still a valid pair and may be pushed as a retry.
+        authority._commit_managed_csv(
+            [str(pool_path), str(watch_path)], message="retry paired run")
+        assert git(root, "rev-parse", "HEAD") == local
+        assert git(root, "rev-parse", "origin/main") == local
