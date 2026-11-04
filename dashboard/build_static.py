@@ -36,6 +36,7 @@ from dashboard.services.bf_midweek_review import (
 DASHBOARD_DIR = Path(__file__).resolve().parent
 STATIC_ASSETS = (
     "index.html",
+    "pool-exit-watch.html",
     "app.js",
     "table_enhancements.js",
     "rs_runtime.js",
@@ -535,6 +536,30 @@ def build_site(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    # Independent Watch payload; no changes to the original dashboard.json.
+    watch_payload = {"available": False, "complete": [], "midweek": [], "dates": {}}
+    try:
+        from pool_exit_watch_store import parse_watch_csv, WATCH_COMPLETE, WATCH_MIDWEEK
+        for label, relative in (("complete", WATCH_COMPLETE), ("midweek", WATCH_MIDWEEK)):
+            source = PROJECT_ROOT / relative
+            if source.exists():
+                rows = parse_watch_csv(source)
+                allowed = {"code", "snapshot_date", "original_ceiling", "last_exit_reason",
+                           "phase", "price_state", "vs_original_pct", "latest_close",
+                           "pending_status", "events", "exit_count"}
+                watch_payload[label] = [{k: v for k, v in row.items() if k in allowed}
+                                        for row in rows]
+                if label == "complete":
+                    watch_payload["available"] = True
+                watch_payload["dates"][label] = max(
+                    (str(r.get("snapshot_date", "")) for r in rows), default="")
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        watch_payload = {"available": False, "complete": [], "midweek": [],
+                         "dates": {}, "error": type(exc).__name__}
+    (data_dir / "pool_exit_watch.json").write_text(
+        json.dumps(watch_payload, ensure_ascii=False, default=str, separators=(",", ":")),
+        encoding="utf-8")
+
     (output / ".nojekyll").write_text("", encoding="utf-8")
     return output
 
