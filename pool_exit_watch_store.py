@@ -109,6 +109,20 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
             raise RuntimeError("BF Watch is not confirmed on origin/main") from exc
         if source.read_bytes() != committed:
             raise RuntimeError("local BF Watch differs from published origin/main")
+        # A failed BF run may have written a local COMPLETE Pool without ever
+        # committing its Watch companion. Never download against that dirty
+        # Pool while authenticating the OLD remote Watch by itself.
+        pool_path = root / "us/breakout_follow_pool.csv"
+        try:
+            official_pool = subprocess.check_output(
+                ["git", "-C", str(root), "show",
+                 "origin/main:us/breakout_follow_pool.csv"],
+                stderr=subprocess.DEVNULL,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError("complete BF Pool is not on origin/main") from exc
+        if not pool_path.is_file() or pool_path.read_bytes() != official_pool:
+            raise RuntimeError("local complete BF Pool differs from published origin/main")
     rows = parse_watch_csv(source)
     if is_repo:
         # Byte-equality to origin/main is not enough: a later Pool-only commit
