@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from pool_exit_watch_store import COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
@@ -418,6 +419,7 @@ class IbdDoubleBottomSnapshotRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
+        self._watch_companion: dict | None = None
 
     @classmethod
     def weekend(cls) -> "IbdDoubleBottomSnapshotRun":
@@ -602,9 +604,52 @@ class BreakoutFollowPoolRun:
             )
         return result
 
+    def register_companion(self, *, target_path: str, staged_path: str,
+                           source_pool_date: str, source_pool_codes_hash: str) -> None:
+        """Bind one prepared CSV to this run's published Pool."""
+        date, digest = pool_identity(self.ensure_current_snapshot())
+        if (date, digest) != (source_pool_date, source_pool_codes_hash):
+            raise ValueError("Watch/Pool source identity mismatch")
+        target = WATCH_MIDWEEK if self._midweek else WATCH_COMPLETE
+        if Path(target_path).resolve() != (Path(DATA_ROOT) / target).resolve():
+            raise ValueError("invalid Watch companion target")
+        if self._watch_companion is not None:
+            raise ValueError("duplicate companion")
+        source = Path(staged_path)
+        if not source.is_file() or source.suffix != ".pending":
+            raise ValueError("missing staged companion")
+        frame = pd.read_csv(source, dtype={"code": str}, keep_default_na=False)
+        if not set(COLUMNS).issubset(frame.columns):
+            raise ValueError("invalid Watch companion schema")
+        if not frame.empty:
+            if frame.code.eq("").any() or frame.code.duplicated().any():
+                raise ValueError("duplicate Watch codes")
+            if set(frame.source_pool_date) != {date} or set(frame.source_pool_codes_hash) != {digest}:
+                raise ValueError("Watch rows reference another Pool")
+        self._watch_companion = dict(target=str(target_path), staged=str(staged_path),
+                                      date=date, digest=digest,
+                                      sha=sha256(source.read_bytes()).hexdigest())
+
     def commit(self) -> None:
-        self.ensure_current_snapshot()
-        _commit_pool(self.path)
+        pool = self.ensure_current_snapshot()
+        target = WATCH_MIDWEEK if self._midweek else WATCH_COMPLETE
+        art = self._watch_companion
+        if art is None:
+            if (Path(DATA_ROOT) / target).exists():
+                raise RuntimeError("published Watch exists; BF run requires companion")
+            _commit_pool(self.path)
+            return
+        if pool_identity(pool) != (art["date"], art["digest"]):
+            raise RuntimeError("BF Pool changed after companion was attached")
+        staged, published = Path(art["staged"]), Path(art["target"])
+        if staged.exists():
+            if sha256(staged.read_bytes()).hexdigest() != art["sha"]:
+                raise RuntimeError("staged Watch mutated")
+            os.replace(staged, published)
+        if not published.is_file() or sha256(published.read_bytes()).hexdigest() != art["sha"]:
+            raise RuntimeError("Watch companion missing or corrupt")
+        _commit_pool(self.path, extra_paths=[str(published)])
+        self._watch_companion = None
 
 
 def _pit_store_path() -> str:
@@ -667,13 +712,13 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
         raise
 
 
-def _commit_pool(pool_path: str) -> None:
+def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> None:
     """Commit only a pool that satisfies the current EPS publication contract."""
     if os.path.exists(pool_path):
         pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
 
-    managed_paths = [pool_path]
+    managed_paths = [pool_path, *(extra_paths or [])]
     pit_path = _pit_store_path()
     if os.path.exists(pit_path):
         managed_paths.append(pit_path)

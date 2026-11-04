@@ -62,3 +62,79 @@ def watch_frame(rows: list[dict], *, snapshot_date: str, pool_codes_hash: str) -
     if not frame.empty and (frame.code.eq("").any() or frame.code.duplicated().any()):
         raise ValueError("invalid Watch rows")
     return frame
+
+
+def pool_identity(pool: pd.DataFrame) -> tuple[str, str]:
+    from hashlib import sha256
+    if pool.empty or not {"code", "snapshot_date"}.issubset(pool.columns):
+        raise ValueError("Pool needs code and snapshot_date")
+    dates = pd.to_datetime(pool["snapshot_date"], errors="coerce")
+    if dates.isna().any() or dates.dt.date.nunique() != 1:
+        raise ValueError("invalid or mixed Pool snapshot_date")
+    codes = sorted(pool.code.astype(str))
+    if len(codes) != len(set(codes)):
+        raise ValueError("duplicate Pool codes")
+    return dates.iloc[0].date().isoformat(), sha256("\n".join(codes).encode()).hexdigest()
+
+
+def published_complete_pools(data_root: str | Path = ".", *, limit: int = 3) -> list[dict]:
+    """Read latest distinct complete Pool weeks from published Git history."""
+    import subprocess
+    import io
+    from datetime import date
+    from bf_snapshot import complete_snapshot_week, monday_of_week
+    root = Path(data_root)
+    log = subprocess.check_output(["git", "-C", str(root), "log", "origin/main",
+                                   "--first-parent", "--format=%H", "--",
+                                   "us/breakout_follow_pool.csv"], text=True)
+    found = {}
+    for ref in log.splitlines():
+        try:
+            data = subprocess.check_output(["git", "-C", str(root), "show",
+                                            f"{ref}:us/breakout_follow_pool.csv"])
+            frame = pd.read_csv(io.BytesIO(data), dtype={"code": str})
+            snapshot, _ = pool_identity(frame)
+            complete_snapshot_week(date.fromisoformat(snapshot))
+            week = monday_of_week(date.fromisoformat(snapshot)).isoformat()
+            found.setdefault(week, dict(ref=ref, week=week, snapshot_date=snapshot,
+                                        rows=frame.to_dict("records")))
+            if len(found) >= limit:
+                break
+        except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
+            continue
+    return sorted(found.values(), key=lambda x: x["week"], reverse=True)[:limit]
+
+
+def watch_was_ever_published(data_root: str | Path = ".") -> bool:
+    import subprocess
+    return bool(subprocess.check_output(["git", "-C", str(data_root), "log",
+        "origin/main", "--format=%H", "--", WATCH_COMPLETE], text=True).strip())
+
+
+def official_watch_for_week(data_root: str | Path, week: str) -> list[dict]:
+    """First valid published Watch for specified complete week, or no rows."""
+    import subprocess
+    import io
+    from datetime import date
+    from bf_snapshot import monday_of_week
+    root = Path(data_root)
+    refs = subprocess.check_output(["git", "-C", str(root), "log", "origin/main",
+           "--first-parent", "--format=%H", "--", WATCH_COMPLETE], text=True)
+    for ref in refs.splitlines():
+        try:
+            blob = subprocess.check_output(["git", "-C", str(root), "show", f"{ref}:{WATCH_COMPLETE}"])
+            frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str}, keep_default_na=False)
+            if not set(COLUMNS).issubset(frame.columns) or frame.empty:
+                continue
+            dates = set(frame.source_pool_date.astype(str))
+            if len(dates) != 1:
+                continue
+            if monday_of_week(date.fromisoformat(next(iter(dates)))).isoformat() != week:
+                continue
+            rows = frame.to_dict("records")
+            for row in rows:
+                row["events"] = json.loads(row["events"]) if row["events"] else []
+            return rows
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            continue
+    return []
