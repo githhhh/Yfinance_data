@@ -696,3 +696,38 @@ def test_literal_na_like_tickers_survive_git_history_and_watch_pairing(tmp_path)
     history = store.published_complete_pools(root, limit=1)
     assert set(row["code"] for row in history[0]["rows"]) == {"NA", "NULL"}
     assert set(store.active_watch_codes(root, required=True)) == {"NA", "NULL"}
+
+
+
+def test_authority_pool_round_trip_preserves_na_codes_without_changing_eps_nulls(
+    tmp_path, monkeypatch,
+):
+    import yfinance_data as authority
+    from market_universe import build_download_universe
+
+    root = tmp_path / "market"
+    (root / "us").mkdir(parents=True)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    monkeypatch.setattr(authority, "BREAKOUT_FOLLOW_POOL_PATH",
+                        str(root / "us" / "breakout_follow_pool.csv"))
+    monkeypatch.setattr(authority, "_enrich_signal_eps", lambda pool: pool)
+    monkeypatch.setattr(authority, "enrich_pool_with_industry", lambda pool: pool)
+    candidate = pd.DataFrame({
+        "code": ["NA", "NULL"],
+        "snapshot_date": ["2026-10-30", "2026-10-30"],
+        "eps_yoy_growth": [None, None],
+    })
+    run = authority.BreakoutFollowPoolRun.weekend()
+    run.save_snapshot(candidate)
+    reread = run.ensure_current_snapshot()
+    assert reread["code"].tolist() == ["NA", "NULL"]
+    assert reread["eps_yoy_growth"].isna().all()
+    assert set(build_download_universe(data_root=root)) == {"NA", "NULL"}
+
+
+def test_screener_csv_na_code_is_not_dropped_from_download_inputs(tmp_path):
+    from market_universe import build_download_universe
+    screener = tmp_path / "us" / "52wk_new_high_results.csv"
+    screener.parent.mkdir(parents=True)
+    screener.write_text("code\nNA\nNULL\n", encoding="utf-8")
+    assert set(build_download_universe(data_root=tmp_path)) == {"NA", "NULL"}
