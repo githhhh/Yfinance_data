@@ -27,6 +27,11 @@ cd "$DATA_REPO_ROOT"
 # Formal local updates must run from a checkout that can fast-forward to the
 # authoritative main branch. Local developer changes/divergence fail closed.
 git pull --ff-only origin main
+# Watch pairing and historical COMPLETE baselines require complete commit
+# ancestry. Local depth-1 clones cannot authenticate the latest Pool/Watch.
+if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+    git fetch --unshallow --filter=blob:none origin main
+fi
 mkdir -p results_pkl
 
 echo "[LocalDataUpdate] running screener and merge"
