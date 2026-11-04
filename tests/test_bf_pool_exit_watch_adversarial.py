@@ -512,3 +512,52 @@ def test_owned_writer_commits_deletion_of_previously_tracked_optional_input(
     authority._commit_managed_csv(str(target), message="remove tracked optional")
     assert git(root, "rev-parse", "HEAD") == git(root, "rev-parse", "origin/main")
     assert "us/optional.csv" not in git(root, "ls-tree", "-r", "--name-only", "HEAD")
+
+
+
+def test_every_market_download_workflow_fetches_pool_history_without_all_old_blobs():
+    """Default depth=1 silently loses the Watch/Pool commit ancestry."""
+    root = Path(__file__).parents[1]
+    for name in (
+        "data-update.yml", "data-update-1d.yml", "data-update-1wk.yml"
+    ):
+        source = (root / ".github" / "workflows" / name).read_text()
+        assert "fetch-depth: 0" in source
+        assert "filter: blob:none" in source
+        assert "python scripts/publish_owned.py" in source
+    local = (root / "scripts" / "run_local_data_update.sh").read_text()
+    assert 'git rev-parse --is-shallow-repository' in local
+    assert "git fetch --unshallow" in local
+
+
+def test_shallow_git_history_would_hide_paired_complete_watch(tmp_path):
+    """Demonstrate why checkout's depth=1 must not be used for real downloads."""
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-16", ["A", "B"])
+    commit_pool(root, "2026-10-23", ["B"])
+    pool = pd.DataFrame([{"code": "B", "snapshot_date": "2026-10-23"}])
+    when, digest = store.pool_identity(pool)
+    store.watch_frame([{"code": "A", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(
+                          root / store.WATCH_COMPLETE, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.active_watch_codes(root) == ["A"]
+
+    # Latest ordinary data-only update leaves valid Pool and Watch blobs
+    # unchanged, yet a depth-1 checkout cannot locate their earlier commits.
+    (root / "unrelated.txt").write_text("ordinary PKL data update")
+    git(root, "add", "unrelated.txt")
+    git(root, "commit", "-qm", "data-only update")
+    remote = setup_bare_remote(root, tmp_path)
+    clone = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "--depth", "1", "--branch", "main",
+                    f"file://{remote}", str(clone)], check=True)
+    assert git(clone, "rev-parse", "--is-shallow-repository") == "true"
+    assert (clone / store.WATCH_COMPLETE).exists()
+    with pytest.raises(RuntimeError, match="no published complete Pool"):
+        store.active_watch_codes(clone, required=True)
+    git(clone, "fetch", "--unshallow", "origin", "main")
+    assert store.active_watch_codes(clone, required=True) == ["A"]
