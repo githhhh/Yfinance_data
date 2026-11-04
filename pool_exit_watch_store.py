@@ -18,11 +18,8 @@ COLUMNS = (
 )
 
 
-def parse_watch_csv(path: str | Path) -> list[dict]:
-    source = Path(path)
-    if not source.exists():
-        return []
-    frame = pd.read_csv(source, dtype={"code": str}, encoding="utf-8-sig", keep_default_na=False)
+def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
+    """Validate one identical Watch contract for staged, local and Git blobs."""
     required = set(COLUMNS)
     if not required.issubset(frame.columns):
         raise ValueError(f"Watch CSV schema missing: {sorted(required - set(frame.columns))}")
@@ -35,10 +32,29 @@ def parse_watch_csv(path: str | Path) -> list[dict]:
     rows = frame.to_dict("records")
     for row in rows:
         value = row["events"]
-        row["events"] = json.loads(value) if value else []
-        if not isinstance(row["events"], list):
+        events = json.loads(value) if isinstance(value, str) and value else value or []
+        if not isinstance(events, list):
             raise ValueError("Watch CSV events must be a JSON array")
+        seen = set()
+        for event in events:
+            if not isinstance(event, dict) or not all(
+                isinstance(event.get(k), str) and event[k]
+                for k in ("id", "type", "week")
+            ):
+                raise ValueError("Watch CSV event is missing its identity")
+            if event["id"] != f'{event["type"]}:{event["week"]}' or event["id"] in seen:
+                raise ValueError("Watch CSV duplicate or mismatched event identity")
+            seen.add(event["id"])
+        row["events"] = events
     return rows
+
+
+def parse_watch_csv(path: str | Path) -> list[dict]:
+    source = Path(path)
+    if not source.exists():
+        return []
+    frame = pd.read_csv(source, dtype={"code": str}, encoding="utf-8-sig", keep_default_na=False)
+    return parse_watch_frame(frame)
 
 
 def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> list[str]:
