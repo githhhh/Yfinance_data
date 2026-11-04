@@ -186,6 +186,7 @@ def test_managed_pair_push_rejection_then_retry_keeps_foreign_staging(tmp_path, 
     """A rejected remote push leaves a single local pair, never an extra file."""
     import yfinance_data as authority
     root = setup_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
     commit_pool(root, "2026-10-23", ["A"])
     git(root, "branch", "-M", "main")
     remote = tmp_path / "remote.git"
