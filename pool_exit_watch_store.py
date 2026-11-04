@@ -10,7 +10,7 @@ ACTIVE_PHASES = frozenset({"AWAITING_DATA", "OBSERVING"})
 COLUMNS = (
     "code", "watch_cycle_id", "snapshot_date", "source_pool_date",
     "source_pool_codes_hash", "original_pool_date", "original_signal",
-    "original_ceiling", "anchor_close", "last_verified_price_state",
+    "original_ceiling", "current_ceiling", "anchor_close", "last_verified_price_state",
     "breakout_date", "breakout_evidence",
     "absence_week", "verified_week", "phase", "current_in_pool",
     "last_exit_reason", "exit_count", "latest_close", "price_state",
