@@ -106,7 +106,12 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
         official = official_watch_for_week(root, latest[0]["week"])
         if official is None or rows != official:
             raise RuntimeError("BF Watch is not paired to latest published complete Pool")
-    return sorted({str(r["code"]) for r in rows if r["phase"] in ACTIVE_PHASES})
+    # Download symbols use the same Yahoo/Schwab representation as the
+    # five-source universe (e.g. BRK.B -> BRK-B). Keep raw Watch identities
+    # untouched in history, only normalize the outbound download list.
+    from market_universe import _normalize_code
+    return sorted({normalized for row in rows if row["phase"] in ACTIVE_PHASES
+                   if (normalized := _normalize_code(row["code"])) is not None})
 
 
 def watch_frame(rows: list[dict], *, snapshot_date: str, pool_codes_hash: str) -> pd.DataFrame:
