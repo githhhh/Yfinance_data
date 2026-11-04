@@ -17,7 +17,8 @@ from pathlib import Path
 import pandas as pd
 
 from pool_exit_watch_store import (COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity,
-    published_complete_pools, official_watch_for_week, watch_was_ever_published, watch_frame)
+    published_complete_pools, official_watch_for_week, watch_was_ever_published,
+    watch_frame, parse_watch_csv)
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
@@ -619,14 +620,13 @@ class BreakoutFollowPoolRun:
         source = Path(staged_path)
         if not source.is_file() or source.suffix != ".pending":
             raise ValueError("missing staged companion")
-        frame = pd.read_csv(source, dtype={"code": str}, keep_default_na=False)
-        if not set(COLUMNS).issubset(frame.columns):
-            raise ValueError("invalid Watch companion schema")
-        if not frame.empty:
-            if frame.code.eq("").any() or frame.code.duplicated().any():
-                raise ValueError("duplicate Watch codes")
-            if set(frame.source_pool_date) != {date} or set(frame.source_pool_codes_hash) != {digest}:
-                raise ValueError("Watch rows reference another Pool")
+        # Validate the *same* schema, phases and event JSON that readers use.
+        # Column-only validation could publish a pair that no downloader or
+        # dashboard could subsequently parse, despite matching Pool identity.
+        rows = parse_watch_csv(source)
+        if rows and ({r["source_pool_date"] for r in rows} != {date} or
+                     {r["source_pool_codes_hash"] for r in rows} != {digest}):
+            raise ValueError("Watch rows reference another Pool")
         self._watch_companion = dict(target=str(target_path), staged=str(staged_path),
                                       date=date, digest=digest,
                                       sha=sha256(source.read_bytes()).hexdigest())
