@@ -474,3 +474,41 @@ def test_download_accepts_unchanged_empty_watch_when_new_pool_pair_is_signed(tmp
     git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
     commit_pool(root, "2026-10-30", ["B"], paired=True)
     assert store.active_watch_codes(root, required=True) == []
+
+
+
+def test_owned_writer_skips_missing_never_tracked_optional_input_but_publishes_real_file(
+    tmp_path, monkeypatch,
+):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    (root / "us" / "existing.csv").write_text("code\nOLD\n")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "initial")
+    setup_bare_remote(root, tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    target = root / "us" / "existing.csv"
+    target.write_text("code\nNEW\n")
+    missing = root / "us" / "optional_never_created.csv"
+    assert not missing.exists()
+    authority._commit_managed_csv([str(target), str(missing)], message="optional")
+    assert git(root, "rev-parse", "HEAD") == git(root, "rev-parse", "origin/main")
+    assert git(root, "show", "--format=", "--name-only", "HEAD") == "us/existing.csv"
+    assert "NEW" in git(root, "show", "HEAD:us/existing.csv")
+
+
+def test_owned_writer_commits_deletion_of_previously_tracked_optional_input(
+    tmp_path, monkeypatch,
+):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    target = root / "us" / "optional.csv"
+    target.write_text("code\nOLD\n")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "initial")
+    setup_bare_remote(root, tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    target.unlink()
+    authority._commit_managed_csv(str(target), message="remove tracked optional")
+    assert git(root, "rev-parse", "HEAD") == git(root, "rev-parse", "origin/main")
+    assert "us/optional.csv" not in git(root, "ls-tree", "-r", "--name-only", "HEAD")
