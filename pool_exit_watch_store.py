@@ -176,20 +176,13 @@ def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | No
             blob = subprocess.check_output(["git", "-C", str(root), "show",
                                             f"{ref}:{WATCH_COMPLETE}"])
             frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str}, keep_default_na=False)
-            if not set(COLUMNS).issubset(frame.columns):
+            rows = parse_watch_frame(frame)
+            if any(row["phase"] == "PROVISIONAL_OUT" for row in rows):
                 return None
-            if frame.code.eq("").any() or frame.code.duplicated().any():
+            if rows and (any(row["source_pool_date"] != source or
+                             row["source_pool_codes_hash"] != digest or
+                             row["snapshot_date"] != source for row in rows)):
                 return None
-            if not frame.phase.isin(("AWAITING_DATA", "OBSERVING", "RETURNED")).all():
-                return None
-            if not frame.empty and (set(frame.source_pool_date) != {source} or
-                                    set(frame.source_pool_codes_hash) != {digest}):
-                return None
-            rows = frame.to_dict("records")
-            for row in rows:
-                row["events"] = json.loads(row["events"]) if row["events"] else []
-                if not isinstance(row["events"], list):
-                    return None
             return rows
         except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
             return None
