@@ -420,7 +420,6 @@ class IbdDoubleBottomSnapshotRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
-        self._watch_companion: dict | None = None
 
     @classmethod
     def weekend(cls) -> "IbdDoubleBottomSnapshotRun":
@@ -539,6 +538,7 @@ class BreakoutFollowPoolRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
+        self._watch_companion: dict | None = None
 
     @classmethod
     def weekend(cls) -> "BreakoutFollowPoolRun":
