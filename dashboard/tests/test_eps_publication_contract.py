@@ -1,4 +1,5 @@
-from types import SimpleNamespace
+import subprocess
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -62,27 +63,36 @@ def test_expected_eps_unavailable_is_published_with_reason(tmp_path, monkeypatch
 
 
 def test_pool_commit_stages_pit_store_with_pool(tmp_path, monkeypatch):
-    pool_path = tmp_path / "us" / "breakout_follow_pool.csv"
-    pit_path = tmp_path / "us" / "signal_eps_pit.csv"
-    pool_path.parent.mkdir(parents=True)
+    """Use a real local remote: the committed Pool and EPS PIT must be atomic."""
+    root = tmp_path / "checkout"
+    us = root / "us"
+    us.mkdir(parents=True)
+    pool_path = us / "breakout_follow_pool.csv"
+    pit_path = us / "signal_eps_pit.csv"
+    pool_path.write_text("code\nOLD\n")
+    pit_path.write_text("snapshot_date,code,eps_yoy_growth\n2026-08-14,OLD,24\n")
+
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
+
+    git("init", "-b", "main")
+    git("config", "user.email", "watch-test@example.invalid")
+    git("config", "user.name", "Watch CI")
+    git("add", ".")
+    git("commit", "-m", "baseline")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-u", "origin", "main")
+
     pool_path.write_text("code\nABC\n")
     pit_path.write_text("snapshot_date,code,eps_yoy_growth\n2026-08-21,ABC,25\n")
-
-    monkeypatch.setattr(yfinance_data, "DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(yfinance_data, "DATA_ROOT", str(root))
     monkeypatch.setattr(SignalEPSLookup, "DEFAULT_CSV_PATH", "us/signal_eps_pit.csv")
-    calls = []
-
-    def fake_run(args, **kwargs):
-        calls.append(args)
-        if args[:4] == ["git", "diff", "--cached", "--quiet"]:
-            return SimpleNamespace(returncode=1, args=args)
-        return SimpleNamespace(returncode=0, args=args)
-
-    monkeypatch.setattr(yfinance_data.subprocess, "run", fake_run)
-
     yfinance_data._commit_pool(str(pool_path))
 
-    add_call = calls[0]
-    assert add_call[:2] == ["git", "add"]
-    assert str(pool_path) in add_call
-    assert str(pit_path) in add_call
+    changed = set(git("show", "--format=", "--name-only", "HEAD").splitlines())
+    assert changed == {"us/breakout_follow_pool.csv", "us/signal_eps_pit.csv"}
+    assert git("rev-parse", "HEAD") == git("rev-parse", "origin/main")
+    assert "ABC" in git("show", "HEAD:us/breakout_follow_pool.csv")
+    assert "ABC,25" in git("show", "HEAD:us/signal_eps_pit.csv")
