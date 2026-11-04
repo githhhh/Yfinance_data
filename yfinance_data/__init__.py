@@ -724,10 +724,11 @@ def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> Non
     if os.path.exists(pit_path):
         managed_paths.append(pit_path)
 
-    _commit_managed_csv(
-        managed_paths,
-        message="Update breakout follow pool",
-    )
+    message = "Update breakout follow pool"
+    if extra_paths:
+        source, digest = pool_identity(pool)
+        message += f"\n\nWatch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}"
+    _commit_managed_csv(managed_paths, message=message)
 
 
 __all__ = [
@@ -766,7 +767,11 @@ def bootstrap_bf_exit_watch(rows: list[dict], recent: dict) -> None:
     try:
         frame.to_csv(pending, index=False, encoding="utf-8-sig")
         os.replace(pending, target)
-        _commit_managed_csv([str(target)], message="Initialize BF Pool Exit Watch")
+        _commit_managed_csv(
+            [str(target)],
+            message=(f"Initialize BF Pool Exit Watch\n\nWatch-Source-Date: {when}"
+                     f"\nWatch-Codes-SHA256: {digest}"),
+        )
     finally:
         if os.path.exists(pending):
             os.unlink(pending)
