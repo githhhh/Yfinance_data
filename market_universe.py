@@ -43,7 +43,7 @@ def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
             logging.warning("Download universe source missing: %s", source_path)
             continue
         try:
-            source = pd.read_csv(source_path, dtype={"code": str})
+            source = pd.read_csv(source_path, converters={"code": str})
         except Exception as exc:
             logging.warning("Download universe source unreadable: %s (%s)", source_path, exc)
             continue
@@ -82,7 +82,7 @@ def pick_active_weekend_signal_codes(
         return []
     path = Path(data_root) / "us" / "breakout_follow_pool.csv"
     try:
-        frame = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
+        frame = pd.read_csv(path, converters={"code": str}, encoding="utf-8-sig")
         required = {"code", "signal", "snapshot_date"}
         if not required.issubset(frame.columns):
             raise ValueError(f"missing columns: {sorted(required - set(frame.columns))}")
