@@ -634,3 +634,39 @@ def test_download_rejects_dirty_local_pool_even_when_remote_watch_is_authentic(t
         store.active_watch_codes(root, required=True)
     git(root, "checkout", "--", "us/breakout_follow_pool.csv")
     assert store.active_watch_codes(root, required=True) == ["X"]
+
+
+
+@pytest.mark.parametrize("bad_pool", [
+    "code,snapshot_date\nABC,not-a-date\n",
+    "code,snapshot_date\nABC,2026-10-22\n",  # not a complete-week snapshot
+    "snapshot_date\n2026-10-30\n",  # missing symbol identity
+    "code,snapshot_date\nA,2026-10-30\nA,2026-10-30\n",
+])
+def test_download_refuses_latest_corrupted_complete_pool_without_using_older_history(
+    tmp_path, bad_pool,
+):
+    """An older valid paired snapshot must never mask an invalid HEAD Pool."""
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A", "B"])
+    pool = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(pool)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([{"code": "X", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(
+                          target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.active_watch_codes(root, required=True) == ["X"]
+
+    (root / "us" / "breakout_follow_pool.csv").write_text(
+        bad_pool, encoding="utf-8")
+    git(root, "add", "us/breakout_follow_pool.csv")
+    git(root, "commit", "-qm", "broken latest Pool")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.published_complete_pools(root, limit=2), (
+        "History still has an older, valid complete Pool")
+    with pytest.raises(RuntimeError, match="latest published complete BF Pool invalid"):
+        store.active_watch_codes(root, required=True)
