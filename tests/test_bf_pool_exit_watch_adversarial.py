@@ -22,11 +22,16 @@ def setup_repo(tmp_path):
     return root
 
 
-def commit_pool(root, d, symbols):
-    pd.DataFrame([{"code":code,"snapshot_date":d,"ceiling":100,"signal":False}
-                  for code in symbols]).to_csv(root/"us"/"breakout_follow_pool.csv",index=False)
+def commit_pool(root, d, symbols, *, paired=False):
+    frame = pd.DataFrame([{"code":code,"snapshot_date":d,"ceiling":100,"signal":False}
+                          for code in symbols])
+    frame.to_csv(root/"us"/"breakout_follow_pool.csv",index=False)
     git(root,"add","us/breakout_follow_pool.csv")
-    git(root,"commit","-qm","pool")
+    message = "pool"
+    if paired:
+        _, digest = store.pool_identity(frame)
+        message += f"\n\nWatch-Source-Date: {d}\nWatch-Codes-SHA256: {digest}"
+    git(root,"commit","-qm",message)
     git(root,"update-ref","refs/remotes/origin/main","HEAD")
 
 
@@ -41,10 +46,18 @@ def test_published_pool_history_and_valid_empty_watch(tmp_path):
     frame=store.watch_frame([],snapshot_date="2026-10-23",pool_codes_hash=digest)
     frame.to_csv(root/"us"/"bf_pool_exit_watch.csv",index=False)
     git(root,"add","us/bf_pool_exit_watch.csv")
-    git(root,"commit","-qm","bootstrap empty")
+    git(root,"commit","-qm",
+        f"bootstrap empty\n\nWatch-Source-Date: 2026-10-23\nWatch-Codes-SHA256: {digest}")
     git(root,"update-ref","refs/remotes/origin/main","HEAD")
     assert store.official_watch_for_week(root,"2026-10-20") is None
     assert store.official_watch_for_week(root,"2026-10-19")==[]
+    # An empty Watch has identical CSV bytes for a second week; history must
+    # be sourced from the paired Pool commit, not Watch-only file change log.
+    commit_pool(root, "2026-10-30", ["B"], paired=True)
+    assert store.official_watch_for_week(root, "2026-10-26") == []
+    # A non-Watch writer changing the Pool must not be accepted as a new baseline.
+    commit_pool(root, "2026-11-06", ["C"])
+    assert store.official_watch_for_week(root, "2026-11-02") is None
 
 
 def test_owned_git_commit_excludes_unrelated_already_staged_file(tmp_path):
