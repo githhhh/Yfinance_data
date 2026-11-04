@@ -109,7 +109,7 @@ def _reject_empty_pool_overwrite(path: str, candidate_codes: frozenset[str], *, 
         if not os.path.exists(protected_path):
             continue
         try:
-            existing = pd.read_csv(protected_path, converters={"code": str}, encoding="utf-8-sig")
+            existing = pd.read_csv(protected_path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
             existing_codes = _pool_codes(existing)
         except Exception as exc:
             raise RuntimeError(f"BF {name} Pool 候选为空且无法验证现有快照") from exc
@@ -189,7 +189,7 @@ def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
         try:
             complete = pd.read_csv(
                 BREAKOUT_FOLLOW_POOL_PATH,
-                converters={"code": str},
+                dtype={"code": str}, keep_default_na=False, na_values=[""],
                 encoding="utf-8-sig",
             )
         except Exception as exc:
@@ -389,7 +389,7 @@ def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
 def supplement_latest_pool_signal_eps() -> dict[str, object]:
     """Refresh missing signal EPS in the latest pool selected by snapshot_date."""
     path, snapshot_date = _latest_pool_path_by_snapshot_date()
-    pool = pd.read_csv(path, converters={"code": str}, encoding="utf-8-sig")
+    pool = pd.read_csv(path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
     before = _signal_eps_missing_count(pool)
     enriched = _enrich_signal_eps(pool)
     _validate_eps_publication_contract(enriched)
@@ -519,7 +519,7 @@ class IbdDoubleBottomSnapshotRun:
             )
         snapshot = pd.read_csv(
             self.path,
-            converters={"code": str},
+            dtype={"code": str}, keep_default_na=False, na_values=[""],
             encoding="utf-8-sig",
         )
         self._validate(snapshot)
@@ -578,7 +578,7 @@ class BreakoutFollowPoolRun:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致") from exc
         if current_digest != self._published_digest:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致")
-        pool = pd.read_csv(self.path, converters={"code": str}, encoding="utf-8-sig")
+        pool = pd.read_csv(self.path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
         return pool
 
@@ -723,7 +723,7 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
                     ["git", "show", f"{commit_sha}:us/breakout_follow_pool.csv"],
                     cwd=root)
                 source_date, codes_digest = pool_identity(
-                    pd.read_csv(io.BytesIO(snapshot_bytes), converters={"code": str}))
+                    pd.read_csv(io.BytesIO(snapshot_bytes), dtype={"code": str}, keep_default_na=False, na_values=[""]))
                 message_body = output("show", "-s", "--format=%B", commit_sha)
                 if (f"Watch-Source-Date: {source_date}" not in message_body or
                     f"Watch-Codes-SHA256: {codes_digest}" not in message_body):
@@ -788,7 +788,7 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
 def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> None:
     """Commit only a pool that satisfies the current EPS publication contract."""
     if os.path.exists(pool_path):
-        pool = pd.read_csv(pool_path, converters={"code": str}, encoding="utf-8-sig")
+        pool = pd.read_csv(pool_path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
 
     managed_paths = [pool_path, *(extra_paths or [])]
