@@ -670,3 +670,29 @@ def test_download_refuses_latest_corrupted_complete_pool_without_using_older_his
         "History still has an older, valid complete Pool")
     with pytest.raises(RuntimeError, match="latest published complete BF Pool invalid"):
         store.active_watch_codes(root, required=True)
+
+
+
+def test_literal_na_like_tickers_survive_git_history_and_watch_pairing(tmp_path):
+    """Pandas default NA parsing must not erase valid ticker identities."""
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["NA", "NULL"])
+    original = pd.DataFrame([
+        {"code": "NA", "snapshot_date": "2026-10-23"},
+        {"code": "NULL", "snapshot_date": "2026-10-23"},
+    ])
+    when, digest = store.pool_identity(original)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([
+        {"code": "NA", "phase": "OBSERVING", "events": []},
+        {"code": "NULL", "phase": "AWAITING_DATA", "events": []},
+    ], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+    history = store.published_complete_pools(root, limit=1)
+    assert set(row["code"] for row in history[0]["rows"]) == {"NA", "NULL"}
+    assert set(store.active_watch_codes(root, required=True)) == {"NA", "NULL"}
