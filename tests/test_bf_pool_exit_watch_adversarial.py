@@ -352,6 +352,11 @@ def test_bootstrap_publishes_once_and_unblocks_download(tmp_path, monkeypatch):
     ("phase", "INVALID_PHASE"),
     ("events", "{not-json}"),
     ("events", '{"not": "a list"}'),
+    ("events", '[{"type":"POOL_EXIT","week":"2026-10-26"}]'),
+    ("events", '[{"id":"BAD","type":"POOL_EXIT","week":"2026-10-26"}]'),
+    ("events", '[{"id":"POOL_EXIT:2026-10-26","type":"POOL_EXIT","week":"2026-10-26"},{"id":"POOL_EXIT:2026-10-26","type":"POOL_EXIT","week":"2026-10-26"}]'),
+    ("snapshot_date", "2026-10-23"),
+    ("phase", "PROVISIONAL_OUT"),
 ])
 def test_authority_rejects_unreadable_watch_before_any_publication(
     tmp_path, monkeypatch, broken_field, bad_value,
