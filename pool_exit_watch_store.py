@@ -41,15 +41,15 @@ def parse_watch_csv(path: str | Path) -> list[dict]:
     return rows
 
 
-def active_watch_codes(data_root: str | Path = ".") -> list[str]:
+def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> list[str]:
     """Only an authoritative, published complete Watch may drive downloads."""
     import subprocess
     root = Path(data_root)
     source = root / WATCH_COMPLETE
     is_repo = (root / ".git").exists()
     if not source.is_file():
-        if is_repo and watch_was_ever_published(root):
-            raise RuntimeError("published BF Watch missing; recovery required")
+        if required or (is_repo and watch_was_ever_published(root)):
+            raise RuntimeError("BF Watch must be remotely bootstrapped before market-data download")
         return []
     if is_repo:
         try:
