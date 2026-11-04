@@ -63,3 +63,43 @@ def test_midweek_page_explicitly_labels_complete_fallback():
     source = (root / "pool-exit-watch.html").read_text(encoding="utf-8")
     assert "midweek_fallback" in source
     assert "Midweek unavailable/stale" in source
+
+
+
+def test_static_watch_page_does_not_show_stale_published_watch_after_pool_only_commit(tmp_path):
+    import subprocess
+    import pandas as pd
+    from dashboard.build_static import build_watch_payload
+    from pool_exit_watch_store import WATCH_COMPLETE, pool_identity, watch_frame
+
+    root = tmp_path / "checkout"
+    (root / "us").mkdir(parents=True)
+    def git(*args):
+        return subprocess.check_output(
+            ["git", "-C", str(root), *args], text=True).strip()
+    git("init", "-b", "main")
+    git("config", "user.email", "watch-page@example.invalid")
+    git("config", "user.name", "Watch Page CI")
+    first = pd.DataFrame([{"code": "ABC", "snapshot_date": "2026-10-23"}])
+    when, digest = pool_identity(first)
+    first.to_csv(root / "us" / "breakout_follow_pool.csv", index=False)
+    watch_frame([{"code": "X", "phase": "OBSERVING", "events": []}],
+                snapshot_date=when, pool_codes_hash=digest).to_csv(
+                    root / WATCH_COMPLETE, index=False)
+    git("add", ".")
+    git("commit", "-m",
+        f"initialize\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    assert build_watch_payload(root)["available"] is True
+
+    newer = pd.DataFrame([{"code": "ABC", "snapshot_date": "2026-10-30"}])
+    newer.to_csv(root / "us" / "breakout_follow_pool.csv", index=False)
+    git("add", "us/breakout_follow_pool.csv")
+    git("commit", "-m", "unpaired Pool-only update")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    result = build_watch_payload(root)
+    assert result["available"] is False
+    assert result["complete"] == []
+    assert result["midweek"] == []
+    assert result["errors"]["complete"] == "RuntimeError"
