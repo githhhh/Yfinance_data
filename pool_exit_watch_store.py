@@ -42,8 +42,26 @@ def parse_watch_csv(path: str | Path) -> list[dict]:
 
 
 def active_watch_codes(data_root: str | Path = ".") -> list[str]:
-    """Fail closed on malformed existing data, not on a never-enabled file."""
-    rows = parse_watch_csv(Path(data_root) / WATCH_COMPLETE)
+    """Only an authoritative, published complete Watch may drive downloads."""
+    import subprocess
+    root = Path(data_root)
+    source = root / WATCH_COMPLETE
+    is_repo = (root / ".git").exists()
+    if not source.is_file():
+        if is_repo and watch_was_ever_published(root):
+            raise RuntimeError("published BF Watch missing; recovery required")
+        return []
+    if is_repo:
+        try:
+            committed = subprocess.check_output(
+                ["git", "-C", str(root), "show", f"origin/main:{WATCH_COMPLETE}"],
+                stderr=subprocess.DEVNULL,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError("BF Watch is not confirmed on origin/main") from exc
+        if source.read_bytes() != committed:
+            raise RuntimeError("local BF Watch differs from published origin/main")
+    rows = parse_watch_csv(source)
     return sorted({str(r["code"]) for r in rows if r["phase"] in ACTIVE_PHASES})
 
 
