@@ -44,7 +44,7 @@ function render(){
  var vs=r.vs_original_pct!==""&&r.vs_original_pct!=null&&Number.isFinite(pct)?pct.toFixed(2)+"%":"—";
  var events=Array.isArray(r.events)?r.events:[];
  var detail="Old Ceiling: "+(r.original_ceiling||"—")+" | Current Ceiling: "+(r.current_ceiling||"—")+" | Close: "+(r.latest_close||"—")+" | "+(r.pending_status||"")+" | Pending High: "+(r.pending_high||"—")+"\n";
- detail+=events.map(function(e){return (e.week||"")+" "+(e.type||"")+" "+(e.reason||"")}).join("\n");
+ detail+=events.map(function(e){return (e.censored_by_gap?"Observed by ":"")+(e.week||"")+" "+(e.type||"")+" "+(e.reason||"")+(e.censored_by_gap?" · gap censored":"")}).join("\n");
  return "<tr><td><b>"+esc(r.code)+"</b></td><td>"+esc(r.last_exit_reason||"UNVERIFIED")+"</td><td>"+esc(vs)+"</td><td>"+esc(r.price_state||r.pending_status||"NO DATA")+"</td><td><details><summary>Details</summary><pre>"+esc(detail)+"</pre></details></td></tr>";
  }).join("");
  if(!visible.length)$("rows").innerHTML='<tr><td colspan="5">No matching observations.</td></tr>';
