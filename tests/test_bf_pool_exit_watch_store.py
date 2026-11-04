@@ -37,3 +37,40 @@ def test_download_requires_explicit_bootstrap_even_when_no_watch_ever_published(
     watch_frame([], snapshot_date="2026-10-30", pool_codes_hash="fixture").to_csv(
         target, index=False)
     assert active_watch_codes(tmp_path, required=True) == []
+
+
+
+@pytest.mark.parametrize("bad_code", [" A", "A ", " ", "nan", "NaN", None])
+def test_watch_csv_rejects_noncanonical_or_missing_codes(tmp_path, bad_code):
+    rows = [{"code": bad_code, "phase": "OBSERVING", "events": []}]
+    target = tmp_path / "watch.csv"
+    watch_frame(rows, snapshot_date="2026-10-30",
+                pool_codes_hash="digest").to_csv(target, index=False)
+    with pytest.raises(ValueError, match="code"):
+        parse_watch_csv(target)
+
+
+@pytest.mark.parametrize("bad_code", [" ABC", "ABC ", "", "nan", None])
+def test_pool_identity_rejects_noncanonical_or_missing_codes(bad_code):
+    import pandas as pd
+    from pool_exit_watch_store import pool_identity
+    with pytest.raises(ValueError, match="code"):
+        pool_identity(pd.DataFrame([{
+            "code": bad_code, "snapshot_date": "2026-10-30"}]))
+
+
+@pytest.mark.parametrize(("event_type", "week"), [
+    ("POOL_EXIT", "2026-10-27"),  # Tuesday, not canonical Monday
+    ("POOL_EXIT", "2026-13-01"),  # impossible calendar day
+    ("FOREIGN_EVENT", "2026-10-26"),  # unknown event kind
+])
+def test_watch_csv_rejects_forged_event_week_or_kind(tmp_path, event_type, week):
+    import json
+    row = {"code": "ABC", "phase": "OBSERVING",
+           "events": [{"id": f"{event_type}:{week}",
+                       "type": event_type, "week": week}]}
+    target = tmp_path / "watch.csv"
+    watch_frame([row], snapshot_date="2026-10-30",
+                pool_codes_hash="digest").to_csv(target, index=False)
+    with pytest.raises(ValueError, match="event"):
+        parse_watch_csv(target)
