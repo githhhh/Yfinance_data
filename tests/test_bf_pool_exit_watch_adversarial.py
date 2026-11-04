@@ -135,3 +135,27 @@ def test_no_only_pool_commit_when_watch_enabled(tmp_path,monkeypatch):
                         lambda:pd.DataFrame([{"code":"A","snapshot_date":"2026-10-30"}]))
     with pytest.raises(RuntimeError,match="requires companion"):
         obj.commit()
+
+
+def test_watch_download_source_must_be_remote_published(tmp_path):
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    pool = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(pool)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        target, index=False)
+    # Locally prepared but never pushed to origin/main is NOT a valid source.
+    with pytest.raises(RuntimeError, match="not confirmed"):
+        store.active_watch_codes(root)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.active_watch_codes(root) == []
+    target.unlink()
+    with pytest.raises(RuntimeError, match="missing"):
+        store.active_watch_codes(root)
+    target.write_text("malformed local Watch")
+    with pytest.raises(RuntimeError, match="differs"):
+        store.active_watch_codes(root)
