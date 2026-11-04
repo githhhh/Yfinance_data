@@ -24,8 +24,10 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
     required = set(COLUMNS)
     if not required.issubset(frame.columns):
         raise ValueError(f"Watch CSV schema missing: {sorted(required - set(frame.columns))}")
-    if frame.code.eq("").any() or frame.code.duplicated().any():
-        raise ValueError("Watch CSV duplicate/blank code")
+    codes = frame.code.astype(str)
+    if (codes.eq("").any() or codes.eq("nan").any() or
+        codes.str.strip().ne(codes).any() or codes.duplicated().any()):
+        raise ValueError("Watch CSV duplicate/blank/noncanonical code")
     if not frame.phase.isin(
         ("AWAITING_DATA", "OBSERVING", "RETURNED", "PROVISIONAL_OUT")
     ).all():
@@ -43,6 +45,17 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
                 for k in ("id", "type", "week")
             ):
                 raise ValueError("Watch CSV event is missing its identity")
+            from datetime import date
+            try:
+                monday = date.fromisoformat(event["week"])
+            except ValueError as exc:
+                raise ValueError("Watch CSV invalid event market week") from exc
+            if (monday.weekday() != 0 or event["week"] != monday.isoformat() or
+                event["type"] not in {"POOL_EXIT", "POOL_RETURN", "CEILING_LOST",
+                                     "CEILING_RECLAIMED", "ZONE_TOUCH",
+                                     "PENDING_CONFIRMED", "PENDING_BLOCKED",
+                                     "COVERAGE_GAP"}):
+                raise ValueError("Watch CSV invalid event type or canonical week")
             if event["id"] != f'{event["type"]}:{event["week"]}' or event["id"] in seen:
                 raise ValueError("Watch CSV duplicate or mismatched event identity")
             seen.add(event["id"])
@@ -121,8 +134,9 @@ def pool_identity(pool: pd.DataFrame) -> tuple[str, str]:
     if dates.isna().any() or dates.dt.date.nunique() != 1:
         raise ValueError("invalid or mixed Pool snapshot_date")
     codes = sorted(pool.code.astype(str))
-    if len(codes) != len(set(codes)):
-        raise ValueError("duplicate Pool codes")
+    if (any(not code or code.strip() != code or code.lower() == "nan"
+            for code in codes) or len(codes) != len(set(codes))):
+        raise ValueError("invalid/duplicate Pool codes")
     return dates.iloc[0].date().isoformat(), sha256("\n".join(codes).encode()).hexdigest()
 
 
