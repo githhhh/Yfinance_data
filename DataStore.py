@@ -295,7 +295,7 @@ if __name__ == "__main__":
             print(f"[Weekend Pick] restored {len(added)} BF signals: {added[:20]}")
 
     # Restore active Watch codes after BOTH normal and fallback picks, for 1d/1wk.
-    watch_codes = active_watch_codes()
+    watch_codes = active_watch_codes(required=True)
     initial = set(tickers)
     tickers = list(dict.fromkeys([*tickers, *watch_codes]))
     restored = sorted(set(watch_codes) - initial)
