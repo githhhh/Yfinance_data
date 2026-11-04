@@ -663,58 +663,95 @@ def _pit_store_path() -> str:
 
 
 def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
-    """Commit and push one or more already-validated managed CSVs."""
-    try:
-        managed_paths = [paths] if isinstance(paths, str) else list(paths)
-        subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
-            cwd=DATA_ROOT,
+    """Publish only owned paths under a per-checkout lock, fail closed on drift.
+
+    A Git commit cannot be pushed in isolation: push includes all its ancestors.
+    Check every unpushed commit, not just the final diff, to prevent a foreign
+    committed file from hitchhiking with a Pool/Watch publication.
+    """
+    import fcntl
+
+    root = Path(DATA_ROOT).resolve()
+    requested = [paths] if isinstance(paths, str) else list(paths)
+    owned = set()
+    for raw in requested:
+        absolute = Path(raw).resolve()
+        if not absolute.is_relative_to(root):
+            raise ValueError(f"managed Git path outside data repository: {raw}")
+        owned.add(absolute.relative_to(root).as_posix())
+    if not owned:
+        raise ValueError("no managed Git files supplied")
+
+    def git(*args, check=True, capture_output=False):
+        return subprocess.run(
+            ["git", *args], cwd=root, check=check, text=True,
+            capture_output=capture_output,
         )
-        if staged.returncode not in (0, 1):
-            raise subprocess.CalledProcessError(staged.returncode, staged.args)
 
-        if staged.returncode == 1:
-            subprocess.run(
-                ["git", "commit", "--only", "-m", message, "--", *managed_paths],
-                cwd=DATA_ROOT,
-                check=True,
-            )
-        else:
-            # No new diff may mean either "already published" or "the previous
-            # run committed locally but push failed". Only retry push when the
-            # managed CSVs themselves differ from the configured upstream;
-            # unrelated local commits must not be pushed by this helper.
-            unpushed = subprocess.run(
-                ["git", "diff", "--quiet", "@{u}..HEAD", "--", *managed_paths],
-                cwd=DATA_ROOT,
-            )
-            if unpushed.returncode == 0:
+    def output(*args):
+        return git(*args, capture_output=True).stdout.strip()
+
+    def is_owned(path: str) -> bool:
+        return any(path == item or path.startswith(item.rstrip("/") + "/")
+                   for item in owned)
+
+    def assert_outgoing_owned() -> None:
+        commits = output("log", "--format=%H", "origin/main..HEAD").splitlines()
+        for commit_sha in commits:
+            parents = output("show", "-s", "--format=%P", commit_sha).split()
+            if len(parents) != 1:
+                raise RuntimeError("managed publication refuses unpushed merge commits")
+            changed = output("diff-tree", "--no-commit-id", "--name-only", "-r",
+                             commit_sha).splitlines()
+            foreign = [p for p in changed if not is_owned(p)]
+            if foreign:
+                raise RuntimeError(
+                    f"managed publication cannot push foreign committed files: {foreign[:8]}"
+                )
+
+    git_path = output("rev-parse", "--git-path", "bf-pool-watch-publish.lock")
+    lock_path = Path(git_path)
+    if not lock_path.is_absolute():
+        lock_path = root / lock_path
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a+") as lock_handle:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        try:
+            # Fresh remote ref: a stale local origin/main can hide a concurrent
+            # external writer. A non-FF push is never forced or rebased blindly.
+            git("fetch", "--no-tags", "origin", "main")
+            git("merge-base", "--is-ancestor", "origin/main", "HEAD")
+            assert_outgoing_owned()
+
+            protected = ("us/breakout_follow_pool.csv",
+                         "us/breakout_follow_pool_midweek.csv",
+                         WATCH_COMPLETE, WATCH_MIDWEEK)
+            if not any(is_owned(p) for p in protected):
+                clean = git("diff", "--quiet", "HEAD", "--", *protected, check=False)
+                if clean.returncode != 0:
+                    raise RuntimeError("another writer left dirty Pool/Watch files")
+
+            pending = output("ls-files", "--",
+                             "us/*.pending", "us/.*.pending").splitlines()
+            if pending:
+                raise RuntimeError(f"tracked Watch pending files: {pending[:8]}")
+
+            git("add", "-A", "--", *sorted(owned))
+            staged = git("diff", "--cached", "--quiet", "--", *sorted(owned),
+                         check=False)
+            if staged.returncode not in (0, 1):
+                raise subprocess.CalledProcessError(staged.returncode, staged.args)
+            if staged.returncode == 1:
+                git("commit", "--only", "-m", message, "--", *sorted(owned))
+
+            assert_outgoing_owned()
+            if output("rev-parse", "HEAD") == output("rev-parse", "origin/main"):
                 return
-            if unpushed.returncode != 1:
-                raise subprocess.CalledProcessError(
-                    unpushed.returncode,
-                    unpushed.args,
-                )
-
-        for attempt in range(1, 4):
-            try:
-                subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info(
-                    "Yfinance_data仓库已更新: %s",
-                    os.path.basename(managed_paths[0]),
-                )
-                break
-            except subprocess.CalledProcessError:
-                if attempt == 3:
-                    raise
-                time.sleep(5)
-    except subprocess.CalledProcessError as exc:
-        logging.error("Git操作失败: %s", exc)
-        raise
-    except Exception as exc:
-        logging.error("检查并提交文件时出错: %s", exc)
-        raise
+            git("push", "origin", "HEAD:main")
+            logging.info("Yfinance_data managed publication completed: %s",
+                         ", ".join(sorted(owned)))
+        finally:
+            fcntl.flock(lock_handle, fcntl.LOCK_UN)
 
 
 def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> None:
