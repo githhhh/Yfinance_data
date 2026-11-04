@@ -238,6 +238,8 @@ def setup_bare_remote(root, tmp_path):
     git(root, "branch", "-M", "main")
     git(root, "remote", "add", "origin", str(remote))
     git(root, "push", "-u", "origin", "main")
+    subprocess.run(["git", "--git-dir", str(remote), "symbolic-ref",
+                    "HEAD", "refs/heads/main"], check=True)
     return remote
 
 
