@@ -13,7 +13,7 @@ th{color:#9cafc3}summary{cursor:pointer;color:#b5cdf0}pre{white-space:pre-wrap}
 <h2>BF Pool Exit Watch</h2><small id="asof">Loading</small>
 <p>Why did it leave the Pool? Is its original Ceiling still intact?</p>
 <div class="toolbar"><select id="period"><option value="complete">Complete</option><option value="midweek">Midweek</option></select>
-<select id="reason"><option value="ALL">All reasons</option><option>CEILING</option><option>MA</option><option value="UNVERIFIED">UNVERIFIED</option></select></div>
+<select id="reason"><option value="ALL">All reasons</option><option>CEILING</option><option>MA</option><option>NO_CEILING</option><option value="UNVERIFIED">UNVERIFIED</option></select></div>
 <div class="stats" id="stats"></div>
 <table><thead><tr><th>Code</th><th>Reason</th><th>Vs Old</th><th>Observation</th><th>Detail</th></tr></thead>
 <tbody id="rows"></tbody></table></main>
@@ -30,7 +30,7 @@ function render(){
  $("asof").textContent=(data.dates[period]||"No dated rows")+" · "+period.toUpperCase()+(data.available?"":" · unavailable");
  var active=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT"].includes(r.phase)});
  var display=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
- var counts={CEILING:0,MA:0,UNVERIFIED:0};
+ var counts={CEILING:0,MA:0,NO_CEILING:0,UNVERIFIED:0};
  active.forEach(function(r){var k=r.last_exit_reason;counts[k in counts?k:"UNVERIFIED"]++});
  $("stats").innerHTML="<span>Active cycles <b>"+active.length+"</b></span>"+Object.keys(counts).map(function(k){return "<span>Active "+k+" <b>"+counts[k]+"</b></span>"}).join("")+"<span>Returned this snapshot <b>"+rows.filter(function(r){return r.phase==="RETURNED"}).length+"</b></span>";
  var visible=display.filter(function(r){return reason==="ALL"||r.last_exit_reason===reason});
