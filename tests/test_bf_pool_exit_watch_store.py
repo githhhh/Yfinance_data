@@ -74,3 +74,17 @@ def test_watch_csv_rejects_forged_event_week_or_kind(tmp_path, event_type, week)
                 pool_codes_hash="digest").to_csv(target, index=False)
     with pytest.raises(ValueError, match="event"):
         parse_watch_csv(target)
+
+
+
+def test_watch_download_restoration_reuses_market_universe_dot_normalization(tmp_path):
+    from market_universe import build_download_universe
+    target = tmp_path / "us" / "bf_pool_exit_watch.csv"
+    target.parent.mkdir(parents=True)
+    watch_frame([{"code": "BRK.B", "phase": "OBSERVING", "events": []},
+                 {"code": "BRK-B", "phase": "AWAITING_DATA", "events": []}],
+                snapshot_date="2026-10-30",
+                pool_codes_hash="digest").to_csv(target, index=False)
+    assert active_watch_codes(tmp_path) == ["BRK-B"]
+    universe = build_download_universe(data_root=tmp_path)
+    assert "BRK-B" in universe and "BRK.B" not in universe
