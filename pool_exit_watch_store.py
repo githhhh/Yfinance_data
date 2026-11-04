@@ -204,7 +204,7 @@ def published_complete_pools(data_root: str | Path = ".", *, limit: int = 3) -> 
         try:
             data = subprocess.check_output(["git", "-C", str(root), "show",
                                             f"{ref}:us/breakout_follow_pool.csv"])
-            frame = pd.read_csv(io.BytesIO(data), dtype={"code": str})
+            frame = pd.read_csv(io.BytesIO(data), dtype={"code": str}, keep_default_na=False)
             snapshot, _ = pool_identity(frame)
             complete_snapshot_week(date.fromisoformat(snapshot))
             week = monday_of_week(date.fromisoformat(snapshot)).isoformat()
@@ -239,7 +239,7 @@ def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | No
         try:
             raw = subprocess.check_output(["git", "-C", str(root), "show",
                                            f"{ref}:us/breakout_follow_pool.csv"])
-            source, digest = pool_identity(pd.read_csv(io.BytesIO(raw), dtype={"code": str}))
+            source, digest = pool_identity(pd.read_csv(io.BytesIO(raw), dtype={"code": str}, keep_default_na=False))
             complete_snapshot_week(date.fromisoformat(source))
             if monday_of_week(date.fromisoformat(source)).isoformat() != week:
                 continue
