@@ -382,3 +382,38 @@ def test_authority_rejects_unreadable_watch_before_any_publication(
             source_pool_date=when, source_pool_codes_hash=digest)
     assert run._watch_companion is None
     assert not target.exists()
+
+
+@pytest.mark.parametrize("corruption", [
+    "missing_exit", "foreign_code", "wrong_source_identity",
+    "provisional_phase", "bad_event",
+])
+def test_bootstrap_rejects_forged_or_unreadable_initial_watch(
+    tmp_path, monkeypatch, corruption,
+):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-16", ["A", "B"])
+    commit_pool(root, "2026-10-23", ["B"])
+    setup_bare_remote(root, tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    recent = store.published_complete_pools(root, limit=2)[0]
+    rows = [{"code": "A", "phase": "AWAITING_DATA", "events": []}]
+    if corruption == "missing_exit":
+        rows = []
+    elif corruption == "foreign_code":
+        rows[0]["code"] = "C"
+    elif corruption == "wrong_source_identity":
+        recent = {**recent, "rows": [
+            {"code": "C", "snapshot_date": recent["snapshot_date"]}]}
+    elif corruption == "provisional_phase":
+        rows[0]["phase"] = "PROVISIONAL_OUT"
+    elif corruption == "bad_event":
+        rows[0]["events"] = [{"type": "POOL_EXIT", "week": "2026-10-19"}]
+
+    initial = git(root, "rev-parse", "origin/main")
+    with pytest.raises((ValueError, RuntimeError)):
+        authority.bootstrap_bf_exit_watch(rows, recent)
+    assert git(root, "rev-parse", "origin/main") == initial
+    assert not (root / store.WATCH_COMPLETE).exists()
+    assert not list((root / "us").glob("*.pending"))
