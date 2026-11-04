@@ -804,6 +804,16 @@ def bootstrap_bf_exit_watch(rows: list[dict], recent: dict) -> None:
     if len(latest) != 2 or latest[0]["ref"] != recent["ref"]:
         raise RuntimeError("bootstrap Pool refs changed")
     when, digest = pool_identity(pd.DataFrame(recent["rows"]))
+    official_when, official_digest = pool_identity(pd.DataFrame(latest[0]["rows"]))
+    if (when, digest) != (official_when, official_digest):
+        raise RuntimeError("bootstrap Pool identity differs from official history")
+    # The first Watch has no carried cycles. Its members must be exactly the
+    # prior-complete Pool exits, including all former signal=False members.
+    old_codes = {str(r["code"]) for r in latest[1]["rows"]}
+    recent_codes = {str(r["code"]) for r in latest[0]["rows"]}
+    expected = old_codes - recent_codes
+    if {str(row.get("code")) for row in rows} != expected:
+        raise ValueError("bootstrap Watch members differ from complete Pool exit diff")
     frame = watch_frame(rows, snapshot_date=when, pool_codes_hash=digest)
     fd, pending = tempfile.mkstemp(prefix=".bf_pool_exit_watch.",
                                    suffix=".pending", dir=str(target.parent))
