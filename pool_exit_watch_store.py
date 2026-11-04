@@ -2,6 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 import json
+from datetime import date
 import pandas as pd
 
 WATCH_COMPLETE = "us/bf_pool_exit_watch.csv"
@@ -25,7 +26,8 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
     if not required.issubset(frame.columns):
         raise ValueError(f"Watch CSV schema missing: {sorted(required - set(frame.columns))}")
     codes = frame.code.astype(str)
-    if (codes.eq("").any() or codes.eq("nan").any() or
+    if (frame.code.isna().any() or codes.eq("").any() or
+        codes.str.lower().eq("nan").any() or
         codes.str.strip().ne(codes).any() or codes.duplicated().any()):
         raise ValueError("Watch CSV duplicate/blank/noncanonical code")
     if not frame.phase.isin(
@@ -45,7 +47,6 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
                 for k in ("id", "type", "week")
             ):
                 raise ValueError("Watch CSV event is missing its identity")
-            from datetime import date
             try:
                 monday = date.fromisoformat(event["week"])
             except ValueError as exc:
@@ -134,7 +135,8 @@ def pool_identity(pool: pd.DataFrame) -> tuple[str, str]:
     if dates.isna().any() or dates.dt.date.nunique() != 1:
         raise ValueError("invalid or mixed Pool snapshot_date")
     codes = sorted(pool.code.astype(str))
-    if (any(not code or code.strip() != code or code.lower() == "nan"
+    if (pool.code.isna().any() or
+        any(not code or code.strip() != code or code.lower() == "nan"
             for code in codes) or len(codes) != len(set(codes))):
         raise ValueError("invalid/duplicate Pool codes")
     return dates.iloc[0].date().isoformat(), sha256("\n".join(codes).encode()).hexdigest()
