@@ -88,3 +88,25 @@ def test_watch_download_restoration_reuses_market_universe_dot_normalization(tmp
     assert active_watch_codes(tmp_path) == ["BRK-B"]
     universe = build_download_universe(data_root=tmp_path)
     assert "BRK-B" in universe and "BRK.B" not in universe
+
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("snapshot_date", "2026-13-30"),
+    ("source_pool_date", "not-a-date"),
+    ("original_pool_date", "2026-02-30"),
+    ("absence_week", "2026-10-30"),
+    ("verified_week", "2026-10-29"),
+    ("last_price_observed_week", "2026-10-30"),
+])
+def test_watch_csv_rejects_invalid_historical_date_field(tmp_path, field, value):
+    target = tmp_path / "watch.csv"
+    watch_frame([{"code": "A", "phase": "OBSERVING", "events": []}],
+                snapshot_date="2026-10-30", pool_codes_hash="digest").to_csv(
+                    target, index=False)
+    import pandas as pd
+    frame = pd.read_csv(target, keep_default_na=False)
+    frame.loc[0, field] = value
+    frame.to_csv(target, index=False)
+    with pytest.raises(ValueError, match=field):
+        parse_watch_csv(target)
