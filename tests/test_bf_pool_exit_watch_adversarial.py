@@ -323,3 +323,26 @@ def test_all_data_writers_share_single_owned_publisher():
     local = (root / "scripts/run_local_data_update.sh").read_text()
     assert "python scripts/publish_owned.py" in local
     assert "git push origin HEAD:main" not in local
+
+
+
+def test_bootstrap_publishes_once_and_unblocks_download(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-16", ["A", "B"])
+    commit_pool(root, "2026-10-23", ["B"])
+    setup_bare_remote(root, tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    last_two = store.published_complete_pools(root, limit=2)
+    recent = last_two[0]
+    rows = [{"code": "A", "phase": "AWAITING_DATA",
+             "original_pool_date": "2026-10-16",
+             "watch_cycle_id": "A:2026-10-19", "events": []}]
+    with pytest.raises(RuntimeError, match="remotely bootstrapped"):
+        store.active_watch_codes(root, required=True)
+    authority.bootstrap_bf_exit_watch(rows, recent)
+    assert store.active_watch_codes(root, required=True) == ["A"]
+    assert store.watch_was_ever_published(root)
+    assert store.official_watch_for_week(root, "2026-10-19")[0]["code"] == "A"
+    with pytest.raises(RuntimeError, match="already enabled"):
+        authority.bootstrap_bf_exit_watch(rows, recent)
