@@ -25,3 +25,15 @@ def test_midweek_never_extends_universe(tmp_path):
     watch_frame([{"code":"MID","phase":"PROVISIONAL_OUT"}],
                 snapshot_date="2026-11-03",pool_codes_hash="x").to_csv(path,index=False)
     assert "MID" not in build_download_universe(data_root=tmp_path)
+
+
+
+def test_download_requires_explicit_bootstrap_even_when_no_watch_ever_published(tmp_path):
+    from pool_exit_watch_store import active_watch_codes
+    with pytest.raises(RuntimeError, match="remotely bootstrapped"):
+        active_watch_codes(tmp_path, required=True)
+    target = tmp_path / "us" / "bf_pool_exit_watch.csv"
+    target.parent.mkdir(parents=True)
+    watch_frame([], snapshot_date="2026-10-30", pool_codes_hash="fixture").to_csv(
+        target, index=False)
+    assert active_watch_codes(tmp_path, required=True) == []
