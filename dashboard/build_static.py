@@ -534,10 +534,14 @@ def build_watch_payload(data_root: Path) -> dict:
 
     complete_date = payload["dates"].get("complete")
     midweek_date = payload["dates"].get("midweek")
-    if payload["available"] and (
-        not have_midweek or
-        (complete_date and midweek_date and midweek_date <= complete_date)
-    ):
+    if not payload["available"]:
+        # A provisional view cannot be trusted when its complete baseline is
+        # unavailable. Never expose it as an independently authoritative view.
+        payload["midweek"] = []
+        payload["dates"].pop("midweek", None)
+    elif (not have_midweek or
+          (not payload["midweek"] and bool(payload["complete"])) or
+          (complete_date and midweek_date and midweek_date <= complete_date)):
         payload["midweek_fallback"] = True
     if errors:
         payload["errors"] = errors
