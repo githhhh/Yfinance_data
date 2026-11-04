@@ -499,6 +499,51 @@ def build_dashboard_payload(
     }
 
 
+def build_watch_payload(data_root: Path) -> dict:
+    """Keep a broken or stale Midweek artifact from hiding a valid Complete Watch."""
+    from pool_exit_watch_store import parse_watch_csv, WATCH_COMPLETE, WATCH_MIDWEEK
+
+    payload = {
+        "available": False, "complete": [], "midweek": [],
+        "dates": {}, "midweek_fallback": False,
+    }
+    errors = {}
+    allowed = {
+        "code", "snapshot_date", "original_ceiling", "current_ceiling",
+        "last_exit_reason", "phase", "price_state", "vs_original_pct",
+        "latest_close", "pending_status", "pending_high", "events", "exit_count",
+    }
+    have_midweek = False
+    for label, relative in (("complete", WATCH_COMPLETE), ("midweek", WATCH_MIDWEEK)):
+        source = data_root / relative
+        if not source.is_file():
+            continue
+        try:
+            rows = parse_watch_csv(source)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            errors[label] = type(exc).__name__
+            continue
+        payload[label] = [{k: v for k, v in row.items() if k in allowed}
+                          for row in rows]
+        payload["dates"][label] = max(
+            (str(r.get("snapshot_date", "")) for r in rows), default="")
+        if label == "complete":
+            payload["available"] = True
+        else:
+            have_midweek = True
+
+    complete_date = payload["dates"].get("complete")
+    midweek_date = payload["dates"].get("midweek")
+    if payload["available"] and (
+        not have_midweek or
+        (complete_date and midweek_date and midweek_date <= complete_date)
+    ):
+        payload["midweek_fallback"] = True
+    if errors:
+        payload["errors"] = errors
+    return payload
+
+
 def build_site(
     output_dir: str | Path,
     *,
@@ -536,26 +581,8 @@ def build_site(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
-    # Independent Watch payload; no changes to the original dashboard.json.
-    watch_payload = {"available": False, "complete": [], "midweek": [], "dates": {}}
-    try:
-        from pool_exit_watch_store import parse_watch_csv, WATCH_COMPLETE, WATCH_MIDWEEK
-        for label, relative in (("complete", WATCH_COMPLETE), ("midweek", WATCH_MIDWEEK)):
-            source = PROJECT_ROOT / relative
-            if source.exists():
-                rows = parse_watch_csv(source)
-                allowed = {"code", "snapshot_date", "original_ceiling", "current_ceiling", "last_exit_reason",
-                           "phase", "price_state", "vs_original_pct", "latest_close",
-                           "pending_status", "pending_high", "events", "exit_count"}
-                watch_payload[label] = [{k: v for k, v in row.items() if k in allowed}
-                                        for row in rows]
-                if label == "complete":
-                    watch_payload["available"] = True
-                watch_payload["dates"][label] = max(
-                    (str(r.get("snapshot_date", "")) for r in rows), default="")
-    except (OSError, ValueError, TypeError, KeyError) as exc:
-        watch_payload = {"available": False, "complete": [], "midweek": [],
-                         "dates": {}, "error": type(exc).__name__}
+    # Independent Watch payload; never disturb the original dashboard.json.
+    watch_payload = build_watch_payload(PROJECT_ROOT)
     (data_dir / "pool_exit_watch.json").write_text(
         json.dumps(watch_payload, ensure_ascii=False, default=str, separators=(",", ":")),
         encoding="utf-8")
