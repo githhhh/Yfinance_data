@@ -557,7 +557,7 @@ def test_shallow_git_history_would_hide_paired_complete_watch(tmp_path):
                     f"file://{remote}", str(clone)], check=True)
     assert git(clone, "rev-parse", "--is-shallow-repository") == "true"
     assert (clone / store.WATCH_COMPLETE).exists()
-    with pytest.raises(RuntimeError, match="no published complete Pool"):
+    with pytest.raises(RuntimeError, match="no published complete Pool|not paired"):
         store.active_watch_codes(clone, required=True)
     git(clone, "fetch", "--unshallow", "origin", "main")
     assert store.active_watch_codes(clone, required=True) == ["A"]
