@@ -164,6 +164,7 @@ def test_watch_download_source_must_be_remote_published(tmp_path):
 def test_deleted_published_watch_blocks_pool_only_commit(tmp_path, monkeypatch):
     import yfinance_data as authority
     root = setup_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
     commit_pool(root, "2026-10-23", ["A"])
     pool = pd.DataFrame([{"code":"A","snapshot_date":"2026-10-23"}])
     when, digest = store.pool_identity(pool)
