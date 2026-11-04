@@ -111,25 +111,32 @@ def watch_was_ever_published(data_root: str | Path = ".") -> bool:
         "origin/main", "--format=%H", "--", WATCH_COMPLETE], text=True).strip())
 
 
-def official_watch_for_week(data_root: str | Path, week: str) -> list[dict]:
-    """First valid published Watch for specified complete week, or no rows."""
+def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | None:
+    """None=missing/corrupt baseline; []=valid but legally empty Watch."""
     import subprocess
     import io
     from datetime import date
     from bf_snapshot import monday_of_week
     root = Path(data_root)
     refs = subprocess.check_output(["git", "-C", str(root), "log", "origin/main",
-           "--first-parent", "--format=%H", "--", WATCH_COMPLETE], text=True)
+        "--first-parent", "--format=%H", "--", WATCH_COMPLETE], text=True)
     for ref in refs.splitlines():
         try:
-            blob = subprocess.check_output(["git", "-C", str(root), "show", f"{ref}:{WATCH_COMPLETE}"])
+            blob = subprocess.check_output(["git", "-C", str(root), "show",
+                                            f"{ref}:{WATCH_COMPLETE}"])
             frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str}, keep_default_na=False)
-            if not set(COLUMNS).issubset(frame.columns) or frame.empty:
+            if not set(COLUMNS).issubset(frame.columns):
                 continue
-            dates = set(frame.source_pool_date.astype(str))
-            if len(dates) != 1:
-                continue
-            if monday_of_week(date.fromisoformat(next(iter(dates)))).isoformat() != week:
+            if frame.empty:
+                pool_blob = subprocess.check_output(["git", "-C", str(root), "show",
+                                                     f"{ref}:us/breakout_follow_pool.csv"])
+                source, _ = pool_identity(pd.read_csv(io.BytesIO(pool_blob), dtype={"code": str}))
+            else:
+                dates = set(frame.source_pool_date.astype(str))
+                if len(dates) != 1:
+                    continue
+                source = next(iter(dates))
+            if monday_of_week(date.fromisoformat(source)).isoformat() != week:
                 continue
             rows = frame.to_dict("records")
             for row in rows:
@@ -137,4 +144,4 @@ def official_watch_for_week(data_root: str | Path, week: str) -> list[dict]:
             return rows
         except (OSError, ValueError, subprocess.CalledProcessError):
             continue
-    return []
+    return None
