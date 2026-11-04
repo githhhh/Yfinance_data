@@ -80,6 +80,17 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
         if source.read_bytes() != committed:
             raise RuntimeError("local BF Watch differs from published origin/main")
     rows = parse_watch_csv(source)
+    if is_repo:
+        # Byte-equality to origin/main is not enough: a later Pool-only commit
+        # could leave an unchanged but *stale* Watch blob in the remote tree.
+        # Resolve the latest COMPLETE Pool and its independently authenticated
+        # companion. This also protects legitimate empty Watch snapshots.
+        latest = published_complete_pools(root, limit=1)
+        if not latest:
+            raise RuntimeError("no published complete Pool for BF Watch")
+        official = official_watch_for_week(root, latest[0]["week"])
+        if official is None or rows != official:
+            raise RuntimeError("BF Watch is not paired to latest published complete Pool")
     return sorted({str(r["code"]) for r in rows if r["phase"] in ACTIVE_PHASES})
 
 
