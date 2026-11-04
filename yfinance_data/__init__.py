@@ -699,6 +699,12 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
                    for item in owned)
 
     def assert_outgoing_owned() -> None:
+        # A pending legacy Pool-only commit can otherwise hitchhike as an
+        # owned ancestor of a new Pool+Watch commit. Path ownership alone does
+        # not prove the required paired historical publication invariant.
+        requires_pairs = (WATCH_COMPLETE in owned and
+                          "us/breakout_follow_pool.csv" in owned and
+                          watch_was_ever_published(root))
         commits = output("log", "--format=%H", "origin/main..HEAD").splitlines()
         for commit_sha in commits:
             parents = output("show", "-s", "--format=%P", commit_sha).split()
@@ -711,6 +717,19 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
                 raise RuntimeError(
                     f"managed publication cannot push foreign committed files: {foreign[:8]}"
                 )
+            if requires_pairs and "us/breakout_follow_pool.csv" in changed:
+                import io
+                snapshot_bytes = subprocess.check_output(
+                    ["git", "show", f"{commit_sha}:us/breakout_follow_pool.csv"],
+                    cwd=root)
+                source_date, codes_digest = pool_identity(
+                    pd.read_csv(io.BytesIO(snapshot_bytes), dtype={"code": str}))
+                message_body = output("show", "-s", "--format=%B", commit_sha)
+                if (f"Watch-Source-Date: {source_date}" not in message_body or
+                    f"Watch-Codes-SHA256: {codes_digest}" not in message_body):
+                    raise RuntimeError(
+                        "managed publication refuses unpaired historical Pool ancestor"
+                    )
 
     git_path = output("rev-parse", "--git-path", "bf-pool-watch-publish.lock")
     lock_path = Path(git_path)
