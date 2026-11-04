@@ -159,3 +159,23 @@ def test_watch_download_source_must_be_remote_published(tmp_path):
     target.write_text("malformed local Watch")
     with pytest.raises(RuntimeError, match="differs"):
         store.active_watch_codes(root)
+
+
+def test_deleted_published_watch_blocks_pool_only_commit(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    pool = pd.DataFrame([{"code":"A","snapshot_date":"2026-10-23"}])
+    when, digest = store.pool_identity(pool)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", "initialize")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    target.unlink()
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    obj = authority.BreakoutFollowPoolRun.weekend()
+    monkeypatch.setattr(obj, "ensure_current_snapshot", lambda: pool)
+    with pytest.raises(RuntimeError, match="requires companion"):
+        obj.commit()
