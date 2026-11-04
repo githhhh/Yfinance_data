@@ -26,8 +26,12 @@ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function render(){
  if(!data)return;
  var period=$("period").value, reason=$("reason").value;
- var rows=data[period]||[];
- $("asof").textContent=(data.dates[period]||"No dated rows")+" · "+period.toUpperCase()+(data.available?"":" · unavailable");
+ var fallback=period==="midweek"&&data.midweek_fallback;
+ var sourcePeriod=fallback?"complete":period;
+ var rows=data[sourcePeriod]||[];
+ var dateLabel=data.dates[sourcePeriod]||"No dated rows";
+ var viewLabel=fallback?"COMPLETE · Midweek unavailable/stale":period.toUpperCase();
+ $("asof").textContent=dateLabel+" · "+viewLabel+(data.available?"":" · unavailable");
  var active=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT"].includes(r.phase)});
  var display=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
  var counts={CEILING:0,MA:0,NO_CEILING:0,UNVERIFIED:0};
