@@ -636,7 +636,10 @@ class BreakoutFollowPoolRun:
         target = WATCH_MIDWEEK if self._midweek else WATCH_COMPLETE
         art = self._watch_companion
         if art is None:
-            if (Path(DATA_ROOT) / target).exists():
+            # Deleting the local Watch file does not disable a feature that was
+            # already published. Never silently revert to Pool-only commits.
+            if ((Path(DATA_ROOT) / target).exists() or
+                watch_was_ever_published(DATA_ROOT)):
                 raise RuntimeError("published Watch exists; BF run requires companion")
             _commit_pool(self.path)
             return
