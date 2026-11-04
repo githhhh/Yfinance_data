@@ -9,6 +9,10 @@ on:
         default: '2'
         type: string
 
+concurrency:
+  group: bf-stock-data-main-writers
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
