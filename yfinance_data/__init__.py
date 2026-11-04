@@ -624,8 +624,11 @@ class BreakoutFollowPoolRun:
         # Column-only validation could publish a pair that no downloader or
         # dashboard could subsequently parse, despite matching Pool identity.
         rows = parse_watch_csv(source)
+        if not self._midweek and any(r["phase"] == "PROVISIONAL_OUT" for r in rows):
+            raise ValueError("complete Watch cannot contain provisional rows")
         if rows and ({r["source_pool_date"] for r in rows} != {date} or
-                     {r["source_pool_codes_hash"] for r in rows} != {digest}):
+                     {r["source_pool_codes_hash"] for r in rows} != {digest} or
+                     {r["snapshot_date"] for r in rows} != {date}):
             raise ValueError("Watch rows reference another Pool")
         self._watch_companion = dict(target=str(target_path), staged=str(staged_path),
                                       date=date, digest=digest,
