@@ -29,10 +29,11 @@ function render(){
  var rows=data[period]||[];
  $("asof").textContent=(data.dates[period]||"No dated rows")+" · "+period.toUpperCase()+(data.available?"":" · unavailable");
  var active=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT"].includes(r.phase)});
+ var display=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
  var counts={CEILING:0,MA:0,UNVERIFIED:0};
  active.forEach(function(r){var k=r.last_exit_reason;counts[k in counts?k:"UNVERIFIED"]++});
- $("stats").innerHTML=Object.keys(counts).map(function(k){return "<span>"+k+" <b>"+counts[k]+"</b></span>"}).join("");
- var visible=active.filter(function(r){return reason==="ALL"||r.last_exit_reason===reason});
+ $("stats").innerHTML="<span>Active cycles <b>"+active.length+"</b></span>"+Object.keys(counts).map(function(k){return "<span>Active "+k+" <b>"+counts[k]+"</b></span>"}).join("")+"<span>Returned this snapshot <b>"+rows.filter(function(r){return r.phase==="RETURNED"}).length+"</b></span>";
+ var visible=display.filter(function(r){return reason==="ALL"||r.last_exit_reason===reason});
  $("rows").innerHTML=visible.map(function(r){
  var pct=Number(r.vs_original_pct);
  var vs=r.vs_original_pct!==""&&r.vs_original_pct!=null&&Number.isFinite(pct)?pct.toFixed(2)+"%":"—";
