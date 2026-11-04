@@ -24,10 +24,10 @@ def test_local_data_update_runner_mirrors_existing_update_flow():
     assert 'DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener' in source
     assert 'if [ "$PROVIDER" = "yahoo" ]; then' in source
     assert 'find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete' in source
-    assert "git add -A -- results_pkl/" in source
+    assert 'python scripts/publish_owned.py --message "Update stock data [skip ci]"' in source
     assert "git add results_pkl/ us/" not in source
-    assert 'git commit --only -m "Update stock data [skip ci]"' in source
-    assert "git push origin HEAD:main" in source
+    assert "git commit --only" not in source
+    assert "git push origin HEAD:main" not in source
 
 
 def test_local_data_update_syncs_first_and_publishes_only_after_validated_cleanup():
@@ -38,6 +38,6 @@ def test_local_data_update_syncs_first_and_publishes_only_after_validated_cleanu
     daily = source.index('DataStore.py --provider="$PROVIDER" --period=2y --interval=1d --skip-screener')
     weekly = source.index('DataStore.py --provider="$PROVIDER" --period=5y --interval=1wk --skip-screener')
     cleanup = source.index('find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete')
-    publish = source.index("git add -A -- results_pkl/")
+    publish = source.index("python scripts/publish_owned.py --message")
 
     assert sync < screener < daily < weekly < cleanup < publish
