@@ -626,7 +626,7 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
 
         if staged.returncode == 1:
             subprocess.run(
-                ["git", "commit", "-m", message],
+                ["git", "commit", "--only", "-m", message, "--", *managed_paths],
                 cwd=DATA_ROOT,
                 check=True,
             )

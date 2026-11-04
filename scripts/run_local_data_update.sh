@@ -59,11 +59,11 @@ echo "[LocalDataUpdate] keeping PKL files with suffix: $TODAY"
 find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete
 
 echo "[LocalDataUpdate] publishing validated data artifacts"
-git add results_pkl/ us/
+git add -A -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
 if git diff --cached --quiet; then
     echo "[LocalDataUpdate] no data changes to commit"
 else
-    git commit -m "Update stock data [skip ci]"
+    git commit --only -m "Update stock data [skip ci]" -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
     git push origin HEAD:main
 fi
 

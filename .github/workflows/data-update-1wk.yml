@@ -65,11 +65,11 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add results_pkl/ us/
+          git add -A -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "Update weekly stock data (5Y-1WK) [skip ci]"
+          git commit --only -m "Update weekly stock data (5Y-1WK) [skip ci]" -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv
           gh auth setup-git
           git push origin HEAD:main
