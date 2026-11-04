@@ -36,6 +36,21 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
         raise ValueError("Watch CSV unknown phase")
     rows = frame.to_dict("records")
     for row in rows:
+        # Empty historical fields are legal during initial bootstrap; any
+        # populated market date must be canonical before it can be persisted.
+        for field in ("snapshot_date", "source_pool_date", "original_pool_date",
+                      "absence_week", "verified_week", "last_price_observed_week"):
+            value = row.get(field)
+            if value is None or value == "":
+                continue
+            try:
+                parsed = date.fromisoformat(str(value))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Watch CSV invalid {field}") from exc
+            if (str(value) != parsed.isoformat() or
+                (field in {"absence_week", "verified_week",
+                           "last_price_observed_week"} and parsed.weekday() != 0)):
+                raise ValueError(f"Watch CSV noncanonical {field}")
         value = row["events"]
         events = json.loads(value) if isinstance(value, str) and value else value or []
         if not isinstance(events, list):
