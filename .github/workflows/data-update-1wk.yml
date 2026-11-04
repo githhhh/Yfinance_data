@@ -3,6 +3,10 @@ name: Update Stock Data - Weekly (1WK)
 on:
   workflow_dispatch:
 
+concurrency:
+  group: bf-stock-data-main-writers
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
