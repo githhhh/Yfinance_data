@@ -123,16 +123,29 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
             raise RuntimeError("complete BF Pool is not on origin/main") from exc
         if not pool_path.is_file() or pool_path.read_bytes() != official_pool:
             raise RuntimeError("local complete BF Pool differs from published origin/main")
+        # Current authority must be the actual HEAD Pool. Historical discovery
+        # deliberately skips malformed/older vintages, and therefore cannot
+        # decide whether the *current* Pool is safe to use for downloads.
+        import io
+        from datetime import date
+        from bf_snapshot import complete_snapshot_week, monday_of_week
+        try:
+            head_source, _ = pool_identity(pd.read_csv(
+                io.BytesIO(official_pool), dtype={"code": str}, keep_default_na=False))
+            complete_snapshot_week(date.fromisoformat(head_source))
+        except (ValueError, KeyError, TypeError, pd.errors.ParserError) as exc:
+            raise RuntimeError("latest published complete BF Pool invalid") from exc
+        head_week = monday_of_week(date.fromisoformat(head_source)).isoformat()
     rows = parse_watch_csv(source)
     if is_repo:
-        # Byte-equality to origin/main is not enough: a later Pool-only commit
-        # could leave an unchanged but *stale* Watch blob in the remote tree.
-        # Resolve the latest COMPLETE Pool and its independently authenticated
-        # companion. This also protects legitimate empty Watch snapshots.
+        # The most recent valid historical Pool is NOT necessarily the HEAD
+        # Pool: a malformed new revision or a retroactive rollback may
+        # otherwise make stale Watch evidence look authoritative.
         latest = published_complete_pools(root, limit=1)
-        if not latest:
-            raise RuntimeError("no published complete Pool for BF Watch")
-        official = official_watch_for_week(root, latest[0]["week"])
+        if (not latest or latest[0]["week"] != head_week or
+            latest[0]["snapshot_date"] != head_source):
+            raise RuntimeError("latest published complete BF Pool history differs from HEAD")
+        official = official_watch_for_week(root, head_week)
         if official is None or rows != official:
             raise RuntimeError("BF Watch is not paired to latest published complete Pool")
     # Download symbols use the same Yahoo/Schwab representation as the
