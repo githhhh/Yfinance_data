@@ -75,6 +75,22 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
             if event["id"] != f'{event["type"]}:{event["week"]}' or event["id"] in seen:
                 raise ValueError("Watch CSV duplicate or mismatched event identity")
             seen.add(event["id"])
+            snapshot_date = row.get("snapshot_date")
+            if snapshot_date:
+                current_date = date.fromisoformat(str(snapshot_date))
+                current_week = current_date.toordinal() - current_date.weekday()
+                if monday.toordinal() > current_week:
+                    raise ValueError("Watch CSV event references a future market week")
+        if row.get("snapshot_date"):
+            current_date = date.fromisoformat(str(row["snapshot_date"]))
+            current_week = current_date.toordinal() - current_date.weekday()
+            for field in ("absence_week", "verified_week", "last_price_observed_week"):
+                value = row.get(field)
+                if value and date.fromisoformat(str(value)).toordinal() > current_week:
+                    raise ValueError(f"Watch CSV {field} references future market week")
+            original = row.get("original_pool_date")
+            if original and date.fromisoformat(str(original)) > current_date:
+                raise ValueError("Watch CSV original_pool_date after snapshot")
         row["events"] = events
     return rows
 
