@@ -346,3 +346,34 @@ def test_bootstrap_publishes_once_and_unblocks_download(tmp_path, monkeypatch):
     assert store.official_watch_for_week(root, "2026-10-19")[0]["code"] == "A"
     with pytest.raises(RuntimeError, match="already enabled"):
         authority.bootstrap_bf_exit_watch(rows, recent)
+
+
+@pytest.mark.parametrize(("broken_field", "bad_value"), [
+    ("phase", "INVALID_PHASE"),
+    ("events", "{not-json}"),
+    ("events", '{"not": "a list"}'),
+])
+def test_authority_rejects_unreadable_watch_before_any_publication(
+    tmp_path, monkeypatch, broken_field, bad_value,
+):
+    import yfinance_data as authority
+    root = tmp_path / "authority"
+    (root / "us").mkdir(parents=True)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    pool = pd.DataFrame([{"code": "A", "snapshot_date": "2026-10-30"}])
+    when, digest = store.pool_identity(pool)
+    rows = [{"code": "A", "phase": "OBSERVING", "events": []}]
+    companion = store.watch_frame(rows, snapshot_date=when, pool_codes_hash=digest)
+    companion.loc[0, broken_field] = bad_value
+    staged = root / "us" / ".bf_pool_exit_watch.test.pending"
+    companion.to_csv(staged, index=False, encoding="utf-8-sig")
+    target = root / store.WATCH_COMPLETE
+
+    run = authority.BreakoutFollowPoolRun.weekend()
+    monkeypatch.setattr(run, "ensure_current_snapshot", lambda: pool)
+    with pytest.raises(ValueError):
+        run.register_companion(
+            target_path=str(target), staged_path=str(staged),
+            source_pool_date=when, source_pool_codes_hash=digest)
+    assert run._watch_companion is None
+    assert not target.exists()
