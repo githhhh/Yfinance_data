@@ -113,36 +113,48 @@ def watch_was_ever_published(data_root: str | Path = ".") -> bool:
 
 
 def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | None:
-    """None=missing/corrupt baseline; []=valid but legally empty Watch."""
+    """Find the latest published Pool/Watch pair, including unchanged empty CSV."""
     import subprocess
     import io
     from datetime import date
-    from bf_snapshot import monday_of_week
+    from bf_snapshot import complete_snapshot_week, monday_of_week
+
     root = Path(data_root)
-    refs = subprocess.check_output(["git", "-C", str(root), "log", "origin/main",
-        "--first-parent", "--format=%H", "--", WATCH_COMPLETE], text=True)
+    refs = subprocess.check_output([
+        "git", "-C", str(root), "log", "origin/main", "--first-parent",
+        "--format=%H", "--", "us/breakout_follow_pool.csv", WATCH_COMPLETE
+    ], text=True)
     for ref in refs.splitlines():
         try:
+            raw = subprocess.check_output(["git", "-C", str(root), "show",
+                                           f"{ref}:us/breakout_follow_pool.csv"])
+            source, digest = pool_identity(pd.read_csv(io.BytesIO(raw), dtype={"code": str}))
+            complete_snapshot_week(date.fromisoformat(source))
+            if monday_of_week(date.fromisoformat(source)).isoformat() != week:
+                continue
+            message = subprocess.check_output(["git", "-C", str(root), "show",
+                                               "-s", "--format=%B", ref], text=True)
+            if (f"Watch-Source-Date: {source}" not in message or
+                f"Watch-Codes-SHA256: {digest}" not in message):
+                return None
             blob = subprocess.check_output(["git", "-C", str(root), "show",
                                             f"{ref}:{WATCH_COMPLETE}"])
             frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str}, keep_default_na=False)
             if not set(COLUMNS).issubset(frame.columns):
-                continue
-            if frame.empty:
-                pool_blob = subprocess.check_output(["git", "-C", str(root), "show",
-                                                     f"{ref}:us/breakout_follow_pool.csv"])
-                source, _ = pool_identity(pd.read_csv(io.BytesIO(pool_blob), dtype={"code": str}))
-            else:
-                dates = set(frame.source_pool_date.astype(str))
-                if len(dates) != 1:
-                    continue
-                source = next(iter(dates))
-            if monday_of_week(date.fromisoformat(source)).isoformat() != week:
-                continue
+                return None
+            if frame.code.eq("").any() or frame.code.duplicated().any():
+                return None
+            if not frame.phase.isin(("AWAITING_DATA", "OBSERVING", "RETURNED")).all():
+                return None
+            if not frame.empty and (set(frame.source_pool_date) != {source} or
+                                    set(frame.source_pool_codes_hash) != {digest}):
+                return None
             rows = frame.to_dict("records")
             for row in rows:
                 row["events"] = json.loads(row["events"]) if row["events"] else []
+                if not isinstance(row["events"], list):
+                    return None
             return rows
-        except (OSError, ValueError, subprocess.CalledProcessError):
-            continue
+        except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
+            return None
     return None
