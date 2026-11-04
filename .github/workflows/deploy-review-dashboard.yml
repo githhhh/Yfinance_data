@@ -82,6 +82,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           node dashboard/tests/review_browser_smoke.cjs
+          node dashboard/tests/watch_browser_smoke.cjs
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'
