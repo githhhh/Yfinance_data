@@ -606,3 +606,31 @@ def test_managed_pool_push_checks_every_unpushed_pool_commit_for_pair_identity(
             [str(pool_path), str(watch_path)], message="retry paired run")
         assert git(root, "rev-parse", "HEAD") == local
         assert git(root, "rev-parse", "origin/main") == local
+
+
+
+def test_download_rejects_dirty_local_pool_even_when_remote_watch_is_authentic(tmp_path):
+    """A failed Pool publish can leave a local new CSV but no Git pair."""
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A", "B"])
+    official = pd.read_csv(root / "us" / "breakout_follow_pool.csv")
+    when, digest = store.pool_identity(official)
+    target = root / store.WATCH_COMPLETE
+    store.watch_frame([{"code": "X", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(target, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm",
+        f"bootstrap\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.active_watch_codes(root, required=True) == ["X"]
+
+    # Crash after authoritative Pool.save_snapshot but before Watch/Pool Git push.
+    pool_path = root / "us" / "breakout_follow_pool.csv"
+    pd.DataFrame([{"code": "B", "snapshot_date": "2026-10-30"}]).to_csv(
+        pool_path, index=False)
+    assert target.read_bytes() == subprocess.check_output([
+        "git", "-C", str(root), "show", f"origin/main:{store.WATCH_COMPLETE}"])
+    with pytest.raises(RuntimeError, match="local complete BF Pool differs"):
+        store.active_watch_codes(root, required=True)
+    git(root, "checkout", "--", "us/breakout_follow_pool.csv")
+    assert store.active_watch_codes(root, required=True) == ["X"]
