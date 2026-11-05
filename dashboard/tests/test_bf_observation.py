@@ -702,7 +702,7 @@ def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed()
     assert actual["review_b_has_value_change"]
 
 
-def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot():
+def test_missing_pool_row_must_not_forge_review_now_event_from_daily_bar():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     complete = pd.DataFrame([row("GABC", snapshot="2026-10-16",
                                  trigger=100, close=102)])
@@ -716,12 +716,16 @@ def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot
         complete, current, current, previous=previous, daily=daily,
         as_of=date(2026, 10, 20),
     )
+    # Legacy daily price path still exists for visual observation, but cannot
+    # invent a Review Now delta when neither published Pool has this ticker.
+    assert raw.set_index("code").loc["GABC", "review_a_event"] == "BELOW → ZONE"
     actual = decorate_observation_view(
         raw, complete=complete, current=current, previous=previous
     ).set_index("code").loc["GABC"]
     assert actual["review_membership"] == "OUT"
-    assert actual["review_a_event"] == "BELOW → ZONE"
-    assert actual["review_a_focus_basis"] == "PRIOR_SESSION"
+    assert actual["review_a_event"] == ""
+    assert not actual["review_a_has_value_change"]
+    assert not actual["review_has_value_change"]
 
 
 def test_stable_below_weekend_anchor_stays_in_cumulative_not_review_now():
@@ -816,11 +820,8 @@ def test_new_weekend_move_still_enters_review_now():
     assert view["review_has_value_change"]
 
 
-def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
+def test_first_published_midweek_after_monday_holiday_uses_weekend_snapshot():
     from dashboard.services.bf_review_presentation import decorate_observation_view
-    from dashboard.services.bf_review_presentation import _first_trading_session
-    assert not _first_trading_session(date(2026, 9, 7))
-    assert _first_trading_session(date(2026, 9, 8))
     weekend = pd.DataFrame([row("SEED", snapshot="2026-09-04",
                                 trigger=100, close=103)])
     current = pd.DataFrame([
