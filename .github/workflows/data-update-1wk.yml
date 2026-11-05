@@ -2,6 +2,12 @@ name: Update Stock Data - Weekly (1WK)
 
 on:
   workflow_dispatch:
+    inputs:
+      exclude_tickers:
+        description: 'Optional comma-separated tickers to skip in this manual run'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: bf-stock-data-main-writers
@@ -46,9 +52,15 @@ jobs:
           python DataStore.py --screener-only --min-eps-growth=150
 
       - name: Run weekly data download script
+        env:
+          EXCLUDE_TICKERS: ${{ inputs.exclude_tickers || '' }}
         run: |
           echo "Weekly data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
-          python DataStore.py --period=5y --interval=1wk --skip-screener
+          EXCLUDE_ARGS=()
+          if [[ -n "$EXCLUDE_TICKERS" ]]; then
+            EXCLUDE_ARGS=(--exclude-tickers "$EXCLUDE_TICKERS")
+          fi
+          python DataStore.py --period=5y --interval=1wk --skip-screener "${EXCLUDE_ARGS[@]}"
           echo "Weekly data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
       - name: Clean old data files (Keep today only)

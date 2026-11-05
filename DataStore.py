@@ -37,6 +37,31 @@ def read_stock_list(stock_list_dir="us"):
     return tickers
 
 
+def apply_manual_download_exclusions(tickers, raw_codes):
+    """Exclude explicitly selected symbols from this run's final download universe."""
+    if not raw_codes or not raw_codes.strip():
+        return tickers
+
+    requested = {
+        code.strip().upper().replace(".", "-")
+        for code in raw_codes.split(",") if code.strip()
+    }
+    protected = sorted(requested & set(MARKET_REFERENCE_SYMBOLS))
+    if protected:
+        raise ValueError(f"Cannot exclude required market indices: {protected}")
+
+    present = set(tickers)
+    skipped = sorted(requested & present)
+    absent = sorted(requested - present)
+    if absent:
+        print(f"[Download Exclude] Not in this run's universe: {absent}")
+    if skipped:
+        print(f"[Download Exclude] Explicitly skipped {len(skipped)}: {skipped}")
+    remaining = [code for code in tickers if code not in requested]
+    if not set(remaining) - set(MARKET_REFERENCE_SYMBOLS):
+        raise ValueError("Cannot exclude all equity tickers from download")
+    return remaining
+
 def download_single_stock(stock_code, period, interval):
     """Download data for a single stock using default Yahoo provider (legacy alias)."""
     provider = YahooDataProvider(
@@ -219,6 +244,7 @@ if __name__ == "__main__":
     parser.add_argument('--callback-url', default=None, help='Schwab App Callback / Redirect URL')
     parser.add_argument('--period', default='2y', help='Data period (1y, 2y, etc.)')
     parser.add_argument('--interval', default='1d', help='Data interval (1d, 1wk, etc.)')
+    parser.add_argument('--exclude-tickers', default='', help='Optional comma-separated symbols to skip in this run')
     parser.add_argument('--skip-screener', action='store_true', help='Skip the screener step')
     parser.add_argument('--screener-only', action='store_true', help='Only run the screener and merge, do not download')
     parser.add_argument('--min-eps-growth', type=int, default=150, help='Minimum EPS YoY growth for the screener')
@@ -311,6 +337,8 @@ if __name__ == "__main__":
             if idx in tickers:
                 tickers.remove(idx)
             tickers.insert(0, idx)
+
+        tickers = apply_manual_download_exclusions(tickers, args.exclude_tickers)
 
         provider = DataProviderFactory.get_provider(
             provider_type=args.provider,
