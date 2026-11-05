@@ -54,6 +54,12 @@ def _midweek_price_event(
     new_status = str(current.get("ibd_entry_status") or "")
     if old_status != new_status:
         return f"{old_status} → {new_status}"
+    # Two distinct Git publications can share one market date. Revisions
+    # still compare published closes even without a trading-day advance.
+    if str(previous.get("snapshot_date") or "")[:10] == str(current.get("snapshot_date") or "")[:10]:
+        before = classify_zone(current_price, previous.get("latest_close"))
+        after = classify_zone(current_price, current.get("latest_close"))
+        return f"{before} → {after}" if before and after and before != after else "CURRENT"
     p = price_replay(
         trigger=current.get("ibd_candidate_price"),
         previous_close=previous.get("latest_close"),
@@ -89,8 +95,9 @@ def decorate_observation_view(
     today = {str(r["code"]): r for _, r in current.iterrows()} if not current.empty else {}
     prior = {str(r["code"]): r for _, r in previous.iterrows()} if previous is not None and not previous.empty else {}
     current_day, prior_day = _observed_date(current), _observed_date(previous)
-    prior_valid = bool(current_day and prior_day and prior_day < current_day
+    prior_valid = bool(current_day and prior_day and prior_day <= current_day
                        and current_day.isocalendar()[:2] == prior_day.isocalendar()[:2])
+    same_day_previous = bool(prior_valid and prior_day == current_day)
     weekend_day = _observed_date(complete)
     first_weekend_comparison = bool(
         first_midweek_snapshot and not prior_valid and current_day and weekend_day
@@ -126,12 +133,12 @@ def decorate_observation_view(
                         if old_status in {"ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"} and old_status != new_status:
                             status_event = f"{old_status} → {new_status}"
 
-        if first_weekend_comparison and has_a:
-            # The first *published* Midweek Pool is measured against the
-            # complete Weekend snapshot, never an unpublished daily candle.
-            weekend_row = weekend[code]
-            price = weekend_row.get("ibd_candidate_price")
-            before = classify_zone(price, weekend_row.get("latest_close"))
+        if (first_weekend_comparison or same_day_previous) and has_a:
+            # Compare the actual published boundary closes. A same-market-date
+            # revision is ordered by Git commits, not by daily candles.
+            baseline_row = weekend[code] if first_weekend_comparison else prior.get(code)
+            price = weekend[code].get("ibd_candidate_price")
+            before = classify_zone(price, baseline_row.get("latest_close")) if baseline_row is not None else None
             after = classify_zone(price, fresh.get("latest_close")) if fresh is not None else None
             zone_event = f"{before} → {after}" if before and after and before != after else ""
             if after:
@@ -146,9 +153,12 @@ def decorate_observation_view(
                     result.at[index, "review_a_as_of"] = current_day.isoformat()
                     result.at[index, "review_data_available"] = True
             result.at[index, "review_a_event"] = zone_event or status_event
-            result.at[index, "review_a_week_event"] = zone_event
+            if first_weekend_comparison:
+                result.at[index, "review_a_week_event"] = zone_event
+            previous_member = baseline_row is not None
             result.at[index, "review_membership_event"] = (
-                "IN → OUT" if fresh is None else ""
+                "IN → OUT" if previous_member and fresh is None else
+                "OUT → IN" if not previous_member and fresh is not None else ""
             )
         elif status_event and not row.get("review_a_event"):
             # Same-price confirmation changes remain Review Now events.
