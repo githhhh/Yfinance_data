@@ -427,7 +427,7 @@ def build_dashboard_payload(
             review_baseline_date = analysis.complete_snapshot_date.isoformat()
         elif effective_previous is not None and not effective_previous.empty and snapshot_date is not None:
             dates = pd.to_datetime(effective_previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
-            if (len(dates) == 1 and dates[0] < snapshot_date
+            if (len(dates) == 1 and dates[0] <= snapshot_date
                     and dates[0].isocalendar()[:2] == snapshot_date.isocalendar()[:2]):
                 review_baseline_kind = "MIDWEEK"
                 review_baseline_date = dates[0].isoformat()
