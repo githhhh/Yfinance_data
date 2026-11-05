@@ -109,7 +109,15 @@ def load_previous_midweek(data_root: str | Path, current_date: date, *, with_his
              "--format=%H", "--", path],
             cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
         ).stdout.splitlines()
-        for sha in history:
+        if not history:
+            return finish(None, False)
+        # A working-tree edit is not a successfully published snapshot.
+        if subprocess.run(
+            ["git", "diff", "--quiet", "HEAD", "--", path],
+            cwd=data_root, check=False, timeout=10,
+        ).returncode != 0:
+            return finish(None, False)
+        for position, sha in enumerate(history):
             raw = subprocess.run(
                 ["git", "show", f"{sha}:{path}"],
                 cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
@@ -150,7 +158,14 @@ def load_previous_midweek(data_root: str | Path, current_date: date, *, with_his
             if len(dates) != 1:
                 return finish(None, False)
             previous_date = dates[0]
-            if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
+            if position == 0:
+                # Skip the current committed artifact, not all commits with
+                # its market date: a later successful same-day revision is a
+                # distinct published snapshot.
+                if previous_date != current_date:
+                    return finish(None, False)
+                continue
+            if previous_date <= current_date and monday_of_week(previous_date) == monday_of_week(current_date):
                 return finish(frame, True)
         return finish(None, True)
     except (OSError, ValueError, subprocess.CalledProcessError,
