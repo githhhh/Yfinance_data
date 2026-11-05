@@ -559,3 +559,32 @@ def test_unpublished_external_midweek_cannot_borrow_repository_git_history(tmp_p
     assert rows["UNPUBLISHED_AUDIT_TEST"]["review_b_display_event"] == "SNAPSHOT"
     assert not any(r["review_has_value_change"] for r in rows.values())
 
+
+
+def test_unpublished_external_weekend_cannot_borrow_repository_git_history(tmp_path, monkeypatch):
+    """The fixed Weekend comparator must also come from its published file."""
+    from dashboard import build_static
+    from bf_snapshot import is_valid_complete_baseline
+
+    complete = pd.read_csv(COMPLETE, dtype={"code": str})
+    current = pd.read_csv(MIDWEEK, dtype={"code": str})
+    complete_dates = pd.to_datetime(complete["snapshot_date"]).dt.date.unique()
+    current_dates = pd.to_datetime(current["snapshot_date"]).dt.date.unique()
+    if (len(complete_dates) != 1 or len(current_dates) != 1
+            or not is_valid_complete_baseline(complete_dates[0], current_dates[0])):
+        pytest.skip("checked-in snapshots are not a comparable Weekend/Midweek pair")
+
+    external_complete = tmp_path / "complete.csv"
+    complete.to_csv(external_complete, index=False)
+
+    def forbidden_history(*_args, **_kwargs):
+        pytest.fail("External Weekend input must not reuse Git publication history")
+    monkeypatch.setattr(build_static, "load_previous_midweek", forbidden_history)
+
+    payload = build_dashboard_payload(
+        complete_path=external_complete, midweek_path=MIDWEEK,
+        window_date=current_dates[0], daily={},
+    )
+    assert payload["meta"]["review_comparison_basis"] == "UNAVAILABLE"
+    assert payload["meta"]["review_comparison_date"] is None
+    assert not any(r["review_has_value_change"] for r in payload["views"]["midweek"]["rows"])
