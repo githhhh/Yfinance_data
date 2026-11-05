@@ -609,9 +609,11 @@
     const fresh = freshness(snapshot);
     const badge = `<span class="data-badge ${fresh.status.toLowerCase()}">Data ${esc(fresh.label)}</span>`;
     const comparison = data.meta.review_comparison_basis;
-    const reviewVs = comparison === "WEEKEND" || comparison === "MIDWEEK"
-      ? ` · Review vs <b>${esc(data.meta.review_comparison_date || "N/A")}</b> ${comparison === "WEEKEND" ? "Weekend" : "Midweek"}`
-      : " · Review comparison unavailable";
+    // The fixed Weekend baseline is already displayed below. Only show a
+    // separate Review boundary when it differs, or is unavailable.
+    const reviewVs = comparison === "MIDWEEK"
+      ? ` · Review vs <b>${esc(data.meta.review_comparison_date || "N/A")}</b> Midweek`
+      : comparison === "UNAVAILABLE" ? " · Review unavailable" : "";
     const snapshotText = isMidweek
       ? `Snapshot <b>${esc(snapshot || "N/A")}</b> · Midweek · baseline <b>${esc(data.meta.midweek_baseline_available ? data.meta.complete_snapshot_date : "unavailable")}</b>${reviewVs}`
       : `Snapshot <b>${esc(snapshot || "N/A")}</b>${fresh.age === null ? "" : ` · ${fresh.age}d old`}`;
