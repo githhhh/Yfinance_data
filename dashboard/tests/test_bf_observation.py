@@ -247,7 +247,7 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
 
 
-def test_previous_publication_found_among_twenty_same_day_revisions(tmp_path):
+def test_prior_trading_day_found_past_twenty_same_day_commits(tmp_path):
     import subprocess
     from dashboard.services.bf_observation import load_previous_midweek
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -267,11 +267,10 @@ def test_previous_publication_found_among_twenty_same_day_revisions(tmp_path):
 
     previous = load_previous_midweek(tmp_path, date(2026, 10, 15))
     assert previous is not None
-    # The immediate prior published version is a same-day revision (number 20),
-    # not the older trading session and not an arbitrary 20-commit truncation.
-    assert previous.iloc[0]["snapshot_date"] == "2026-10-15"
-    assert previous.iloc[0]["code"] == "LATEST"
-    assert previous.iloc[0]["ibd_candidate_price"] == 120
+    # Same-date Git revisions are not independent comparison boundaries.
+    # Scan through all 22 revisions to the last distinct market date.
+    assert previous.iloc[0]["snapshot_date"] == "2026-10-14"
+    assert previous.iloc[0]["code"] == "OLD"
 
 
 def test_corrupt_latest_git_history_fails_closed_instead_of_using_older_day(tmp_path):
@@ -1052,12 +1051,12 @@ def test_previous_midweek_reports_verified_absence_separately_from_unreadable_hi
     subprocess.run(["git", "commit", "-qm", "first valid publication"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
     assert frame is None and verified
-    # Re-publishing the same market date creates another legitimate Git snapshot.
+    # Re-publishing the same market date must not create another Review baseline.
     pd.DataFrame([row("REVISED", snapshot="2026-11-03", trigger=101)]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "same-day revision"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
-    assert verified and frame is not None and frame.iloc[0]["code"] == "FIRST"
+    assert verified and frame is None, "No earlier distinct in-week trading date"
     pd.DataFrame([row("NEXT", snapshot="2026-11-05")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "later valid publication"], cwd=tmp_path, check=True)
@@ -1072,17 +1071,18 @@ def test_previous_midweek_reports_verified_absence_separately_from_unreadable_hi
 
 
 
-def test_republished_same_market_date_uses_previous_git_snapshot_not_weekend():
+def test_same_market_date_publication_uses_earlier_trading_day_not_same_date():
+    """Duplicate publications are corrections, not a daily review increment."""
     from dashboard.services.bf_review_presentation import decorate_observation_view
 
-    weekend = pd.DataFrame([row("A", snapshot="2026-10-30",
-                                trigger=100, close=102)])
-    previous = pd.DataFrame([
-        row("A", snapshot="2026-11-03", trigger=100, close=103,
-            status="ACTIONABLE"),
-        row("B", snapshot="2026-11-03", trigger=120, close=123,
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30", trigger=100, close=102)])
+    earlier = pd.DataFrame([
+        row("A", snapshot="2026-11-02", trigger=100, close=103),
+        row("B", snapshot="2026-11-02", trigger=120, close=123,
             status="UNCONFIRMED", valid=False),
     ])
+    # Another earlier version of the current market day may exist in Git;
+    # it is intentionally not passed as previous_pool.
     current = pd.DataFrame([
         row("A", snapshot="2026-11-03", trigger=100, close=108,
             status="EXTENDED"),
@@ -1091,12 +1091,11 @@ def test_republished_same_market_date_uses_previous_git_snapshot_not_weekend():
         row("C", snapshot="2026-11-03", trigger=130, close=132),
     ])
     raw = build_observation_view(
-        weekend, current, current, previous=previous, daily={},
+        weekend, current, current, previous=earlier, daily={},
         as_of=date(2026, 11, 3),
     )
     view = decorate_observation_view(
-        raw, complete=weekend, current=current, previous=previous,
-        first_midweek_snapshot=False,
+        raw, complete=weekend, current=current, previous=earlier,
     ).set_index("code")
     assert view.loc["A", "review_a_event"] == "ZONE → EXT"
     assert view.loc["A", "review_a_focus_basis"] == "PREVIOUS_SNAPSHOT"
@@ -1104,4 +1103,18 @@ def test_republished_same_market_date_uses_previous_git_snapshot_not_weekend():
     assert view.loc["B", "review_b_display_event"] == "UNCONFIRMED → ACTIONABLE"
     assert bool(view.loc["B", "review_b_has_value_change"])
     assert view.loc["C", "review_b_display_event"] == "NEW BP"
-    assert view.loc["C", "review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
+
+def test_same_market_date_prior_is_not_a_valid_increment_boundary():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30", close=102)])
+    same_date = pd.DataFrame([row("A", snapshot="2026-11-03", close=98)])
+    current = pd.DataFrame([row("A", snapshot="2026-11-03", close=108)])
+    raw = build_observation_view(
+        weekend, current, current, previous=same_date, daily={},
+        as_of=date(2026, 11, 3),
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=same_date,
+    ).set_index("code").loc["A"]
+    assert not bool(view["review_has_value_change"])
