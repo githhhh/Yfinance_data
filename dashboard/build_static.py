@@ -502,8 +502,10 @@ def build_dashboard_payload(
 def build_watch_payload(data_root: Path) -> dict:
     """Keep a broken or stale Midweek artifact from hiding a valid Complete Watch."""
     from pool_exit_watch_store import (
-        parse_watch_csv, active_watch_codes, WATCH_COMPLETE, WATCH_MIDWEEK
+        parse_watch_csv, active_watch_codes, pool_identity,
+        WATCH_COMPLETE, WATCH_MIDWEEK,
     )
+    from bf_snapshot import complete_snapshot_week, is_valid_complete_baseline
 
     payload = {
         "available": False, "complete": [], "midweek": [],
@@ -516,7 +518,13 @@ def build_watch_payload(data_root: Path) -> dict:
         "latest_close", "pending_status", "pending_high", "events", "exit_count",
     }
     have_midweek = False
-    for label, relative in (("complete", WATCH_COMPLETE), ("midweek", WATCH_MIDWEEK)):
+    # A legal empty Watch has no row-level date. Its matching Pool owns the
+    # snapshot identity, just as it does for nonempty Watch publications.
+    watch_sources = (
+        ("complete", WATCH_COMPLETE, "us/breakout_follow_pool.csv"),
+        ("midweek", WATCH_MIDWEEK, "us/breakout_follow_pool_midweek.csv"),
+    )
+    for label, relative, pool_relative in watch_sources:
         source = data_root / relative
         if not source.is_file():
             continue
@@ -526,14 +534,27 @@ def build_watch_payload(data_root: Path) -> dict:
             # In fixture-only directories (no Git checkout) validate schema.
             if label == "complete" and (data_root / ".git").exists():
                 active_watch_codes(data_root, required=True)
+            pool = pd.read_csv(
+                data_root / pool_relative, dtype={"code": str},
+                keep_default_na=False, na_values=[""], encoding="utf-8-sig",
+            )
+            source_date, codes_hash = pool_identity(pool)
+            if label == "complete":
+                complete_snapshot_week(date.fromisoformat(source_date))
             rows = parse_watch_csv(source)
+            if any(
+                row["snapshot_date"] != source_date
+                or row["source_pool_date"] != source_date
+                or row["source_pool_codes_hash"] != codes_hash
+                for row in rows
+            ):
+                raise ValueError("Watch identity differs from corresponding Pool")
         except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
             errors[label] = type(exc).__name__
             continue
         payload[label] = [{k: v for k, v in row.items() if k in allowed}
                           for row in rows]
-        payload["dates"][label] = max(
-            (str(r.get("snapshot_date", "")) for r in rows), default="")
+        payload["dates"][label] = source_date
         if label == "complete":
             payload["available"] = True
         else:
@@ -547,8 +568,9 @@ def build_watch_payload(data_root: Path) -> dict:
         payload["midweek"] = []
         payload["dates"].pop("midweek", None)
     elif (not have_midweek or
-          (not payload["midweek"] and bool(payload["complete"])) or
-          (complete_date and midweek_date and midweek_date <= complete_date)):
+          not is_valid_complete_baseline(
+              date.fromisoformat(complete_date),
+              date.fromisoformat(midweek_date))):
         payload["midweek_fallback"] = True
     if errors:
         payload["errors"] = errors
