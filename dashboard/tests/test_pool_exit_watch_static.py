@@ -91,7 +91,7 @@ def test_empty_complete_watch_does_not_resurrect_old_midweek(tmp_path):
     assert result["midweek_fallback"] is True
 
 
-def test_current_empty_midweek_keeps_its_pool_date_without_fallback(tmp_path):
+def test_current_empty_midweek_preserves_complete_fallback_and_pool_date(tmp_path):
     from dashboard.build_static import build_watch_payload
     from pool_exit_watch_store import WATCH_COMPLETE, WATCH_MIDWEEK, watch_frame
 
@@ -107,7 +107,9 @@ def test_current_empty_midweek_keeps_its_pool_date_without_fallback(tmp_path):
     assert result["available"] is True
     assert result["dates"] == {"complete": "2026-11-06", "midweek": "2026-11-11"}
     assert result["midweek"] == []
-    assert result["midweek_fallback"] is False
+    # Preserve the pre-existing UI fallback while retaining the correct
+    # date metadata for a legal, empty current Midweek Watch.
+    assert result["midweek_fallback"] is True
 
 
 def test_watch_midweek_source_must_match_actual_pool(tmp_path):
