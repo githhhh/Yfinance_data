@@ -174,7 +174,7 @@ def decorate_observation_view(
             )
         # Only published snapshot differences belong in Review Now. Weekend
         # quick groups remain cumulative and independently queryable.
-        a_attention = bool(a_event or membership_event) if has_a else False
+        a_attention = bool(a_event or membership_event) if has_a and (prior_valid or first_weekend_comparison) else False
         result.at[index, "review_a_has_value_change"] = a_attention
         result.at[index, "review_has_value_change"] = bool(
             a_attention or row.get("review_b_has_value_change")
