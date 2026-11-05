@@ -568,6 +568,7 @@ def build_watch_payload(data_root: Path) -> dict:
         payload["midweek"] = []
         payload["dates"].pop("midweek", None)
     elif (not have_midweek or
+          (not payload["midweek"] and bool(payload["complete"])) or
           not is_valid_complete_baseline(
               date.fromisoformat(complete_date),
               date.fromisoformat(midweek_date))):
