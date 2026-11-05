@@ -247,7 +247,7 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
 
 
-def test_previous_midweek_not_truncated_by_twenty_current_day_commits(tmp_path):
+def test_previous_publication_found_among_twenty_same_day_revisions(tmp_path):
     import subprocess
     from dashboard.services.bf_observation import load_previous_midweek
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -267,8 +267,11 @@ def test_previous_midweek_not_truncated_by_twenty_current_day_commits(tmp_path):
 
     previous = load_previous_midweek(tmp_path, date(2026, 10, 15))
     assert previous is not None
-    assert previous.iloc[0]["snapshot_date"] == "2026-10-14"
-    assert previous.iloc[0]["code"] == "OLD"
+    # The immediate prior published version is a same-day revision (number 20),
+    # not the older trading session and not an arbitrary 20-commit truncation.
+    assert previous.iloc[0]["snapshot_date"] == "2026-10-15"
+    assert previous.iloc[0]["code"] == "LATEST"
+    assert previous.iloc[0]["ibd_candidate_price"] == 120
 
 
 def test_corrupt_latest_git_history_fails_closed_instead_of_using_older_day(tmp_path):
