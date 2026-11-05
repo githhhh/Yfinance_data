@@ -1048,6 +1048,12 @@ def test_previous_midweek_reports_verified_absence_separately_from_unreadable_hi
     subprocess.run(["git", "commit", "-qm", "first valid publication"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
     assert frame is None and verified
+    # Re-publishing the same market date creates another legitimate Git snapshot.
+    pd.DataFrame([row("REVISED", snapshot="2026-11-03", trigger=101)]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "same-day revision"], cwd=tmp_path, check=True)
+    frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
+    assert verified and frame is not None and frame.iloc[0]["code"] == "FIRST"
     pd.DataFrame([row("NEXT", snapshot="2026-11-05")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "later valid publication"], cwd=tmp_path, check=True)
@@ -1059,3 +1065,39 @@ def test_previous_midweek_reports_verified_absence_separately_from_unreadable_hi
     subprocess.run(["git", "commit", "-qm", "corrupt latest prior"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 6), with_history_status=True)
     assert frame is None and not verified
+
+
+
+def test_republished_same_market_date_uses_previous_git_snapshot_not_weekend():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30",
+                                trigger=100, close=102)])
+    previous = pd.DataFrame([
+        row("A", snapshot="2026-11-03", trigger=100, close=103,
+            status="ACTIONABLE"),
+        row("B", snapshot="2026-11-03", trigger=120, close=123,
+            status="UNCONFIRMED", valid=False),
+    ])
+    current = pd.DataFrame([
+        row("A", snapshot="2026-11-03", trigger=100, close=108,
+            status="EXTENDED"),
+        row("B", snapshot="2026-11-03", trigger=120, close=124,
+            status="ACTIONABLE", valid=True),
+        row("C", snapshot="2026-11-03", trigger=130, close=132),
+    ])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous, daily={},
+        as_of=date(2026, 11, 3),
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+        first_midweek_snapshot=False,
+    ).set_index("code")
+    assert view.loc["A", "review_a_event"] == "ZONE → EXT"
+    assert view.loc["A", "review_a_focus_basis"] == "PREVIOUS_SNAPSHOT"
+    assert bool(view.loc["A", "review_has_value_change"])
+    assert view.loc["B", "review_b_display_event"] == "UNCONFIRMED → ACTIONABLE"
+    assert bool(view.loc["B", "review_b_has_value_change"])
+    assert view.loc["C", "review_b_display_event"] == "NEW BP"
+    assert view.loc["C", "review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
