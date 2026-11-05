@@ -6,6 +6,8 @@ on:
     paths:
       - 'us/breakout_follow_pool.csv'
       - 'us/breakout_follow_pool_midweek.csv'
+      - 'us/bf_pool_exit_watch.csv'
+      - 'us/bf_pool_exit_watch_midweek.csv'
       - 'results_pkl/stock_data_*_1d.pkl'
       - 'dashboard/**'
       - 'yfinance_data/**'
@@ -16,6 +18,8 @@ on:
     paths:
       - 'us/breakout_follow_pool.csv'
       - 'us/breakout_follow_pool_midweek.csv'
+      - 'us/bf_pool_exit_watch.csv'
+      - 'us/bf_pool_exit_watch_midweek.csv'
       - 'results_pkl/stock_data_*_1d.pkl'
       - 'dashboard/**'
       - 'yfinance_data/**'
@@ -78,6 +82,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           node dashboard/tests/review_browser_smoke.cjs
+          node dashboard/tests/watch_browser_smoke.cjs
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'

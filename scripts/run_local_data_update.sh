@@ -27,6 +27,11 @@ cd "$DATA_REPO_ROOT"
 # Formal local updates must run from a checkout that can fast-forward to the
 # authoritative main branch. Local developer changes/divergence fail closed.
 git pull --ff-only origin main
+# Watch pairing and historical COMPLETE baselines require complete commit
+# ancestry. Local depth-1 clones cannot authenticate the latest Pool/Watch.
+if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+    git fetch --unshallow --filter=blob:none origin main
+fi
 mkdir -p results_pkl
 
 echo "[LocalDataUpdate] running screener and merge"
@@ -59,12 +64,9 @@ echo "[LocalDataUpdate] keeping PKL files with suffix: $TODAY"
 find results_pkl -name "*.pkl" ! -name "*${TODAY}*" -delete
 
 echo "[LocalDataUpdate] publishing validated data artifacts"
-git add results_pkl/ us/
-if git diff --cached --quiet; then
-    echo "[LocalDataUpdate] no data changes to commit"
-else
-    git commit -m "Update stock data [skip ci]"
-    git push origin HEAD:main
-fi
+python scripts/publish_owned.py --message "Update stock data [skip ci]" -- \
+  results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv \
+  us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv \
+  us/stage2/stage2_whitelist.csv
 
 echo "[LocalDataUpdate] validated PKL snapshots are ready for the strategy run"

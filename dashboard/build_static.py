@@ -36,6 +36,7 @@ from dashboard.services.bf_midweek_review import (
 DASHBOARD_DIR = Path(__file__).resolve().parent
 STATIC_ASSETS = (
     "index.html",
+    "pool-exit-watch.html",
     "app.js",
     "table_enhancements.js",
     "rs_runtime.js",
@@ -528,6 +529,85 @@ def build_dashboard_payload(
     }
 
 
+def build_watch_payload(data_root: Path) -> dict:
+    """Keep a broken or stale Midweek artifact from hiding a valid Complete Watch."""
+    from pool_exit_watch_store import (
+        parse_watch_csv, active_watch_codes, pool_identity,
+        WATCH_COMPLETE, WATCH_MIDWEEK,
+    )
+    from bf_snapshot import complete_snapshot_week, is_valid_complete_baseline
+
+    payload = {
+        "available": False, "complete": [], "midweek": [],
+        "dates": {}, "midweek_fallback": False,
+    }
+    errors = {}
+    allowed = {
+        "code", "snapshot_date", "original_ceiling", "current_ceiling",
+        "last_exit_reason", "phase", "price_state", "vs_original_pct",
+        "latest_close", "pending_status", "pending_high", "events", "exit_count",
+    }
+    have_midweek = False
+    # A legal empty Watch has no row-level date. Its matching Pool owns the
+    # snapshot identity, just as it does for nonempty Watch publications.
+    watch_sources = (
+        ("complete", WATCH_COMPLETE, "us/breakout_follow_pool.csv"),
+        ("midweek", WATCH_MIDWEEK, "us/breakout_follow_pool_midweek.csv"),
+    )
+    for label, relative, pool_relative in watch_sources:
+        source = data_root / relative
+        if not source.is_file():
+            continue
+        try:
+            # A syntactically valid CSV is not enough: a newer unpaired Pool
+            # must not leave an old Watch displayed as current on Pages.
+            # In fixture-only directories (no Git checkout) validate schema.
+            if label == "complete" and (data_root / ".git").exists():
+                active_watch_codes(data_root, required=True)
+            pool = pd.read_csv(
+                data_root / pool_relative, dtype={"code": str},
+                keep_default_na=False, na_values=[""], encoding="utf-8-sig",
+            )
+            source_date, codes_hash = pool_identity(pool)
+            if label == "complete":
+                complete_snapshot_week(date.fromisoformat(source_date))
+            rows = parse_watch_csv(source)
+            if any(
+                row["snapshot_date"] != source_date
+                or row["source_pool_date"] != source_date
+                or row["source_pool_codes_hash"] != codes_hash
+                for row in rows
+            ):
+                raise ValueError("Watch identity differs from corresponding Pool")
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
+            errors[label] = type(exc).__name__
+            continue
+        payload[label] = [{k: v for k, v in row.items() if k in allowed}
+                          for row in rows]
+        payload["dates"][label] = source_date
+        if label == "complete":
+            payload["available"] = True
+        else:
+            have_midweek = True
+
+    complete_date = payload["dates"].get("complete")
+    midweek_date = payload["dates"].get("midweek")
+    if not payload["available"]:
+        # A provisional view cannot be trusted when its complete baseline is
+        # unavailable. Never expose it as an independently authoritative view.
+        payload["midweek"] = []
+        payload["dates"].pop("midweek", None)
+    elif (not have_midweek or
+          (not payload["midweek"] and bool(payload["complete"])) or
+          not is_valid_complete_baseline(
+              date.fromisoformat(complete_date),
+              date.fromisoformat(midweek_date))):
+        payload["midweek_fallback"] = True
+    if errors:
+        payload["errors"] = errors
+    return payload
+
+
 def build_site(
     output_dir: str | Path,
     *,
@@ -565,6 +645,12 @@ def build_site(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    # Independent Watch payload; never disturb the original dashboard.json.
+    watch_payload = build_watch_payload(PROJECT_ROOT)
+    (data_dir / "pool_exit_watch.json").write_text(
+        json.dumps(watch_payload, ensure_ascii=False, default=str, separators=(",", ":")),
+        encoding="utf-8")
+
     (output / ".nojekyll").write_text("", encoding="utf-8")
     return output
 

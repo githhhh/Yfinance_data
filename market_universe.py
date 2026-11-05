@@ -43,7 +43,7 @@ def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
             logging.warning("Download universe source missing: %s", source_path)
             continue
         try:
-            source = pd.read_csv(source_path, dtype={"code": str})
+            source = pd.read_csv(source_path, dtype={"code": str}, keep_default_na=False, na_values=[""])
         except Exception as exc:
             logging.warning("Download universe source unreadable: %s (%s)", source_path, exc)
             continue
@@ -59,6 +59,9 @@ def build_download_universe(*, data_root: str | Path = ".") -> list[str]:
         tickers.update(source_codes)
         logging.info("Download universe source %s: %s codes", relative_path, len(source_codes))
 
+    # Only official active Watch Cycles extend the universe; not Midweek/RETURNED.
+    from pool_exit_watch_store import active_watch_codes
+    tickers.update(active_watch_codes(root))
     result = sorted(tickers)
     logging.info("Download universe total: %s codes", len(result))
     return result
@@ -79,7 +82,7 @@ def pick_active_weekend_signal_codes(
         return []
     path = Path(data_root) / "us" / "breakout_follow_pool.csv"
     try:
-        frame = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
+        frame = pd.read_csv(path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
         required = {"code", "signal", "snapshot_date"}
         if not required.issubset(frame.columns):
             raise ValueError(f"missing columns: {sorted(required - set(frame.columns))}")

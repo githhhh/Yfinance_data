@@ -36,3 +36,6 @@ output/eps_pit_cache/
 
 # Local Pine-compatible RS anchor cache
 output/rs_snapshot_cache/
+
+# BF Pool Exit Watch staged files stay in us/ but are never staged
+us/*.pending

@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BF Pool Exit Watch</title><style>
+:root{color-scheme:dark}body{font:14px system-ui;background:#0c1016;color:#e7edf6}
+main{max-width:950px;margin:auto;padding:20px}a{color:#9fcaff}small{color:#97a8bd}
+select{background:#1b2636;color:#eee;padding:8px;border:1px solid #34465c;border-radius:6px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}.stats{display:flex;flex-wrap:wrap;gap:10px 16px;padding:12px;background:#192432}
+.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:13px;margin-top:15px}
+td,th{padding:12px 7px;text-align:left;border-bottom:1px solid #2b3545}
+th{color:#9cafc3}summary{cursor:pointer;color:#b5cdf0}pre{white-space:pre-wrap}
+@media(max-width:550px){main{padding:10px}td,th{padding:8px 3px;font-size:11px}}
+</style></head><body><main><p><a href="./index.html">Back to Pool</a></p>
+<h2>BF Pool Exit Watch</h2><small id="asof">Loading</small>
+<p>Why did it leave the Pool? Is its original Ceiling still intact?</p>
+<div class="toolbar"><select id="period"><option value="complete">Complete</option><option value="midweek">Midweek</option></select>
+<select id="reason"><option value="ALL">All reasons</option><option>CEILING</option><option>MA</option><option>NO_CEILING</option><option value="UNVERIFIED">UNVERIFIED</option></select></div>
+<div class="stats" id="stats"></div>
+<div class="table-scroll" role="region" aria-label="Exit Watch observations" tabindex="0"><table><thead><tr><th>Code</th><th>Reason</th><th>Vs Old</th><th>Observation</th><th>Detail</th></tr></thead>
+<tbody id="rows"></tbody></table></div></main>
+<script>
+"use strict";
+var data=null;
+function $(id){return document.getElementById(id)}
+function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){
+return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function render(){
+ if(!data)return;
+ var period=$("period").value, reason=$("reason").value;
+ var fallback=period==="midweek"&&data.midweek_fallback;
+ var sourcePeriod=fallback?"complete":period;
+ var rows=data[sourcePeriod]||[];
+ var dateLabel=data.dates[sourcePeriod]||"No dated rows";
+ var viewLabel=fallback?"COMPLETE · Midweek unavailable/stale":period.toUpperCase();
+ $("asof").textContent=dateLabel+" · "+viewLabel+(data.available?"":" · unavailable");
+ var active=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT"].includes(r.phase)});
+ var display=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
+ var counts={CEILING:0,MA:0,NO_CEILING:0,UNVERIFIED:0};
+ active.forEach(function(r){var k=r.last_exit_reason;counts[k in counts?k:"UNVERIFIED"]++});
+ $("stats").innerHTML="<span>Active cycles <b>"+active.length+"</b></span>"+Object.keys(counts).map(function(k){return "<span>Active "+k+" <b>"+counts[k]+"</b></span>"}).join("")+"<span>Returned this snapshot <b>"+rows.filter(function(r){return r.phase==="RETURNED"}).length+"</b></span>";
+ var visible=display.filter(function(r){return reason==="ALL"||r.last_exit_reason===reason});
+ $("rows").innerHTML=visible.map(function(r){
+ var pct=Number(r.vs_original_pct);
+ var vs=r.vs_original_pct!==""&&r.vs_original_pct!=null&&Number.isFinite(pct)?pct.toFixed(2)+"%":"—";
+ var events=Array.isArray(r.events)?r.events:[];
+ var detail="Old Ceiling: "+(r.original_ceiling||"—")+" | Current Ceiling: "+(r.current_ceiling||"—")+" | Close: "+(r.latest_close||"—")+" | "+(r.pending_status||"")+" | Pending High: "+(r.pending_high||"—")+"\n";
+ detail+=events.map(function(e){return (e.censored_by_gap?"Observed by ":"")+(e.week||"")+" "+(e.type||"")+" "+(e.reason||"")+(e.censored_by_gap?" · gap censored":"")}).join("\n");
+ return "<tr><td><b>"+esc(r.code)+"</b></td><td>"+esc(r.last_exit_reason||"UNVERIFIED")+"</td><td>"+esc(vs)+"</td><td>"+esc(r.price_state||r.pending_status||"NO DATA")+"</td><td><details><summary>Details</summary><pre>"+esc(detail)+"</pre></details></td></tr>";
+ }).join("");
+ if(!visible.length)$("rows").innerHTML='<tr><td colspan="5">No matching observations.</td></tr>';
+}
+$("period").addEventListener("change",render);$("reason").addEventListener("change",render);
+fetch("./data/pool_exit_watch.json",{cache:"no-store"}).then(function(r){return r.json()})
+.then(function(p){data=p;render()}).catch(function(){data={available:false,complete:[],midweek:[],dates:{}};render()});
+</script></body></html>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import subprocess
 from types import SimpleNamespace
 
 import pandas as pd
@@ -647,53 +648,57 @@ def test_pool_run_fails_closed_when_ibd_enrichment_is_incomplete(tmp_path, monke
         pool_run.load_actionable_codes()
 
 
+def _git_checkout_for_managed_publication(tmp_path):
+    root = tmp_path / "checkout"
+    (root / "us").mkdir(parents=True)
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(root), *args],
+                                       text=True).strip()
+    git("init", "-b", "main")
+    git("config", "user.email", "watch-test@example.invalid")
+    git("config", "user.name", "Watch CI")
+    return root, git
+
+
 def test_pool_run_commit_targets_only_the_run_file(tmp_path, monkeypatch):
+    """A published midweek Pool must never carry dirty complete Pool data."""
     monkeypatch.setattr(yfinance_data, "_enrich_signal_eps", _passthrough_resolved_eps)
-    complete_path = tmp_path / "breakout_follow_pool.csv"
-    midweek_path = tmp_path / "breakout_follow_pool_midweek.csv"
-    calls: list[list[str]] = []
-
-    def fake_run(args, **kwargs):
-        calls.append(args)
-        return SimpleNamespace(returncode=0)
-
+    root, git = _git_checkout_for_managed_publication(tmp_path)
+    complete_path = root / "us" / "breakout_follow_pool.csv"
+    midweek_path = root / "us" / "breakout_follow_pool_midweek.csv"
+    complete_path.write_text("code\nKEEP\n")
+    midweek_path.write_text("code\nOLD\n")
+    git("add", ".")
+    git("commit", "-m", "initial")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-u", "origin", "main")
+    monkeypatch.setattr(yfinance_data, "DATA_ROOT", str(root))
     monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_PATH", str(complete_path))
     monkeypatch.setattr(yfinance_data, "BREAKOUT_FOLLOW_POOL_MIDWEEK_PATH", str(midweek_path))
-    monkeypatch.setattr(yfinance_data.subprocess, "run", fake_run)
+
     pool_run = yfinance_data.BreakoutFollowPoolRun.midweek()
     pool_run.save_snapshot(pd.DataFrame({"code": ["MID"]}))
-
     pool_run.commit()
-
-    diff_calls = [
-        args
-        for args in calls
-        if args[:4] == ["git", "diff", "--cached", "--quiet"]
-    ]
-    assert len(diff_calls) == 1
-    assert str(midweek_path) in diff_calls[0]
+    assert git("rev-parse", "origin/main") == git("rev-parse", "HEAD")
+    changed = git("show", "--format=", "--name-only", "HEAD").splitlines()
+    assert changed == ["us/breakout_follow_pool_midweek.csv"]
+    assert git("show", "HEAD:us/breakout_follow_pool.csv") == "code\nKEEP"
 
 
 def test_pool_commit_propagates_git_failures(tmp_path, monkeypatch):
-    pool_path = tmp_path / "breakout_follow_pool.csv"
-    pd.DataFrame(
-        [
-            {
-                "code": "CURRENT",
-                "signal": False,
-                "eps_yoy_growth": None,
-                "eps_yoy_growth_source": None,
-                "eps_yoy_growth_status": None,
-                "eps_yoy_growth_missing_reason": None,
-                "eps_growth_type": None,
-            }
-        ]
-    ).to_csv(pool_path, index=False)
-
-    def fail_git_add(args, **kwargs):
-        raise yfinance_data.subprocess.CalledProcessError(1, args)
-
-    monkeypatch.setattr(yfinance_data.subprocess, "run", fail_git_add)
-
-    with pytest.raises(yfinance_data.subprocess.CalledProcessError):
+    """A missing origin may never be interpreted as a successful publication."""
+    root, git = _git_checkout_for_managed_publication(tmp_path)
+    pool_path = root / "us" / "breakout_follow_pool.csv"
+    pd.DataFrame([{
+        "code": "CURRENT", "signal": False,
+        "eps_yoy_growth": None, "eps_yoy_growth_source": None,
+        "eps_yoy_growth_status": None,
+        "eps_yoy_growth_missing_reason": None, "eps_growth_type": None,
+    }]).to_csv(pool_path, index=False)
+    git("add", ".")
+    git("commit", "-m", "initial")
+    monkeypatch.setattr(yfinance_data, "DATA_ROOT", str(root))
+    with pytest.raises(subprocess.CalledProcessError):
         yfinance_data._commit_pool(str(pool_path))

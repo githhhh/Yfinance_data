@@ -17,6 +17,7 @@ from data_providers.ohlcv_validation import (
     validate_ohlcv_frame,
 )
 from market_universe import build_download_universe, pick_active_weekend_signal_codes
+from pool_exit_watch_store import active_watch_codes
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
@@ -292,6 +293,14 @@ if __name__ == "__main__":
         added = sorted(set(protected) - original)
         if added:
             print(f"[Weekend Pick] restored {len(added)} BF signals: {added[:20]}")
+
+    # Restore active Watch codes after BOTH normal and fallback picks, for 1d/1wk.
+    watch_codes = active_watch_codes(required=True)
+    initial = set(tickers)
+    tickers = list(dict.fromkeys([*tickers, *watch_codes]))
+    restored = sorted(set(watch_codes) - initial)
+    if restored:
+        print(f"[BF Pool Exit Watch] restored {len(restored)} active codes: {restored[:20]}")
 
     if not tickers:
         print("No tickers to download.")

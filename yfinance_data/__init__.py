@@ -16,6 +16,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from pool_exit_watch_store import (COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity,
+    published_complete_pools, official_watch_for_week, watch_was_ever_published,
+    watch_frame, parse_watch_csv)
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
@@ -106,7 +109,7 @@ def _reject_empty_pool_overwrite(path: str, candidate_codes: frozenset[str], *, 
         if not os.path.exists(protected_path):
             continue
         try:
-            existing = pd.read_csv(protected_path, dtype={"code": str}, encoding="utf-8-sig")
+            existing = pd.read_csv(protected_path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
             existing_codes = _pool_codes(existing)
         except Exception as exc:
             raise RuntimeError(f"BF {name} Pool 候选为空且无法验证现有快照") from exc
@@ -186,7 +189,7 @@ def _load_midweek_actionable_codes(midweek: pd.DataFrame) -> list[str]:
         try:
             complete = pd.read_csv(
                 BREAKOUT_FOLLOW_POOL_PATH,
-                dtype={"code": str},
+                dtype={"code": str}, keep_default_na=False, na_values=[""],
                 encoding="utf-8-sig",
             )
         except Exception as exc:
@@ -386,7 +389,7 @@ def _enrich_signal_eps(pool: pd.DataFrame) -> pd.DataFrame:
 def supplement_latest_pool_signal_eps() -> dict[str, object]:
     """Refresh missing signal EPS in the latest pool selected by snapshot_date."""
     path, snapshot_date = _latest_pool_path_by_snapshot_date()
-    pool = pd.read_csv(path, dtype={"code": str}, encoding="utf-8-sig")
+    pool = pd.read_csv(path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
     before = _signal_eps_missing_count(pool)
     enriched = _enrich_signal_eps(pool)
     _validate_eps_publication_contract(enriched)
@@ -516,7 +519,7 @@ class IbdDoubleBottomSnapshotRun:
             )
         snapshot = pd.read_csv(
             self.path,
-            dtype={"code": str},
+            dtype={"code": str}, keep_default_na=False, na_values=[""],
             encoding="utf-8-sig",
         )
         self._validate(snapshot)
@@ -536,6 +539,7 @@ class BreakoutFollowPoolRun:
     def __init__(self, *, _midweek: bool):
         self._midweek = _midweek
         self._published_digest: str | None = None
+        self._watch_companion: dict | None = None
 
     @classmethod
     def weekend(cls) -> "BreakoutFollowPoolRun":
@@ -574,7 +578,7 @@ class BreakoutFollowPoolRun:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致") from exc
         if current_digest != self._published_digest:
             raise ValueError(f"BF {self.name} Pool 与本轮快照不一致")
-        pool = pd.read_csv(self.path, dtype={"code": str}, encoding="utf-8-sig")
+        pool = pd.read_csv(self.path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
         return pool
 
@@ -602,9 +606,58 @@ class BreakoutFollowPoolRun:
             )
         return result
 
+    def register_companion(self, *, target_path: str, staged_path: str,
+                           source_pool_date: str, source_pool_codes_hash: str) -> None:
+        """Bind one prepared CSV to this run's published Pool."""
+        date, digest = pool_identity(self.ensure_current_snapshot())
+        if (date, digest) != (source_pool_date, source_pool_codes_hash):
+            raise ValueError("Watch/Pool source identity mismatch")
+        target = WATCH_MIDWEEK if self._midweek else WATCH_COMPLETE
+        if Path(target_path).resolve() != (Path(DATA_ROOT) / target).resolve():
+            raise ValueError("invalid Watch companion target")
+        if self._watch_companion is not None:
+            raise ValueError("duplicate companion")
+        source = Path(staged_path)
+        if not source.is_file() or source.suffix != ".pending":
+            raise ValueError("missing staged companion")
+        # Validate the *same* schema, phases and event JSON that readers use.
+        # Column-only validation could publish a pair that no downloader or
+        # dashboard could subsequently parse, despite matching Pool identity.
+        rows = parse_watch_csv(source)
+        if not self._midweek and any(r["phase"] == "PROVISIONAL_OUT" for r in rows):
+            raise ValueError("complete Watch cannot contain provisional rows")
+        if rows and ({r["source_pool_date"] for r in rows} != {date} or
+                     {r["source_pool_codes_hash"] for r in rows} != {digest} or
+                     {r["snapshot_date"] for r in rows} != {date}):
+            raise ValueError("Watch rows reference another Pool")
+        self._watch_companion = dict(target=str(target_path), staged=str(staged_path),
+                                      date=date, digest=digest,
+                                      sha=sha256(source.read_bytes()).hexdigest())
+
     def commit(self) -> None:
-        self.ensure_current_snapshot()
-        _commit_pool(self.path)
+        pool = self.ensure_current_snapshot()
+        target = WATCH_MIDWEEK if self._midweek else WATCH_COMPLETE
+        art = self._watch_companion
+        if art is None:
+            # Deleting the local Watch file does not disable a feature that was
+            # already published. Never silently revert to Pool-only commits.
+            if ((Path(DATA_ROOT) / target).exists() or
+                ((Path(DATA_ROOT) / ".git").exists() and
+                 watch_was_ever_published(DATA_ROOT))):
+                raise RuntimeError("published Watch exists; BF run requires companion")
+            _commit_pool(self.path)
+            return
+        if pool_identity(pool) != (art["date"], art["digest"]):
+            raise RuntimeError("BF Pool changed after companion was attached")
+        staged, published = Path(art["staged"]), Path(art["target"])
+        if staged.exists():
+            if sha256(staged.read_bytes()).hexdigest() != art["sha"]:
+                raise RuntimeError("staged Watch mutated")
+            os.replace(staged, published)
+        if not published.is_file() or sha256(published.read_bytes()).hexdigest() != art["sha"]:
+            raise RuntimeError("Watch companion missing or corrupt")
+        _commit_pool(self.path, extra_paths=[str(published)])
+        self._watch_companion = None
 
 
 def _pit_store_path() -> str:
@@ -613,75 +666,141 @@ def _pit_store_path() -> str:
 
 
 def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
-    """Commit and push one or more already-validated managed CSVs."""
-    try:
-        managed_paths = [paths] if isinstance(paths, str) else list(paths)
-        subprocess.run(["git", "add", *managed_paths], cwd=DATA_ROOT, check=True)
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet", "--", *managed_paths],
-            cwd=DATA_ROOT,
+    """Publish only owned paths under a per-checkout lock, fail closed on drift.
+
+    A Git commit cannot be pushed in isolation: push includes all its ancestors.
+    Check every unpushed commit, not just the final diff, to prevent a foreign
+    committed file from hitchhiking with a Pool/Watch publication.
+    """
+    import fcntl
+
+    root = Path(DATA_ROOT).resolve()
+    requested = [paths] if isinstance(paths, str) else list(paths)
+    owned = set()
+    for raw in requested:
+        absolute = Path(raw).resolve()
+        if not absolute.is_relative_to(root):
+            raise ValueError(f"managed Git path outside data repository: {raw}")
+        owned.add(absolute.relative_to(root).as_posix())
+    if not owned:
+        raise ValueError("no managed Git files supplied")
+
+    def git(*args, check=True, capture_output=False):
+        return subprocess.run(
+            ["git", *args], cwd=root, check=check, text=True,
+            capture_output=capture_output,
         )
-        if staged.returncode not in (0, 1):
-            raise subprocess.CalledProcessError(staged.returncode, staged.args)
 
-        if staged.returncode == 1:
-            subprocess.run(
-                ["git", "commit", "-m", message],
-                cwd=DATA_ROOT,
-                check=True,
-            )
-        else:
-            # No new diff may mean either "already published" or "the previous
-            # run committed locally but push failed". Only retry push when the
-            # managed CSVs themselves differ from the configured upstream;
-            # unrelated local commits must not be pushed by this helper.
-            unpushed = subprocess.run(
-                ["git", "diff", "--quiet", "@{u}..HEAD", "--", *managed_paths],
-                cwd=DATA_ROOT,
-            )
-            if unpushed.returncode == 0:
+    def output(*args):
+        return git(*args, capture_output=True).stdout.strip()
+
+    def is_owned(path: str) -> bool:
+        return any(path == item or path.startswith(item.rstrip("/") + "/")
+                   for item in owned)
+
+    def assert_outgoing_owned() -> None:
+        # A pending legacy Pool-only commit can otherwise hitchhike as an
+        # owned ancestor of a new Pool+Watch commit. Path ownership alone does
+        # not prove the required paired historical publication invariant.
+        requires_pairs = (WATCH_COMPLETE in owned and
+                          "us/breakout_follow_pool.csv" in owned and
+                          watch_was_ever_published(root))
+        commits = output("log", "--format=%H", "origin/main..HEAD").splitlines()
+        for commit_sha in commits:
+            parents = output("show", "-s", "--format=%P", commit_sha).split()
+            if len(parents) != 1:
+                raise RuntimeError("managed publication refuses unpushed merge commits")
+            changed = output("diff-tree", "--no-commit-id", "--name-only", "-r",
+                             commit_sha).splitlines()
+            foreign = [p for p in changed if not is_owned(p)]
+            if foreign:
+                raise RuntimeError(
+                    f"managed publication cannot push foreign committed files: {foreign[:8]}"
+                )
+            if requires_pairs and "us/breakout_follow_pool.csv" in changed:
+                import io
+                snapshot_bytes = subprocess.check_output(
+                    ["git", "show", f"{commit_sha}:us/breakout_follow_pool.csv"],
+                    cwd=root)
+                source_date, codes_digest = pool_identity(
+                    pd.read_csv(io.BytesIO(snapshot_bytes), dtype={"code": str}, keep_default_na=False, na_values=[""]))
+                message_body = output("show", "-s", "--format=%B", commit_sha)
+                if (f"Watch-Source-Date: {source_date}" not in message_body or
+                    f"Watch-Codes-SHA256: {codes_digest}" not in message_body):
+                    raise RuntimeError(
+                        "managed publication refuses unpaired historical Pool ancestor"
+                    )
+
+    git_path = output("rev-parse", "--git-path", "bf-pool-watch-publish.lock")
+    lock_path = Path(git_path)
+    if not lock_path.is_absolute():
+        lock_path = root / lock_path
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a+") as lock_handle:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        try:
+            # Fresh remote ref: a stale local origin/main can hide a concurrent
+            # external writer. A non-FF push is never forced or rebased blindly.
+            git("fetch", "--no-tags", "origin", "main")
+            git("merge-base", "--is-ancestor", "origin/main", "HEAD")
+            assert_outgoing_owned()
+
+            protected = ("us/breakout_follow_pool.csv",
+                         "us/breakout_follow_pool_midweek.csv",
+                         WATCH_COMPLETE, WATCH_MIDWEEK)
+            if not any(is_owned(p) for p in protected):
+                clean = git("diff", "--quiet", "HEAD", "--", *protected, check=False)
+                if clean.returncode != 0:
+                    raise RuntimeError("another writer left dirty Pool/Watch files")
+
+            pending = output("ls-files", "--",
+                             "us/*.pending", "us/.*.pending").splitlines()
+            if pending:
+                raise RuntimeError(f"tracked Watch pending files: {pending[:8]}")
+
+            # Some optional screener outputs may never have been created.
+            # 'git add -A -- missing-untracked-file' is fatal (pathspec does
+            # not match), while a *tracked* missing file must still be staged
+            # as a deletion. Preserve both cases without broadening ownership.
+            staged_paths = [
+                path for path in sorted(owned)
+                if (root / path).exists() or output("ls-files", "--", path)
+            ]
+            if staged_paths:
+                git("add", "-A", "--", *staged_paths)
+                staged = git("diff", "--cached", "--quiet", "--", *staged_paths,
+                             check=False)
+                if staged.returncode not in (0, 1):
+                    raise subprocess.CalledProcessError(staged.returncode, staged.args)
+                if staged.returncode == 1:
+                    git("commit", "--only", "-m", message, "--", *staged_paths)
+
+            assert_outgoing_owned()
+            if output("rev-parse", "HEAD") == output("rev-parse", "origin/main"):
                 return
-            if unpushed.returncode != 1:
-                raise subprocess.CalledProcessError(
-                    unpushed.returncode,
-                    unpushed.args,
-                )
-
-        for attempt in range(1, 4):
-            try:
-                subprocess.run(["git", "push"], cwd=DATA_ROOT, check=True)
-                logging.info(
-                    "Yfinance_data仓库已更新: %s",
-                    os.path.basename(managed_paths[0]),
-                )
-                break
-            except subprocess.CalledProcessError:
-                if attempt == 3:
-                    raise
-                time.sleep(5)
-    except subprocess.CalledProcessError as exc:
-        logging.error("Git操作失败: %s", exc)
-        raise
-    except Exception as exc:
-        logging.error("检查并提交文件时出错: %s", exc)
-        raise
+            git("push", "origin", "HEAD:main")
+            logging.info("Yfinance_data managed publication completed: %s",
+                         ", ".join(sorted(owned)))
+        finally:
+            fcntl.flock(lock_handle, fcntl.LOCK_UN)
 
 
-def _commit_pool(pool_path: str) -> None:
+def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> None:
     """Commit only a pool that satisfies the current EPS publication contract."""
     if os.path.exists(pool_path):
-        pool = pd.read_csv(pool_path, dtype={"code": str}, encoding="utf-8-sig")
+        pool = pd.read_csv(pool_path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
         _validate_eps_publication_contract(pool)
 
-    managed_paths = [pool_path]
+    managed_paths = [pool_path, *(extra_paths or [])]
     pit_path = _pit_store_path()
     if os.path.exists(pit_path):
         managed_paths.append(pit_path)
 
-    _commit_managed_csv(
-        managed_paths,
-        message="Update breakout follow pool",
-    )
+    message = "Update breakout follow pool"
+    if extra_paths:
+        source, digest = pool_identity(pool)
+        message += f"\n\nWatch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}"
+    _commit_managed_csv(managed_paths, message=message)
 
 
 __all__ = [
@@ -701,3 +820,45 @@ __all__ = [
     "monday_of_week",
     "supplement_latest_pool_signal_eps",
 ]
+
+
+def bootstrap_bf_exit_watch(rows: list[dict], recent: dict) -> None:
+    """Explicit first publication before next data download."""
+    root = Path(DATA_ROOT)
+    target = root / WATCH_COMPLETE
+    if target.exists() or watch_was_ever_published(root):
+        raise RuntimeError("Watch already enabled or needs recovery")
+    latest = published_complete_pools(root, limit=2)
+    if len(latest) != 2 or latest[0]["ref"] != recent["ref"]:
+        raise RuntimeError("bootstrap Pool refs changed")
+    when, digest = pool_identity(pd.DataFrame(recent["rows"]))
+    official_when, official_digest = pool_identity(pd.DataFrame(latest[0]["rows"]))
+    if (when, digest) != (official_when, official_digest):
+        raise RuntimeError("bootstrap Pool identity differs from official history")
+    # The first Watch has no carried cycles. Its members must be exactly the
+    # prior-complete Pool exits, including all former signal=False members.
+    old_codes = {str(r["code"]) for r in latest[1]["rows"]}
+    recent_codes = {str(r["code"]) for r in latest[0]["rows"]}
+    expected = old_codes - recent_codes
+    if {str(row.get("code")) for row in rows} != expected:
+        raise ValueError("bootstrap Watch members differ from complete Pool exit diff")
+    frame = watch_frame(rows, snapshot_date=when, pool_codes_hash=digest)
+    fd, pending = tempfile.mkstemp(prefix=".bf_pool_exit_watch.",
+                                   suffix=".pending", dir=str(target.parent))
+    os.close(fd)
+    try:
+        frame.to_csv(pending, index=False, encoding="utf-8-sig")
+        # Bootstrap bypasses register_companion: apply the exact same official
+        # row/event contract *before* any local or remote publication.
+        validated_rows = parse_watch_csv(pending)
+        if any(r["phase"] == "PROVISIONAL_OUT" for r in validated_rows):
+            raise ValueError("bootstrap cannot publish provisional Watch rows")
+        os.replace(pending, target)
+        _commit_managed_csv(
+            [str(target)],
+            message=(f"Initialize BF Pool Exit Watch\n\nWatch-Source-Date: {when}"
+                     f"\nWatch-Codes-SHA256: {digest}"),
+        )
+    finally:
+        if os.path.exists(pending):
+            os.unlink(pending)

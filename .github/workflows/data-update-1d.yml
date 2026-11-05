@@ -9,6 +9,10 @@ on:
         default: '2'
         type: string
 
+concurrency:
+  group: bf-stock-data-main-writers
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -24,6 +28,11 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Watch download preflight verifies latest COMPLETE Pool/Watch pairing
+          # through Git history; checkout's default shallow depth=1 is invalid.
+          # Partial clone avoids downloading every historical PKL blob.
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -83,11 +92,5 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add results_pkl/ us/
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "Update daily stock data (${DOWNLOAD_YEARS}Y-1D) [skip ci]"
           gh auth setup-git
-          git push origin HEAD:main
+          python scripts/publish_owned.py --message "Update daily stock data (${DOWNLOAD_YEARS}Y-1D) [skip ci]" -- results_pkl/ us/52wk_new_high_results.csv us/eps_growth_screener_results.csv us/weekly_vol_screener_results.csv us/stage2/stage2_screener_filter.csv us/stage2/stage2_whitelist.csv

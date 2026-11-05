@@ -1,0 +1,1 @@
+BF Pool Exit Watch V1: complete Watch active/awaiting rows are the only Watch source for 1d/1wk universe. Market-data updaters own results_pkl and explicit screener files, not BF Pool, EPS PIT, DB snapshots or Watch. Publication requires a separately audited companion handshake, bootstrap and cross-writer failure tests before enabling production.
