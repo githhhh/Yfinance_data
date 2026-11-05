@@ -45,6 +45,23 @@ vm.runInNewContext(hooked, scope, { filename: "app.js" });
 const app = scope.__reviewAudit;
 const state = app.getState();
 
+fixture.meta.review_comparison_basis = "WEEKEND";
+fixture.meta.review_comparison_date = "2026-10-09";
+assert(app.headerHtml([]).includes("Review vs <b>2026-10-09</b> Weekend"),
+  "The user must see which published snapshot drives Review Now");
+const unavailableFixture = structuredClone(fixture);
+unavailableFixture.meta.review_comparison_basis = "UNAVAILABLE";
+unavailableFixture.meta.review_comparison_date = null;
+const unavailableScope = {
+  ...scope,
+  __fixture: unavailableFixture,
+  document: { getElementById: () => ({ addEventListener() {} }) },
+};
+vm.runInNewContext(hooked, unavailableScope, { filename: "app.js" });
+assert.equal(unavailableScope.__reviewAudit.getState().scope, "ALL_SIGNALS",
+  "Unverifiable history must default to All Review, not an empty Review Now");
+
+
 function entry(code) {
   return {
     code, signal: true, review_watch_active: true, industry: "Software",
