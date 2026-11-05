@@ -437,3 +437,87 @@ def test_ga4_is_injected_only_into_built_site(tmp_path: Path) -> None:
     original = (DASHBOARD_DIR / "index.html").read_text(encoding="utf-8")
     assert "gtag('config', 'G-TEST1234')" in generated
     assert "googletagmanager.com/gtag/js" not in original
+
+
+
+def test_first_midweek_static_payload_uses_verified_weekend_snapshot(monkeypatch):
+    """Actual committed pools must not produce an empty Review Now after skipped jobs."""
+    from dashboard import build_static
+    from bf_snapshot import is_valid_complete_baseline
+
+    complete = pd.read_csv(COMPLETE, dtype={"code": str})
+    current = pd.read_csv(MIDWEEK, dtype={"code": str})
+    complete_day = pd.to_datetime(complete["snapshot_date"]).dt.date.unique()
+    current_day = pd.to_datetime(current["snapshot_date"]).dt.date.unique()
+    if (len(complete_day) != 1 or len(current_day) != 1
+            or not is_valid_complete_baseline(complete_day[0], current_day[0])):
+        pytest.skip("checked-in fixtures are not a comparable Weekend/Midweek pair")
+
+    def verified_first(_root, _day, *, with_history_status=False):
+        assert with_history_status
+        return None, True
+
+    monkeypatch.setattr(build_static, "load_previous_midweek", verified_first)
+    payload = build_dashboard_payload(
+        complete_path=COMPLETE, midweek_path=MIDWEEK,
+        window_date=current_day[0], daily={},
+    )
+    assert payload["meta"]["review_comparison_basis"] == "WEEKEND"
+    assert payload["meta"]["review_comparison_date"] == complete_day[0].isoformat()
+    rows = {row["code"]: row for row in payload["views"]["midweek"]["rows"]}
+    assert rows
+    first_b = [r for r in rows.values() if r["review_b_active"]]
+    assert all(r["review_b_display_event"] == "NEW BP" for r in first_b)
+    assert all(r["review_b_has_value_change"] for r in first_b)
+    assert any(r["review_has_value_change"] for r in rows.values()), (
+        "First published Midweek must compare against the Weekend Pool"
+    )
+
+    # Broken/unavailable Git history is not proof of first publication.
+    monkeypatch.setattr(
+        build_static, "load_previous_midweek",
+        lambda _root, _day, *, with_history_status=False: (None, False),
+    )
+    unavailable = build_dashboard_payload(
+        complete_path=COMPLETE, midweek_path=MIDWEEK,
+        window_date=current_day[0], daily={},
+    )
+    assert unavailable["meta"]["review_comparison_basis"] == "UNAVAILABLE"
+    assert not any(
+        row["review_has_value_change"] for row in unavailable["views"]["midweek"]["rows"]
+    )
+
+
+def test_static_payload_prefers_supplied_same_week_midweek_over_weekend(monkeypatch):
+    from dashboard import build_static
+    from bf_snapshot import is_valid_complete_baseline
+
+    complete = pd.read_csv(COMPLETE, dtype={"code": str})
+    current = pd.read_csv(MIDWEEK, dtype={"code": str})
+    complete_date = pd.to_datetime(complete["snapshot_date"]).dt.date.unique()
+    current_date = pd.to_datetime(current["snapshot_date"]).dt.date.unique()
+    if (len(complete_date) != 1 or len(current_date) != 1
+            or not is_valid_complete_baseline(complete_date[0], current_date[0])
+            or current_date[0].weekday() == 0):
+        pytest.skip("fixtures do not support a prior same-week session")
+
+    # Inject a known previous published snapshot with identical prices.
+    # No missing-day assumptions may force fallback to Weekend.
+    previous = current.copy()
+    previous_day = current_date[0] - pd.Timedelta(days=1)
+    previous["snapshot_date"] = previous_day.isoformat()
+    monkeypatch.setattr(
+        build_static, "load_previous_midweek",
+        lambda *_args, **_kwargs: pytest.fail("Must use supplied previous snapshot"),
+    )
+    payload = build_dashboard_payload(
+        complete_path=COMPLETE, midweek_path=MIDWEEK,
+        window_date=current_date[0], daily={},
+        previous_pool=previous,
+    )
+    assert payload["meta"]["review_comparison_basis"] == "MIDWEEK"
+    assert payload["meta"]["review_comparison_date"] == previous_day.isoformat()
+    for item in payload["views"]["midweek"]["rows"]:
+        if item["review_b_active"]:
+            assert item["review_b_display_event"] == "CURRENT"
+            assert not item["review_b_has_value_change"]
