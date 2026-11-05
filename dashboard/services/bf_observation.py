@@ -158,14 +158,13 @@ def load_previous_midweek(data_root: str | Path, current_date: date, *, with_his
             if len(dates) != 1:
                 return finish(None, False)
             previous_date = dates[0]
-            if position == 0:
-                # Skip the current committed artifact, not all commits with
-                # its market date: a later successful same-day revision is a
-                # distinct published snapshot.
-                if previous_date != current_date:
-                    return finish(None, False)
+            if position == 0 and previous_date != current_date:
+                return finish(None, False)
+            # A trading-day snapshot has one effective version. Multiple Git
+            # publications for this same market date are not new Review events.
+            if previous_date == current_date:
                 continue
-            if previous_date <= current_date and monday_of_week(previous_date) == monday_of_week(current_date):
+            if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
                 return finish(frame, True)
         return finish(None, True)
     except (OSError, ValueError, subprocess.CalledProcessError,
