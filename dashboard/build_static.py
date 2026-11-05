@@ -412,9 +412,15 @@ def build_dashboard_payload(
         # independent A/B observation projection with immutable weekend anchor.
         base = materialize_review_view(analysis.midweek_review)
         snapshot_date = analysis.midweek_snapshot_date
-        effective_previous = previous_pool
-        history_verified = effective_previous is not None
-        if effective_previous is None and snapshot_date is not None:
+        # Only the repository's published Pool can inherit Git provenance.
+        # Custom --midweek inputs remain viewable, but cannot create official
+        # Review Now changes using another file's publication history.
+        published_input = Path(midweek_path).resolve() == (
+            PROJECT_ROOT / "us" / "breakout_follow_pool_midweek.csv"
+        ).resolve()
+        effective_previous = previous_pool if published_input else None
+        history_verified = published_input and effective_previous is not None
+        if published_input and effective_previous is None and snapshot_date is not None:
             effective_previous, history_verified = load_previous_midweek(
                 PROJECT_ROOT, snapshot_date, with_history_status=True,
             )
