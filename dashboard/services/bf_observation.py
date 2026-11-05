@@ -15,6 +15,7 @@ from io import StringIO
 import pandas as pd
 
 from bf_snapshot import monday_of_week
+from dashboard.data_utils import normalize_pool_df, validate_pool_schema, validate_pool_semantics
 from dashboard.services.bf_transition import (
     ENTRY_STATUSES, SOURCE_FACT_FIELDS, _calculate_status, _price_zone,
     _same_buy_point_price, to_bool,
@@ -117,55 +118,42 @@ def load_previous_midweek(data_root: str | Path, current_date: date, *, with_his
             cwd=data_root, check=False, timeout=10,
         ).returncode != 0:
             return finish(None, False)
+        # Git order identifies revisions *within* a market date. The Review
+        # comparison date itself is the latest valid earlier trading date.
+        candidates = {}
         for position, sha in enumerate(history):
             raw = subprocess.run(
                 ["git", "show", f"{sha}:{path}"],
                 cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
             ).stdout
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
-            required = {"snapshot_date", "code", "signal"}
-            if frame.empty or not required.issubset(frame.columns):
+            # Identify the trading date before validating the payload: an
+            # obsolete broken version of today's Pool must not block review.
+            if frame.empty or "snapshot_date" not in frame.columns:
                 return finish(None, False)
-            parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce")
-            signals = frame["signal"].map(to_bool)
-            if (parsed.isna().any() or frame["code"].isna().any()
-                    or frame["code"].astype(str).str.strip().eq("").any()
-                    or frame["code"].duplicated().any()
-                    or signals.isna().any()):
+            parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date.unique()
+            if len(parsed) != 1 or pd.isna(parsed[0]):
                 return finish(None, False)
-            # Corrupted prior selected prices/statuses are not evidence of a
-            # buy-point revision or a confirmation transition. Do not silently
-            # skip one bad commit and compare against an older stale version.
-            active = frame.loc[signals.eq(True)]
-            if not active.empty:
-                signal_fields = {
-                    "ibd_candidate_price", "latest_close",
-                    "ibd_entry_status", "ibd_entry_valid",
-                }
-                if not signal_fields.issubset(frame.columns):
-                    return finish(None, False)
-                if (active["ibd_entry_valid"].map(to_bool).isna().any()
-                        or not active["ibd_entry_status"].isin(ENTRY_STATUSES).all()):
-                    return finish(None, False)
-                for field in ("ibd_candidate_price", "latest_close"):
-                    prices = pd.to_numeric(active[field], errors="coerce")
-                    if not prices.map(
-                        lambda value: pd.notna(value) and
-                        isfinite(float(value)) and float(value) > 0
-                    ).all():
-                        return finish(None, False)
-            dates = parsed.dt.date.unique()
-            if len(dates) != 1:
+            market_date = parsed[0]
+            if position == 0 and market_date != current_date:
                 return finish(None, False)
-            previous_date = dates[0]
-            if position == 0 and previous_date != current_date:
-                return finish(None, False)
-            # A trading-day snapshot has one effective version. Multiple Git
-            # publications for this same market date are not new Review events.
-            if previous_date == current_date:
+            if market_date == current_date:
                 continue
-            if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
-                return finish(frame, True)
+            if (market_date >= current_date
+                    or monday_of_week(market_date) != monday_of_week(current_date)
+                    or market_date in candidates):
+                continue
+            try:
+                # Reuse exactly the current authoritative Pool contract.
+                validate_pool_schema(frame)
+                validate_pool_semantics(normalize_pool_df(frame))
+            except (ValueError, TypeError, KeyError):
+                # A semantically invalid revision is not a successful snapshot.
+                # A valid earlier trading day may still exist.
+                continue
+            candidates[market_date] = frame
+        if candidates:
+            return finish(candidates[max(candidates)], True)
         return finish(None, True)
     except (OSError, ValueError, subprocess.CalledProcessError,
             subprocess.TimeoutExpired, pd.errors.ParserError):
