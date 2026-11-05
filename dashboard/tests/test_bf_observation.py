@@ -964,7 +964,7 @@ def test_unknown_publication_history_does_not_invent_first_midweek_events():
         row("NEW", snapshot="2026-11-03", trigger=120, close=122),
     ])
     daily = {"SEED": pd.DataFrame(
-        {"Close": [105, 98]}, index=pd.to_datetime(["2026-11-02", "2026-11-03"]),
+        {"Close": [108, 98]}, index=pd.to_datetime(["2026-11-02", "2026-11-03"]),
     )}
     raw = build_observation_view(
         weekend, current, current, daily=daily, as_of=date(2026, 11, 3),
