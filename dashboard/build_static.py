@@ -412,12 +412,15 @@ def build_dashboard_payload(
         # independent A/B observation projection with immutable weekend anchor.
         base = materialize_review_view(analysis.midweek_review)
         snapshot_date = analysis.midweek_snapshot_date
-        # Only the repository's published Pool can inherit Git provenance.
-        # Custom --midweek inputs remain viewable, but cannot create official
-        # Review Now changes using another file's publication history.
-        published_input = Path(midweek_path).resolve() == (
-            PROJECT_ROOT / "us" / "breakout_follow_pool_midweek.csv"
-        ).resolve()
+        # Git provenance belongs to the exact committed Pool input pair.
+        # External --complete/--midweek CSVs remain viewable, but cannot
+        # borrow the repository's publication history for Review Now.
+        published_input = (
+            Path(midweek_path).resolve() ==
+            (PROJECT_ROOT / "us" / "breakout_follow_pool_midweek.csv").resolve()
+            and Path(complete_path).resolve() ==
+            (PROJECT_ROOT / "us" / "breakout_follow_pool.csv").resolve()
+        )
         effective_previous = previous_pool if published_input else None
         history_verified = published_input and effective_previous is not None
         if published_input and effective_previous is None and snapshot_date is not None:
