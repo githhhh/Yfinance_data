@@ -87,13 +87,23 @@ def load_daily_snapshot(data_root: str | Path, *, window_date: date) -> dict:
     return result
 
 
-def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataFrame | None:
-    """Use an earlier committed version of the midweek CSV, not a new DB.
+def load_previous_midweek(data_root: str | Path, current_date: date, *, with_history_status: bool = False):
+    """Find the last valid, published same-week Midweek Pool.
 
-    A shallow/non-git checkout simply disables yesterday-diff labels.
+    When requested, return (previous, history_verified). A verified absence
+    permits comparing the first Midweek snapshot against the Weekend Pool;
+    inaccessible or corrupt Git history must not invent a first publication.
     """
+    def finish(frame, verified):
+        return (frame, verified) if with_history_status else frame
     path = "us/breakout_follow_pool_midweek.csv"
     try:
+        shallow = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=data_root, capture_output=True, text=True, check=True, timeout=10,
+        ).stdout.strip()
+        if shallow != "false":
+            return finish(None, False)
         history = subprocess.run(
             ["git", "log", f"--since={monday_of_week(current_date).isoformat()}T00:00:00",
              "--format=%H", "--", path],
@@ -107,14 +117,14 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
             frame = pd.read_csv(StringIO(raw), dtype={"code": str})
             required = {"snapshot_date", "code", "signal"}
             if frame.empty or not required.issubset(frame.columns):
-                return None
+                return finish(None, False)
             parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce")
             signals = frame["signal"].map(to_bool)
             if (parsed.isna().any() or frame["code"].isna().any()
                     or frame["code"].astype(str).str.strip().eq("").any()
                     or frame["code"].duplicated().any()
                     or signals.isna().any()):
-                return None
+                return finish(None, False)
             # Corrupted prior selected prices/statuses are not evidence of a
             # buy-point revision or a confirmation transition. Do not silently
             # skip one bad commit and compare against an older stale version.
@@ -125,27 +135,28 @@ def load_previous_midweek(data_root: str | Path, current_date: date) -> pd.DataF
                     "ibd_entry_status", "ibd_entry_valid",
                 }
                 if not signal_fields.issubset(frame.columns):
-                    return None
+                    return finish(None, False)
                 if (active["ibd_entry_valid"].map(to_bool).isna().any()
                         or not active["ibd_entry_status"].isin(ENTRY_STATUSES).all()):
-                    return None
+                    return finish(None, False)
                 for field in ("ibd_candidate_price", "latest_close"):
                     prices = pd.to_numeric(active[field], errors="coerce")
                     if not prices.map(
                         lambda value: pd.notna(value) and
                         isfinite(float(value)) and float(value) > 0
                     ).all():
-                        return None
+                        return finish(None, False)
             dates = parsed.dt.date.unique()
             if len(dates) != 1:
-                return None
+                return finish(None, False)
             previous_date = dates[0]
             if previous_date < current_date and monday_of_week(previous_date) == monday_of_week(current_date):
-                return frame
+                return finish(frame, True)
+        return finish(None, True)
     except (OSError, ValueError, subprocess.CalledProcessError,
             subprocess.TimeoutExpired, pd.errors.ParserError):
-        return None
-    return None
+        return finish(None, False)
+    return finish(None, False)
 
 
 def _price_path(weekend, current, daily, *, as_of: date, previous=None,
