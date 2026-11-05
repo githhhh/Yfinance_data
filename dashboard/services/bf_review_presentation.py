@@ -11,7 +11,7 @@ from datetime import timedelta
 
 import pandas as pd
 
-from bf_snapshot import monday_of_week, _is_market_trading_day
+from bf_snapshot import monday_of_week, _is_market_trading_day, is_valid_complete_baseline
 
 from dashboard.services.bf_observation_replay import price_replay, zone as classify_zone
 from dashboard.services.bf_transition import _same_buy_point_price, to_bool
@@ -36,12 +36,12 @@ def _first_trading_session(day):
 
 def _midweek_price_event(
     current, previous, *, has_previous_snapshot: bool,
-    first_midweek_day: bool, weekend_price=None,
+    first_midweek_snapshot: bool, weekend_price=None,
 ):
-    # No prior published snapshot on Tuesday-Thursday is not evidence of a
-    # NEW event. The B still belongs to this week's snapshot collection.
+    # A verified first publication compares against the complete Weekend Pool,
+    # irrespective of how many trading sessions were skipped before publishing.
     if not has_previous_snapshot:
-        return "NEW BP" if first_midweek_day else "SNAPSHOT"
+        return "NEW BP" if first_midweek_snapshot else "SNAPSHOT"
     if previous is None or to_bool(previous.get("signal")) is not True:
         return "NEW BP"
     previous_price = previous.get("ibd_candidate_price")
@@ -75,6 +75,7 @@ def decorate_observation_view(
     complete: pd.DataFrame,
     current: pd.DataFrame,
     previous: pd.DataFrame | None,
+    first_midweek_snapshot: bool = False,
 ) -> pd.DataFrame:
     """Add UI-only source identity, event and comparison labels.
 
@@ -90,12 +91,72 @@ def decorate_observation_view(
     current_day, prior_day = _observed_date(current), _observed_date(previous)
     prior_valid = bool(current_day and prior_day and prior_day < current_day
                        and current_day.isocalendar()[:2] == prior_day.isocalendar()[:2])
+    weekend_day = _observed_date(complete)
+    first_weekend_comparison = bool(
+        first_midweek_snapshot and not prior_valid and current_day and weekend_day
+        and is_valid_complete_baseline(weekend_day, current_day)
+    )
     for index, row in result.iterrows():
         code = str(row["code"])
         has_a = bool(row.get("review_a_active"))
-        a_event = str(row.get("review_a_event") or "")
-        a_week = str(row.get("review_a_week_event") or "")
-        membership_event = str(row.get("review_membership_event") or "")
+        fresh = today.get(code)
+        status_event = ""
+        if has_a and fresh is not None and to_bool(fresh.get("signal")) is True:
+            # Identity belongs to the immutable Weekend price; confirmation
+            # belongs to the current snapshot whenever it selects that price.
+            weekend_price = weekend[code].get("ibd_candidate_price")
+            if _same_buy_point_price(fresh.get("ibd_candidate_price"), weekend_price):
+                old = weekend[code] if first_weekend_comparison else prior.get(code) if prior_valid else None
+                new_status = str(fresh.get("ibd_entry_status") or "")
+                new_valid = to_bool(fresh.get("ibd_entry_valid"))
+                if new_status in {"ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"}:
+                    if new_status == "ACTIONABLE" and new_valid is not True:
+                        new_status = "UNCONFIRMED"
+                    result.at[index, "ibd_entry_status"] = new_status
+                    result.at[index, "ibd_entry_valid"] = new_valid
+                    ratio = pd.to_numeric(fresh.get("ibd_entry_volume_ratio"), errors="coerce")
+                    result.at[index, "ibd_entry_vol_or_reject"] = (
+                        f"{float(ratio):.2f}x" if new_valid is True and pd.notna(ratio)
+                        else "n/a" if new_valid is True
+                        else str(fresh.get("ibd_entry_reject_reason") or "Volume not confirmed")
+                    )
+                    if (old is not None and to_bool(old.get("signal")) is True
+                            and _same_buy_point_price(old.get("ibd_candidate_price"), weekend_price)):
+                        old_status = str(old.get("ibd_entry_status") or "")
+                        if old_status in {"ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"} and old_status != new_status:
+                            status_event = f"{old_status} → {new_status}"
+
+        if first_weekend_comparison and has_a:
+            # The first *published* Midweek Pool is measured against the
+            # complete Weekend snapshot, never an unpublished daily candle.
+            weekend_row = weekend[code]
+            price = weekend_row.get("ibd_candidate_price")
+            before = classify_zone(price, weekend_row.get("latest_close"))
+            after = classify_zone(price, fresh.get("latest_close")) if fresh is not None else None
+            zone_event = f"{before} → {after}" if before and after and before != after else ""
+            if after:
+                result.at[index, "review_a_zone"] = after
+                trigger = pd.to_numeric(price, errors="coerce")
+                close = pd.to_numeric(fresh.get("latest_close"), errors="coerce")
+                if pd.notna(trigger) and trigger > 0 and pd.notna(close) and close > 0:
+                    pct = round((close / trigger - 1) * 100, 2)
+                    result.at[index, "review_a_pct"] = pct
+                    result.at[index, "current_vs_ibd_candidate_pct"] = pct
+                    result.at[index, "latest_close"] = float(close)
+                    result.at[index, "review_a_as_of"] = current_day.isoformat()
+                    result.at[index, "review_data_available"] = True
+            result.at[index, "review_a_event"] = zone_event or status_event
+            result.at[index, "review_a_week_event"] = zone_event
+            result.at[index, "review_membership_event"] = (
+                "IN → OUT" if fresh is None else ""
+            )
+        elif status_event and not row.get("review_a_event"):
+            # Same-price confirmation changes remain Review Now events.
+            result.at[index, "review_a_event"] = status_event
+
+        a_event = str(result.at[index, "review_a_event"] or "")
+        a_week = str(result.at[index, "review_a_week_event"] or "")
+        membership_event = str(result.at[index, "review_membership_event"] or "")
         # The Weekend quick groups are cumulative relative to the immutable A
         # baseline. Legacy path["change"] chooses yesterday as its basis when
         # today's price crosses a zone, and therefore cannot drive the
@@ -111,18 +172,15 @@ def decorate_observation_view(
                 weekend_zone_group.get(row.get("review_a_zone"), "UNCHANGED")
                 if a_week else "UNCHANGED"
             )
-        # Show persistent Vs Weekend state in What Changed / All Review, but
-        # do not repeatedly inject an old difference into Review Now.
-        # On the first US trading session, comparison against Weekend is new.
-        first_session = _first_trading_session(current_day)
-        a_attention = bool(
-            a_event or membership_event or (first_session and a_week)
-        ) if has_a else False
+        # Only published snapshot differences belong in Review Now. Weekend
+        # quick groups remain cumulative and independently queryable.
+        a_attention = bool(a_event or membership_event) if has_a else False
         result.at[index, "review_a_has_value_change"] = a_attention
         result.at[index, "review_has_value_change"] = bool(
             a_attention or row.get("review_b_has_value_change")
         )
         result.at[index, "review_a_focus_basis"] = (
+            "WEEKEND" if a_event and first_weekend_comparison else
             "PREVIOUS_SNAPSHOT" if a_event and prior_valid and code in prior
             and pd.notna(pd.to_numeric(prior[code].get("latest_close"), errors="coerce"))
             else "PRIOR_SESSION" if a_event else "WEEKEND" if a_week else None
@@ -185,13 +243,13 @@ def decorate_observation_view(
             continue
         result.at[index, "review_b_display_basis"] = (
             "PREVIOUS_SNAPSHOT" if prior_valid else
-            "WEEKEND" if _first_trading_session(current_day) and not complete.empty
+            "WEEKEND" if first_weekend_comparison
             else "UNAVAILABLE"
         )
         previous_row = prior.get(code) if prior_valid else None
         event = _midweek_price_event(
             fresh, previous_row, has_previous_snapshot=prior_valid,
-            first_midweek_day=_first_trading_session(current_day),
+            first_midweek_snapshot=first_weekend_comparison,
             weekend_price=weekend_price,
         )
         result.at[index, "review_b_display_event"] = event
