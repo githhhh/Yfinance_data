@@ -42,12 +42,6 @@ def _midweek_price_event(
     new_status = str(current.get("ibd_entry_status") or "")
     if old_status != new_status:
         return f"{old_status} → {new_status}"
-    # Two distinct Git publications can share one market date. Revisions
-    # still compare published closes even without a trading-day advance.
-    if str(previous.get("snapshot_date") or "")[:10] == str(current.get("snapshot_date") or "")[:10]:
-        before = classify_zone(current_price, previous.get("latest_close"))
-        after = classify_zone(current_price, current.get("latest_close"))
-        return f"{before} → {after}" if before and after and before != after else "CURRENT"
     p = price_replay(
         trigger=current.get("ibd_candidate_price"),
         previous_close=previous.get("latest_close"),
@@ -83,7 +77,7 @@ def decorate_observation_view(
     today = {str(r["code"]): r for _, r in current.iterrows()} if not current.empty else {}
     prior = {str(r["code"]): r for _, r in previous.iterrows()} if previous is not None and not previous.empty else {}
     current_day, prior_day = _observed_date(current), _observed_date(previous)
-    prior_valid = bool(current_day and prior_day and prior_day <= current_day
+    prior_valid = bool(current_day and prior_day and prior_day < current_day
                        and current_day.isocalendar()[:2] == prior_day.isocalendar()[:2])
     weekend_day = _observed_date(complete)
     first_weekend_comparison = bool(
