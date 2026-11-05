@@ -47,8 +47,14 @@ const state = app.getState();
 
 fixture.meta.review_comparison_basis = "WEEKEND";
 fixture.meta.review_comparison_date = "2026-10-09";
-assert(app.headerHtml([]).includes("Review vs <b>2026-10-09</b> Weekend"),
-  "The user must see which published snapshot drives Review Now");
+assert(app.headerHtml([]).includes("baseline <b>2026-10-09</b>"),
+  "First Midweek publication inherits the fixed Weekend baseline");
+assert(!app.headerHtml([]).includes("Review vs <b>2026-10-09</b>"),
+  "Do not repeat the same Weekend date twice in the header");
+fixture.meta.review_comparison_basis = "MIDWEEK";
+fixture.meta.review_comparison_date = "2026-10-12";
+assert(app.headerHtml([]).includes("Review vs <b>2026-10-12</b> Midweek"),
+  "Later Midweek publications identify their actual previous snapshot");
 const unavailableFixture = structuredClone(fixture);
 unavailableFixture.meta.review_comparison_basis = "UNAVAILABLE";
 unavailableFixture.meta.review_comparison_date = null;
