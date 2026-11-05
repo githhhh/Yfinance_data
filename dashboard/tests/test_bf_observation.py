@@ -24,6 +24,25 @@ def row(code, *, snapshot="2026-10-09", signal=True, trigger=100, close=103,
     }
 
 
+def published_row(code, **kwargs):
+    """Authoritative-compatible test row for committed Pool history."""
+    value = row(code, **kwargs)
+    trigger, close = value["ibd_candidate_price"], value["latest_close"]
+    pct = (close / trigger - 1) * 100 if trigger is not None and trigger > 0 else None
+    value["current_vs_ibd_candidate_pct"] = pct
+    value["ibd_entry_volume_ratio"] = 1.5
+    value["volume_ratio"] = 1.2
+    if value["signal"] is not True:
+        value["ibd_entry_status"] = None
+    elif value["ibd_entry_valid"] is not True:
+        value["ibd_entry_status"] = "UNCONFIRMED"
+    else:
+        value["ibd_entry_status"] = (
+            "BELOW_TRIGGER" if pct < 0 else "ACTIONABLE" if pct <= 5 else "EXTENDED"
+        )
+    return value
+
+
 def test_weekend_signal_out_of_pool_remains_tracked_from_daily_prices():
     complete = pd.DataFrame([row("OUT", close=108)])
     current = pd.DataFrame([row("OTHER", snapshot="2026-10-13", trigger=50, close=52)])
@@ -238,7 +257,7 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
     for market_date in ["2026-10-12", "2026-10-13", "2026-10-14"]:
-        pd.DataFrame([row("HISTORY", snapshot=market_date)]).to_csv(pool, index=False)
+        pd.DataFrame([published_row("HISTORY", snapshot=market_date)]).to_csv(pool, index=False)
         subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
         subprocess.run(["git", "commit", "-qm", market_date], cwd=tmp_path, check=True)
     previous = load_previous_midweek(tmp_path, date(2026, 10, 14))
@@ -255,11 +274,11 @@ def test_prior_trading_day_found_past_twenty_same_day_commits(tmp_path):
     subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
-    pd.DataFrame([row("OLD", snapshot="2026-10-14")]).to_csv(pool, index=False)
+    pd.DataFrame([published_row("OLD", snapshot="2026-10-14")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "previous day"], cwd=tmp_path, check=True)
     for number in range(22):
-        pd.DataFrame([row("LATEST", snapshot="2026-10-15", trigger=100 + number)]).to_csv(
+        pd.DataFrame([published_row("LATEST", snapshot="2026-10-15", trigger=100 + number)]).to_csv(
             pool, index=False
         )
         subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
@@ -281,7 +300,7 @@ def test_corrupt_latest_git_history_fails_closed_instead_of_using_older_day(tmp_
     subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
-    pd.DataFrame([row("SAFE", snapshot="2026-10-14")]).to_csv(pool, index=False)
+    pd.DataFrame([published_row("SAFE", snapshot="2026-10-14")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "older valid"], cwd=tmp_path, check=True)
     pool.write_text("code,signal,latest_close\nBROKEN,True,102\n", encoding="utf-8")
@@ -300,7 +319,7 @@ def test_invalid_prior_signal_price_does_not_forge_a_buy_point_change(tmp_path):
     subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
-    stale = row("B", snapshot="2026-10-14", trigger=120)
+    stale = published_row("B", snapshot="2026-10-14", trigger=120)
     stale["ibd_candidate_price"] = None
     pd.DataFrame([stale]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
@@ -330,7 +349,7 @@ def test_invalid_prior_confirmation_cannot_create_status_change(tmp_path):
     subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
-    old = row("B", snapshot="2026-10-14", trigger=120)
+    old = published_row("B", snapshot="2026-10-14", trigger=120)
     old["ibd_entry_status"] = ""
     pd.DataFrame([old]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
@@ -1046,18 +1065,18 @@ def test_previous_midweek_reports_verified_absence_separately_from_unreadable_hi
     subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
     pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
     pool.parent.mkdir()
-    pd.DataFrame([row("FIRST", snapshot="2026-11-03")]).to_csv(pool, index=False)
+    pd.DataFrame([published_row("FIRST", snapshot="2026-11-03")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "first valid publication"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
     assert frame is None and verified
     # Re-publishing the same market date must not create another Review baseline.
-    pd.DataFrame([row("REVISED", snapshot="2026-11-03", trigger=101)]).to_csv(pool, index=False)
+    pd.DataFrame([published_row("REVISED", snapshot="2026-11-03", trigger=101)]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "same-day revision"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
     assert verified and frame is None, "No earlier distinct in-week trading date"
-    pd.DataFrame([row("NEXT", snapshot="2026-11-05")]).to_csv(pool, index=False)
+    pd.DataFrame([published_row("NEXT", snapshot="2026-11-05")]).to_csv(pool, index=False)
     subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "later valid publication"], cwd=tmp_path, check=True)
     frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 5), with_history_status=True)
@@ -1118,3 +1137,82 @@ def test_same_market_date_prior_is_not_a_valid_increment_boundary():
         raw, complete=weekend, current=current, previous=same_date,
     ).set_index("code").loc["A"]
     assert not bool(view["review_has_value_change"])
+
+
+def test_history_selects_latest_market_date_not_most_recent_git_commit(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    commits = [
+        ("2026-11-02", 99), ("2026-11-03", 102),
+        ("2026-11-02", 98), ("2026-11-04", 102),
+    ]
+    for market_date, close in commits:
+        pd.DataFrame([published_row("A", snapshot=market_date, close=close)]).to_csv(pool, index=False)
+        subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", f"published {market_date} {close}"], cwd=tmp_path, check=True)
+
+    previous, verified = load_previous_midweek(
+        tmp_path, date(2026, 11, 4), with_history_status=True,
+    )
+    assert verified and previous is not None
+    assert previous.iloc[0]["snapshot_date"] == "2026-11-03"
+    assert previous.iloc[0]["latest_close"] == 102
+
+
+def test_semantically_invalid_history_cannot_forge_confirmation_change(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    for market_date in ["2026-11-02", "2026-11-03", "2026-11-04"]:
+        record = published_row("A", snapshot=market_date, close=102)
+        if market_date == "2026-11-03":
+            record["ibd_entry_status"] = "UNCONFIRMED"  # contradicts valid=True
+        pd.DataFrame([record]).to_csv(pool, index=False)
+        subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", f"published {market_date}"], cwd=tmp_path, check=True)
+
+    previous, verified = load_previous_midweek(
+        tmp_path, date(2026, 11, 4), with_history_status=True,
+    )
+    assert verified and previous is not None
+    assert previous.iloc[0]["snapshot_date"] == "2026-11-02"
+    assert previous.iloc[0]["ibd_entry_status"] == "ACTIONABLE"
+
+
+def test_invalid_old_same_day_revision_does_not_block_earlier_day(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    for market_date, price in [
+        ("2026-11-02", 103), ("2026-11-04", None), ("2026-11-04", 98),
+    ]:
+        record = published_row("A", snapshot=market_date, close=price or 98)
+        if price is None:
+            record["ibd_candidate_price"] = None
+        pd.DataFrame([record]).to_csv(pool, index=False)
+        subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", f"published {market_date} {price}"], cwd=tmp_path, check=True)
+
+    previous, verified = load_previous_midweek(
+        tmp_path, date(2026, 11, 4), with_history_status=True,
+    )
+    assert verified and previous is not None
+    assert previous.iloc[0]["snapshot_date"] == "2026-11-02"
+    assert previous.iloc[0]["latest_close"] == 103
+
