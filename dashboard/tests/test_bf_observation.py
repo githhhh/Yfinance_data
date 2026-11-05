@@ -247,7 +247,7 @@ def test_previous_midweek_uses_committed_same_week_snapshot_not_current(tmp_path
     assert load_previous_midweek(tmp_path, date(2026, 10, 12)) is None
 
 
-def test_previous_midweek_not_truncated_by_twenty_current_day_commits(tmp_path):
+def test_prior_trading_day_found_past_twenty_same_day_commits(tmp_path):
     import subprocess
     from dashboard.services.bf_observation import load_previous_midweek
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -267,6 +267,8 @@ def test_previous_midweek_not_truncated_by_twenty_current_day_commits(tmp_path):
 
     previous = load_previous_midweek(tmp_path, date(2026, 10, 15))
     assert previous is not None
+    # Same-date Git revisions are not independent comparison boundaries.
+    # Scan through all 22 revisions to the last distinct market date.
     assert previous.iloc[0]["snapshot_date"] == "2026-10-14"
     assert previous.iloc[0]["code"] == "OLD"
 
@@ -668,7 +670,7 @@ def test_different_price_is_new_despite_missing_weekend_structure_metadata():
     w, m = pd.DataFrame([weekend_row]), pd.DataFrame([now])
     raw = build_observation_view(w, m, m, as_of=date(2026, 10, 19))
     result = decorate_observation_view(
-        raw, complete=w, current=m, previous=None
+        raw, complete=w, current=m, previous=None, first_midweek_snapshot=True,
     ).iloc[0]
     assert result["review_new_buy_point"]
     assert result["review_b_has_value_change"]
@@ -699,7 +701,7 @@ def test_previous_was_weekend_anchor_today_first_distinct_b_is_new_not_changed()
     assert actual["review_b_has_value_change"]
 
 
-def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot():
+def test_missing_pool_row_must_not_forge_review_now_event_from_daily_bar():
     from dashboard.services.bf_review_presentation import decorate_observation_view
     complete = pd.DataFrame([row("GABC", snapshot="2026-10-16",
                                  trigger=100, close=102)])
@@ -713,12 +715,16 @@ def test_out_of_pool_weekend_price_event_uses_prior_session_not_missing_snapshot
         complete, current, current, previous=previous, daily=daily,
         as_of=date(2026, 10, 20),
     )
+    # Legacy daily price path still exists for visual observation, but cannot
+    # invent a Review Now delta when neither published Pool has this ticker.
+    assert raw.set_index("code").loc["GABC", "review_a_event"] == "BELOW → ZONE"
     actual = decorate_observation_view(
         raw, complete=complete, current=current, previous=previous
     ).set_index("code").loc["GABC"]
     assert actual["review_membership"] == "OUT"
-    assert actual["review_a_event"] == "BELOW → ZONE"
-    assert actual["review_a_focus_basis"] == "PRIOR_SESSION"
+    assert actual["review_a_event"] == ""
+    assert not actual["review_a_has_value_change"]
+    assert not actual["review_has_value_change"]
 
 
 def test_stable_below_weekend_anchor_stays_in_cumulative_not_review_now():
@@ -813,11 +819,8 @@ def test_new_weekend_move_still_enters_review_now():
     assert view["review_has_value_change"]
 
 
-def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
+def test_first_published_midweek_after_monday_holiday_uses_weekend_snapshot():
     from dashboard.services.bf_review_presentation import decorate_observation_view
-    from dashboard.services.bf_review_presentation import _first_trading_session
-    assert not _first_trading_session(date(2026, 9, 7))
-    assert _first_trading_session(date(2026, 9, 8))
     weekend = pd.DataFrame([row("SEED", snapshot="2026-09-04",
                                 trigger=100, close=103)])
     current = pd.DataFrame([
@@ -832,6 +835,7 @@ def test_first_us_session_after_monday_holiday_is_weekend_comparison_day():
     )
     view = decorate_observation_view(
         raw, complete=weekend, current=current, previous=None,
+        first_midweek_snapshot=True,
     ).set_index("code")
     assert view.loc["SEED", "review_a_week_event"] == "ZONE → BELOW"
     assert bool(view.loc["SEED", "review_a_has_value_change"])
@@ -899,9 +903,218 @@ def test_price_changed_with_same_structure_is_midweek_point():
     raw = build_observation_view(complete, current, current, as_of=date(2026, 10, 19))
     view = decorate_observation_view(
         raw, complete=complete, current=current, previous=None,
+        first_midweek_snapshot=True,
     ).iloc[0]
     assert view["review_a_active"] and view["review_b_active"]
     assert view["review_a_price"] == 100
     assert view["review_b_price"] == 103
     assert view["review_new_buy_point"]
     assert view["review_b_display_event"] == "NEW BP"
+
+
+
+def test_first_published_tuesday_midweek_compares_to_weekend_not_unpublished_daily():
+    """Skipped task days do not erase the first-published comparison boundary."""
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([
+        row("SEED", snapshot="2026-10-30", close=103),
+        row("SAME", snapshot="2026-10-30", close=102,
+            valid=False, status="UNCONFIRMED"),
+        row("OUT", snapshot="2026-10-30", close=102),
+    ])
+    current = pd.DataFrame([
+        row("SEED", snapshot="2026-11-03", close=97,
+            signal=False, status="BELOW_TRIGGER"),
+        row("SAME", snapshot="2026-11-03", close=102,
+            valid=True, status="ACTIONABLE"),
+        row("NEW", snapshot="2026-11-03", trigger=120, close=123),
+    ])
+    # Monday and Tuesday had the same zone: an incremental K-line comparison
+    # would say "unchanged", but the first *published* snapshot differs from Friday.
+    daily = {"SEED": pd.DataFrame(
+        {"Close": [97, 97]},
+        index=pd.to_datetime(["2026-11-02", "2026-11-03"]),
+    )}
+    raw = build_observation_view(
+        weekend, current, current, daily=daily, as_of=date(2026, 11, 3),
+    )
+    assert not raw.set_index("code").loc["SEED", "review_a_event"]
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+        first_midweek_snapshot=True,
+    ).set_index("code")
+
+    assert view.loc["SEED", "review_a_event"] == "ZONE → BELOW"
+    assert view.loc["SEED", "review_a_focus_basis"] == "WEEKEND"
+    assert bool(view.loc["SEED", "review_has_value_change"])
+    assert view.loc["SAME", "review_a_event"] == "UNCONFIRMED → ACTIONABLE"
+    assert view.loc["SAME", "ibd_entry_status"] == "ACTIONABLE"
+    assert bool(view.loc["SAME", "review_a_has_value_change"])
+    assert view.loc["NEW", "review_b_display_event"] == "NEW BP"
+    assert view.loc["NEW", "review_b_display_basis"] == "WEEKEND"
+    assert bool(view.loc["NEW", "review_b_has_value_change"])
+    assert view.loc["OUT", "review_membership_event"] == "IN → OUT"
+    assert bool(view.loc["OUT", "review_has_value_change"])
+
+
+def test_unknown_publication_history_does_not_invent_first_midweek_events():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("SEED", snapshot="2026-10-30", close=102)])
+    current = pd.DataFrame([
+        row("SEED", snapshot="2026-11-03", close=98, signal=False),
+        row("NEW", snapshot="2026-11-03", trigger=120, close=122),
+    ])
+    daily = {"SEED": pd.DataFrame(
+        {"Close": [108, 98]}, index=pd.to_datetime(["2026-11-02", "2026-11-03"]),
+    )}
+    raw = build_observation_view(
+        weekend, current, current, daily=daily, as_of=date(2026, 11, 3),
+    )
+    unverified = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+        first_midweek_snapshot=False,
+    ).set_index("code")
+    assert unverified.loc["SEED", "review_a_event"] == "EXT → BELOW"
+    assert not bool(unverified.loc["SEED", "review_a_has_value_change"])
+    assert unverified.loc["NEW", "review_b_display_event"] == "SNAPSHOT"
+    assert not bool(unverified.loc["NEW", "review_b_has_value_change"])
+
+    # An explicitly verified first publication must use only the Friday-vs-
+    # Tuesday snapshot difference, not the Monday-to-Tuesday daily transition.
+    verified = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+        first_midweek_snapshot=True,
+    ).set_index("code")
+    assert verified.loc["SEED", "review_a_event"] == "ZONE → BELOW"
+    assert bool(verified.loc["SEED", "review_a_has_value_change"])
+    assert verified.loc["NEW", "review_b_display_event"] == "NEW BP"
+
+
+def test_later_midweek_snapshot_uses_last_published_midweek_across_skipped_days():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30", close=102)])
+    previous = pd.DataFrame([
+        row("A", snapshot="2026-11-02", close=103),
+        row("B", snapshot="2026-11-02", trigger=120, close=123),
+    ])
+    current = pd.DataFrame([
+        row("A", snapshot="2026-11-05", close=98, status="BELOW_TRIGGER"),
+        row("B", snapshot="2026-11-05", trigger=120, close=123),
+        row("C", snapshot="2026-11-05", trigger=130, close=132),
+    ])
+    raw = build_observation_view(
+        weekend, current, current, previous=previous, daily={},
+        as_of=date(2026, 11, 5),
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=previous,
+        first_midweek_snapshot=False,
+    ).set_index("code")
+    assert view.loc["A", "review_a_event"] == "ZONE → BELOW"
+    assert view.loc["A", "review_a_focus_basis"] == "PREVIOUS_SNAPSHOT"
+    assert view.loc["B", "review_b_display_event"] == "CURRENT"
+    assert not bool(view.loc["B", "review_b_has_value_change"])
+    assert view.loc["C", "review_b_display_event"] == "NEW BP"
+    assert view.loc["C", "review_b_display_basis"] == "PREVIOUS_SNAPSHOT"
+
+
+def test_first_midweek_flag_requires_correct_complete_week():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+    weekend = pd.DataFrame([row("OTHER", snapshot="2026-10-16")])
+    current = pd.DataFrame([row("NEW", snapshot="2026-11-03", trigger=130, close=132)])
+    raw = build_observation_view(
+        weekend, current, current, as_of=date(2026, 11, 3), daily={},
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=None,
+        first_midweek_snapshot=True,
+    ).set_index("code")
+    assert view.loc["NEW", "review_b_display_event"] == "SNAPSHOT"
+    assert not bool(view.loc["NEW", "review_has_value_change"])
+
+
+def test_previous_midweek_reports_verified_absence_separately_from_unreadable_history(tmp_path):
+    import subprocess
+    from dashboard.services.bf_observation import load_previous_midweek
+
+    assert load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True) == (None, False)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=tmp_path, check=True)
+    pool = tmp_path / "us" / "breakout_follow_pool_midweek.csv"
+    pool.parent.mkdir()
+    pd.DataFrame([row("FIRST", snapshot="2026-11-03")]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "first valid publication"], cwd=tmp_path, check=True)
+    frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
+    assert frame is None and verified
+    # Re-publishing the same market date must not create another Review baseline.
+    pd.DataFrame([row("REVISED", snapshot="2026-11-03", trigger=101)]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "same-day revision"], cwd=tmp_path, check=True)
+    frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 3), with_history_status=True)
+    assert verified and frame is None, "No earlier distinct in-week trading date"
+    pd.DataFrame([row("NEXT", snapshot="2026-11-05")]).to_csv(pool, index=False)
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "later valid publication"], cwd=tmp_path, check=True)
+    frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 5), with_history_status=True)
+    assert verified and frame is not None
+    assert frame.iloc[0]["snapshot_date"] == "2026-11-03"
+    pool.write_text("code,signal,latest_close\nBROKEN,True,102\n", encoding="utf-8")
+    subprocess.run(["git", "add", "us/breakout_follow_pool_midweek.csv"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "corrupt latest prior"], cwd=tmp_path, check=True)
+    frame, verified = load_previous_midweek(tmp_path, date(2026, 11, 6), with_history_status=True)
+    assert frame is None and not verified
+
+
+
+def test_same_market_date_publication_uses_earlier_trading_day_not_same_date():
+    """Duplicate publications are corrections, not a daily review increment."""
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30", trigger=100, close=102)])
+    earlier = pd.DataFrame([
+        row("A", snapshot="2026-11-02", trigger=100, close=103),
+        row("B", snapshot="2026-11-02", trigger=120, close=123,
+            status="UNCONFIRMED", valid=False),
+    ])
+    # Another earlier version of the current market day may exist in Git;
+    # it is intentionally not passed as previous_pool.
+    current = pd.DataFrame([
+        row("A", snapshot="2026-11-03", trigger=100, close=108,
+            status="EXTENDED"),
+        row("B", snapshot="2026-11-03", trigger=120, close=124,
+            status="ACTIONABLE", valid=True),
+        row("C", snapshot="2026-11-03", trigger=130, close=132),
+    ])
+    raw = build_observation_view(
+        weekend, current, current, previous=earlier, daily={},
+        as_of=date(2026, 11, 3),
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=earlier,
+    ).set_index("code")
+    assert view.loc["A", "review_a_event"] == "ZONE → EXT"
+    assert view.loc["A", "review_a_focus_basis"] == "PREVIOUS_SNAPSHOT"
+    assert bool(view.loc["A", "review_has_value_change"])
+    assert view.loc["B", "review_b_display_event"] == "UNCONFIRMED → ACTIONABLE"
+    assert bool(view.loc["B", "review_b_has_value_change"])
+    assert view.loc["C", "review_b_display_event"] == "NEW BP"
+
+def test_same_market_date_prior_is_not_a_valid_increment_boundary():
+    from dashboard.services.bf_review_presentation import decorate_observation_view
+
+    weekend = pd.DataFrame([row("A", snapshot="2026-10-30", close=102)])
+    same_date = pd.DataFrame([row("A", snapshot="2026-11-03", close=98)])
+    current = pd.DataFrame([row("A", snapshot="2026-11-03", close=108)])
+    raw = build_observation_view(
+        weekend, current, current, previous=same_date, daily={},
+        as_of=date(2026, 11, 3),
+    )
+    view = decorate_observation_view(
+        raw, complete=weekend, current=current, previous=same_date,
+    ).set_index("code").loc["A"]
+    assert not bool(view["review_has_value_change"])

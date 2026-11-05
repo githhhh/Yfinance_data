@@ -98,7 +98,8 @@
 
   function defaultPeriodContext(period) {
     return {
-      scope: period === "MIDWEEK" && data.meta.midweek_baseline_available ? "CHANGES" : "ALL_SIGNALS",
+      scope: period === "MIDWEEK" && data.meta.midweek_baseline_available &&
+        data.meta.review_comparison_basis !== "UNAVAILABLE" ? "CHANGES" : "ALL_SIGNALS",
       change: "ALL",
       newBuyPoint: "ALL",
       status: "ALL",
@@ -415,7 +416,8 @@
         cumulative ? text(row.review_a_week_event, "") :
         text(row.review_a_event, "") || text(row.review_a_week_event, "");
       const basis = !cumulative && row.review_a_event
-        ? row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
+        ? row.review_a_focus_basis === "WEEKEND" ? "Vs Weekend" :
+          row.review_a_focus_basis === "PRIOR_SESSION" ? "Vs Prior Session" : "Vs Previous Snapshot"
         : "Vs Weekend";
       const event = compactChangeEvent(raw);
       // In Review Now, a membership-only change is the new event; an older
@@ -606,8 +608,14 @@
     const trackedOut = isMidweek ? rows.filter((row) => row.review_membership === "OUT").length : 0;
     const fresh = freshness(snapshot);
     const badge = `<span class="data-badge ${fresh.status.toLowerCase()}">Data ${esc(fresh.label)}</span>`;
+    const comparison = data.meta.review_comparison_basis;
+    // The fixed Weekend baseline is already displayed below. Only show a
+    // separate Review boundary when it differs, or is unavailable.
+    const reviewVs = comparison === "MIDWEEK"
+      ? ` · Review vs <b>${esc(data.meta.review_comparison_date || "N/A")}</b> Midweek`
+      : comparison === "UNAVAILABLE" ? " · Review unavailable" : "";
     const snapshotText = isMidweek
-      ? `Snapshot <b>${esc(snapshot || "N/A")}</b> · Midweek · baseline <b>${esc(data.meta.midweek_baseline_available ? data.meta.complete_snapshot_date : "unavailable")}</b>`
+      ? `Snapshot <b>${esc(snapshot || "N/A")}</b> · Midweek · baseline <b>${esc(data.meta.midweek_baseline_available ? data.meta.complete_snapshot_date : "unavailable")}</b>${reviewVs}`
       : `Snapshot <b>${esc(snapshot || "N/A")}</b>${fresh.age === null ? "" : ` · ${fresh.age}d old`}`;
     return `
       <header class="dashboard-header">
