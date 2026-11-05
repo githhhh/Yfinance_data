@@ -7,11 +7,9 @@ Nothing here is used by Futu or the Telegram v1/v2 event producers.
 """
 from __future__ import annotations
 
-from datetime import timedelta
-
 import pandas as pd
 
-from bf_snapshot import monday_of_week, _is_market_trading_day, is_valid_complete_baseline
+from bf_snapshot import is_valid_complete_baseline
 
 from dashboard.services.bf_observation_replay import price_replay, zone as classify_zone
 from dashboard.services.bf_transition import _same_buy_point_price, to_bool
@@ -22,16 +20,6 @@ def _observed_date(frame: pd.DataFrame):
         return None
     parsed = pd.to_datetime(frame["snapshot_date"], errors="coerce").dropna().dt.date.unique()
     return parsed[0] if len(parsed) == 1 else None
-
-
-def _first_trading_session(day):
-    if not day or not _is_market_trading_day(day):
-        return False
-    start = monday_of_week(day)
-    return not any(
-        _is_market_trading_day(start + timedelta(days=i))
-        for i in range((day - start).days)
-    )
 
 
 def _midweek_price_event(
@@ -97,7 +85,6 @@ def decorate_observation_view(
     current_day, prior_day = _observed_date(current), _observed_date(previous)
     prior_valid = bool(current_day and prior_day and prior_day <= current_day
                        and current_day.isocalendar()[:2] == prior_day.isocalendar()[:2])
-    same_day_previous = bool(prior_valid and prior_day == current_day)
     weekend_day = _observed_date(complete)
     first_weekend_comparison = bool(
         first_midweek_snapshot and not prior_valid and current_day and weekend_day
@@ -133,9 +120,9 @@ def decorate_observation_view(
                         if old_status in {"ACTIONABLE", "UNCONFIRMED", "BELOW_TRIGGER", "EXTENDED"} and old_status != new_status:
                             status_event = f"{old_status} → {new_status}"
 
-        if (first_weekend_comparison or same_day_previous) and has_a:
-            # Compare the actual published boundary closes. A same-market-date
-            # revision is ordered by Git commits, not by daily candles.
+        if (first_weekend_comparison or prior_valid) and has_a:
+            # Only published Pool snapshot closes define Review Now deltas;
+            # intervening daily bars remain observation evidence, not baselines.
             baseline_row = weekend[code] if first_weekend_comparison else prior.get(code)
             price = weekend[code].get("ibd_candidate_price")
             before = classify_zone(price, baseline_row.get("latest_close")) if baseline_row is not None else None
@@ -191,9 +178,8 @@ def decorate_observation_view(
         )
         result.at[index, "review_a_focus_basis"] = (
             "WEEKEND" if a_event and first_weekend_comparison else
-            "PREVIOUS_SNAPSHOT" if a_event and prior_valid and code in prior
-            and pd.notna(pd.to_numeric(prior[code].get("latest_close"), errors="coerce"))
-            else "PRIOR_SESSION" if a_event else "WEEKEND" if a_week else None
+            "PREVIOUS_SNAPSHOT" if a_event and prior_valid else
+            "WEEKEND" if a_week else None
         )
         result.at[index, "review_b_display_event"] = ""
         result.at[index, "review_b_display_basis"] = None
