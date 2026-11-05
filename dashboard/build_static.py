@@ -405,14 +405,32 @@ def build_dashboard_payload(
 
     complete = _complete_view(analysis.complete_pool)
     midweek = pd.DataFrame()
+    review_baseline_kind = "UNAVAILABLE"
+    review_baseline_date = None
     if analysis.midweek_available:
         # Futu uses the original trade projection; public Review uses an
         # independent A/B observation projection with immutable weekend anchor.
         base = materialize_review_view(analysis.midweek_review)
         snapshot_date = analysis.midweek_snapshot_date
         effective_previous = previous_pool
+        history_verified = effective_previous is not None
         if effective_previous is None and snapshot_date is not None:
-            effective_previous = load_previous_midweek(PROJECT_ROOT, snapshot_date)
+            effective_previous, history_verified = load_previous_midweek(
+                PROJECT_ROOT, snapshot_date, with_history_status=True,
+            )
+        first_midweek_snapshot = bool(
+            analysis.midweek_baseline_available and history_verified
+            and (effective_previous is None or effective_previous.empty)
+        )
+        if first_midweek_snapshot:
+            review_baseline_kind = "WEEKEND"
+            review_baseline_date = analysis.complete_snapshot_date.isoformat()
+        elif effective_previous is not None and not effective_previous.empty and snapshot_date is not None:
+            dates = pd.to_datetime(effective_previous["snapshot_date"], errors="coerce").dropna().dt.date.unique()
+            if (len(dates) == 1 and dates[0] < snapshot_date
+                    and dates[0].isocalendar()[:2] == snapshot_date.isocalendar()[:2]):
+                review_baseline_kind = "MIDWEEK"
+                review_baseline_date = dates[0].isoformat()
         # Keep all compared prices within the MIDWEEK Pool's market session.
         # The latest 1D PKL can be newer than the published Pool.
         observation_date = snapshot_date or window_date
@@ -429,6 +447,7 @@ def build_dashboard_payload(
             complete=analysis.complete_pool if analysis.midweek_baseline_available else pd.DataFrame(),
             current=analysis.midweek_pool,
             previous=effective_previous,
+            first_midweek_snapshot=first_midweek_snapshot,
         )
 
     complete_snapshot = (
@@ -466,6 +485,8 @@ def build_dashboard_payload(
             ),
             "midweek_available": bool(analysis.midweek_available),
             "midweek_baseline_available": bool(analysis.midweek_baseline_available),
+            "review_comparison_basis": review_baseline_kind,
+            "review_comparison_date": review_baseline_date,
             "warnings": list(analysis.warnings),
             "summary": dict(analysis.summary),
             "complete_freshness": freshness,
