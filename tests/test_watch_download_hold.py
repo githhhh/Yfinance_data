@@ -148,3 +148,27 @@ def test_stale_watch_vintage_rejected_before_replace(tmp_path, monkeypatch):
         obj.commit()
     assert target.read_bytes() == now
     assert stage.exists()
+
+
+
+def test_midweek_projection_never_carries_manual_hold(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = tmp_path / "no_git"
+    (root / "us").mkdir(parents=True)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    pool = pd.DataFrame([{"code": "A", "snapshot_date": "2026-11-04"}])
+    when, digest = store.pool_identity(pool)
+    staged = root / "us/.midweek.pending"
+    store.watch_frame([
+        {"code": "A", "watch_cycle_id": "A:2026-10-26",
+         "phase": "OBSERVING", "events": [],
+         "download_hold_reason": "STALE_HOLD"},
+    ], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        staged, index=False, encoding="utf-8-sig")
+    target = root / store.WATCH_MIDWEEK
+    run = authority.BreakoutFollowPoolRun.midweek()
+    monkeypatch.setattr(run, "ensure_current_snapshot", lambda: pool)
+    run.register_companion(target_path=str(target), staged_path=str(staged),
+                           source_pool_date=when, source_pool_codes_hash=digest)
+    assert store.parse_watch_csv(staged)[0]["download_hold_reason"] == ""
+    assert run._watch_companion["watch_version"] is None
