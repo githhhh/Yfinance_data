@@ -17,7 +17,7 @@ from data_providers.ohlcv_validation import (
     validate_ohlcv_frame,
 )
 from market_universe import build_download_universe, pick_active_weekend_signal_codes
-from pool_exit_watch_store import active_watch_codes
+from pool_exit_watch_store import active_watch_codes, held_watch_codes
 
 FILTER_SNAPSHOT_PATH = os.path.join("us", "stage2", "stage2_screener_filter.csv")
 from importlib import import_module
@@ -212,6 +212,7 @@ def filter_schwab_stock_data(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download stock data')
+    parser.add_argument('--exclude-tickers', default='', help='Manual-only comma-separated temporary download exclusions')
     parser.add_argument('--provider', default='yahoo', choices=['yahoo', 'schwab'], help='Data provider to use (yahoo, schwab)')
     parser.add_argument('--app-key', default=None, help='Schwab App Key (Client ID)')
     parser.add_argument('--app-secret', default=None, help='Schwab App Secret')
@@ -301,6 +302,16 @@ if __name__ == "__main__":
     restored = sorted(set(watch_codes) - initial)
     if restored:
         print(f"[BF Pool Exit Watch] restored {len(restored)} active codes: {restored[:20]}")
+
+    # Final eligibility applies after Stage2, fallback, Pool and Watch unions.
+    # The optional CLI exclusion is opt-in for manual recovery only.
+    from market_universe import _normalize_code
+    held = set(held_watch_codes(required=True))
+    manual = {_normalize_code(code) for code in args.exclude_tickers.split(",")}
+    excluded = held | (manual - {None})
+    if excluded:
+        tickers = [code for code in tickers if code not in excluded]
+        print(f"[Watch download hold] excluded: {sorted(excluded)}")
 
     if not tickers:
         print("No tickers to download.")

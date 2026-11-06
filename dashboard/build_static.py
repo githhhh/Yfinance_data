@@ -568,17 +568,12 @@ def build_watch_payload(data_root: Path) -> dict:
                 data_root / pool_relative, dtype={"code": str},
                 keep_default_na=False, na_values=[""], encoding="utf-8-sig",
             )
-            source_date, codes_hash = pool_identity(pool)
+            source_date, _ = pool_identity(pool)
             if label == "complete":
                 complete_snapshot_week(date.fromisoformat(source_date))
             rows = parse_watch_csv(source)
-            if any(
-                row["snapshot_date"] != source_date
-                or row["source_pool_date"] != source_date
-                or row["source_pool_codes_hash"] != codes_hash
-                for row in rows
-            ):
-                raise ValueError("Watch identity differs from corresponding Pool")
+            if any(row["snapshot_date"] != source_date for row in rows):
+                raise ValueError("Watch snapshot date differs from corresponding Pool")
         except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
             errors[label] = type(exc).__name__
             continue

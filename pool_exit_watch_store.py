@@ -9,22 +9,20 @@ WATCH_COMPLETE = "us/bf_pool_exit_watch.csv"
 WATCH_MIDWEEK = "us/bf_pool_exit_watch_midweek.csv"
 ACTIVE_PHASES = frozenset({"AWAITING_DATA", "OBSERVING"})
 COLUMNS = (
-    "code", "watch_cycle_id", "snapshot_date", "source_pool_date",
-    "source_pool_codes_hash", "original_pool_date", "original_signal",
+    "code", "watch_cycle_id", "snapshot_date", "original_pool_date", "original_signal",
     "original_ceiling", "current_ceiling", "anchor_close", "last_verified_price_state",
     "last_price_observed_week",
-    "breakout_date", "breakout_evidence",
-    "absence_week", "verified_week", "phase", "current_in_pool",
-    "last_exit_reason", "exit_count", "latest_close", "price_state",
-    "vs_original_pct", "observed_weeks", "pending_status", "pending_high", "events",
+    "breakout_date", "absence_week", "verified_week", "phase", "current_in_pool",
+    "last_exit_reason", "latest_close", "price_state",
+    "vs_original_pct", "observed_weeks", "pending_status", "pending_high",
+    "events", "download_hold_reason",
 )
 
 
 def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
     """Validate one identical Watch contract for staged, local and Git blobs."""
-    required = set(COLUMNS)
-    if not required.issubset(frame.columns):
-        raise ValueError(f"Watch CSV schema missing: {sorted(required - set(frame.columns))}")
+    if list(frame.columns) != list(COLUMNS):
+        raise ValueError("Watch CSV must use the exact 24-column published schema")
     codes = frame.code.astype(str)
     if (frame.code.isna().any() or codes.eq("").any() or
         codes.str.lower().eq("nan").any() or
@@ -38,7 +36,16 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
     for row in rows:
         # Empty historical fields are legal during initial bootstrap; any
         # populated market date must be canonical before it can be persisted.
-        for field in ("snapshot_date", "source_pool_date", "original_pool_date",
+        reason = row["download_hold_reason"]
+        if not isinstance(reason, str) or len(reason) > 160 or (
+            reason and (reason != reason.strip() or
+                        any(ord(char) < 32 for char in reason))
+        ):
+            raise ValueError("Watch CSV invalid download_hold_reason")
+        if reason and (row["phase"] not in ACTIVE_PHASES or
+                       not str(row.get("watch_cycle_id") or "")):
+            raise ValueError("only an active official Watch Cycle can be held")
+        for field in ("snapshot_date", "original_pool_date",
                       "absence_week", "verified_week", "last_price_observed_week"):
             value = row.get(field)
             if value is None or value == "":
@@ -103,8 +110,8 @@ def parse_watch_csv(path: str | Path) -> list[dict]:
     return parse_watch_frame(frame)
 
 
-def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> list[str]:
-    """Only an authoritative, published complete Watch may drive downloads."""
+def _validated_watch_rows(data_root: str | Path = ".", *, required: bool = False) -> list[dict]:
+    """Read only the authoritative published complete Pool/Watch pair."""
     import subprocess
     root = Path(data_root)
     source = root / WATCH_COMPLETE
@@ -164,12 +171,66 @@ def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -
         official = official_watch_for_week(root, head_week)
         if official is None or rows != official:
             raise RuntimeError("BF Watch is not paired to latest published complete Pool")
-    # Download symbols use the same Yahoo/Schwab representation as the
-    # five-source universe (e.g. BRK.B -> BRK-B). Keep raw Watch identities
-    # untouched in history, only normalize the outbound download list.
+    return rows
+
+
+def active_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> list[str]:
+    """All active official Watch codes, including held ones."""
     from market_universe import _normalize_code
-    return sorted({normalized for row in rows if row["phase"] in ACTIVE_PHASES
-                   if (normalized := _normalize_code(row["code"])) is not None})
+    return sorted({code for row in _validated_watch_rows(data_root, required=required)
+                   if row["phase"] in ACTIVE_PHASES
+                   if (code := _normalize_code(row["code"])) is not None})
+
+
+def held_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> list[str]:
+    """Manual holds in official complete active cycles, normalized for downloads."""
+    from market_universe import _normalize_code
+    return sorted({code for row in _validated_watch_rows(data_root, required=required)
+                   if row["phase"] in ACTIVE_PHASES and row["download_hold_reason"]
+                   if (code := _normalize_code(row["code"])) is not None})
+
+
+def published_watch_state(data_root: str | Path = ".") -> tuple[list[dict], str | None, str, str]:
+    """Read a consistent published Pool/Watch pair, not the dirty working Pool."""
+    import io
+    import subprocess
+    from bf_snapshot import complete_snapshot_week, monday_of_week
+    root = Path(data_root)
+    if not (root / ".git").exists():
+        source = root / WATCH_COMPLETE
+        return (parse_watch_csv(source) if source.exists() else []), None, "", ""
+    def git_bytes(*args: str) -> bytes:
+        return subprocess.check_output(["git", "-C", str(root), *args])
+    try:
+        raw = git_bytes("show", "origin/main:us/breakout_follow_pool.csv")
+        pool = pd.read_csv(io.BytesIO(raw), dtype={"code": str}, keep_default_na=False)
+        source, digest = pool_identity(pool)
+        complete_snapshot_week(date.fromisoformat(source))
+        week = monday_of_week(date.fromisoformat(source)).isoformat()
+        rows = official_watch_for_week(root, week)
+        if rows is None:
+            raise RuntimeError("latest published Pool/Watch is not paired")
+        version = git_bytes("log", "-1", "--format=%H", "origin/main",
+                            "--", WATCH_COMPLETE).decode().strip()
+        if not version:
+            raise RuntimeError("official Watch has no Git version")
+        return rows, version, source, digest
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as exc:
+        raise RuntimeError("cannot read paired official Watch from origin/main") from exc
+
+
+def inherit_download_holds(frame: pd.DataFrame, published: list[dict]) -> pd.DataFrame:
+    """Only identical active cycles inherit, including an empty manual restore."""
+    previous = {(r["code"], str(r["watch_cycle_id"])): r
+                for r in published if r["phase"] in ACTIVE_PHASES}
+    output = frame.copy()
+    output["download_hold_reason"] = [
+        previous.get((str(r["code"]), str(r["watch_cycle_id"])), {})
+                .get("download_hold_reason", "")
+        if r["phase"] in ACTIVE_PHASES else ""
+        for r in output.to_dict("records")
+    ]
+    return output
 
 
 def watch_frame(rows: list[dict], *, snapshot_date: str, pool_codes_hash: str) -> pd.DataFrame:
@@ -270,9 +331,7 @@ def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | No
             rows = parse_watch_frame(frame)
             if any(row["phase"] == "PROVISIONAL_OUT" for row in rows):
                 return None
-            if rows and (any(row["source_pool_date"] != source or
-                             row["source_pool_codes_hash"] != digest or
-                             row["snapshot_date"] != source for row in rows)):
+            if any(row["snapshot_date"] != source for row in rows):
                 return None
             return rows
         except (OSError, ValueError, KeyError, subprocess.CalledProcessError):

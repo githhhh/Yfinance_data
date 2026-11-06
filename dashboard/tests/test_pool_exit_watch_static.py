@@ -112,7 +112,7 @@ def test_current_empty_midweek_preserves_complete_fallback_and_pool_date(tmp_pat
     assert result["midweek_fallback"] is True
 
 
-def test_watch_midweek_source_must_match_actual_pool(tmp_path):
+def test_watch_midweek_snapshot_date_must_match_actual_pool(tmp_path):
     from dashboard.build_static import build_watch_payload
     from pool_exit_watch_store import WATCH_COMPLETE, WATCH_MIDWEEK, watch_frame
 
@@ -122,7 +122,7 @@ def test_watch_midweek_source_must_match_actual_pool(tmp_path):
     watch_frame([], snapshot_date="2026-10-30", pool_codes_hash=complete_hash).to_csv(
         tmp_path / WATCH_COMPLETE, index=False)
     watch_frame([{"code": "STALE", "phase": "PROVISIONAL_OUT", "events": []}],
-                snapshot_date="2026-11-04", pool_codes_hash="wrong-digest").to_csv(
+                snapshot_date="2026-11-03", pool_codes_hash="unused").to_csv(
                     tmp_path / WATCH_MIDWEEK, index=False)
     result = build_watch_payload(tmp_path)
     assert result["available"] is True
