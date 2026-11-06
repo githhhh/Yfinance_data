@@ -18,7 +18,8 @@ import pandas as pd
 
 from pool_exit_watch_store import (COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity,
     published_complete_pools, official_watch_for_week, watch_was_ever_published,
-    watch_frame, parse_watch_csv)
+    watch_frame, parse_watch_csv, published_watch_state, inherit_download_holds,
+    active_watch_codes)
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
@@ -623,15 +624,22 @@ class BreakoutFollowPoolRun:
         # Validate the *same* schema, phases and event JSON that readers use.
         # Column-only validation could publish a pair that no downloader or
         # dashboard could subsequently parse, despite matching Pool identity.
+        # The authority owns manual fields. Merge them once, BEFORE binding
+        # the existing staged-file digest; the Watch engine remains unaware.
+        version = None
+        if not self._midweek:
+            published, version, _, _ = published_watch_state(DATA_ROOT)
+            draft = pd.read_csv(source, dtype={"code": str},
+                                keep_default_na=False, encoding="utf-8-sig")
+            draft = inherit_download_holds(draft, published)
+            draft.to_csv(source, index=False, encoding="utf-8-sig")
         rows = parse_watch_csv(source)
         if not self._midweek and any(r["phase"] == "PROVISIONAL_OUT" for r in rows):
             raise ValueError("complete Watch cannot contain provisional rows")
-        if rows and ({r["source_pool_date"] for r in rows} != {date} or
-                     {r["source_pool_codes_hash"] for r in rows} != {digest} or
-                     {r["snapshot_date"] for r in rows} != {date}):
+        if any(r["snapshot_date"] != date for r in rows):
             raise ValueError("Watch rows reference another Pool")
         self._watch_companion = dict(target=str(target_path), staged=str(staged_path),
-                                      date=date, digest=digest,
+                                      date=date, digest=digest, watch_version=version,
                                       sha=sha256(source.read_bytes()).hexdigest())
 
     def commit(self) -> None:
@@ -650,13 +658,27 @@ class BreakoutFollowPoolRun:
         if pool_identity(pool) != (art["date"], art["digest"]):
             raise RuntimeError("BF Pool changed after companion was attached")
         staged, published = Path(art["staged"]), Path(art["target"])
-        if staged.exists():
+
+        def prepare_locked_watch() -> None:
+            # Same managed publisher lock as manual Watch-only edits. Never
+            # overwrite the official file before validating its Git vintage.
+            if art["watch_version"] is not None:
+                _, current_version, _, _ = published_watch_state(DATA_ROOT)
+                if current_version != art["watch_version"]:
+                    raise RuntimeError(
+                        "published complete Watch changed since preparation; "
+                        "discard this run and rerun after checking external side effects"
+                    )
+            if not staged.is_file():
+                raise RuntimeError("staged Watch missing")
             if sha256(staged.read_bytes()).hexdigest() != art["sha"]:
                 raise RuntimeError("staged Watch mutated")
             os.replace(staged, published)
-        if not published.is_file() or sha256(published.read_bytes()).hexdigest() != art["sha"]:
-            raise RuntimeError("Watch companion missing or corrupt")
-        _commit_pool(self.path, extra_paths=[str(published)])
+            if not published.is_file() or sha256(published.read_bytes()).hexdigest() != art["sha"]:
+                raise RuntimeError("Watch companion missing or corrupt")
+
+        _commit_pool(self.path, extra_paths=[str(published)],
+                     before_stage=prepare_locked_watch)
         self._watch_companion = None
 
 
@@ -665,7 +687,8 @@ def _pit_store_path() -> str:
     return path if os.path.isabs(path) else os.path.join(DATA_ROOT, path)
 
 
-def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
+def _commit_managed_csv(paths: str | list[str], *, message: str,
+                        before_stage=None) -> None:
     """Publish only owned paths under a per-checkout lock, fail closed on drift.
 
     A Git commit cannot be pushed in isolation: push includes all its ancestors.
@@ -744,6 +767,13 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
             git("fetch", "--no-tags", "origin", "main")
             git("merge-base", "--is-ancestor", "origin/main", "HEAD")
             assert_outgoing_owned()
+            # This callback runs exactly once under the existing Git lock,
+            # after remote refresh and before any official file replacement.
+            commit_message = message
+            if before_stage is not None:
+                prepared_message = before_stage()
+                if prepared_message is not None:
+                    commit_message = prepared_message
 
             protected = ("us/breakout_follow_pool.csv",
                          "us/breakout_follow_pool_midweek.csv",
@@ -773,7 +803,7 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
                 if staged.returncode not in (0, 1):
                     raise subprocess.CalledProcessError(staged.returncode, staged.args)
                 if staged.returncode == 1:
-                    git("commit", "--only", "-m", message, "--", *staged_paths)
+                    git("commit", "--only", "-m", commit_message, "--", *staged_paths)
 
             assert_outgoing_owned()
             if output("rev-parse", "HEAD") == output("rev-parse", "origin/main"):
@@ -785,7 +815,8 @@ def _commit_managed_csv(paths: str | list[str], *, message: str) -> None:
             fcntl.flock(lock_handle, fcntl.LOCK_UN)
 
 
-def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> None:
+def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None,
+                 before_stage=None) -> None:
     """Commit only a pool that satisfies the current EPS publication contract."""
     if os.path.exists(pool_path):
         pool = pd.read_csv(pool_path, dtype={"code": str}, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
@@ -800,7 +831,65 @@ def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None) -> Non
     if extra_paths:
         source, digest = pool_identity(pool)
         message += f"\n\nWatch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}"
-    _commit_managed_csv(managed_paths, message=message)
+    _commit_managed_csv(managed_paths, message=message, before_stage=before_stage)
+
+
+def get_download_hold(code: str) -> dict:
+    """Query the current published COMPLETE Watch identity and manual reason."""
+    published, _, _, _ = published_watch_state(DATA_ROOT)
+    row = next((r for r in published if r["code"] == code), None)
+    if row is None:
+        raise ValueError(f"no official Watch record for {code}")
+    return {key: row.get(key, "") for key in (
+        "code", "watch_cycle_id", "phase", "download_hold_reason")}
+
+
+def set_download_hold(code: str, watch_cycle_id: str, reason: str) -> None:
+    """Set or clear exactly one manual field in the published active Cycle."""
+    from pool_exit_watch_store import ACTIVE_PHASES
+    if not code or not watch_cycle_id or not isinstance(reason, str):
+        raise ValueError("code, expected watch_cycle_id and string reason are required")
+    if len(reason) > 160 or reason != reason.strip() or any(ord(c) < 32 for c in reason):
+        raise ValueError("invalid hold reason")
+    root = Path(DATA_ROOT)
+    target = root / WATCH_COMPLETE
+
+    def prepare_locked_update() -> str:
+        # Must use paired authority and verify that local Pool/Watch still
+        # exactly match the published version. Never modify dirty snapshots.
+        active_watch_codes(root, required=True)
+        official, _, source, digest = published_watch_state(root)
+        frame = pd.read_csv(target, dtype={"code": str},
+                            keep_default_na=False, encoding="utf-8-sig")
+        parse_watch_csv(target)
+        matched = [i for i, row in frame.iterrows() if
+                   row["code"] == code and row["watch_cycle_id"] == watch_cycle_id]
+        if len(matched) != 1:
+            raise ValueError("official Watch Cycle identity is absent or stale")
+        idx = matched[0]
+        if frame.at[idx, "phase"] not in ACTIVE_PHASES:
+            raise ValueError("only an active official Watch Cycle may be held")
+        if not any(r["code"] == code and r["watch_cycle_id"] == watch_cycle_id
+                   and r["phase"] in ACTIVE_PHASES for r in official):
+            raise ValueError("official Watch Cycle identity changed")
+        frame.at[idx, "download_hold_reason"] = reason
+        from pool_exit_watch_store import parse_watch_frame
+        parse_watch_frame(frame)
+        fd, temp_path = tempfile.mkstemp(prefix=".watch-hold.", suffix=".pending",
+                                          dir=str(target.parent))
+        os.close(fd)
+        try:
+            frame.to_csv(temp_path, index=False, encoding="utf-8-sig")
+            os.replace(temp_path, target)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        return (f"Update BF Watch download hold for {code}\n\n"
+                f"Watch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}")
+
+    # Watch-only owner: never call _commit_pool, which also owns Pool/EPS PIT.
+    _commit_managed_csv([str(target)], message="Update BF Watch download hold",
+                        before_stage=prepare_locked_update)
 
 
 __all__ = [
