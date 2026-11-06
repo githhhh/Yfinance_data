@@ -205,7 +205,8 @@ def apply_final_download_filter(tickers, *, held_codes, manual_csv=""):
     from market_universe import _normalize_code
     manual = {_normalize_code(code) for code in manual_csv.split(",")}
     excluded = set(held_codes) | (manual - {None})
-    return [code for code in tickers if code not in excluded], excluded
+    return [code for code in tickers
+            if _normalize_code(code) not in excluded], excluded
 
 
 def filter_schwab_stock_data(

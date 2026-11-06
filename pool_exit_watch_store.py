@@ -202,15 +202,16 @@ def published_watch_state(data_root: str | Path = ".") -> tuple[list[dict], str 
     def git_bytes(*args: str) -> bytes:
         return subprocess.check_output(["git", "-C", str(root), *args])
     try:
-        raw = git_bytes("show", "origin/main:us/breakout_follow_pool.csv")
+        pinned_ref = git_bytes("rev-parse", "origin/main").decode().strip()
+        raw = git_bytes("show", f"{pinned_ref}:us/breakout_follow_pool.csv")
         pool = pd.read_csv(io.BytesIO(raw), dtype={"code": str}, keep_default_na=False)
         source, digest = pool_identity(pool)
         complete_snapshot_week(date.fromisoformat(source))
         week = monday_of_week(date.fromisoformat(source)).isoformat()
-        rows = official_watch_for_week(root, week)
+        rows = official_watch_for_week(root, week, ref=pinned_ref)
         if rows is None:
             raise RuntimeError("latest published Pool/Watch is not paired")
-        version = git_bytes("log", "-1", "--format=%H", "origin/main",
+        version = git_bytes("log", "-1", "--format=%H", pinned_ref,
                             "--", WATCH_COMPLETE).decode().strip()
         if not version:
             raise RuntimeError("official Watch has no Git version")
@@ -241,8 +242,6 @@ def watch_frame(rows: list[dict], *, snapshot_date: str, pool_codes_hash: str) -
     for row in rows:
         rendered = {name: row.get(name, "") for name in COLUMNS}
         rendered["snapshot_date"] = snapshot_date
-        rendered["source_pool_date"] = snapshot_date
-        rendered["source_pool_codes_hash"] = pool_codes_hash
         rendered["events"] = json.dumps(row.get("events") or [], ensure_ascii=False, separators=(",", ":"))
         output.append(rendered)
     frame = pd.DataFrame(output, columns=COLUMNS)
@@ -300,7 +299,8 @@ def watch_was_ever_published(data_root: str | Path = ".") -> bool:
         "origin/main", "--format=%H", "--", WATCH_COMPLETE], text=True).strip())
 
 
-def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | None:
+def official_watch_for_week(data_root: str | Path, week: str, *,
+                            ref: str = "origin/main") -> list[dict] | None:
     """Find the latest published Pool/Watch pair, including unchanged empty CSV."""
     import subprocess
     import io
@@ -309,7 +309,7 @@ def official_watch_for_week(data_root: str | Path, week: str) -> list[dict] | No
 
     root = Path(data_root)
     refs = subprocess.check_output([
-        "git", "-C", str(root), "log", "origin/main", "--first-parent",
+        "git", "-C", str(root), "log", ref, "--first-parent",
         "--format=%H", "--", "us/breakout_follow_pool.csv", WATCH_COMPLETE
     ], text=True)
     for ref in refs.splitlines():

@@ -872,6 +872,9 @@ def set_download_hold(code: str, watch_cycle_id: str, reason: str) -> None:
         if not any(r["code"] == code and r["watch_cycle_id"] == watch_cycle_id
                    and r["phase"] in ACTIVE_PHASES for r in official):
             raise ValueError("official Watch Cycle identity changed")
+        if frame.at[idx, "download_hold_reason"] == reason:
+            return (f"Update BF Watch download hold for {code}\n\n"
+                    f"Watch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}")
         frame.at[idx, "download_hold_reason"] = reason
         from pool_exit_watch_store import parse_watch_frame
         parse_watch_frame(frame)

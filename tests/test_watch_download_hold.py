@@ -85,7 +85,8 @@ def test_hold_excludes_even_if_independently_selected_and_preserves_normal_list(
     all_sources = ["A", "BRK-B", "LXP", "OTHER"]
     assert apply_final_download_filter(all_sources, held_codes=[])[0] == all_sources
     filtered, excluded = apply_final_download_filter(
-        all_sources, held_codes=store.held_watch_codes(tmp_path), manual_csv="LXP")
+        all_sources + ["BRK.B"], held_codes=store.held_watch_codes(tmp_path),
+        manual_csv="LXP")
     assert filtered == ["A", "OTHER"]
     assert excluded == {"BRK-B", "LXP"}
 
