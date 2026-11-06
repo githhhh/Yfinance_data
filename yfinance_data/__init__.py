@@ -627,12 +627,15 @@ class BreakoutFollowPoolRun:
         # The authority owns manual fields. Merge them once, BEFORE binding
         # the existing staged-file digest; the Watch engine remains unaware.
         version = None
-        if not self._midweek:
+        draft = pd.read_csv(source, dtype={"code": str},
+                            keep_default_na=False, encoding="utf-8-sig")
+        if self._midweek:
+            # Provisional projection never publishes a manual control value.
+            draft["download_hold_reason"] = ""
+        else:
             published, version, _, _ = published_watch_state(DATA_ROOT)
-            draft = pd.read_csv(source, dtype={"code": str},
-                                keep_default_na=False, encoding="utf-8-sig")
             draft = inherit_download_holds(draft, published)
-            draft.to_csv(source, index=False, encoding="utf-8-sig")
+        draft.to_csv(source, index=False, encoding="utf-8-sig")
         rows = parse_watch_csv(source)
         if not self._midweek and any(r["phase"] == "PROVISIONAL_OUT" for r in rows):
             raise ValueError("complete Watch cannot contain provisional rows")
