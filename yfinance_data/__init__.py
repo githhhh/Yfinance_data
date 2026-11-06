@@ -627,7 +627,7 @@ class BreakoutFollowPoolRun:
         # The authority owns manual fields. Merge them once, BEFORE binding
         # the existing staged-file digest; the Watch engine remains unaware.
         version = None
-        draft = pd.read_csv(source, dtype={"code": str},
+        draft = pd.read_csv(source, dtype={"code": str, "download_hold_reason": str},
                             keep_default_na=False, encoding="utf-8-sig")
         if self._midweek:
             # Provisional projection never publishes a manual control value.
@@ -866,7 +866,7 @@ def set_download_hold(code: str, watch_cycle_id: str, reason: str) -> None:
         # exactly match the published version. Never modify dirty snapshots.
         active_watch_codes(root, required=True)
         official, _, source, digest = published_watch_state(root)
-        frame = pd.read_csv(target, dtype={"code": str},
+        frame = pd.read_csv(target, dtype={"code": str, "download_hold_reason": str},
                             keep_default_na=False, encoding="utf-8-sig")
         parse_watch_csv(target)
         matched = [i for i, row in frame.iterrows() if
