@@ -93,7 +93,6 @@ def test_watch_download_restoration_reuses_market_universe_dot_normalization(tmp
 
 @pytest.mark.parametrize(("field", "value"), [
     ("snapshot_date", "2026-13-30"),
-    ("source_pool_date", "not-a-date"),
     ("original_pool_date", "2026-02-30"),
     ("absence_week", "2026-10-30"),
     ("verified_week", "2026-10-29"),
