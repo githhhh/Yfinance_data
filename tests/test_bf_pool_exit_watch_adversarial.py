@@ -328,6 +328,16 @@ def test_all_data_writers_share_single_owned_publisher():
     assert "git push origin HEAD:main" not in local
 
 
+def test_combined_manual_workflow_passes_temporary_download_exclusions_to_both_periods():
+    source = (Path(__file__).parents[1] / ".github/workflows/data-update.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "exclude_tickers:" in source
+    assert "github.event.inputs.exclude_tickers" in source
+    assert source.count('--exclude-tickers="${EXCLUDE_TICKERS}"') == 2
+
+
 
 def test_bootstrap_publishes_once_and_unblocks_download(tmp_path, monkeypatch):
     import yfinance_data as authority
