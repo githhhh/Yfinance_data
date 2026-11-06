@@ -106,7 +106,7 @@ def parse_watch_csv(path: str | Path) -> list[dict]:
     source = Path(path)
     if not source.exists():
         return []
-    frame = pd.read_csv(source, dtype={"code": str}, encoding="utf-8-sig", keep_default_na=False)
+    frame = pd.read_csv(source, dtype={"code": str, "download_hold_reason": str}, encoding="utf-8-sig", keep_default_na=False)
     return parse_watch_frame(frame)
 
 
@@ -327,7 +327,7 @@ def official_watch_for_week(data_root: str | Path, week: str, *,
                 return None
             blob = subprocess.check_output(["git", "-C", str(root), "show",
                                             f"{ref}:{WATCH_COMPLETE}"])
-            frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str}, keep_default_na=False)
+            frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str, "download_hold_reason": str}, keep_default_na=False)
             rows = parse_watch_frame(frame)
             if any(row["phase"] == "PROVISIONAL_OUT" for row in rows):
                 return None

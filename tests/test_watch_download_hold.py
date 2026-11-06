@@ -215,3 +215,37 @@ def test_real_managed_git_lock_rejects_stale_companion_before_replace(tmp_path, 
     assert pending.exists()
     from hashlib import sha256
     assert sha256(pending.read_bytes()).hexdigest() == staged_digest
+
+
+
+@pytest.mark.parametrize("reason", ["404", "True"])
+def test_numeric_like_hold_survives_publish_read_and_resume(tmp_path, monkeypatch, reason):
+    """A legal reason must never be inferred as a number or boolean by pandas."""
+    import yfinance_data as authority
+
+    root = official_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    target = root / store.WATCH_COMPLETE
+    pool_before = (root / "us/breakout_follow_pool.csv").read_bytes()
+    row_before = store.parse_watch_csv(target)[0]
+
+    authority.set_download_hold("A", "A:2026-10-26", reason)
+    published = store.parse_watch_csv(target)[0]
+    assert published["download_hold_reason"] == reason
+    assert isinstance(published["download_hold_reason"], str)
+    assert authority.get_download_hold("A")["download_hold_reason"] == reason
+    assert store.held_watch_codes(root, required=True) == ["A"]
+    assert store.official_watch_for_week(root, "2026-10-26")[0]["download_hold_reason"] == reason
+    rows, version, _, _ = store.published_watch_state(root)
+    assert version is not None and rows[0]["download_hold_reason"] == reason
+    assert {key: value for key, value in published.items()
+            if key != "download_hold_reason"} == {
+                key: value for key, value in row_before.items()
+                if key != "download_hold_reason"}
+
+    # The same string-typed frame must be editable, not just readable.
+    authority.set_download_hold("A", "A:2026-10-26", "")
+    assert store.parse_watch_csv(target)[0]["download_hold_reason"] == ""
+    assert authority.get_download_hold("A")["download_hold_reason"] == ""
+    assert store.held_watch_codes(root, required=True) == []
+    assert (root / "us/breakout_follow_pool.csv").read_bytes() == pool_before
