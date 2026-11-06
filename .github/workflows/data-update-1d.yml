@@ -8,6 +8,11 @@ on:
         required: false
         default: '2'
         type: string
+      exclude_tickers:
+        description: 'Manual-only temporary excluded symbols (comma-separated, e.g. LXP)'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: bf-stock-data-main-writers
@@ -63,9 +68,10 @@ jobs:
       - name: Run daily data download script
         env:
           DOWNLOAD_YEARS: ${{ github.event.inputs.years || '2' }}
+          EXCLUDE_TICKERS: ${{ github.event.inputs.exclude_tickers || '' }}
         run: |
           echo "Daily data execution started at: $(date +"%Y-%m-%d %H:%M:%S %Z"), period=${DOWNLOAD_YEARS}y"
-          python DataStore.py --period="${DOWNLOAD_YEARS}y" --interval=1d --skip-screener
+          python DataStore.py --period="${DOWNLOAD_YEARS}y" --interval=1d --skip-screener --exclude-tickers="${EXCLUDE_TICKERS}"
           echo "Daily data execution completed at: $(date +"%Y-%m-%d %H:%M:%S %Z")"
 
       - name: Clean old data files (Keep today only)
