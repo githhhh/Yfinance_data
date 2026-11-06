@@ -96,7 +96,11 @@ def test_manual_watch_only_commit_has_pair_trailers_and_does_not_change_pool(tmp
     root = official_repo(tmp_path)
     monkeypatch.setattr(authority, "DATA_ROOT", str(root))
     pool_before = (root / "us/breakout_follow_pool.csv").read_bytes()
+    watch_before = store.parse_watch_csv(root / store.WATCH_COMPLETE)[0]
     authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    watch_after = store.parse_watch_csv(root / store.WATCH_COMPLETE)[0]
+    assert {k: v for k, v in watch_before.items() if k != "download_hold_reason"} == {
+        k: v for k, v in watch_after.items() if k != "download_hold_reason"}
     current = authority.get_download_hold("A")
     assert current["download_hold_reason"] == "REQUEST_ERROR"
     assert (root / "us/breakout_follow_pool.csv").read_bytes() == pool_before
