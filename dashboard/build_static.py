@@ -577,8 +577,12 @@ def build_watch_payload(data_root: Path) -> dict:
         except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
             errors[label] = type(exc).__name__
             continue
-        payload[label] = [{k: v for k, v in row.items() if k in allowed}
-                          for row in rows]
+        payload[label] = [
+            {**{k: v for k, v in row.items() if k in allowed},
+             "exit_count": sum(e.get("type") == "POOL_EXIT"
+                               for e in row["events"])}
+            for row in rows
+        ]
         payload["dates"][label] = source_date
         if label == "complete":
             payload["available"] = True

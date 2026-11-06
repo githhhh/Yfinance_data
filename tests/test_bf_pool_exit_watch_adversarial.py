@@ -115,8 +115,11 @@ def test_companion_survives_until_commit_and_rejects_pool_mutation(tmp_path,monk
     assert staged.exists() and not path.exists()
     pool[0]=old_pool
     published=[]
-    monkeypatch.setattr(authority,"_commit_pool",
-                       lambda path,extra_paths=None: published.extend(extra_paths or []))
+    def fake_commit(path, extra_paths=None, before_stage=None):
+        if before_stage is not None:
+            before_stage()
+        published.extend(extra_paths or [])
+    monkeypatch.setattr(authority, "_commit_pool", fake_commit)
     obj.commit()
     assert path.exists() and not staged.exists()
     assert str(path) in published

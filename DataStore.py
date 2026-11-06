@@ -200,6 +200,14 @@ def filter_downloaded_stock_data(
     return valid, sorted(excluded)
 
 
+def apply_final_download_filter(tickers, *, held_codes, manual_csv=""):
+    """One final filter for all strategy sources and both 1D/1W providers."""
+    from market_universe import _normalize_code
+    manual = {_normalize_code(code) for code in manual_csv.split(",")}
+    excluded = set(held_codes) | (manual - {None})
+    return [code for code in tickers if code not in excluded], excluded
+
+
 def filter_schwab_stock_data(
     stock_data, *, failed, expected_symbols, interval, failure_reasons=None
 ):
@@ -305,12 +313,11 @@ if __name__ == "__main__":
 
     # Final eligibility applies after Stage2, fallback, Pool and Watch unions.
     # The optional CLI exclusion is opt-in for manual recovery only.
-    from market_universe import _normalize_code
-    held = set(held_watch_codes(required=True))
-    manual = {_normalize_code(code) for code in args.exclude_tickers.split(",")}
-    excluded = held | (manual - {None})
+    tickers, excluded = apply_final_download_filter(
+        tickers, held_codes=held_watch_codes(required=True),
+        manual_csv=args.exclude_tickers,
+    )
     if excluded:
-        tickers = [code for code in tickers if code not in excluded]
         print(f"[Watch download hold] excluded: {sorted(excluded)}")
 
     if not tickers:
