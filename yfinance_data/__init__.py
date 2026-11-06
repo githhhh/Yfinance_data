@@ -834,7 +834,11 @@ def _commit_pool(pool_path: str, *, extra_paths: list[str] | None = None,
     if extra_paths:
         source, digest = pool_identity(pool)
         message += f"\n\nWatch-Source-Date: {source}\nWatch-Codes-SHA256: {digest}"
-    _commit_managed_csv(managed_paths, message=message, before_stage=before_stage)
+    if before_stage is None:
+        _commit_managed_csv(managed_paths, message=message)
+    else:
+        _commit_managed_csv(managed_paths, message=message,
+                            before_stage=before_stage)
 
 
 def get_download_hold(code: str) -> dict:
