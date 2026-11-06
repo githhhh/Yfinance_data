@@ -172,3 +172,46 @@ def test_midweek_projection_never_carries_manual_hold(tmp_path, monkeypatch):
                            source_pool_date=when, source_pool_codes_hash=digest)
     assert store.parse_watch_csv(staged)[0]["download_hold_reason"] == ""
     assert run._watch_companion["watch_version"] is None
+
+
+
+def test_real_managed_git_lock_rejects_stale_companion_before_replace(tmp_path, monkeypatch):
+    """Exercise the real managed writer, not a mocked before_stage callback."""
+    import yfinance_data as authority
+    root = official_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+
+    next_pool = pd.DataFrame([{"code": "A", "snapshot_date": "2026-11-06"}])
+    when, digest = store.pool_identity(next_pool)
+    pending = root / "us/.stale-companion.pending"
+    store.watch_frame([{
+        "code": "A", "watch_cycle_id": "A:2026-10-26",
+        "phase": "OBSERVING", "events": [],
+    }], snapshot_date=when, pool_codes_hash=digest).to_csv(
+        pending, index=False, encoding="utf-8-sig")
+
+    run = authority.BreakoutFollowPoolRun.weekend()
+    monkeypatch.setattr(run, "ensure_current_snapshot", lambda: next_pool)
+    target = root / store.WATCH_COMPLETE
+    run.register_companion(
+        target_path=str(target), staged_path=str(pending),
+        source_pool_date=when, source_pool_codes_hash=digest)
+    staged_digest = run._watch_companion["sha"]
+
+    authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    published_head = git(root, "rev-parse", "origin/main")
+    published_watch = target.read_bytes()
+
+    def use_real_git_writer(_pool_path, *, extra_paths=None, before_stage=None):
+        authority._commit_managed_csv(
+            extra_paths or [], message="stale run should never commit",
+            before_stage=before_stage)
+
+    monkeypatch.setattr(authority, "_commit_pool", use_real_git_writer)
+    with pytest.raises(RuntimeError, match="changed since preparation"):
+        run.commit()
+    assert git(root, "rev-parse", "origin/main") == published_head
+    assert target.read_bytes() == published_watch
+    assert pending.exists()
+    from hashlib import sha256
+    assert sha256(pending.read_bytes()).hexdigest() == staged_digest
