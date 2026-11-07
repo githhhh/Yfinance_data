@@ -95,9 +95,15 @@ const near = row("NEAR", {
   bf_watch_active: true, review_a_active: false, review_b_active: false,
   bf_watch_type: "pivot", bf_watch_trigger_price: 180, ibd_entry_status: null,
 });
+// This fixture simulates an established Midweek comparison, independent of the
+// current published data (which can correctly have no comparison history).
 payload.default_period = "MIDWEEK";
 payload.meta.midweek_available = true;
 payload.meta.midweek_baseline_available = true;
+payload.meta.complete_snapshot_date = "2026-10-09";
+payload.meta.midweek_snapshot_date = "2026-10-14";
+payload.meta.review_comparison_basis = "MIDWEEK";
+payload.meta.review_comparison_date = "2026-10-13";
 payload.views.midweek.rows = [aOnly, belowOut, bOnly, dual, poolOnly, returned, revertedZone, near];
 
 const server = spawn("python", ["-m", "http.server", String(port), "--directory", root], { stdio: "ignore" });
