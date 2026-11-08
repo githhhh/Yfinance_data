@@ -89,7 +89,8 @@ const waitForServer = async () => {
       assert((await page.locator("#rows tr").first().innerText()).includes("CONFIRM"),
         "Verified event comes before ordinary Pending");
       const confirm=page.locator('#rows tr[data-code="CONFIRM"]');
-      assert((await confirm.innerText()).includes("1W"),"Lost → Confirm uses verified calendar weeks");
+      assert((await confirm.locator("td").nth(3).textContent()).includes("1W"),
+        "Lost → Confirm uses verified calendar weeks, even when mobile hides secondary columns");
       assert(!(await page.locator('#rows tr[data-code="BLOCKED"]').innerText()).includes("Pending Confirmed"),
         "Historical blocked confirmation is not a new event");
       assert((await page.locator('#rows tr[data-code="RETURNED"]').innerText()).includes("Returned"),
