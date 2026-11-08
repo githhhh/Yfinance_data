@@ -249,8 +249,15 @@ async function ready() {
       const selected = await page.locator(".selected-strip").innerText();
       assert(selected.includes("Weekend Buy Point 170"), "All Review restores A primary");
 
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
-      assert(!overflow, "No body-level horizontal overflow at " + viewport.width);
+      const overflow = await page.evaluate(() => {
+        const shell = document.querySelector(".results-section .table-shell");
+        return {
+          body: document.documentElement.scrollWidth > window.innerWidth + 2,
+          table: shell && shell.scrollWidth > shell.clientWidth + 2,
+        };
+      });
+      assert(!overflow.body, "No body-level horizontal overflow at " + viewport.width);
+      assert(!overflow.table, "Stock table must fit without horizontal scrolling at " + viewport.width);
       await page.evaluate(() => {
         window.BFIndustryRS = {
           status: () => "ready", industryForCode: () => "Software",
