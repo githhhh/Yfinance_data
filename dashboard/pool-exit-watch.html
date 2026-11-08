@@ -94,6 +94,11 @@
  .watch-detail-row .watch-selected-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
  .watch-detail-row .watch-fact strong{font-size:13px}
 }
+@media(max-width:480px){
+ .watch-toolbar{display:block}
+ .watch-toolbar-right{justify-content:flex-start;flex-wrap:wrap;margin-top:7px}
+ .watch-filter{min-width:0}
+}
 @media(max-width:359px){
  .watch-table th,.watch-table td{padding-left:4px;padding-right:4px}
  .watch-toolbar select{max-width:94px}
@@ -132,7 +137,7 @@ function age(start,end){var s=week(start),e=week(end);if(!s||!e)return null;var 
 function events(row){return Array.isArray(row.events)?row.events:[]}
 function inWeek(row,type,snapshotWeek){return events(row).some(function(e){return e.type===type&&e.week===snapshotWeek})}
 function priorLost(row,limit){var matching=events(row).filter(function(e){return e.type==="CEILING_LOST"&&e.week<=limit});return matching.length?matching[matching.length-1]:null}
-function selectedView(row){var e=events(row),latest=e.filter(function(x){return x.type==="PENDING_CONFIRMED"}).slice(-1)[0],lost=latest?priorLost(row,latest.week):null,elapsed=latest&&lost?age(lost.week,latest.week):null;var msg="";
+function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
  if(row.pending_status==="PENDING_BLOCKED"){var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];msg="Historical first pullback confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" already consumed by the BF scanner; not a new Pending trigger.";}
  else if(row.pending_status==="PENDING"){msg="Pending is not a confirmation. Waiting for a verified close above Pending High; proximity alone has no signal priority.";}
  else if(row.pending_status==="CONFIRMED"){msg="First pullback confirmed in this market snapshot.";}
@@ -142,7 +147,7 @@ function selectedView(row){var e=events(row),latest=e.filter(function(x){return 
  var ordered=e.slice().sort(function(a,b){return String(a.week).localeCompare(String(b.week))||String(a.type).localeCompare(String(b.type))});
  var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap"};
  var timeline=(row.breakout_date?'<span class="watch-node">Breakout · '+esc(row.breakout_date)+'</span>':"")+ordered.map(function(x){return '<span class="watch-node '+(x.type==="PENDING_CONFIRMED"||x.type==="CEILING_RECLAIMED"?"important":"")+'" title="'+esc(x.censored_by_gap?"Observed by this week; exact crossing date unavailable":x.week||"")+'">'+esc(labels[x.type]||x.type)+" · "+esc(x.week||"")+(x.type==="POOL_EXIT"&&x.reason?" · "+esc(x.reason):"")+(x.censored_by_gap?" *":"")+"</span>"}).join("");
- var duration=elapsed!==null?" · Lost → Confirm: "+elapsed+" calendar week"+(elapsed===1?"":"s"):"";
+ var duration=interval.short!=="—"?" · "+interval.long:"";
  var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
  return '<div class="watch-selected-head"><strong class="watch-selected-code">'+esc(row.code)+'</strong><span class="watch-selected-label">'+esc(pathLabel(row,week(row.snapshot_date)))+' · '+esc(row.phase||"")+'</span></div>'+
  '<div class="watch-selected-facts"><div class="watch-fact"><small>Original Ceiling</small><strong>'+esc(money(row.original_ceiling))+'</strong></div><div class="watch-fact"><small>Latest Close</small><strong>'+esc(money(row.latest_close))+'</strong></div><div class="watch-fact"><small>Vs Original</small><strong>'+esc(pct(row.vs_original_pct))+'</strong></div><div class="watch-fact"><small>Pending High</small><strong>'+esc(money(row.pending_high))+'</strong></div></div>'+
@@ -162,11 +167,12 @@ function pathLabel(r,w){
  return r.price_state==="ABOVE_ORIGINAL"?"Above Original":"Unverified";
 }
 function pathAge(r,snap){
+ var l=priorLost(r,snap);
  var c=events(r).filter(function(e){return e.type==="PENDING_CONFIRMED"&&e.week<=snap}).slice(-1)[0];
- var l=c?priorLost(r,c.week):priorLost(r,snap);
- var n=l?age(l.week,c?c.week:snap):null;
- if(n===null)return {short:"—",long:"No verified Lost → Confirm interval"};
- return {short:(l.censored_by_gap?"≥":"")+n+"W",long:(c?"Observed Lost → Pending Confirmed: ":"Since observed Ceiling Lost: ")+n+" calendar weeks"+(l.censored_by_gap?" (crossing week censored)":"")};
+ var confirmed=!!(l&&c&&c.week>=l.week), n=l?age(l.week,confirmed?c.week:snap):null;
+ if(n===null)return {short:"—",long:"No verified Ceiling Lost interval"};
+ var label=confirmed?(n===0?"Lost and Confirm observed in same week; order unknown":"Lost → Confirm: "+n+" calendar week"+(n===1?"":"s")):"Since observed Lost: "+n+" calendar week"+(n===1?"":"s");
+ return {short:(l.censored_by_gap?"≥":"")+n+"W",long:label+(l.censored_by_gap?" (crossing week censored)":"")};
 }
 function visibleSource(){
  var period=$("period").value;
