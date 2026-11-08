@@ -67,6 +67,19 @@ const rows = [
       event("PENDING_BLOCKED","2026-11-02",{historical_confirmation:"2026-09-28"}),
       event("CEILING_RECLAIMED","2026-11-02")]
   }),
+  row("LATERRECLAIM", {
+    pending_status:"PENDING_BLOCKED", pending_high:106,
+    price_state:"ABOVE_ORIGINAL", vs_original_pct:7, latest_close:107,
+    events:[event("CEILING_LOST","2026-10-19"),
+      event("PENDING_CONFIRMED","2026-10-26"),
+      event("CEILING_RECLAIMED","2026-11-02")]
+  }),
+  row("CENSORED", {
+    pending_status:"PENDING",
+    price_state:"ABOVE_ORIGINAL", vs_original_pct:3, latest_close:103,
+    events:[event("CEILING_LOST","2026-10-26",{censored_by_gap:true}),
+      event("CEILING_RECLAIMED","2026-11-02")]
+  }),
   row("TESTX", {
     last_exit_reason:"NO_CEILING", pending_status:"NONE",
     events:[event("POOL_EXIT","2026-10-26",{reason:malicious})]
@@ -100,9 +113,9 @@ const waitForServer = async () => {
           dates:{complete:snap,midweek:"2026-10-28"},midweek_fallback:true})
       }));
       await page.goto("http://127.0.0.1:8766/pool-exit-watch.html",{waitUntil:"networkidle"});
-      assert.equal(await page.locator("#rows tr[data-code]").count(),10);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),12);
       assert.equal(await page.locator("#confirmed-count").innerText(),"2");
-      assert.equal(await page.locator("#reclaimed-count").innerText(),"2");
+      assert.equal(await page.locator("#reclaimed-count").innerText(),"3");
       assert((await page.locator("#rows tr").first().innerText()).includes("CONFIRM"),
         "Verified event comes before ordinary Pending");
       const confirm=page.locator('#rows tr[data-code="CONFIRM"]');
@@ -135,7 +148,11 @@ const waitForServer = async () => {
         "Confirmation without verified Lost stays out of first-pullback alerts");
       assert.equal(await page.locator("#confirmed").getAttribute("aria-pressed"),"true");
       await page.locator('[data-event-filter="CEILING_RECLAIMED"]').click();
-      assert.equal(await page.locator("#rows tr[data-code]").count(),2);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),3);
+      assert.equal(await page.locator('#rows tr[data-code="LATERRECLAIM"]').count(),1,
+        "Retain a later reclaim if first Pending confirmation occurred after verified Lost");
+      assert.equal(await page.locator('#rows tr[data-code="CENSORED"]').count(),0,
+        "Gap-censored Lost cannot be promoted to first-pullback event");
       assert.equal(await page.locator('#rows tr[data-code="PRIORRECLAIM"]').count(),0,
         "Reclaim after prior consumed confirmation is not a first-pullback event");
       assert.equal(await page.locator("#reclaimed").getAttribute("aria-pressed"),"true");
@@ -154,7 +171,7 @@ const waitForServer = async () => {
       await page.locator("#period").selectOption("midweek");
       assert((await page.locator("#asof").innerText()).includes("Midweek unavailable/stale"),
         "Stale Midweek is marked as Complete fallback");
-      assert.equal(await page.locator("#rows tr[data-code]").count(),10);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),12);
       assert.equal(await page.locator('#rows tr[data-code="OLD"]').count(),0);
       const visibleColumns=await page.locator(".watch-table thead th").evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=="none").length);
       assert.equal(visibleColumns,width>=521?5:width>=360?4:3,
