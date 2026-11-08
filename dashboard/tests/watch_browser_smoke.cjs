@@ -82,6 +82,20 @@ const rows = [
     events:[event("CEILING_LOST","2026-10-26",{censored_by_gap:true}),
       event("CEILING_RECLAIMED","2026-11-02")]
   }),
+  // Same market week can be both qualified and confirmed; no intrabar order
+  // is inferred, and the confirmation is not left marked as still pending.
+  row("SAMEWEEK", {
+    pending_status:"CONFIRMED", pending_high:95, latest_close:98,
+    events:[event("CEILING_LOST","2026-11-02"),event("PULLBACK_LOST","2026-11-02"),
+      event("PENDING_CONFIRMED","2026-11-02",{confirm_date:"2026-11-06"})]
+  }),
+  // A W2 confirmation discovered in W3 is a completed path but NOT a W3
+  // live Pending Confirmed alert.
+  row("LATECONFIRM", {
+    pending_status:"PENDING_BLOCKED", latest_close:99,
+    events:[event("CEILING_LOST","2026-10-19"),event("PULLBACK_LOST","2026-10-19"),
+      event("PENDING_BLOCKED","2026-11-02",{historical_confirmation:"2026-10-30"})]
+  }),
   row("TESTX", {
     last_exit_reason:"NO_CEILING", pending_status:"NONE",
     events:[event("POOL_EXIT","2026-10-26",{reason:malicious})]
@@ -115,8 +129,8 @@ const waitForServer = async () => {
           dates:{complete:snap,midweek:"2026-10-28"},midweek_fallback:true})
       }));
       await page.goto("http://127.0.0.1:8766/pool-exit-watch.html",{waitUntil:"networkidle"});
-      assert.equal(await page.locator("#rows tr[data-code]").count(),12);
-      assert.equal(await page.locator("#confirmed-count").innerText(),"2");
+      assert.equal(await page.locator("#rows tr[data-code]").count(),14);
+      assert.equal(await page.locator("#confirmed-count").innerText(),"3");
       assert.equal(await page.locator("#reclaimed-count").innerText(),"3");
       assert((await page.locator("#rows tr").first().innerText()).includes("CONFIRM"),
         "Verified event comes before ordinary Pending");
@@ -140,12 +154,22 @@ const waitForServer = async () => {
       assert((await details.innerText()).includes("Lost → Confirm: 1 calendar week"));
       assert((await details.innerText()).includes("Original Ceiling"));
       assert((await details.innerText()).includes("Breakout · 2026-09-07"));
+      await page.locator('#rows tr[data-code="SAMEWEEK"]').click();
+      const sameWeekDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      assert((await sameWeekDetails.innerText()).includes("Lost and Confirm observed in same week; order unknown"));
+      await page.locator('#rows tr[data-code="LATECONFIRM"]').click();
+      const delayedDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      const delayedText=await delayedDetails.innerText();
+      assert(delayedText.includes("First native pullback confirmation: 2026-10-30"));
+      assert(delayedText.includes("Discovered in week 2026-11-02; not a new signal this week."));
       await page.locator('#rows tr[data-code="RECLAIM"]').click();
       const reclaimDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
       assert((await reclaimDetails.innerText()).includes("Since qualified Lost: 1 calendar week"),
         "Unconfirmed observation shows age since the verified Lost, not time to an invented confirmation");
       await page.locator('[data-event-filter="PENDING_CONFIRMED"]').click();
-      assert.equal(await page.locator("#rows tr[data-code]").count(),2);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),3);
+      assert.equal(await page.locator('#rows tr[data-code="LATECONFIRM"]').count(),0,
+        "Historical confirmation discovered in this week cannot count as a new signal");
       assert.equal(await page.locator('#rows tr[data-code="FAKECONFIRM"]').count(),0,
         "Confirmation without verified Lost stays out of first-pullback alerts");
       assert.equal(await page.locator("#confirmed").getAttribute("aria-pressed"),"true");
