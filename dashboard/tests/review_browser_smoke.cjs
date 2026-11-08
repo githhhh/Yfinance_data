@@ -125,6 +125,7 @@ async function ready() {
   try {
     for (const viewport of [
       { width: 1680, height: 960 }, { width: 1360, height: 900 },
+      { width: 1200, height: 900 }, { width: 900, height: 900 }, { width: 800, height: 900 },
       { width: 1024, height: 900 }, { width: 760, height: 844 },
       { width: 430, height: 844 }, { width: 390, height: 844 },
       { width: 350, height: 844 }, { width: 320, height: 844 },
@@ -251,13 +252,25 @@ async function ready() {
 
       const overflow = await page.evaluate(() => {
         const shell = document.querySelector(".results-section .table-shell");
+        const table = shell?.querySelector(".review-table");
+        const fields = Array.from(table?.querySelectorAll("thead th[data-field]") || [])
+          .filter(th => getComputedStyle(th).display !== "none").map(th => th.dataset.field);
         return {
           body: document.documentElement.scrollWidth > window.innerWidth + 2,
           table: shell && shell.scrollWidth > shell.clientWidth + 2,
+          fields,
         };
       });
       assert(!overflow.body, "No body-level horizontal overflow at " + viewport.width);
       assert(!overflow.table, "Stock table must fit without horizontal scrolling at " + viewport.width);
+      if (viewport.width > 760) {
+        const expected = viewport.width >= 1200 ? 11 : viewport.width >= 900 ? 9 : 6;
+        assert.equal(overflow.fields.length, expected,
+          "Allocate desktop table width before hiding secondary columns at " + viewport.width);
+        assert(overflow.fields.includes("code") && overflow.fields.includes("ibd_entry_status") &&
+          overflow.fields.includes("current_vs_ibd_candidate_pct") && overflow.fields.includes("rs_percentile"),
+          "Keep primary decision columns visible on every desktop");
+      }
       await page.evaluate(() => {
         window.BFIndustryRS = {
           status: () => "ready", industryForCode: () => "Software",
