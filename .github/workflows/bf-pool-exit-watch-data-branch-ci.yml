@@ -1,7 +1,7 @@
 name: BF Pool Exit Watch Data Branch Check
 on:
   push:
-    branches: ['feat/bf-pool-exit-watch-v1', 'feat/bf-watch-download-hold-20261106']
+    branches: ['feat/bf-pool-exit-watch-v1', 'feat/bf-watch-download-hold-20261106', 'feat/watch-pullback-lost-contract-20261108']
   workflow_dispatch:
 
 permissions:
