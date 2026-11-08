@@ -63,6 +63,7 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
         if not isinstance(events, list):
             raise ValueError("Watch CSV events must be a JSON array")
         seen = set()
+        pullback_lost_count = 0
         for event in events:
             if not isinstance(event, dict) or not all(
                 isinstance(event.get(k), str) and event[k]
@@ -77,11 +78,15 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
                 event["type"] not in {"POOL_EXIT", "POOL_RETURN", "CEILING_LOST",
                                      "CEILING_RECLAIMED", "ZONE_TOUCH",
                                      "PENDING_CONFIRMED", "PENDING_BLOCKED",
-                                     "COVERAGE_GAP"}):
+                                     "PULLBACK_LOST", "COVERAGE_GAP"}):
                 raise ValueError("Watch CSV invalid event type or canonical week")
             if event["id"] != f'{event["type"]}:{event["week"]}' or event["id"] in seen:
                 raise ValueError("Watch CSV duplicate or mismatched event identity")
             seen.add(event["id"])
+            if event["type"] == "PULLBACK_LOST":
+                pullback_lost_count += 1
+                if pullback_lost_count > 1:
+                    raise ValueError("Watch CSV multiple PULLBACK_LOST in one Cycle")
             snapshot_date = row.get("snapshot_date")
             if snapshot_date:
                 current_date = date.fromisoformat(str(snapshot_date))

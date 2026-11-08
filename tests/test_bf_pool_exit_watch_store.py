@@ -132,3 +132,41 @@ def test_watch_csv_rejects_future_event_or_observation_anchor(tmp_path, future_f
                 pool_codes_hash="digest").to_csv(target, index=False)
     with pytest.raises(ValueError, match="future|after snapshot"):
         parse_watch_csv(target)
+
+
+def test_pullback_lost_event_contract_keeps_24_columns_and_legacy_rows(tmp_path):
+    target = tmp_path / "watch.csv"
+    first = {"id": "PULLBACK_LOST:2026-10-26", "type": "PULLBACK_LOST",
+             "week": "2026-10-26", "touch_date": "2026-10-30",
+             "pending_high": 102.0}
+    rows = [
+        {"code": "A", "phase": "OBSERVING", "watch_cycle_id": "A:2026-10-26",
+         "events": [first]},
+        {"code": "B", "phase": "OBSERVING", "watch_cycle_id": "B:2026-10-26",
+         "events": []},
+    ]
+    watch_frame(rows, snapshot_date="2026-10-30", pool_codes_hash="fixture").to_csv(
+        target, index=False)
+    parsed = parse_watch_csv(target)
+    assert len(parsed) == 2
+    assert parsed[0]["events"] == [first]
+    assert parsed[1]["events"] == []
+    import pandas as pd
+    assert len(pd.read_csv(target).columns) == 24
+
+
+def test_pullback_lost_event_must_be_unique_per_cycle_even_across_weeks(tmp_path):
+    target = tmp_path / "watch.csv"
+    rows = [{
+        "code": "A", "phase": "OBSERVING", "watch_cycle_id": "A:2026-10-26",
+        "events": [
+            {"id": "PULLBACK_LOST:2026-10-26", "type": "PULLBACK_LOST",
+             "week": "2026-10-26"},
+            {"id": "PULLBACK_LOST:2026-11-02", "type": "PULLBACK_LOST",
+             "week": "2026-11-02"},
+        ],
+    }]
+    watch_frame(rows, snapshot_date="2026-11-06", pool_codes_hash="fixture").to_csv(
+        target, index=False)
+    with pytest.raises(ValueError, match="multiple PULLBACK_LOST"):
+        parse_watch_csv(target)
