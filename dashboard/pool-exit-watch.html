@@ -160,46 +160,47 @@ function events(row){return Array.isArray(row.events)?row.events:[]}
 function inWeek(row,type,snapshotWeek){return events(row).some(function(e){return e.type===type&&e.week===snapshotWeek})}
 function priorLost(row,limit){var matching=events(row).filter(function(e){return e.type==="CEILING_LOST"&&e.week<=limit});return matching.length?matching[matching.length-1]:null}
 
-/* First-confirmation opportunity under the authoritative BF scanner.
-   This does not claim that every zone touch was physically the first touch:
-   the native scanner can revisit the zone until its FIRST confirmation. */
-function firstPullbackLost(r){
- var origin=week(r.breakout_date);
- if(!origin||num(r.original_ceiling)===null)return false;
- var lost=events(r).filter(function(e){
-  return e.type==="CEILING_LOST"&&!e.censored_by_gap&&week(e.week)>=origin;
- });
- if(!lost.length)return false;
- var nativePending=r.pending_status==="PENDING"||r.pending_status==="CONFIRMED";
- // Reclaimed may occur AFTER a verified first Pending confirmation; the native
- // scanner then reports PENDING_BLOCKED on later weeks. Preserve that path only
- // if this same Watch Cycle recorded the first confirmation AFTER its Lost.
- var confirmedAfterLost=lost.some(function(l){
-  return events(r).some(function(e){
-   return e.type==="PENDING_CONFIRMED"&&week(e.week)>=week(l.week);
-  });
- });
- return nativePending||confirmedAfterLost;
+/* Only Watch Engine establishes the lost-pullback path. */
+function qualification(row){
+ return events(row).find(function(e){return e.type==="PULLBACK_LOST"})||null;
 }
-function focusEvent(r,type,w){
- return firstPullbackLost(r)&&events(r).some(function(e){
-  return e.type===type&&e.week===w&&events(r).some(function(l){
-   return l.type==="CEILING_LOST"&&!l.censored_by_gap&&week(l.week)<=w;
-  });
+function confirmedOnPath(row){
+ var q=qualification(row);if(!q)return null;
+ var candidates=events(row).filter(function(e){
+  return e.type==="PENDING_CONFIRMED"||e.type==="PENDING_BLOCKED";
+ }).map(function(e){
+  var date=e.type==="PENDING_CONFIRMED"?e.confirm_date:e.historical_confirmation;
+  var w=week(date);return w&&w>=q.week?{date:date,week:w,discovered:e.week,type:e.type}:null;
+ }).filter(Boolean);
+ candidates.sort(function(a,b){return a.week.localeCompare(b.week)});
+ return candidates.length?candidates[0]:null;
+}
+function focusEvent(row,type,w){
+ var q=qualification(row);if(!q)return false;
+ return events(row).some(function(e){
+  return e.type===type&&e.week===w&&e.week>=q.week;
  });
 }
 
 function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
- if(row.pending_status==="PENDING_BLOCKED"){var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];msg=firstPullbackLost(row)?"This Watch Cycle already captured the first confirmation after verified Lost. Later Ceiling reclaim is an independent event, not a second Pending confirmation.":"Historical first pullback confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" was already consumed before this Watch path; not a new Pending trigger.";}
- else if(row.pending_status==="PENDING"){msg=firstPullbackLost(row)?"The original BF first-confirmation opportunity remains pending after a verified Ceiling Lost. The native scanner may include repeated zone touches before this first confirmation; proximity alone has no priority.":"A native Pending exists, but this Watch Cycle has no verified Ceiling Lost. Do not infer a Lost → Confirm path.";}
- else if(row.pending_status==="CONFIRMED"){msg="First pullback confirmed in this market snapshot.";}
- else if(row.pending_status==="HISTORY_UNAVAILABLE"||row.pending_status==="SCALE_UNVERIFIED"){msg="Pending evidence unavailable or price scale unverified; no inferred confirmation.";}
- else if(row.pending_status==="UNVERIFIED"){msg="Pending evidence unavailable at this snapshot.";}
- else{msg="No active first-pullback Pending confirmation.";}
- if(!firstPullbackLost(row)&&events(row).some(function(x){return x.type==="CEILING_LOST"}))msg+=" Lost alone does not verify the native first Ceiling Pullback; see original scanner evidence.";
+ var q=qualification(row),completed=confirmedOnPath(row);
+ if(q&&completed){
+  msg="First native pullback confirmation: "+completed.date+".";
+  if(completed.type==="PENDING_BLOCKED")msg+=" Discovered in week "+completed.discovered+"; not a new signal this week.";
+  if(row.pending_status==="HISTORY_UNAVAILABLE"||row.pending_status==="SCALE_UNVERIFIED")msg+=" Current scanner evidence unavailable; historical completion remains valid.";
+ }else if(q&&row.pending_status==="PENDING"){
+  msg="Verified lost-pullback path · awaiting the native first confirmation.";
+ }else if(q){
+  msg="Verified lost-pullback path · confirmation not yet established. Missing history does not cancel its qualification.";
+ }else if(row.pending_status==="PENDING_BLOCKED"){
+  var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];
+  msg="Historical first confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" without a verified lost-pullback qualification.";
+ }else{
+  msg="Pullback Lost qualification not established. Generic BF Exit Watch remains available.";
+ }
  var ordered=e.slice().sort(function(a,b){return String(a.week).localeCompare(String(b.week))||String(a.type).localeCompare(String(b.type))});
- var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap"};
- var timeline=(row.breakout_date?'<span class="watch-node">Breakout · '+esc(row.breakout_date)+'</span>':"")+ordered.map(function(x){return '<span class="watch-node '+(x.type==="PENDING_CONFIRMED"||x.type==="CEILING_RECLAIMED"?"important":"")+'" title="'+esc(x.censored_by_gap?"Observed by this week; exact crossing date unavailable":x.week||"")+'">'+esc(labels[x.type]||x.type)+" · "+esc(x.week||"")+(x.type==="POOL_EXIT"&&x.reason?" · "+esc(x.reason):"")+(x.censored_by_gap?" *":"")+"</span>"}).join("");
+ var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",PULLBACK_LOST:"Pullback Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap"};
+ var timeline=(row.breakout_date?'<span class="watch-node">Breakout · '+esc(row.breakout_date)+'</span>':"")+ordered.map(function(x){return '<span class="watch-node '+(x.type==="PENDING_CONFIRMED"||x.type==="CEILING_RECLAIMED"?"important":"")+'" title="'+esc(x.censored_by_gap?"Observed by this week; exact crossing date unavailable":x.week||"")+'">'+esc(labels[x.type]||x.type)+" · "+esc(x.week||"")+(x.type==="POOL_EXIT"&&x.reason?" · "+esc(x.reason):"")+(x.type==="PENDING_BLOCKED"&&x.historical_confirmation?" · confirmed "+esc(x.historical_confirmation):"")+(x.censored_by_gap?" *":"")+"</span>"}).join("");
  var duration=interval.short!=="—"?" · "+interval.long:"";
  var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
  return '<div class="watch-selected-head"><strong class="watch-selected-code">'+esc(row.code)+'</strong><span class="watch-selected-label">'+esc(pathLabel(row,week(row.snapshot_date)))+' · '+esc(row.phase||"")+'</span></div>'+
@@ -214,7 +215,7 @@ function pathLabel(r,w){
  if(r.phase==="RETURNED")return "Returned"+(r.pending_status==="PENDING"?" · Pending":"");
  if(r.phase==="AWAITING_DATA")return "No Data";
  if(r.phase==="PROVISIONAL_OUT")return "Provisional Out";
- if(firstPullbackLost(r))return "Lost · Pending";
+ if(qualification(r))return confirmedOnPath(r)?"Pullback Confirmed":r.pending_status==="PENDING"?"Lost · Pending":"Lost · Watching";
  if(r.price_state==="BELOW_ORIGINAL")return "Ceiling Lost";
  if(r.pending_status==="PENDING")return "Above · Pending";
  if(inWeek(r,"CEILING_RECLAIMED",w))return "Ceiling Reclaimed · PB unverified";
@@ -223,12 +224,11 @@ function pathLabel(r,w){
  return r.price_state==="ABOVE_ORIGINAL"?"Above Original":"Unverified";
 }
 function pathAge(r,snap){
- var l=priorLost(r,snap);
- var c=events(r).filter(function(e){return e.type==="PENDING_CONFIRMED"&&e.week<=snap}).slice(-1)[0];
- var confirmed=!!(l&&c&&c.week>=l.week), n=l?age(l.week,confirmed?c.week:snap):null;
- if(n===null)return {short:"—",long:"No verified Ceiling Lost interval"};
- var label=confirmed?(n===0?"Lost and Confirm observed in same week; order unknown":"Lost → Confirm: "+n+" calendar week"+(n===1?"":"s")):"Since observed Lost: "+n+" calendar week"+(n===1?"":"s");
- return {short:(l.censored_by_gap?"≥":"")+n+"W",long:label+(l.censored_by_gap?" (crossing week censored)":"")};
+ var q=qualification(r),done=confirmedOnPath(r);
+ var n=q?age(q.week,done?done.week:snap):null;
+ if(n===null)return {short:"—",long:"No verified Pullback Lost qualification"};
+ var label=done?(n===0?"Lost and Confirm observed in same week; order unknown":"Lost → Confirm: "+n+" calendar week"+(n===1?"":"s")):"Since qualified Lost: "+n+" calendar week"+(n===1?"":"s");
+ return {short:n+"W",long:label};
 }
 function visibleSource(){
  var period=$("period").value;
@@ -249,19 +249,19 @@ function rerender(){
  var reason=$("reason").value;
  currentRows=display.filter(function(r){return (reason==="ALL"||r.last_exit_reason===reason)&&(!eventFilter||focusEvent(r,eventFilter,w))});
  currentRows.sort(function(a,b){
-  var rank=function(r){return focusEvent(r,"PENDING_CONFIRMED",w)?0:focusEvent(r,"CEILING_RECLAIMED",w)?1:firstPullbackLost(r)?2:r.phase==="RETURNED"?3:4};
+  var rank=function(r){return focusEvent(r,"PENDING_CONFIRMED",w)?0:focusEvent(r,"CEILING_RECLAIMED",w)?1:qualification(r)?2:r.phase==="RETURNED"?3:4};
   return rank(a)-rank(b)||String(a.code).localeCompare(String(b.code))
  });
  $("list-title").textContent=(eventFilter==="PENDING_CONFIRMED"?"Pending Confirmed":eventFilter==="CEILING_RECLAIMED"?"Ceiling Reclaimed":"Observation")+" · "+currentRows.length;
  $("rows").innerHTML=currentRows.length?currentRows.map(function(r){
   var t=pathLabel(r,w),v=num(r.vs_original_pct),interval=pathAge(r,w),emph=focusEvent(r,"PENDING_CONFIRMED",w)||focusEvent(r,"CEILING_RECLAIMED",w);
-  var status=r.pending_status==="PENDING_BLOCKED"?"First confirmation earlier":firstPullbackLost(r)?"Native first confirmation pending":r.pending_status==="PENDING"?"Pending without verified Lost":r.phase==="RETURNED"?"Back in BF Pool":"";
+  var status=qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
   return '<tr data-code="'+esc(r.code)+'" tabindex="-1" aria-selected="'+(selectedCode===r.code?"true":"false")+'" class="'+(selectedCode===r.code?"is-selected":"")+'">'+
   '<td class="watch-code" title="'+esc(r.code)+'">'+esc(r.code)+'</td>'+
   '<td title="'+esc(t)+'"><span class="'+(emph?"watch-event-strong":"")+'">'+esc(t)+'</span>'+(status?'<small class="watch-row-sub">'+esc(status)+'</small>':"")+'</td>'+
   '<td class="'+(v!==null?(v<0?"watch-vs-negative":"watch-vs-positive"):"")+'">'+esc(pct(v))+'</td>'+
   '<td title="'+esc(interval.long)+'">'+esc(interval.short)+'</td><td>'+esc(r.last_exit_reason||"UNVERIFIED")+'</td></tr>';
- }).join(""):'<tr><td colspan="5" class="watch-no-rows">'+(eventFilter?"No native-first-pullback "+esc(eventFilter==="PENDING_CONFIRMED"?"confirmation":"Ceiling reclaim")+" in this snapshot.":"No matching observations.")+'</td></tr>';
+ }).join(""):'<tr><td colspan="5" class="watch-no-rows">'+(eventFilter?"No qualified pullback "+esc(eventFilter==="PENDING_CONFIRMED"?"confirmation":"Ceiling reclaim")+" in this snapshot.":"No matching observations.")+'</td></tr>';
  if(!currentRows.some(function(r){return r.code===selectedCode}))selectedCode=null;
  selectCode(selectedCode);
 }
