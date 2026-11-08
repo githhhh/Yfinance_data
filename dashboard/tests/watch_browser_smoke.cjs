@@ -104,6 +104,10 @@ const waitForServer = async () => {
       assert((await details.innerText()).includes("Lost → Confirm: 1 calendar week"));
       assert((await details.innerText()).includes("Original Ceiling"));
       assert((await details.innerText()).includes("Breakout · 2026-09-07"));
+      await page.locator('#rows tr[data-code="RECLAIM"]').click();
+      const reclaimDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      assert((await reclaimDetails.innerText()).includes("Since observed Lost: 1 calendar week"),
+        "Unconfirmed observation shows age since the verified Lost, not time to an invented confirmation");
       await page.locator('[data-event-filter="PENDING_CONFIRMED"]').click();
       assert.equal(await page.locator("#rows tr[data-code]").count(),2);
       assert.equal(await page.locator("#confirmed").getAttribute("aria-pressed"),"true");
@@ -132,7 +136,10 @@ const waitForServer = async () => {
         const table=document.querySelector(".watch-table");
         return {body:document.documentElement.scrollWidth,viewport:innerWidth,
           shellWidth:shell.clientWidth,shellScroll:shell.scrollWidth,
-          tableWidth:table.getBoundingClientRect().width};
+          tableWidth:table.getBoundingClientRect().width,
+          offenders:Array.from(document.querySelectorAll("body *")).filter(node=>{
+            const b=node.getBoundingClientRect();return b.width>0&&b.right>innerWidth+2;
+          }).slice(0,8).map(node=>node.tagName.toLowerCase()+"."+node.className)};
       });
       assert(dims.body<=dims.viewport+1,"Watch page-wide overflow at "+width+"px: "+JSON.stringify(dims));
       assert(dims.shellScroll<=dims.shellWidth+1,"Watch table scrolls sideways at "+width+"px: "+JSON.stringify(dims));
