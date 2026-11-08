@@ -12,8 +12,12 @@ def test_details_include_current_and_frozen_ceiling():
     root=Path(__file__).parents[1]
     page=(root/'pool-exit-watch.html').read_text(encoding='utf-8')
     builder=(root/'build_static.py').read_text(encoding='utf-8')
-    assert 'Old Ceiling:' in page and 'Current Ceiling:' in page
-    assert '"current_ceiling"' in builder
+    assert 'Original Ceiling' in page and 'Pending High' in page
+    assert 'Observed path' in page and 'Lost → Confirm' in page
+    assert '"original_ceiling"' in builder and '"current_ceiling"' in builder
+    # The page stays an event-first review, not a second BF strategy/scanner.
+    assert 'CEILING_RECLAIMED' in page and 'PENDING_CONFIRMED' in page
+    assert '"breakout_date", "absence_week", "current_in_pool"' in builder
 
 
 

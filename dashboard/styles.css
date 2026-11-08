@@ -1193,3 +1193,71 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 /* Short, self-explanatory hold states. Keep source provenance in details. */
 .change-still { color:#8f9dad; font-size:10px; font-weight:550; white-space:nowrap; }
 .change-help { margin-left:5px; color:#687c8e; font-size:10px; font-weight:normal; cursor:help; }
+
+
+/* Width-first review layout: all fields remain on desktop whenever they fit.
+   Prioritize horizontal space and compact typography BEFORE dropping columns.
+   Table and page must never require horizontal scrolling. */
+@media (width > 760px) {
+  .results-section .table-shell { overflow-x: hidden; overflow-y: auto; }
+  .results-section .review-table {
+    width: 100%; min-width: 0; table-layout: fixed;
+  }
+  .results-section .review-table th,
+  .results-section .review-table td {
+    min-width: 0; padding-left: 5px; padding-right: 5px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .results-section .review-table th {
+    font-size: 9px; letter-spacing: 0; white-space: normal;
+    overflow-wrap: normal; line-height: 1.1;
+  }
+  .results-section .review-table th[data-field="code"],
+  .results-section .review-table td[data-field="code"] { width: 7%; }
+  .results-section .review-table th[data-field="review_change_label"],
+  .results-section .review-table td[data-field="review_change_label"] { width: 14%; }
+  .results-section .review-table th[data-field="ibd_entry_status"],
+  .results-section .review-table td[data-field="ibd_entry_status"] { width: 15%; }
+  .results-section .review-table th[data-field="ibd_candidate_rule"],
+  .results-section .review-table td[data-field="ibd_candidate_rule"] { width: 8%; }
+  .results-section .review-table th[data-field="current_vs_ibd_candidate_pct"],
+  .results-section .review-table td[data-field="current_vs_ibd_candidate_pct"] { width: 9%; }
+  .results-section .review-table th[data-field="ibd_breakout_quality"],
+  .results-section .review-table td[data-field="ibd_breakout_quality"] { width: 11%; }
+  .results-section .review-table th[data-field="latest_close"],
+  .results-section .review-table td[data-field="latest_close"] { width: 7%; }
+  .results-section .review-table th[data-field="ibd_entry_vol_or_reject"],
+  .results-section .review-table td[data-field="ibd_entry_vol_or_reject"] { width: 12%; }
+  .results-section .review-table th[data-field="volume_ratio"],
+  .results-section .review-table td[data-field="volume_ratio"] { width: 6%; }
+  .results-section .review-table th[data-field="rs_percentile"],
+  .results-section .review-table td[data-field="rs_percentile"] { width: 6%; }
+  .results-section .review-table th[data-field="industry_rs"],
+  .results-section .review-table td[data-field="industry_rs"] { width: 5%; }
+}
+@media (width > 760px) and (width <= 1199px) {
+  /* Nine columns still fit at 1024px; remove verbose diagnostics first. */
+  .results-section .review-table [data-field="ibd_breakout_quality"],
+  .results-section .review-table [data-field="ibd_entry_vol_or_reject"] { display: none; }
+  .results-section .review-table [data-field="code"] { width: 9%; }
+  .results-section .review-table [data-field="review_change_label"] { width: 20%; }
+  .results-section .review-table [data-field="ibd_entry_status"] { width: 19%; }
+  .results-section .review-table [data-field="ibd_candidate_rule"] { width: 9%; }
+  .results-section .review-table [data-field="current_vs_ibd_candidate_pct"] { width: 12%; }
+  .results-section .review-table [data-field="latest_close"] { width: 10%; }
+  .results-section .review-table [data-field="volume_ratio"] { width: 7%; }
+  .results-section .review-table [data-field="rs_percentile"] { width: 7%; }
+  .results-section .review-table [data-field="industry_rs"] { width: 7%; }
+}
+@media (width > 760px) and (width <= 899px) {
+  /* Six decision columns at 800px; defer secondary values to Selected. */
+  .results-section .review-table [data-field="ibd_candidate_rule"],
+  .results-section .review-table [data-field="volume_ratio"],
+  .results-section .review-table [data-field="industry_rs"] { display: none; }
+  .results-section .review-table [data-field="code"] { width: 12%; }
+  .results-section .review-table [data-field="review_change_label"] { width: 24%; }
+  .results-section .review-table [data-field="ibd_entry_status"] { width: 25%; }
+  .results-section .review-table [data-field="current_vs_ibd_candidate_pct"] { width: 16%; }
+  .results-section .review-table [data-field="latest_close"] { width: 13%; }
+  .results-section .review-table [data-field="rs_percentile"] { width: 10%; }
+}

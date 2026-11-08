@@ -1,55 +1,297 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BF Pool Exit Watch</title><style>
-:root{color-scheme:dark}body{font:14px system-ui;background:#0c1016;color:#e7edf6}
-main{max-width:950px;margin:auto;padding:20px}a{color:#9fcaff}small{color:#97a8bd}
-select{background:#1b2636;color:#eee;padding:8px;border:1px solid #34465c;border-radius:6px}
-.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}.stats{display:flex;flex-wrap:wrap;gap:10px 16px;padding:12px;background:#192432}
-.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{border-collapse:collapse;width:100%;min-width:520px;font-size:13px;margin-top:15px}
-td,th{padding:12px 7px;text-align:left;border-bottom:1px solid #2b3545}
-th{color:#9cafc3}summary{cursor:pointer;color:#b5cdf0}pre{white-space:pre-wrap}
-@media(max-width:550px){main{padding:10px}td,th{padding:8px 3px;font-size:11px}}
-</style></head><body><main><p><a href="./index.html">Back to Pool</a></p>
-<h2>BF Pool Exit Watch</h2><small id="asof">Loading</small>
-<p>Why did it leave the Pool? Is its original Ceiling still intact?</p>
-<div class="toolbar"><select id="period"><option value="complete">Complete</option><option value="midweek">Midweek</option></select>
-<select id="reason"><option value="ALL">All reasons</option><option>CEILING</option><option>MA</option><option>NO_CEILING</option><option value="UNVERIFIED">UNVERIFIED</option></select></div>
-<div class="stats" id="stats"></div>
-<div class="table-scroll" role="region" aria-label="Exit Watch observations" tabindex="0"><table><thead><tr><th>Code</th><th>Reason</th><th>Vs Old</th><th>Observation</th><th>Detail</th></tr></thead>
-<tbody id="rows"></tbody></table></div></main>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1016">
+<title>BF Exit Watch</title>
+<link rel="stylesheet" href="./styles.css">
+<style>
+.watch-layout{max-width:1240px;min-width:0;margin:auto;padding:20px 24px 40px}
+.watch-back{display:inline-block;color:var(--muted);font-size:12px;text-decoration:none;margin-bottom:12px}
+.watch-back:hover{color:var(--cyan)}
+.watch-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:15px}
+.watch-heading h1{margin:0;font-size:27px;letter-spacing:-.035em}
+.watch-subtitle{margin:5px 0 0;color:var(--muted);font-size:12px}
+.watch-count{font-size:12px;color:var(--muted);white-space:nowrap}
+.watch-count strong{color:var(--text)}
+.watch-heading small{color:var(--muted)}
+.watch-events{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.watch-event{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:14px;text-align:left;color:var(--text);cursor:pointer;min-width:0}
+.watch-event:hover,.watch-event[aria-pressed="true"]{border-color:var(--cyan);background:#152b2d}
+.watch-event-label{display:block;font-size:12px;font-weight:750;letter-spacing:.02em}
+.watch-event-value{display:block;margin:8px 0 2px;font-size:25px;font-weight:800;font-variant-numeric:tabular-nums}
+.watch-event-caption{display:block;color:var(--muted);font-size:11px;line-height:1.35}
+.watch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0}
+.watch-title{font-size:15px;font-weight:800}
+.watch-toolbar-right{display:flex;align-items:center;gap:8px;min-width:0}
+.watch-toolbar select{min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--input);color:var(--text);padding:7px;font-size:12px}
+.watch-filter{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.watch-clear{padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:11px;cursor:pointer}
+.watch-selected{min-height:132px;border:1px solid var(--line);border-radius:9px 9px 0 0;background:var(--panel-soft);padding:13px 15px;margin-top:6px}
+.watch-empty-selected{font-size:12px;color:var(--muted);padding:35px 0;text-align:center}
+.watch-selected-head{display:flex;align-items:baseline;justify-content:space-between;gap:9px;margin-bottom:10px}
+.watch-selected-code{font-size:17px;font-weight:800;color:var(--cyan)}
+.watch-selected-label{font-size:11px;font-weight:700;color:#c7d6e2;text-align:right}
+.watch-selected-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.watch-fact{min-width:0}
+.watch-fact small{display:block;color:var(--muted-2);font-size:10px;margin-bottom:4px}
+.watch-fact strong{display:block;font-size:16px;font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.watch-selected-foot{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.4}
+.watch-selected-foot a{color:var(--cyan);white-space:nowrap}
+.watch-detail{border-top:1px solid var(--line-soft);margin-top:10px;padding-top:10px;font-size:11px;color:var(--muted);line-height:1.5}
+.watch-timeline{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0}
+.watch-node{display:inline-flex;align-items:center;max-width:100%;border:1px solid #354556;border-radius:5px;padding:4px 7px;color:#cbd8e5;font-size:10px;overflow-wrap:anywhere}
+.watch-node.important{border-color:#317c74;color:#8ce7d7}
+.watch-note{font-size:11px;color:#b9c6d4;overflow-wrap:anywhere}
+.watch-table-wrap{max-height:61vh;overflow-x:hidden;overflow-y:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 9px 9px;background:var(--panel-soft);overscroll-behavior:contain}
+.watch-table{width:100%;min-width:0;table-layout:fixed;border-spacing:0;border-collapse:separate;font-size:12px}
+.watch-table th{position:sticky;top:0;z-index:2;height:36px;background:#18212b;text-align:left;color:var(--muted);font-size:10px;font-weight:750;letter-spacing:.02em}
+.watch-table td{height:45px;color:#dde5ed;border-top:1px solid var(--line-soft);font-variant-numeric:tabular-nums}
+.watch-table th,.watch-table td{padding:7px 12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.watch-table th:nth-child(1),.watch-table td:nth-child(1){width:15%}
+.watch-table th:nth-child(2),.watch-table td:nth-child(2){width:34%}
+.watch-table th:nth-child(3),.watch-table td:nth-child(3){width:16%;text-align:right}
+.watch-table th:nth-child(4),.watch-table td:nth-child(4){width:15%;text-align:center}
+.watch-table th:nth-child(5),.watch-table td:nth-child(5){width:20%}
+.watch-table tr[data-code]{cursor:pointer}
+.watch-table tr[data-code]:hover td,.watch-table tr[data-code].is-selected td{background:#172b30}
+.watch-code{font-weight:800;color:var(--cyan)!important}
+.watch-event-strong{color:#8fe5d5;font-weight:800}
+.watch-event-subtle{color:var(--muted)}
+.watch-row-sub{display:block;color:var(--muted);font-size:10px;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+.watch-vs-negative{color:#ed9b9b!important}
+.watch-vs-positive{color:#92dabb!important}
+.watch-detail-row{display:none}
+.watch-no-rows{text-align:center;color:var(--muted);padding:18px!important;white-space:normal!important}
+.watch-alert{color:#f1c185;font-size:11px;margin-top:7px}
+@media(max-width:760px){
+ .watch-layout{padding:12px 10px 22px}
+ .watch-heading h1{font-size:23px}
+ .watch-heading{align-items:center}
+ .watch-events{gap:7px;margin-bottom:10px}
+ .watch-event{padding:10px}
+ .watch-event-value{font-size:23px;margin:4px 0}
+ .watch-event-caption{font-size:10px}
+ .watch-selected{display:none}
+ .watch-toolbar{align-items:flex-start;gap:5px}
+ .watch-title{font-size:13px;padding-top:8px}
+ .watch-toolbar-right{gap:5px}
+ .watch-toolbar select{max-width:102px;font-size:11px;padding:6px 4px}
+ .watch-clear{font-size:10px;padding:6px}
+ .watch-table-wrap{border-top:1px solid var(--line);border-radius:9px;max-height:60vh}
+ .watch-table th,.watch-table td{padding:7px 6px}
+ .watch-table th:nth-child(1),.watch-table td:nth-child(1){width:26%}
+ .watch-table th:nth-child(2),.watch-table td:nth-child(2){width:48%}
+ .watch-table th:nth-child(3),.watch-table td:nth-child(3){width:26%}
+ .watch-table th:nth-child(4),.watch-table td:nth-child(4),
+ .watch-table th:nth-child(5),.watch-table td:nth-child(5){display:none}
+ .watch-table td{height:48px;font-size:11px}
+ .watch-table .watch-row-sub{font-size:9px}
+ .watch-detail-row{display:table-row}
+ .watch-detail-row td{display:table-cell!important;width:100%!important;height:auto!important;padding:10px!important;white-space:normal;overflow-wrap:anywhere;text-align:left!important;background:#111e23}
+ .watch-detail-row .watch-selected-head{margin-bottom:10px}
+ .watch-detail-row .watch-selected-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .watch-detail-row .watch-fact strong{font-size:13px}
+}
+/* Width-first Watch table: keep five columns through tablet width,
+   four on small phones, three only at the narrowest supported viewport. */
+@media(max-width:760px){
+ .watch-table th:nth-child(1),.watch-table td:nth-child(1){width:15%}
+ .watch-table th:nth-child(2),.watch-table td:nth-child(2){width:33%}
+ .watch-table th:nth-child(3),.watch-table td:nth-child(3){width:17%}
+ .watch-table th:nth-child(4),.watch-table td:nth-child(4){width:13%;display:table-cell}
+ .watch-table th:nth-child(5),.watch-table td:nth-child(5){width:22%;display:table-cell}
+}
+@media(max-width:520px){
+ .watch-table th:nth-child(1),.watch-table td:nth-child(1){width:20%}
+ .watch-table th:nth-child(2),.watch-table td:nth-child(2){width:44%}
+ .watch-table th:nth-child(3),.watch-table td:nth-child(3){width:20%}
+ .watch-table th:nth-child(4),.watch-table td:nth-child(4){width:16%}
+ .watch-table th:nth-child(5),.watch-table td:nth-child(5){display:none}
+}
+@media(max-width:359px){
+ .watch-table th:nth-child(1),.watch-table td:nth-child(1){width:26%}
+ .watch-table th:nth-child(2),.watch-table td:nth-child(2){width:48%}
+ .watch-table th:nth-child(3),.watch-table td:nth-child(3){width:26%}
+ .watch-table th:nth-child(4),.watch-table td:nth-child(4){display:none}
+}
+@media(max-width:480px){
+ .watch-toolbar{display:block}
+ .watch-toolbar-right{justify-content:flex-start;flex-wrap:wrap;margin-top:7px}
+ .watch-filter{min-width:0}
+}
+@media(max-width:359px){
+ .watch-table th,.watch-table td{padding-left:4px;padding-right:4px}
+ .watch-toolbar select{max-width:94px}
+ .watch-event-label{font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="watch-layout">
+ <a class="watch-back" href="./index.html">‹ Back to BF Pool</a>
+ <header class="watch-heading"><div><h1>Exit Watch</h1><p id="asof" class="watch-subtitle">Loading observation…</p></div><div id="count" class="watch-count"></div></header>
+ <section class="watch-events" aria-label="New confirmed events this snapshot">
+  <button class="watch-event" type="button" id="confirmed" data-event-filter="PENDING_CONFIRMED" aria-pressed="false"><span class="watch-event-label">Pending Confirmed</span><strong class="watch-event-value" id="confirmed-count">—</strong><span class="watch-event-caption">Native first-confirmation path · after Lost</span></button>
+  <button class="watch-event" type="button" id="reclaimed" data-event-filter="CEILING_RECLAIMED" aria-pressed="false"><span class="watch-event-label">Ceiling Reclaimed</span><strong class="watch-event-value" id="reclaimed-count">—</strong><span class="watch-event-caption">Native first-confirmation path · this snapshot</span></button>
+ </section>
+ <div class="watch-toolbar"><span class="watch-title" id="list-title">Observation</span><div class="watch-toolbar-right">
+  <label class="watch-filter">Period <select id="period"><option value="complete">Complete</option><option value="midweek">Midweek</option></select></label>
+  <label class="watch-filter">Exit <select id="reason"><option value="ALL">All</option><option>CEILING</option><option>MA</option><option>NO_CEILING</option><option>UNVERIFIED</option></select></label>
+  <button class="watch-clear" type="button" id="clear" hidden>All events</button>
+ </div></div>
+ <section class="watch-selected" id="selected" aria-label="Selected observation"><div class="watch-empty-selected">Select a ticker to inspect the original Ceiling and observed event path.</div></section>
+ <div class="watch-table-wrap" id="list-shell" role="region" aria-label="Exit Watch observations" tabindex="0">
+  <table class="watch-table"><thead><tr><th>Code</th><th>Observation</th><th>Vs Old</th><th>Weeks</th><th>Exit reason</th></tr></thead><tbody id="rows"></tbody></table>
+ </div>
+</main>
 <script>
 "use strict";
-var data=null;
+var data=null, selectedCode=null, eventFilter=null, currentRows=[];
 function $(id){return document.getElementById(id)}
-function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){
-return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function render(){
- if(!data)return;
- var period=$("period").value, reason=$("reason").value;
- var fallback=period==="midweek"&&data.midweek_fallback;
- var sourcePeriod=fallback?"complete":period;
- var rows=data[sourcePeriod]||[];
- var dateLabel=data.dates[sourcePeriod]||"No dated rows";
- var viewLabel=fallback?"COMPLETE · Midweek unavailable/stale":period.toUpperCase();
- $("asof").textContent=dateLabel+" · "+viewLabel+(data.available?"":" · unavailable");
- var active=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT"].includes(r.phase)});
- var display=rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
- var counts={CEILING:0,MA:0,NO_CEILING:0,UNVERIFIED:0};
- active.forEach(function(r){var k=r.last_exit_reason;counts[k in counts?k:"UNVERIFIED"]++});
- $("stats").innerHTML="<span>Active cycles <b>"+active.length+"</b></span>"+Object.keys(counts).map(function(k){return "<span>Active "+k+" <b>"+counts[k]+"</b></span>"}).join("")+"<span>Returned this snapshot <b>"+rows.filter(function(r){return r.phase==="RETURNED"}).length+"</b></span>";
- var visible=display.filter(function(r){return reason==="ALL"||r.last_exit_reason===reason});
- $("rows").innerHTML=visible.map(function(r){
- var pct=Number(r.vs_original_pct);
- var vs=r.vs_original_pct!==""&&r.vs_original_pct!=null&&Number.isFinite(pct)?pct.toFixed(2)+"%":"—";
- var events=Array.isArray(r.events)?r.events:[];
- var detail="Old Ceiling: "+(r.original_ceiling||"—")+" | Current Ceiling: "+(r.current_ceiling||"—")+" | Close: "+(r.latest_close||"—")+" | "+(r.pending_status||"")+" | Pending High: "+(r.pending_high||"—")+"\n";
- detail+=events.map(function(e){return (e.censored_by_gap?"Observed by ":"")+(e.week||"")+" "+(e.type||"")+" "+(e.reason||"")+(e.censored_by_gap?" · gap censored":"")}).join("\n");
- return "<tr><td><b>"+esc(r.code)+"</b></td><td>"+esc(r.last_exit_reason||"UNVERIFIED")+"</td><td>"+esc(vs)+"</td><td>"+esc(r.price_state||r.pending_status||"NO DATA")+"</td><td><details><summary>Details</summary><pre>"+esc(detail)+"</pre></details></td></tr>";
- }).join("");
- if(!visible.length)$("rows").innerHTML='<tr><td colspan="5">No matching observations.</td></tr>';
+function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function num(v){if(v==null||v==="")return null;var n=Number(v);return Number.isFinite(n)?n:null}
+function money(v){var n=num(v);return n===null?"—":"$"+n.toFixed(2)}
+function pct(v){var n=num(v);return n===null?"—":(n>0?"+":"")+n.toFixed(2)+"%"}
+function week(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||"")))return null;var d=new Date(v+"T00:00:00Z");if(!Number.isFinite(d.getTime()))return null;d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return d.toISOString().slice(0,10)}
+function age(start,end){var s=week(start),e=week(end);if(!s||!e)return null;var n=Math.round((Date.parse(e)-Date.parse(s))/604800000);return n>=0?n:null}
+function events(row){return Array.isArray(row.events)?row.events:[]}
+function inWeek(row,type,snapshotWeek){return events(row).some(function(e){return e.type===type&&e.week===snapshotWeek})}
+function priorLost(row,limit){var matching=events(row).filter(function(e){return e.type==="CEILING_LOST"&&e.week<=limit});return matching.length?matching[matching.length-1]:null}
+
+/* Only Watch Engine establishes the lost-pullback path. */
+function qualification(row){
+ return events(row).find(function(e){return e.type==="PULLBACK_LOST"})||null;
 }
-$("period").addEventListener("change",render);$("reason").addEventListener("change",render);
-fetch("./data/pool_exit_watch.json",{cache:"no-store"}).then(function(r){return r.json()})
-.then(function(p){data=p;render()}).catch(function(){data={available:false,complete:[],midweek:[],dates:{}};render()});
-</script></body></html>
+function confirmedOnPath(row){
+ var q=qualification(row);if(!q)return null;
+ var candidates=events(row).filter(function(e){
+  return e.type==="PENDING_CONFIRMED"||e.type==="PENDING_BLOCKED";
+ }).map(function(e){
+  var date=e.type==="PENDING_CONFIRMED"?e.confirm_date:e.historical_confirmation;
+  var w=week(date);return w&&w>=q.week?{date:date,week:w,discovered:e.week,type:e.type}:null;
+ }).filter(Boolean);
+ candidates.sort(function(a,b){return a.week.localeCompare(b.week)});
+ return candidates.length?candidates[0]:null;
+}
+function focusEvent(row,type,w){
+ var q=qualification(row);if(!q)return false;
+ return events(row).some(function(e){
+  return e.type===type&&e.week===w&&e.week>=q.week;
+ });
+}
+
+function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
+ var q=qualification(row),completed=confirmedOnPath(row);
+ if(q&&completed){
+  msg="First native pullback confirmation: "+completed.date+".";
+  if(completed.type==="PENDING_BLOCKED")msg+=" Discovered in week "+completed.discovered+"; not a new signal this week.";
+  if(row.pending_status==="HISTORY_UNAVAILABLE"||row.pending_status==="SCALE_UNVERIFIED")msg+=" Current scanner evidence unavailable; historical completion remains valid.";
+ }else if(q&&row.pending_status==="PENDING"){
+  msg="Verified lost-pullback path · awaiting the native first confirmation.";
+ }else if(q){
+  msg="Verified lost-pullback path · confirmation not yet established. Missing history does not cancel its qualification.";
+ }else if(row.pending_status==="PENDING_BLOCKED"){
+  var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];
+  msg="Historical first confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" without a verified lost-pullback qualification.";
+ }else{
+  msg="Pullback Lost qualification not established. Generic BF Exit Watch remains available.";
+ }
+ var ordered=e.slice().sort(function(a,b){return String(a.week).localeCompare(String(b.week))||String(a.type).localeCompare(String(b.type))});
+ var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",PULLBACK_LOST:"Pullback Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap"};
+ var timeline=(row.breakout_date?'<span class="watch-node">Breakout · '+esc(row.breakout_date)+'</span>':"")+ordered.map(function(x){return '<span class="watch-node '+(x.type==="PENDING_CONFIRMED"||x.type==="CEILING_RECLAIMED"?"important":"")+'" title="'+esc(x.censored_by_gap?"Observed by this week; exact crossing date unavailable":x.week||"")+'">'+esc(labels[x.type]||x.type)+" · "+esc(x.week||"")+(x.type==="POOL_EXIT"&&x.reason?" · "+esc(x.reason):"")+(x.type==="PENDING_BLOCKED"&&x.historical_confirmation?" · confirmed "+esc(x.historical_confirmation):"")+(x.censored_by_gap?" *":"")+"</span>"}).join("");
+ var duration=interval.short!=="—"?" · "+interval.long:"";
+ var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
+ return '<div class="watch-selected-head"><strong class="watch-selected-code">'+esc(row.code)+'</strong><span class="watch-selected-label">'+esc(pathLabel(row,week(row.snapshot_date)))+' · '+esc(row.phase||"")+'</span></div>'+
+ '<div class="watch-selected-facts"><div class="watch-fact"><small>Original Ceiling</small><strong>'+esc(money(row.original_ceiling))+'</strong></div><div class="watch-fact"><small>Latest Close</small><strong>'+esc(money(row.latest_close))+'</strong></div><div class="watch-fact"><small>Vs Original</small><strong>'+esc(pct(row.vs_original_pct))+'</strong></div><div class="watch-fact"><small>Pending High</small><strong>'+esc(money(row.pending_high))+'</strong></div></div>'+
+ '<div class="watch-selected-foot">Original breakout: '+esc(row.breakout_date||"—")+' · Exit: '+esc(row.absence_week||"—")+' · Pool: '+(pool?'IN':'OUT')+duration+(pool?' · <a href="./index.html">View BF Pool</a>':"")+'</div>'+
+ '<div class="watch-detail"><b>Observed path</b><div class="watch-timeline">'+(timeline||'<span class="watch-node">No dated event</span>')+'</div><div class="watch-note">'+esc(msg)+'</div>'+(e.some(function(x){return x.censored_by_gap})?'<div class="watch-alert">* Missing observations: exact crossing week is not verified.</div>':"")+'</div>';
+}
+function pathLabel(r,w){
+ if(focusEvent(r,"PENDING_CONFIRMED",w)&&focusEvent(r,"CEILING_RECLAIMED",w))return "Confirmed · Reclaimed";
+ if(focusEvent(r,"PENDING_CONFIRMED",w))return "Pending Confirmed";
+ if(focusEvent(r,"CEILING_RECLAIMED",w))return "Ceiling Reclaimed";
+ if(r.phase==="RETURNED")return "Returned"+(r.pending_status==="PENDING"?" · Pending":"");
+ if(r.phase==="AWAITING_DATA")return "No Data";
+ if(r.phase==="PROVISIONAL_OUT")return "Provisional Out";
+ if(qualification(r))return confirmedOnPath(r)?"Pullback Confirmed":r.pending_status==="PENDING"?"Lost · Pending":"Lost · Watching";
+ if(r.price_state==="BELOW_ORIGINAL")return "Ceiling Lost";
+ if(r.pending_status==="PENDING")return "Above · Pending";
+ if(inWeek(r,"CEILING_RECLAIMED",w))return "Ceiling Reclaimed · PB unverified";
+ if(r.pending_status==="PENDING_BLOCKED")return "Prior Confirm";
+ if(inWeek(r,"PENDING_CONFIRMED",w))return "Prior Confirm · PB unverified";
+ return r.price_state==="ABOVE_ORIGINAL"?"Above Original":"Unverified";
+}
+function pathAge(r,snap){
+ var q=qualification(r),done=confirmedOnPath(r);
+ var n=q?age(q.week,done?done.week:snap):null;
+ if(n===null)return {short:"—",long:"No verified Pullback Lost qualification"};
+ var label=done?(n===0?"Lost and Confirm observed in same week; order unknown":"Lost → Confirm: "+n+" calendar week"+(n===1?"":"s")):"Since qualified Lost: "+n+" calendar week"+(n===1?"":"s");
+ return {short:n+"W",long:label};
+}
+function visibleSource(){
+ var period=$("period").value;
+ var fallback=period==="midweek"&&data.midweek_fallback;
+ return {source:fallback?"complete":period,fallback:fallback,rows:data[fallback?"complete":period]||[]};
+}
+function rerender(){
+ if(!data)return;
+ var source=visibleSource(),snap=data.dates[source.source],w=week(snap),display=source.rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
+ var confirmed=display.filter(function(r){return focusEvent(r,"PENDING_CONFIRMED",w)}).length;
+ var reclaimed=display.filter(function(r){return focusEvent(r,"CEILING_RECLAIMED",w)}).length;
+ $("asof").textContent=(snap||"No dated rows")+" · "+(source.fallback?"COMPLETE · Midweek unavailable/stale":source.source.toUpperCase())+(data.available?"":" · unavailable");
+ $("count").innerHTML="<strong>"+display.length+"</strong> cycles";
+ $("confirmed-count").textContent=confirmed;
+ $("reclaimed-count").textContent=reclaimed;
+ ["PENDING_CONFIRMED","CEILING_RECLAIMED"].forEach(function(type){document.querySelector('[data-event-filter="'+type+'"]').setAttribute("aria-pressed",eventFilter===type?"true":"false")});
+ $("clear").hidden=!eventFilter;
+ var reason=$("reason").value;
+ currentRows=display.filter(function(r){return (reason==="ALL"||r.last_exit_reason===reason)&&(!eventFilter||focusEvent(r,eventFilter,w))});
+ currentRows.sort(function(a,b){
+  var rank=function(r){return focusEvent(r,"PENDING_CONFIRMED",w)?0:focusEvent(r,"CEILING_RECLAIMED",w)?1:qualification(r)?2:r.phase==="RETURNED"?3:4};
+  return rank(a)-rank(b)||String(a.code).localeCompare(String(b.code))
+ });
+ $("list-title").textContent=(eventFilter==="PENDING_CONFIRMED"?"Pending Confirmed":eventFilter==="CEILING_RECLAIMED"?"Ceiling Reclaimed":"Observation")+" · "+currentRows.length;
+ $("rows").innerHTML=currentRows.length?currentRows.map(function(r){
+  var t=pathLabel(r,w),v=num(r.vs_original_pct),interval=pathAge(r,w),emph=focusEvent(r,"PENDING_CONFIRMED",w)||focusEvent(r,"CEILING_RECLAIMED",w);
+  var status=qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
+  return '<tr data-code="'+esc(r.code)+'" tabindex="-1" aria-selected="'+(selectedCode===r.code?"true":"false")+'" class="'+(selectedCode===r.code?"is-selected":"")+'">'+
+  '<td class="watch-code" title="'+esc(r.code)+'">'+esc(r.code)+'</td>'+
+  '<td title="'+esc(t)+'"><span class="'+(emph?"watch-event-strong":"")+'">'+esc(t)+'</span>'+(status?'<small class="watch-row-sub">'+esc(status)+'</small>':"")+'</td>'+
+  '<td class="'+(v!==null?(v<0?"watch-vs-negative":"watch-vs-positive"):"")+'">'+esc(pct(v))+'</td>'+
+  '<td title="'+esc(interval.long)+'">'+esc(interval.short)+'</td><td>'+esc(r.last_exit_reason||"UNVERIFIED")+'</td></tr>';
+ }).join(""):'<tr><td colspan="5" class="watch-no-rows">'+(eventFilter?"No qualified pullback "+esc(eventFilter==="PENDING_CONFIRMED"?"confirmation":"Ceiling reclaim")+" in this snapshot.":"No matching observations.")+'</td></tr>';
+ if(!currentRows.some(function(r){return r.code===selectedCode}))selectedCode=null;
+ selectCode(selectedCode);
+}
+function selectCode(code){
+ selectedCode=code;
+ var chosen=currentRows.find(function(r){return r.code===code})||null;
+ document.querySelectorAll("#rows tr[data-code]").forEach(function(tr){var hit=tr.dataset.code===code;tr.classList.toggle("is-selected",hit);tr.setAttribute("aria-selected",hit?"true":"false");tr.setAttribute("aria-expanded",hit?"true":"false")});
+ var old=document.querySelector(".watch-detail-row");if(old)old.remove();
+ $("selected").innerHTML=chosen?selectedView(chosen):'<div class="watch-empty-selected">Select a ticker to inspect the original Ceiling and observed event path.</div>';
+ if(chosen){
+  var target=Array.from(document.querySelectorAll("#rows tr[data-code]")).find(function(x){return x.dataset.code===code});
+  if(target){var tr=document.createElement("tr");tr.className="watch-detail-row";var td=document.createElement("td");td.colSpan=5;td.innerHTML=selectedView(chosen);tr.appendChild(td);target.insertAdjacentElement("afterend",tr);}
+ }
+}
+$("rows").addEventListener("click",function(e){var tr=e.target.closest("tr[data-code]");if(tr)selectCode(tr.dataset.code===selectedCode?null:tr.dataset.code)});
+$("list-shell").addEventListener("keydown",function(e){
+ if(e.key!=="ArrowDown"&&e.key!=="ArrowUp")return;
+ if(!currentRows.length)return;e.preventDefault();
+ var ix=currentRows.findIndex(function(r){return r.code===selectedCode});
+ var next=Math.max(0,Math.min(currentRows.length-1,ix+(e.key==="ArrowDown"?1:-1)));
+ if(ix<0)next=e.key==="ArrowDown"?0:currentRows.length-1;
+ selectCode(currentRows[next].code);
+ var tr=Array.from(document.querySelectorAll("#rows tr[data-code]")).find(function(t){return t.dataset.code===selectedCode});
+ if(tr)tr.scrollIntoView({block:"nearest"});
+});
+$("period").addEventListener("change",function(){eventFilter=null;rerender()});
+$("reason").addEventListener("change",rerender);
+$("clear").addEventListener("click",function(){eventFilter=null;rerender()});
+document.querySelectorAll("[data-event-filter]").forEach(function(b){b.addEventListener("click",function(){eventFilter=eventFilter===b.dataset.eventFilter?null:b.dataset.eventFilter;rerender()})});
+fetch("./data/pool_exit_watch.json",{cache:"no-store"}).then(function(r){if(!r.ok)throw Error("Watch unavailable");return r.json()}).then(function(v){data=v;rerender()}).catch(function(){data={available:false,complete:[],midweek:[],dates:{}};rerender()});
+</script>
+</body>
+</html>

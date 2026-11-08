@@ -546,6 +546,7 @@ def build_watch_payload(data_root: Path) -> dict:
         "code", "snapshot_date", "original_ceiling", "current_ceiling",
         "last_exit_reason", "phase", "price_state", "vs_original_pct",
         "latest_close", "pending_status", "pending_high", "events", "exit_count",
+        "breakout_date", "absence_week", "current_in_pool",
     }
     have_midweek = False
     # A legal empty Watch has no row-level date. Its matching Pool owns the
