@@ -164,12 +164,29 @@ function priorLost(row,limit){var matching=events(row).filter(function(e){return
    This does not claim that every zone touch was physically the first touch:
    the native scanner can revisit the zone until its FIRST confirmation. */
 function firstPullbackLost(r){
- var nativeFirst=r.pending_status==="PENDING"||r.pending_status==="CONFIRMED";
- return nativeFirst&&!!r.breakout_date&&num(r.original_ceiling)!==null&&
-   events(r).some(function(e){return e.type==="CEILING_LOST"});
+ var origin=week(r.breakout_date);
+ if(!origin||num(r.original_ceiling)===null)return false;
+ var lost=events(r).filter(function(e){
+  return e.type==="CEILING_LOST"&&!e.censored_by_gap&&week(e.week)>=origin;
+ });
+ if(!lost.length)return false;
+ var nativePending=r.pending_status==="PENDING"||r.pending_status==="CONFIRMED";
+ // Reclaimed may occur AFTER a verified first Pending confirmation; the native
+ // scanner then reports PENDING_BLOCKED on later weeks. Preserve that path only
+ // if this same Watch Cycle recorded the first confirmation AFTER its Lost.
+ var confirmedAfterLost=lost.some(function(l){
+  return events(r).some(function(e){
+   return e.type==="PENDING_CONFIRMED"&&week(e.week)>=week(l.week);
+  });
+ });
+ return nativePending||confirmedAfterLost;
 }
 function focusEvent(r,type,w){
- return firstPullbackLost(r)&&inWeek(r,type,w);
+ return firstPullbackLost(r)&&events(r).some(function(e){
+  return e.type===type&&e.week===w&&events(r).some(function(l){
+   return l.type==="CEILING_LOST"&&!l.censored_by_gap&&week(l.week)<=w;
+  });
+ });
 }
 
 function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
