@@ -131,6 +131,9 @@ const waitForServer = async () => {
         "Stale Midweek is marked as Complete fallback");
       assert.equal(await page.locator("#rows tr[data-code]").count(),7);
       assert.equal(await page.locator('#rows tr[data-code="OLD"]').count(),0);
+      const visibleColumns=await page.locator(".watch-table thead th").evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=="none").length);
+      assert.equal(visibleColumns,width>=521?5:width>=360?4:3,
+        "Watch must allocate widths before removing columns at "+width+"px");
       const dims=await page.evaluate(()=>{
         const shell=document.getElementById("list-shell");
         const table=document.querySelector(".watch-table");
