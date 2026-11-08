@@ -197,7 +197,7 @@ const waitForServer = async () => {
       await page.locator("#period").selectOption("midweek");
       assert((await page.locator("#asof").innerText()).includes("Midweek unavailable/stale"),
         "Stale Midweek is marked as Complete fallback");
-      assert.equal(await page.locator("#rows tr[data-code]").count(),12);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),14);
       assert.equal(await page.locator('#rows tr[data-code="OLD"]').count(),0);
       const visibleColumns=await page.locator(".watch-table thead th").evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=="none").length);
       assert.equal(visibleColumns,width>=521?5:width>=360?4:3,
