@@ -25,18 +25,20 @@ const rows = [
   row("CONFIRM", {
     pending_status:"CONFIRMED", pending_high:112, latest_close:114,
     price_state:"ABOVE_ORIGINAL", vs_original_pct:14,
-    events:[event("CEILING_LOST", "2026-10-26"),event("ZONE_TOUCH","2026-10-26"),
-      event("PENDING_CONFIRMED","2026-11-02",{pending_high:112})]
+    events:[event("CEILING_LOST", "2026-10-26"),event("PULLBACK_LOST","2026-10-26"),
+      event("ZONE_TOUCH","2026-10-26"),event("PENDING_CONFIRMED","2026-11-02",{pending_high:112,confirm_date:"2026-11-06"})]
   }),
   row("RECLAIM", {
     pending_status:"PENDING", pending_high:118, latest_close:102,
     price_state:"ABOVE_ORIGINAL", vs_original_pct:2,
-    events:[event("CEILING_LOST","2026-10-26"),event("CEILING_RECLAIMED","2026-11-02")]
+    events:[event("CEILING_LOST","2026-10-26"),event("PULLBACK_LOST","2026-10-26"),
+      event("CEILING_RECLAIMED","2026-11-02")]
   }),
   row("DUAL", {
     pending_status:"CONFIRMED", pending_high:120, latest_close:122,
     price_state:"ABOVE_ORIGINAL", vs_original_pct:22,
-    events:[event("CEILING_LOST","2026-10-26"),event("PENDING_CONFIRMED","2026-11-02"),
+    events:[event("CEILING_LOST","2026-10-26"),event("PULLBACK_LOST","2026-10-26"),
+      event("PENDING_CONFIRMED","2026-11-02",{confirm_date:"2026-11-06"}),
       event("CEILING_RECLAIMED","2026-11-02")]
   }),
   row("BLOCKED", {
@@ -53,7 +55,7 @@ const rows = [
   // Generic Pool exits and historical confirmations must not masquerade as
   // the native scanner's FIRST post-Lost confirmation opportunity.
   row("NOFIRST", {
-    pending_status:"NONE",
+    pending_status:"PENDING",
     events:[event("CEILING_LOST","2026-11-02")]
   }),
   row("FAKECONFIRM", {
@@ -70,8 +72,8 @@ const rows = [
   row("LATERRECLAIM", {
     pending_status:"PENDING_BLOCKED", pending_high:106,
     price_state:"ABOVE_ORIGINAL", vs_original_pct:7, latest_close:107,
-    events:[event("CEILING_LOST","2026-10-19"),
-      event("PENDING_CONFIRMED","2026-10-26"),
+    events:[event("CEILING_LOST","2026-10-19"),event("PULLBACK_LOST","2026-10-19"),
+      event("PENDING_CONFIRMED","2026-10-26",{confirm_date:"2026-10-30"}),
       event("CEILING_RECLAIMED","2026-11-02")]
   }),
   row("CENSORED", {
@@ -140,7 +142,7 @@ const waitForServer = async () => {
       assert((await details.innerText()).includes("Breakout · 2026-09-07"));
       await page.locator('#rows tr[data-code="RECLAIM"]').click();
       const reclaimDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
-      assert((await reclaimDetails.innerText()).includes("Since observed Lost: 1 calendar week"),
+      assert((await reclaimDetails.innerText()).includes("Since qualified Lost: 1 calendar week"),
         "Unconfirmed observation shows age since the verified Lost, not time to an invented confirmation");
       await page.locator('[data-event-filter="PENDING_CONFIRMED"]').click();
       assert.equal(await page.locator("#rows tr[data-code]").count(),2);
@@ -152,7 +154,7 @@ const waitForServer = async () => {
       assert.equal(await page.locator('#rows tr[data-code="LATERRECLAIM"]').count(),1,
         "Retain a later reclaim if first Pending confirmation occurred after verified Lost");
       assert.equal(await page.locator('#rows tr[data-code="CENSORED"]').count(),0,
-        "Gap-censored Lost cannot be promoted to first-pullback event");
+        "Without authoritative qualification, censored Lost cannot enter first-pullback alerts");
       assert.equal(await page.locator('#rows tr[data-code="PRIORRECLAIM"]').count(),0,
         "Reclaim after prior consumed confirmation is not a first-pullback event");
       assert.equal(await page.locator("#reclaimed").getAttribute("aria-pressed"),"true");
