@@ -190,7 +190,7 @@ function focusEvent(r,type,w){
 }
 
 function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
- if(row.pending_status==="PENDING_BLOCKED"){var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];msg="Historical first pullback confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" already consumed by the BF scanner; not a new Pending trigger.";}
+ if(row.pending_status==="PENDING_BLOCKED"){var blocked=e.filter(function(x){return x.type==="PENDING_BLOCKED"}).slice(-1)[0];msg=firstPullbackLost(row)?"This Watch Cycle already captured the first confirmation after verified Lost. Later Ceiling reclaim is an independent event, not a second Pending confirmation.":"Historical first pullback confirmation"+(blocked&&blocked.historical_confirmation?" ("+blocked.historical_confirmation+")":"")+" was already consumed before this Watch path; not a new Pending trigger.";}
  else if(row.pending_status==="PENDING"){msg=firstPullbackLost(row)?"The original BF first-confirmation opportunity remains pending after a verified Ceiling Lost. The native scanner may include repeated zone touches before this first confirmation; proximity alone has no priority.":"A native Pending exists, but this Watch Cycle has no verified Ceiling Lost. Do not infer a Lost → Confirm path.";}
  else if(row.pending_status==="CONFIRMED"){msg="First pullback confirmed in this market snapshot.";}
  else if(row.pending_status==="HISTORY_UNAVAILABLE"||row.pending_status==="SCALE_UNVERIFIED"){msg="Pending evidence unavailable or price scale unverified; no inferred confirmation.";}
@@ -217,8 +217,8 @@ function pathLabel(r,w){
  if(firstPullbackLost(r))return "Lost · Pending";
  if(r.price_state==="BELOW_ORIGINAL")return "Ceiling Lost";
  if(r.pending_status==="PENDING")return "Above · Pending";
- if(r.pending_status==="PENDING_BLOCKED")return "Prior Confirm";
  if(inWeek(r,"CEILING_RECLAIMED",w))return "Ceiling Reclaimed · PB unverified";
+ if(r.pending_status==="PENDING_BLOCKED")return "Prior Confirm";
  if(inWeek(r,"PENDING_CONFIRMED",w))return "Prior Confirm · PB unverified";
  return r.price_state==="ABOVE_ORIGINAL"?"Above Original":"Unverified";
 }
