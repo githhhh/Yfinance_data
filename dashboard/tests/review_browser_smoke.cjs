@@ -23,7 +23,11 @@ function row(code, rest) {
     review_a_has_value_change: false, review_b_has_value_change: false,
     review_b_active: false, review_has_value_change: false,
     review_weekend_buy_point_change: "UNCHANGED", review_new_buy_point: false,
+    // Keep synthetic events independent of whichever real stock leads today's payload.
     review_new_buy_point_zone: null, review_b_event: "",
+    review_b_display_event: "", review_b_display_basis: null,
+    review_a_event: "", review_a_week_event: "", review_a_focus_basis: null,
+    review_membership_event: "", review_selected_price_event: "",
     review_change_label: "", review_buy_point_change_label: "",
     review_buy_point_priority: 9, ...rest };
 }
@@ -31,6 +35,7 @@ const bOnly = row("BONLY", {
   review_b_active: true, review_b_price: 185, review_b_status: "UNCONFIRMED",
   review_b_rule: "pivot", review_b_close: 180, review_b_pct: -2.70,
   review_b_zone: "BELOW", review_b_event: "NEW BP",
+  review_b_display_event: "NEW BP",
   review_b_date: "2026-10-14", review_b_entry_reason: "Volume not confirmed",
   review_b_details: {
     base_duration_weeks: 11, base_depth_pct: -12, ceiling: 181,
