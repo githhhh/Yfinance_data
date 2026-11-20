@@ -141,7 +141,7 @@ def filter_downloaded_stock_data(
 ):
     """Shared per-symbol quarantine; always strictly validate surviving frames.
 
-    Yahoo allows only known OHLCV validation failures to be excluded. Schwab
+    Yahoo permits only explicitly classified failures to be excluded. Schwab
     retains its existing retry/failure policy by leaving allowed_failed_symbols
     unset. Neither may suppress missing indices or an empty equity universe.
     """
@@ -350,7 +350,7 @@ if __name__ == "__main__":
             failure_reasons=provider.failure_reasons,
             provider_name=args.provider.capitalize(),
             allowed_failed_symbols=(
-                provider.validation_failure_symbols if args.provider == "yahoo" else None
+                provider.allowed_failure_symbols if args.provider == "yahoo" else None
             ),
         )
         expected_saved_symbols = list(stock_data)

@@ -196,3 +196,25 @@ def test_static_watch_page_does_not_show_stale_published_watch_after_pool_only_c
     assert result["complete"] == []
     assert result["midweek"] == []
     assert result["errors"]["complete"] == "RuntimeError"
+
+
+def test_missing_data_pending_is_not_labeled_as_verified_exit_in_watch_ui():
+    from pathlib import Path
+
+    page = (Path(__file__).parents[1] / "pool-exit-watch.html").read_text(encoding="utf-8")
+    assert 'function pendingData(row)' in page
+    assert 'e.type==="POOL_EXIT"' in page
+    assert "No verified Pool Exit" in page
+    assert "Missing since:" in page
+    assert "Pool: UNOBSERVED" in page
+    assert 'pendingData(r)?"NO DATA"' in page
+
+
+def test_watch_exit_date_uses_verified_event_not_first_missing_week():
+    """Deferred exit dates must not masquerade as the first failed Yahoo week."""
+    from pathlib import Path
+
+    page = (Path(__file__).parents[1] / "pool-exit-watch.html").read_text(encoding="utf-8")
+    assert 'function lastExitWeek(row)' in page
+    assert ' · Exit observed: ' in page
+    assert 'esc(lastExitWeek(row)||"—")' in page

@@ -170,3 +170,25 @@ def test_pullback_lost_event_must_be_unique_per_cycle_even_across_weeks(tmp_path
         target, index=False)
     with pytest.raises(ValueError, match="multiple PULLBACK_LOST"):
         parse_watch_csv(target)
+
+
+def test_missing_market_data_pending_watch_keeps_download_eligibility(tmp_path):
+    """A pending watch with no official POOL_EXIT remains a valid 24-column row."""
+    from pool_exit_watch_store import COLUMNS
+
+    path = tmp_path / "us" / "bf_pool_exit_watch.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    watch_frame([{
+        "code": "NWE", "phase": "AWAITING_DATA",
+        "watch_cycle_id": "NWE:2026-11-16",
+        "original_pool_date": "2026-11-13",
+        "absence_week": "2026-11-16",
+        "current_in_pool": False,
+        "events": [],
+    }], snapshot_date="2026-11-20", pool_codes_hash="fixture").to_csv(path, index=False)
+    saved = parse_watch_csv(path)
+    assert len(COLUMNS) == 24
+    assert len(saved) == 1
+    assert saved[0]["events"] == []
+    assert saved[0]["phase"] == "AWAITING_DATA"
+    assert active_watch_codes(tmp_path) == ["NWE"]
