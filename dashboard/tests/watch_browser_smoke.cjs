@@ -103,6 +103,14 @@ const rows = [
   row("GAP", {
     last_exit_reason:"UNVERIFIED", pending_status:"UNVERIFIED",
     events:[event("CEILING_LOST","2026-11-02",{censored_by_gap:true})]
+  }),
+  row("NOOBS", {
+    phase:"AWAITING_DATA", current_in_pool:false, last_exit_reason:"UNVERIFIED",
+    latest_close:null, price_state:null, vs_original_pct:null, events:[]
+  }),
+  row("DEFEREXIT", {
+    phase:"OBSERVING", absence_week:"2026-10-19",
+    events:[event("POOL_EXIT","2026-11-02",{reason:"CEILING",censored_by_gap:true})]
   })
 ];
 const waitForServer = async () => {
@@ -129,7 +137,7 @@ const waitForServer = async () => {
           dates:{complete:snap,midweek:"2026-10-28"},midweek_fallback:true})
       }));
       await page.goto("http://127.0.0.1:8766/pool-exit-watch.html",{waitUntil:"networkidle"});
-      assert.equal(await page.locator("#rows tr[data-code]").count(),14);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),16);
       assert.equal(await page.locator("#confirmed-count").innerText(),"3");
       assert.equal(await page.locator("#reclaimed-count").innerText(),"3");
       assert((await page.locator("#rows tr").first().innerText()).includes("CONFIRM"),
@@ -145,6 +153,19 @@ const waitForServer = async () => {
         "Historical blocked confirmation is not a new event");
       assert((await page.locator('#rows tr[data-code="RETURNED"]').innerText()).includes("Returned"),
         "Returned remains a lifecycle fact");
+      const pendingRow=page.locator('#rows tr[data-code="NOOBS"]');
+      assert((await pendingRow.innerText()).includes("NO DATA"),"Unobserved member is not a verified exit");
+      await pendingRow.click();
+      const pendingDetail=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      const pendingText=await pendingDetail.innerText();
+      assert(pendingText.includes("Missing since: 2026-10-26"));
+      assert(pendingText.includes("Pool: UNOBSERVED"));
+      assert(pendingText.includes("No verified Pool Exit"));
+      assert(!pendingText.includes("Exit observed:"));
+      await page.locator('#rows tr[data-code="DEFEREXIT"]').click();
+      const deferredDetail=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      assert((await deferredDetail.innerText()).includes("Exit observed: 2026-11-02"),
+        "Deferred exit is dated by first verified event, not the unobserved gap");
       const before=await confirm.boundingBox();
       await confirm.click();
       const after=await confirm.boundingBox();
@@ -197,7 +218,7 @@ const waitForServer = async () => {
       await page.locator("#period").selectOption("midweek");
       assert((await page.locator("#asof").innerText()).includes("Midweek unavailable/stale"),
         "Stale Midweek is marked as Complete fallback");
-      assert.equal(await page.locator("#rows tr[data-code]").count(),14);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),16);
       assert.equal(await page.locator('#rows tr[data-code="OLD"]').count(),0);
       const visibleColumns=await page.locator(".watch-table thead th").evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=="none").length);
       assert.equal(visibleColumns,width>=521?5:width>=360?4:3,
