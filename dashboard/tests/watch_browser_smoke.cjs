@@ -154,7 +154,9 @@ const waitForServer = async () => {
       assert((await page.locator('#rows tr[data-code="RETURNED"]').innerText()).includes("Returned"),
         "Returned remains a lifecycle fact");
       const pendingRow=page.locator('#rows tr[data-code="NOOBS"]');
-      assert((await pendingRow.innerText()).includes("NO DATA"),"Unobserved member is not a verified exit");
+      const pendingCellText=await pendingRow.innerText();
+      assert(pendingCellText.includes("No Data"),"Unobserved member is not a verified exit");
+      if(width>=521)assert(pendingCellText.includes("NO DATA"),"Desktop shows NO DATA as exit reason");
       await pendingRow.click();
       const pendingDetail=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
       const pendingText=await pendingDetail.innerText();
