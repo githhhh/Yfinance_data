@@ -208,3 +208,13 @@ def test_missing_data_pending_is_not_labeled_as_verified_exit_in_watch_ui():
     assert "Missing since:" in page
     assert "Pool: UNOBSERVED" in page
     assert 'pendingData(r)?"NO DATA"' in page
+
+
+def test_watch_exit_date_uses_verified_event_not_first_missing_week():
+    """Deferred exit dates must not masquerade as the first failed Yahoo week."""
+    from pathlib import Path
+
+    page = (Path(__file__).parents[1] / "pool-exit-watch.html").read_text(encoding="utf-8")
+    assert 'function lastExitWeek(row)' in page
+    assert ' · Exit observed: ' in page
+    assert 'esc(lastExitWeek(row)||"—")' in page

@@ -158,6 +158,7 @@ function week(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||"")))return null;var d
 function age(start,end){var s=week(start),e=week(end);if(!s||!e)return null;var n=Math.round((Date.parse(e)-Date.parse(s))/604800000);return n>=0?n:null}
 function events(row){return Array.isArray(row.events)?row.events:[]}
 function pendingData(row){return row.phase==="AWAITING_DATA"&&!events(row).some(function(e){return e.type==="POOL_EXIT"})}
+function lastExitWeek(row){var exits=events(row).filter(function(e){return e.type==="POOL_EXIT"});return exits.length?exits[exits.length-1].week:row.absence_week}
 function inWeek(row,type,snapshotWeek){return events(row).some(function(e){return e.type===type&&e.week===snapshotWeek})}
 function priorLost(row,limit){var matching=events(row).filter(function(e){return e.type==="CEILING_LOST"&&e.week<=limit});return matching.length?matching[matching.length-1]:null}
 
@@ -208,7 +209,7 @@ function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snaps
  var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
  return '<div class="watch-selected-head"><strong class="watch-selected-code">'+esc(row.code)+'</strong><span class="watch-selected-label">'+esc(pathLabel(row,week(row.snapshot_date)))+' · '+esc(row.phase||"")+'</span></div>'+
  '<div class="watch-selected-facts"><div class="watch-fact"><small>Original Ceiling</small><strong>'+esc(money(row.original_ceiling))+'</strong></div><div class="watch-fact"><small>Latest Close</small><strong>'+esc(money(row.latest_close))+'</strong></div><div class="watch-fact"><small>Vs Original</small><strong>'+esc(pct(row.vs_original_pct))+'</strong></div><div class="watch-fact"><small>Pending High</small><strong>'+esc(money(row.pending_high))+'</strong></div></div>'+
- '<div class="watch-selected-foot">Original breakout: '+esc(row.breakout_date||"—")+(pendingData(row)?' · Missing since: '+esc(row.absence_week||"—")+' · Pool: UNOBSERVED':' · Exit: '+esc(row.absence_week||"—")+' · Pool: '+(pool?'IN':'OUT'))+duration+(pool?' · <a href="./index.html">View BF Pool</a>':"")+'</div>'+
+ '<div class="watch-selected-foot">Original breakout: '+esc(row.breakout_date||"—")+(pendingData(row)?' · Missing since: '+esc(row.absence_week||"—")+' · Pool: UNOBSERVED':' · Exit observed: '+esc(lastExitWeek(row)||"—")+' · Pool: '+(pool?'IN':'OUT'))+duration+(pool?' · <a href="./index.html">View BF Pool</a>':"")+'</div>'+
  '<div class="watch-detail"><b>Observed path</b><div class="watch-timeline">'+(timeline||'<span class="watch-node">No dated event</span>')+'</div><div class="watch-note">'+esc(msg)+'</div>'+(e.some(function(x){return x.censored_by_gap})?'<div class="watch-alert">* Missing observations: exact crossing week is not verified.</div>':"")+'</div>';
 }
 function pathLabel(r,w){
