@@ -10,6 +10,7 @@ import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
 
 from data_providers.base_provider import BaseDataProvider
+from data_providers.yahoo_failure_policy import YahooFailureAction, classify_yahoo_exception
 from data_providers.ohlcv_validation import (
     DataIntegrityError,
     MARKET_REFERENCE_SYMBOLS,
@@ -72,6 +73,7 @@ class YahooDataProvider(BaseDataProvider):
         # Sticky within a batch: transport failures must never be reclassified
         # as safe exclusions by a later empty/malformed response.
         self._request_failure_symbols: set[str] = set()
+        self._quarantined_symbols: set[str] = set()
 
     @property
     def failure_reasons(self) -> Dict[str, str]:
@@ -85,9 +87,22 @@ class YahooDataProvider(BaseDataProvider):
         with self._failure_lock:
             return set(self._validation_failures)
 
+    @property
+    def quarantined_symbols(self) -> set[str]:
+        """Deterministic Yahoo failures, scoped to this download batch."""
+        with self._failure_lock:
+            return set(self._quarantined_symbols)
+
+    @property
+    def allowed_failure_symbols(self) -> set[str]:
+        """Only terminal OHLCV-invalid or explicitly quarantined symbols."""
+        with self._failure_lock:
+            return set(self._validation_failures | self._quarantined_symbols)
+
     def _record_failure(
         self, symbol: str, reason: str, *,
         invalid_data: bool = False, request_failure: bool = False,
+        quarantine: bool = False,
     ) -> None:
         with self._failure_lock:
             if request_failure:
@@ -101,12 +116,17 @@ class YahooDataProvider(BaseDataProvider):
                 self._validation_failures.add(symbol)
             else:
                 self._validation_failures.discard(symbol)
+            if quarantine:
+                self._quarantined_symbols.add(symbol)
+            else:
+                self._quarantined_symbols.discard(symbol)
 
     def _clear_failure(self, symbol: str) -> None:
         with self._failure_lock:
             self._last_failure_reasons.pop(symbol, None)
             self._validation_failures.discard(symbol)
             self._request_failure_symbols.discard(symbol)
+            self._quarantined_symbols.discard(symbol)
 
     def _cooldown_remaining(self) -> float:
         with self._rate_limit_lock:
@@ -226,6 +246,9 @@ class YahooDataProvider(BaseDataProvider):
         """抓取单只股票数据；坏 K 线隔离、无重试，429 沿用共享熔断。"""
         attempt = 0
         while attempt <= self.max_retries:
+            # An already isolated symbol must not be re-requested by this batch.
+            if symbol in self.quarantined_symbols:
+                return symbol, None
             if abort_event is not None and abort_event.is_set():
                 return symbol, None
 
@@ -289,6 +312,19 @@ class YahooDataProvider(BaseDataProvider):
                 print(f"[Yahoo] Invalid history for {symbol}; {disposition}: {e}")
                 return symbol, None
             except Exception as e:
+                decision = classify_yahoo_exception(e, interval=interval)
+                if decision.action is YahooFailureAction.QUARANTINE:
+                    self._record_failure(
+                        symbol, f"{decision.reason_code}: {type(e).__name__}: {e}",
+                        quarantine=True,
+                    )
+                    # Preserve an earlier transport error: a later exception
+                    # must never make an incomplete batch look publishable.
+                    if symbol in self.quarantined_symbols:
+                        print(f"[Yahoo Quarantine] {symbol} {interval}: {decision.reason_code}")
+                    else:
+                        print(f"[Yahoo] {symbol} has a prior request failure; refusing quarantine")
+                    return symbol, None
                 self._record_failure(symbol, f"{type(e).__name__}: {e}", request_failure=True)
                 print(
                     f"[Yahoo] Error downloading {symbol} "
@@ -391,7 +427,8 @@ class YahooDataProvider(BaseDataProvider):
             self._last_failure_reasons.clear()
             self._validation_failures.clear()
             self._request_failure_symbols.clear()
-        terminal_validation_failures: set[str] = set()
+            self._quarantined_symbols.clear()
+        terminal_allowed_failures: set[str] = set()
         all_data: Dict[str, pd.DataFrame] = {}
         failed: List[str] = []
         total = len(symbols)
@@ -416,9 +453,9 @@ class YahooDataProvider(BaseDataProvider):
                 max_workers=self.max_workers,
             )
             all_data.update(downloaded)
-            invalid = self.validation_failure_symbols
-            terminal_validation_failures.update(set(batch_failed) & invalid)
-            failed.extend(symbol for symbol in batch_failed if symbol not in invalid)
+            allowed = self.allowed_failure_symbols
+            terminal_allowed_failures.update(set(batch_failed) & allowed)
+            failed.extend(symbol for symbol in batch_failed if symbol not in allowed)
 
             batch_end_time = time.time()
             print(
@@ -451,7 +488,7 @@ class YahooDataProvider(BaseDataProvider):
             )
             failed = retry_failed
 
-        failed = sorted(set(failed) | terminal_validation_failures)
+        failed = sorted(set(failed) | terminal_allowed_failures)
 
         # Empty-but-successful histories are ambiguous until the original
         # low-concurrency batch recovery finishes. Transport errors are sticky
@@ -467,7 +504,7 @@ class YahooDataProvider(BaseDataProvider):
         # A majority of invalid equities suggests a provider-wide failure
         # (including Yahoo silently returning empty frames on a bad session).
         # Isolated bad symbols remain filterable; severe truncation never is.
-        quarantined_equities = self.validation_failure_symbols - set(MARKET_REFERENCE_SYMBOLS)
+        quarantined_equities = self.allowed_failure_symbols - set(MARKET_REFERENCE_SYMBOLS)
         valid_equities = set(all_data) - set(MARKET_REFERENCE_SYMBOLS)
         if len(quarantined_equities) > len(valid_equities):
             raise DataIntegrityError(
