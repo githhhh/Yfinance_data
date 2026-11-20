@@ -157,6 +157,7 @@ function pct(v){var n=num(v);return n===null?"—":(n>0?"+":"")+n.toFixed(2)+"%"
 function week(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||"")))return null;var d=new Date(v+"T00:00:00Z");if(!Number.isFinite(d.getTime()))return null;d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return d.toISOString().slice(0,10)}
 function age(start,end){var s=week(start),e=week(end);if(!s||!e)return null;var n=Math.round((Date.parse(e)-Date.parse(s))/604800000);return n>=0?n:null}
 function events(row){return Array.isArray(row.events)?row.events:[]}
+function pendingData(row){return row.phase==="AWAITING_DATA"&&!events(row).some(function(e){return e.type==="POOL_EXIT"})}
 function inWeek(row,type,snapshotWeek){return events(row).some(function(e){return e.type===type&&e.week===snapshotWeek})}
 function priorLost(row,limit){var matching=events(row).filter(function(e){return e.type==="CEILING_LOST"&&e.week<=limit});return matching.length?matching[matching.length-1]:null}
 
@@ -184,7 +185,9 @@ function focusEvent(row,type,w){
 
 function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
  var q=qualification(row),completed=confirmedOnPath(row);
- if(q&&completed){
+ if(pendingData(row)){
+  msg="Market data unavailable. No verified Pool Exit; the last confirmed membership remains under observation.";
+ }else if(q&&completed){
   msg="First native pullback confirmation: "+completed.date+".";
   if(completed.type==="PENDING_BLOCKED")msg+=" Discovered in week "+completed.discovered+"; not a new signal this week.";
   if(row.pending_status==="HISTORY_UNAVAILABLE"||row.pending_status==="SCALE_UNVERIFIED")msg+=" Current scanner evidence unavailable; historical completion remains valid.";
@@ -205,7 +208,7 @@ function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snaps
  var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
  return '<div class="watch-selected-head"><strong class="watch-selected-code">'+esc(row.code)+'</strong><span class="watch-selected-label">'+esc(pathLabel(row,week(row.snapshot_date)))+' · '+esc(row.phase||"")+'</span></div>'+
  '<div class="watch-selected-facts"><div class="watch-fact"><small>Original Ceiling</small><strong>'+esc(money(row.original_ceiling))+'</strong></div><div class="watch-fact"><small>Latest Close</small><strong>'+esc(money(row.latest_close))+'</strong></div><div class="watch-fact"><small>Vs Original</small><strong>'+esc(pct(row.vs_original_pct))+'</strong></div><div class="watch-fact"><small>Pending High</small><strong>'+esc(money(row.pending_high))+'</strong></div></div>'+
- '<div class="watch-selected-foot">Original breakout: '+esc(row.breakout_date||"—")+' · Exit: '+esc(row.absence_week||"—")+' · Pool: '+(pool?'IN':'OUT')+duration+(pool?' · <a href="./index.html">View BF Pool</a>':"")+'</div>'+
+ '<div class="watch-selected-foot">Original breakout: '+esc(row.breakout_date||"—")+(pendingData(row)?' · Missing since: '+esc(row.absence_week||"—")+' · Pool: UNOBSERVED':' · Exit: '+esc(row.absence_week||"—")+' · Pool: '+(pool?'IN':'OUT'))+duration+(pool?' · <a href="./index.html">View BF Pool</a>':"")+'</div>'+
  '<div class="watch-detail"><b>Observed path</b><div class="watch-timeline">'+(timeline||'<span class="watch-node">No dated event</span>')+'</div><div class="watch-note">'+esc(msg)+'</div>'+(e.some(function(x){return x.censored_by_gap})?'<div class="watch-alert">* Missing observations: exact crossing week is not verified.</div>':"")+'</div>';
 }
 function pathLabel(r,w){
@@ -255,12 +258,12 @@ function rerender(){
  $("list-title").textContent=(eventFilter==="PENDING_CONFIRMED"?"Pending Confirmed":eventFilter==="CEILING_RECLAIMED"?"Ceiling Reclaimed":"Observation")+" · "+currentRows.length;
  $("rows").innerHTML=currentRows.length?currentRows.map(function(r){
   var t=pathLabel(r,w),v=num(r.vs_original_pct),interval=pathAge(r,w),emph=focusEvent(r,"PENDING_CONFIRMED",w)||focusEvent(r,"CEILING_RECLAIMED",w);
-  var status=qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
+  var status=pendingData(r)?"No verified Pool Exit":qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
   return '<tr data-code="'+esc(r.code)+'" tabindex="-1" aria-selected="'+(selectedCode===r.code?"true":"false")+'" class="'+(selectedCode===r.code?"is-selected":"")+'">'+
   '<td class="watch-code" title="'+esc(r.code)+'">'+esc(r.code)+'</td>'+
   '<td title="'+esc(t)+'"><span class="'+(emph?"watch-event-strong":"")+'">'+esc(t)+'</span>'+(status?'<small class="watch-row-sub">'+esc(status)+'</small>':"")+'</td>'+
   '<td class="'+(v!==null?(v<0?"watch-vs-negative":"watch-vs-positive"):"")+'">'+esc(pct(v))+'</td>'+
-  '<td title="'+esc(interval.long)+'">'+esc(interval.short)+'</td><td>'+esc(r.last_exit_reason||"UNVERIFIED")+'</td></tr>';
+  '<td title="'+esc(interval.long)+'">'+esc(interval.short)+'</td><td>'+esc(pendingData(r)?"NO DATA":r.last_exit_reason||"UNVERIFIED")+'</td></tr>';
  }).join(""):'<tr><td colspan="5" class="watch-no-rows">'+(eventFilter?"No qualified pullback "+esc(eventFilter==="PENDING_CONFIRMED"?"confirmation":"Ceiling reclaim")+" in this snapshot.":"No matching observations.")+'</td></tr>';
  if(!currentRows.some(function(r){return r.code===selectedCode}))selectedCode=null;
  selectCode(selectedCode);
