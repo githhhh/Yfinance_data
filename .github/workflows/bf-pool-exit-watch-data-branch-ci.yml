@@ -37,3 +37,6 @@ jobs:
           PY
       - run: python dashboard/build_static.py --output _site_watch_ci
       - run: test -s _site_watch_ci/pool-exit-watch.html && test -s _site_watch_ci/data/pool_exit_watch.json
+      - name: Full data and dashboard regression on A5 feature branch
+        if: github.ref_name == 'feature/bf-ceiling-a5'
+        run: python -m pytest -q tests/ dashboard/tests/
