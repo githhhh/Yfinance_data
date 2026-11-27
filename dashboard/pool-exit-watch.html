@@ -138,7 +138,7 @@
  </section>
  <div class="watch-toolbar"><span class="watch-title" id="list-title">Observation</span><div class="watch-toolbar-right">
   <label class="watch-filter">Period <select id="period"><option value="complete">Complete</option><option value="midweek">Midweek</option></select></label>
-  <label class="watch-filter">Exit <select id="reason"><option value="ALL">All</option><option>CEILING</option><option>MA</option><option>NO_CEILING</option><option>UNVERIFIED</option></select></label>
+  <label class="watch-filter">Exit <select id="reason"><option value="ALL">All</option><option>CEILING</option><option>MA_DEATH_CROSS</option><option>MA_IPO</option><option>MA</option><option>NO_CEILING</option><option>UNVERIFIED</option></select></label>
   <button class="watch-clear" type="button" id="clear" hidden>All events</button>
  </div></div>
  <section class="watch-selected" id="selected" aria-label="Selected observation"><div class="watch-empty-selected">Select a ticker to inspect the original Ceiling and observed event path.</div></section>
@@ -178,6 +178,7 @@ function confirmedOnPath(row){
  return candidates.length?candidates[0]:null;
 }
 function focusEvent(row,type,w){
+ if(row.phase==="TREND_ENDED")return false;
  var q=qualification(row);if(!q)return false;
  return events(row).some(function(e){
   return e.type===type&&e.week===w&&e.week>=q.week;
@@ -186,7 +187,10 @@ function focusEvent(row,type,w){
 
 function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snapshot_date));var msg="";
  var q=qualification(row),completed=confirmedOnPath(row);
- if(pendingData(row)){
+ if(row.phase==="TREND_ENDED"){
+  var ended=e.filter(function(x){return x.type==="TREND_ENDED"}).slice(-1)[0];
+  msg="Old trend ended."+(ended?" Confirmed week "+ended.confirm_week+"; observed week "+ended.week+".":"");
+ }else if(pendingData(row)){
   msg="Market data unavailable. No verified Pool Exit; the last confirmed membership remains under observation.";
  }else if(q&&completed){
   msg="First native pullback confirmation: "+completed.date+".";
@@ -203,7 +207,7 @@ function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snaps
   msg="Pullback Lost qualification not established. Generic BF Exit Watch remains available.";
  }
  var ordered=e.slice().sort(function(a,b){return String(a.week).localeCompare(String(b.week))||String(a.type).localeCompare(String(b.type))});
- var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",PULLBACK_LOST:"Pullback Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap"};
+ var labels={POOL_EXIT:"Pool Exit",CEILING_LOST:"Ceiling Lost",PULLBACK_LOST:"Pullback Lost",ZONE_TOUCH:"Zone Touch",PENDING_CONFIRMED:"Pending Confirmed",CEILING_RECLAIMED:"Ceiling Reclaimed",POOL_RETURN:"Pool Return",PENDING_BLOCKED:"Prior Confirm",COVERAGE_GAP:"Coverage Gap",TREND_ENDED:"Trend Ended"};
  var timeline=(row.breakout_date?'<span class="watch-node">Breakout · '+esc(row.breakout_date)+'</span>':"")+ordered.map(function(x){return '<span class="watch-node '+(x.type==="PENDING_CONFIRMED"||x.type==="CEILING_RECLAIMED"?"important":"")+'" title="'+esc(x.censored_by_gap?"Observed by this week; exact crossing date unavailable":x.week||"")+'">'+esc(labels[x.type]||x.type)+" · "+esc(x.week||"")+(x.type==="POOL_EXIT"&&x.reason?" · "+esc(x.reason):"")+(x.type==="PENDING_BLOCKED"&&x.historical_confirmation?" · confirmed "+esc(x.historical_confirmation):"")+(x.censored_by_gap?" *":"")+"</span>"}).join("");
  var duration=interval.short!=="—"?" · "+interval.long:"";
  var pool=String(row.current_in_pool).toLowerCase()==="true"||row.phase==="RETURNED";
@@ -213,6 +217,7 @@ function selectedView(row){var e=events(row),interval=pathAge(row,week(row.snaps
  '<div class="watch-detail"><b>Observed path</b><div class="watch-timeline">'+(timeline||'<span class="watch-node">No dated event</span>')+'</div><div class="watch-note">'+esc(msg)+'</div>'+(e.some(function(x){return x.censored_by_gap})?'<div class="watch-alert">* Missing observations: exact crossing week is not verified.</div>':"")+'</div>';
 }
 function pathLabel(r,w){
+ if(r.phase==="TREND_ENDED")return "Trend Ended";
  if(focusEvent(r,"PENDING_CONFIRMED",w)&&focusEvent(r,"CEILING_RECLAIMED",w))return "Confirmed · Reclaimed";
  if(focusEvent(r,"PENDING_CONFIRMED",w))return "Pending Confirmed";
  if(focusEvent(r,"CEILING_RECLAIMED",w))return "Ceiling Reclaimed";
@@ -241,7 +246,7 @@ function visibleSource(){
 }
 function rerender(){
  if(!data)return;
- var source=visibleSource(),snap=data.dates[source.source],w=week(snap),display=source.rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED"].includes(r.phase)});
+ var source=visibleSource(),snap=data.dates[source.source],w=week(snap),display=source.rows.filter(function(r){return ["OBSERVING","AWAITING_DATA","PROVISIONAL_OUT","RETURNED","TREND_ENDED"].includes(r.phase)});
  var confirmed=display.filter(function(r){return focusEvent(r,"PENDING_CONFIRMED",w)}).length;
  var reclaimed=display.filter(function(r){return focusEvent(r,"CEILING_RECLAIMED",w)}).length;
  $("asof").textContent=(snap||"No dated rows")+" · "+(source.fallback?"COMPLETE · Midweek unavailable/stale":source.source.toUpperCase())+(data.available?"":" · unavailable");
@@ -259,7 +264,7 @@ function rerender(){
  $("list-title").textContent=(eventFilter==="PENDING_CONFIRMED"?"Pending Confirmed":eventFilter==="CEILING_RECLAIMED"?"Ceiling Reclaimed":"Observation")+" · "+currentRows.length;
  $("rows").innerHTML=currentRows.length?currentRows.map(function(r){
   var t=pathLabel(r,w),v=num(r.vs_original_pct),interval=pathAge(r,w),emph=focusEvent(r,"PENDING_CONFIRMED",w)||focusEvent(r,"CEILING_RECLAIMED",w);
-  var status=pendingData(r)?"No verified Pool Exit":qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
+  var status=r.phase==="TREND_ENDED"?"Old trend ended":pendingData(r)?"No verified Pool Exit":qualification(r)?(confirmedOnPath(r)?"Native first confirmation completed":r.pending_status==="PENDING"?"Native confirmation pending":"Confirmation not established"):r.pending_status==="PENDING"?"Pending · path unverified":r.phase==="RETURNED"?"Back in BF Pool":"";
   return '<tr data-code="'+esc(r.code)+'" tabindex="-1" aria-selected="'+(selectedCode===r.code?"true":"false")+'" class="'+(selectedCode===r.code?"is-selected":"")+'">'+
   '<td class="watch-code" title="'+esc(r.code)+'">'+esc(r.code)+'</td>'+
   '<td title="'+esc(t)+'"><span class="'+(emph?"watch-event-strong":"")+'">'+esc(t)+'</span>'+(status?'<small class="watch-row-sub">'+esc(status)+'</small>':"")+'</td>'+
