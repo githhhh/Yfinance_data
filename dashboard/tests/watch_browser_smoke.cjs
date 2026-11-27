@@ -108,6 +108,12 @@ const rows = [
     phase:"AWAITING_DATA", current_in_pool:false, last_exit_reason:"UNVERIFIED",
     latest_close:null, price_state:null, vs_original_pct:null, events:[]
   }),
+  row("ENDED", {
+    phase:"TREND_ENDED", last_exit_reason:"MA_DEATH_CROSS",
+    pending_status:"PENDING", pending_high:125,
+    events:[event("POOL_EXIT","2026-10-26"),event("PULLBACK_LOST","2026-10-26"),
+      event("TREND_ENDED","2026-11-02",{confirm_week:"2026-11-02"})]
+  }),
   row("DEFEREXIT", {
     phase:"OBSERVING", absence_week:"2026-10-19",
     events:[event("POOL_EXIT","2026-11-02",{reason:"CEILING",censored_by_gap:true})]
@@ -137,11 +143,20 @@ const waitForServer = async () => {
           dates:{complete:snap,midweek:"2026-10-28"},midweek_fallback:true})
       }));
       await page.goto("http://127.0.0.1:8766/pool-exit-watch.html",{waitUntil:"networkidle"});
-      assert.equal(await page.locator("#rows tr[data-code]").count(),16);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),17);
       assert.equal(await page.locator("#confirmed-count").innerText(),"3");
       assert.equal(await page.locator("#reclaimed-count").innerText(),"3");
       assert((await page.locator("#rows tr").first().innerText()).includes("CONFIRM"),
         "Verified event comes before ordinary Pending");
+      const ended=page.locator('#rows tr[data-code="ENDED"]');
+      assert.equal(await page.locator("#rows tr[data-code]").last().getAttribute("data-code"),"ENDED",
+        "Ended trends must sort after active observations");
+      assert((await ended.innerText()).includes("Trend Ended"));
+      assert((await ended.innerText()).includes("Old trend ended"));
+      assert(!(await ended.innerText()).includes("confirmation pending"));
+      await ended.click();
+      const endedDetails=width<=760?page.locator(".watch-detail-row"):page.locator("#selected");
+      assert((await endedDetails.innerText()).includes("Confirmed week 2026-11-02; observed week 2026-11-02"));
       const confirm=page.locator('#rows tr[data-code="CONFIRM"]');
       assert((await confirm.locator("td").nth(3).textContent()).includes("1W"),
         "Lost → Confirm uses verified calendar weeks, even when mobile hides secondary columns");
@@ -220,7 +235,7 @@ const waitForServer = async () => {
       await page.locator("#period").selectOption("midweek");
       assert((await page.locator("#asof").innerText()).includes("Midweek unavailable/stale"),
         "Stale Midweek is marked as Complete fallback");
-      assert.equal(await page.locator("#rows tr[data-code]").count(),16);
+      assert.equal(await page.locator("#rows tr[data-code]").count(),17);
       assert.equal(await page.locator('#rows tr[data-code="OLD"]').count(),0);
       const visibleColumns=await page.locator(".watch-table thead th").evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=="none").length);
       assert.equal(visibleColumns,width>=521?5:width>=360?4:3,

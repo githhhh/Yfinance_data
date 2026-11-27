@@ -258,7 +258,7 @@ function rerender(){
  var reason=$("reason").value;
  currentRows=display.filter(function(r){return (reason==="ALL"||r.last_exit_reason===reason)&&(!eventFilter||focusEvent(r,eventFilter,w))});
  currentRows.sort(function(a,b){
-  var rank=function(r){return focusEvent(r,"PENDING_CONFIRMED",w)?0:focusEvent(r,"CEILING_RECLAIMED",w)?1:qualification(r)?2:r.phase==="RETURNED"?3:4};
+  var rank=function(r){return r.phase==="TREND_ENDED"?5:focusEvent(r,"PENDING_CONFIRMED",w)?0:focusEvent(r,"CEILING_RECLAIMED",w)?1:qualification(r)?2:r.phase==="RETURNED"?3:4};
   return rank(a)-rank(b)||String(a.code).localeCompare(String(b.code))
  });
  $("list-title").textContent=(eventFilter==="PENDING_CONFIRMED"?"Pending Confirmed":eventFilter==="CEILING_RECLAIMED"?"Ceiling Reclaimed":"Observation")+" · "+currentRows.length;

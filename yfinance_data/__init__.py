@@ -19,7 +19,7 @@ import pandas as pd
 from pool_exit_watch_store import (COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity,
     published_complete_pools, official_watch_for_week, watch_was_ever_published,
     watch_frame, parse_watch_csv, published_watch_state, inherit_download_holds,
-    active_watch_codes, published_watch_record, bf_version_tuple, _commit_bf_version,
+    active_watch_codes, published_watch_record, bf_version_tuple, commit_bf_version,
     resolve_exit_watch_context, official_watch_record_for_week)
 from bf_snapshot import (
     BreakoutFollowPoolKind,
@@ -805,7 +805,7 @@ def _commit_managed_csv(paths: str | list[str], *, message: str,
                 source_date, codes_digest = pool_identity(
                     pd.read_csv(io.BytesIO(snapshot_bytes), dtype={"code": str}, keep_default_na=False, na_values=[""]))
                 message_body = output("show", "-s", "--format=%B", commit_sha)
-                _assert_bf_version(_commit_bf_version(message_body))
+                _assert_bf_version(commit_bf_version(message_body))
                 if (f"Watch-Source-Date: {source_date}" not in message_body or
                     f"Watch-Codes-SHA256: {codes_digest}" not in message_body):
                     raise RuntimeError(
@@ -968,6 +968,7 @@ __all__ = [
     "BreakoutFollowPoolRun",
     "IbdDoubleBottomSnapshotRun",
     "classify_breakout_follow_pool",
+    "commit_bf_version",
     "complete_snapshot_week",
     "complete_target_week",
     "is_valid_complete_baseline",

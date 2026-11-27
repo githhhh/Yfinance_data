@@ -1,7 +1,17 @@
 name: BF Pool Exit Watch Data Branch Check
 on:
   push:
-    branches: ['feat/bf-pool-exit-watch-v1', 'feat/bf-watch-download-hold-20261106', 'feat/watch-pullback-lost-contract-20261108', 'feature/bf-ceiling-a5']
+    branches: ['feat/bf-pool-exit-watch-v1', 'feat/bf-watch-download-hold-20261106', 'feat/watch-pullback-lost-contract-20261108']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pool_exit_watch_store.py'
+      - 'yfinance_data/**'
+      - 'dashboard/pool-exit-watch.html'
+      - 'dashboard/tests/*watch*'
+      - 'tests/test_bf_pool_exit_watch*'
+      - 'tests/test_watch_download_hold.py'
+      - '.github/workflows/bf-pool-exit-watch-data-branch-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -30,13 +40,16 @@ jobs:
           from pool_exit_watch_store import COLUMNS, parse_watch_csv, active_watch_codes
           from dashboard.build_static import build_watch_payload
           assert len(COLUMNS) == 24
-          assert parse_watch_csv("us/bf_pool_exit_watch.csv")
-          assert parse_watch_csv("us/bf_pool_exit_watch_midweek.csv")
+          for name in ("bf_pool_exit_watch.csv", "bf_pool_exit_watch_midweek.csv"):
+              path = Path("us") / name
+              assert path.is_file(), f"Missing Watch: {path}"
+              parse_watch_csv(path)  # Empty, schema-valid Watch is legal.
           active_watch_codes(Path("."), required=True)
           assert build_watch_payload(Path("."))["available"] is True
           PY
+      - run: python dashboard/self_check.py --csv us/breakout_follow_pool.csv --midweek-csv us/breakout_follow_pool_midweek.csv
+      - run: python security_scan.py --history
       - run: python dashboard/build_static.py --output _site_watch_ci
       - run: test -s _site_watch_ci/pool-exit-watch.html && test -s _site_watch_ci/data/pool_exit_watch.json
-      - name: Full data and dashboard regression on A5 feature branch
-        if: github.ref_name == 'feature/bf-ceiling-a5'
+      - name: Full data and dashboard regression
         run: python -m pytest -q tests/ dashboard/tests/

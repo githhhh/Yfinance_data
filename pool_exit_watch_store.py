@@ -202,7 +202,8 @@ def bf_version_tuple(value: str) -> tuple[int, int, int]:
     return tuple(map(int, value.split(".")))
 
 
-def _commit_bf_version(message: str) -> str:
+def commit_bf_version(message: str) -> str:
+    """Read the BF generation from a Git commit; missing means Legacy."""
     values = [line.split(":", 1)[1].strip() for line in message.splitlines()
               if line.startswith("Watch-BF-Version:")]
     if len(values) > 1:
@@ -240,11 +241,11 @@ def _paired_record(root, pool):
     if (f"Watch-Source-Date: {source}" not in message or
         f"Watch-Codes-SHA256: {digest}" not in message):
         raise ValueError("missing Pool/Watch pair trailers")
-    version = _commit_bf_version(message)
+    version = commit_bf_version(message)
     pool_ref = _git(root, "log", "-1", "--first-parent", "--format=%H", ref,
                     "--", "us/breakout_follow_pool.csv").decode().strip()
     if pool_ref != ref:
-        pool_version = _commit_bf_version(_git(root, "show", "-s", "--format=%B", pool_ref).decode())
+        pool_version = commit_bf_version(_git(root, "show", "-s", "--format=%B", pool_ref).decode())
         if version != pool_version:
             raise ValueError("Watch-only version differs from its Pool")
     frame = pd.read_csv(io.BytesIO(_git(root, "show", f"{ref}:{WATCH_COMPLETE}")),

@@ -225,6 +225,7 @@ def test_trend_ended_is_terminal_and_excluded_from_active_focus():
     html = (Path(__file__).resolve().parents[1] / "pool-exit-watch.html").read_text(encoding="utf-8")
     assert 'if(row.phase==="TREND_ENDED")return false;' in html
     assert 'if(r.phase==="TREND_ENDED")return "Trend Ended";' in html
+    assert 'var rank=function(r){return r.phase==="TREND_ENDED"?5:' in html
     assert 'Confirmed week "+ended.confirm_week' in html
     assert "<option>MA_DEATH_CROSS</option>" in html
     assert "<option>MA_IPO</option>" in html
