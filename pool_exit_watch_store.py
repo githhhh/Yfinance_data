@@ -29,7 +29,7 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
         codes.str.strip().ne(codes).any() or codes.duplicated().any()):
         raise ValueError("Watch CSV duplicate/blank/noncanonical code")
     if not frame.phase.isin(
-        ("AWAITING_DATA", "OBSERVING", "RETURNED", "PROVISIONAL_OUT")
+        ("AWAITING_DATA", "OBSERVING", "RETURNED", "PROVISIONAL_OUT", "TREND_ENDED")
     ).all():
         raise ValueError("Watch CSV unknown phase")
     rows = frame.to_dict("records")
@@ -78,7 +78,7 @@ def parse_watch_frame(frame: pd.DataFrame) -> list[dict]:
                 event["type"] not in {"POOL_EXIT", "POOL_RETURN", "CEILING_LOST",
                                      "CEILING_RECLAIMED", "ZONE_TOUCH",
                                      "PENDING_CONFIRMED", "PENDING_BLOCKED",
-                                     "PULLBACK_LOST", "COVERAGE_GAP"}):
+                                     "PULLBACK_LOST", "COVERAGE_GAP", "TREND_ENDED"}):
                 raise ValueError("Watch CSV invalid event type or canonical week")
             if event["id"] != f'{event["type"]}:{event["week"]}' or event["id"] in seen:
                 raise ValueError("Watch CSV duplicate or mismatched event identity")
@@ -195,34 +195,139 @@ def held_watch_codes(data_root: str | Path = ".", *, required: bool = False) -> 
                    if (code := _normalize_code(row["code"])) is not None})
 
 
-def published_watch_state(data_root: str | Path = ".") -> tuple[list[dict], str | None, str, str]:
-    """Read a consistent published Pool/Watch pair, not the dirty working Pool."""
-    import io
+def bf_version_tuple(value: str) -> tuple[int, int, int]:
+    import re
+    if not isinstance(value, str) or not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", value):
+        raise ValueError("invalid BF version")
+    return tuple(map(int, value.split(".")))
+
+
+def _commit_bf_version(message: str) -> str:
+    values = [line.split(":", 1)[1].strip() for line in message.splitlines()
+              if line.startswith("Watch-BF-Version:")]
+    if len(values) > 1:
+        raise ValueError("duplicate Watch-BF-Version")
+    value = values[0] if values else "0.0.1"
+    bf_version_tuple(value)
+    return value
+
+
+def _git(root, *args):
     import subprocess
+    return subprocess.check_output(["git", "-C", str(root), *args])
+
+
+def _pool_record(root, ref):
+    import io
     from bf_snapshot import complete_snapshot_week, monday_of_week
+    frame = pd.read_csv(io.BytesIO(_git(root, "show", f"{ref}:us/breakout_follow_pool.csv")),
+                        dtype={"code": str}, keep_default_na=False)
+    source, digest = pool_identity(frame)
+    complete_snapshot_week(date.fromisoformat(source))
+    return dict(ref=ref, week=monday_of_week(date.fromisoformat(source)).isoformat(),
+                snapshot_date=source, digest=digest, rows=frame.to_dict("records"))
+
+
+def _pair_refs(root, ref):
+    return _git(root, "log", ref, "--first-parent", "--format=%H", "--",
+                "us/breakout_follow_pool.csv", WATCH_COMPLETE).decode().splitlines()
+
+
+def _paired_record(root, pool):
+    import io
+    ref, source, digest = pool["ref"], pool["snapshot_date"], pool["digest"]
+    message = _git(root, "show", "-s", "--format=%B", ref).decode()
+    if (f"Watch-Source-Date: {source}" not in message or
+        f"Watch-Codes-SHA256: {digest}" not in message):
+        raise ValueError("missing Pool/Watch pair trailers")
+    version = _commit_bf_version(message)
+    pool_ref = _git(root, "log", "-1", "--first-parent", "--format=%H", ref,
+                    "--", "us/breakout_follow_pool.csv").decode().strip()
+    if pool_ref != ref:
+        pool_version = _commit_bf_version(_git(root, "show", "-s", "--format=%B", pool_ref).decode())
+        if version != pool_version:
+            raise ValueError("Watch-only version differs from its Pool")
+    frame = pd.read_csv(io.BytesIO(_git(root, "show", f"{ref}:{WATCH_COMPLETE}")),
+                        dtype={"code": str, "download_hold_reason": str}, keep_default_na=False)
+    rows = parse_watch_frame(frame)
+    if any(row["phase"] == "PROVISIONAL_OUT" or row["snapshot_date"] != source for row in rows):
+        raise ValueError("invalid Complete Watch rows")
+    return dict(rows=rows, pair_sha=ref, source=source, digest=digest,
+                bf_version=version, week=pool["week"])
+
+
+def published_watch_record(data_root: str | Path = ".", *, ref: str = "origin/main") -> dict:
+    """Read the latest validated Complete pair and BF generation from one Git vintage."""
+    import subprocess
     root = Path(data_root)
     if not (root / ".git").exists():
         source = root / WATCH_COMPLETE
-        return (parse_watch_csv(source) if source.exists() else []), None, "", ""
-    def git_bytes(*args: str) -> bytes:
-        return subprocess.check_output(["git", "-C", str(root), *args])
+        return dict(rows=parse_watch_csv(source) if source.exists() else [],
+                    pair_sha=None, source="", digest="", bf_version="0.0.1", week="")
     try:
-        pinned_ref = git_bytes("rev-parse", "origin/main").decode().strip()
-        raw = git_bytes("show", f"{pinned_ref}:us/breakout_follow_pool.csv")
-        pool = pd.read_csv(io.BytesIO(raw), dtype={"code": str}, keep_default_na=False)
-        source, digest = pool_identity(pool)
-        complete_snapshot_week(date.fromisoformat(source))
-        week = monday_of_week(date.fromisoformat(source)).isoformat()
-        rows = official_watch_for_week(root, week, ref=pinned_ref)
-        if rows is None:
-            raise RuntimeError("latest published Pool/Watch is not paired")
-        version = git_bytes("log", "-1", "--format=%H", pinned_ref,
-                            "--", WATCH_COMPLETE).decode().strip()
-        if not version:
-            raise RuntimeError("official Watch has no Git version")
-        return rows, version, source, digest
-    except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as exc:
-        raise RuntimeError("cannot read paired official Watch from origin/main") from exc
+        pinned = _git(root, "rev-parse", ref).decode().strip()
+        head = _pool_record(root, pinned)
+        pair = _paired_record(root, _pool_record(root, _pair_refs(root, pinned)[0]))
+        if (head["snapshot_date"], head["digest"]) != (pair["source"], pair["digest"]):
+            raise ValueError("latest published Pool/Watch differs from HEAD")
+        return pair
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError, IndexError) as exc:
+        raise RuntimeError("cannot read paired official Watch from published ref") from exc
+
+
+def published_watch_state(data_root: str | Path = ".") -> tuple[list[dict], str | None, str, str]:
+    """Preserve the legacy tuple; identity includes both Complete files."""
+    pair = published_watch_record(data_root)
+    return pair["rows"], pair["pair_sha"], pair["source"], pair["digest"]
+
+
+def resolve_exit_watch_context(data_root, *, snapshot_date: str, midweek: bool,
+                               bf_version: str, rebaseline_authorized: bool = False) -> dict:
+    """Resolve strict same-generation history or an authorized Complete cutover."""
+    import logging
+    import subprocess
+    from bf_snapshot import complete_snapshot_week, monday_of_week
+    root = Path(data_root)
+    target = bf_version_tuple(bf_version)
+    snapshot = date.fromisoformat(snapshot_date)
+    if not midweek:
+        complete_snapshot_week(snapshot)
+    week = monday_of_week(snapshot).isoformat()
+    try:
+        pinned = _git(root, "rev-parse", "origin/main").decode().strip()
+        latest = published_watch_record(root, ref=pinned)
+        if latest["week"] > week:
+            raise ValueError("snapshot predates published Complete")
+        current = latest if latest["week"] == week else None
+        prior_pool = None
+        prior = None
+        for ref in _pair_refs(root, pinned):
+            pool = _pool_record(root, ref)
+            if pool["week"] >= week:
+                continue
+            prior_pool, prior = pool, _paired_record(root, pool)
+            break
+        if prior is None:
+            raise ValueError("missing previous Complete Pool/Watch pair")
+        old = bf_version_tuple(prior["bf_version"])
+        current_version = bf_version_tuple(current["bf_version"]) if current else None
+        mode = None
+        if old == target and (current is None or current_version == target):
+            mode = "normal"
+            if rebaseline_authorized:
+                logging.warning("ignoring residual BF Watch rebaseline authorization")
+        elif not midweek and old < target:
+            if current_version == target and not current["rows"]:
+                mode = "rebaseline"
+            elif rebaseline_authorized and (current is None or current_version < target):
+                mode = "rebaseline"
+        if mode is None:
+            raise ValueError("BF Watch generation/state mismatch or unauthorized rebaseline")
+        return dict(mode=mode, previous_pool=prior_pool["rows"] if mode == "normal" else None,
+                    previous_watch=prior["rows"] if mode == "normal" else None,
+                    baseline_pair_sha=latest["pair_sha"])
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError, IndexError) as exc:
+        raise RuntimeError("cannot resolve BF Exit Watch context") from exc
 
 
 def inherit_download_holds(frame: pd.DataFrame, published: list[dict]) -> pd.DataFrame:
@@ -308,37 +413,12 @@ def official_watch_for_week(data_root: str | Path, week: str, *,
                             ref: str = "origin/main") -> list[dict] | None:
     """Find the latest published Pool/Watch pair, including unchanged empty CSV."""
     import subprocess
-    import io
-    from datetime import date
-    from bf_snapshot import complete_snapshot_week, monday_of_week
-
     root = Path(data_root)
-    refs = subprocess.check_output([
-        "git", "-C", str(root), "log", ref, "--first-parent",
-        "--format=%H", "--", "us/breakout_follow_pool.csv", WATCH_COMPLETE
-    ], text=True)
-    for ref in refs.splitlines():
-        try:
-            raw = subprocess.check_output(["git", "-C", str(root), "show",
-                                           f"{ref}:us/breakout_follow_pool.csv"])
-            source, digest = pool_identity(pd.read_csv(io.BytesIO(raw), dtype={"code": str}, keep_default_na=False))
-            complete_snapshot_week(date.fromisoformat(source))
-            if monday_of_week(date.fromisoformat(source)).isoformat() != week:
-                continue
-            message = subprocess.check_output(["git", "-C", str(root), "show",
-                                               "-s", "--format=%B", ref], text=True)
-            if (f"Watch-Source-Date: {source}" not in message or
-                f"Watch-Codes-SHA256: {digest}" not in message):
-                return None
-            blob = subprocess.check_output(["git", "-C", str(root), "show",
-                                            f"{ref}:{WATCH_COMPLETE}"])
-            frame = pd.read_csv(io.BytesIO(blob), dtype={"code": str, "download_hold_reason": str}, keep_default_na=False)
-            rows = parse_watch_frame(frame)
-            if any(row["phase"] == "PROVISIONAL_OUT" for row in rows):
-                return None
-            if any(row["snapshot_date"] != source for row in rows):
-                return None
-            return rows
-        except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
-            return None
+    try:
+        for sha in _pair_refs(root, ref):
+            pool = _pool_record(root, sha)
+            if pool["week"] == week:
+                return _paired_record(root, pool)["rows"]
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
+        return None
     return None
