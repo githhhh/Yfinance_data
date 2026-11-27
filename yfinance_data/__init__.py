@@ -19,7 +19,8 @@ import pandas as pd
 from pool_exit_watch_store import (COLUMNS, WATCH_COMPLETE, WATCH_MIDWEEK, pool_identity,
     published_complete_pools, official_watch_for_week, watch_was_ever_published,
     watch_frame, parse_watch_csv, published_watch_state, inherit_download_holds,
-    active_watch_codes, published_watch_record, bf_version_tuple, _commit_bf_version)
+    active_watch_codes, published_watch_record, bf_version_tuple, _commit_bf_version,
+    resolve_exit_watch_context, official_watch_record_for_week)
 from bf_snapshot import (
     BreakoutFollowPoolKind,
     classify_breakout_follow_pool,
