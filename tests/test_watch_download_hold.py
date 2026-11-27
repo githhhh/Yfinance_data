@@ -250,3 +250,27 @@ def test_numeric_like_hold_survives_publish_read_and_resume(tmp_path, monkeypatc
     assert authority.get_download_hold("A")["download_hold_reason"] == ""
     assert store.held_watch_codes(root, required=True) == []
     assert (root / "us/breakout_follow_pool.csv").read_bytes() == pool_before
+
+
+def test_manual_hold_inherits_a5_version(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = official_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    pool_path = root / "us/breakout_follow_pool.csv"
+    watch_path = root / store.WATCH_COMPLETE
+    pool = pd.read_csv(pool_path, keep_default_na=False)
+    pool["snapshot_date"] = "2026-11-06"
+    when, digest = store.pool_identity(pool)
+    pool.to_csv(pool_path, index=False)
+    rows = store.parse_watch_csv(watch_path)
+    store.watch_frame(rows, snapshot_date=when, pool_codes_hash=digest).to_csv(watch_path, index=False)
+    git(root, "add", "us/breakout_follow_pool.csv", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", f"paired A5\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}\nWatch-BF-Version: 0.0.2")
+    git(root, "push", "origin", "main")
+    authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    assert store.published_watch_record(root)["bf_version"] == "0.0.2"
+    assert store.held_watch_codes(root, required=True) == ["A"]
+    assert "Watch-BF-Version: 0.0.2" in git(root, "show", "-s", "--format=%B", "HEAD")
+    before = git(root, "rev-parse", "HEAD")
+    authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    assert git(root, "rev-parse", "HEAD") == before
