@@ -786,3 +786,39 @@ def test_versioned_pair_context_rebaseline_and_corrupt_prior(tmp_path):
     assert store.official_watch_for_week(root, "2026-10-26") is None
     with pytest.raises(RuntimeError):
         context("2026-11-06", allow=True)
+
+
+def test_empty_complete_pair_drift_invalidates_midweek_companion(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    path = root / store.WATCH_COMPLETE
+    _, digest = store.pool_identity(pd.read_csv(root / "us/breakout_follow_pool.csv"))
+    store.watch_frame([], snapshot_date="2026-10-23", pool_codes_hash=digest).to_csv(path, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", f"bootstrap\n\nWatch-Source-Date: 2026-10-23\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    commit_pool(root, "2026-10-30", ["A"], paired=True)
+    baseline = store.published_watch_state(root)[1]
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    run = authority.BreakoutFollowPoolRun.midweek()
+    pool = pd.DataFrame([{"code": "A", "snapshot_date": "2026-11-04"}])
+    date, digest = store.pool_identity(pool)
+    monkeypatch.setattr(run, "ensure_current_snapshot", lambda: pool)
+    staged = root / "us/.midweek.pending"
+    store.watch_frame([], snapshot_date=date, pool_codes_hash=digest).to_csv(staged, index=False)
+    target = root / store.WATCH_MIDWEEK
+    run.register_companion(target_path=str(target), staged_path=str(staged),
+                           source_pool_date=date, source_pool_codes_hash=digest,
+                           baseline_pair_sha=baseline)
+    assert run._watch_companion["watch_version"] == baseline
+    original_watch = path.read_bytes()
+    # A same-week Complete revision advances only Pool, leaving the empty Watch identical.
+    commit_pool(root, "2026-10-30", ["B"], paired=True)
+    assert path.read_bytes() == original_watch
+    def locked(_path, *, extra_paths=None, before_stage=None, bf_version=None):
+        before_stage()
+    monkeypatch.setattr(authority, "_commit_pool", locked)
+    with pytest.raises(RuntimeError, match="changed since preparation"):
+        run.commit()
+    assert staged.exists() and not target.exists()
