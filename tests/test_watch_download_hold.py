@@ -109,6 +109,7 @@ def test_manual_watch_only_commit_has_pair_trailers_and_does_not_change_pool(tmp
     _, digest = store.pool_identity(pd.read_csv(root / "us/breakout_follow_pool.csv"))
     assert "Watch-Source-Date: 2026-10-30" in message
     assert f"Watch-Codes-SHA256: {digest}" in message
+    assert "Watch-BF-Version: 0.0.1" in message
     assert store.official_watch_for_week(root, "2026-10-26")[0]["download_hold_reason"] == "REQUEST_ERROR"
     authority.set_download_hold("A", "A:2026-10-26", "")
     assert authority.get_download_hold("A")["download_hold_reason"] == ""
@@ -140,7 +141,7 @@ def test_stale_watch_vintage_rejected_before_replace(tmp_path, monkeypatch):
     # An independent manual writer advances the same official Watch.
     authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
     now = target.read_bytes()
-    def simulate_locked_publish(path, *, extra_paths=None, before_stage=None):
+    def simulate_locked_publish(path, *, extra_paths=None, before_stage=None, bf_version=None):
         assert before_stage is not None
         before_stage()
     monkeypatch.setattr(authority, "_commit_pool", simulate_locked_publish)
@@ -202,7 +203,7 @@ def test_real_managed_git_lock_rejects_stale_companion_before_replace(tmp_path, 
     published_head = git(root, "rev-parse", "origin/main")
     published_watch = target.read_bytes()
 
-    def use_real_git_writer(_pool_path, *, extra_paths=None, before_stage=None):
+    def use_real_git_writer(_pool_path, *, extra_paths=None, before_stage=None, bf_version=None):
         authority._commit_managed_csv(
             extra_paths or [], message="stale run should never commit",
             before_stage=before_stage)
