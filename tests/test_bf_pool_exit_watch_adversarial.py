@@ -115,7 +115,7 @@ def test_companion_survives_until_commit_and_rejects_pool_mutation(tmp_path,monk
     assert staged.exists() and not path.exists()
     pool[0]=old_pool
     published=[]
-    def fake_commit(path, extra_paths=None, before_stage=None):
+    def fake_commit(path, extra_paths=None, before_stage=None, bf_version=None):
         if before_stage is not None:
             before_stage()
         published.extend(extra_paths or [])
@@ -744,3 +744,45 @@ def test_screener_csv_na_code_is_not_dropped_from_download_inputs(tmp_path):
     screener.parent.mkdir(parents=True)
     screener.write_text("code\nNA\nNULL\n", encoding="utf-8")
     assert set(build_download_universe(data_root=tmp_path)) == {"NA", "NULL"}
+
+
+def test_versioned_pair_context_rebaseline_and_corrupt_prior(tmp_path):
+    root = setup_repo(tmp_path)
+    commit_pool(root, "2026-10-23", ["A"])
+    path = root / store.WATCH_COMPLETE
+    _, digest = store.pool_identity(pd.read_csv(root / "us/breakout_follow_pool.csv"))
+    store.watch_frame([], snapshot_date="2026-10-23", pool_codes_hash=digest).to_csv(path, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", f"bootstrap\n\nWatch-Source-Date: 2026-10-23\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    def context(when, *, midweek=False, allow=False):
+        return store.resolve_exit_watch_context(root, snapshot_date=when,
+                    midweek=midweek, bf_version="0.0.2", rebaseline_authorized=allow)
+    with pytest.raises(RuntimeError):
+        context("2026-10-30")
+    with pytest.raises(RuntimeError):
+        context("2026-10-28", midweek=True, allow=True)
+    assert context("2026-10-30", allow=True)["mode"] == "rebaseline"
+    before = store.published_watch_state(root)[1]
+    pool = pd.DataFrame([{"code": "B", "snapshot_date": "2026-10-30"}])
+    pool.to_csv(root / "us/breakout_follow_pool.csv", index=False)
+    when, digest = store.pool_identity(pool)
+    git(root, "add", "us/breakout_follow_pool.csv")
+    git(root, "commit", "-qm", f"cutover\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}\nWatch-BF-Version: 0.0.2")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.published_watch_state(root)[1] != before
+    assert store.published_watch_record(root)["bf_version"] == "0.0.2"
+    assert context("2026-10-30")["mode"] == "rebaseline"
+    assert context("2026-11-04", midweek=True)["mode"] == "normal"
+    assert context("2026-11-06", allow=True)["mode"] == "normal"
+    with pytest.raises(RuntimeError):
+        context("2026-10-23", allow=True)
+    # An unversioned Watch-only revision cannot inherit an A5 Pool.
+    store.watch_frame([{"code": "A", "phase": "OBSERVING", "events": []}],
+                      snapshot_date=when, pool_codes_hash=digest).to_csv(path, index=False)
+    git(root, "add", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", f"bad hold\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert store.official_watch_for_week(root, "2026-10-26") is None
+    with pytest.raises(RuntimeError):
+        context("2026-11-06", allow=True)
