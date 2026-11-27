@@ -409,16 +409,23 @@ def watch_was_ever_published(data_root: str | Path = ".") -> bool:
         "origin/main", "--format=%H", "--", WATCH_COMPLETE], text=True).strip())
 
 
-def official_watch_for_week(data_root: str | Path, week: str, *,
-                            ref: str = "origin/main") -> list[dict] | None:
-    """Find the latest published Pool/Watch pair, including unchanged empty CSV."""
+def official_watch_record_for_week(data_root: str | Path, week: str, *,
+                                  ref: str = "origin/main") -> dict | None:
+    """Read a historical paired record with its generation."""
     import subprocess
     root = Path(data_root)
     try:
         for sha in _pair_refs(root, ref):
             pool = _pool_record(root, sha)
             if pool["week"] == week:
-                return _paired_record(root, pool)["rows"]
+                return _paired_record(root, pool)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
         return None
     return None
+
+
+def official_watch_for_week(data_root: str | Path, week: str, *,
+                            ref: str = "origin/main") -> list[dict] | None:
+    """Find the latest published Pool/Watch pair, including unchanged empty CSV."""
+    record = official_watch_record_for_week(data_root, week, ref=ref)
+    return record["rows"] if record is not None else None
