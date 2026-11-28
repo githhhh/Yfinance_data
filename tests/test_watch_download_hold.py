@@ -109,6 +109,7 @@ def test_manual_watch_only_commit_has_pair_trailers_and_does_not_change_pool(tmp
     _, digest = store.pool_identity(pd.read_csv(root / "us/breakout_follow_pool.csv"))
     assert "Watch-Source-Date: 2026-10-30" in message
     assert f"Watch-Codes-SHA256: {digest}" in message
+    assert "Watch-BF-Version: 0.0.1" in message
     assert store.official_watch_for_week(root, "2026-10-26")[0]["download_hold_reason"] == "REQUEST_ERROR"
     authority.set_download_hold("A", "A:2026-10-26", "")
     assert authority.get_download_hold("A")["download_hold_reason"] == ""
@@ -140,7 +141,7 @@ def test_stale_watch_vintage_rejected_before_replace(tmp_path, monkeypatch):
     # An independent manual writer advances the same official Watch.
     authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
     now = target.read_bytes()
-    def simulate_locked_publish(path, *, extra_paths=None, before_stage=None):
+    def simulate_locked_publish(path, *, extra_paths=None, before_stage=None, bf_version=None):
         assert before_stage is not None
         before_stage()
     monkeypatch.setattr(authority, "_commit_pool", simulate_locked_publish)
@@ -202,7 +203,7 @@ def test_real_managed_git_lock_rejects_stale_companion_before_replace(tmp_path, 
     published_head = git(root, "rev-parse", "origin/main")
     published_watch = target.read_bytes()
 
-    def use_real_git_writer(_pool_path, *, extra_paths=None, before_stage=None):
+    def use_real_git_writer(_pool_path, *, extra_paths=None, before_stage=None, bf_version=None):
         authority._commit_managed_csv(
             extra_paths or [], message="stale run should never commit",
             before_stage=before_stage)
@@ -249,3 +250,27 @@ def test_numeric_like_hold_survives_publish_read_and_resume(tmp_path, monkeypatc
     assert authority.get_download_hold("A")["download_hold_reason"] == ""
     assert store.held_watch_codes(root, required=True) == []
     assert (root / "us/breakout_follow_pool.csv").read_bytes() == pool_before
+
+
+def test_manual_hold_inherits_a5_version(tmp_path, monkeypatch):
+    import yfinance_data as authority
+    root = official_repo(tmp_path)
+    monkeypatch.setattr(authority, "DATA_ROOT", str(root))
+    pool_path = root / "us/breakout_follow_pool.csv"
+    watch_path = root / store.WATCH_COMPLETE
+    pool = pd.read_csv(pool_path, keep_default_na=False)
+    pool["snapshot_date"] = "2026-11-06"
+    when, digest = store.pool_identity(pool)
+    pool.to_csv(pool_path, index=False)
+    rows = store.parse_watch_csv(watch_path)
+    store.watch_frame(rows, snapshot_date=when, pool_codes_hash=digest).to_csv(watch_path, index=False)
+    git(root, "add", "us/breakout_follow_pool.csv", store.WATCH_COMPLETE)
+    git(root, "commit", "-qm", f"paired A5\n\nWatch-Source-Date: {when}\nWatch-Codes-SHA256: {digest}\nWatch-BF-Version: 0.0.2")
+    git(root, "push", "origin", "main")
+    authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    assert store.published_watch_record(root)["bf_version"] == "0.0.2"
+    assert store.held_watch_codes(root, required=True) == ["A"]
+    assert "Watch-BF-Version: 0.0.2" in git(root, "show", "-s", "--format=%B", "HEAD")
+    before = git(root, "rev-parse", "HEAD")
+    authority.set_download_hold("A", "A:2026-10-26", "REQUEST_ERROR")
+    assert git(root, "rev-parse", "HEAD") == before
