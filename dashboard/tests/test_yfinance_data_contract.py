@@ -12,6 +12,9 @@ from eps_pit.lookup import SignalEPSLookup
 from eps_pit.models import EPS_RESOLVER_VERSION
 
 
+pytestmark = pytest.mark.usefixtures("isolated_bf_pool_data")
+
+
 def _passthrough_resolved_eps(pool: pd.DataFrame) -> pd.DataFrame:
     df = pool.copy()
     if "signal" not in df.columns:

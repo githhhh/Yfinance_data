@@ -7,6 +7,9 @@ from eps_pit import EPSMissingReason, EPSResolveMode
 from eps_pit.lookup import SignalEPSLookup
 
 
+pytestmark = pytest.mark.usefixtures("isolated_bf_pool_data")
+
+
 def _pool(code: object, snapshot_date: object = "2026-08-21") -> pd.DataFrame:
     return pd.DataFrame(
         [

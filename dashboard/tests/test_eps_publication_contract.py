@@ -9,6 +9,9 @@ from eps_pit import EPSStatus
 from eps_pit.lookup import SignalEPSLookup
 
 
+pytestmark = pytest.mark.usefixtures("isolated_bf_pool_data")
+
+
 def _pool(code: str) -> pd.DataFrame:
     return pd.DataFrame(
         [
